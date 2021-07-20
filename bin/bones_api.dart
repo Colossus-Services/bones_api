@@ -66,6 +66,25 @@ abstract class CommandSourceFileBase extends Command<bool> {
     return _verbose!;
   }
 
+  int get parametersStartIndex => 0;
+
+  List<String>? _parameters;
+
+  List<String> get parameters {
+    if (_parameters == null) {
+      var list = argResults!.rest;
+      var startIndex = parametersStartIndex;
+      if (list.length <= startIndex) return <String>[];
+      _parameters = list.sublist(startIndex).toList();
+    }
+    return _parameters!;
+  }
+
+  String? getParameter(int index, [String? def]) {
+    var params = parameters;
+    return index < params.length ? params[index] : def;
+  }
+
   String get sourceFilePath {
     var argResults = this.argResults!;
 
@@ -99,29 +118,36 @@ class CommandServe extends CommandSourceFileBase {
         abbr: 'p', help: 'Server listen port', defaultsTo: '8080');
 
     argParser.addOption('class',
-        abbr: 'c', help: 'APIRoot Class name', defaultsTo: 'API');
+        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
   }
 
-  String get mainFunction => argResults!['function'] ?? 'main';
+  String? get argDirectory => argResults!['directory'];
 
-  List<String> get parameters {
-    var list = argResults!.rest;
-    if (list.length <= 1) return <String>[];
-    return list.sublist(1).toList();
-  }
+  String? get argClass => argResults!['class'];
+
+  String get argAddress => argResults!['address']!;
+
+  String get argPort => argResults!['port']!;
 
   @override
   FutureOr<bool> run() async {
-    var parameters = this.parameters;
+    var directory = argDirectory;
+    var apiRootClass = argClass;
+    var address = argAddress;
+    var port = argPort;
 
-    if (verbose) {
-      _log('SERVE', '$sourceFile > $mainFunction( $parameters )');
+    if (directory == null) {
+      throw ArgumentError.notNull('directory');
     }
 
-    var directory = argResults!['directory'];
-    var address = argResults!['address'];
-    var port = argResults!['port'];
-    var apiRootClass = argResults!['class'];
+    if (apiRootClass == null) {
+      throw ArgumentError.notNull('apiRootClass');
+    }
+
+    if (verbose) {
+      _log('SERVE',
+          'directory: $directory ; apiRootClass: $apiRootClass ; address: $address ; port: $port');
+    }
 
     var isolateSpawner = IsolateSpawner(directory);
 
