@@ -1,5 +1,5 @@
 /// Bones_API Server Library.
-library bones_api;
+library bones_api_server;
 
 export 'package:bones_api/bones_api.dart';
 

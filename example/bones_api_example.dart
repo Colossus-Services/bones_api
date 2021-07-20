@@ -39,7 +39,7 @@ class MyBaseModule extends APIModule {
   @override
   void configure() {
     routes.get('foo', (request) => APIResponse.ok('Hi[GET]!'));
-    routes.pos(
+    routes.post(
         'foo', (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'));
 
     routes.any('time', (request) => APIResponse.ok(DateTime.now()));

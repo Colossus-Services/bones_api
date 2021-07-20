@@ -7,16 +7,27 @@ import 'package:bones_api/bones_api.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
+/// An API HTTP Server
 class APIServer {
   static const String VERSION = '1.0.0';
 
+  /// The API root of this server.
   final APIRoot apiRoot;
 
+  /// The bind address of this server.
   final String address;
+
+  /// The listen port of this server.
   final int port;
 
+  /// The name of this server.
+  ///
+  /// This is used for the `server` header.
   final String name;
 
+  /// The version of this server.
+  ///
+  /// This is used for the `server` header.
   final String version;
 
   APIServer(this.apiRoot, String address, this.port,
@@ -37,30 +48,40 @@ class APIServer {
     return address;
   }
 
+  /// The `server` header value.
   String get serverName => '$name/$version';
 
+  /// The local URL of this server.
   String get url {
     return 'http://$address:$port/';
   }
 
   bool _started = false;
 
+  /// Returns `true` if this servers is started.
   bool get isStarted => _started;
 
   late HttpServer _httpServer;
 
+  /// Starts this server.
   Future<bool> start() async {
     if (_started) return true;
     _started = true;
 
     _httpServer = await shelf_io.serve(_process, address, port);
+    _httpServer.autoCompress = true;
+
     return true;
   }
 
   bool _closed = false;
 
+  /// Returns `true` if this server is closed.type
+  ///
+  /// A closed server can't processe new requests.
   bool get isClosed => _closed;
 
+  /// Stops/closes this server.
   void stop() {
     if (!_started || _closed) return;
     _closed = true;
@@ -74,6 +95,7 @@ class APIServer {
         .resolveMapped((res) => _processAPIResponse(request, res));
   }
 
+  /// Convers a [request] to an [APIRequest].
   APIRequest toAPIRequest(Request request) {
     var method = parseAPIRequestMethod(request.method)!;
 
@@ -147,6 +169,7 @@ class APIServer {
     return response;
   }
 
+  /// Resolves a [payload] to a HTTP body.
   static Object? resolveBody(dynamic payload) {
     if (payload == null) return null;
     if (payload is String) return payload;

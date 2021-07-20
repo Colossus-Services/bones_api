@@ -1,23 +1,30 @@
 import 'dart:async';
 
+/// Root class of an API.
 abstract class APIRoot {
+  /// API name.
   final String name;
 
+  /// API version.
   final String version;
 
   APIRoot(this.name, this.version);
 
+  /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
 
+  /// Loads the modules of this API.
   Set<APIModule> loadModules();
 
   Map<String, APIModule>? _modules;
 
+  /// Returns the names of the modules of this API.
   Set<String> get modulesNames {
     _ensureModulesLoaded();
     return _modules!.keys.toSet();
   }
 
+  /// Returns the modules of this API.
   Set<APIModule> get modules {
     _ensureModulesLoaded();
     return _modules!.values.toSet();
@@ -27,22 +34,28 @@ abstract class APIRoot {
     _modules ??= Map.fromEntries(loadModules().map((e) => MapEntry(e.name, e)));
   }
 
+  /// Returns a module with [name].
   APIModule? getModule(String name) {
     _ensureModulesLoaded();
     return _modules![name];
   }
 
+  /// Returns an [APIModule] based in the [request].
+  ///
+  /// Calls [resolveModule] to determine the module name.
   APIModule? getModuleByRequest(APIRequest request) {
     _ensureModulesLoaded();
     var moduleName = resolveModule(request);
     return _modules![moduleName];
   }
 
+  /// Resolves the module name of a [request].
   String resolveModule(APIRequest request) {
     var moduleName = request.pathPart(1, reversed: true);
     return moduleName;
   }
 
+  /// Calls the API.
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
     var module = getModuleByRequest(request);
 
@@ -66,10 +79,13 @@ abstract class APIRoot {
   }
 }
 
+/// An API route handler
 typedef APIRouteHandler<T> = FutureOr<APIResponse<T>> Function(
     APIRequest request);
 
+/// A module of an API.
 abstract class APIModule {
+  /// The name of this API module.
   final String name;
 
   late final APIRouteBuilder _routeBuilder;
@@ -78,8 +94,10 @@ abstract class APIModule {
     _routeBuilder = APIRouteBuilder(this);
   }
 
+  /// The default route to use when the request doesn't match.
   String? get defaultRouteName => null;
 
+  /// Configures this API module. Usually defines the routes of this instance.
   void configure();
 
   bool _configured = false;
@@ -125,6 +143,10 @@ abstract class APIModule {
     }
   }
 
+  /// Adds a route, of [name], to this module.
+  ///
+  /// [method] The route method. If `null` accepts any method.
+  /// [handler] The route handler, to process calls.
   APIModule addRoute(
       APIRequestMethod? method, String name, APIRouteHandler handler) {
     var routesHandlers = _getRoutesHandlers(method);
@@ -132,8 +154,10 @@ abstract class APIModule {
     return this;
   }
 
+  /// Returns the routes builder of this module.
   APIRouteBuilder get routes => _routeBuilder;
 
+  /// Returns a route handler for [name].
   APIRouteHandler<T>? getRouteHandler<T>(String name,
       [APIRequestMethod? method]) {
     var handler = _getRouteHandlerImpl<T>(name, method);
@@ -162,6 +186,9 @@ abstract class APIModule {
     return handler as APIRouteHandler<T>?;
   }
 
+  /// Returns a route handler for [request].
+  ///
+  /// Calls [resolveRoute] to determine the route name of the [request].
   APIRouteHandler<T>? getRouteHandlerByRequest<T>(APIRequest request) {
     _ensureConfigured();
 
@@ -169,11 +196,13 @@ abstract class APIModule {
     return getRouteHandler(route, request.method);
   }
 
+  /// Resolves the route name of the [request].
   String resolveRoute(APIRequest request) {
     var routeName = request.pathPart(0, reversed: true);
     return routeName;
   }
 
+  /// Calls a route for [request].
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
     var handler = getRouteHandlerByRequest<T>(request);
 
@@ -201,30 +230,39 @@ abstract class APIModule {
   int get hashCode => name.hashCode;
 }
 
+/// A route builder.
 class APIRouteBuilder {
+  /// The API module of this route builder.
   final APIModule module;
 
   APIRouteBuilder(this.module);
 
+  /// Adds a route of [name] with [handler] for ANY method.
   APIModule any(String name, APIRouteHandler handler) =>
       module.addRoute(null, name, handler);
 
+  /// Adds a route of [name] with [handler] for `GET` method.
   APIModule get(String name, APIRouteHandler handler) =>
       module.addRoute(APIRequestMethod.GET, name, handler);
 
-  APIModule pos(String name, APIRouteHandler handler) =>
+  /// Adds a route of [name] with [handler] for `POST` method.
+  APIModule post(String name, APIRouteHandler handler) =>
       module.addRoute(APIRequestMethod.POST, name, handler);
 
+  /// Adds a route of [name] with [handler] for `PUT` method.
   APIModule put(String name, APIRouteHandler handler) =>
       module.addRoute(APIRequestMethod.PUT, name, handler);
 
+  /// Adds a route of [name] with [handler] for `DELETE` method.
   APIModule delete(String name, APIRouteHandler handler) =>
       module.addRoute(APIRequestMethod.DELETE, name, handler);
 
+  /// Adds a route of [name] with [handler] for `PATCH` method.
   APIModule patch(String name, APIRouteHandler handler) =>
       module.addRoute(APIRequestMethod.PATH, name, handler);
 }
 
+/// API Methods
 enum APIRequestMethod {
   GET,
   POST,
@@ -233,6 +271,7 @@ enum APIRequestMethod {
   PATH,
 }
 
+/// Returns the [APIRequestMethod] for [method].
 APIRequestMethod? parseAPIRequestMethod(String? method) {
   if (method == null) return null;
   method = method.trim();
@@ -259,15 +298,21 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
   }
 }
 
+/// Represents an API request.
 class APIRequest {
+  /// The request method.
   final APIRequestMethod method;
 
+  /// The request path.
   final String path;
 
+  /// The parameters of the request.
   final Map<String, dynamic> parameters;
 
+  /// The headers of the request.
   final Map<String, dynamic> headers;
 
+  /// The payload/body of the request.
   final dynamic payload;
 
   late final List<String> _pathParts;
@@ -292,6 +337,7 @@ class APIRequest {
     return p.split('/');
   }
 
+  /// Creates a request of `GET` method.
   factory APIRequest.get(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
@@ -302,6 +348,7 @@ class APIRequest {
         payload: payload);
   }
 
+  /// Creates a request of `POST` method.
   factory APIRequest.post(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
@@ -312,6 +359,7 @@ class APIRequest {
         payload: payload);
   }
 
+  /// Creates a request of `PUT` method.
   factory APIRequest.put(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
@@ -322,6 +370,7 @@ class APIRequest {
         payload: payload);
   }
 
+  /// Creates a request of `DELETE` method.
   factory APIRequest.delete(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
@@ -332,6 +381,7 @@ class APIRequest {
         payload: payload);
   }
 
+  /// Creates a request of `PATCH` method.
   factory APIRequest.path(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
@@ -342,9 +392,13 @@ class APIRequest {
         payload: payload);
   }
 
+  /// Returns the parts of the [path].
   List<String> get pathParts => _pathParts.toList();
 
-  String pathPart(int index, {String delimiter = '/', bool reversed = false}) {
+  /// Returns a path part at [index].
+  ///
+  /// [reversed] if `true`, [index] is reversed.
+  String pathPart(int index, {bool reversed = false}) {
     var length = _pathParts.length;
 
     int idx;
@@ -358,6 +412,7 @@ class APIRequest {
   }
 }
 
+/// An [APIResponse] status.
 enum APIResponseStatus {
   OK,
   NOT_FOUND,
@@ -365,34 +420,43 @@ enum APIResponseStatus {
   ERROR,
 }
 
+/// Represents an API response.
 class APIResponse<T> {
+  /// The response status.
   final APIResponseStatus status;
 
+  /// The response headers.
   final Map<String, dynamic> headers;
 
+  /// The response payload/body/
   final T? payload;
 
+  /// The response error.
   final dynamic error;
 
   APIResponse(this.status,
       {this.headers = const <String, dynamic>{}, this.payload, this.error});
 
+  /// Creates a response of status `OK`.
   factory APIResponse.ok(T? payload, {Map<String, dynamic>? headers}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{}, payload: payload);
   }
 
+  /// Creates a response of status `NOT_FOUND`.
   factory APIResponse.notFound({Map<String, dynamic>? headers, T? payload}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
         headers: headers ?? <String, dynamic>{}, payload: payload);
   }
 
+  /// Creates a response of status `UNAUTHORIZED`.
   factory APIResponse.unauthorized(
       {Map<String, dynamic>? headers, T? payload}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
         headers: headers ?? <String, dynamic>{}, payload: payload);
   }
 
+  /// Creates an error response.
   factory APIResponse.error({Map<String, dynamic>? headers, dynamic error}) {
     return APIResponse(APIResponseStatus.ERROR,
         headers: headers ?? <String, dynamic>{}, error: error);
