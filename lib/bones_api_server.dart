@@ -3,4 +3,5 @@ library bones_api;
 
 export 'package:bones_api/bones_api.dart';
 
+export 'src/bones_api_isolate.dart';
 export 'src/bones_api_server.dart';

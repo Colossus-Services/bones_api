@@ -63,6 +63,28 @@ class MyBaseModule extends APIModule {
 }
 ```
 
+## CLI
+
+You can use the built-in command-line interface (CLI) `bones_api`.
+
+To activate it globally:
+
+```bash
+ $> dart pub global activate bones_api
+```
+
+Now tou can use the CLI directly:
+
+```bash
+  $> bones_api --help
+```
+
+To serve an API project:
+
+```bash
+  $> bones_api serve --directory path/to/project --class MyAPIRoot
+```
+
 ## Bones_UI
 
 See also the package [Bones_UI][bones_ui], a simple and easy Web User Interface Framework for Dart.
