@@ -8,6 +8,7 @@
   - Improved serve console logging.
 - Using `dart_spawner` to spawn/run an `API`.
 - dart_spawner: ^1.0.2
+- Removed `yaml: ^3.1.0`
 
 ## 1.0.1
 
