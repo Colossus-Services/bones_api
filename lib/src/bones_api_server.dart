@@ -37,11 +37,19 @@ class APIServer {
   static String _normalizeAddress(String address) {
     address = address.trim();
 
-    if (address.isEmpty || address == '*' || address == '0') {
+    if (address.isEmpty ||
+        address == '*' ||
+        address == '0' ||
+        address == '::' ||
+        address == '0:0:0:0:0:0:0:0') {
       return '0.0.0.0';
     }
 
-    if (address == 'local' || address == '1') {
+    if (address == 'local' ||
+        address == '1' ||
+        address == '127' ||
+        address == '::1' ||
+        address == '0:0:0:0:0:0:0:1') {
       return 'localhost';
     }
 
@@ -199,5 +207,84 @@ class APIServer {
   @override
   String toString() {
     return 'APIServer{ apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, stopped: $isStopped }';
+  }
+
+  /// Creates an [APIServer] with [apiRoot].
+  static APIServer create(APIRoot apiRoot,
+      [List<String> args = const <String>[], int argsOffset = 0]) {
+    if (argsOffset > args.length) {
+      argsOffset = args.length;
+    }
+
+    if (argsOffset > 0) {
+      args = args.sublist(argsOffset);
+    }
+
+    String address;
+    int port;
+
+    if (args.isEmpty) {
+      address = 'localhost';
+      port = 8080;
+    } else if (args.length == 1) {
+      var a = args[0];
+      var p = int.tryParse(a);
+
+      if (p != null) {
+        if (p >= 80) {
+          address = 'localhost';
+          port = p;
+        } else {
+          address = '$p';
+          port = 8080;
+        }
+      } else {
+        address = a;
+        port = 8080;
+      }
+    } else {
+      address = _parseArg(args, 'address', 'a', 'localhost', 0);
+      port = int.parse(_parseArg(args, 'port', 'p', '8080', 1));
+    }
+
+    var apiServer = APIServer(apiRoot, address, port);
+
+    return apiServer;
+  }
+
+  /// Runs [apiRoot] and returns the [APIServer].
+  static Future<APIServer> run(APIRoot apiRoot, List<String> args,
+      {int argsOffset = 0, bool verbose = false}) async {
+    var apiServer = create(apiRoot, args, argsOffset);
+
+    await apiServer.start();
+
+    if (verbose) {
+      print('Running: $apiServer');
+      print('URL: ${apiServer.url}');
+    }
+
+    return apiServer;
+  }
+
+  static String _parseArg(
+      List<String> args, String name, String abbrev, String def, int index) {
+    if (args.isEmpty) return def;
+
+    for (var i = 0; i < args.length; ++i) {
+      var a = args[i];
+
+      if (i < args.length - 1 &&
+          (a == '--$name' || a == '-$name' || a == '-$abbrev')) {
+        var v = args[i + 1];
+        return v;
+      }
+    }
+
+    if (index < args.length) {
+      return args[index];
+    }
+
+    return def;
   }
 }

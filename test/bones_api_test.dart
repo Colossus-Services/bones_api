@@ -146,6 +146,93 @@ void main() {
       await apiServer.stop();
     });
   });
+
+  group('APIServer.create', () {
+    final api = MyAPI();
+
+    test('create []', () async {
+      var apiServer = APIServer.create(api);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(8080));
+    });
+
+    test('create [localhost]', () async {
+      var apiServer = APIServer.create(api, ['localhost']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(8080));
+    });
+
+    test('create [localhost, 5545]', () async {
+      var apiServer = APIServer.create(api, ['localhost', '5545']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(5545));
+    });
+
+    test('create [0]', () async {
+      var apiServer = APIServer.create(api, ['0']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('0.0.0.0'));
+      expect(apiServer.port, equals(8080));
+    });
+
+    test('create [1]', () async {
+      var apiServer = APIServer.create(api, ['1']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(8080));
+    });
+
+    test('create [8091]', () async {
+      var apiServer = APIServer.create(api, ['8091']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(8091));
+    });
+
+    test('create [localhost, 5545]', () async {
+      var apiServer =
+          APIServer.create(api, ['--address', 'localhost', '-p', '5546']);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(5546));
+    });
+  });
+
+  group('APIServer.create + start + GET', () {
+    final api = MyAPI();
+
+    final apiServer = APIServer.create(api, ['localhost', '5545']);
+
+    setUp(() async {
+      await apiServer.start();
+    });
+
+    test('foo[GET]', () async {
+      var res = await _getURL('${apiServer.url}service/base/foo');
+      expect(res.toString(), equals('Hi[GET]!'));
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+    });
+  });
+
+  group('APIServer.run', () {
+    final api = MyAPI();
+
+    test('run + stop', () async {
+      final apiServer =
+          await APIServer.run(api, ['X', '5546'], argsOffset: 1, verbose: true);
+      expect(apiServer, isNotNull);
+      expect(apiServer.address, equals('localhost'));
+      expect(apiServer.port, equals(5546));
+
+      await apiServer.stop();
+    });
+  });
 }
 
 class MyAPI extends APIRoot {
