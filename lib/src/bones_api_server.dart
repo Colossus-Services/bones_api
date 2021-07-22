@@ -74,18 +74,25 @@ class APIServer {
     return true;
   }
 
-  bool _closed = false;
-
   /// Returns `true` if this server is closed.type
   ///
   /// A closed server can't processe new requests.
-  bool get isClosed => _closed;
+  bool get isStopped => _stopped.isCompleted;
+
+  final Completer<bool> _stopped = Completer<bool>();
+
+  /// Returns a [Future] that complets when this server stops.
+  Future<bool> waitStopped() => _stopped.future;
+
+  bool _stopping = false;
 
   /// Stops/closes this server.
-  void stop() {
-    if (!_started || _closed) return;
-    _closed = true;
-    _httpServer.close();
+  Future<void> stop() async {
+    if (!_started || _stopping || isStopped) return;
+    _stopping = true;
+
+    await _httpServer.close();
+    _stopped.complete(true);
   }
 
   FutureOr<Response> _process(Request request) {
@@ -191,6 +198,6 @@ class APIServer {
 
   @override
   String toString() {
-    return 'APIServer{ apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, closed: $isClosed }';
+    return 'APIServer{ apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, stopped: $isStopped }';
   }
 }

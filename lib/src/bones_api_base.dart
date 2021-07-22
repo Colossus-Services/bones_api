@@ -136,7 +136,7 @@ abstract class APIModule {
         return _routesHandlersPUT;
       case APIRequestMethod.DELETE:
         return _routesHandlersDELETE;
-      case APIRequestMethod.PATH:
+      case APIRequestMethod.PATCH:
         return _routesHandlersPATH;
       default:
         return _routesHandlers;
@@ -259,7 +259,7 @@ class APIRouteBuilder {
 
   /// Adds a route of [name] with [handler] for `PATCH` method.
   APIModule patch(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.PATH, name, handler);
+      module.addRoute(APIRequestMethod.PATCH, name, handler);
 }
 
 /// API Methods
@@ -268,7 +268,7 @@ enum APIRequestMethod {
   POST,
   PUT,
   DELETE,
-  PATH,
+  PATCH,
 }
 
 /// Returns the [APIRequestMethod] for [method].
@@ -289,9 +289,9 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
     case 'delete':
     case 'DELETE':
       return APIRequestMethod.DELETE;
-    case 'path':
-    case 'PATH':
-      return APIRequestMethod.PATH;
+    case 'patch':
+    case 'PATCH':
+      return APIRequestMethod.PATCH;
 
     default:
       return null;
@@ -382,11 +382,11 @@ class APIRequest {
   }
 
   /// Creates a request of `PATCH` method.
-  factory APIRequest.path(String path,
+  factory APIRequest.patch(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       dynamic payload}) {
-    return APIRequest(APIRequestMethod.PATH, path,
+    return APIRequest(APIRequestMethod.PATCH, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
         payload: payload);

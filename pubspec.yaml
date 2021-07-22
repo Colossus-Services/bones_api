@@ -1,6 +1,6 @@
 name: bones_api
 description: Bones_API - Simple and easy API framework, with routes and HTTP Server.
-version: 1.0.1
+version: 1.0.2
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:
@@ -12,6 +12,7 @@ executables:
 dependencies:
   shelf: ^1.2.0
   async_extension: ^1.0.4
+  dart_spawner: ^1.0.2
   args: ^2.0.0
   yaml: ^3.1.0
 

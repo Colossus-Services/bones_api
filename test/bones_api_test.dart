@@ -46,6 +46,31 @@ void main() {
       var res = await api.call(APIRequest.get('/service/base/bar'));
       expect(res.toString(), equals('404: /service/base/bar'));
     });
+
+    test('unauthorized', () async {
+      var res = await api.call(APIRequest.get('/service/base/auth'));
+      expect(res.toString(), equals('APIResponseStatus.UNAUTHORIZED'));
+    });
+
+    test('error', () async {
+      var res = await api.call(APIRequest.get('/service/base/err'));
+      expect(res.toString(), contains('Bad state: Error!'));
+    });
+
+    test('put', () async {
+      var res = await api.call(APIRequest.put('/service/base/put'));
+      expect(res.toString(), equals('PUT'));
+    });
+
+    test('delete', () async {
+      var res = await api.call(APIRequest.delete('/service/base/delete'));
+      expect(res.toString(), equals('DELETE'));
+    });
+
+    test('patch', () async {
+      var res = await api.call(APIRequest.patch('/service/base/patch'));
+      expect(res.toString(), equals('PATCH'));
+    });
   });
 
   group('APIServer', () {
@@ -87,8 +112,38 @@ void main() {
       expect(res.toString(), equals('404: /service/base/bar'));
     });
 
+    test('unauthorized', () async {
+      var res = await _getURL('${apiServer.url}service/base/auth',
+          method: APIRequestMethod.GET);
+      expect(res.toString(), equals('Forbidden'));
+    });
+
+    test('error', () async {
+      var res = await _getURL('${apiServer.url}service/base/err',
+          method: APIRequestMethod.GET);
+      expect(res.toString(), contains('Bad state: Error!'));
+    });
+
+    test('put', () async {
+      var res = await _getURL('${apiServer.url}service/base/put',
+          method: APIRequestMethod.PUT);
+      expect(res.toString(), equals('PUT'));
+    });
+
+    test('delete', () async {
+      var res = await _getURL('${apiServer.url}service/base/delete',
+          method: APIRequestMethod.DELETE);
+      expect(res.toString(), equals('DELETE'));
+    });
+
+    test('patch', () async {
+      var res = await _getURL('${apiServer.url}service/base/patch',
+          method: APIRequestMethod.PATCH);
+      expect(res.toString(), equals('PATCH'));
+    });
+
     tearDownAll(() async {
-      apiServer.stop();
+      await apiServer.stop();
     });
   });
 }
@@ -114,8 +169,16 @@ class MyBaseModule extends APIModule {
 
     routes.any('time', (request) => APIResponse.ok(DateTime.now()));
 
+    routes.any('auth', (request) => APIResponse.unauthorized());
+
     routes.any('404',
         (request) => APIResponse.notFound(payload: '404: ${request.path}'));
+
+    routes.any('err', (request) => throw StateError('Error!'));
+
+    routes.put('put', (request) => APIResponse.ok('PUT'));
+    routes.delete('delete', (request) => APIResponse.ok('DELETE'));
+    routes.patch('patch', (request) => APIResponse.ok('PATCH'));
   }
 }
 
@@ -165,7 +228,7 @@ Future<String> _getURL(String url,
         future = httpClient.deleteUrl(uri);
         break;
       }
-    case APIRequestMethod.PATH:
+    case APIRequestMethod.PATCH:
       {
         future = httpClient.patchUrl(uri);
         break;

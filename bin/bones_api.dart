@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:bones_api/bones_api_server.dart';
-import 'package:bones_api/src/bones_api_isolate.dart';
+import 'package:dart_spawner/dart_spawner.dart';
 
 void _log(String ns, String message) {
   print('## [$ns]\t$message');
@@ -149,25 +149,27 @@ class CommandServe extends CommandSourceFileBase {
           'directory: $directory ; apiRootClass: $apiRootClass ; address: $address ; port: $port');
     }
 
-    var isolateSpawner = IsolateSpawner(directory);
+    var spawner = DartSpawner(directory: Directory(directory));
 
     var projectBonesAPIVersions =
-        isolateSpawner.getProjectDependencyVersion('bones_api');
+        spawner.getProjectDependencyVersion('bones_api');
 
     if (projectBonesAPIVersions == null) {
       throw StateError(
-          'Target project (`${isolateSpawner.projectPackageName}`) is not using package `bones_api`: $directory');
+          'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory');
     }
 
-    var dartScript = buildDartScript(
-        isolateSpawner.id,
-        isolateSpawner.projectPackageName!,
-        isolateSpawner.projectLibraryName!,
-        apiRootClass);
+    var projectPackageName = (await spawner.projectPackageName)!;
+    var projectLibraryName = (await spawner.projectLibraryName)!;
 
-    var process = await isolateSpawner.spawnDartScript(
+    var dartScript = buildDartScript(
+        spawner.id, projectPackageName, projectLibraryName, apiRootClass);
+
+    var process = await spawner.spawnDartScript(
       dartScript,
       [address, port],
+      usesSpawnedMain: true,
+      debugName: apiRootClass,
     );
 
     var exit = await process.exitCode;
@@ -184,7 +186,7 @@ import 'package:bones_api/bones_api_server.dart';
 import 'package:$projectPackageName/$projectLibraryName.dart';
 
 void main(List<String> args, dynamic parentPort) {
-  spawnMain(args, parentPort, $isolateID, () async {
+  spawnedMain(args, parentPort, $isolateID, (args) async {
     var address = args[0];
     var port = int.parse(args[1]); 
     
@@ -193,8 +195,13 @@ void main(List<String> args, dynamic parentPort) {
     var apiServer = APIServer(api, address, port);
     await apiServer.start();
     
+    print('------------------------------------------------------------------');
+    print('- API Package: $projectPackageName/$projectLibraryName');
+    print('- API Class: $apiRootClass\\n');
     print('Running \$apiServer');
     print('URL: \${ apiServer.url }');
+    
+    await apiServer.waitStopped();
   });
 }
     ''';

@@ -1,3 +1,14 @@
+## 1.0.2
+
+- `APIServer`:
+  - Add `isStopped` and `waitStopped()`.
+  - Removed `isClosed`.
+- Fix `PATCH` method.
+- CLI:
+  - Improved serve console logging.
+- Using `dart_spawner` to spawn/run an `API`.
+- dart_spawner: ^1.0.2
+
 ## 1.0.1
 
 - Improve documentation.
