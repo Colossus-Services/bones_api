@@ -9,8 +9,6 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 
 /// An API HTTP Server
 class APIServer {
-  static const String VERSION = '1.0.0';
-
   /// The API root of this server.
   final APIRoot apiRoot;
 
@@ -31,7 +29,7 @@ class APIServer {
   final String version;
 
   APIServer(this.apiRoot, String address, this.port,
-      {this.name = 'APIServer', this.version = VERSION})
+      {this.name = 'APIServer', this.version = APIRoot.VERSION})
       : address = _normalizeAddress(address);
 
   static String _normalizeAddress(String address) {
@@ -146,6 +144,11 @@ class APIServer {
 
     headers['server'] ??= serverName;
 
+    var contentType = apiResponse.payloadMimeType;
+    if (contentType != null && contentType.isNotEmpty) {
+      headers['content-type'] = contentType;
+    }
+
     var payload = resolveBody(apiResponse.payload);
 
     Response response;
@@ -206,7 +209,7 @@ class APIServer {
 
   @override
   String toString() {
-    return 'APIServer{ apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, stopped: $isStopped }';
+    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, stopped: $isStopped }';
   }
 
   /// Creates an [APIServer] with [apiRoot].

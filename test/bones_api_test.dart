@@ -2,9 +2,79 @@ import 'dart:convert' as convert;
 import 'dart:io';
 
 import 'package:bones_api/bones_api_server.dart';
+import 'package:bones_api/src/bones_api_console.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('Arguments', () {
+    setUp(() {});
+
+    test('Arguments.parseLine 1', () async {
+      var args = Arguments.parseLine('x -a 1 -b 2 -f');
+
+      print(args);
+
+      expect(args.parameters, equals({'a': '1', 'b': '2'}));
+      expect(args.flags, equals({'f'}));
+      expect(args.args, equals(['x']));
+
+      expect(args.toArgumentsLine(), equals('-f --a 1 --b 2'));
+    });
+
+    test('Arguments.parseLine 2', () async {
+      var args = Arguments.parseLine('-a host -port 80 -v a b',
+          abbreviations: {'a': 'address', 'v': 'verbose'}, flags: {'verbose'});
+
+      expect(args.parameters, equals({'address': 'host', 'port': '80'}));
+      expect(args.flags, equals({'verbose'}));
+      expect(args.args, equals(['a', 'b']));
+
+      expect(args.toArgumentsLine(), equals('-v --address host --port 80'));
+      expect(args.toArgumentsLine(abbreviateFlags: false),
+          equals('-verbose --address host --port 80'));
+
+      expect(
+          args.toArgumentsLine(
+              abbreviateFlags: false, abbreviateParameters: true),
+          equals('-verbose --a host --port 80'));
+    });
+
+    test('Arguments.parseLine 3', () async {
+      var args = Arguments.parseLine('-a host -port 80 -list 1 -list 2 -v a b',
+          abbreviations: {'a': 'address', 'v': 'verbose'}, flags: {'verbose'});
+
+      expect(
+          args.parameters,
+          equals({
+            'address': 'host',
+            'port': '80',
+            'list': ['1', '2']
+          }));
+      expect(args.flags, equals({'verbose'}));
+      expect(args.args, equals(['a', 'b']));
+    });
+
+    test('Arguments.parseLine 3', () async {
+      var args = Arguments.parseLine(
+          '-a host -port 80 -list 1 -list 2 -list 3 -v a b',
+          abbreviations: {'a': 'address', 'v': 'verbose'},
+          flags: {'verbose'});
+
+      expect(
+          args.parameters,
+          equals({
+            'address': 'host',
+            'port': '80',
+            'list': ['1', '2', '3']
+          }));
+      expect(args.flags, equals({'verbose'}));
+      expect(args.args, equals(['a', 'b']));
+
+      expect(args.toArgumentsLine(),
+          equals('-v --address host --port 80 --list 1 --list 2 --list 3'));
+    });
+  });
+
   group('APIRoot', () {
     final api = MyAPI();
 
@@ -21,8 +91,30 @@ void main() {
     });
 
     test('foo[GET]', () async {
-      var res = await api.call(APIRequest.get('/service/base/foo'));
+      var apiRequest = APIRequest.get('/service/base/foo');
+
+      expect(apiRequest.pathParts, equals(['service', 'base', 'foo']));
+
+      var res = await api.call(apiRequest);
       expect(res.toString(), equals('Hi[GET]!'));
+      expect(
+          res.toInfos(),
+          equals(
+              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 8 }'));
+
+      expect(res.payloadLength, equals(8));
+    });
+
+    test('foo[GET]', () async {
+      var apiRequest = APIRequest.get('/service/base/foo');
+      expect(apiRequest.pathParts, equals(['service', 'base', 'foo']));
+
+      var res = await api.call(apiRequest);
+      expect(res.toString(), equals('Hi[GET]!'));
+
+      var res2 = await api.doCall(APIRequestMethod.GET, '/service/base/foo');
+
+      expect(res2.toString(), equals(res.toString()));
     });
 
     test('foo[POST]', () async {
@@ -35,6 +127,13 @@ void main() {
       var res = await api.call(APIRequest.post('/service/base/time'));
       expect(res.toString(),
           matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
+
+      expect(
+          res.toInfos(),
+          equals(
+              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }'));
+
+      expect(res.payloadMimeType, equals('text/plain'));
     });
 
     test('404 module', () async {
@@ -95,7 +194,7 @@ void main() {
 
     test('time', () async {
       var res = await _getURL('${apiServer.url}service/base/time',
-          method: APIRequestMethod.POST);
+          method: APIRequestMethod.POST, expectedContentType: 'text/plain');
       expect(res.toString(),
           matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
     });
@@ -233,6 +332,65 @@ void main() {
       await apiServer.stop();
     });
   });
+
+  group('APIConsole', () {
+    final api = MyAPI();
+
+    test('basic', () async {
+      var apiConsole = APIConsole(api);
+
+      expect(apiConsole.toString(), startsWith('APIConsole{'));
+
+      var res1 = await apiConsole.processRequestLine('base/foo');
+      expect(res1.toString(), equals('Hi[GET]!'));
+
+      var res2 =
+          await apiConsole.processRequestLine('base/foo --method post -a 1');
+      expect(res2.toString(), equals('Hi[POST]! {a: 1}'));
+    });
+
+    test('run', () async {
+      var apiConsole = APIConsole(api);
+
+      var commandsConst = const [
+        'base/foo',
+        'base/foo --method post -a 2',
+      ];
+
+      var commands = commandsConst.toList();
+
+      var responses = await apiConsole
+          .run(() => commands.isNotEmpty ? commands.removeAt(0) : null);
+
+      print(responses);
+
+      expect(responses[0].toString(), equals('Hi[GET]!'));
+      expect(responses[0].payloadLength, equals(8));
+
+      expect(responses[1].toString(), equals('Hi[POST]! {a: 2}'));
+
+      var onRequests = <APIRequest>[];
+      var onResponses = <APIResponse>[];
+
+      var commands2 = commandsConst.toList();
+
+      var responses2 = await apiConsole.run(
+          () => commands2.isNotEmpty ? commands2.removeAt(0) : null,
+          onRequest: (req) => onRequests.add(req),
+          onResponse: (res) => onResponses.add(res),
+          returnResponses: false);
+
+      print(onRequests);
+      print(onResponses);
+
+      expect(responses2, isEmpty);
+
+      expect(
+          onRequests.map((e) => '${e.path}'), equals(['base/foo', 'base/foo']));
+      expect(onResponses.map((e) => '$e'),
+          equals(['Hi[GET]!', 'Hi[POST]! {a: 2}']));
+    });
+  });
 }
 
 class MyAPI extends APIRoot {
@@ -254,7 +412,8 @@ class MyBaseModule extends APIModule {
     routes.post(
         'foo', (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'));
 
-    routes.any('time', (request) => APIResponse.ok(DateTime.now()));
+    routes.any('time',
+        (request) => APIResponse.ok(DateTime.now(), mimeType: 'text/plain'));
 
     routes.any('auth', (request) => APIResponse.unauthorized());
 
@@ -271,7 +430,9 @@ class MyBaseModule extends APIModule {
 
 /// Simple HTTP get URL function.
 Future<String> _getURL(String url,
-    {APIRequestMethod? method, Map<String, dynamic>? parameters}) async {
+    {APIRequestMethod? method,
+    Map<String, dynamic>? parameters,
+    String? expectedContentType}) async {
   method ??= APIRequestMethod.GET;
 
   var uri = Uri.parse(url);
@@ -324,7 +485,13 @@ Future<String> _getURL(String url,
 
   response = await future.then((request) => request.close());
 
+  if (expectedContentType != null) {
+    var contentType = response.headers['content-type'];
+    expect(contentType![0], expectedContentType);
+  }
+
   var data = await response.transform(convert.Utf8Decoder()).toList();
   var body = data.join();
+
   return body;
 }

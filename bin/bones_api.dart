@@ -10,11 +10,12 @@ void _log(String ns, String message) {
   print('## [$ns]\t$message');
 }
 
-const String cliTitle = '[Bones_API/${APIServer.VERSION}]';
+const String cliTitle = '[Bones_API/${APIRoot.VERSION}]';
 
 void main(List<String> args) async {
   var commandRunner = CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
-    ..addCommand(CommandServe());
+    ..addCommand(CommandServe())
+    ..addCommand(CommandConsole());
 
   commandRunner.argParser.addFlag('version',
       abbr: 'v', negatable: false, defaultsTo: false, help: 'Show version.');
@@ -32,7 +33,7 @@ void main(List<String> args) async {
 }
 
 void showVersion() {
-  print('Bones_API/${APIServer.VERSION} - CLI Tool');
+  print('Bones_API/${APIRoot.VERSION} - CLI Tool');
 }
 
 abstract class CommandSourceFileBase extends Command<bool> {
@@ -52,6 +53,8 @@ abstract class CommandSourceFileBase extends Command<bool> {
           '(defaults to current directory)',
     );
   }
+
+  String? get argDirectory => argResults!['directory'];
 
   @override
   String get usage {
@@ -121,8 +124,6 @@ class CommandServe extends CommandSourceFileBase {
         abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
   }
 
-  String? get argDirectory => argResults!['directory'];
-
   String? get argClass => argResults!['class'];
 
   String get argAddress => argResults!['address']!;
@@ -183,6 +184,8 @@ class CommandServe extends CommandSourceFileBase {
       String projectLibraryName, String apiRootClass) {
     var script = '''
 import 'package:bones_api/bones_api_server.dart';
+import 'package:bones_api/bones_api_dart_spawner.dart';
+
 import 'package:$projectPackageName/$projectLibraryName.dart';
 
 void main(List<String> args, dynamic parentPort) {
@@ -202,6 +205,132 @@ void main(List<String> args, dynamic parentPort) {
     print('URL: \${ apiServer.url }');
     
     await apiServer.waitStopped();
+  });
+}
+    ''';
+
+    return script;
+  }
+}
+
+class CommandConsole extends CommandSourceFileBase {
+  @override
+  final String description = 'API Console';
+
+  @override
+  final String name = 'console';
+
+  CommandConsole() {
+    argParser.addOption('class',
+        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
+  }
+
+  String? get argClass => argResults!['class'];
+
+  @override
+  FutureOr<bool> run() async {
+    var directory = argDirectory;
+    var apiRootClass = argClass;
+
+    if (directory == null) {
+      throw ArgumentError.notNull('directory');
+    }
+
+    if (apiRootClass == null) {
+      throw ArgumentError.notNull('apiRootClass');
+    }
+
+    if (verbose) {
+      _log('CONSOLE', 'directory: $directory ; apiRootClass: $apiRootClass');
+    }
+
+    var spawner = DartSpawner(directory: Directory(directory));
+
+    var projectBonesAPIVersions =
+        spawner.getProjectDependencyVersion('bones_api');
+
+    if (projectBonesAPIVersions == null) {
+      throw StateError(
+          'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory');
+    }
+
+    var projectPackageName = (await spawner.projectPackageName)!;
+    var projectLibraryName = (await spawner.projectLibraryName)!;
+
+    var dartScript = buildDartScript(
+        spawner.id, projectPackageName, projectLibraryName, apiRootClass);
+
+    var process = await spawner.spawnDartScript(
+      dartScript,
+      [],
+      usesSpawnedMain: true,
+      debugName: apiRootClass,
+    );
+
+    var exit = await process.exitCode;
+
+    print('Serve exit: $exit');
+
+    return true;
+  }
+
+  String buildDartScript(int isolateID, String projectPackageName,
+      String projectLibraryName, String apiRootClass) {
+    var script = '''
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:bones_api/bones_api_console.dart';
+import 'package:bones_api/bones_api_dart_spawner.dart';
+
+import 'package:$projectPackageName/$projectLibraryName.dart';
+
+Stream<String> _stdinLineStreamBroadcaster = stdin
+    .transform(utf8.decoder)
+    .transform(const LineSplitter())
+    .asBroadcastStream();
+
+Future<String> _readStdinLine() async {
+  stdout.write('CMD> ');
+  
+  var lineCompleter = Completer<String>();
+
+  var listener = _stdinLineStreamBroadcaster.listen((line) {
+    if (!lineCompleter.isCompleted) {
+      lineCompleter.complete(line);
+    }
+  });
+
+  return lineCompleter.future.then((line) {
+    listener.cancel();
+    return line;
+  });
+}
+
+void _onRequest(APIRequest request) {
+  print('>> REQUEST: \$request');
+}
+
+void _onResponse(APIResponse response) {
+  print('>> RESPONSE: \${response.toInfos()}\\n\$response');
+}
+
+void main(List<String> args, dynamic parentPort) {
+  spawnedMain(args, parentPort, $isolateID, (args) async {
+    var api = $apiRootClass();
+    
+    var apiConsole = APIConsole(api);
+    
+    await Future.delayed(Duration(milliseconds: 100));
+    
+    print('------------------------------------------------------------------');
+    print('- API Package: $projectPackageName/$projectLibraryName');
+    print('- API Class: $apiRootClass\\n');
+    
+    print('Running \$apiConsole\\n');
+    
+    await apiConsole.run(_readStdinLine, onRequest: _onRequest, onResponse: _onResponse);
   });
 }
     ''';

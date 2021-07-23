@@ -1,3 +1,12 @@
+## 1.0.4
+
+- CLI `bones_api`:
+  - Added command `console`.
+  - Command `serve`: added header `Content-Type`.
+- Added `Arguments` tool.
+- Added `APIRequest.fromArgs` and `APIRequest.fromArgsLine`.
+- Added `APIRequest`/`APIResponse` `payloadMimeType`.
+
 ## 1.0.3
 
 - `APIServer`:

@@ -2,6 +2,8 @@ import 'dart:async';
 
 /// Root class of an API.
 abstract class APIRoot {
+  static const String VERSION = '1.0.4';
+
   /// API name.
   final String name;
 
@@ -53,6 +55,16 @@ abstract class APIRoot {
   String resolveModule(APIRequest request) {
     var moduleName = request.pathPart(1, reversed: true);
     return moduleName;
+  }
+
+  /// Perform an API call.
+  FutureOr<APIResponse<T>> doCall<T>(APIRequestMethod method, String path,
+      {Map<String, dynamic>? parameters,
+      Map<String, dynamic>? headers,
+      dynamic payload}) {
+    var request = APIRequest(method, path,
+        parameters: parameters, headers: headers, payload: payload);
+    return call(request);
   }
 
   /// Calls the API.
@@ -298,8 +310,43 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
   }
 }
 
+/// Base class for payload.
+abstract class APIPayload {
+  /// The payload.
+  dynamic get payload;
+
+  /// The payload MIME Type.
+  String? get payloadMimeType;
+
+  /// Returns `true` if [payload] is not `null`.
+  bool get hasPayload => payload != null;
+
+  /// Returns the [payload] length.
+  int get payloadLength {
+    if (payload == null) {
+      return -1;
+    } else if (payload is String) {
+      return payload.length;
+    } else if (payload is Iterable<Iterable>) {
+      return _sum(payload);
+    } else if (payload is Iterable) {
+      return payload.length;
+    } else {
+      return '$payload'.length;
+    }
+  }
+
+  static int _sum(Iterable<Iterable> itr) {
+    var total = 0;
+    for (var e in itr) {
+      total += e.length;
+    }
+    return total;
+  }
+}
+
 /// Represents an API request.
-class APIRequest {
+class APIRequest extends APIPayload {
   /// The request method.
   final APIRequestMethod method;
 
@@ -313,15 +360,23 @@ class APIRequest {
   final Map<String, dynamic> headers;
 
   /// The payload/body of the request.
+  @override
   final dynamic payload;
+
+  /// The payload/body MIME Type.
+  @override
+  String? payloadMimeType;
 
   late final List<String> _pathParts;
 
   APIRequest(this.method, this.path,
-      {this.parameters = const <String, dynamic>{},
-      this.headers = const <String, dynamic>{},
-      this.payload})
-      : _pathParts = _buildPathParts(path);
+      {Map<String, dynamic>? parameters,
+      Map<String, dynamic>? headers,
+      this.payload,
+      this.payloadMimeType})
+      : parameters = parameters ?? <String, dynamic>{},
+        headers = headers ?? <String, dynamic>{},
+        _pathParts = _buildPathParts(path);
 
   static List<String> _buildPathParts(String path) {
     var p = path.trim();
@@ -335,6 +390,59 @@ class APIRequest {
     }
 
     return p.split('/');
+  }
+
+  /// Constructs an [APIRequest] parsing [argsLine].
+  factory APIRequest.fromArgsLine(String argsLine) {
+    var args = Arguments.splitArgumentsLine(argsLine);
+    return APIRequest.fromArgs(args);
+  }
+
+  static final RegExp _regexpHeaderPrefix =
+      RegExp(r'^header[-_]', caseSensitive: false);
+
+  /// Constructs an [APIRequest] parsing [args].
+  factory APIRequest.fromArgs(List<String> args) {
+    var path = args.removeAt(0);
+
+    var arguments = Arguments.parse(
+      args,
+      abbreviations: {
+        'm': 'method',
+        'q': 'query',
+        'querystring': 'query',
+        'body': 'payload',
+      },
+    );
+
+    var query = arguments.parameters.remove('query');
+
+    if (query != null) {
+      var params = Uri.splitQueryString(query);
+      arguments.parameters.addAll(params);
+    }
+
+    var methodVal = arguments.parameters.remove('method');
+    var method = methodVal != null
+        ? parseAPIRequestMethod(methodVal.toString().toLowerCase()) ??
+            APIRequestMethod.GET
+        : APIRequestMethod.GET;
+
+    var payload = arguments.parameters.remove('payload');
+
+    var parameters = Map.fromEntries(arguments.parameters.entries
+        .where((e) => !_regexpHeaderPrefix.hasMatch(e.key)));
+
+    for (var f in arguments.flags) {
+      parameters[f] = true;
+    }
+
+    var headers = Map.fromEntries(arguments.parameters.entries
+        .where((e) => _regexpHeaderPrefix.hasMatch(e.key))
+        .map((e) => MapEntry(e.key.substring(7), e.value)));
+
+    return APIRequest(method, path,
+        parameters: parameters, headers: headers, payload: payload);
   }
 
   /// Creates a request of `GET` method.
@@ -410,6 +518,11 @@ class APIRequest {
 
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
+
+  @override
+  String toString() {
+    return 'APIRequest{ method: $method, path: $path, parameters: $parameters, headers: $headers${hasPayload ? ', payloadLength: $payloadLength' : ''} }';
+  }
 }
 
 /// An [APIResponse] status.
@@ -421,7 +534,7 @@ enum APIResponseStatus {
 }
 
 /// Represents an API response.
-class APIResponse<T> {
+class APIResponse<T> extends APIPayload {
   /// The response status.
   final APIResponseStatus status;
 
@@ -429,18 +542,29 @@ class APIResponse<T> {
   final Map<String, dynamic> headers;
 
   /// The response payload/body/
+  @override
   final T? payload;
+
+  /// The payload/body MIME Type.
+  @override
+  String? payloadMimeType;
 
   /// The response error.
   final dynamic error;
 
   APIResponse(this.status,
-      {this.headers = const <String, dynamic>{}, this.payload, this.error});
+      {this.headers = const <String, dynamic>{},
+      this.payload,
+      this.payloadMimeType,
+      this.error});
 
   /// Creates a response of status `OK`.
-  factory APIResponse.ok(T? payload, {Map<String, dynamic>? headers}) {
+  factory APIResponse.ok(T? payload,
+      {Map<String, dynamic>? headers, String? mimeType}) {
     return APIResponse(APIResponseStatus.OK,
-        headers: headers ?? <String, dynamic>{}, payload: payload);
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadMimeType: mimeType);
   }
 
   /// Creates a response of status `NOT_FOUND`.
@@ -462,6 +586,17 @@ class APIResponse<T> {
         headers: headers ?? <String, dynamic>{}, error: error);
   }
 
+  /// Response infos.
+  String toInfos() {
+    return 'APIResponse{'
+        ' status: $status, headers: $headers'
+        '${hasPayload ? ', payloadLength: $payloadLength' : ''}'
+        '${payloadMimeType != null ? ', payloadMimeType: $payloadMimeType' : ''}'
+        '${error != null ? ', error: $error' : ''}'
+        ' }';
+  }
+
+  /// Returns the [payload] or the [status] as [String].
   @override
   String toString() {
     if (payload != null) {
@@ -470,6 +605,212 @@ class APIResponse<T> {
       return error.toString();
     } else {
       return status.toString();
+    }
+  }
+}
+
+class Arguments {
+  /// The positional arguments.
+  List<String> args;
+
+  /// The parameters (keys with `--` prefixes).
+  Map<String, dynamic> parameters;
+
+  /// The flags (keys with `--` prefixes and no values).
+  Set<String> flags;
+
+  /// The abbreviations used to [parse].
+  Map<String, String> abbreviations;
+
+  Arguments(this.args,
+      {Map<String, dynamic>? parameters,
+      Set<String>? flags,
+      Map<String, String>? abbreviations})
+      : parameters = parameters ?? <String, dynamic>{},
+        flags = flags ?? <String>{},
+        abbreviations = abbreviations ?? <String, String>{};
+
+  /// The keys abbreviations.
+  Map<String, String> get keysAbbreviations {
+    var keysAbbrev = <String, String>{};
+
+    for (var e in abbreviations.entries) {
+      if (!keysAbbrev.containsKey(e.value)) {
+        keysAbbrev[e.value] = e.key;
+      }
+    }
+
+    return keysAbbrev;
+  }
+
+  /// Converts this instances to a [String] line.
+  ///
+  /// The inverse of [parseLine].
+  String toArgumentsLine(
+          {bool abbreviateFlags = true, bool abbreviateParameters = false}) =>
+      toArgumentsList(
+              abbreviateFlags: abbreviateFlags,
+              abbreviateParameters: abbreviateParameters)
+          .join(' ');
+
+  /// Converts this instances to a [String] line.
+  ///
+  /// The inverse of [parse].
+  List<String> toArgumentsList(
+      {bool abbreviateFlags = true, bool abbreviateParameters = false}) {
+    var arguments = <String>[];
+
+    var keysAbbreviations = abbreviateFlags || abbreviateParameters
+        ? this.keysAbbreviations
+        : abbreviations;
+
+    for (var f in flags) {
+      if (abbreviateFlags) {
+        var abbrev = keysAbbreviations[f];
+        if (abbrev != null) {
+          f = abbrev;
+        }
+      }
+      arguments.add('-$f');
+    }
+
+    for (var e in parameters.entries) {
+      var k = e.key;
+
+      if (abbreviateParameters) {
+        var abbrev = keysAbbreviations[k];
+        if (abbrev != null) {
+          k = abbrev;
+        }
+      }
+
+      var v = e.value;
+
+      if (v is Iterable) {
+        for (var val in v) {
+          arguments.add('--$k');
+          arguments.add('$val');
+        }
+      } else {
+        arguments.add('--$k');
+        arguments.add('$v');
+      }
+    }
+
+    return arguments;
+  }
+
+  @override
+  String toString() {
+    return 'Arguments{ args: $args, parameters: $parameters, flags: $flags }';
+  }
+
+  static final RegExp _regexpSpace = RegExp(r'\s+');
+
+  /// Splits [argsLine] to a [List].
+  static List<String> splitArgumentsLine(String argsLine) =>
+      argsLine.split(_regexpSpace);
+
+  /// Parses [argsLine].
+  ///
+  /// - See [parse].
+  factory Arguments.parseLine(
+    String argsLine, {
+    Set<String>? flags,
+    Map<String, String>? abbreviations,
+    bool caseInsensitive = true,
+  }) {
+    var args = splitArgumentsLine(argsLine);
+    return Arguments.parse(args,
+        flags: flags,
+        abbreviations: abbreviations,
+        caseInsensitive: caseInsensitive);
+  }
+
+  static final RegExp _namedParameter = RegExp(r'^--?(\w+)$');
+
+  /// Parses [args].
+  ///
+  /// - [flags] the flags keys.
+  /// - [abbreviations] the keys abbreviations.
+  /// - [caseInsensitive] if `true`, keys are `toLowerCase`.
+  factory Arguments.parse(
+    List<String> args, {
+    Set<String>? flags,
+    Map<String, String>? abbreviations,
+    bool caseInsensitive = true,
+  }) {
+    abbreviations ??= <String, String>{};
+
+    var parsedParams = <String, dynamic>{};
+    var parsedFlags = <String>{};
+
+    for (var i = 0; i < args.length;) {
+      var key = args[i];
+
+      String? name;
+      var flagName = false;
+
+      if (key.startsWith('-')) {
+        var match = _namedParameter.firstMatch(key);
+
+        if (match != null) {
+          name = match.group(1)!;
+
+          if (caseInsensitive) {
+            name = name.toLowerCase();
+          }
+
+          if (!key.startsWith('--')) {
+            var name2 = abbreviations[name];
+            if (name2 != null) {
+              name = name2;
+            } else if (i < args.length - 1) {
+              var next = args[i + 1];
+              var nextKey = _namedParameter.hasMatch(next);
+              flagName = nextKey;
+            } else {
+              flagName = true;
+            }
+          }
+        }
+      }
+
+      if (name != null) {
+        if (flags != null && flags.contains(name)) {
+          args.removeAt(i);
+          parsedFlags.add(name);
+        } else if (flagName) {
+          args.removeAt(i);
+          parsedFlags.add(name);
+        } else if (i < args.length - 1) {
+          var val = args.removeAt(i + 1);
+          args.removeAt(i);
+          _addToMap(parsedParams, name, val);
+        } else {
+          throw StateError('Should be a flag');
+        }
+      } else {
+        ++i;
+      }
+    }
+
+    return Arguments(args,
+        parameters: parsedParams,
+        flags: parsedFlags,
+        abbreviations: abbreviations);
+  }
+
+  static void _addToMap(Map<String, dynamic> map, String key, String value) {
+    if (map.containsKey(key)) {
+      var prev = map[key];
+      if (prev is List) {
+        prev.add(value);
+      } else {
+        map[key] = [prev, value];
+      }
+    } else {
+      map[key] = value;
     }
   }
 }
