@@ -74,7 +74,7 @@ To activate it globally:
  $> dart pub global activate bones_api
 ```
 
-Now tou can use the CLI directly:
+Now you can use the CLI directly:
 
 ```bash
   $> bones_api --help
