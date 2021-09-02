@@ -16,6 +16,7 @@
 - petitparser: ^4.2.0
 - hotreloader: ^3.0.1
 - logging: ^1.0.1
+- collection: ^1.15.0
 - lints: ^1.0.1
 
 ## 1.0.4

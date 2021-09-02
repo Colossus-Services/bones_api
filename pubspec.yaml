@@ -18,6 +18,7 @@ dependencies:
   petitparser: ^4.2.0
   hotreloader: ^3.0.1
   logging: ^1.0.1
+  collection: ^1.15.0
 
 dev_dependencies:
   lints: ^1.0.1
