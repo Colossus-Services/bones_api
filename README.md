@@ -86,6 +86,27 @@ To serve an API project:
   $> bones_api serve --directory path/to/project --class MyAPIRoot
 ```
 
+## Hot Reload
+
+`APIServer` supports Hot Reload when the Dart VM is running with `--enable-vm-service`:
+
+```dart
+void main() async {
+  var apiServer = APIServer(api, 'localhost', 8080, hotReload: true);
+  await apiServer.start();
+}
+```
+
+The CLI `bones_api`, when called with `--hotreload`,
+will launch a new Dart VM with `--enable-vm-service` (if needed) to allow Hot Reload. 
+
+To serve an API project with Hot Reload enabled:
+
+```bash
+  $> bones_api serve --directory path/to/project --class MyAPIRoot --hotreload
+```
+
+
 ## Bones_UI
 
 See also the package [Bones_UI][bones_ui], a simple and easy Web User Interface Framework for Dart.

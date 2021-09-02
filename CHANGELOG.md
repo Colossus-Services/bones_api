@@ -1,3 +1,23 @@
+## 1.0.5
+
+- Added integration with `ReflectionFactory`.
+  - Routes can be configured using a `reflection` object. 
+- `APIServer`:
+  - Added support to Dart VM Hot Reload.
+- CLI `bones_api`:
+  - Added flag `--hotreload` to serve the API with Hot Reload enabled.  
+- Added `DataEntity` and `DataHandler` framework
+- Added `Condition`:
+  - Allow queries using a syntax similar to Dart.
+- New `APIRepository`, to allow database agnostic integration.
+- dart_spawner: ^1.0.5
+- reflection_factory: ^1.0.4
+- args: ^2.2.0 
+- petitparser: ^4.2.0
+- hotreloader: ^3.0.1
+- logging: ^1.0.1
+- lints: ^1.0.1
+
 ## 1.0.4
 
 - CLI `bones_api`:

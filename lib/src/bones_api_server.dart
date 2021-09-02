@@ -4,8 +4,15 @@ import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/bones_api.dart';
+import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
+
+import 'bones_api_hotreload.dart';
+import 'bones_api_logging.dart';
+
+final _log = logging.Logger('APIServer');
 
 /// An API HTTP Server
 class APIServer {
@@ -28,9 +35,21 @@ class APIServer {
   /// This is used for the `server` header.
   final String version;
 
-  APIServer(this.apiRoot, String address, this.port,
-      {this.name = 'APIServer', this.version = APIRoot.VERSION})
-      : address = _normalizeAddress(address);
+  /// If `true` enables Hot Reload ([APIHotReload.enable]).
+  final bool hotReload;
+
+  /// If `true` log messages to [stdout] (console).
+  final bool logToConsole;
+
+  APIServer(
+    this.apiRoot,
+    String address,
+    this.port, {
+    this.name = 'Bones_API',
+    this.version = APIRoot.VERSION,
+    this.hotReload = false,
+    this.logToConsole = true,
+  }) : address = _normalizeAddress(address);
 
   static String _normalizeAddress(String address) {
     address = address.trim();
@@ -74,8 +93,18 @@ class APIServer {
     if (_started) return true;
     _started = true;
 
+    if (logToConsole) {
+      _log.handler.logToConsole();
+    }
+
     _httpServer = await shelf_io.serve(_process, address, port);
     _httpServer.autoCompress = true;
+
+    if (hotReload) {
+      await APIHotReload.get().enable();
+    }
+
+    _log.info('Started HTTP server: $address:$port');
 
     return true;
   }
@@ -144,12 +173,12 @@ class APIServer {
 
     headers['server'] ??= serverName;
 
+    var payload = resolveBody(apiResponse.payload, apiResponse);
+
     var contentType = apiResponse.payloadMimeType;
     if (contentType != null && contentType.isNotEmpty) {
       headers['content-type'] = contentType;
     }
-
-    var payload = resolveBody(apiResponse.payload);
 
     Response response;
     switch (apiResponse.status) {
@@ -170,7 +199,7 @@ class APIServer {
         }
       case APIResponseStatus.ERROR:
         {
-          var error = resolveBody(apiResponse.error);
+          var error = resolveBody(apiResponse.error, apiResponse);
           response =
               Response.internalServerError(body: error, headers: headers);
           break;
@@ -188,28 +217,55 @@ class APIServer {
   }
 
   /// Resolves a [payload] to a HTTP body.
-  static Object? resolveBody(dynamic payload) {
+  static Object? resolveBody(dynamic payload, APIResponse apiResponse) {
     if (payload == null) return null;
-    if (payload is String) return payload;
-    if (payload is List<int>) return payload;
-    if (payload is Stream<List<int>>) return payload;
+
+    if (payload is String) {
+      apiResponse.payloadMimeType ??= resolveBestTextMimeType(payload);
+      return payload;
+    }
+
+    if (payload is List<int>) {
+      apiResponse.payloadMimeType ??= 'application/octet-stream';
+      return payload;
+    }
+
+    if (payload is Stream<List<int>>) {
+      apiResponse.payloadMimeType ??= 'application/octet-stream';
+      return payload;
+    }
 
     if (payload is DateTime) {
       return payload.toString();
     }
 
     try {
-      var s = json.encode(payload);
+      var s =
+          json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
+      apiResponse.payloadMimeType ??= 'application/json';
       return s;
     } catch (e) {
       var s = payload.toString();
+      apiResponse.payloadMimeType ??= resolveBestTextMimeType(s);
       return s;
     }
   }
 
+  static final RegExp _htmlTag = RegExp(r'<\w+.*?>');
+
+  static String resolveBestTextMimeType(String text) {
+    if (text.contains('<')) {
+      if (_htmlTag.hasMatch(text)) {
+        return 'text/html';
+      }
+    }
+
+    return 'text/plain';
+  }
+
   @override
   String toString() {
-    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port, started: $isStarted, stopped: $isStopped }';
+    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port, hotReload: $hotReload, started: $isStarted, stopped: $isStopped }';
   }
 
   /// Creates an [APIServer] with [apiRoot].
@@ -225,6 +281,7 @@ class APIServer {
 
     String address;
     int port;
+    var hotReload = false;
 
     if (args.isEmpty) {
       address = 'localhost';
@@ -248,9 +305,15 @@ class APIServer {
     } else {
       address = _parseArg(args, 'address', 'a', 'localhost', 0);
       port = int.parse(_parseArg(args, 'port', 'p', '8080', 1));
+
+      var hotReloadStr =
+          _parseArg(args, 'hotreload', 'r', 'false', 2, flag: true)
+              .toLowerCase();
+
+      hotReload = hotReloadStr == 'true' || hotReloadStr == 'hotreload';
     }
 
-    var apiServer = APIServer(apiRoot, address, port);
+    var apiServer = APIServer(apiRoot, address, port, hotReload: hotReload);
 
     return apiServer;
   }
@@ -271,7 +334,8 @@ class APIServer {
   }
 
   static String _parseArg(
-      List<String> args, String name, String abbrev, String def, int index) {
+      List<String> args, String name, String abbrev, String def, int index,
+      {bool flag = false}) {
     if (args.isEmpty) return def;
 
     for (var i = 0; i < args.length; ++i) {
@@ -279,8 +343,12 @@ class APIServer {
 
       if (i < args.length - 1 &&
           (a == '--$name' || a == '-$name' || a == '-$abbrev')) {
-        var v = args[i + 1];
-        return v;
+        if (!flag) {
+          var v = args[i + 1];
+          return v;
+        } else {
+          return 'true';
+        }
       }
     }
 

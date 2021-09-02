@@ -120,8 +120,12 @@ class CommandServe extends CommandSourceFileBase {
     argParser.addOption('port',
         abbr: 'p', help: 'Server listen port', defaultsTo: '8080');
 
-    argParser.addOption('class',
-        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
+    argParser.addOption('class', abbr: 'c', help: 'Project APIRoot Class name');
+
+    argParser.addFlag('hotreload',
+        abbr: 'r',
+        help:
+            'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed)');
   }
 
   String? get argClass => argResults!['class'];
@@ -130,27 +134,100 @@ class CommandServe extends CommandSourceFileBase {
 
   String get argPort => argResults!['port']!;
 
+  bool get argHotReload => argResults!['hotreload']! as bool;
+
   @override
   FutureOr<bool> run() async {
     var directory = argDirectory;
     var apiRootClass = argClass;
     var address = argAddress;
     var port = argPort;
+    var hotReload = argHotReload;
+
+    var parametersMessage = <String>[];
 
     if (directory == null) {
-      throw ArgumentError.notNull('directory');
+      var filePubSpec = File('./pubspec.yaml').absolute;
+
+      if (filePubSpec.existsSync()) {
+        directory = Directory.current.absolute.path;
+        parametersMessage
+            .add('** Using current directory as Project directory.');
+      }
+    }
+
+    var requiredParameters = <String>[];
+
+    if (directory == null) {
+      requiredParameters.add('--directory ./path/to/project');
+    } else {
+      directory = Directory(directory).absolute.path;
+      if (directory.endsWith('/.')) {
+        directory = directory.substring(0, directory.length - 2);
+      }
     }
 
     if (apiRootClass == null) {
-      throw ArgumentError.notNull('apiRootClass');
+      requiredParameters.add('--class APIRootClassName');
     }
 
-    if (verbose) {
-      _log('SERVE',
-          'directory: $directory ; apiRootClass: $apiRootClass ; address: $address ; port: $port');
+    if (requiredParameters.isNotEmpty) {
+      print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
+
+      if (parametersMessage.isNotEmpty) {
+        for (var m in parametersMessage) {
+          print(m);
+        }
+        print('');
+      }
+
+      print('** Required parameters:');
+      for (var m in requiredParameters) {
+        print('  $m');
+      }
+
+      print('\nTry --help for usage information.');
+      return false;
     }
 
-    var spawner = DartSpawner(directory: Directory(directory));
+    var spawner = DartSpawner(directory: Directory(directory!));
+
+    if (hotReload) {
+      var hotReloadAllowed = await APIHotReload.get().isHotReloadAllowed();
+      if (!hotReloadAllowed) {
+        await _spawnDartVMForHotReload(spawner, directory, apiRootClass!,
+            address, port, parametersMessage);
+        return true;
+      }
+    }
+
+    return await _spawnAPIServerIsolate(parametersMessage, directory,
+        apiRootClass!, spawner, address, port, hotReload);
+  }
+
+  Future<bool> _spawnAPIServerIsolate(
+      List<String> parametersMessage,
+      String directory,
+      String apiRootClass,
+      DartSpawner spawner,
+      String address,
+      String port,
+      bool hotReload) async {
+    print(
+        '________________________________________________________________________________');
+    print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
+
+    if (parametersMessage.isNotEmpty) {
+      for (var m in parametersMessage) {
+        print(m);
+      }
+      print('');
+    }
+
+    print('- Project directory: $directory');
+    print('- API Class: $apiRootClass\n');
+
+    print('Building API Server...');
 
     var projectBonesAPIVersions =
         spawner.getProjectDependencyVersion('bones_api');
@@ -166,18 +243,71 @@ class CommandServe extends CommandSourceFileBase {
     var dartScript = buildDartScript(
         spawner.id, projectPackageName, projectLibraryName, apiRootClass);
 
+    print('Spawning API Server Isolate...\n');
+
     var process = await spawner.spawnDartScript(
       dartScript,
-      [address, port],
+      [address, port, '$hotReload'],
       usesSpawnedMain: true,
       debugName: apiRootClass,
     );
 
     var exit = await process.exitCode;
 
-    print('Serve exit: $exit');
+    await Future.delayed(Duration(milliseconds: 500));
+
+    print(
+        '________________________________________________________________________________');
+    print('API Server exit: $exit');
 
     return true;
+  }
+
+  Future<void> _spawnDartVMForHotReload(
+      DartSpawner spawner,
+      String directory,
+      String apiRootClass,
+      String address,
+      String port,
+      List<String> parametersMessage) async {
+    print(
+        '________________________________________________________________________________');
+    print('[Bones_API/${APIRoot.VERSION}]\n');
+
+    if (parametersMessage.isNotEmpty) {
+      for (var m in parametersMessage) {
+        print(m);
+      }
+      print('');
+    }
+
+    print('Enabling Hot Reload...');
+    print('Starting a Dart VM with `--enable-vm-service` for Hot Reload...');
+    print(
+        '================================================================================');
+
+    var process = await spawner.runDartVM(
+        'bones_api',
+        [
+          'serve',
+          '--directory',
+          directory,
+          '--class',
+          apiRootClass,
+          '--address',
+          address,
+          '--port',
+          port,
+          '--hotreload',
+        ],
+        enableVMService: true,
+        handleSignals: true,
+        redirectOutput: true,
+        onSignal: (s) => print('\n## SIGNAL: $s'));
+
+    var exitCode = await process.exitCode;
+
+    exit(exitCode);
   }
 
   String buildDartScript(int isolateID, String projectPackageName,
@@ -190,19 +320,29 @@ import 'package:$projectPackageName/$projectLibraryName.dart';
 
 void main(List<String> args, dynamic parentPort) {
   spawnedMain(args, parentPort, $isolateID, (args) async {
+    print('________________________________________________________________________________');
+    print('[Bones_API/${APIRoot.VERSION}] :: HTTP Server\\n');
+    print('- API Package: $projectPackageName/$projectLibraryName');
+    print('- API Class: $apiRootClass');
+    
     var address = args[0];
-    var port = int.parse(args[1]); 
+    var port = int.parse(args[1]);
+    var hotReload = args[2] == 'true'; 
+    
+    print('- API Server: \$address:\$port\\n');
+    
+    print('Starting APIServer...\\n');
     
     var api = $apiRootClass();
     
-    var apiServer = APIServer(api, address, port);
+    var apiServer = APIServer(api, address, port, hotReload: hotReload);
     await apiServer.start();
     
-    print('------------------------------------------------------------------');
-    print('- API Package: $projectPackageName/$projectLibraryName');
-    print('- API Class: $apiRootClass\\n');
-    print('Running \$apiServer');
+    print('\\n** APIServer Started.\\n');
+    
+    print('\$apiServer\\n');
     print('URL: \${ apiServer.url }');
+    print('________________________________________________________________________________');
     
     await apiServer.waitStopped();
   });
@@ -269,7 +409,7 @@ class CommandConsole extends CommandSourceFileBase {
 
     var exit = await process.exitCode;
 
-    print('Serve exit: $exit');
+    print('Console exit: $exit');
 
     return true;
   }

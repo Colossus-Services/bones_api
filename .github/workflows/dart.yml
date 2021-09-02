@@ -30,6 +30,8 @@ jobs:
         run: dart run dependency_validator
       - name: Run tests
         run: dart test
+      - name: dartdoc
+        run: dartdoc --no-generate-docs
       - name: Generate coverage report
         run: dart run test_cov
       - name: Upload coverage to Codecov

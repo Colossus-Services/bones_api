@@ -1,8 +1,14 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
+import 'package:reflection_factory/reflection_factory.dart';
+
+import 'bones_api_extension.dart';
+
 /// Root class of an API.
 abstract class APIRoot {
-  static const String VERSION = '1.0.4';
+  // ignore: constant_identifier_names
+  static const String VERSION = '1.0.5';
 
   /// API name.
   final String name;
@@ -243,43 +249,139 @@ abstract class APIModule {
 }
 
 /// A route builder.
-class APIRouteBuilder {
+class APIRouteBuilder<M extends APIModule> {
   /// The API module of this route builder.
-  final APIModule module;
+  final M module;
 
   APIRouteBuilder(this.module);
 
-  /// Adds a route of [name] with [handler] for ANY method.
+  /// Adds a route of [name] with [handler] for ANY request method.
   APIModule any(String name, APIRouteHandler handler) =>
-      module.addRoute(null, name, handler);
+      add(null, name, handler);
 
-  /// Adds a route of [name] with [handler] for `GET` method.
+  /// Adds a route of [name] with [handler] for `GET` request method.
   APIModule get(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.GET, name, handler);
+      add(APIRequestMethod.GET, name, handler);
 
-  /// Adds a route of [name] with [handler] for `POST` method.
+  /// Adds a route of [name] with [handler] for `POST` request method.
   APIModule post(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.POST, name, handler);
+      add(APIRequestMethod.POST, name, handler);
 
-  /// Adds a route of [name] with [handler] for `PUT` method.
+  /// Adds a route of [name] with [handler] for `PUT` request method.
   APIModule put(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.PUT, name, handler);
+      add(APIRequestMethod.PUT, name, handler);
 
-  /// Adds a route of [name] with [handler] for `DELETE` method.
+  /// Adds a route of [name] with [handler] for `DELETE` request method.
   APIModule delete(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.DELETE, name, handler);
+      add(APIRequestMethod.DELETE, name, handler);
 
-  /// Adds a route of [name] with [handler] for `PATCH` method.
+  /// Adds a route of [name] with [handler] for `PATCH` request method.
   APIModule patch(String name, APIRouteHandler handler) =>
-      module.addRoute(APIRequestMethod.PATCH, name, handler);
+      add(APIRequestMethod.PATCH, name, handler);
+
+  /// Adds a route of [name] with [handler] for the request [method].
+  APIModule add(
+          APIRequestMethod? method, String name, APIRouteHandler handler) =>
+      module.addRoute(method, name, handler);
+
+  /// Adds routes from [provider] for ANY request method.
+  void anyFrom(Object? provider) => from(null, provider);
+
+  /// Adds routes from [provider] for `GET` request method.
+  void getFrom(Object? provider) => from(APIRequestMethod.GET, provider);
+
+  /// Adds routes from [provider] for `POS` request method.
+  void postFrom(Object? provider) => from(APIRequestMethod.POST, provider);
+
+  /// Adds routes from [provider] for `PUT` request method.
+  void putFrom(Object? provider) => from(APIRequestMethod.PUT, provider);
+
+  /// Adds routes from [provider] for `DELETE` request method.
+  void deleteFrom(Object? provider) => from(APIRequestMethod.DELETE, provider);
+
+  /// Adds routes from [provider] for `PATCH` request method.
+  void patchFrom(Object? provider) => from(APIRequestMethod.PATCH, provider);
+
+  /// Adds routes from [provider] for the request [requestMethod].
+  ///
+  /// [provider] can be one of the types below:
+  /// - [MethodReflection]: a route from a reflection method (uses the method name as route name). See [apiMethod].
+  /// - [Iterable<MethodReflection>]: a list of many routes from [MethodReflection]. See [apiMethods].
+  /// - [ClassReflection]: uses the API methods in the reflected class. See [apiReflection].
+  /// - [Iterable]: a list of any of the provider types above.
+  void from(APIRequestMethod? requestMethod, Object? provider) {
+    if (provider == null) return;
+
+    if (provider is MethodReflection) {
+      apiMethod(provider, requestMethod);
+    } else if (provider is Iterable<MethodReflection>) {
+      apiMethods(provider, requestMethod);
+    } else if (provider is ClassReflection) {
+      apiReflection(provider, requestMethod);
+    } else if (provider is Iterable) {
+      for (var e in provider) {
+        from(e, requestMethod);
+      }
+    }
+  }
+
+  /// Adds routes from a [reflection], one for each API method in the reflected class.
+  /// See [ClassReflectionExtension.apiMethods].
+  ///
+  /// - [requestMethod] the route request method.
+  void apiReflection(ClassReflection reflection,
+      [APIRequestMethod? requestMethod]) {
+    var methods = reflection.apiMethods();
+    apiMethods(methods, requestMethod);
+  }
+
+  /// Adds the routes from [apiMethods]. See [apiMethod].
+  void apiMethods(Iterable<MethodReflection> apiMethods,
+      [APIRequestMethod? requestMethod]) {
+    for (var m in apiMethods) {
+      apiMethod(m, requestMethod);
+    }
+  }
+
+  /// Adds a route from [apiMethod], using the same name of the methods as route.
+  /// See [MethodReflectionExtension.isAPIMethod].
+  ///
+  /// - [requestMethod] the route request method.
+  void apiMethod(MethodReflection apiMethod,
+      [APIRequestMethod? requestMethod]) {
+    var returnsAPIResponse = apiMethod.returnsAPIResponse;
+    var receivesAPIRequest = apiMethod.receivesAPIRequest;
+
+    if (returnsAPIResponse && receivesAPIRequest) {
+      add(requestMethod, apiMethod.name, (req) {
+        return apiMethod.invoke([req]);
+      });
+    } else if (receivesAPIRequest) {
+      add(requestMethod, apiMethod.name, (req) {
+        var ret = apiMethod.invoke([req]);
+        return APIResponse.from(ret);
+      });
+    } else if (returnsAPIResponse) {
+      add(requestMethod, apiMethod.name, (req) {
+        var methodInvocation = apiMethod
+            .methodInvocation((key) => req.getParameterIgnoreCase(key));
+        return methodInvocation.invoke(apiMethod.method);
+      });
+    }
+  }
 }
 
 /// API Methods
 enum APIRequestMethod {
+  // ignore: constant_identifier_names
   GET,
+  // ignore: constant_identifier_names
   POST,
+  // ignore: constant_identifier_names
   PUT,
+  // ignore: constant_identifier_names
   DELETE,
+  // ignore: constant_identifier_names
   PATCH,
 }
 
@@ -519,6 +621,119 @@ class APIRequest extends APIPayload {
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
 
+  /// Returns from [parameters] a value for [name] or [name1] .. [name9].
+  V? getParameter<V>(
+    String name, [
+    String? name2,
+    String? name3,
+    String? name4,
+    String? name5,
+    String? name6,
+    String? name7,
+    String? name8,
+    String? name9,
+  ]) {
+    var val = parameters[name];
+    if (val != null) return val;
+
+    if (name2 != null) {
+      val = parameters[name2];
+      if (val != null) return val;
+    }
+
+    if (name3 != null) {
+      val = parameters[name3];
+      if (val != null) return val;
+    }
+
+    if (name4 != null) {
+      val = parameters[name4];
+      if (val != null) return val;
+    }
+
+    if (name5 != null) {
+      val = parameters[name5];
+      if (val != null) return val;
+    }
+
+    if (name6 != null) {
+      val = parameters[name6];
+      if (val != null) return val;
+    }
+
+    if (name7 != null) {
+      val = parameters[name7];
+      if (val != null) return val;
+    }
+
+    if (name8 != null) {
+      val = parameters[name8];
+      if (val != null) return val;
+    }
+
+    if (name9 != null) {
+      val = parameters[name9];
+      if (val != null) return val;
+    }
+
+    return null;
+  }
+
+  /// Returns from [parameters] a value for [name] or [name1] .. [name9] ignoring case.
+  /// See [getParameter].
+  V? getParameterIgnoreCase<V>(
+    String name, [
+    String? name2,
+    String? name3,
+    String? name4,
+    String? name5,
+    String? name6,
+    String? name7,
+    String? name8,
+    String? name9,
+  ]) {
+    var val = getParameter(name, name2, name3, name4, name5);
+    if (val != null) return val;
+
+    for (var k in parameters.keys) {
+      if (equalsIgnoreAsciiCase(k, name)) return parameters[k];
+
+      if (name2 != null && equalsIgnoreAsciiCase(k, name2)) {
+        return parameters[k];
+      }
+
+      if (name3 != null && equalsIgnoreAsciiCase(k, name3)) {
+        return parameters[k];
+      }
+
+      if (name4 != null && equalsIgnoreAsciiCase(k, name4)) {
+        return parameters[k];
+      }
+
+      if (name5 != null && equalsIgnoreAsciiCase(k, name5)) {
+        return parameters[k];
+      }
+
+      if (name6 != null && equalsIgnoreAsciiCase(k, name6)) {
+        return parameters[k];
+      }
+
+      if (name7 != null && equalsIgnoreAsciiCase(k, name7)) {
+        return parameters[k];
+      }
+
+      if (name8 != null && equalsIgnoreAsciiCase(k, name8)) {
+        return parameters[k];
+      }
+
+      if (name9 != null && equalsIgnoreAsciiCase(k, name9)) {
+        return parameters[k];
+      }
+    }
+
+    return null;
+  }
+
   @override
   String toString() {
     return 'APIRequest{ method: $method, path: $path, parameters: $parameters, headers: $headers${hasPayload ? ', payloadLength: $payloadLength' : ''} }';
@@ -527,9 +742,13 @@ class APIRequest extends APIPayload {
 
 /// An [APIResponse] status.
 enum APIResponseStatus {
+  // ignore: constant_identifier_names
   OK,
+  // ignore: constant_identifier_names
   NOT_FOUND,
+  // ignore: constant_identifier_names
   UNAUTHORIZED,
+  // ignore: constant_identifier_names
   ERROR,
 }
 
@@ -584,6 +803,17 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.error({Map<String, dynamic>? headers, dynamic error}) {
     return APIResponse(APIResponseStatus.ERROR,
         headers: headers ?? <String, dynamic>{}, error: error);
+  }
+
+  /// Creates a response based into [o] value.
+  factory APIResponse.from(dynamic o) {
+    if (o == null) {
+      return APIResponse.notFound();
+    } else if (o is Error || o is Exception) {
+      return APIResponse.error(error: '$o');
+    } else {
+      return APIResponse.ok(o);
+    }
   }
 
   /// Response infos.

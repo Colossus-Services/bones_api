@@ -16,7 +16,8 @@ void main() async {
   var r3 = await api.call(APIRequest.get('/service/base/bar'));
   print(r3);
 
-  var apiServer = APIServer(api, '*', 8088);
+  // Start an APIServer with Hot Reload:
+  var apiServer = APIServer(api, '*', 8088, hotReload: true);
   await apiServer.start();
 
   print('Running: $apiServer');
