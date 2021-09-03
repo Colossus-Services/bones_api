@@ -11,6 +11,17 @@ abstract class APIHotReload {
   /// Returns `true` if Hot Reload is allowed in this Dart process.
   Future<bool> isHotReloadAllowed();
 
+  /// Returns the [isolate] ID that can be used at [ignoreIsolate].
+  String? getIsolateID(Object isolate);
+
+  /// Ignores an `Isolate` with [isolateId] for Hot Reload.
+  ///
+  /// - If [ignore] is `true` will add to ignore list, otherwise will removed.
+  void ignoreIsolate(String isolateId, [bool ignore = true]);
+
+  /// Returns `true` if [isolateId] is in ignore list for Hot Reload.
+  bool isIgnoredIsolate(String? isolateId);
+
   /// Returns `true` if Hot Reload is enabled.
   bool get isEnabled;
 

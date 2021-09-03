@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
@@ -245,9 +246,15 @@ class CommandServe extends CommandSourceFileBase {
 
     print('Spawning API Server Isolate...\n');
 
+    String hotReloadIgnoreIsolate = '';
+    if (hotReload) {
+      hotReloadIgnoreIsolate =
+          APIHotReload.get().getIsolateID(Isolate.current) ?? '';
+    }
+
     var process = await spawner.spawnDartScript(
       dartScript,
-      [address, port, '$hotReload'],
+      [address, port, '$hotReload', hotReloadIgnoreIsolate],
       usesSpawnedMain: true,
       debugName: apiRootClass,
     );
@@ -327,9 +334,15 @@ void main(List<String> args, dynamic parentPort) {
     
     var address = args[0];
     var port = int.parse(args[1]);
-    var hotReload = args[2] == 'true'; 
+    var hotReload = args[2] == 'true';
+    var hotReloadIgnoreIsolate = args[3]; 
     
     print('- API Server: \$address:\$port\\n');
+    
+    if (hotReloadIgnoreIsolate.isNotEmpty) {
+      print('Adding Isolate ID `\$hotReloadIgnoreIsolate` to Hot Reload ignore list...');
+      APIHotReload.get().ignoreIsolate(hotReloadIgnoreIsolate);
+    }
     
     print('Starting APIServer...\\n');
     

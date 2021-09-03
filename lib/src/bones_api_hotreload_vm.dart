@@ -1,13 +1,17 @@
 import 'dart:developer';
-import 'package:logging/logging.dart' as logging;
+import 'dart:isolate';
+
 import 'package:hotreloader/hotreloader.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_hotreload.dart';
 
 final _log = logging.Logger('APIHotReload');
 
 class APIHotReloadVM extends APIHotReload {
-  static Future<bool> isVMServiceEnabled() async {
+  APIHotReloadVM._();
+
+  Future<bool> isVMServiceEnabled() async {
     try {
       var serviceInfo = await Service.getInfo();
       var enabled = serviceInfo.serverUri != null;
@@ -19,16 +23,50 @@ class APIHotReloadVM extends APIHotReload {
     }
   }
 
-  static HotReloader? _hotReloader;
+  HotReloader? _hotReloader;
 
-  static Future<HotReloader?> hotReloader({bool autoCreate = true}) async {
+  Future<HotReloader?> hotReloader({bool autoCreate = true}) async {
     if (_hotReloader == null && autoCreate) {
       logging.hierarchicalLoggingEnabled = true;
       HotReloader.logLevel = logging.Level.CONFIG;
-      _hotReloader = await HotReloader.create();
+      _hotReloader = await HotReloader.create(onBeforeReload: (ctx) {
+        var isolateId = ctx.isolate.id;
+        var ignore = isIgnoredIsolate(isolateId);
+        if (ignore) {
+          _log.info('Hot-reload ignored for Isolate: `$isolateId`');
+        } else {
+          _log.info('Hot-reloading Isolate: `$isolateId`');
+        }
+        return !ignore;
+      });
       _log.info('Created HotReloader');
     }
     return _hotReloader;
+  }
+
+  @override
+  String? getIsolateID(Object isolate) {
+    if (isolate is Isolate) {
+      return Service.getIsolateID(isolate);
+    }
+    return null;
+  }
+
+  final Set<String> _ignoredIsolateIDs = <String>{};
+
+  @override
+  bool isIgnoredIsolate(String? isolateId) {
+    if (isolateId == null) return false;
+    return _ignoredIsolateIDs.contains(isolateId);
+  }
+
+  @override
+  void ignoreIsolate(String isolateId, [bool ignore = true]) {
+    if (ignore) {
+      _ignoredIsolateIDs.add(isolateId);
+    } else {
+      _ignoredIsolateIDs.remove(isolateId);
+    }
   }
 
   @override
@@ -114,5 +152,5 @@ class APIHotReloadVM extends APIHotReload {
 }
 
 APIHotReload createAPIHotReload() {
-  return APIHotReloadVM();
+  return APIHotReloadVM._();
 }

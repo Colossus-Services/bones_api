@@ -18,6 +18,15 @@ class APIHotReloadGeneric extends APIHotReload {
   @override
   Future<bool> reload({bool force = false, bool autoEnable = true}) async =>
       false;
+
+  @override
+  String? getIsolateID(Object isolate) => null;
+
+  @override
+  void ignoreIsolate(String isolateId, [bool ignore = true]) {}
+
+  @override
+  bool isIgnoredIsolate(String? isolateId) => false;
 }
 
 APIHotReload createAPIHotReload() {
