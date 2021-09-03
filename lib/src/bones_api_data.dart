@@ -14,6 +14,8 @@ abstract class DataEntity {
 
   void setID<V>(V id) => setField('id', id);
 
+  List<String> get fieldsNames;
+
   V? getField<V>(String key);
 
   void setField<V>(String key, V? value);
@@ -35,7 +37,7 @@ class DataHandlerProvider {
   }
 
   DataHandler<O>? getDataHandler<O>([O? o]) =>
-      _getDataHandlerImpl<O>() ?? _globalProvider._getDataHandlerImpl<O>();
+      _getDataHandlerImpl<O>(o) ?? _globalProvider._getDataHandlerImpl<O>(o);
 
   DataHandler<O>? _getDataHandlerImpl<O>([O? o]) {
     var dataHandler = _dataHandlers[O];
@@ -52,9 +54,9 @@ abstract class DataHandler<O> {
 
   DataHandler(DataHandlerProvider? provider, {Type? type})
       : provider = provider ?? DataHandlerProvider.globalProvider,
-        type = O {
+        type = type ?? O {
     if (!isValidType(this.type)) {
-      throw StateError('Invalid DataHandler type: $O ?? $type');
+      throw StateError('Invalid DataHandler type: $type ?? $O');
     }
 
     this.provider._register(this);
@@ -84,6 +86,8 @@ abstract class DataHandler<O> {
   V? getID<V>(O o) => getField(o, 'id');
 
   void setID<V>(O o, V id) => setField(o, 'id', id);
+
+  List<String> fieldsNames([O? o]);
 
   V? getField<V>(O o, String key);
 
@@ -115,6 +119,69 @@ abstract class DataHandler<O> {
       dart_convert.json.encode(o, toEncodable: jsonToEncodable);
 }
 
+class EntityDataHandler<O extends DataEntity> extends DataHandler<O> {
+  EntityDataHandler(
+      {Type? type, O? sampleEntity, DataHandlerProvider? provider})
+      : super(provider, type: type ?? O) {
+    if (sampleEntity != null) {
+      _populateFieldsNames(sampleEntity);
+    }
+  }
+
+  List<String>? _fieldsNames;
+
+  @override
+  List<String> fieldsNames([O? o]) {
+    var fieldsNames = _fieldsNames;
+
+    if (fieldsNames == null && o != null) {
+      _populateFieldsNames(o);
+      fieldsNames = _fieldsNames;
+    }
+
+    if (fieldsNames == null) {
+      throw StateError(
+          "`fieldsNames` Not populated yet! No DataEntity instances presented to this EntityDataHandler yet.");
+    }
+
+    return fieldsNames;
+  }
+
+  void _populateFieldsNames(O o) {
+    _fieldsNames ??= o.fieldsNames;
+  }
+
+  @override
+  String encodeObjectJson(O o) {
+    _populateFieldsNames(o);
+    return super.encodeObjectJson(o);
+  }
+
+  @override
+  V? getID<V>(O o) {
+    _populateFieldsNames(o);
+    return o.getID();
+  }
+
+  @override
+  void setID<V>(O o, V id) {
+    _populateFieldsNames(o);
+    o.setID(id);
+  }
+
+  @override
+  V? getField<V>(O o, String key) {
+    _populateFieldsNames(o);
+    return o.getField<V>(key);
+  }
+
+  @override
+  void setField<V>(O o, String key, V? value) {
+    _populateFieldsNames(o);
+    return o.setField<V>(key, value);
+  }
+}
+
 class ClassReflectionDataHandler<O> extends DataHandler<O> {
   Type classType;
 
@@ -137,6 +204,9 @@ class ClassReflectionDataHandler<O> extends DataHandler<O> {
   @override
   void setField<V>(O o, String key, V? value) =>
       reflection.setField(key, value, o);
+
+  @override
+  List<String> fieldsNames([O? o]) => reflection.fieldsNames;
 }
 
 mixin DataFieldAccessor<O> {
@@ -197,6 +267,8 @@ abstract class DataSource<O> extends DataAccessor<O> {
     return ret.isNotEmpty ? ret.first : null;
   }
 
+  int length();
+
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
   Iterable<O> selectByQuery(String query,
@@ -222,14 +294,71 @@ abstract class DataStorage<O> extends DataAccessor<O> {
 
   dynamic store(O o);
 
-  Iterable storeSet(Iterable<O> o);
+  Iterable storeAll(Iterable<O> o);
+}
+
+class DataRepositoryProvider {
+  static final DataRepositoryProvider _globalProvider =
+      DataRepositoryProvider();
+
+  static DataRepositoryProvider get globalProvider => _globalProvider;
+
+  final Map<Type, DataRepository> _dataRepositories = <Type, DataRepository>{};
+
+  void _register<O>(DataRepository<O> dataRepository) {
+    _dataRepositories[dataRepository.type] = dataRepository;
+  }
+
+  DataRepository<O>? getDataRepository<O>([O? o]) =>
+      _getDataRepositoryImpl<O>(o) ??
+      _globalProvider._getDataRepositoryImpl<O>(o);
+
+  DataRepository<O>? _getDataRepositoryImpl<O>([O? o]) {
+    var dataRepository = _dataRepositories[O];
+    if (dataRepository == null && o != null) {
+      dataRepository = _dataRepositories[o.runtimeType];
+    }
+    return dataRepository as DataRepository<O>?;
+  }
 }
 
 abstract class DataRepository<O> extends DataAccessor<O>
     implements DataSource<O>, DataStorage<O> {
-  DataRepository(String name) : super(name);
+  final DataRepositoryProvider provider;
 
-  DataHandler<O>? dataHandler;
+  final DataHandler<O> dataHandler;
+  final Type type;
+
+  DataRepository(
+      DataRepositoryProvider? provider, String name, this.dataHandler,
+      {Type? type})
+      : provider = provider ?? DataRepositoryProvider.globalProvider,
+        type = type ?? O,
+        super(name) {
+    if (!DataHandler.isValidType(this.type)) {
+      throw StateError('Invalid DataRepository type: $type ?? $O');
+    }
+
+    this.provider._register(this);
+  }
+
+  bool _initialized = false;
+
+  void ensureInitialized() {
+    if (_initialized) {
+      return;
+    }
+
+    _initialized = true;
+
+    initialize();
+  }
+
+  void initialize() {}
+
+  dynamic ensureStored(O o);
+
+  void ensureReferencesStored(O o);
 
   @override
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
@@ -246,11 +375,21 @@ abstract class DataRepository<O> extends DataAccessor<O>
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
   }
+
+  Map<String, dynamic> information();
+
+  @override
+  String toString() {
+    var info = information();
+    return 'DataRepository{ name: $name, provider: $provider, type: $type, information: $info }';
+  }
 }
 
 abstract class IterableDataRepository<O> extends DataRepository<O>
     with DataFieldAccessor<O> {
-  IterableDataRepository(String name) : super(name);
+  IterableDataRepository(String name, DataHandler<O> dataHandler,
+      {DataRepositoryProvider? provider})
+      : super(provider, name, dataHandler);
 
   Iterable<O> iterable();
 
@@ -283,7 +422,7 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
   }
 
   @override
-  int store(O o) {
+  dynamic store(O o) {
     var oId = getID(o, dataHandler: dataHandler);
 
     if (oId == null) {
@@ -293,17 +432,55 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
 
     put(o);
 
+    ensureReferencesStored(o);
+
     return oId;
   }
 
   @override
-  Iterable<int> storeSet(Iterable<O> os) {
+  Iterable<dynamic> storeAll(Iterable<O> os) {
     return os.map((o) => store(o)).toList();
   }
+
+  @override
+  dynamic ensureStored(O o) {
+    var id = getID(o, dataHandler: dataHandler);
+
+    if (id == null) {
+      return store(o);
+    }
+
+    return null;
+  }
+
+  @override
+  void ensureReferencesStored(O o) {
+    for (var fieldName in dataHandler.fieldsNames(o)) {
+      var value = dataHandler.getField(o, fieldName);
+      if (value == null) {
+        continue;
+      }
+
+      var repository = provider.getDataRepository(value);
+      if (repository == null) {
+        continue;
+      }
+
+      repository.ensureStored(value);
+    }
+  }
+
+  @override
+  Map<String, dynamic> information() => {
+        'length': length(),
+        'nextID': nextID(),
+      };
 }
 
 class SetDataRepository<O> extends IterableDataRepository<O> {
-  SetDataRepository(String name) : super(name);
+  SetDataRepository(String name, DataHandler<O> dataHandler,
+      {DataRepositoryProvider? provider})
+      : super(name, dataHandler, provider: provider);
 
   final Set<O> _entries = <O>{};
 
@@ -312,6 +489,9 @@ class SetDataRepository<O> extends IterableDataRepository<O> {
 
   @override
   int nextID() => _entries.length + 1;
+
+  @override
+  int length() => _entries.length;
 
   @override
   void put(O o) {

@@ -538,8 +538,6 @@ abstract class KeyCondition<O> extends Condition<O> {
   Object? getKeyValue(O o, [DataHandler<O>? dataHandler]) {
     if (o == null) return null;
 
-    DataFieldAccessorGeneric();
-
     dynamic obj = o;
     DataFieldAccessor fieldAccessor = this;
 

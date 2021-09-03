@@ -1,3 +1,14 @@
+## 1.0.6
+
+- CLI Hot Reload fixed:
+  - Avoid reload of main Isolate (bones_api CLI),
+    since API is spawned in it's own Isolate.
+- `DataEntity`:
+  - Added `fieldsNames`.
+- `DataHandlerProvider`:
+  - Fixed `getDataHandler`.
+- Added `EntityDataHandler` and `DataRepositoryProvider`.
+
 ## 1.0.5
 
 - Added integration with `ReflectionFactory`.

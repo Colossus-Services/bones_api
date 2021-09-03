@@ -6,7 +6,8 @@ void main() {
     setUp(() {});
 
     test('basic', () async {
-      var repository = SetDataRepository<User>('user');
+      var repository =
+          SetDataRepository<User>('user', EntityDataHandler<User>());
 
       expect(repository.nextID(), equals(1));
       expect(repository.selectByID(1), isNull);
@@ -107,6 +108,10 @@ class User extends DataEntity {
   int get hashCode => id.hashCode;
 
   @override
+  List<String> get fieldsNames =>
+      const <String>['id', 'email', 'password', 'address'];
+
+  @override
   V? getField<V>(String key) {
     switch (key) {
       case 'id':
@@ -196,6 +201,10 @@ class Address extends DataEntity {
       city.hashCode ^
       street.hashCode ^
       number.hashCode;
+
+  @override
+  List<String> get fieldsNames =>
+      const <String>['id', 'state', 'city', 'street', 'number'];
 
   @override
   V? getField<V>(String key) {

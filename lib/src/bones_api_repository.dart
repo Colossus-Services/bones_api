@@ -4,7 +4,9 @@ import 'bones_api_data.dart';
 abstract class APIRepository<O> {
   final DataRepository<O> dataRepository;
 
-  APIRepository(this.dataRepository);
+  APIRepository(this.dataRepository) {
+    dataRepository.ensureInitialized();
+  }
 
   void configure();
 
