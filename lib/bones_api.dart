@@ -15,7 +15,10 @@
 library bones_api;
 
 export 'src/bones_api_base.dart';
-export 'src/bones_api_data.dart';
 export 'src/bones_api_condition.dart';
+export 'src/bones_api_condition_sql.dart';
+export 'src/bones_api_data.dart';
+export 'src/bones_api_data_adapter.dart';
+export 'src/bones_api_data_sql.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_repository.dart';

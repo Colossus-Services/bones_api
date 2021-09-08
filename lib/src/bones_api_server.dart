@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/bones_api.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:mime/mime.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -221,21 +222,31 @@ class APIServer {
     if (payload == null) return null;
 
     if (payload is String) {
-      apiResponse.payloadMimeType ??= resolveBestTextMimeType(payload);
+      apiResponse.payloadMimeType ??=
+          resolveBestTextMimeType(payload, apiResponse.payloadFileExtension);
       return payload;
     }
 
     if (payload is List<int>) {
-      apiResponse.payloadMimeType ??= 'application/octet-stream';
+      apiResponse.payloadMimeType ??= lookupMimeType(
+              apiResponse.payloadFileExtension ?? 'bytes',
+              headerBytes: payload) ??
+          'application/octet-stream';
       return payload;
     }
 
     if (payload is Stream<List<int>>) {
-      apiResponse.payloadMimeType ??= 'application/octet-stream';
+      apiResponse.payloadMimeType ??=
+          lookupMimeType(apiResponse.payloadFileExtension ?? 'bytes') ??
+              'application/octet-stream';
+
       return payload;
     }
 
     if (payload is DateTime) {
+      apiResponse.payloadMimeType ??=
+          lookupMimeType(apiResponse.payloadFileExtension ?? 'text') ??
+              'text/plain';
       return payload.toString();
     }
 
@@ -246,14 +257,22 @@ class APIServer {
       return s;
     } catch (e) {
       var s = payload.toString();
-      apiResponse.payloadMimeType ??= resolveBestTextMimeType(s);
+      apiResponse.payloadMimeType ??=
+          resolveBestTextMimeType(s, apiResponse.payloadFileExtension);
       return s;
     }
   }
 
   static final RegExp _htmlTag = RegExp(r'<\w+.*?>');
 
-  static String resolveBestTextMimeType(String text) {
+  static String resolveBestTextMimeType(String text, [String? fileExtension]) {
+    if (fileExtension != null && fileExtension.isNotEmpty) {
+      var mimeType = lookupMimeType(fileExtension);
+      if (mimeType != null) {
+        return mimeType;
+      }
+    }
+
     if (text.contains('<')) {
       if (_htmlTag.hasMatch(text)) {
         return 'text/html';

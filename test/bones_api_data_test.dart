@@ -6,8 +6,8 @@ void main() {
     setUp(() {});
 
     test('basic', () async {
-      var repository =
-          SetDataRepository<User>('user', EntityDataHandler<User>());
+      var repository = SetDataRepository<User>('user',
+          EntityDataHandler<User>(instantiatorFromMap: (m) => User.fromMap(m)));
 
       expect(repository.nextID(), equals(1));
       expect(repository.selectByID(1), isNull);
@@ -81,8 +81,9 @@ void main() {
           equals([user2]));
 
       expect(
-          repository.selectByQuery('address.state == ?',
-              parameters: {'state': 'FL'}).map((e) => e.toJsonEncoded()),
+          (await repository.selectByQuery('address.state == ?',
+                  parameters: {'state': 'FL'}))
+              .map((e) => e.toJsonEncoded()),
           isEmpty);
     });
   });
@@ -98,6 +99,12 @@ class User extends DataEntity {
   Address address;
 
   User(this.email, this.password, this.address, {this.id});
+
+  User.fromMap(Map<String, dynamic> map)
+      : email = map['email'],
+        password = map['email'],
+        address = map['address'],
+        id = map['id'];
 
   @override
   bool operator ==(Object other) =>
@@ -122,6 +129,22 @@ class User extends DataEntity {
         return password as V?;
       case 'address':
         return address as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Type? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return int;
+      case 'email':
+        return String;
+      case 'password':
+        return String;
+      case 'address':
+        return Address;
       default:
         return null;
     }
@@ -219,6 +242,24 @@ class Address extends DataEntity {
         return street as V?;
       case 'number':
         return number as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Type? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return int;
+      case 'state':
+        return String;
+      case 'city':
+        return String;
+      case 'street':
+        return String;
+      case 'number':
+        return int;
       default:
         return null;
     }

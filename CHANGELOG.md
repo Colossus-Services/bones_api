@@ -1,3 +1,16 @@
+## 1.0.7
+
+- Added `APIPayload.payloadFileExtension`.
+- Added `ConditionEncoder`, `ConditionSQLEncoder`.
+- Improved Data & Entity framework:
+  - Added `SQLDatabaseAdapter` and `PostgreAdapter`.
+  - Added `DataRepositorySQL`.
+- Added DB Adapter for PostgreSQL.
+- APIServer:
+  - Better auto MIME Type resolution.
+- Now API methods can return `FutureOr<APIResponse>`.
+- mime: ^1.0.0
+
 ## 1.0.6
 
 - CLI Hot Reload fixed:

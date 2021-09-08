@@ -545,7 +545,7 @@ abstract class KeyCondition<O> extends Condition<O> {
       Object? value;
 
       if (key is ConditionKeyField) {
-        var objDataHandler = dataHandler?.getDataHandler(obj);
+        var objDataHandler = dataHandler?.getDataHandler(obj: obj);
         value =
             fieldAccessor.getField(obj, key.name, dataHandler: objDataHandler);
       } else if (key is ConditionKeyIndex) {

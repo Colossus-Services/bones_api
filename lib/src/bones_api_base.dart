@@ -420,6 +420,9 @@ abstract class APIPayload {
   /// The payload MIME Type.
   String? get payloadMimeType;
 
+  /// The payload usual file name extension.
+  String? get payloadFileExtension;
+
   /// Returns `true` if [payload] is not `null`.
   bool get hasPayload => payload != null;
 
@@ -469,13 +472,18 @@ class APIRequest extends APIPayload {
   @override
   String? payloadMimeType;
 
+  /// The payload usual file name extension.
+  @override
+  String? payloadFileExtension;
+
   late final List<String> _pathParts;
 
   APIRequest(this.method, this.path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       this.payload,
-      this.payloadMimeType})
+      this.payloadMimeType,
+      this.payloadFileExtension})
       : parameters = parameters ?? <String, dynamic>{},
         headers = headers ?? <String, dynamic>{},
         _pathParts = _buildPathParts(path);
@@ -768,6 +776,10 @@ class APIResponse<T> extends APIPayload {
   @override
   String? payloadMimeType;
 
+  /// The payload usual file name extension.
+  @override
+  String? payloadFileExtension;
+
   /// The response error.
   final dynamic error;
 
@@ -775,6 +787,7 @@ class APIResponse<T> extends APIPayload {
       {this.headers = const <String, dynamic>{},
       this.payload,
       this.payloadMimeType,
+      this.payloadFileExtension,
       this.error});
 
   /// Creates a response of status `OK`.

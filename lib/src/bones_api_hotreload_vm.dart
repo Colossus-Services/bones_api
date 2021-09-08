@@ -31,11 +31,13 @@ class APIHotReloadVM extends APIHotReload {
       HotReloader.logLevel = logging.Level.CONFIG;
       _hotReloader = await HotReloader.create(onBeforeReload: (ctx) {
         var isolateId = ctx.isolate.id;
+        var isolateName = ctx.isolate.name ?? '?';
         var ignore = isIgnoredIsolate(isolateId);
         if (ignore) {
-          _log.info('Hot-reload ignored for Isolate: `$isolateId`');
+          _log.info(
+              'Hot-reload ignored for Isolate[$isolateName]: `$isolateId`');
         } else {
-          _log.info('Hot-reloading Isolate: `$isolateId`');
+          _log.info('Hot-reloading Isolate[$isolateName]: `$isolateId`');
         }
         return !ignore;
       });
