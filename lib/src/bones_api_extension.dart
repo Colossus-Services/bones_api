@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_base.dart';
-import 'bones_api_data.dart';
+import 'bones_api_entity.dart';
 
 /// [ClassReflection] extension.
 extension ClassReflectionExtension<O> on ClassReflection<O> {
-  /// Returns a [ClassReflectionDataHandler] for instances of this reflected class ([classType]).
-  ClassReflectionDataHandler<O> get reflectionDataHandler =>
-      ClassReflectionDataHandler<O>(O);
+  /// Returns a [ClassReflectionEntityHandler] for instances of this reflected class ([classType]).
+  ClassReflectionEntityHandler<O> get reflectionEntityHandler =>
+      ClassReflectionEntityHandler<O>(O);
 
   /// Lists the API methods of this reflected class.
   /// See [MethodReflectionExtension.isAPIMethod].

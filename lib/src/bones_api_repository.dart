@@ -1,28 +1,31 @@
 import 'dart:async';
 
-import 'bones_api_data.dart';
+import 'bones_api_entity.dart';
 
-/// A data repository API.
+/// A entity repository API.
 abstract class APIRepository<O> {
-  /// Resolves a [DataRepository].
-  static DataRepository<O>? resolveDataRepository<O>(
-      {DataRepository<O>? dataRepository,
-      DataRepositoryProvider? provider,
+  /// Resolves a [EntityRepository].
+  static EntityRepository<O>? resolveEntityRepository<O>(
+      {EntityRepository<O>? entityRepository,
+      EntityRepositoryProvider? provider,
       Type? type}) {
-    return dataRepository ??
-        provider?.getDataRepository<O>(type: type) ??
-        DataRepositoryProvider.globalProvider.getDataRepository<O>(type: type);
+    return entityRepository ??
+        provider?.getEntityRepository<O>(type: type) ??
+        EntityRepositoryProvider.globalProvider
+            .getEntityRepository<O>(type: type);
   }
 
-  final DataRepository<O> dataRepository;
+  final EntityRepository<O> entityRepository;
 
   APIRepository(
-      {DataRepository<O>? dataRepository,
-      DataRepositoryProvider? provider,
+      {EntityRepository<O>? entityRepository,
+      EntityRepositoryProvider? provider,
       Type? type})
-      : dataRepository = resolveDataRepository(
-            dataRepository: dataRepository, provider: provider, type: type)! {
-    this.dataRepository.ensureInitialized();
+      : entityRepository = resolveEntityRepository(
+            entityRepository: entityRepository,
+            provider: provider,
+            type: type)! {
+    this.entityRepository.ensureInitialized();
   }
 
   void configure();
@@ -35,15 +38,15 @@ abstract class APIRepository<O> {
     configure();
   }
 
-  FutureOr<O?> selectByID(dynamic id) => dataRepository.selectByID(id);
+  FutureOr<O?> selectByID(dynamic id) => entityRepository.selectByID(id);
 
-  FutureOr<int> length() => dataRepository.length();
+  FutureOr<int> length() => entityRepository.length();
 
   FutureOr<Iterable<O>> selectByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters}) =>
-      dataRepository.selectByQuery(query,
+      entityRepository.selectByQuery(query,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);

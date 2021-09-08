@@ -1,31 +1,37 @@
 import 'dart:async';
 
-import 'package:bones_api/bones_api.dart';
-
 import 'package:async_extension/async_extension.dart';
 
-import 'bones_api_data_adapter.dart';
+import 'bones_api_condition.dart';
+import 'bones_api_entity.dart';
+import 'bones_api_entity_adapter.dart';
 
-class DataRepositorySQL<O> extends DataRepository<O> with DataFieldAccessor<O> {
+class SQLEntityRepository<O> extends EntityRepository<O>
+    with EntityFieldAccessor<O> {
   final SQLRepositoryAdapter<O> sqlRepositoryAdapter;
 
-  DataRepositorySQL(this.sqlRepositoryAdapter, DataRepositoryProvider? provider,
-      String name, DataHandler<O> dataHandler,
+  SQLEntityRepository(
+      this.sqlRepositoryAdapter,
+      EntityRepositoryProvider? provider,
+      String name,
+      EntityHandler<O> entityHandler,
       {Type? type})
-      : super(provider, name, dataHandler, type: type);
+      : super(provider, name, entityHandler, type: type);
 
   @override
   void initialize() {
     sqlRepositoryAdapter.ensureInitialized();
   }
 
+  String get dialect => sqlRepositoryAdapter.dialect;
+
   @override
   Map<String, dynamic> information() =>
-      {'queryType': 'SQL', 'dialect': sqlRepositoryAdapter.dialect};
+      {'queryType': 'SQL', 'dialect': dialect};
 
   @override
   dynamic ensureStored(o) {
-    var id = getID(o, dataHandler: dataHandler);
+    var id = getID(o, entityHandler: entityHandler);
 
     if (id == null) {
       return store(o);
@@ -38,13 +44,13 @@ class DataRepositorySQL<O> extends DataRepository<O> with DataFieldAccessor<O> {
 
   @override
   void ensureReferencesStored(o) {
-    for (var fieldName in dataHandler.fieldsNames(o)) {
-      var value = dataHandler.getField(o, fieldName);
+    for (var fieldName in entityHandler.fieldsNames(o)) {
+      var value = entityHandler.getField(o, fieldName);
       if (value == null) {
         continue;
       }
 
-      var repository = provider.getDataRepository(obj: value);
+      var repository = provider.getEntityRepository(obj: value);
       if (repository == null) {
         continue;
       }
@@ -72,14 +78,14 @@ class DataRepositorySQL<O> extends DataRepository<O> with DataFieldAccessor<O> {
         namedParameters: namedParameters);
 
     return selRet.resolveMapped((sel) {
-      var entities = sel.map((e) => dataHandler.createFromMap(e)).toList();
+      var entities = sel.map((e) => entityHandler.createFromMap(e)).toList();
       return entities.resolveAll();
     });
   }
 
   @override
   dynamic store(O o) {
-    var fields = dataHandler.getFields(o);
+    var fields = entityHandler.getFields(o);
     var sql = sqlRepositoryAdapter.generateInsertSQL(o, fields);
     return sqlRepositoryAdapter.insertSQL(sql, fields);
   }

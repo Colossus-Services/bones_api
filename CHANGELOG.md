@@ -1,3 +1,7 @@
+## 1.0.8
+
+- Rename `Data` classes to `Entity`.
+
 ## 1.0.7
 
 - Added `APIPayload.payloadFileExtension`.

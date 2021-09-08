@@ -6,10 +6,10 @@ import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_sql.dart';
-import 'bones_api_data.dart';
+import 'bones_api_entity.dart';
 import 'bones_api_mixin.dart';
 
-final _log = logging.Logger('SQLDatabaseAdapter');
+final _log = logging.Logger('SQLRepositoryAdapter');
 
 typedef PasswordProvider = FutureOr<String> Function(String user);
 
@@ -26,18 +26,18 @@ class SQL {
   }
 }
 
-abstract class SQLDatabaseAdapter<C>
+abstract class SQLAdapter<C>
     with Initializable, Pool<C>
-    implements DataRepositoryProvider {
+    implements EntityRepositoryProvider {
   final int minConnections;
 
   final int maxConnections;
 
   final String dialect;
 
-  final DataRepositoryProvider? parentRepositoryProvider;
+  final EntityRepositoryProvider? parentRepositoryProvider;
 
-  SQLDatabaseAdapter(this.minConnections, this.maxConnections, this.dialect,
+  SQLAdapter(this.minConnections, this.maxConnections, this.dialect,
       {this.parentRepositoryProvider});
 
   static final ConditionSQLEncoder _conditionSQLGenerator =
@@ -146,61 +146,62 @@ abstract class SQLDatabaseAdapter<C>
             tableName: tableName, type: type)) as SQLRepositoryAdapter<O>;
   }
 
-  final Map<Type, DataRepository> _dataRepositories = <Type, DataRepository>{};
+  final Map<Type, EntityRepository> _entityRepositories =
+      <Type, EntityRepository>{};
 
   @override
-  void registerDataRepository<O>(DataRepository<O> dataRepository) {
-    _dataRepositories[dataRepository.type] = dataRepository;
+  void registerEntityRepository<O>(EntityRepository<O> entityRepository) {
+    _entityRepositories[entityRepository.type] = entityRepository;
   }
 
   @override
-  DataRepository<O>? getDataRepository<O>({O? obj, Type? type}) =>
-      _getDataRepositoryImpl<O>(obj: obj, type: type) ??
-      DataRepositoryProvider.globalProvider
-          .getDataRepository<O>(obj: obj, type: type);
+  EntityRepository<O>? getEntityRepository<O>({O? obj, Type? type}) =>
+      _getEntityRepositoryImpl<O>(obj: obj, type: type) ??
+      EntityRepositoryProvider.globalProvider
+          .getEntityRepository<O>(obj: obj, type: type);
 
-  DataRepository<O>? _getDataRepositoryImpl<O>({O? obj, Type? type}) {
-    var dataRepository = _dataRepositories[O];
+  EntityRepository<O>? _getEntityRepositoryImpl<O>({O? obj, Type? type}) {
+    var entityRepository = _entityRepositories[O];
 
-    if (dataRepository == null && obj != null) {
-      dataRepository = _dataRepositories[obj.runtimeType];
+    if (entityRepository == null && obj != null) {
+      entityRepository = _entityRepositories[obj.runtimeType];
     }
 
-    if (dataRepository == null && type != null) {
-      dataRepository = _dataRepositories[type];
+    if (entityRepository == null && type != null) {
+      entityRepository = _entityRepositories[type];
     }
 
-    if (dataRepository != null) {
-      return dataRepository as DataRepository<O>;
+    if (entityRepository != null) {
+      return entityRepository as EntityRepository<O>;
     }
 
-    dataRepository =
-        parentRepositoryProvider?.getDataRepository<O>(obj: obj, type: type);
-    if (dataRepository != null) {
-      return dataRepository as DataRepository<O>;
+    entityRepository =
+        parentRepositoryProvider?.getEntityRepository<O>(obj: obj, type: type);
+    if (entityRepository != null) {
+      return entityRepository as EntityRepository<O>;
     }
 
-    for (var p in _knownDataRepositoryProviders) {
-      dataRepository = p.getDataRepository<O>(obj: obj, type: type);
-      if (dataRepository != null) {
-        return dataRepository as DataRepository<O>;
+    for (var p in _knownEntityRepositoryProviders) {
+      entityRepository = p.getEntityRepository<O>(obj: obj, type: type);
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
       }
     }
 
     return null;
   }
 
-  final Set<DataRepositoryProvider> _knownDataRepositoryProviders =
-      <DataRepositoryProvider>{};
+  final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
+      <EntityRepositoryProvider>{};
 
   @override
-  void notifyKnownDataRepositoryProvider(DataRepositoryProvider provider) {
-    _knownDataRepositoryProviders.add(provider);
+  void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
+    _knownEntityRepositoryProviders.add(provider);
   }
 }
 
 class SQLRepositoryAdapter<O> with Initializable {
-  final SQLDatabaseAdapter databaseAdapter;
+  final SQLAdapter databaseAdapter;
 
   final String name;
 

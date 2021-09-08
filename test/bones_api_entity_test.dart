@@ -6,8 +6,10 @@ void main() {
     setUp(() {});
 
     test('basic', () async {
-      var repository = SetDataRepository<User>('user',
-          EntityDataHandler<User>(instantiatorFromMap: (m) => User.fromMap(m)));
+      var repository = SetEntityRepository<User>(
+          'user',
+          GenericEntityHandler<User>(
+              instantiatorFromMap: (m) => User.fromMap(m)));
 
       expect(repository.nextID(), equals(1));
       expect(repository.selectByID(1), isNull);
@@ -89,7 +91,7 @@ void main() {
   });
 }
 
-class User extends DataEntity {
+class User extends Entity {
   int? id;
 
   String email;
@@ -187,7 +189,7 @@ class User extends DataEntity {
       };
 }
 
-class Address extends DataEntity {
+class Address extends Entity {
   int? id;
 
   String state;

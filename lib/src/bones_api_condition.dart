@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:bones_api/src/bones_api_condition_parser.dart';
 
-import 'bones_api_data.dart';
+import 'bones_api_entity.dart';
 
 abstract class ConditionElement {
   bool _resolved = false;
@@ -191,18 +191,18 @@ class ConditionParameter extends ConditionElement {
 
 abstract class EntityMatcher<O> {
   bool matches(O o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters});
 }
 
 abstract class Condition<O> extends ConditionElement
-    with DataFieldAccessor<O>
+    with EntityFieldAccessor<O>
     implements EntityMatcher<O> {
   @override
   bool matches(O o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters});
@@ -318,7 +318,7 @@ class GroupConditionAND<O> extends GroupCondition<O> {
 
   @override
   bool matches(o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
@@ -328,7 +328,7 @@ class GroupConditionAND<O> extends GroupCondition<O> {
 
     for (var c in conditions) {
       var matches = c.matches(o,
-          dataHandler: dataHandler,
+          entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
@@ -356,7 +356,7 @@ class GroupConditionOR<O> extends GroupCondition<O> {
 
   @override
   bool matches(o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
@@ -366,7 +366,7 @@ class GroupConditionOR<O> extends GroupCondition<O> {
 
     for (var c in conditions) {
       var matches = c.matches(o,
-          dataHandler: dataHandler,
+          entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
@@ -406,11 +406,11 @@ class IDCondition<O> extends Condition<O> {
 
   @override
   bool matches(o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var id = getID(o, dataHandler: dataHandler);
+    var id = getID(o, entityHandler: entityHandler);
 
     var idValue = this.idValue;
 
@@ -532,22 +532,22 @@ abstract class KeyCondition<O> extends Condition<O> {
   String get encodeKey =>
       isWordKey ? keys.first.encode() : keys.map((e) => e.encode()).join('.');
 
-  static final DataFieldAccessorGeneric _accessorGeneric =
-      DataFieldAccessorGeneric();
+  static final EntityFieldAccessorGeneric _accessorGeneric =
+      EntityFieldAccessorGeneric();
 
-  Object? getKeyValue(O o, [DataHandler<O>? dataHandler]) {
+  Object? getKeyValue(O o, [EntityHandler<O>? entityHandler]) {
     if (o == null) return null;
 
     dynamic obj = o;
-    DataFieldAccessor fieldAccessor = this;
+    EntityFieldAccessor fieldAccessor = this;
 
     for (var key in keys) {
       Object? value;
 
       if (key is ConditionKeyField) {
-        var objDataHandler = dataHandler?.getDataHandler(obj: obj);
-        value =
-            fieldAccessor.getField(obj, key.name, dataHandler: objDataHandler);
+        var objEntityHandler = entityHandler?.getEntityHandler(obj: obj);
+        value = fieldAccessor.getField(obj, key.name,
+            entityHandler: objEntityHandler);
       } else if (key is ConditionKeyIndex) {
         var index = key.index;
 
@@ -581,11 +581,11 @@ class KeyConditionEQ<O> extends KeyCondition<O> {
 
   @override
   bool matches(o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var keyValue = getKeyValue(o, dataHandler);
+    var keyValue = getKeyValue(o, entityHandler);
 
     return equalsConditionValue(value, keyValue,
         parameters: parameters,
@@ -610,11 +610,11 @@ class KeyConditionNotEQ<O> extends KeyCondition<O> {
 
   @override
   bool matches(o,
-      {DataHandler<O>? dataHandler,
+      {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var keyValue = getKeyValue(o, dataHandler);
+    var keyValue = getKeyValue(o, entityHandler);
 
     return !equalsConditionValue(value, keyValue,
         parameters: parameters,
@@ -683,12 +683,12 @@ class ConditionQuery<O> implements EntityMatcher<O> {
 
   @override
   bool matches(O o,
-          {DataHandler<O>? dataHandler,
+          {EntityHandler<O>? entityHandler,
           Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters}) =>
       condition.matches(o,
-          dataHandler: dataHandler,
+          entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);

@@ -1,6 +1,6 @@
 name: bones_api
 description: Bones_API - Simple and easy API framework, with routes and HTTP Server.
-version: 1.0.7
+version: 1.0.8
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:

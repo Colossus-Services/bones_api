@@ -2,17 +2,17 @@ import 'dart:async';
 import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/src/bones_api_mixin.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
+import 'bones_api_mixin.dart';
 
 typedef JsonToEncodable = Object? Function(dynamic object);
 
 typedef JsonReviver = Object? Function(Object? key, Object? value);
 
-abstract class DataEntity {
+abstract class Entity {
   V? getID<V>() => getField('id');
 
   void setID<V>(V id) => setField('id', id);
@@ -30,45 +30,45 @@ abstract class DataEntity {
   String toJsonEncoded() => dart_convert.json.encode(toJson());
 }
 
-class DataHandlerProvider {
-  static final DataHandlerProvider _globalProvider = DataHandlerProvider();
+class EntityHandlerProvider {
+  static final EntityHandlerProvider _globalProvider = EntityHandlerProvider();
 
-  static DataHandlerProvider get globalProvider => _globalProvider;
+  static EntityHandlerProvider get globalProvider => _globalProvider;
 
-  final Map<Type, DataHandler> _dataHandlers = <Type, DataHandler>{};
+  final Map<Type, EntityHandler> _entityHandlers = <Type, EntityHandler>{};
 
-  void _register<O>(DataHandler<O> dataHandler) {
-    _dataHandlers[dataHandler.type] = dataHandler;
+  void _register<O>(EntityHandler<O> entityHandler) {
+    _entityHandlers[entityHandler.type] = entityHandler;
   }
 
-  DataHandler<O>? getDataHandler<O>({O? obj, Type? type}) =>
-      _getDataHandlerImpl<O>(obj: obj, type: type) ??
-      _globalProvider._getDataHandlerImpl<O>(obj: obj, type: type);
+  EntityHandler<O>? getEntityHandler<O>({O? obj, Type? type}) =>
+      _getEntityHandlerImpl<O>(obj: obj, type: type) ??
+      _globalProvider._getEntityHandlerImpl<O>(obj: obj, type: type);
 
-  DataHandler<O>? _getDataHandlerImpl<O>({O? obj, Type? type}) {
-    var dataHandler = _dataHandlers[O];
+  EntityHandler<O>? _getEntityHandlerImpl<O>({O? obj, Type? type}) {
+    var entityHandler = _entityHandlers[O];
 
-    if (dataHandler == null && obj != null) {
-      dataHandler = _dataHandlers[obj.runtimeType];
+    if (entityHandler == null && obj != null) {
+      entityHandler = _entityHandlers[obj.runtimeType];
     }
 
-    if (dataHandler == null && type != null) {
-      dataHandler = _dataHandlers[type];
+    if (entityHandler == null && type != null) {
+      entityHandler = _entityHandlers[type];
     }
 
-    return dataHandler as DataHandler<O>?;
+    return entityHandler as EntityHandler<O>?;
   }
 }
 
-abstract class DataHandler<O> {
-  final DataHandlerProvider provider;
+abstract class EntityHandler<O> {
+  final EntityHandlerProvider provider;
   final Type type;
 
-  DataHandler(DataHandlerProvider? provider, {Type? type})
-      : provider = provider ?? DataHandlerProvider.globalProvider,
+  EntityHandler(EntityHandlerProvider? provider, {Type? type})
+      : provider = provider ?? EntityHandlerProvider.globalProvider,
         type = type ?? O {
     if (!isValidType(this.type)) {
-      throw StateError('Invalid DataHandler type: $type ?? $O');
+      throw StateError('Invalid EntityHandler type: $type ?? $O');
     }
 
     this.provider._register(this);
@@ -88,15 +88,15 @@ abstract class DataHandler<O> {
         type == bool;
   }
 
-  DataHandler<T>? getDataHandler<T>({T? obj, Type? type}) {
+  EntityHandler<T>? getEntityHandler<T>({T? obj, Type? type}) {
     if (T == O && isValidType<T>()) {
-      return this as DataHandler<T>;
+      return this as EntityHandler<T>;
     } else if (obj != null && obj.runtimeType == O && isValidType<O>()) {
-      return this as DataHandler<T>;
+      return this as EntityHandler<T>;
     } else if (type != null && type == O && isValidType<O>()) {
-      return this as DataHandler<T>;
+      return this as EntityHandler<T>;
     } else {
-      return provider.getDataHandler<T>(obj: obj, type: type);
+      return provider.getEntityHandler<T>(obj: obj, type: type);
     }
   }
 
@@ -174,7 +174,7 @@ abstract class DataHandler<O> {
       setField(o, key, value);
       return value;
     } else {
-      var valRepo = getDataRepository(type: fieldType);
+      var valRepo = getEntityRepository(type: fieldType);
       var valDynamicRet = valRepo?.selectByID(value);
 
       return valDynamicRet.resolveMapped((valDynamic) {
@@ -216,16 +216,16 @@ abstract class DataHandler<O> {
     return null;
   }
 
-  final Set<DataRepositoryProvider> _knownDataRepositoryProviders =
-      <DataRepositoryProvider>{};
+  final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
+      <EntityRepositoryProvider>{};
 
-  void notifyKnownDataRepositoryProvider(DataRepositoryProvider provider) {
-    _knownDataRepositoryProviders.add(provider);
+  void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
+    _knownEntityRepositoryProviders.add(provider);
   }
 
-  DataRepository<T>? getDataRepository<T>({T? obj, Type? type}) {
-    for (var provider in _knownDataRepositoryProviders) {
-      var repository = provider.getDataRepository(obj: obj, type: type);
+  EntityRepository<T>? getEntityRepository<T>({T? obj, Type? type}) {
+    for (var provider in _knownEntityRepositoryProviders) {
+      var repository = provider.getEntityRepository(obj: obj, type: type);
       if (repository != null) {
         return repository;
       }
@@ -238,17 +238,17 @@ typedef InstantiatorDefault<O> = FutureOr<O> Function();
 
 typedef InstantiatorFromMap<O> = FutureOr<O> Function(Map<String, dynamic>);
 
-class EntityDataHandler<O extends DataEntity> extends DataHandler<O> {
+class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   final InstantiatorDefault<O>? instantiatorDefault;
 
   final InstantiatorFromMap<O>? instantiatorFromMap;
 
-  EntityDataHandler(
+  GenericEntityHandler(
       {this.instantiatorDefault,
       this.instantiatorFromMap,
       Type? type,
       O? sampleEntity,
-      DataHandlerProvider? provider})
+      EntityHandlerProvider? provider})
       : super(provider, type: type ?? O) {
     if (instantiatorDefault == null && instantiatorFromMap == null) {
       throw ArgumentError(
@@ -273,7 +273,7 @@ class EntityDataHandler<O extends DataEntity> extends DataHandler<O> {
 
     if (fieldsNames == null) {
       throw StateError(
-          "`fieldsNames` Not populated yet! No DataEntity instances presented to this EntityDataHandler yet.");
+          "`fieldsNames` Not populated yet! No Entity instance presented to this EntityHandler yet.");
     }
 
     return fieldsNames;
@@ -330,13 +330,13 @@ class EntityDataHandler<O extends DataEntity> extends DataHandler<O> {
   }
 }
 
-class ClassReflectionDataHandler<O> extends DataHandler<O> {
+class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   Type classType;
 
   ClassReflection<O>? _reflection;
 
-  ClassReflectionDataHandler(this.classType,
-      {DataHandlerProvider? provider, ClassReflection<O>? reflection})
+  ClassReflectionEntityHandler(this.classType,
+      {EntityHandlerProvider? provider, ClassReflection<O>? reflection})
       : _reflection = reflection,
         super(provider);
 
@@ -391,58 +391,59 @@ class ClassReflectionDataHandler<O> extends DataHandler<O> {
   }
 }
 
-mixin DataFieldAccessor<O> {
-  dynamic getID(O o, {DataHandler<O>? dataHandler}) {
-    if (o is DataEntity) {
+mixin EntityFieldAccessor<O> {
+  dynamic getID(O o, {EntityHandler<O>? entityHandler}) {
+    if (o is Entity) {
       return o.getID();
-    } else if (dataHandler != null) {
-      return dataHandler.getID(o);
+    } else if (entityHandler != null) {
+      return entityHandler.getID(o);
     } else {
-      throw StateError('getID: No DataHandler provided for: $o');
+      throw StateError('getID: No EntityHandler provided for: $o');
     }
   }
 
-  void setID(O o, Object id, {DataHandler<O>? dataHandler}) {
-    if (o is DataEntity) {
+  void setID(O o, Object id, {EntityHandler<O>? entityHandler}) {
+    if (o is Entity) {
       return o.setID(id);
-    } else if (dataHandler != null) {
-      return dataHandler.setID(o, id);
+    } else if (entityHandler != null) {
+      return entityHandler.setID(o, id);
     } else {
-      throw StateError('setID: No DataHandler provided for: $o');
+      throw StateError('setID: No EntityHandler provided for: $o');
     }
   }
 
-  dynamic getField(O o, String key, {DataHandler<O>? dataHandler}) {
-    if (o is DataEntity) {
+  dynamic getField(O o, String key, {EntityHandler<O>? entityHandler}) {
+    if (o is Entity) {
       return o.getField(key);
-    } else if (dataHandler != null) {
-      return dataHandler.getField(o, key);
+    } else if (entityHandler != null) {
+      return entityHandler.getField(o, key);
     } else {
-      throw StateError('getField($key): No DataHandler provided for: $o');
+      throw StateError('getField($key): No EntityHandler provided for: $o');
     }
   }
 
-  void setField(O o, String key, Object? value, {DataHandler<O>? dataHandler}) {
-    if (o is DataEntity) {
+  void setField(O o, String key, Object? value,
+      {EntityHandler<O>? entityHandler}) {
+    if (o is Entity) {
       o.setField(key, value);
-    } else if (dataHandler != null) {
-      dataHandler.setField(o, key, value);
+    } else if (entityHandler != null) {
+      entityHandler.setField(o, key, value);
     } else {
-      throw StateError('setField($key): No DataHandler provided for: $o');
+      throw StateError('setField($key): No EntityHandler provided for: $o');
     }
   }
 }
 
-class DataFieldAccessorGeneric<O> with DataFieldAccessor<O> {}
+class EntityFieldAccessorGeneric<O> with EntityFieldAccessor<O> {}
 
-abstract class DataAccessor<O> {
+abstract class EntityAccessor<O> {
   final String name;
 
-  DataAccessor(this.name);
+  EntityAccessor(this.name);
 }
 
-abstract class DataSource<O> extends DataAccessor<O> {
-  DataSource(String name) : super(name);
+abstract class EntitySource<O> extends EntityAccessor<O> {
+  EntitySource(String name) : super(name);
 
   FutureOr<O?> selectByID(dynamic id) {
     return select(IDCondition(id)).resolveMapped((sel) {
@@ -472,57 +473,58 @@ abstract class DataSource<O> extends DataAccessor<O> {
       Map<String, Object?>? namedParameters});
 }
 
-abstract class DataStorage<O> extends DataAccessor<O> {
-  DataStorage(String name) : super(name);
+abstract class EntityStorage<O> extends EntityAccessor<O> {
+  EntityStorage(String name) : super(name);
 
   dynamic store(O o);
 
   Iterable storeAll(Iterable<O> o);
 }
 
-class DataRepositoryProvider {
-  static final DataRepositoryProvider _globalProvider =
-      DataRepositoryProvider();
+class EntityRepositoryProvider {
+  static final EntityRepositoryProvider _globalProvider =
+      EntityRepositoryProvider();
 
-  static DataRepositoryProvider get globalProvider => _globalProvider;
+  static EntityRepositoryProvider get globalProvider => _globalProvider;
 
-  final Map<Type, DataRepository> _dataRepositories = <Type, DataRepository>{};
+  final Map<Type, EntityRepository> _entityRepositories =
+      <Type, EntityRepository>{};
 
-  void registerDataRepository<O>(DataRepository<O> dataRepository) {
-    _dataRepositories[dataRepository.type] = dataRepository;
+  void registerEntityRepository<O>(EntityRepository<O> entityRepository) {
+    _entityRepositories[entityRepository.type] = entityRepository;
   }
 
-  DataRepository<O>? getDataRepository<O>({O? obj, Type? type}) {
-    var dataRepository = _getDataRepositoryImpl<O>(obj: obj, type: type);
-    if (dataRepository != null) {
-      return dataRepository;
+  EntityRepository<O>? getEntityRepository<O>({O? obj, Type? type}) {
+    var entityRepository = _getEntityRepositoryImpl<O>(obj: obj, type: type);
+    if (entityRepository != null) {
+      return entityRepository;
     }
 
     if (!identical(this, _globalProvider)) {
-      return _globalProvider._getDataRepositoryImpl<O>(obj: obj, type: type);
+      return _globalProvider._getEntityRepositoryImpl<O>(obj: obj, type: type);
     }
 
     return null;
   }
 
-  DataRepository<O>? _getDataRepositoryImpl<O>({O? obj, Type? type}) {
-    var dataRepository = _dataRepositories[O];
+  EntityRepository<O>? _getEntityRepositoryImpl<O>({O? obj, Type? type}) {
+    var entityRepository = _entityRepositories[O];
 
-    if (dataRepository == null && obj != null) {
-      dataRepository = _dataRepositories[obj.runtimeType];
+    if (entityRepository == null && obj != null) {
+      entityRepository = _entityRepositories[obj.runtimeType];
     }
 
-    if (dataRepository == null && type != null) {
-      dataRepository = _dataRepositories[type];
+    if (entityRepository == null && type != null) {
+      entityRepository = _entityRepositories[type];
     }
 
-    if (dataRepository != null) {
-      return dataRepository as DataRepository<O>;
+    if (entityRepository != null) {
+      return entityRepository as EntityRepository<O>;
     } else {
-      for (var p in _knownDataRepositoryProviders) {
-        dataRepository = p.getDataRepository<O>(obj: obj, type: type);
-        if (dataRepository != null) {
-          return dataRepository as DataRepository<O>;
+      for (var p in _knownEntityRepositoryProviders) {
+        entityRepository = p.getEntityRepository<O>(obj: obj, type: type);
+        if (entityRepository != null) {
+          return entityRepository as EntityRepository<O>;
         }
       }
 
@@ -530,35 +532,35 @@ class DataRepositoryProvider {
     }
   }
 
-  final Set<DataRepositoryProvider> _knownDataRepositoryProviders =
-      <DataRepositoryProvider>{};
+  final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
+      <EntityRepositoryProvider>{};
 
-  void notifyKnownDataRepositoryProvider(DataRepositoryProvider provider) {
-    _knownDataRepositoryProviders.add(provider);
+  void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
+    _knownEntityRepositoryProviders.add(provider);
   }
 }
 
-abstract class DataRepository<O> extends DataAccessor<O>
+abstract class EntityRepository<O> extends EntityAccessor<O>
     with Initializable
-    implements DataSource<O>, DataStorage<O> {
-  final DataRepositoryProvider provider;
+    implements EntitySource<O>, EntityStorage<O> {
+  final EntityRepositoryProvider provider;
 
-  final DataHandler<O> dataHandler;
+  final EntityHandler<O> entityHandler;
   final Type type;
 
-  DataRepository(
-      DataRepositoryProvider? provider, String name, this.dataHandler,
+  EntityRepository(
+      EntityRepositoryProvider? provider, String name, this.entityHandler,
       {Type? type})
-      : provider = provider ?? DataRepositoryProvider.globalProvider,
+      : provider = provider ?? EntityRepositoryProvider.globalProvider,
         type = type ?? O,
         super(name) {
-    if (!DataHandler.isValidType(this.type)) {
-      throw StateError('Invalid DataRepository type: $type ?? $O');
+    if (!EntityHandler.isValidType(this.type)) {
+      throw StateError('Invalid EntityRepository type: $type ?? $O');
     }
 
-    this.provider.registerDataRepository(this);
+    this.provider.registerEntityRepository(this);
 
-    dataHandler.notifyKnownDataRepositoryProvider(this.provider);
+    entityHandler.notifyKnownEntityRepositoryProvider(this.provider);
   }
 
   @override
@@ -593,15 +595,15 @@ abstract class DataRepository<O> extends DataAccessor<O>
   @override
   String toString() {
     var info = information();
-    return 'DataRepository{ name: $name, provider: $provider, type: $type, information: $info }';
+    return 'EntityRepository{ name: $name, provider: $provider, type: $type, information: $info }';
   }
 }
 
-abstract class IterableDataRepository<O> extends DataRepository<O>
-    with DataFieldAccessor<O> {
-  IterableDataRepository(String name, DataHandler<O> dataHandler,
-      {DataRepositoryProvider? provider})
-      : super(provider, name, dataHandler);
+abstract class IterableEntityRepository<O> extends EntityRepository<O>
+    with EntityFieldAccessor<O> {
+  IterableEntityRepository(String name, EntityHandler<O> entityHandler,
+      {EntityRepositoryProvider? provider})
+      : super(provider, name, entityHandler);
 
   Iterable<O> iterable();
 
@@ -617,7 +619,7 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
     return iterable().where((o) {
       return matcher.matches(
         o,
-        dataHandler: dataHandler,
+        entityHandler: entityHandler,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
@@ -628,18 +630,18 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
   @override
   O? selectByID(id) {
     return iterable().firstWhereOrNull((o) {
-      var oId = getID(o, dataHandler: dataHandler);
+      var oId = getID(o, entityHandler: entityHandler);
       return oId == id;
     });
   }
 
   @override
   dynamic store(O o) {
-    var oId = getID(o, dataHandler: dataHandler);
+    var oId = getID(o, entityHandler: entityHandler);
 
     if (oId == null) {
       oId = nextID();
-      setID(o, oId, dataHandler: dataHandler);
+      setID(o, oId, entityHandler: entityHandler);
     }
 
     put(o);
@@ -656,7 +658,7 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
 
   @override
   dynamic ensureStored(O o) {
-    var id = getID(o, dataHandler: dataHandler);
+    var id = getID(o, entityHandler: entityHandler);
 
     if (id == null) {
       return store(o);
@@ -669,13 +671,13 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
 
   @override
   void ensureReferencesStored(O o) {
-    for (var fieldName in dataHandler.fieldsNames(o)) {
-      var value = dataHandler.getField(o, fieldName);
+    for (var fieldName in entityHandler.fieldsNames(o)) {
+      var value = entityHandler.getField(o, fieldName);
       if (value == null) {
         continue;
       }
 
-      var repository = provider.getDataRepository(obj: value);
+      var repository = provider.getEntityRepository(obj: value);
       if (repository == null) {
         continue;
       }
@@ -691,10 +693,10 @@ abstract class IterableDataRepository<O> extends DataRepository<O>
       };
 }
 
-class SetDataRepository<O> extends IterableDataRepository<O> {
-  SetDataRepository(String name, DataHandler<O> dataHandler,
-      {DataRepositoryProvider? provider})
-      : super(name, dataHandler, provider: provider);
+class SetEntityRepository<O> extends IterableEntityRepository<O> {
+  SetEntityRepository(String name, EntityHandler<O> entityHandler,
+      {EntityRepositoryProvider? provider})
+      : super(name, entityHandler, provider: provider);
 
   final Set<O> _entries = <O>{};
 

@@ -4,12 +4,12 @@ import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
 
-import 'bones_api_data.dart';
-import 'bones_api_data_adapter.dart';
+import 'bones_api_entity.dart';
+import 'bones_api_entity_adapter.dart';
 
 final _log = logging.Logger('PostgreAdapter');
 
-class PostgreAdapter extends SQLDatabaseAdapter<PostgreSQLConnection> {
+class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
   final String host;
   final int port;
   final String databaseName;
@@ -19,13 +19,13 @@ class PostgreAdapter extends SQLDatabaseAdapter<PostgreSQLConnection> {
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
-  PostgreAdapter(this.host, this.databaseName, this.username,
+  PostgreSQLAdapter(this.host, this.databaseName, this.username,
       {String? password,
       PasswordProvider? passwordProvider,
       this.port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
-      DataRepositoryProvider? parentRepositoryProvider})
+      EntityRepositoryProvider? parentRepositoryProvider})
       : _password = password,
         _passwordProvider = passwordProvider,
         super(minConnections, maxConnections, 'postgre',
@@ -34,7 +34,7 @@ class PostgreAdapter extends SQLDatabaseAdapter<PostgreSQLConnection> {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
 
-    parentRepositoryProvider?.notifyKnownDataRepositoryProvider(this);
+    parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
   FutureOr<String> _getPassword() {
