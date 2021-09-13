@@ -218,16 +218,16 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   Parser start() => ref0(condition).end();
 
   Parser<Condition> condition() =>
-      (conditionGroup() | conditionParenthesis() | conditionKeyValue())
+      (conditionGroup() | conditionParenthesis() | conditionMatch())
           .map((v) => v as Condition);
 
   Parser<Condition> conditionParenthesisOrValue() =>
-      (conditionParenthesis() | conditionKeyValue()).map((v) {
+      (conditionParenthesis() | conditionMatch()).map((v) {
         return v as Condition;
       });
 
   Parser<Condition> conditionParenthesis() => (char('(').trim() &
-              (conditionGroup() | conditionKeyValue()) &
+              (conditionGroup() | conditionMatch()) &
               char(')').trim())
           .map((l) {
         return l[1] as Condition;
@@ -257,6 +257,9 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
             .whereType<Condition>();
         return GroupConditionOR([v1, ...v2]);
       });
+
+  Parser<Condition> conditionMatch() =>
+      (conditionID() | conditionKeyValue()).cast<Condition>();
 
   Parser<Condition> conditionKeyValue() =>
       (conditionKeys() & conditionOperator() & conditionValue()).map((l) {
@@ -303,6 +306,13 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
           s = l as String;
         }
         return ConditionKeyField(s);
+      });
+
+  Parser<ConditionID> conditionID() =>
+      (string('#ID').trim() & string('==').trim() & conditionValue()).map((l) {
+        var value = l[2];
+
+        return ConditionID(value);
       });
 
   Parser<String> conditionOperator() =>

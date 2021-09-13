@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_logging_generic.dart'
@@ -41,14 +42,35 @@ abstract class LoggerHandler {
     _loggingListenSubscription = listen;
   }
 
-  static final Map<String, int> _maxKeys = <String, int>{};
+  static final Map<String, QueueList<int>> _maxKeys =
+      <String, QueueList<int>>{};
 
   static int _maxKey(String key, String s, int limit) {
-    var max = _maxKeys[key];
-    if (max == null || s.length > max) {
-      _maxKeys[key] = max = s.length;
+    var maxList = _maxKeys[key];
+    var sLength = s.length;
+
+    if (maxList == null) {
+      var max = sLength;
+      _maxKeys[key] = QueueList.from([sLength]);
+      return max;
+    } else {
+      maxList.addLast(sLength);
+      while (maxList.length > 20) {
+        maxList.removeFirst();
+      }
+      var max = _listMax(maxList);
+      return max;
     }
-    return max < limit ? max : limit;
+  }
+
+  static int _listMax(List<int> l) {
+    var max = l.first;
+    for (var n in l.skip(1)) {
+      if (n > max) {
+        max = n;
+      }
+    }
+    return max;
   }
 
   void _log(logging.LogRecord msg) {
@@ -64,7 +86,7 @@ abstract class LoggerHandler {
 
     var loggerName = this.loggerName(msg);
     if (loggerName.isNotEmpty) {
-      var max = _maxKey('loggerName', loggerName, 14);
+      var max = _maxKey('loggerName', loggerName, 20);
       loggerName = truncateString(loggerName, max);
       loggerName = loggerName.padRight(max);
     }

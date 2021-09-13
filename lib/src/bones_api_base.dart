@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bones_api/src/bones_api_config.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
@@ -10,13 +11,78 @@ abstract class APIRoot {
   // ignore: constant_identifier_names
   static const String VERSION = '1.0.5';
 
+  static final Map<String, APIRoot> _instances = <String, APIRoot>{};
+
+  /// Returns the last [APIRoot] if instantiated.
+  ///
+  /// - IF [singleton] is `true` and multiple instances exists throws an [StateError].
+  static APIRoot? get({bool singleton = true}) {
+    if (_instances.isEmpty) {
+      return null;
+    } else if (_instances.length == 1) {
+      return _instances.values.first;
+    } else if (_instances.length == 2) {
+      if (singleton) {
+        throw StateError(
+            "Multiple APIRoot instances> singleton: $singleton ; length: ${_instances.length} ; names: ${_instances.keys.toList()}");
+      }
+      return _instances.values.last;
+    }
+  }
+
+  /// Returns an [APIRoot] instance with [name].
+  ///
+  /// - If [caseInsensitive] is `true` will ignore [name] case.
+  static APIRoot? getByName(String name,
+      {bool caseInsensitive = true, bool lastAsDefault = false}) {
+    var apiRoot = _instances[name];
+    if (apiRoot != null) return apiRoot;
+
+    if (caseInsensitive) {
+      var nameLC = name.toLowerCase();
+      for (var n in _instances.keys) {
+        if (n.toLowerCase() == nameLC) {
+          return _instances[n];
+        }
+      }
+    }
+
+    return lastAsDefault ? get(singleton: false) : null;
+  }
+
+  /// Returns the first [APIRoot] matched by [matcher].
+  static APIRoot? getWhere(bool Function(APIRoot apiRoot) matcher,
+          {bool lastAsDefault = false}) =>
+      _instances.values.firstWhereOrNull(matcher) ??
+      (lastAsDefault ? get(singleton: false) : null);
+
+  static APIRoot? getWithinName(String part,
+      {bool lastAsDefault = false, bool caseInsensitive = true}) {
+    if (caseInsensitive) {
+      part = part.toLowerCase();
+    }
+
+    return getWhere((apiRoot) {
+      var n = caseInsensitive ? apiRoot.name.toLowerCase() : apiRoot.name;
+      return n.contains(part);
+    }, lastAsDefault: lastAsDefault);
+  }
+
   /// API name.
   final String name;
 
   /// API version.
   final String version;
 
-  APIRoot(this.name, this.version);
+  /// The API Configuration.
+  APIConfig apiConfig;
+
+  APIRoot(this.name, this.version,
+      {dynamic apiConfig, APIConfigProvider? apiConfigProvider})
+      : apiConfig =
+            APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+    _instances[name] = this;
+  }
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
@@ -92,6 +158,12 @@ abstract class APIRoot {
   }
 
   @override
+  bool operator ==(Object other) => identical(this, other);
+
+  @override
+  int get hashCode => name.hashCode ^ version.hashCode;
+
+  @override
   String toString() {
     return '$name[$version]$modulesNames';
   }
@@ -103,14 +175,20 @@ typedef APIRouteHandler<T> = FutureOr<APIResponse<T>> Function(
 
 /// A module of an API.
 abstract class APIModule {
+  /// The API root, that is loading this module.
+  final APIRoot apiRoot;
+
   /// The name of this API module.
   final String name;
 
   late final APIRouteBuilder _routeBuilder;
 
-  APIModule(this.name) {
+  APIModule(this.apiRoot, this.name) {
     _routeBuilder = APIRouteBuilder(this);
   }
+
+  /// The [APIConfig] from [apiRoot].
+  APIConfig get apiConfig => apiRoot.apiConfig;
 
   /// The default route to use when the request doesn't match.
   String? get defaultRouteName => null;

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 
 /// A entity repository API.
@@ -28,7 +29,7 @@ abstract class APIRepository<O> {
     this.entityRepository.ensureInitialized();
   }
 
-  void configure();
+  void configure() {}
 
   bool _configured = false;
 
@@ -50,4 +51,33 @@ abstract class APIRepository<O> {
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
+
+  FutureOr<Iterable<O>> select(EntityMatcher<O> matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters}) =>
+      entityRepository.select(matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+  FutureOr<Iterable<O>> deleteByQuery(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters}) =>
+      entityRepository.deleteByQuery(query,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+  FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters}) =>
+      entityRepository.delete(matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+  FutureOr<dynamic> store(O o) => entityRepository.store(o);
 }

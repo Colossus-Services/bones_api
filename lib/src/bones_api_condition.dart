@@ -9,14 +9,12 @@ abstract class ConditionElement {
 
   bool get resolved => _resolved;
 
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
-    _resolved = true;
-  }
-
   void _markResolved() {
     _resolved = true;
   }
+
+  void resolve(
+      {Condition? parent, required List<ConditionParameter> parameters});
 
   late List<ConditionParameter> _parameters;
 
@@ -80,7 +78,8 @@ class ConditionParameter extends ConditionElement {
   Object? getValue(
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      Map<String, Object?>? encodingParameters}) {
     if (parameters != null) {
       if (parameters is! Map && parameters is! Iterable) {
         var obj = parameters as dynamic;
@@ -127,7 +126,7 @@ class ConditionParameter extends ConditionElement {
     }
 
     if (key != null) {
-      return namedParameters != null ? namedParameters[key] : null;
+      return namedParameters?[key] ?? encodingParameters?[key];
     }
 
     return null;
@@ -190,7 +189,13 @@ class ConditionParameter extends ConditionElement {
 }
 
 abstract class EntityMatcher<O> {
-  bool matches(O o,
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters});
+
+  bool matchesEntityMap(Map<String, dynamic> o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
@@ -201,7 +206,7 @@ abstract class Condition<O> extends ConditionElement
     with EntityFieldAccessor<O>
     implements EntityMatcher<O> {
   @override
-  bool matches(O o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
@@ -317,7 +322,7 @@ class GroupConditionAND<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matches(o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
@@ -327,7 +332,30 @@ class GroupConditionAND<O> extends GroupCondition<O> {
     }
 
     for (var c in conditions) {
-      var matches = c.matches(o,
+      var matches = c.matchesEntity(o,
+          entityHandler: entityHandler,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+      if (!matches) return false;
+    }
+
+    return true;
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    if (conditions.isEmpty) {
+      return false;
+    }
+
+    for (var c in conditions) {
+      var matches = c.matchesEntityMap(o,
           entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,
@@ -355,7 +383,7 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matches(o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
@@ -365,7 +393,30 @@ class GroupConditionOR<O> extends GroupCondition<O> {
     }
 
     for (var c in conditions) {
-      var matches = c.matches(o,
+      var matches = c.matchesEntity(o,
+          entityHandler: entityHandler,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+      if (matches) return true;
+    }
+
+    return false;
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    if (conditions.isEmpty) {
+      return false;
+    }
+
+    for (var c in conditions) {
+      var matches = c.matchesEntityMap(o,
           entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,
@@ -381,14 +432,14 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   String encode() => '( ${conditions.join(' || ')} )';
 }
 
-class IDCondition<O> extends Condition<O> {
+class ConditionID<O> extends Condition<O> {
   dynamic idValue;
 
-  IDCondition(this.idValue) : super._();
+  ConditionID([this.idValue]) : super._();
 
   @override
-  IDCondition<T> cast<T>() =>
-      this is IDCondition<T> ? this as IDCondition<T> : IDCondition<T>(idValue);
+  ConditionID<T> cast<T>() =>
+      this is ConditionID<T> ? this as ConditionID<T> : ConditionID<T>(idValue);
 
   @override
   void resolve(
@@ -405,7 +456,7 @@ class IDCondition<O> extends Condition<O> {
   }
 
   @override
-  bool matches(o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
@@ -424,10 +475,31 @@ class IDCondition<O> extends Condition<O> {
     }
   }
 
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var idField = entityHandler?.idFieldsName() ?? 'id';
+    var id = o[idField];
+
+    var idValue = this.idValue;
+
+    if (idValue is ConditionParameter) {
+      return idValue.matches(id,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+    } else {
+      return id == idValue;
+    }
+  }
+
   String get encodeIdValue => Condition.encodeConditionValue(idValue);
 
   @override
-  String encode() => 'ID == $encodeIdValue';
+  String encode() => idValue != null ? '#ID == $encodeIdValue' : '#ID == ?';
 }
 
 abstract class ConditionKey {
@@ -471,6 +543,9 @@ abstract class ConditionKey {
   bool get isWordKey;
 
   String encode();
+
+  @override
+  String toString() => encode();
 }
 
 class ConditionKeyField extends ConditionKey {
@@ -535,7 +610,7 @@ abstract class KeyCondition<O> extends Condition<O> {
   static final EntityFieldAccessorGeneric _accessorGeneric =
       EntityFieldAccessorGeneric();
 
-  Object? getKeyValue(O o, [EntityHandler<O>? entityHandler]) {
+  Object? getEntityKeyValue(O o, [EntityHandler<O>? entityHandler]) {
     if (o == null) return null;
 
     dynamic obj = o;
@@ -569,6 +644,43 @@ abstract class KeyCondition<O> extends Condition<O> {
 
     return obj;
   }
+
+  Object? getEntityMapKeyValue(Map<String, dynamic>? o,
+      [EntityHandler<O>? entityHandler]) {
+    if (o == null || o.isEmpty) return null;
+
+    dynamic obj = o;
+
+    for (var key in keys) {
+      Object? value;
+
+      if (key is ConditionKeyField) {
+        if (obj is Map) {
+          value = obj[key.name];
+        } else {
+          throw StateError(
+              "Can't access key[${key.name}] for type: ${obj.runtimeType}");
+        }
+      } else if (key is ConditionKeyIndex) {
+        var index = key.index;
+
+        if (obj is Iterable) {
+          value = obj.elementAt(index);
+        } else {
+          throw StateError(
+              "Can't access index[$index] for type: ${obj.runtimeType}");
+        }
+      }
+
+      if (value == null) {
+        return null;
+      } else {
+        obj = value;
+      }
+    }
+
+    return obj;
+  }
 }
 
 class KeyConditionEQ<O> extends KeyCondition<O> {
@@ -580,12 +692,26 @@ class KeyConditionEQ<O> extends KeyCondition<O> {
       : KeyConditionEQ<T>(keys, value);
 
   @override
-  bool matches(o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var keyValue = getKeyValue(o, entityHandler);
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return equalsConditionValue(value, keyValue,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
 
     return equalsConditionValue(value, keyValue,
         parameters: parameters,
@@ -609,12 +735,26 @@ class KeyConditionNotEQ<O> extends KeyCondition<O> {
       : KeyConditionNotEQ<T>(keys, value);
 
   @override
-  bool matches(o,
+  bool matchesEntity(O o,
       {EntityHandler<O>? entityHandler,
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var keyValue = getKeyValue(o, entityHandler);
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return !equalsConditionValue(value, keyValue,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
 
     return !equalsConditionValue(value, keyValue,
         parameters: parameters,
@@ -682,12 +822,24 @@ class ConditionQuery<O> implements EntityMatcher<O> {
   Condition<O> get condition => parse<O>(query);
 
   @override
-  bool matches(O o,
+  bool matchesEntity(O o,
           {EntityHandler<O>? entityHandler,
           Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters}) =>
-      condition.matches(o,
+      condition.matchesEntity(o,
+          entityHandler: entityHandler,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+          {EntityHandler<O>? entityHandler,
+          Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters}) =>
+      condition.matchesEntityMap(o,
           entityHandler: entityHandler,
           parameters: parameters,
           positionalParameters: positionalParameters,

@@ -11,7 +11,8 @@
 [![Code size](https://img.shields.io/github/languages/code-size/Colossus-Services/bones_api?logo=github&logoColor=white)](https://github.com/Colossus-Services/bones_api)
 [![License](https://img.shields.io/github/license/Colossus-Services/bones_api?logo=open-source-initiative&logoColor=green)](https://github.com/Colossus-Services/bones_api/blob/master/LICENSE)
 
-Bones_API - Simple and easy API framework, with routes and HTTP Server.
+Bones_API - A Powerful API backend framework for Dart. Comes with a built-in HTTP Server,
+routes handler, entity handler, SQL translator, and DB adapters.
 
 ## Usage
 
@@ -106,6 +107,218 @@ To serve an API project with Hot Reload enabled:
   $> bones_api serve --directory path/to/project --class MyAPIRoot --hotreload
 ```
 
+## Using Reflection
+
+You can use the package [reflection_factory] to automate some
+declarations.
+
+[reflection_factory]: https://pub.dev/packages/reflection_factory
+
+For example, you can map all routes in classes with one line of code:
+
+File: `module_account.dart`:
+```dart
+import 'package:bones_api/bones_api.dart';
+import 'package:reflection_factory/reflection_factory.dart';
+
+// See Repositories sections below in this README:
+import 'repositories.dart';
+
+// The generated reflection code by `reflection_factory`:
+part 'module_account.reflection.g.dart';
+
+@EnableReflection()
+class AccountModule extends APIModule {
+  AccountModule(APIRoot apiRoot) : super(apiRoot, 'account');
+
+  final AddressAPIRepository addressRepository = AddressAPIRepository();
+
+  final AccountAPIRepository accountRepository = AccountAPIRepository();
+
+  @override
+  void configure() {
+    // Maps the POST routes by reflection of any method in this class
+    // that returns `APIResponse` or accepts `APIRequest`.
+    routes.postFrom(reflection);
+  }
+
+  Future<APIResponse> auth(String? email, {String? password}) async {
+    if (email == null) {
+      return APIResponse.error(error: 'Invalid parameters!');
+    }
+
+    if (password == null) {
+      return APIResponse.unauthorized();
+    }
+
+    var sel = await accountRepository.selectAccountByEmail(email);
+
+    if (sel.isEmpty) {
+      return APIResponse.unauthorized();
+    }
+
+    var account = sel.first;
+
+    return account.checkPassword(password)
+        ? APIResponse.ok(account.toJson()
+      ..remove('passwordHash'))
+        : APIResponse.unauthorized();
+  }
+  
+}
+```
+
+## Declaring Entities & Reflection
+
+You can declare entities classes in portable Dart code (that also works in the Browser).
+
+To easily enable `toJSon` and `fromJson`, just add `@EnableReflection()` to you entities.
+
+File: `entities.dart`:
+```dart
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:reflection_factory/reflection_factory.dart';
+
+part 'entities.reflection.g.dart';
+
+@EnableReflection()
+class Account {
+  int? id;
+
+  String email;
+
+  String passwordHash;
+
+  Address? address;
+
+  Account(this.email, String passwordOrHash, this.address, {this.id})
+      : passwordHash = hashPassword(passwordOrHash);
+
+  Account.create() : this('', '', null);
+
+  bool checkPassword(String password) {
+    return passwordHash == hashPassword(password);
+  }
+
+  static final RegExp _regExpHEX = RegExp(r'ˆ(?:[0-9a-fA-F]{2})+$');
+
+  static bool isHashedPassword(String password) {
+    return password.length == 64 && _regExpHEX.hasMatch(password);
+  }
+
+  static String hashPassword(String password) {
+    if (isHashedPassword(password)) {
+      return password;
+    }
+
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    var hash = digest.toString();
+
+    return hash;
+  }
+}
+
+@EnableReflection()
+class Address {
+  int? id;
+
+  String countryCode;
+
+  String state;
+
+  String city;
+
+  String address1;
+  String address2;
+
+  String zipCode;
+
+  Address(this.countryCode, this.state, this.city, this.address1, this.address2,
+      this.zipCode,
+      {this.id});
+
+  Address.create() : this('', '', '', '', '', '');
+}
+
+```
+
+See [reflection_factory] for more Reflection documentation.
+
+## Repositories & Database
+
+File: `repositories.dart` 
+```dart
+import 'package:bones_api/bones_api.dart';
+
+// The PostgreSQL Adapter:
+import 'package:bones_api/bones_api_adapter_postgre.dart';
+
+// The above entities file:
+import 'entities.dart';
+
+// The `EntityRepository` provider:
+class APIEntityRepositoryProvider extends EntityRepositoryProvider {
+  static final APIEntityRepositoryProvider _instance =
+      APIEntityRepositoryProvider._();
+
+  // Singleton
+  factory APIEntityRepositoryProvider() => _instance;
+
+  APIRoot? get apiRoot => APIRoot.get();
+
+  APIEntityRepositoryProvider._() {
+    var apiConfig = apiRoot?.apiConfig;
+
+    var postgreAdapter = PostgreSQLAdapter.fromConfig(
+      apiConfig?['postgres'], // The connection configuration
+      parentRepositoryProvider: this,
+    );
+
+    SQLEntityRepository<Address>(
+        postgreAdapter, 'address', Address$reflection().entityHandler);
+
+    SQLEntityRepository<Account>(
+        postgreAdapter, 'account', Account$reflection().entityHandler);
+  }
+}
+
+// The Address repository:
+class AddressAPIRepository extends APIRepository<Address> {
+  AddressAPIRepository() : super(provider: APIEntityRepositoryProvider());
+
+  FutureOr<Iterable<Address>> selectByState(String state) {
+    return selectByQuery(' state == ? ', parameters: {'state': state});
+  }
+}
+
+// The Account repository:
+class AccountAPIRepository extends APIRepository<Account> {
+  AccountAPIRepository() : super(provider: APIEntityRepositoryProvider());
+
+  FutureOr<Iterable<Account>> selectAccountByEmail(String email) {
+    return selectByQuery(' email == ? ', parameters: {'email': email});
+  }
+
+  FutureOr<Iterable<Account>> selectAccountByAddressState(String state) {
+    // This condition will be translated to a SQL with INNER JOIN (when using an SQLAdapter):
+    return selectByQuery(' address.state == ? ', parameters: [state]);
+  }
+}
+
+```
+
+The config file used above:
+
+File: `api-local.yaml`
+```yaml
+postgres:
+  database: yourdb
+  username: postgres
+  password: 123456
+```
 
 ## Bones_UI
 
@@ -119,10 +332,22 @@ Please file feature requests and bugs at the [issue tracker][tracker].
 
 [tracker]: https://github.com/Colossus-Services/bones_api/issues
 
-## Colossus.Services
+# Contribution
 
-This is an open-source project from [Colossus.Services][colossus]:
-the gateway for smooth solutions.
+Any help from the open-source community is always welcome and needed:
+
+- Found an issue?
+    - Please fill a bug report with details.
+- Wish a feature?
+    - Open a feature request with use cases.
+- Are you using and liking the project?
+    - Promote the project: create an article, do a post or make a donation.
+- Are you a developer?
+    - Fix a bug and send a pull request.
+    - Implement a new feature.
+    - Improve the Unit Tests.
+- Have you already helped in any way?
+    - **Many thanks from me, the contributors and everybody that uses this project!**
 
 ## Author
 

@@ -162,7 +162,8 @@ class APIServer {
     return req;
   }
 
-  Response _processAPIResponse(Request request, APIResponse apiResponse) {
+  FutureOr<Response> _processAPIResponse(
+      Request request, APIResponse apiResponse) {
     var headers = <String, Object>{};
 
     for (var e in apiResponse.headers.entries) {
@@ -174,52 +175,48 @@ class APIServer {
 
     headers['server'] ??= serverName;
 
-    var payload = resolveBody(apiResponse.payload, apiResponse);
+    var retPayload = resolveBody(apiResponse.payload, apiResponse);
 
-    var contentType = apiResponse.payloadMimeType;
-    if (contentType != null && contentType.isNotEmpty) {
-      headers['content-type'] = contentType;
-    }
+    return retPayload.resolveMapped((payload) {
+      var contentType = apiResponse.payloadMimeType;
+      if (contentType != null && contentType.isNotEmpty) {
+        headers['content-type'] = contentType;
+      }
 
-    Response response;
-    switch (apiResponse.status) {
-      case APIResponseStatus.OK:
-        {
-          response = Response.ok(payload, headers: headers);
-          break;
-        }
-      case APIResponseStatus.NOT_FOUND:
-        {
-          response = Response.notFound(payload, headers: headers);
-          break;
-        }
-      case APIResponseStatus.UNAUTHORIZED:
-        {
-          response = Response.forbidden(payload, headers: headers);
-          break;
-        }
-      case APIResponseStatus.ERROR:
-        {
-          var error = resolveBody(apiResponse.error, apiResponse);
-          response =
-              Response.internalServerError(body: error, headers: headers);
-          break;
-        }
-      default:
-        {
-          response = Response.notFound(
+      switch (apiResponse.status) {
+        case APIResponseStatus.OK:
+          return Response.ok(payload, headers: headers);
+        case APIResponseStatus.NOT_FOUND:
+          return Response.notFound(payload, headers: headers);
+        case APIResponseStatus.UNAUTHORIZED:
+          return Response.forbidden(payload, headers: headers);
+        case APIResponseStatus.ERROR:
+          {
+            var retError = resolveBody(apiResponse.error, apiResponse);
+
+            return retError.resolveMapped((error) {
+              return Response.internalServerError(
+                  body: error, headers: headers);
+            });
+          }
+        default:
+          return Response.notFound(
               'NOT FOUND[${request.method}]: ${request.url}',
               headers: headers);
-          break;
-        }
-    }
-
-    return response;
+      }
+    });
   }
 
   /// Resolves a [payload] to a HTTP body.
-  static Object? resolveBody(dynamic payload, APIResponse apiResponse) {
+  static FutureOr<Object?> resolveBody(
+      dynamic payload, APIResponse apiResponse) {
     if (payload == null) return null;
+
+    if (payload is Future) {
+      return payload.then((value) {
+        return resolveBody(value, apiResponse);
+      });
+    }
 
     if (payload is String) {
       apiResponse.payloadMimeType ??=

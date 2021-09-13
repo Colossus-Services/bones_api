@@ -1,6 +1,25 @@
 ## 1.0.8
 
+- Added `APIConfig`:
+  - CLI now accepts a `--config` option. 
 - Rename `Data` classes to `Entity`.
+- Added `MemorySQLAdapter`.
+- Added `TableScheme` to help `ConditionEncoder`:
+  - SQL now can perform inner join:
+    - Example Condition: ` address.state = "NY" `
+- Improved `ConditionID` encoding:
+  - ID field name (primary key) can be resolved for each table.
+  - `#ID` can be used to point to the primary key field/column.
+- `APIRepository` & `EntityRepository`:
+  - Added delete operation.
+- `EntityHandler` now handles better fields that points
+  to other entities.
+- Improved tests.
+- async_extension: ^1.0.5
+- reflection_factory: ^1.0.6
+- yaml: ^3.1.0
+- yaml_writer: ^1.0.1
+- mercury_client: ^2.1.0
 
 ## 1.0.7
 

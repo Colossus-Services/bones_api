@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_condition_parser.dart';
+import 'package:bones_api/src/bones_api_logging.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
+final _log = logging.Logger('bones_api_test');
+
 void main() {
+  _log.handler.logToConsole();
+
   group('Condition', () {
     setUp(() {});
 
@@ -28,6 +35,24 @@ void main() {
               .encode(),
           equals('foo == ?:xy'));
     });
+  });
+
+  test('ConditionParameter', () async {
+    var c = ConditionID(123);
+    expect(c.idValue, equals(123));
+
+    var g = GroupConditionOR(
+        [ConditionID(10), ConditionID(ConditionParameter.key('id'))]);
+
+    var parameters = <ConditionParameter>[];
+    g.resolve(parameters: parameters);
+
+    expect(g.conditions.length, equals(2));
+    expect((g.conditions[0] as ConditionID).idValue, equals(10));
+    expect((g.conditions[1] as ConditionID).idValue,
+        equals(ConditionParameter.key('id')));
+
+    expect(parameters, equals([ConditionParameter.key('id')]));
   });
 
   group('ConditionParser', () {
@@ -229,5 +254,84 @@ void main() {
       expect(c8.parameters.map((e) => e.index), equals([null, 0, null]));
       expect(c8.parameters.map((e) => e.key), equals([null, null, null]));
     });
+
+    test('group OR', () async {
+      var conditionParser = ConditionParser();
+
+      var c1 = conditionParser.parse(' #ID == 123 ') as ConditionID;
+      expect(c1.idValue, equals(123));
+
+      var c2 = conditionParser.parse(' #ID == ? ') as ConditionID;
+      expect(c2.idValue.toString(), equals('?'));
+    });
   });
+
+  group('ConditionEncoder', () {
+    setUp(() {});
+
+    test('SQL Encoder', () async {
+      var parser = ConditionParser();
+
+      var sqlEncoder = ConditionSQLEncoder(_TestSchemeProvider());
+
+      {
+        var sql = await sqlEncoder.encode(
+            parser.parse('email == ? && admin == ?'), 'account',
+            parameters: {'email': 'joe@m.com', 'admin': false});
+
+        expect(sql.outputString,
+            equals('( "ac"."email" = @email AND "ac"."admin" = @admin )'));
+        expect(sql.parametersPlaceholders,
+            equals({'email': 'joe@m.com', 'admin': false}));
+        expect(sql.tableAliases, equals({'account': 'ac'}));
+        expect(sql.fieldsReferencedTables, isEmpty);
+      }
+
+      {
+        var sql = await sqlEncoder.encode(
+            parser.parse('email == ? && address.state == ?'), 'account',
+            parameters: {'email': 'joe@m.com', 'state': 'NY'});
+
+        expect(sql.outputString,
+            equals('( "ac"."email" = @email AND "ad"."state" = @state )'));
+        expect(sql.parametersPlaceholders,
+            equals({'email': 'joe@m.com', 'state': 'NY'}));
+        expect(sql.tableAliases, equals({'account': 'ac', 'address': 'ad'}));
+        expect(sql.fieldsReferencedTables,
+            {TableFieldReference('account', 'address', 'address', 'id')});
+      }
+    });
+  });
+}
+
+class _TestSchemeProvider extends SchemeProvider {
+  @override
+  FutureOr<TableScheme> getTableSchemeImpl(String table) {
+    switch (table) {
+      case 'account':
+        return TableScheme(
+          'account',
+          'id',
+          {
+            'id': int,
+            'email': String,
+            'pass': String,
+            'address': int,
+            'admin': bool
+          },
+          {
+            'address':
+                TableFieldReference('account', 'address', 'address', 'id')
+          },
+        );
+      case 'address':
+        return TableScheme(
+          'address',
+          'id',
+          {'id': int, 'state': String, 'city': String, 'street': String},
+        );
+      default:
+        throw StateError("Unknown table: $table");
+    }
+  }
 }

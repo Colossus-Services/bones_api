@@ -123,6 +123,9 @@ class CommandServe extends CommandSourceFileBase {
 
     argParser.addOption('class', abbr: 'c', help: 'Project APIRoot Class name');
 
+    argParser.addOption('config',
+        abbr: 'i', help: 'API Configuration', valueHelp: 'file|url|json');
+
     argParser.addFlag('hotreload',
         abbr: 'r',
         help:
@@ -137,6 +140,8 @@ class CommandServe extends CommandSourceFileBase {
 
   bool get argHotReload => argResults!['hotreload']! as bool;
 
+  String get argApiConfig => (argResults!['config'] ?? '') as String;
+
   @override
   FutureOr<bool> run() async {
     var directory = argDirectory;
@@ -144,6 +149,7 @@ class CommandServe extends CommandSourceFileBase {
     var address = argAddress;
     var port = argPort;
     var hotReload = argHotReload;
+    var apiConfig = argApiConfig;
 
     var parametersMessage = <String>[];
 
@@ -197,13 +203,13 @@ class CommandServe extends CommandSourceFileBase {
       var hotReloadAllowed = await APIHotReload.get().isHotReloadAllowed();
       if (!hotReloadAllowed) {
         await _spawnDartVMForHotReload(spawner, directory, apiRootClass!,
-            address, port, parametersMessage);
+            address, port, apiConfig, parametersMessage);
         return true;
       }
     }
 
     return await _spawnAPIServerIsolate(parametersMessage, directory,
-        apiRootClass!, spawner, address, port, hotReload);
+        apiRootClass!, spawner, address, port, hotReload, apiConfig);
   }
 
   Future<bool> _spawnAPIServerIsolate(
@@ -213,7 +219,8 @@ class CommandServe extends CommandSourceFileBase {
       DartSpawner spawner,
       String address,
       String port,
-      bool hotReload) async {
+      bool hotReload,
+      String apiConfig) async {
     print(
         '________________________________________________________________________________');
     print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
@@ -254,7 +261,7 @@ class CommandServe extends CommandSourceFileBase {
 
     var process = await spawner.spawnDartScript(
       dartScript,
-      [address, port, '$hotReload', hotReloadIgnoreIsolate],
+      [address, port, '$hotReload', hotReloadIgnoreIsolate, apiConfig],
       usesSpawnedMain: true,
       debugName: apiRootClass,
     );
@@ -276,6 +283,7 @@ class CommandServe extends CommandSourceFileBase {
       String apiRootClass,
       String address,
       String port,
+      String apiConfig,
       List<String> parametersMessage) async {
     print(
         '________________________________________________________________________________');
@@ -306,6 +314,7 @@ class CommandServe extends CommandSourceFileBase {
           '--port',
           port,
           '--hotreload',
+          if (apiConfig.isNotEmpty) ...['--config', apiConfig]
         ],
         enableVMService: true,
         handleSignals: true,
@@ -335,7 +344,8 @@ void main(List<String> args, dynamic parentPort) {
     var address = args[0];
     var port = int.parse(args[1]);
     var hotReload = args[2] == 'true';
-    var hotReloadIgnoreIsolate = args[3]; 
+    var hotReloadIgnoreIsolate = args[3];
+    var config = args[4];
     
     print('- API Server: \$address:\$port\\n');
     
@@ -347,6 +357,14 @@ void main(List<String> args, dynamic parentPort) {
     print('Starting APIServer...\\n');
     
     var api = $apiRootClass();
+    
+    if (config.isNotEmpty) {
+      var apiConfig = APIConfig.fromSync(config);
+      if (apiConfig != null) {
+        print('\$apiConfig\\n\\n');
+        api.apiConfig = apiConfig;
+      }
+    }
     
     var apiServer = APIServer(api, address, port, hotReload: hotReload);
     await apiServer.start();

@@ -203,4 +203,15 @@ mixin Pool<O> {
       }
     });
   }
+
+  FutureOr<R> executeWithPool<R>(FutureOr<R> Function(O o) f,
+      {Duration? timeout}) {
+    return catchFromPool(timeout: timeout).resolveMapped((o) {
+      try {
+        return f(o);
+      } finally {
+        releaseIntoPool(o);
+      }
+    });
+  }
 }

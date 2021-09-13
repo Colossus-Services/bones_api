@@ -8,7 +8,7 @@ import 'bones_api_entity.dart';
 /// [ClassReflection] extension.
 extension ClassReflectionExtension<O> on ClassReflection<O> {
   /// Returns a [ClassReflectionEntityHandler] for instances of this reflected class ([classType]).
-  ClassReflectionEntityHandler<O> get reflectionEntityHandler =>
+  ClassReflectionEntityHandler<O> get entityHandler =>
       ClassReflectionEntityHandler<O>(O);
 
   /// Lists the API methods of this reflected class.

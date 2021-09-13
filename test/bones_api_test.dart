@@ -3,15 +3,27 @@ import 'dart:io';
 
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/src/bones_api_console.dart';
+import 'package:bones_api/src/bones_api_logging.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
+final _log = logging.Logger('bones_api_test');
+
 void main() {
+  _log.handler.logToConsole();
+
   group('APIRoot', () {
     final api = MyAPI();
 
     setUp(() {});
 
     test('api', () async {
+      expect(APIRoot.get(singleton: true), equals(api));
+      expect(APIRoot.getByName('Example'), equals(api));
+      expect(APIRoot.getByName('Foo'), isNull);
+      expect(APIRoot.getWithinName('ex'), equals(api));
+      expect(APIRoot.getWithinName('foo'), isNull);
+
       expect(api.modules.length, equals(1));
       expect(api.modulesNames, equals(['base']));
       expect(api.getModule('base'), isNotNull);
@@ -324,14 +336,18 @@ void main() {
 }
 
 class MyAPI extends APIRoot {
-  MyAPI() : super('example', '1.0');
+  static MyAPI? _instance;
+
+  factory MyAPI() => _instance ??= MyAPI._();
+
+  MyAPI._() : super('example', '1.0');
 
   @override
-  Set<APIModule> loadModules() => {MyBaseModule()};
+  Set<APIModule> loadModules() => {MyBaseModule(this)};
 }
 
 class MyBaseModule extends APIModule {
-  MyBaseModule() : super('base');
+  MyBaseModule(APIRoot apiRoot) : super(apiRoot, 'base');
 
   @override
   String? get defaultRouteName => '404';

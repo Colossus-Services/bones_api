@@ -14,11 +14,17 @@
 /// Bones_API Library.
 library bones_api;
 
+export 'dart:async';
+
 export 'src/bones_api_base.dart';
+export 'src/bones_api_config.dart';
 export 'src/bones_api_condition.dart';
+export 'src/bones_api_condition_encoder.dart';
+export 'src/bones_api_condition_parser.dart';
 export 'src/bones_api_condition_sql.dart';
 export 'src/bones_api_entity.dart';
 export 'src/bones_api_entity_adapter.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_repository.dart';
+export 'src/bones_api_utils.dart';

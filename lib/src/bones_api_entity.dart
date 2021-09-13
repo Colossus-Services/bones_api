@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
@@ -16,6 +15,8 @@ abstract class Entity {
   V? getID<V>() => getField('id');
 
   void setID<V>(V id) => setField('id', id);
+
+  String get idFieldName;
 
   List<String> get fieldsNames;
 
@@ -72,6 +73,8 @@ abstract class EntityHandler<O> {
     }
 
     this.provider._register(this);
+
+    _jsonReviver = _defaultJsonReviver;
   }
 
   static bool isValidType<T>([Type? type]) {
@@ -104,6 +107,8 @@ abstract class EntityHandler<O> {
 
   void setID<V>(O o, V id) => setField(o, 'id', id);
 
+  String idFieldsName([O? o]);
+
   List<String> fieldsNames([O? o]);
 
   Type? getFieldType(O o, String key);
@@ -126,7 +131,25 @@ abstract class EntityHandler<O> {
     }
   }
 
-  JsonReviver? jsonReviver;
+  late JsonReviver _jsonReviver;
+
+  JsonReviver get jsonReviver => _jsonReviver;
+
+  set jsonReviver(JsonReviver? value) {
+    _jsonReviver = value ?? _defaultJsonReviver;
+  }
+
+  Object? _defaultJsonReviver(Object? key, Object? value) {
+    if (key != null) {
+      return value;
+    }
+
+    if (value is Map<String, dynamic>) {
+      return createFromMap(value);
+    }
+
+    return value;
+  }
 
   O decodeObjectJson(String json) =>
       dart_convert.json.decode(json, reviver: jsonReviver);
@@ -153,12 +176,15 @@ abstract class EntityHandler<O> {
 
   FutureOr<O> createFromMap(Map<String, dynamic> fields);
 
-  FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields) async {
-    for (var f in fieldsNames(o)) {
+  FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields) {
+    var fieldsNames = this.fieldsNames(o);
+
+    var setFutures = fieldsNames.map((f) {
       var val = getFieldFromMap(fields, f);
-      await setFieldValueDynamic(o, f, val);
-    }
-    return o;
+      return setFieldValueDynamic(o, f, val).resolveWithValue(true);
+    });
+
+    return setFutures.resolveAllWithValue(o);
   }
 
   FutureOr<dynamic> setFieldValueDynamic(O o, String key, dynamic value) {
@@ -173,11 +199,26 @@ abstract class EntityHandler<O> {
         isPrimitiveType(fieldType)) {
       setField(o, key, value);
       return value;
+    } else if (value is Map && fieldType == Map) {
+      setField(o, key, value);
+      return value;
+    } else if (value is Map<String, dynamic>) {
+      var valEntityHandler = getEntityHandler(type: fieldType);
+      valEntityHandler ??= getEntityRepository(type: fieldType)?.entityHandler;
+
+      if (valEntityHandler != null) {
+        var valEntity = valEntityHandler.createFromMap(value);
+        setField(o, key, valEntity);
+        return valEntity;
+      } else {
+        setField(o, key, value);
+        return value;
+      }
     } else {
       var valRepo = getEntityRepository(type: fieldType);
-      var valDynamicRet = valRepo?.selectByID(value);
+      var retValDynamic = valRepo?.selectByID(value);
 
-      return valDynamicRet.resolveMapped((valDynamic) {
+      return retValDynamic.resolveMapped((valDynamic) {
         valDynamic ??= value;
         setField(o, key, valDynamic);
         return valDynamic;
@@ -223,14 +264,18 @@ abstract class EntityHandler<O> {
     _knownEntityRepositoryProviders.add(provider);
   }
 
-  EntityRepository<T>? getEntityRepository<T>({T? obj, Type? type}) {
+  EntityRepository<T>? getEntityRepository<T>(
+      {T? obj, Type? type, String? name}) {
     for (var provider in _knownEntityRepositoryProviders) {
-      var repository = provider.getEntityRepository(obj: obj, type: type);
+      var repository =
+          provider.getEntityRepository(obj: obj, type: type, name: name);
       if (repository != null) {
         return repository;
       }
     }
-    return null;
+
+    return EntityRepositoryProvider.globalProvider
+        .getEntityRepository<T>(obj: obj, type: type, name: name);
   }
 }
 
@@ -256,8 +301,26 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     }
 
     if (sampleEntity != null) {
-      _populateFieldsNames(sampleEntity);
+      _populate(sampleEntity);
     }
+  }
+
+  String? _idFieldsName;
+
+  @override
+  String idFieldsName([O? o]) {
+    var idFieldsName = _idFieldsName;
+
+    if (idFieldsName == null && o != null) {
+      idFieldsName = _idFieldsName = o.idFieldName;
+    }
+
+    if (idFieldsName == null) {
+      throw StateError(
+          "`idFieldsName` Not populated yet! No Entity instance presented to this EntityHandler yet.");
+    }
+
+    return idFieldsName;
   }
 
   List<String>? _fieldsNames;
@@ -267,7 +330,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     var fieldsNames = _fieldsNames;
 
     if (fieldsNames == null && o != null) {
-      _populateFieldsNames(o);
+      _populate(o);
       fieldsNames = _fieldsNames;
     }
 
@@ -279,43 +342,44 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     return fieldsNames;
   }
 
-  void _populateFieldsNames(O o) {
+  void _populate(O o) {
+    _idFieldsName ??= o.idFieldName;
     _fieldsNames ??= o.fieldsNames;
   }
 
   @override
   String encodeObjectJson(O o) {
-    _populateFieldsNames(o);
+    _populate(o);
     return super.encodeObjectJson(o);
   }
 
   @override
   V? getID<V>(O o) {
-    _populateFieldsNames(o);
+    _populate(o);
     return o.getID();
   }
 
   @override
   void setID<V>(O o, V id) {
-    _populateFieldsNames(o);
+    _populate(o);
     o.setID(id);
   }
 
   @override
   V? getField<V>(O o, String key) {
-    _populateFieldsNames(o);
+    _populate(o);
     return o.getField<V>(key);
   }
 
   @override
   Type? getFieldType(O o, String key) {
-    _populateFieldsNames(o);
+    _populate(o);
     return o.getFieldType(key);
   }
 
   @override
   void setField<V>(O o, String key, V? value) {
-    _populateFieldsNames(o);
+    _populate(o);
     return o.setField<V>(key, value);
   }
 
@@ -381,8 +445,70 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     }
   }
 
+  String? _idFieldsName;
+
   @override
-  List<String> fieldsNames([O? o]) => reflection.fieldsNames;
+  String idFieldsName([O? o]) {
+    if (_idFieldsName == null) {
+      // Just to populate:
+      if (_fieldsNames == null) {
+        fieldsNames(o);
+      }
+
+      var fieldName = findIdFieldName();
+      _idFieldsName = fieldName ?? 'id';
+    }
+    return _idFieldsName!;
+  }
+
+  String? findIdFieldName() {
+    var possibleFields = reflection.fieldsWhere((f) {
+      return f.type.isPrimitiveType;
+    }).toList();
+
+    if (possibleFields.isEmpty) {
+      throw StateError(
+          "Class without candidate for ID field: ${fieldsNames()}");
+    }
+
+    if (possibleFields.length == 1) {
+      return possibleFields.first.name;
+    }
+
+    possibleFields.sort((a, b) {
+      var n1 = a.nullable;
+      var n2 = b.nullable;
+      return n1 == n2 ? 0 : (n1 ? -1 : 1);
+    });
+
+    var idField = possibleFields.firstWhereOrNull((f) {
+      var name = f.name.toLowerCase();
+      return name == 'id' || name == 'key' || name == 'primary';
+    });
+
+    if (idField != null) {
+      return idField.name;
+    }
+
+    idField = possibleFields.firstWhereOrNull((f) => f.type.isNumericType);
+
+    if (idField != null) {
+      return idField.name;
+    }
+
+    idField = possibleFields.firstWhereOrNull((f) => f.nullable);
+
+    if (idField != null) {
+      return idField.name;
+    }
+
+    return null;
+  }
+
+  List<String>? _fieldsNames;
+
+  @override
+  List<String> fieldsNames([O? o]) => _fieldsNames ??= reflection.fieldsNames;
 
   @override
   FutureOr<O> createFromMap(Map<String, dynamic> fields) {
@@ -446,12 +572,31 @@ abstract class EntitySource<O> extends EntityAccessor<O> {
   EntitySource(String name) : super(name);
 
   FutureOr<O?> selectByID(dynamic id) {
-    return select(IDCondition(id)).resolveMapped((sel) {
+    return select(ConditionID(id)).resolveMapped((sel) {
       return sel.isNotEmpty ? sel.first : null;
     });
   }
 
-  FutureOr<int> length();
+  FutureOr<int> length() => count();
+
+  FutureOr<int> countByQuery(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var condition = _parseCache.parseQuery(query);
+
+    return count(
+        matcher: condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  FutureOr<int> count(
+      {EntityMatcher<O>? matcher,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters});
 
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
@@ -471,14 +616,31 @@ abstract class EntitySource<O> extends EntityAccessor<O> {
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters});
+
+  FutureOr<Iterable<O>> deleteByQuery(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var condition = _parseCache.parseQuery(query);
+
+    return delete(condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters});
 }
 
 abstract class EntityStorage<O> extends EntityAccessor<O> {
   EntityStorage(String name) : super(name);
 
-  dynamic store(O o);
+  FutureOr<dynamic> store(O o);
 
-  Iterable storeAll(Iterable<O> o);
+  FutureOr<Iterable> storeAll(Iterable<O> o);
 }
 
 class EntityRepositoryProvider {
@@ -494,20 +656,27 @@ class EntityRepositoryProvider {
     _entityRepositories[entityRepository.type] = entityRepository;
   }
 
-  EntityRepository<O>? getEntityRepository<O>({O? obj, Type? type}) {
-    var entityRepository = _getEntityRepositoryImpl<O>(obj: obj, type: type);
+  List<EntityRepository> get registeredEntityRepositories =>
+      _entityRepositories.values.toList();
+
+  EntityRepository<O>? getEntityRepository<O>(
+      {O? obj, Type? type, String? name}) {
+    var entityRepository =
+        _getEntityRepositoryImpl<O>(obj: obj, type: type, name: name);
     if (entityRepository != null) {
       return entityRepository;
     }
 
     if (!identical(this, _globalProvider)) {
-      return _globalProvider._getEntityRepositoryImpl<O>(obj: obj, type: type);
+      return _globalProvider._getEntityRepositoryImpl<O>(
+          obj: obj, type: type, name: name);
     }
 
     return null;
   }
 
-  EntityRepository<O>? _getEntityRepositoryImpl<O>({O? obj, Type? type}) {
+  EntityRepository<O>? _getEntityRepositoryImpl<O>(
+      {O? obj, Type? type, String? name}) {
     var entityRepository = _entityRepositories[O];
 
     if (entityRepository == null && obj != null) {
@@ -520,16 +689,25 @@ class EntityRepositoryProvider {
 
     if (entityRepository != null) {
       return entityRepository as EntityRepository<O>;
-    } else {
-      for (var p in _knownEntityRepositoryProviders) {
-        entityRepository = p.getEntityRepository<O>(obj: obj, type: type);
-        if (entityRepository != null) {
-          return entityRepository as EntityRepository<O>;
-        }
-      }
-
-      return null;
     }
+
+    if (name != null) {
+      entityRepository =
+          _entityRepositories.values.where((e) => e.name == name).firstOrNull;
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      }
+    }
+
+    for (var p in _knownEntityRepositoryProviders) {
+      entityRepository =
+          p.getEntityRepository<O>(obj: obj, type: type, name: name);
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      }
+    }
+
+    return null;
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -565,7 +743,7 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
 
   @override
   FutureOr<O?> selectByID(dynamic id) {
-    return select(IDCondition(id)).resolveMapped((sel) {
+    return select(ConditionID(id)).resolveMapped((sel) {
       return sel.isNotEmpty ? sel.first : null;
     });
   }
@@ -578,6 +756,20 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
   @override
+  FutureOr<int> countByQuery(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var condition = _parseCache.parseQuery(query);
+
+    return count(
+        matcher: condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
   FutureOr<Iterable<O>> selectByQuery(String query,
       {Object? parameters,
       List? positionalParameters,
@@ -585,6 +777,19 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
     var condition = _parseCache.parseQuery(query);
 
     return select(condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  FutureOr<Iterable<O>> deleteByQuery(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var condition = _parseCache.parseQuery(query);
+
+    return delete(condition,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
@@ -611,20 +816,35 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
 
   void put(O o);
 
+  void remove(O o);
+
   @override
-  Iterable<O> select(EntityMatcher<O> matcher,
-      {Object? parameters,
+  FutureOr<int> count(
+      {EntityMatcher<O>? matcher,
+      Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
+    if (matcher == null) {
+      return iterable().length;
+    }
+
     return iterable().where((o) {
-      return matcher.matches(
+      return matcher.matchesEntity(
         o,
         entityHandler: entityHandler,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
       );
-    }).toList();
+    }).length;
+  }
+
+  @override
+  Iterable<O> select(EntityMatcher<O> matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    return matches(matcher, parameters, positionalParameters, namedParameters);
   }
 
   @override
@@ -637,16 +857,15 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
 
   @override
   dynamic store(O o) {
+    ensureReferencesStored(o);
+
     var oId = getID(o, entityHandler: entityHandler);
 
     if (oId == null) {
       oId = nextID();
       setID(o, oId, entityHandler: entityHandler);
+      put(o);
     }
-
-    put(o);
-
-    ensureReferencesStored(o);
 
     return oId;
   }
@@ -658,15 +877,15 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
 
   @override
   dynamic ensureStored(O o) {
+    ensureReferencesStored(o);
+
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null) {
       return store(o);
     } else {
-      ensureReferencesStored(o);
+      return id;
     }
-
-    return id;
   }
 
   @override
@@ -684,6 +903,34 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
 
       repository.ensureStored(value);
     }
+  }
+
+  @override
+  FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var del =
+        matches(matcher, parameters, positionalParameters, namedParameters);
+
+    for (var o in del) {
+      remove(o);
+    }
+
+    return del;
+  }
+
+  List<O> matches(EntityMatcher<dynamic> matcher, Object? parameters,
+      List? positionalParameters, Map<String, Object?>? namedParameters) {
+    return iterable().where((o) {
+      return matcher.matchesEntity(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
+    }).toList();
   }
 
   @override
@@ -712,5 +959,10 @@ class SetEntityRepository<O> extends IterableEntityRepository<O> {
   @override
   void put(O o) {
     _entries.add(o);
+  }
+
+  @override
+  void remove(O o) {
+    _entries.remove(o);
   }
 }
