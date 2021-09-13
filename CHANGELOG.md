@@ -1,3 +1,11 @@
+## 1.0.9
+
+- `apiMethod` now can receive an `APIRequest` parameter while receiving other normal parameters.
+- `PostgreSQLAdapter`: correctly resolving `idFieldName` by primary key column.
+- Added test to ensure that `APIRoot.VERSION` is compatible with `pubspec.yaml`.
+- Added test that uses reflection.
+- reflection_factory: ^1.0.7
+
 ## 1.0.8
 
 - Added `APIConfig`:

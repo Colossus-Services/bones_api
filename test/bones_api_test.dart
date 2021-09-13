@@ -5,7 +5,10 @@ import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/src/bones_api_console.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:test/test.dart';
+
+part 'bones_api_test.reflection.g.dart';
 
 final _log = logging.Logger('bones_api_test');
 
@@ -24,9 +27,10 @@ void main() {
       expect(APIRoot.getWithinName('ex'), equals(api));
       expect(APIRoot.getWithinName('foo'), isNull);
 
-      expect(api.modules.length, equals(1));
-      expect(api.modulesNames, equals(['base']));
+      expect(api.modules.length, equals(2));
+      expect(api.modulesNames, equals(['base', 'info']));
       expect(api.getModule('base'), isNotNull);
+      expect(api.getModule('info'), isNotNull);
       expect(api.getModule('X'), isNull);
 
       expect(api.defaultModuleName, isNull);
@@ -124,64 +128,78 @@ void main() {
       await apiServer.start();
     });
 
-    test('foo[GET]', () async {
+    test('foo[GET] /base', () async {
       var res = await _getURL('${apiServer.url}service/base/foo');
       expect(res.toString(), equals('Hi[GET]!'));
     });
 
-    test('foo[POST]', () async {
+    test('foo[POST] /base', () async {
       var res = await _getURL('${apiServer.url}service/base/foo',
           method: APIRequestMethod.POST, parameters: {'a': 1});
       expect(res.toString(), equals('Hi[POST]! {a: 1}'));
     });
 
-    test('time', () async {
+    test('time /base', () async {
       var res = await _getURL('${apiServer.url}service/base/time',
           method: APIRequestMethod.POST, expectedContentType: 'text/plain');
       expect(res.toString(),
           matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
     });
 
-    test('404 module', () async {
+    test('404 module /base', () async {
       var res = await _getURL('${apiServer.url}service/baseX/foo',
           method: APIRequestMethod.GET);
       expect(res.toString(), equals('Not Found'));
     });
 
-    test('404 route', () async {
+    test('404 route /base', () async {
       var res = await _getURL('${apiServer.url}service/base/bar',
           method: APIRequestMethod.GET);
       expect(res.toString(), equals('404: /service/base/bar'));
     });
 
-    test('unauthorized', () async {
+    test('unauthorized /base', () async {
       var res = await _getURL('${apiServer.url}service/base/auth',
           method: APIRequestMethod.GET);
       expect(res.toString(), equals('Forbidden'));
     });
 
-    test('error', () async {
+    test('error /base', () async {
       var res = await _getURL('${apiServer.url}service/base/err',
           method: APIRequestMethod.GET);
       expect(res.toString(), contains('Bad state: Error!'));
     });
 
-    test('put', () async {
+    test('put /base', () async {
       var res = await _getURL('${apiServer.url}service/base/put',
           method: APIRequestMethod.PUT);
       expect(res.toString(), equals('PUT'));
     });
 
-    test('delete', () async {
+    test('delete /base', () async {
       var res = await _getURL('${apiServer.url}service/base/delete',
           method: APIRequestMethod.DELETE);
       expect(res.toString(), equals('DELETE'));
     });
 
-    test('patch', () async {
+    test('patch /base', () async {
       var res = await _getURL('${apiServer.url}service/base/patch',
           method: APIRequestMethod.PATCH);
       expect(res.toString(), equals('PATCH'));
+    });
+
+    test('get /info', () async {
+      var res = await _getURL('${apiServer.url}service/info/echo',
+          method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
+
+      expect(res.toString(),
+          equals('[method: GET ; msg: HELLO! ; agent: BonesAPI/Test]'));
+
+      var res2 = await _getURL('${apiServer.url}service/info/echo',
+          method: APIRequestMethod.POST, parameters: {'msg': 'Hello!'});
+
+      expect(res2.toString(),
+          equals('[method: POST ; msg: HELLO! ; agent: BonesAPI/Test]'));
     });
 
     tearDownAll(() async {
@@ -343,7 +361,7 @@ class MyAPI extends APIRoot {
   MyAPI._() : super('example', '1.0');
 
   @override
-  Set<APIModule> loadModules() => {MyBaseModule(this)};
+  Set<APIModule> loadModules() => {MyBaseModule(this), MyInfoModule(this)};
 }
 
 class MyBaseModule extends APIModule {
@@ -374,6 +392,23 @@ class MyBaseModule extends APIModule {
   }
 }
 
+@EnableReflection()
+class MyInfoModule extends APIModule {
+  MyInfoModule(APIRoot apiRoot) : super(apiRoot, 'info');
+
+  @override
+  void configure() {
+    routes.anyFrom(reflection);
+  }
+
+  FutureOr<APIResponse> echo(String msg, APIRequest request) {
+    var method = request.method.name;
+    var agent = request.headers['user-agent'];
+    var reply = '[method: $method ; msg: ${msg.toUpperCase()} ; agent: $agent]';
+    return APIResponse.ok(reply);
+  }
+}
+
 /// Simple HTTP get URL function.
 Future<String> _getURL(String url,
     {APIRequestMethod? method,
@@ -398,6 +433,8 @@ Future<String> _getURL(String url,
   }
 
   var httpClient = HttpClient();
+
+  httpClient.userAgent = 'BonesAPI/Test';
 
   Future<HttpClientRequest> future;
   HttpClientResponse response;

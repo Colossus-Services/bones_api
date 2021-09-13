@@ -124,7 +124,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
     if (scheme.isEmpty) return null;
 
-    var idFieldName = _findIDField(scheme);
+    var idFieldName = await _findIDField(connection, table, scheme);
 
     var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
       var k = e['column_name'] as String;
@@ -147,7 +147,36 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
     return tableScheme;
   }
 
-  String _findIDField(List<Map<String, dynamic>> scheme) {
+  Future<String> _findIDField(PostgreSQLConnection connection, String table,
+      List<Map<String, dynamic>> scheme) async {
+    var sql = '''
+    SELECT
+      c.column_name, c.data_type
+    FROM
+      information_schema.table_constraints tc 
+    JOIN
+      information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name) 
+    JOIN
+      information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+    WHERE
+      constraint_type = 'PRIMARY KEY' and tc.table_name = '$table';
+    ''';
+
+    var results = await connection.mappedResultsQuery(sql);
+
+    var columns = results.map((r) {
+      return Map.fromEntries(r.values.expand((e) => e.entries));
+    }).toList();
+
+    var primaryFields = Map.fromEntries(
+        columns.map((m) => MapEntry(m['column_name'], m['data_type'])));
+
+    if (primaryFields.length == 1) {
+      return primaryFields.keys.first;
+    } else if (primaryFields.length > 1) {
+      return primaryFields.keys.first;
+    }
+
     return 'id';
   }
 

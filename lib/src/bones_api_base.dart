@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert' as dart_convert;
+import 'dart:typed_data';
 
 import 'package:bones_api/src/bones_api_config.dart';
 import 'package:collection/collection.dart';
@@ -9,13 +11,13 @@ import 'bones_api_extension.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.5';
+  static const String VERSION = '1.0.9';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
   /// Returns the last [APIRoot] if instantiated.
   ///
-  /// - IF [singleton] is `true` and multiple instances exists throws an [StateError].
+  /// - If [singleton] is `true` and multiple instances exists throws an [StateError].
   static APIRoot? get({bool singleton = true}) {
     if (_instances.isEmpty) {
       return null;
@@ -441,11 +443,26 @@ class APIRouteBuilder<M extends APIModule> {
       });
     } else if (returnsAPIResponse) {
       add(requestMethod, apiMethod.name, (req) {
-        var methodInvocation = apiMethod
-            .methodInvocation((key) => req.getParameterIgnoreCase(key));
+        var methodInvocation =
+            apiMethod.methodInvocation((p) => _resolveRequestParameter(req, p));
         return methodInvocation.invoke(apiMethod.method);
       });
     }
+  }
+
+  _resolveRequestParameter(APIRequest request, ParameterReflection parameter) {
+    var typeReflection = parameter.type;
+    if (typeReflection.isOfType(APIRequest)) {
+      return request;
+    }
+
+    if (typeReflection.isOfType(Uint8List) ||
+        (typeReflection.isOfType(List) &&
+            typeReflection.equalsArgumentsTypes([int]))) {
+      return request.payloadAsBytes;
+    }
+
+    return request.getParameterIgnoreCase(parameter.name);
   }
 }
 
@@ -461,6 +478,26 @@ enum APIRequestMethod {
   DELETE,
   // ignore: constant_identifier_names
   PATCH,
+}
+
+/// Extension of enum [APIRequestMethod].
+extension APIRequestMethodExtension on APIRequestMethod {
+  String get name {
+    switch (this) {
+      case APIRequestMethod.GET:
+        return 'GET';
+      case APIRequestMethod.POST:
+        return 'POST';
+      case APIRequestMethod.PUT:
+        return 'PUT';
+      case APIRequestMethod.DELETE:
+        return 'DELETE';
+      case APIRequestMethod.PATCH:
+        return 'PATCH';
+      default:
+        throw ArgumentError('Unknown method: $this');
+    }
+  }
 }
 
 /// Returns the [APIRequestMethod] for [method].
@@ -545,6 +582,27 @@ class APIRequest extends APIPayload {
   /// The payload/body of the request.
   @override
   final dynamic payload;
+
+  Uint8List? get payloadAsBytes {
+    var payload = this.payload;
+
+    if (payload == null) {
+      return null;
+    }
+
+    if (payload is Uint8List) {
+      return payload;
+    }
+
+    if (payload is List<int>) {
+      return Uint8List.fromList(payload);
+    }
+
+    var s = payload.toString();
+    var bs = dart_convert.utf8.encode(s);
+
+    return Uint8List.fromList(bs);
+  }
 
   /// The payload/body MIME Type.
   @override
