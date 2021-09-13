@@ -114,7 +114,7 @@ declarations.
 
 [reflection_factory]: https://pub.dev/packages/reflection_factory
 
-For example, you can map all routes in classes with one line of code:
+For example, you can map all routes in a class with one line of code:
 
 File: `module_account.dart`:
 ```dart
@@ -142,7 +142,9 @@ class AccountModule extends APIModule {
     routes.postFrom(reflection);
   }
 
-  Future<APIResponse> auth(String? email, {String? password}) async {
+  // The request parameters will be mapped to the correct
+  // method parameter by name:
+  Future<APIResponse> auth(String? email, String? password) async {
     if (email == null) {
       return APIResponse.error(error: 'Invalid parameters!');
     }
@@ -159,9 +161,10 @@ class AccountModule extends APIModule {
 
     var account = sel.first;
 
+    // The object `account` will be automatically converted
+    // to JSON when the response is sent through HTTP.
     return account.checkPassword(password)
-        ? APIResponse.ok(account.toJson()
-      ..remove('passwordHash'))
+        ? APIResponse.ok(account)
         : APIResponse.unauthorized();
   }
   
@@ -172,7 +175,7 @@ class AccountModule extends APIModule {
 
 You can declare entities classes in portable Dart code (that also works in the Browser).
 
-To easily enable `toJSon` and `fromJson`, just add `@EnableReflection()` to you entities.
+To easily enable `toJSon` and `fromJson`, just add `@EnableReflection()` to your entities.
 
 File: `entities.dart`:
 ```dart
@@ -188,9 +191,7 @@ class Account {
   int? id;
 
   String email;
-
   String passwordHash;
-
   Address? address;
 
   Account(this.email, String passwordOrHash, this.address, {this.id})
@@ -226,11 +227,8 @@ class Address {
   int? id;
 
   String countryCode;
-
   String state;
-
   String city;
-
   String address1;
   String address2;
 
@@ -249,6 +247,8 @@ See [reflection_factory] for more Reflection documentation.
 
 ## Repositories & Database
 
+To stored entities in Databases and manipulate them you can set up an `EntityRepositoryProvider`:
+
 File: `repositories.dart` 
 ```dart
 import 'package:bones_api/bones_api.dart';
@@ -264,12 +264,14 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   static final APIEntityRepositoryProvider _instance =
       APIEntityRepositoryProvider._();
 
-  // Singleton
+  // Singleton:
   factory APIEntityRepositoryProvider() => _instance;
 
+  // Returns the current `APIRoot`:
   APIRoot? get apiRoot => APIRoot.get();
 
   APIEntityRepositoryProvider._() {
+    // The current APIConfig:
     var apiConfig = apiRoot?.apiConfig;
 
     var postgreAdapter = PostgreSQLAdapter.fromConfig(
@@ -277,9 +279,15 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
       parentRepositoryProvider: this,
     );
 
+    // Join the `PostgreSQLAdapter` and the Address/Account
+    // `EntityHandler` (from reflection) to set up an
+    // `EntityRepository` that uses SQL:
+    
+    // Entity `Address` in table `address`:
     SQLEntityRepository<Address>(
         postgreAdapter, 'address', Address$reflection().entityHandler);
 
+    // Entity `Account` in table `account`:
     SQLEntityRepository<Account>(
         postgreAdapter, 'account', Account$reflection().entityHandler);
   }
@@ -289,6 +297,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 class AddressAPIRepository extends APIRepository<Address> {
   AddressAPIRepository() : super(provider: APIEntityRepositoryProvider());
 
+  // Selects an Address by field `state`:
   FutureOr<Iterable<Address>> selectByState(String state) {
     return selectByQuery(' state == ? ', parameters: {'state': state});
   }
@@ -298,10 +307,12 @@ class AddressAPIRepository extends APIRepository<Address> {
 class AccountAPIRepository extends APIRepository<Account> {
   AccountAPIRepository() : super(provider: APIEntityRepositoryProvider());
 
+  // Selects an Account by field `email`:
   FutureOr<Iterable<Account>> selectAccountByEmail(String email) {
     return selectByQuery(' email == ? ', parameters: {'email': email});
   }
 
+  // Selects an Account by field `address` and sub-field `state`:
   FutureOr<Iterable<Account>> selectAccountByAddressState(String state) {
     // This condition will be translated to a SQL with INNER JOIN (when using an SQLAdapter):
     return selectByQuery(' address.state == ? ', parameters: [state]);
