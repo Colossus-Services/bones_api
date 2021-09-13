@@ -1,7 +1,6 @@
 @TestOn('vm')
 
 import 'package:pubspec/pubspec.dart';
-import 'package:swiss_knife/swiss_knife_vm.dart';
 import 'package:test/test.dart';
 import 'dart:io';
 
@@ -30,7 +29,7 @@ void main() {
 
       print(srcFile);
 
-      var src = await catFile(srcFile);
+      var src = srcFile.readAsStringSync();
 
       var versionMatch = RegExp(r"VERSION\s*=\s*'(.*?)'").firstMatch(src)!;
 
