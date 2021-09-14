@@ -765,9 +765,9 @@ class APIRequest extends APIPayload {
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
 
-  /// Returns from [parameters] a value for [name] or [name1] .. [name9].
+  /// Returns from [parameters] a value for [name1] or [name1] .. [name9].
   V? getParameter<V>(
-    String name, [
+    String name1, [
     String? name2,
     String? name3,
     String? name4,
@@ -777,7 +777,7 @@ class APIRequest extends APIPayload {
     String? name8,
     String? name9,
   ]) {
-    var val = parameters[name];
+    var val = parameters[name1];
     if (val != null) return val;
 
     if (name2 != null) {
