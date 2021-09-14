@@ -3,6 +3,7 @@
 - `TableScheme`:
   - Added `getFieldsValues` and `getFieldValue`.
 - `EntityHandler`: optimized fiel resolution on `setFieldsFromMap`.
+- Improved dartdoc references.
 - Improved tests.
 
 ## 1.0.9
