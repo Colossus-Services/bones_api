@@ -1,3 +1,10 @@
+## 1.0.10
+
+- `TableScheme`:
+  - Added `getFieldsValues` and `getFieldValue`.
+- `EntityHandler`: optimized fiel resolution on `setFieldsFromMap`.
+- Improved tests.
+
 ## 1.0.9
 
 - `apiMethod` now can receive an `APIRequest` parameter while receiving other normal parameters.

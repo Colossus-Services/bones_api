@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_condition.dart';
+import 'bones_api_mixin.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -44,7 +45,7 @@ class TableFieldReference {
 }
 
 /// A generic table scheme.
-class TableScheme {
+class TableScheme with FieldsFromMap {
   /// The table name
   final String name;
 
@@ -60,13 +61,31 @@ class TableScheme {
   /// Fields that are references to another table field.
   final Map<String, TableFieldReference> fieldsReferencedTables;
 
+  late final Map<String, int> _fieldsNamesIndexes;
+  late final List<String> _fieldsNamesLC;
+  late final List<String> _fieldsNamesSimple;
+
   TableScheme(this.name, this.idFieldName, Map<String, Type> fieldsTypes,
       [Map<String, TableFieldReference> fieldsReferencedTables =
           const <String, TableFieldReference>{}])
       : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
         fieldsTypes = Map.unmodifiable(fieldsTypes),
         fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
-            fieldsReferencedTables);
+            fieldsReferencedTables) {
+    _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
+    _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
+    _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
+  }
+
+  /// Returns a [Map] with the table fields values populated from the provided [map].
+  ///
+  /// The field name resolution is case insensitive. See [getFieldValue].
+  Map<String, Object?> getFieldsValues(Map<String, Object?> map) {
+    return getFieldsValuesFromMap(fieldsNames, map,
+        fieldsNamesIndexes: _fieldsNamesIndexes,
+        fieldsNamesLC: _fieldsNamesLC,
+        fieldsNamesSimple: _fieldsNamesSimple);
+  }
 
   @override
   String toString() {
@@ -131,7 +150,7 @@ class EncodingContext {
 
   Map<String, Object?>? encodingParameters;
 
-  /// The encoded parameters placeholders.
+  /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
 
   /// The table aliases used in the encoded output.

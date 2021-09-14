@@ -215,3 +215,126 @@ mixin Pool<O> {
     });
   }
 }
+
+mixin FieldsFromMap {
+  Map<String, int> buildFieldsNamesIndexes(List<String> fieldsNames) {
+    return Map<String, int>.fromEntries(
+        List.generate(fieldsNames.length, (i) => MapEntry(fieldsNames[i], i)));
+  }
+
+  List<String> buildFieldsNamesLC(List<String> fieldsNames) =>
+      List<String>.unmodifiable(fieldsNames.map((f) => fieldToLCKey(f)));
+
+  List<String> buildFieldsNamesSimple(List<String> fieldsNames) {
+    return List<String>.unmodifiable(
+        fieldsNames.map((f) => fieldToSimpleKey(f)));
+  }
+
+  /// Returns a [Map] with the fields values populated from the provided [map].
+  ///
+  /// The field name resolution is case insensitive. See [getFieldValueFromMap].
+  Map<String, Object?> getFieldsValuesFromMap(
+    List<String> fieldsNames,
+    Map<String, Object?> map, {
+    Map<String, int>? fieldsNamesIndexes,
+    List<String>? fieldsNamesLC,
+    List<String>? fieldsNamesSimple,
+  }) {
+    var mapLC = <String, Object?>{};
+    var mapSimple = <String, Object?>{};
+
+    var fields = Map<String, Object?>.fromEntries(fieldsNames.map((f) {
+      String? fLC, fSimple;
+      if (fieldsNamesIndexes != null) {
+        var idx = fieldsNamesIndexes[f]!;
+        fLC = fieldsNamesLC?[idx];
+        fSimple = fieldsNamesSimple?[idx];
+      }
+
+      var value =
+          _getFieldValueFromMapImpl(f, fLC, fSimple, map, mapLC, mapSimple);
+      return MapEntry(f, value);
+    }));
+
+    return fields;
+  }
+
+  /// Returns a [field] value from [map].
+  /// - [field] is case insensitive.
+  Object? getFieldValueFromMap(String field, Map<String, Object?> map) =>
+      _getFieldValueFromMapImpl(field, null, null, map, null, null);
+
+  Object? _getFieldValueFromMapImpl(
+      String field,
+      String? fieldLC,
+      String? fieldSimple,
+      Map<String, Object?> map,
+      Map<String, Object?>? mapLC,
+      Map<String, Object?>? mapSimple) {
+    if (map.isEmpty) return null;
+
+    var val = map[field];
+    if (val != null) return val;
+
+    fieldLC ??= fieldToLCKey(field);
+
+    val = map[fieldLC];
+    if (val != null) return val;
+
+    fieldSimple ??= fieldToSimpleKey(field);
+
+    val = map[fieldSimple];
+    if (val != null) return val;
+
+    if (mapLC != null) {
+      if (mapLC.isEmpty) {
+        for (var e in map.entries) {
+          var kLC = fieldToLCKey(e.key);
+          mapLC[kLC] = e.value;
+        }
+      }
+
+      val = mapLC[fieldLC];
+      if (val != null) {
+        return val;
+      }
+    } else {
+      for (var k in map.keys) {
+        var kLC = fieldToLCKey(k);
+        if (kLC == fieldLC) {
+          return map[k];
+        }
+      }
+    }
+
+    if (mapSimple != null) {
+      if (mapSimple.isEmpty) {
+        for (var e in map.entries) {
+          var kSimple = fieldToSimpleKey(e.key);
+          mapSimple[kSimple] = e.value;
+        }
+      }
+
+      val = mapSimple[fieldSimple];
+      if (val != null) {
+        return val;
+      }
+    } else {
+      for (var k in map.keys) {
+        var kSimple = fieldToSimpleKey(k);
+        if (kSimple == fieldSimple) {
+          return map[k];
+        }
+      }
+    }
+
+    return null;
+  }
+
+  String fieldToLCKey(String key) => key.toLowerCase();
+
+  static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z0-9]');
+
+  String fieldToSimpleKey(String key) =>
+      key.toLowerCase().replaceAll(_regexpLettersAndDigits, '');
+}

@@ -61,7 +61,7 @@ class EntityHandlerProvider {
   }
 }
 
-abstract class EntityHandler<O> {
+abstract class EntityHandler<O> with FieldsFromMap {
   final EntityHandlerProvider provider;
   final Type type;
 
@@ -110,6 +110,36 @@ abstract class EntityHandler<O> {
   String idFieldsName([O? o]);
 
   List<String> fieldsNames([O? o]);
+
+  Map<String, int>? _fieldsNamesIndexes;
+
+  Map<String, int> fieldsNamesIndexes([O? o]) {
+    if (_fieldsNamesIndexes == null) {
+      var fieldsNames = this.fieldsNames(o);
+      _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
+    }
+    return _fieldsNamesIndexes!;
+  }
+
+  List<String>? _fieldsNamesLC;
+
+  List<String> fieldsNamesLC([O? o]) {
+    if (_fieldsNamesLC == null) {
+      var fieldsNames = this.fieldsNames(o);
+      _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
+    }
+    return _fieldsNamesLC!;
+  }
+
+  List<String>? _fieldsNamesSimple;
+
+  List<String> fieldsNamesSimple([O? o]) {
+    if (_fieldsNamesSimple == null) {
+      var fieldsNames = this.fieldsNames(o);
+      _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
+    }
+    return _fieldsNamesSimple!;
+  }
 
   Type? getFieldType(O o, String key);
 
@@ -179,9 +209,13 @@ abstract class EntityHandler<O> {
   FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields) {
     var fieldsNames = this.fieldsNames(o);
 
-    var setFutures = fieldsNames.map((f) {
-      var val = getFieldFromMap(fields, f);
-      return setFieldValueDynamic(o, f, val).resolveWithValue(true);
+    var fieldsValues = getFieldsValuesFromMap(fieldsNames, fields,
+        fieldsNamesIndexes: fieldsNamesIndexes(o),
+        fieldsNamesLC: fieldsNamesLC(o),
+        fieldsNamesSimple: fieldsNamesSimple(o));
+
+    var setFutures = fieldsValues.entries.map((e) {
+      return setFieldValueDynamic(o, e.key, e.value).resolveWithValue(true);
     });
 
     return setFutures.resolveAllWithValue(o);
@@ -224,37 +258,6 @@ abstract class EntityHandler<O> {
         return valDynamic;
       });
     }
-  }
-
-  static final RegExp _regexpNonWord = RegExp(r'\W');
-
-  V? getFieldFromMap<V>(Map<String, dynamic> map, String key) {
-    var v = map[key];
-    if (v != null) return v;
-
-    var keyLC = key.toLowerCase();
-    v = map[keyLC];
-    if (v != null) return v;
-
-    var keyLC2 = keyLC.replaceAll(_regexpNonWord, '');
-
-    for (var k in map.keys) {
-      var kLC = k.toLowerCase();
-
-      if (keyLC == kLC) {
-        var v = map[k];
-        return v;
-      }
-
-      var kLC2 = kLC.replaceAll(_regexpNonWord, '');
-
-      if (keyLC2 == kLC2) {
-        var v = map[k];
-        return v;
-      }
-    }
-
-    return null;
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -344,7 +347,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
 
   void _populate(O o) {
     _idFieldsName ??= o.idFieldName;
-    _fieldsNames ??= o.fieldsNames;
+    _fieldsNames ??= List<String>.unmodifiable(o.fieldsNames);
   }
 
   @override

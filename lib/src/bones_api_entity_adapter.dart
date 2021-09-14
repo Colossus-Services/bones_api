@@ -228,7 +228,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// If `true` indicates that this adapter SQL uses the `RETURNING` syntax for inserts.
   bool get sqlAcceptsInsertReturning;
 
-  FutureOr<SQL> generateInsertSQL(String table, Map<String, dynamic> fields) {
+  FutureOr<SQL> generateInsertSQL(String table, Map<String, Object?> fields) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -238,14 +238,18 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       var context = EncodingContext(table, namedParameters: fields);
 
-      var fieldsNames =
-          tableScheme.fieldsNames.where((f) => fields[f] != null).toList();
+      var fieldsValues = tableScheme.getFieldsValues(fields);
 
-      var fieldsValues = <String, Object?>{};
+      var fieldsNotNull = fieldsValues.entries
+          .map((e) => e.value != null ? e.key : null)
+          .whereNotNull()
+          .toList();
 
-      return fieldsNames
-          .map((f) =>
-              fieldValueToSQL(context, tableScheme, f, fields[f], fieldsValues))
+      var fieldsValuesInSQL = <String, Object?>{};
+
+      return fieldsNotNull
+          .map((f) => fieldValueToSQL(
+              context, tableScheme, f, fieldsValues[f]!, fieldsValuesInSQL))
           .toList()
           .resolveAll()
           .resolveMapped((values) {
@@ -256,7 +260,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
         sql.write('INSERT INTO "');
         sql.write(table);
         sql.write('" ("');
-        sql.write(fieldsNames.join('","'));
+        sql.write(fieldsNotNull.join('","'));
         sql.write('")');
 
         if (sqlAcceptsInsertOutput) {
@@ -272,7 +276,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
           sql.write(' RETURNING "$table"."$idFieldName"');
         }
 
-        return SQL(sql.toString(), fieldsValues,
+        return SQL(sql.toString(), fieldsValuesInSQL,
             entityName: table, idFieldName: idFieldName);
       });
     });
