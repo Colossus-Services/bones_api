@@ -65,7 +65,12 @@ void main() {
 
       _log.info('DockerCommander: $dockerCommander');
 
-      dockerRunning = await dockerCommander.isDaemonRunning();
+      var daemonOK = false;
+      try {
+        daemonOK = await dockerCommander.isDaemonRunning();
+      } catch (_) {}
+
+      dockerRunning = daemonOK;
 
       _log.info('dockerRunning: $dockerRunning');
 
