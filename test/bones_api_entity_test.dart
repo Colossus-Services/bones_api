@@ -91,15 +91,15 @@ void main() {
     test('basic', () async {
       var user1 = User(
           'joe@mail.com', '123', Address('NY', 'New York', 'Fifth Avenue', 101),
-          creationTime: DateTime(2020, 10, 11, 12, 13, 14, 0, 0));
+          creationTime: DateTime.utc(2020, 10, 11, 12, 13, 14, 0, 0));
       var user2 = User('smith@mail.com', 'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          creationTime: DateTime(2021, 10, 11, 12, 13, 14, 0, 0));
+          creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"creationTime":1602429194000}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"creationTime":1602418394000}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"creationTime":1633965194000}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"creationTime":1633954394000}';
 
       addressEntityHandler.inspectObject(user1.address);
       userEntityHandler.inspectObject(user1);
