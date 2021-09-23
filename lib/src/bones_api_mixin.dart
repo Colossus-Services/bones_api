@@ -119,7 +119,6 @@ mixin Pool<O> {
 
   FutureOr<O?> createPoolElement() {
     ++_createElementCount;
-    print('!!! createPoolElement> $_createElementCount');
     return null;
   }
 
@@ -265,8 +264,6 @@ mixin Pool<O> {
       if (recycled != null) {
         checkPool();
         _pool.addLast(recycled);
-
-        print('!!! release> $recycled');
 
         if (_yields.isNotEmpty) {
           var yield = _yields.removeFirst();

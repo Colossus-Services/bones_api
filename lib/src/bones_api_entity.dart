@@ -1271,8 +1271,6 @@ class Transaction {
 
     _lastResult = result;
 
-    print('!!! executed> $op > $result');
-
     var waitingExecutedOperation = _waitingExecutedOperation;
     if (waitingExecutedOperation != null &&
         !waitingExecutedOperation.isCompleted) {
@@ -1291,8 +1289,6 @@ class Transaction {
   }
 
   Future<bool> _waitAllExecutedImpl() async {
-    print('!!! _waitAllExecutedImpl> ...\n$this');
-
     while (_executedOperations.length < _operations.length) {
       var completer = _waitingExecutedOperation ??= Completer<bool>();
       await completer.future;
@@ -1327,8 +1323,6 @@ class Transaction {
   FutureOr<R?> _commitImpl<R>() {
     var result = _lastResult;
     _result = result;
-
-    print('!!! commit> $this');
 
     _transactionCompleter.complete(result);
 
