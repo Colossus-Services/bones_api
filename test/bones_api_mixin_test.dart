@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:bones_api/src/bones_api_mixin.dart';
 import 'package:logging/logging.dart' as logging;
@@ -99,6 +101,129 @@ void main() {
           }));
     });
   });
+
+  group('Pool', () {
+    setUp(() {});
+
+    test('basic', () async {
+      var pool = _PoolTest(3);
+
+      expect(pool.poolSize, equals(0));
+      expect(pool.isPoolEmpty, isTrue);
+      expect(pool.isPoolNotEmpty, isFalse);
+
+      {
+        var e = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+        e.status += 'a';
+        expect(e.status, equals('a'));
+        pool.releaseIntoPool(e);
+
+        expect(pool.poolSize, equals(1));
+        expect(pool.isPoolEmpty, isFalse);
+        expect(pool.isPoolNotEmpty, isTrue);
+      }
+
+      {
+        var e = await pool.catchFromPool();
+        e.status += 'b';
+        expect(e.status, equals('ab'));
+        pool.releaseIntoPool(e);
+      }
+
+      {
+        expect(pool.poolSize, equals(1));
+        var e1 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+        var e2 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+
+        e1.status += 'c';
+        e2.status += 'c';
+
+        expect(e1.status, equals('abc'));
+        expect(e2.status, equals('c'));
+
+        pool.releaseIntoPool(e1);
+        expect(pool.poolSize, equals(1));
+        pool.releaseIntoPool(e2);
+        expect(pool.poolSize, equals(2));
+      }
+
+      {
+        expect(pool.poolSize, equals(2));
+        var e1 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(1));
+        var e2 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+
+        e1.close();
+        pool.releaseIntoPool(e1);
+        expect(pool.poolSize, equals(0));
+        pool.releaseIntoPool(e2);
+        expect(pool.poolSize, equals(1));
+      }
+
+      {
+        expect(pool.poolSize, equals(1));
+        var e1 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+        var e2 = await pool.catchFromPool();
+        expect(pool.poolSize, equals(0));
+
+        pool.releaseIntoPool(e1);
+        expect(pool.poolSize, equals(1));
+        pool.releaseIntoPool(e2);
+        expect(pool.poolSize, equals(2));
+
+        e2.close();
+
+        pool.checkPool();
+        expect(pool.poolSize, equals(1));
+      }
+    });
+  });
 }
 
 class _FieldsTest with FieldsFromMap {}
+
+class _PoolTest with Pool<_PoolElement> {
+  final int sizeLimit;
+
+  _PoolTest(this.sizeLimit);
+
+  int _idCount = 0;
+
+  @override
+  FutureOr<_PoolElement> createPoolElement() {
+    super.createPoolElement();
+    return _PoolElement(++_idCount);
+  }
+
+  @override
+  FutureOr<bool> isPoolElementValid(_PoolElement o) {
+    return !o.isClosed;
+  }
+
+  @override
+  int get poolSizeDesiredLimit => sizeLimit;
+}
+
+class _PoolElement {
+  final int id;
+
+  _PoolElement(this.id);
+
+  bool _closed = false;
+
+  bool get isClosed => _closed;
+
+  void close() => _closed = true;
+
+  String status = '';
+
+  @override
+  String toString() {
+    return '_PoolElement[#$id]{closed: $_closed, status: <$status>}';
+  }
+}

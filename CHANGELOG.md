@@ -1,3 +1,24 @@
+## 1.0.11
+
+- `APIRequest`:
+  - Added `scheme`, `requesterSource` and `_requesterAddress`.
+- `APIResponse`:
+  - Added metrics support (used to generate `Server-Timing` headers). 
+  - Added `setCORS`.
+- Added `TypeParser`, for lenient parsing of basic Dart types.
+- Entities:
+  - Better automatic conversion of types when setting entities fields.
+  - Added support for transactions.
+- Repositories:
+  - Added `limit` support for queries.
+  - Better resolution of correct `EntityRepository` and `EntityHandler` for a type while loading it.
+  - Better resolution of sub-entities in fields.
+- Improved tests:
+  - Using Docker container to test PostgreSQL adapter.
+- async_extension: ^1.0.7
+- reflection_factory: ^1.0.8
+- docker_commander: ^2.0.12
+
 ## 1.0.10
 
 - `TableScheme`:

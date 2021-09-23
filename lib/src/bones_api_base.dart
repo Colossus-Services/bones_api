@@ -11,7 +11,7 @@ import 'bones_api_extension.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.10';
+  static const String VERSION = '1.0.11';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -565,6 +565,8 @@ abstract class APIPayload {
   }
 }
 
+enum APIRequesterSource { internal, local, remote, unknown }
+
 /// Represents an API request.
 class APIRequest extends APIPayload {
   /// The request method.
@@ -578,6 +580,9 @@ class APIRequest extends APIPayload {
 
   /// The headers of the request.
   final Map<String, dynamic> headers;
+
+  /// The [DateTime] of this request.
+  final DateTime time;
 
   /// The payload/body of the request.
   @override
@@ -612,6 +617,11 @@ class APIRequest extends APIPayload {
   @override
   String? payloadFileExtension;
 
+  final String? scheme;
+
+  final APIRequesterSource requesterSource;
+  final String? _requesterAddress;
+
   late final List<String> _pathParts;
 
   APIRequest(this.method, this.path,
@@ -619,10 +629,44 @@ class APIRequest extends APIPayload {
       Map<String, dynamic>? headers,
       this.payload,
       this.payloadMimeType,
-      this.payloadFileExtension})
+      this.payloadFileExtension,
+      String? scheme,
+      APIRequesterSource? requesterSource,
+      String? requesterAddress,
+      DateTime? time})
       : parameters = parameters ?? <String, dynamic>{},
         headers = headers ?? <String, dynamic>{},
-        _pathParts = _buildPathParts(path);
+        _pathParts = _buildPathParts(path),
+        scheme = scheme?.trim(),
+        requesterSource = _resolveRestSource(requesterAddress),
+        _requesterAddress = requesterAddress,
+        time = time ?? DateTime.now();
+
+  static APIRequesterSource _resolveRestSource(String? requestAddress) {
+    if (requestAddress == null) return APIRequesterSource.unknown;
+
+    requestAddress = requestAddress.trim();
+    if (requestAddress.isEmpty || requestAddress == '?') {
+      return APIRequesterSource.unknown;
+    }
+
+    var requestAddressLC = requestAddress.toLowerCase();
+
+    if (requestAddressLC == 'localhost' ||
+        requestAddressLC == '127.0.0.1' ||
+        requestAddressLC == '0.0.0.0' ||
+        requestAddressLC == '::1' ||
+        requestAddressLC == '::' ||
+        requestAddressLC == '*') {
+      return APIRequesterSource.local;
+    }
+
+    if (requestAddressLC == 'internal' || requestAddressLC == '.') {
+      return APIRequesterSource.internal;
+    }
+
+    return APIRequesterSource.remote;
+  }
 
   static List<String> _buildPathParts(String path) {
     var p = path.trim();
@@ -745,6 +789,11 @@ class APIRequest extends APIPayload {
         headers: headers ?? <String, dynamic>{},
         payload: payload);
   }
+
+  /// The elapsed time of this request.
+  ///
+  /// Difference between [DateTime.now] and [time].
+  Duration get elapsedTime => DateTime.now().difference(time);
 
   /// Returns the parts of the [path].
   List<String> get pathParts => _pathParts.toList();
@@ -878,9 +927,110 @@ class APIRequest extends APIPayload {
     return null;
   }
 
+  String? getHeader(String headerKey, {String? def}) {
+    var val = headers[headerKey];
+    if (val != null) return val;
+
+    headerKey = headerKey.trim().toLowerCase();
+
+    val = headers[headerKey];
+    if (val != null) return val;
+
+    for (var k in headers.keys) {
+      var kLC = k.toLowerCase();
+
+      if (kLC == headerKey) {
+        return headers[k];
+      }
+    }
+
+    return def;
+  }
+
+  String get hostname {
+    var host = getHeader('host');
+    if (host == null) {
+      return 'localhost';
+    }
+
+    var idx = host.lastIndexOf(':');
+    if (idx >= 0) {
+      host = host.substring(0, idx);
+    }
+
+    host = host.trim();
+
+    if (host.isEmpty) {
+      return 'localhost';
+    }
+
+    return host;
+  }
+
+  int get port {
+    var port = getHeader('port');
+    if (port != null) {
+      var p = int.tryParse(port.trim());
+      if (p != null) return p;
+    }
+
+    var host = getHeader('host');
+    if (host == null) {
+      return 0;
+    }
+
+    var idx = host.lastIndexOf(':');
+    if (idx > 0) {
+      port = host.substring(idx + 1);
+      var p = int.tryParse(port.trim());
+      if (p != null) return p;
+    }
+
+    return 0;
+  }
+
+  String get hostnameAndPort => '$hostname:$port';
+
+  String? get requesterAddress {
+    if (_requesterAddress != null) return _requesterAddress;
+
+    String? client;
+
+    var proxy = getHeader('x-forwarded-for');
+    if (proxy != null) {
+      var idx = proxy.indexOf(',');
+      client = idx > 0 ? proxy.substring(0, idx) : proxy;
+    } else {
+      client = getHeader('remote-address') ?? '';
+    }
+
+    client = client.trim();
+    if (client.isNotEmpty) {
+      return client;
+    }
+
+    return null;
+  }
+
+  String get origin {
+    var origin = getHeader('origin');
+    if (origin != null) {
+      origin = origin.trim();
+      if (origin.isNotEmpty) {
+        return origin;
+      }
+    }
+
+    var host = hostnameAndPort;
+    var scheme = this.scheme ?? 'http';
+
+    origin = "$scheme://$host/";
+    return origin;
+  }
+
   @override
   String toString() {
-    return 'APIRequest{ method: $method, path: $path, parameters: $parameters, headers: $headers${hasPayload ? ', payloadLength: $payloadLength' : ''} }';
+    return 'APIRequest{ method: $method, path: $path, parameters: $parameters, requester: $requesterSource @ $requesterAddress, headers: $headers${hasPayload ? ', payloadLength: $payloadLength' : ''} }';
   }
 }
 
@@ -924,34 +1074,110 @@ class APIResponse<T> extends APIPayload {
       this.payload,
       this.payloadMimeType,
       this.payloadFileExtension,
-      this.error});
+      this.error,
+      Map<String, Duration>? metrics})
+      : _metrics = metrics;
 
   /// Creates a response of status `OK`.
   factory APIResponse.ok(T? payload,
-      {Map<String, dynamic>? headers, String? mimeType}) {
+      {Map<String, dynamic>? headers,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
-        payloadMimeType: mimeType);
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `OK` response.
+  APIResponse asOk(
+      {T? payload,
+      Map<String, dynamic>? headers,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.ok(payload ?? this.payload,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `NOT_FOUND`.
-  factory APIResponse.notFound({Map<String, dynamic>? headers, T? payload}) {
+  factory APIResponse.notFound(
+      {Map<String, dynamic>? headers,
+      T? payload,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
-        headers: headers ?? <String, dynamic>{}, payload: payload);
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to a `notFound` response.
+  APIResponse asNotFound(
+      {T? payload,
+      Map<String, dynamic>? headers,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.notFound(
+        payload: payload,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `UNAUTHORIZED`.
   factory APIResponse.unauthorized(
-      {Map<String, dynamic>? headers, T? payload}) {
+      {Map<String, dynamic>? headers,
+      T? payload,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
-        headers: headers ?? <String, dynamic>{}, payload: payload);
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `unauthorized` response.
+  APIResponse asUnauthorized(
+      {T? payload,
+      Map<String, dynamic>? headers,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.unauthorized(
+        payload: payload,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
   }
 
   /// Creates an error response.
-  factory APIResponse.error({Map<String, dynamic>? headers, dynamic error}) {
+  factory APIResponse.error(
+      {Map<String, dynamic>? headers,
+      dynamic error,
+      Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.ERROR,
-        headers: headers ?? <String, dynamic>{}, error: error);
+        headers: headers ?? <String, dynamic>{},
+        error: error,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `error` response.
+  APIResponse asError(
+      {Map<String, dynamic>? headers,
+      dynamic error,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.error(
+        headers: headers ?? this.headers,
+        error: error ?? this.error,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
   }
 
   /// Creates a response based into [o] value.
@@ -963,6 +1189,139 @@ class APIResponse<T> extends APIPayload {
     } else {
       return APIResponse.ok(o);
     }
+  }
+
+  Map<String, Duration>? _metrics;
+
+  /// Returns `true` if any metric is set. See [metrics].
+  bool get hasMetrics => _metrics != null && _metrics!.isNotEmpty;
+
+  /// Returns the current metrics.
+  Map<String, Duration> get metrics => _metrics ??= <String, Duration>{};
+
+  /// Set a metric.
+  ///
+  /// This usually is transformed to a `Server-Timing` header.
+  setMetric(String name, Duration duration) => metrics[name] = duration;
+
+  /// Returns a metric.
+  getMetric(String name) => metrics[name];
+
+  Map<String, DateTime>? _startedMetrics;
+
+  void _copyStartedMetrics(APIResponse other) {
+    var otherStartedMetrics = other._startedMetrics;
+
+    if (otherStartedMetrics != null && otherStartedMetrics.isNotEmpty) {
+      var startedMetrics = _startedMetrics ??= <String, DateTime>{};
+      startedMetrics.addAll(otherStartedMetrics);
+    }
+  }
+
+  /// Starts a metric chronometer.
+  DateTime startMetric(String name) {
+    var startedMetrics = _startedMetrics ??= <String, DateTime>{};
+
+    var time = startedMetrics.putIfAbsent(name, () => DateTime.now());
+    return time;
+  }
+
+  /// Stops a metric previously started and adds it to [metrics].
+  /// See [startMetric].
+  Duration? stopMetric(String name, {DateTime? now}) {
+    var start = _startedMetrics?[name];
+    if (start == null) return null;
+
+    now ??= DateTime.now();
+
+    var duration = now.difference(start);
+    setMetric(name, duration);
+
+    return duration;
+  }
+
+  void stopAllMetrics({DateTime? now}) {
+    var startedMetrics = _startedMetrics;
+
+    if (startedMetrics != null) {
+      now ??= DateTime.now();
+
+      for (var k in startedMetrics.keys) {
+        stopMetric(k, now: now);
+      }
+    }
+  }
+
+  String? getHeader(String headerKey, {String? def}) {
+    var val = headers[headerKey];
+    if (val != null) return val;
+
+    headerKey = headerKey.trim().toLowerCase();
+
+    val = headers[headerKey];
+    if (val != null) return val;
+
+    for (var k in headers.keys) {
+      var kLC = k.toLowerCase();
+
+      if (kLC == headerKey) {
+        return headers[k];
+      }
+    }
+
+    return def;
+  }
+
+  static final String headerXAccessToken = "X-Access-Token";
+  static final String headerXAccessTokenExpiration =
+      "X-Access-Token-Expiration";
+
+  static final String exposeHeaders =
+      "Content-Length, Content-Type, Last-Modified, $headerXAccessToken, $headerXAccessTokenExpiration";
+
+  /// Returns `true` if this response has `CORS` (Cross-origin Resource Sharing) headers set.
+  bool get hasCORS =>
+      getHeader('Access-Control-Allow-Origin') != null ||
+      getHeader('Access-Control-Allow-Methods') != null;
+
+  /// Sets the `CORS` (Cross-origin Resource Sharing) headers of this response.
+  void setCORS(APIRequest request,
+      {bool allowCredentials = true,
+      List<String>? allowMethods,
+      List<String>? allowHeaders,
+      List<String>? exposeHeaders}) {
+    var origin = request.origin;
+
+    var localhost = false;
+
+    if (origin.isEmpty) {
+      headers["Access-Control-Allow-Origin"] = "*";
+    } else {
+      headers["Access-Control-Allow-Origin"] = origin;
+
+      if (origin.contains("://localhost:") ||
+          origin.contains("://127.0.0.1:") ||
+          origin.contains("://::1")) {
+        localhost = true;
+      }
+    }
+
+    headers["Access-Control-Allow-Methods"] =
+        allowMethods?.join(',') ?? 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS';
+
+    headers["Access-Control-Allow-Credentials"] =
+        allowCredentials ? 'true' : 'false';
+
+    if (localhost) {
+      headers["Access-Control-Allow-Headers"] = allowHeaders?.join(', ') ??
+          'Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt';
+    } else {
+      headers["Access-Control-Allow-Headers"] = allowHeaders?.join(', ') ??
+          'Content-Type, Access-Control-Allow-Headers, Authorization';
+    }
+
+    headers["Access-Control-Expose-Headers"] =
+        exposeHeaders?.join(', ') ?? exposeHeaders;
   }
 
   /// Response infos.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 
 mixin Initializable {
   bool _initialized = false;
@@ -17,6 +18,23 @@ mixin Initializable {
   }
 
   void initialize() {}
+}
+
+mixin Closable {
+  bool _closed = false;
+
+  bool get isClosed => _closed;
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+  }
+
+  void checkNotClosed() {
+    if (isClosed) {
+      throw StateError("Closed: $this");
+    }
+  }
 }
 
 class PoolTimeoutError extends Error {
@@ -35,13 +53,16 @@ mixin Pool<O> {
 
   Iterable<O> get poolElements => List<O>.unmodifiable(_pool);
 
-  bool removeFromPool(O o) => _pool.remove(o);
+  bool removeFromPool(O o) {
+    return _pool.remove(o);
+  }
 
   int removeElementsFromPool(int amount) {
     var rm = 0;
 
     while (amount > 0 && _pool.isNotEmpty) {
-      _pool.removeFirst();
+      var o = _pool.removeFirst();
+      closePoolElement(o);
       --amount;
       rm++;
     }
@@ -55,17 +76,10 @@ mixin Pool<O> {
   FutureOr<List<O>> invalidPoolElements() => filterPoolElements(
       (o) => isPoolElementValid(o).resolveMapped((valid) => !valid));
 
-  FutureOr<List<O>> filterPoolElements(
-      FutureOr<bool> Function(O o) filter) async {
-    var elements = <O>[];
-
-    for (var o in _pool) {
-      await filter(o).resolveMapped((valid) {
-        if (valid) {
-          elements.add(o);
-        }
-      });
-    }
+  FutureOr<List<O>> filterPoolElements(FutureOr<bool> Function(O o) filter) {
+    var elements = _pool.map((o) {
+      return filter(o).resolveMapped((valid) => valid ? o : null);
+    }).resolveAllNotNull();
 
     return elements;
   }
@@ -90,7 +104,24 @@ mixin Pool<O> {
 
   int get poolSize => _pool.length;
 
-  FutureOr<O?> createPoolElement();
+  bool get isPoolEmpty => poolSize == 0;
+  bool get isPoolNotEmpty => !isPoolEmpty;
+
+  int get poolCreatedElementsCount => _createElementCount;
+
+  int get poolDisposedElementsCount =>
+      _closedElementsCount + _unrecycledElementCount;
+
+  int get poolAliveElementsSize =>
+      poolCreatedElementsCount - poolDisposedElementsCount;
+
+  int _createElementCount = 0;
+
+  FutureOr<O?> createPoolElement() {
+    ++_createElementCount;
+    print('!!! createPoolElement> $_createElementCount');
+    return null;
+  }
 
   Completer<bool>? _waitingPoolElement;
 
@@ -102,8 +133,38 @@ mixin Pool<O> {
     }
   }
 
+  int get poolSizeDesiredLimit;
+
+  static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 100);
+
+  Duration get poolYieldTimeout => _defaultPoolYieldTimeout;
+
+  final QueueList<Completer<bool>> _yields = QueueList(8);
+
   FutureOr<O> _catchFromEmptyPool(Duration? timeout) {
-    return createPoolElement().resolveMapped((o) {
+    var alive = poolAliveElementsSize;
+
+    FutureOr<O?> created;
+
+    if (alive > poolSizeDesiredLimit) {
+      var yield = Completer<bool>();
+      _yields.addLast(yield);
+
+      created = yield.future.timeout(poolYieldTimeout, onTimeout: () {
+        _yields.remove(yield);
+        return false;
+      }).then((ok) {
+        if (_pool.isNotEmpty) {
+          return _catchFromPopulatedPool();
+        } else {
+          return createPoolElement();
+        }
+      });
+    } else {
+      created = createPoolElement();
+    }
+
+    return created.resolveMapped((o) {
       if (o != null) return o;
 
       var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
@@ -128,7 +189,15 @@ mixin Pool<O> {
 
   FutureOr<O> _catchFromPopulatedPool() {
     var o = _pool.removeLast();
-    _waitingPoolElement = null;
+
+    var waitingPoolElement = _waitingPoolElement;
+    if (waitingPoolElement != null) {
+      if (!waitingPoolElement.isCompleted) {
+        waitingPoolElement.complete(false);
+      }
+      _waitingPoolElement = null;
+    }
+
     return preparePoolElement(o);
   }
 
@@ -159,7 +228,7 @@ mixin Pool<O> {
     });
   }
 
-  FutureOr<bool> checkPool() => true;
+  FutureOr<bool> checkPool() => removeInvalidElementsFromPool();
 
   FutureOr<bool> checkPoolSize(
       int minSize, int maxSize, int checkInvalidsIntervalMs) {
@@ -182,7 +251,12 @@ mixin Pool<O> {
     }
   }
 
-  FutureOr<O> recyclePoolElement(O o) => o;
+  FutureOr<O?> recyclePoolElement(O o) {
+    var retValid = isPoolElementValid(o);
+    return retValid.resolveMapped((valid) => valid ? o : null);
+  }
+
+  int _unrecycledElementCount = 0;
 
   FutureOr<bool> releaseIntoPool(O o) {
     var ret = recyclePoolElement(o);
@@ -192,6 +266,15 @@ mixin Pool<O> {
         checkPool();
         _pool.addLast(recycled);
 
+        print('!!! release> $recycled');
+
+        if (_yields.isNotEmpty) {
+          var yield = _yields.removeFirst();
+          if (!yield.isCompleted) {
+            yield.complete(true);
+          }
+        }
+
         var waitingPoolElement = _waitingPoolElement;
         if (waitingPoolElement != null && !waitingPoolElement.isCompleted) {
           waitingPoolElement.complete(true);
@@ -199,18 +282,36 @@ mixin Pool<O> {
 
         return true;
       } else {
+        ++_unrecycledElementCount;
         return false;
       }
     });
+  }
+
+  int _closedElementsCount = 0;
+
+  FutureOr<bool> closePoolElement(O o) {
+    ++_closedElementsCount;
+    return true;
+  }
+
+  FutureOr<bool> disposePoolElement(O o) {
+    _pool.remove(o);
+    return closePoolElement(o);
   }
 
   FutureOr<R> executeWithPool<R>(FutureOr<R> Function(O o) f,
       {Duration? timeout}) {
     return catchFromPool(timeout: timeout).resolveMapped((o) {
       try {
-        return f(o);
-      } finally {
-        releaseIntoPool(o);
+        var ret = f(o);
+        return ret.resolveMapped((val) {
+          releaseIntoPool(o);
+          return val;
+        });
+      } catch (_) {
+        disposePoolElement(o);
+        rethrow;
       }
     });
   }

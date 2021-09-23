@@ -11,7 +11,7 @@ import 'bones_api_entity_adapter.dart';
 final _log = logging.Logger('PostgreAdapter');
 
 /// A PostgreSQL adapter.
-class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
+class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   final String host;
   final int port;
   final String databaseName;
@@ -80,13 +80,18 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
   }
 
   @override
-  String getConnectionURL(PostgreSQLConnection connection) {
-    return 'postgresql://${connection.username}@${connection.host}:${connection.port}/${connection.databaseName}';
+  String getConnectionURL(PostgreSQLExecutionContext connection) {
+    var c = connection as PostgreSQLConnection;
+    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
   }
+
+  int _connectionCount = 0;
 
   @override
   FutureOr<PostgreSQLConnection> createConnection() async {
     var password = await _getPassword();
+
+    var count = ++_connectionCount;
 
     var connection = PostgreSQLConnection(host, port, databaseName,
         username: username, password: password);
@@ -94,17 +99,25 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
     var connUrl = getConnectionURL(connection);
 
-    _log.log(logging.Level.INFO, 'createConnection> $connUrl > $connection');
+    _log.log(
+        logging.Level.INFO, 'createConnection[$count]> $connUrl > $connection');
 
     return connection;
   }
 
   @override
-  FutureOr<bool> isConnectionValid(PostgreSQLConnection connection) {
-    if (connection.isClosed) {
-      return false;
+  FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
+    _log.log(logging.Level.INFO, 'closeConnection> $connection');
+
+    if (connection is PostgreSQLConnection) {
+      connection.close();
     }
     return true;
+  }
+
+  @override
+  FutureOr<bool> isConnectionValid(PostgreSQLExecutionContext connection) {
+    return connection is PostgreSQLConnection && !connection.isClosed;
   }
 
   @override
@@ -120,7 +133,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
     if (results.isEmpty) return null;
 
-    var scheme = results.map((e) => e['']!).toList();
+    var scheme = results.map((e) => e['']!).toList(growable: false);
 
     if (scheme.isEmpty) return null;
 
@@ -132,7 +145,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
       return MapEntry(k, v);
     }));
 
-    var fieldsNames = fieldsTypes.keys.toList();
+    var fieldsNames = fieldsTypes.keys.toList(growable: false);
 
     var fieldsReferencedTables =
         await _findFieldsReferencedTables(connection, table, fieldsNames);
@@ -147,8 +160,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
     return tableScheme;
   }
 
-  Future<String> _findIDField(PostgreSQLConnection connection, String table,
-      List<Map<String, dynamic>> scheme) async {
+  Future<String> _findIDField(PostgreSQLExecutionContext connection,
+      String table, List<Map<String, dynamic>> scheme) async {
     var sql = '''
     SELECT
       c.column_name, c.data_type
@@ -166,7 +179,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
     var columns = results.map((r) {
       return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList();
+    }).toList(growable: false);
 
     var primaryFields = Map.fromEntries(
         columns.map((m) => MapEntry(m['column_name'], m['data_type'])));
@@ -194,7 +207,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-      PostgreSQLConnection connection,
+      PostgreSQLExecutionContext connection,
       String table,
       List<String> fieldsNames) async {
     var sql = '''
@@ -216,7 +229,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
     var referenceFields = results.map((r) {
       return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList();
+    }).toList(growable: false);
 
     var map =
         Map<String, TableFieldReference>.fromEntries(referenceFields.map((e) {
@@ -235,7 +248,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
   @override
   FutureOr<int> doCountSQL(
-      String table, SQL sql, PostgreSQLConnection connection) {
+      String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -253,7 +266,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
-      String table, SQL sql, PostgreSQLConnection connection) {
+      String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -268,7 +281,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
-      String table, SQL sql, PostgreSQLConnection connection) {
+      String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -288,8 +301,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
   bool get sqlAcceptsInsertReturning => true;
 
   @override
-  FutureOr<dynamic> doInsertSQL(
-      String table, SQL sql, PostgreSQLConnection connection) {
+  FutureOr<dynamic> doInsertSQL(Transaction transaction, String table, SQL sql,
+      PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -315,6 +328,44 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLConnection> {
           return id;
         }
       }
+    });
+  }
+
+  @override
+  FutureOr<R> executeTransaction<R>(
+      Transaction transaction,
+      TransactionOperation op,
+      TransactionExecution<R, PostgreSQLExecutionContext> f) {
+    if (transaction.length == 1) {
+      return executeWithPool((connection) => f(connection));
+    }
+
+    if (!transaction.isOpen && !transaction.isOpening) {
+      _openTransaction(transaction);
+    }
+
+    return transaction.onOpen<R>(() {
+      return transaction
+          .addExecution<R, PostgreSQLExecutionContext>((c) => f(c));
+    });
+  }
+
+  void _openTransaction(Transaction transaction) {
+    transaction.open(() {
+      var contextCompleter = Completer<PostgreSQLExecutionContext>();
+
+      var ret = executeWithPool((connection) {
+        var theConnection = connection as PostgreSQLConnection;
+
+        return theConnection.transaction((c) {
+          contextCompleter.complete(c);
+          return transaction.transactionFuture;
+        });
+      });
+
+      transaction.transactionResult = ret;
+
+      return contextCompleter.future;
     });
   }
 }

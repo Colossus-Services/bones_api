@@ -135,7 +135,7 @@ class APIServer {
     var apiRequest = toAPIRequest(request);
     var apiResponse = apiRoot.call(apiRequest);
     return apiResponse
-        .resolveMapped((res) => _processAPIResponse(request, res));
+        .resolveMapped((res) => _processAPIResponse(request, apiRequest, res));
   }
 
   /// Convers a [request] to an [APIRequest].
@@ -163,8 +163,12 @@ class APIServer {
   }
 
   FutureOr<Response> _processAPIResponse(
-      Request request, APIResponse apiResponse) {
+      Request request, APIRequest apiRequest, APIResponse apiResponse) {
     var headers = <String, Object>{};
+
+    if (!apiResponse.hasCORS) {
+      apiResponse.setCORS(apiRequest);
+    }
 
     for (var e in apiResponse.headers.entries) {
       var value = e.value;
@@ -178,10 +182,15 @@ class APIServer {
     var retPayload = resolveBody(apiResponse.payload, apiResponse);
 
     return retPayload.resolveMapped((payload) {
+      apiResponse.setMetric('API-call', apiRequest.elapsedTime);
+      apiResponse.stopAllMetrics();
+
       var contentType = apiResponse.payloadMimeType;
       if (contentType != null && contentType.isNotEmpty) {
         headers['content-type'] = contentType;
       }
+
+      headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
 
       switch (apiResponse.status) {
         case APIResponseStatus.OK:
@@ -373,5 +382,21 @@ class APIServer {
     }
 
     return def;
+  }
+
+  static String resolveServerTiming(Map<String, Duration> metrics) {
+    var s = StringBuffer();
+
+    for (var e in metrics.entries) {
+      if (s.isNotEmpty) {
+        s.write(', ');
+      }
+      s.write(e.key);
+      s.write(';dur=');
+      var ms = e.value.inMicroseconds / 1000;
+      s.write(ms);
+    }
+
+    return s.toString();
   }
 }

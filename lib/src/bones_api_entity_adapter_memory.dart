@@ -10,6 +10,10 @@ import 'bones_api_entity_adapter.dart';
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
 class MemorySQLAdapter extends SQLAdapter<int> {
+  static int _idCount = 0;
+
+  final int id = ++_idCount;
+
   MemorySQLAdapter({EntityRepositoryProvider? parentRepositoryProvider})
       : super(1, 3, 'generic',
             parentRepositoryProvider: parentRepositoryProvider);
@@ -22,8 +26,13 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   int createConnection() => ++_connectionCount;
 
+  @override
+  FutureOr<bool> closeConnection(int connection) => true;
+
   final Map<String, Map<Object, Map<String, dynamic>>> _tables =
       <String, Map<Object, Map<String, dynamic>>>{};
+
+  final Map<String, int> _tablesIdCount = <String, int>{};
 
   Map<Object, Map<String, dynamic>>? _getTableMap(
       String table, bool autoCreate) {
@@ -50,10 +59,11 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doInsertSQL(String table, SQL sql, int connection) {
+  FutureOr doInsertSQL(
+      Transaction transaction, String table, SQL sql, int connection) {
     var map = _getTableMap(table, true)!;
 
-    var id = nextID(map);
+    var id = nextID(table);
 
     var entry = sql.parameters;
 
@@ -67,7 +77,9 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     return id;
   }
 
-  Object nextID(Map<Object, Map<String, dynamic>> map) => map.length + 1;
+  Object nextID(String table) {
+    return _tablesIdCount.update(table, (n) => n + 1, ifAbsent: () => 1);
+  }
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
@@ -131,7 +143,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
           return match ? MapEntry(e.key, obj) : null;
         })
         .whereNotNull()
-        .toList();
+        .toList(growable: false);
 
     return _removeEntries(entries, map);
   }
@@ -197,4 +209,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   bool get sqlAcceptsInsertReturning => true;
+
+  @override
+  String toString() {
+    var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
+    return 'MemorySQLAdapter{id: $id, tables: $tablesSizes}';
+  }
 }

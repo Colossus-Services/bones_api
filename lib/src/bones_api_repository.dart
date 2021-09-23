@@ -46,20 +46,24 @@ abstract class APIRepository<O> {
   FutureOr<Iterable<O>> selectByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
+          Map<String, Object?>? namedParameters,
+          int? limit}) =>
       entityRepository.selectByQuery(query,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          limit: limit);
 
   FutureOr<Iterable<O>> select(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
+          Map<String, Object?>? namedParameters,
+          int? limit}) =>
       entityRepository.select(matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          limit: limit);
 
   FutureOr<Iterable<O>> deleteByQuery(String query,
           {Object? parameters,
@@ -79,5 +83,6 @@ abstract class APIRepository<O> {
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
 
-  FutureOr<dynamic> store(O o) => entityRepository.store(o);
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
+      entityRepository.store(o, transaction: transaction);
 }

@@ -95,8 +95,9 @@ class ConditionParameter extends ConditionElement {
             : parameters.map<String, Object?>(
                 (key, value) => MapEntry<String, Object?>('$key', value));
       } else if (parameters is Iterable) {
-        positionalParameters ??=
-            parameters is List ? parameters : parameters.toList();
+        positionalParameters ??= parameters is List
+            ? parameters
+            : parameters.toList(growable: false);
       }
     }
 
@@ -798,7 +799,7 @@ class ConditionParseCache<O> {
     }
 
     if (_parsedConditions.length > 500) {
-      for (var k in _parsedConditions.keys.take(100).toList()) {
+      for (var k in _parsedConditions.keys.take(100).toList(growable: false)) {
         _parsedConditions.remove(k);
       }
     }

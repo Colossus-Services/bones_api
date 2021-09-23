@@ -55,7 +55,7 @@ class SQL {
 
 /// Base class for SQL adapters.
 abstract class SQLAdapter<C> extends SchemeProvider
-    with Initializable, Pool<C>
+    with Initializable, Pool<C>, Closable
     implements EntityRepositoryProvider {
   /// The minimum number of connections in the pool of this adapter.
   final int minConnections;
@@ -79,7 +79,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
   @override
   void initialize();
 
-  FutureOr<SQL> generateCountSQL(String table,
+  FutureOr<SQL> generateCountSQL(Transaction transaction, String table,
       {EntityMatcher? matcher,
       Object? parameters,
       List? positionalParameters,
@@ -88,7 +88,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var sqlQuery = 'SELECT count(*) as "count" FROM "$table" ';
       return SQL(sqlQuery, {});
     } else {
-      return _generateSQLFrom(table, matcher,
+      return _generateSQLFrom(transaction, table, matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
@@ -99,25 +99,30 @@ abstract class SQLAdapter<C> extends SchemeProvider
     }
   }
 
-  FutureOr<SQL> generateSelectSQL(String table, EntityMatcher matcher,
+  FutureOr<SQL> generateSelectSQL(
+      Transaction transaction, String table, EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
-    return _generateSQLFrom(table, matcher,
+      Map<String, Object?>? namedParameters,
+      int? limit}) {
+    return _generateSQLFrom(transaction, table, matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         sqlBuilder: (String from, EncodingContext context) {
       var tableAlias = context.resolveEntityAlias(table);
-      return 'SELECT "$tableAlias".* $from';
+      var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
+      var sql = 'SELECT "$tableAlias".* $from$limitStr';
+      return sql;
     });
   }
 
-  FutureOr<SQL> generateDeleteSQL(String table, EntityMatcher matcher,
+  FutureOr<SQL> generateDeleteSQL(
+      Transaction transaction, String table, EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    return _generateSQLFrom(table, matcher,
+    return _generateSQLFrom(transaction, table, matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
@@ -141,7 +146,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
     });
   }
 
-  FutureOr<SQL> _generateSQLFrom(String table, EntityMatcher matcher,
+  FutureOr<SQL> _generateSQLFrom(
+      Transaction transaction, String table, EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
@@ -228,7 +234,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// If `true` indicates that this adapter SQL uses the `RETURNING` syntax for inserts.
   bool get sqlAcceptsInsertReturning;
 
-  FutureOr<SQL> generateInsertSQL(String table, Map<String, Object?> fields) {
+  FutureOr<SQL> generateInsertSQL(
+      Transaction transaction, String table, Map<String, Object?> fields) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -236,21 +243,22 @@ abstract class SQLAdapter<C> extends SchemeProvider
         throw StateError("Can't find TableScheme for table: $table");
       }
 
-      var context = EncodingContext(table, namedParameters: fields);
+      var context = EncodingContext(table,
+          namedParameters: fields, transaction: transaction);
 
       var fieldsValues = tableScheme.getFieldsValues(fields);
 
       var fieldsNotNull = fieldsValues.entries
           .map((e) => e.value != null ? e.key : null)
           .whereNotNull()
-          .toList();
+          .toList(growable: false);
 
       var fieldsValuesInSQL = <String, Object?>{};
 
       return fieldsNotNull
           .map((f) => fieldValueToSQL(
               context, tableScheme, f, fieldsValues[f]!, fieldsValuesInSQL))
-          .toList()
+          .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
         var idFieldName = tableScheme.idFieldName;
@@ -307,7 +315,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
           var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
           return valueSQL;
         } else {
-          var retRefId = refEntityRepository.store(refEntity);
+          var retRefId = refEntityRepository.store(refEntity,
+              transaction: context.transaction);
           return retRefId.resolveMapped((refId) {
             fieldsValues.putIfAbsent(fieldName, () => refId);
             var valueSQL =
@@ -342,8 +351,9 @@ abstract class SQLAdapter<C> extends SchemeProvider
     }
   }
 
-  FutureOr<int> countSQL(String table, SQL sql) {
-    return executeWithPool((connection) {
+  FutureOr<int> countSQL(
+      Transaction transaction, TransactionOperation op, String table, SQL sql) {
+    return executeTransaction(transaction, op, (connection) {
       _log.log(logging.Level.INFO, 'countSQL> $sql');
       return doCountSQL(table, sql, connection);
     });
@@ -355,12 +365,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
     C connection,
   );
 
-  FutureOr<dynamic> insertSQL(
+  FutureOr<dynamic> insertSQL(Transaction transaction, TransactionOperation op,
       String table, SQL sql, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
-    return executeWithPool((connection) {
+    return executeTransaction(transaction, op, (connection) {
       _log.log(logging.Level.INFO, 'insertSQL> $sql');
-      var retInsert = doInsertSQL(table, sql, connection);
+      var retInsert = doInsertSQL(transaction, table, sql, connection);
 
       if (mapper != null) {
         return retInsert.resolveMapped((e) => mapper(e));
@@ -370,11 +380,17 @@ abstract class SQLAdapter<C> extends SchemeProvider
     });
   }
 
-  FutureOr<dynamic> doInsertSQL(String table, SQL sql, C connection);
+  FutureOr<R> executeTransaction<R>(Transaction transaction,
+          TransactionOperation op, FutureOr<R> Function(C connection) f) =>
+      executeWithPool(f);
 
-  FutureOr<Iterable<Map<String, dynamic>>> selectSQL(String table, SQL sql,
+  FutureOr<dynamic> doInsertSQL(
+      Transaction transaction, String table, SQL sql, C connection);
+
+  FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
+      Transaction transaction, TransactionOperation op, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
-    return executeWithPool((connection) {
+    return executeTransaction(transaction, op, (connection) {
       _log.log(logging.Level.INFO, 'selectSQL> $sql');
 
       var retSel = doSelectSQL(table, sql, connection);
@@ -393,9 +409,10 @@ abstract class SQLAdapter<C> extends SchemeProvider
     C connection,
   );
 
-  FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(String table, SQL sql,
+  FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
+      Transaction transaction, TransactionOperation op, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
-    return executeWithPool((connection) {
+    return executeTransaction(transaction, op, (connection) {
       _log.log(logging.Level.INFO, 'deleteSQL> $sql');
 
       var retSel = doDeleteSQL(table, sql, connection);
@@ -423,6 +440,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// Returns `true` if [connection] is valid for usage.
   FutureOr<bool> isConnectionValid(C connection);
 
+  FutureOr<bool> closeConnection(C connection);
+
   /// Checks the connections of the pool. Defaults: calls [removeInvalidElementsFromPool].
   FutureOr<bool> checkConnections() => removeInvalidElementsFromPool();
 
@@ -435,9 +454,14 @@ abstract class SQLAdapter<C> extends SchemeProvider
   FutureOr<bool> checkPool() =>
       checkPoolSize(minConnections, maxConnections, 30000);
 
+  @override
+  int get poolSizeDesiredLimit => maxConnections;
+
   /// Defaults: calls [createConnection].
   @override
   FutureOr<C?> createPoolElement() {
+    super.createPoolElement();
+
     if (poolSize < maxConnections) {
       return createConnection();
     } else {
@@ -445,11 +469,22 @@ abstract class SQLAdapter<C> extends SchemeProvider
     }
   }
 
+  /// Defaults: calls [closeConnection].
+  @override
+  FutureOr<bool> closePoolElement(C o) {
+    super.closePoolElement(o);
+    return closeConnection(o);
+  }
+
   final Map<String, SQLRepositoryAdapter> _repositoriesAdapters =
       <String, SQLRepositoryAdapter>{};
 
   SQLRepositoryAdapter<O>? getRepositoryAdapter<O>(String name,
       {String? tableName, Type? type}) {
+    if (isClosed) {
+      return null;
+    }
+
     return _repositoriesAdapters.putIfAbsent(
         name,
         () => SQLRepositoryAdapter<O>(this, name,
@@ -461,6 +496,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
   @override
   void registerEntityRepository<O>(EntityRepository<O> entityRepository) {
+    checkNotClosed();
+
     _entityRepositories[entityRepository.type] = entityRepository;
   }
 
@@ -468,47 +505,75 @@ abstract class SQLAdapter<C> extends SchemeProvider
   List<EntityRepository> get registeredEntityRepositories =>
       _entityRepositories.values.toList();
 
+  bool _callingGetEntityRepository = false;
+
   @override
   EntityRepository<O>? getEntityRepository<O>(
-          {O? obj, Type? type, String? name}) =>
-      _getEntityRepositoryImpl<O>(obj: obj, type: type, name: name) ??
-      EntityRepositoryProvider.globalProvider
-          .getEntityRepository<O>(obj: obj, type: type, name: name);
+      {O? obj, Type? type, String? name}) {
+    if (isClosed) return null;
+
+    if (_callingGetEntityRepository) return null;
+    _callingGetEntityRepository = true;
+
+    try {
+      return _getEntityRepositoryImpl<O>(obj: obj, type: type, name: name) ??
+          EntityRepositoryProvider.globalProvider
+              .getEntityRepository<O>(obj: obj, type: type, name: name);
+    } finally {
+      _callingGetEntityRepository = false;
+    }
+  }
 
   EntityRepository<O>? _getEntityRepositoryImpl<O>(
       {O? obj, Type? type, String? name}) {
-    var entityRepository = _entityRepositories[O];
+    if (!isClosed) {
+      var entityRepository = _entityRepositories[O];
+      if (entityRepository != null && entityRepository.isClosed) {
+        entityRepository = null;
+      }
 
-    if (entityRepository == null && obj != null) {
-      entityRepository = _entityRepositories[obj.runtimeType];
-    }
+      if (entityRepository == null && obj != null) {
+        entityRepository = _entityRepositories[obj.runtimeType];
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+      }
 
-    if (entityRepository == null && type != null) {
-      entityRepository = _entityRepositories[type];
-    }
+      if (entityRepository == null && type != null) {
+        entityRepository = _entityRepositories[type];
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+      }
 
-    if (entityRepository != null) {
-      return entityRepository as EntityRepository<O>;
-    }
-
-    if (name != null) {
-      entityRepository =
-          _entityRepositories.values.where((e) => e.name == name).firstOrNull;
       if (entityRepository != null) {
         return entityRepository as EntityRepository<O>;
       }
+
+      if (name != null) {
+        entityRepository =
+            _entityRepositories.values.where((e) => e.name == name).firstOrNull;
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+
+        if (entityRepository != null) {
+          return entityRepository as EntityRepository<O>;
+        }
+      }
     }
 
-    entityRepository =
+    var entityRepository =
         parentRepositoryProvider?.getEntityRepository<O>(obj: obj, type: type);
+
     if (entityRepository != null) {
-      return entityRepository as EntityRepository<O>;
+      return entityRepository;
     }
 
     for (var p in _knownEntityRepositoryProviders) {
       entityRepository = p.getEntityRepository<O>(obj: obj, type: type);
       if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
+        return entityRepository;
       }
     }
 
@@ -545,55 +610,64 @@ class SQLRepositoryAdapter<O> with Initializable {
 
   String get dialect => databaseAdapter.dialect;
 
-  FutureOr<SQL> generateCountSQL(
+  FutureOr<SQL> generateCountSQL(Transaction transaction,
           {EntityMatcher? matcher,
           Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters}) =>
-      databaseAdapter.generateCountSQL(tableName,
+      databaseAdapter.generateCountSQL(transaction, tableName,
           matcher: matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
 
-  FutureOr<int> countSQL(SQL sql) {
-    return databaseAdapter.countSQL(tableName, sql);
+  FutureOr<int> countSQL(
+      Transaction transaction, TransactionOperation op, SQL sql) {
+    return databaseAdapter.countSQL(transaction, op, tableName, sql);
   }
 
-  FutureOr<SQL> generateSelectSQL(EntityMatcher matcher,
+  FutureOr<SQL> generateSelectSQL(
+          Transaction transaction, EntityMatcher matcher,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
-      databaseAdapter.generateSelectSQL(tableName, matcher,
+          Map<String, Object?>? namedParameters,
+          int? limit}) =>
+      databaseAdapter.generateSelectSQL(transaction, tableName, matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          limit: limit);
 
-  FutureOr<Iterable<Map<String, dynamic>>> selectSQL(SQL sql) {
-    return databaseAdapter.selectSQL(tableName, sql);
+  FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
+      Transaction transaction, TransactionOperation op, SQL sql) {
+    return databaseAdapter.selectSQL(transaction, op, tableName, sql);
   }
 
-  FutureOr<SQL> generateInsertSQL(O o, Map<String, dynamic> fields) {
-    return databaseAdapter.generateInsertSQL(tableName, fields);
+  FutureOr<SQL> generateInsertSQL(
+      Transaction transaction, O o, Map<String, dynamic> fields) {
+    return databaseAdapter.generateInsertSQL(transaction, tableName, fields);
   }
 
-  FutureOr<dynamic> insertSQL(SQL sql, Map<String, dynamic> fields,
+  FutureOr<dynamic> insertSQL(Transaction transaction, TransactionOperation op,
+      SQL sql, Map<String, dynamic> fields,
       {String? idFieldName}) {
     return databaseAdapter
-        .insertSQL(tableName, sql, fields)
+        .insertSQL(transaction, op, tableName, sql, fields)
         .resolveMapped((ret) => ret ?? {});
   }
 
-  FutureOr<SQL> generateDeleteSQL(EntityMatcher matcher,
+  FutureOr<SQL> generateDeleteSQL(
+          Transaction transaction, EntityMatcher matcher,
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters}) =>
-      databaseAdapter.generateDeleteSQL(tableName, matcher,
+      databaseAdapter.generateDeleteSQL(transaction, tableName, matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
 
-  FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(SQL sql) {
-    return databaseAdapter.deleteSQL(tableName, sql);
+  FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
+      Transaction transaction, TransactionOperation op, SQL sql) {
+    return databaseAdapter.deleteSQL(transaction, op, tableName, sql);
   }
 }

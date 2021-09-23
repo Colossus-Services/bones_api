@@ -3,6 +3,7 @@ import 'package:collection/collection.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_entity.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -150,6 +151,8 @@ class EncodingContext {
 
   Map<String, Object?>? encodingParameters;
 
+  Transaction? transaction;
+
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
 
@@ -163,7 +166,10 @@ class EncodingContext {
       <TableFieldReference>{};
 
   EncodingContext(this.entityName,
-      {this.parameters, this.positionalParameters, this.namedParameters});
+      {this.parameters,
+      this.positionalParameters,
+      this.namedParameters,
+      this.transaction});
 
   String get outputString => output.toString();
 
@@ -279,11 +285,13 @@ abstract class ConditionEncoder {
   FutureOr<EncodingContext> encode(Condition condition, String entityName,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction}) {
     var context = EncodingContext(entityName,
         parameters: parameters,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        transaction: transaction);
 
     var rootIsGroup = condition is GroupCondition;
 
@@ -368,7 +376,7 @@ abstract class ConditionEncoder {
       var rets = conditions.skip(1).map((c2) {
         s.write(operator);
         return encodeCondition(c2, context);
-      }).toList();
+      }).toList(growable: false);
 
       return rets
           .resolveAllReduced((value, element) => element)

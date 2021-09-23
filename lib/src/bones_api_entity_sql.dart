@@ -29,115 +29,185 @@ class SQLEntityRepository<O> extends EntityRepository<O>
       {'queryType': 'SQL', 'dialect': dialect};
 
   @override
-  dynamic ensureStored(o) {
-    ensureReferencesStored(o);
+  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+    checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null) {
-      return store(o);
+      transaction ??= Transaction.executingOrNew();
+      return store(o, transaction: transaction);
     } else {
-      return id;
+      return ensureReferencesStored(o, transaction: transaction)
+          .resolveWithValue(id);
     }
   }
 
   @override
-  void ensureReferencesStored(o) {
-    for (var fieldName in entityHandler.fieldsNames(o)) {
-      var value = entityHandler.getField(o, fieldName);
-      if (value == null) {
-        continue;
-      }
+  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+    checkNotClosed();
 
-      if (!EntityHandler.isValidType(value.runtimeType)) {
-        continue;
-      }
+    transaction ??= Transaction.executingOrNew();
 
-      var repository = provider.getEntityRepository(obj: value);
-      if (repository == null) {
-        continue;
-      }
+    var fieldsNames = entityHandler.fieldsNames(o);
 
-      repository.ensureStored(value);
-    }
+    var futures = fieldsNames
+        .map((fieldName) {
+          var value = entityHandler.getField(o, fieldName);
+          if (value == null) return null;
+
+          if (!EntityHandler.isValidType(value.runtimeType)) {
+            return null;
+          }
+
+          var repository = provider.getEntityRepository(obj: value);
+          if (repository == null) return null;
+
+          return repository.ensureStored(value, transaction: transaction);
+        })
+        .whereNotNull()
+        .toList(growable: false);
+
+    return futures.resolveAllWithValue(true);
   }
 
   @override
-  FutureOr<int> length() => count();
+  FutureOr<int> length({Transaction? transaction}) =>
+      count(transaction: transaction);
 
   @override
   FutureOr<int> count(
       {EntityMatcher? matcher,
       Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
-    var retSql = sqlRepositoryAdapter.generateCountSQL(
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      TransactionOperation? op}) {
+    checkNotClosed();
+
+    var externalTransaction = transaction != null;
+    transaction ??= Transaction.executingOrNew();
+    var transactionRoot = transaction.isEmpty && !transaction.isExecuting;
+
+    var op = TransactionOperationCount();
+    transaction.addOperation(op);
+
+    var retSql = sqlRepositoryAdapter.generateCountSQL(transaction,
         matcher: matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
 
-    return retSql.resolveMapped((sql) => sqlRepositoryAdapter.countSQL(sql));
+    return retSql.resolveMapped((sql) {
+      var retCount = sqlRepositoryAdapter.countSQL(transaction!, op, sql);
+      return retCount.resolveMapped((count) {
+        return transaction!
+            .finishOperation(op, count, transactionRoot, externalTransaction);
+      });
+    });
   }
 
   @override
   FutureOr<Iterable<O>> select(EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
-    var retSql = sqlRepositoryAdapter.generateSelectSQL(matcher,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    checkNotClosed();
+
+    var externalTransaction = transaction != null;
+    transaction ??= Transaction.executingOrNew();
+    var transactionRoot = transaction.isEmpty && !transaction.isExecuting;
+
+    var op = TransactionOperationSelect(matcher);
+    transaction.addOperation(op);
+
+    var retSql = sqlRepositoryAdapter.generateSelectSQL(transaction, matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        limit: limit);
 
     return retSql.resolveMapped((sql) {
-      var selRet = sqlRepositoryAdapter.selectSQL(sql);
+      var selRet = sqlRepositoryAdapter.selectSQL(transaction!, op, sql);
 
       return selRet.resolveMapped((sel) {
         var entities = sel.map((e) => entityHandler.createFromMap(e)).toList();
-        return entities.resolveAll();
+        return entities.resolveAllJoined((l) {
+          return transaction!
+              .finishOperation(op, l, transactionRoot, externalTransaction);
+        });
       });
     });
   }
 
   @override
-  FutureOr<dynamic> store(O o) {
-    ensureReferencesStored(o);
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) {
+    checkNotClosed();
 
-    var fields = entityHandler.getFields(o);
-    var retSql = sqlRepositoryAdapter.generateInsertSQL(o, fields);
+    var externalTransaction = transaction != null;
+    transaction ??= Transaction.executingOrNew();
+    var transactionRoot = transaction.isEmpty && !transaction.isExecuting;
 
-    return retSql.resolveMapped((sql) {
-      var retId = sqlRepositoryAdapter.insertSQL(sql, fields);
+    var op = TransactionOperationStore(o);
+    transaction.addOperation(op);
 
-      return retId.resolveMapped((id) {
-        entityHandler.setID(o, id);
-        return id;
+    return ensureReferencesStored(o, transaction: transaction).resolveWith(() {
+      var fields = entityHandler.getFields(o);
+      var retSql =
+          sqlRepositoryAdapter.generateInsertSQL(transaction!, o, fields);
+
+      return retSql.resolveMapped((sql) {
+        var retId =
+            sqlRepositoryAdapter.insertSQL(transaction!, op, sql, fields);
+
+        return retId.resolveMapped((id) {
+          entityHandler.setID(o, id);
+          return transaction!
+              .finishOperation(op, id, transactionRoot, externalTransaction);
+        });
       });
     });
   }
 
   @override
-  Iterable<dynamic> storeAll(Iterable<O> os) {
-    return os.map((o) => store(o)).toList();
+  Iterable<dynamic> storeAll(Iterable<O> os, {Transaction? transaction}) {
+    checkNotClosed();
+
+    transaction ??= Transaction.executingOrNew();
+    return os.map((o) => store(o, transaction: transaction)).toList();
   }
 
   @override
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
-    var retSql = sqlRepositoryAdapter.generateDeleteSQL(matcher,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction}) {
+    checkNotClosed();
+
+    var externalTransaction = transaction != null;
+    transaction ??= Transaction.executingOrNew();
+    var transactionRoot = transaction.isEmpty && !transaction.isExecuting;
+
+    var op = TransactionOperationDelete(matcher);
+    transaction.addOperation(op);
+
+    var retSql = sqlRepositoryAdapter.generateDeleteSQL(transaction, matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
 
     return retSql.resolveMapped((sql) {
-      var selRet = sqlRepositoryAdapter.deleteSQL(sql);
+      var selRet = sqlRepositoryAdapter.deleteSQL(transaction!, op, sql);
 
       return selRet.resolveMapped((sel) {
         var entities = sel.map((e) => entityHandler.createFromMap(e)).toList();
-        return entities.resolveAll();
+        return entities.resolveAllJoined((l) {
+          return transaction!
+              .finishOperation(op, l, transactionRoot, externalTransaction);
+        });
       });
     });
   }

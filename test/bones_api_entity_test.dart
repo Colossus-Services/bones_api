@@ -1,18 +1,12 @@
-import 'dart:async';
-
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_entity_adapter_memory.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
+import 'bones_api_test_entities.dart';
+
 final _log = logging.Logger('bones_api_entity_test');
-
-final addressEntityHandler = GenericEntityHandler<Address>(
-    instantiatorFromMap: (m) => Address.fromMap(m));
-
-final userEntityHandler =
-    GenericEntityHandler<User>(instantiatorFromMap: (m) => User.fromMap(m));
 
 class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   static final APIEntityRepositoryProvider _instance =
@@ -26,7 +20,6 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   late final SQLEntityRepository<User> userSQLRepository;
 
   late final AddressAPIRepository addressAPIRepository;
-
   late final UserAPIRepository userAPIRepository;
 
   APIEntityRepositoryProvider._() {
@@ -40,6 +33,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
             'email': String,
             'password': String,
             'address': int,
+            'creationTime': DateTime,
           },
           {
             'address':
@@ -73,46 +67,42 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   }
 }
 
-class AddressAPIRepository extends APIRepository<Address> {
-  AddressAPIRepository(APIEntityRepositoryProvider provider)
-      : super(provider: provider);
-
-  FutureOr<Iterable<Address>> selectByState(String state) {
-    return selectByQuery(' state == ? ', parameters: {'state': state});
-  }
-}
-
-class UserAPIRepository extends APIRepository<User> {
-  UserAPIRepository(APIEntityRepositoryProvider provider)
-      : super(provider: provider);
-
-  FutureOr<Iterable<User>> selectByEmail(String email) {
-    return selectByQuery(' email == ? ', parameters: {'email': email});
-  }
-
-  FutureOr<Iterable<User>> selectByAddressState(String state) {
-    return selectByQuery(' address.state == ? ', parameters: [state]);
-  }
-}
-
 void main() {
   _log.handler.logToConsole();
 
   group('Entity', () {
-    setUp(() {});
+    late final SetEntityRepository<Address> addressRepository;
+    late final SetEntityRepository<User> userRepository;
+
+    setUpAll(() {
+      addressRepository =
+          SetEntityRepository<Address>('address', addressEntityHandler);
+      addressRepository.ensureInitialized();
+
+      userRepository = SetEntityRepository<User>('user', userEntityHandler);
+      userRepository.ensureInitialized();
+    });
+
+    tearDownAll(() {
+      addressRepository.close();
+      userRepository.close();
+    });
 
     test('basic', () async {
-      APIEntityRepositoryProvider();
-
-      var user1 = User('joe@mail.com', '123',
-          Address('NY', 'New York', 'Fifth Avenue', 101));
+      var user1 = User(
+          'joe@mail.com', '123', Address('NY', 'New York', 'Fifth Avenue', 101),
+          creationTime: DateTime(2020, 10, 11, 12, 13, 14, 0, 0));
       var user2 = User('smith@mail.com', 'abc',
-          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404));
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          creationTime: DateTime(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101}}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"creationTime":1602429194000}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404}}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"creationTime":1633965194000}';
+
+      addressEntityHandler.inspectObject(user1.address);
+      userEntityHandler.inspectObject(user1);
 
       expect(userEntityHandler.encodeJson(user1), equals(user1Json));
       expect(userEntityHandler.decodeJson(user1Json), equals(user1));
@@ -129,93 +119,118 @@ void main() {
     });
 
     test('SetEntityRepository', () async {
-      var repository = SetEntityRepository<User>('user', userEntityHandler);
+      expect(userRepository.nextID(), equals(1));
+      expect(userRepository.selectByID(1), isNull);
 
-      expect(repository.nextID(), equals(1));
-      expect(repository.selectByID(1), isNull);
+      var user1Time = DateTime.utc(2019, 1, 2, 3, 4, 5);
+      var user2Time = DateTime.utc(2019, 12, 2, 3, 4, 5);
 
-      var user1 = User('joe@mail.com', '123',
-          Address('NY', 'New York', 'Fifth Avenue', 101));
-      var user2 = User('smith@mail.com', 'abc',
-          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404));
+      var user1 = User(
+          'joe@setl.com', '123', Address('NY', 'New York', 'Fifth Avenue', 101),
+          creationTime: user1Time);
+      var user2 = User('smith@setl.com', 'abc',
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          creationTime: user2Time);
 
-      repository.store(user1);
-      repository.store(user2);
+      userRepository.store(user1);
+      userRepository.store(user2);
 
       var user1Json = user1.toJsonEncoded();
       var user2Json = user2.toJsonEncoded();
 
-      expect(repository.nextID(), equals(3));
+      expect(userRepository.nextID(), equals(3));
 
-      expect(repository.selectByID(1)!.toJsonEncoded(), equals(user1Json));
+      expect(userRepository.selectByID(1)!.toJsonEncoded(), equals(user1Json));
 
       expect(
-          repository
-              .select(Condition.parse('email == "joe@mail.com"'))
+          userRepository
+              .select(Condition.parse('email == "joe@setl.com"'))
               .map((e) => e.toJsonEncoded()),
           equals([user1Json]));
 
       expect(
-          repository
-              .select(Condition.parse('email != "smith@mail.com"'))
+          userRepository
+              .select(Condition.parse('email != "smith@setl.com"'))
               .map((e) => e.toJsonEncoded()),
           equals([user1Json]));
 
       expect(
-          repository
-              .select(Condition.parse(' email != "joe@mail.com" '))
+          userRepository
+              .select(Condition.parse(' email != "joe@setl.com" '))
               .map((e) => e.toJsonEncoded()),
           equals([user2Json]));
 
-      expect(repository.select(Condition.parse('email == "foo@mail.com"')),
+      expect(userRepository.select(Condition.parse('email == "foo@setl.com"')),
           isEmpty);
 
       expect(
-          repository
-              .select(Condition.parse('email != "foo@mail.com"'))
+          userRepository
+              .select(Condition.parse('email != "foo@setl.com"'))
               .map((e) => e.toJsonEncoded()),
           equals([user1Json, user2Json]));
 
-      expect(repository.selectByQuery('address.state == ?', parameters: ['NY']),
+      expect(
+          userRepository
+              .selectByQuery('address.state == ?', parameters: ['NY']),
           equals([user1]));
 
       expect(
-          repository.selectByQuery('address.state == ?#0', parameters: ['NY']),
+          userRepository
+              .selectByQuery('address.state == ?#0', parameters: ['NY']),
           equals([user1]));
 
       expect(
-          repository.selectByQuery('address.state == ?#', parameters: ['NY']),
+          userRepository
+              .selectByQuery('address.state == ?#', parameters: ['NY']),
           equals([user1]));
 
       expect(
-          repository
+          userRepository
               .selectByQuery('address.state == ?', parameters: {'state': 'CA'}),
           equals([user2]));
 
       expect(
-          repository.selectByQuery('address.state == ?:the_state',
+          userRepository.selectByQuery('address.state == ?:the_state',
               parameters: {'the_state': 'CA'}),
           equals([user2]));
 
       expect(
-          repository.selectByQuery('address.state == ?:',
+          userRepository.selectByQuery('address.state == ?:',
               parameters: {'state': 'CA'}),
           equals([user2]));
 
       expect(
-          (await repository.selectByQuery('address.state == ?',
+          (await userRepository.selectByQuery('address.state == ?',
                   parameters: {'state': 'FL'}))
               .map((e) => e.toJsonEncoded()),
           isEmpty);
+
+      {
+        var del =
+            await userRepository.deleteByQuery(' #ID == ? ', parameters: [2]);
+        var user = del.first;
+        expect(user.email, equals('smith@setl.com'));
+        expect(user.address.state, equals('CA'));
+        expect(user.creationTime, equals(user2Time));
+      }
+
+      expect(userRepository.length(), equals(1));
+
+      {
+        var user = userRepository.selectByID(2);
+        expect(user, isNull);
+      }
     });
   });
 
-  group('SQLEntityRepository', () {
-    setUp(() {
+  group('SQLEntityRepository[memory]', () {
+    setUpAll(() {
       APIEntityRepositoryProvider();
     });
 
     test('store, selectByID, selectByQuery', () async {
+      var addressSQLRepository =
+          APIEntityRepositoryProvider().addressSQLRepository;
       var userSQLRepository = APIEntityRepositoryProvider().userSQLRepository;
 
       expect(await userSQLRepository.length(), equals(0));
@@ -230,34 +245,47 @@ void main() {
         expect(del, isEmpty);
       }
 
+      var user1Time = DateTime.utc(2020, 1, 2, 3, 4, 5);
+
       {
         var address = Address('NY', 'New York', 'street A', 101);
-        var user = User('joe@mail.com', '123', address);
-        var id = userSQLRepository.store(user);
+        var user =
+            User('joe@memory.com', '123', address, creationTime: user1Time);
+        var id = await userSQLRepository.store(user);
         expect(id, equals(1));
       }
+
+      var user2Time = DateTime.utc(2021, 1, 2, 3, 4, 5);
+
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
-        var user = User('smith@mail.com', 'abc', address);
-        var id = userSQLRepository.store(user);
+
+        var user =
+            User('smith@memory.com', 'abc', address, creationTime: user2Time);
+        var id = await userSQLRepository.store(user);
         expect(id, equals(2));
       }
 
+      expect(await addressSQLRepository.count(), equals(2));
+      expect(await userSQLRepository.count(), equals(2));
+
       expect(
           await userSQLRepository
-              .countByQuery(' email == ? ', parameters: ['smith@mail.com']),
+              .countByQuery(' email == ? ', parameters: ['smith@memory.com']),
           equals(2));
 
       {
         var user = await userSQLRepository.selectByID(1);
-        expect(user!.email, equals('joe@mail.com'));
+        expect(user!.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
+        expect(user.creationTime, equals(user1Time));
       }
 
       {
         var user = await userSQLRepository.selectByID(2);
-        expect(user!.email, equals('smith@mail.com'));
+        expect(user!.email, equals('smith@memory.com'));
         expect(user.address.state, equals('CA'));
+        expect(user.creationTime, equals(user2Time));
       }
 
       {
@@ -267,17 +295,17 @@ void main() {
 
       {
         var sel = await userSQLRepository
-            .selectByQuery(' email == ? ', parameters: ['joe@mail.com']);
+            .selectByQuery(' email == ? ', parameters: ['joe@memory.com']);
         var user = sel.first;
-        expect(user.email, equals('joe@mail.com'));
+        expect(user.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
 
       {
         var sel = await userSQLRepository.selectByQuery(' email == ? ',
-            parameters: {'email': 'smith@mail.com'});
+            parameters: {'email': 'smith@memory.com'});
         var user = sel.first;
-        expect(user.email, equals('smith@mail.com'));
+        expect(user.email, equals('smith@memory.com'));
         expect(user.address.state, equals('CA'));
       }
 
@@ -285,15 +313,19 @@ void main() {
         var sel = await userSQLRepository
             .selectByQuery(' address.state == ?:st ', parameters: {'st': 'NY'});
         var user = sel.first;
-        expect(user.email, equals('joe@mail.com'));
+        expect(user.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
     });
   });
 
   group('APIRepository', () {
-    setUp(() {
+    setUpAll(() {
       APIEntityRepositoryProvider();
+    });
+
+    tearDownAll(() {
+      APIEntityRepositoryProvider().close();
     });
 
     test('selectByEmail, selectByAddressState, selectByState', () async {
@@ -301,30 +333,29 @@ void main() {
       var addressAPIRepository =
           APIEntityRepositoryProvider().addressAPIRepository;
 
+      expect(await addressAPIRepository.length(), equals(2));
+      expect(await userAPIRepository.length(), equals(2));
+
       // User:
-      {
-        var count = await userAPIRepository.length();
-        expect(count, equals(2));
-      }
 
       {
         var user = await userAPIRepository.selectByID(1);
         expect(user!.id, equals(1));
-        expect(user.email, equals('joe@mail.com'));
+        expect(user.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('joe@mail.com');
+        var sel = await userAPIRepository.selectByEmail('joe@memory.com');
         var user = sel.first;
-        expect(user.email, equals('joe@mail.com'));
+        expect(user.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
 
       {
         var sel = await userAPIRepository.selectByAddressState('CA');
         var user = sel.first;
-        expect(user.email, equals('smith@mail.com'));
+        expect(user.email, equals('smith@memory.com'));
         expect(user.address.state, equals('CA'));
       }
 
@@ -386,15 +417,15 @@ void main() {
       // Add User:
       {
         var address = Address('FL', 'Miami', 'Ocean Drive', 11);
-        var user = User('mary@mail.com', 'xyz', address);
-        var id = userAPIRepository.store(user);
+        var user = User('mary@memory.com', 'xyz', address);
+        var id = await userAPIRepository.store(user);
         expect(id, equals(3));
       }
 
       {
         var sel = await userAPIRepository.selectByAddressState('FL');
         var user = sel.first;
-        expect(user.email, equals('mary@mail.com'));
+        expect(user.email, equals('mary@memory.com'));
         expect(user.address.state, equals('FL'));
       }
 
@@ -407,9 +438,9 @@ void main() {
 
       {
         var del = await userAPIRepository
-            .deleteByQuery(' email == ? ', parameters: ['smith@mail.com']);
+            .deleteByQuery(' email == ? ', parameters: ['smith@memory.com']);
         var user = del.first;
-        expect(user.email, equals('smith@mail.com'));
+        expect(user.email, equals('smith@memory.com'));
         expect(user.address.state, equals('CA'));
       }
 
@@ -437,256 +468,43 @@ void main() {
         var count = await addressAPIRepository.length();
         expect(count, equals(2));
       }
+
+      // Transaction:
+
+      {
+        var t = Transaction();
+        await t.execute(() async {
+          var address = Address('TX', 'Austin', 'Main street', 22);
+          var user = User('bill@memory.com', 'txs', address);
+          var id = await userAPIRepository.store(user);
+          expect(id, equals(4));
+
+          expect(t.isExecuting, isTrue);
+
+          var count = await userAPIRepository.length();
+          expect(count, equals(3));
+
+          var del = await userAPIRepository
+              .deleteByQuery(' #ID == ? ', parameters: [id]);
+          var delUser = del.first;
+          expect(delUser.id, equals(4));
+        });
+
+        expect(t.isCommitted, isTrue);
+        expect(t.length, equals(4));
+        expect(t.isExecuting, isFalse);
+        expect((t.result as List).first, isA<User>());
+      }
+
+      {
+        var count = await userAPIRepository.length();
+        expect(count, equals(2));
+      }
+
+      {
+        var count = await addressAPIRepository.length();
+        expect(count, equals(3));
+      }
     });
   });
-}
-
-class User extends Entity {
-  int? id;
-
-  String email;
-
-  String password;
-
-  Address address;
-
-  User(this.email, this.password, this.address, {this.id});
-
-  User.empty()
-      : email = '',
-        password = '',
-        address = Address.empty();
-
-  User.fromMap(Map<String, dynamic> map)
-      : email = map['email'],
-        password = map['email'],
-        address = map['address'] is Map
-            ? Address.fromMap(map['address'])
-            : (map['address'] is int
-                    ? APIEntityRepositoryProvider()
-                        .getEntityRepository<Address>()!
-                        .selectByID(map['address']) as Address?
-                    : null) ??
-                Address.empty(),
-        id = map['id'];
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is User && runtimeType == other.runtimeType && id == other.id;
-
-  @override
-  int get hashCode => id.hashCode;
-
-  @override
-  String get idFieldName => 'id';
-
-  @override
-  List<String> get fieldsNames =>
-      const <String>['id', 'email', 'password', 'address'];
-
-  @override
-  V? getField<V>(String key) {
-    switch (key) {
-      case 'id':
-        return id as V?;
-      case 'email':
-        return email as V?;
-      case 'password':
-        return password as V?;
-      case 'address':
-        return address as V?;
-      default:
-        return null;
-    }
-  }
-
-  @override
-  Type? getFieldType(String key) {
-    switch (key) {
-      case 'id':
-        return int;
-      case 'email':
-        return String;
-      case 'password':
-        return String;
-      case 'address':
-        return Address;
-      default:
-        return null;
-    }
-  }
-
-  @override
-  void setField<V>(String key, V? value) {
-    switch (key) {
-      case 'id':
-        {
-          id = value as int;
-          break;
-        }
-      case 'email':
-        {
-          email = value as String;
-          break;
-        }
-      case 'password':
-        {
-          password = value as String;
-          break;
-        }
-      case 'address':
-        {
-          address = value as Address;
-          break;
-        }
-      default:
-        return;
-    }
-  }
-
-  @override
-  Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'email': email,
-        'password': password,
-        'address': address.toJson(),
-      };
-}
-
-class Address extends Entity {
-  int? id;
-
-  String state;
-
-  String city;
-
-  String street;
-
-  int number;
-
-  Address(
-    this.state,
-    this.city,
-    this.street,
-    this.number, {
-    this.id,
-  });
-
-  Address.empty()
-      : state = '',
-        city = '',
-        street = '',
-        number = 0;
-
-  Address.fromMap(Map<String, dynamic> map)
-      : state = map['state'],
-        city = map['city'],
-        street = map['street'],
-        number = map['number'],
-        id = map['id'];
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Address &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          state == other.state &&
-          city == other.city &&
-          street == other.street &&
-          number == other.number;
-
-  @override
-  int get hashCode =>
-      id.hashCode ^
-      state.hashCode ^
-      city.hashCode ^
-      street.hashCode ^
-      number.hashCode;
-
-  @override
-  String get idFieldName => 'id';
-
-  @override
-  List<String> get fieldsNames =>
-      const <String>['id', 'state', 'city', 'street', 'number'];
-
-  @override
-  V? getField<V>(String key) {
-    switch (key) {
-      case 'id':
-        return id as V?;
-      case 'state':
-        return state as V?;
-      case 'city':
-        return city as V?;
-      case 'street':
-        return street as V?;
-      case 'number':
-        return number as V?;
-      default:
-        return null;
-    }
-  }
-
-  @override
-  Type? getFieldType(String key) {
-    switch (key) {
-      case 'id':
-        return int;
-      case 'state':
-        return String;
-      case 'city':
-        return String;
-      case 'street':
-        return String;
-      case 'number':
-        return int;
-      default:
-        return null;
-    }
-  }
-
-  @override
-  void setField<V>(String key, V? value) {
-    switch (key) {
-      case 'id':
-        {
-          id = value as int;
-          break;
-        }
-      case 'state':
-        {
-          state = value as String;
-          break;
-        }
-      case 'city':
-        {
-          city = value as String;
-          break;
-        }
-      case 'street':
-        {
-          street = value as String;
-          break;
-        }
-      case 'number':
-        {
-          number = int.parse('$value');
-          break;
-        }
-      default:
-        return;
-    }
-  }
-
-  @override
-  Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'state': state,
-        'city': city,
-        'street': street,
-        'number': number,
-      };
 }
