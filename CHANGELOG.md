@@ -1,3 +1,14 @@
+## 1.0.12
+
+- CLI:
+  - Added option `--build` to automatically build reflection files when detected by inspector.
+  - Added commands:
+    - `create`: creates a `bones_api` backend project tree.
+    - `info`: show information about the `bones_api` backend project template.
+- reflection_factory: ^1.0.9
+- project_template: ^1.0.2
+- resource_portable: ^3.0.0
+
 ## 1.0.11
 
 - `APIRequest`:

@@ -6,17 +6,32 @@ import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:dart_spawner/dart_spawner.dart';
+import 'package:project_template/project_template_cli.dart';
+import 'package:reflection_factory/inspector.dart';
+import 'package:resource_portable/resource.dart';
 
 void _log(String ns, String message) {
   print('## [$ns]\t$message');
 }
 
+void _consolePrinter(Object? o) {
+  print(o);
+}
+
 const String cliTitle = '[Bones_API/${APIRoot.VERSION}]';
 
 void main(List<String> args) async {
+  var commandInfo = MyCommandInfo(cliTitle, _consolePrinter);
+  var commandCreate = MyCommandCreate(cliTitle, _consolePrinter);
+
+  await commandInfo.configure();
+  await commandCreate.configure();
+
   var commandRunner = CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
-    ..addCommand(CommandServe())
-    ..addCommand(CommandConsole());
+    ..addCommand(MyCommandServe())
+    ..addCommand(MyCommandConsole())
+    ..addCommand(commandInfo)
+    ..addCommand(commandCreate);
 
   commandRunner.argParser.addFlag('version',
       abbr: 'v', negatable: false, defaultsTo: false, help: 'Show version.');
@@ -45,7 +60,7 @@ abstract class CommandSourceFileBase extends Command<bool> {
 
   CommandSourceFileBase() {
     argParser.addFlag('verbose',
-        abbr: 'v', help: 'Verbose mode', defaultsTo: false, negatable: false);
+        abbr: 'v', help: 'Verbose mode.', defaultsTo: false, negatable: false);
 
     argParser.addOption(
       'directory',
@@ -104,32 +119,38 @@ abstract class CommandSourceFileBase extends Command<bool> {
   String get source => sourceFile.readAsStringSync();
 }
 
-class CommandServe extends CommandSourceFileBase {
+class MyCommandServe extends CommandSourceFileBase {
   @override
   final String description = 'Serve an API';
 
   @override
   final String name = 'serve';
 
-  CommandServe() {
+  MyCommandServe() {
     argParser.addOption('address',
         abbr: 'a',
-        help: 'Server bind address',
+        help: 'Server bind address.',
         defaultsTo: 'localhost',
         valueHelp: 'localhost|*');
 
     argParser.addOption('port',
-        abbr: 'p', help: 'Server listen port', defaultsTo: '8080');
+        abbr: 'p', help: 'Server listen port.', defaultsTo: '8080');
 
-    argParser.addOption('class', abbr: 'c', help: 'Project APIRoot Class name');
+    argParser.addOption('class',
+        abbr: 'c', help: 'Project APIRoot Class name.');
 
     argParser.addOption('config',
-        abbr: 'i', help: 'API Configuration', valueHelp: 'file|url|json');
+        abbr: 'i', help: 'API Configuration.', valueHelp: 'file|url|json');
 
     argParser.addFlag('hotreload',
         abbr: 'r',
         help:
-            'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed)');
+            'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed).');
+
+    argParser.addFlag('build',
+        abbr: 'b',
+        help:
+            'Allows automatic reflection build if the inspector detects the need at startup.');
   }
 
   String? get argClass => argResults!['class'];
@@ -140,6 +161,8 @@ class CommandServe extends CommandSourceFileBase {
 
   bool get argHotReload => argResults!['hotreload']! as bool;
 
+  bool get argBuild => argResults!['build']! as bool;
+
   String get argApiConfig => (argResults!['config'] ?? '') as String;
 
   @override
@@ -149,6 +172,7 @@ class CommandServe extends CommandSourceFileBase {
     var address = argAddress;
     var port = argPort;
     var hotReload = argHotReload;
+    var allowBuild = argBuild;
     var apiConfig = argApiConfig;
 
     var parametersMessage = <String>[];
@@ -208,8 +232,16 @@ class CommandServe extends CommandSourceFileBase {
       }
     }
 
-    return await _spawnAPIServerIsolate(parametersMessage, directory,
-        apiRootClass!, spawner, address, port, hotReload, apiConfig);
+    return await _spawnAPIServerIsolate(
+        parametersMessage,
+        directory,
+        apiRootClass!,
+        spawner,
+        address,
+        port,
+        hotReload,
+        allowBuild,
+        apiConfig);
   }
 
   Future<bool> _spawnAPIServerIsolate(
@@ -220,6 +252,7 @@ class CommandServe extends CommandSourceFileBase {
       String address,
       String port,
       bool hotReload,
+      bool allowBuild,
       String apiConfig) async {
     print(
         '________________________________________________________________________________');
@@ -234,6 +267,13 @@ class CommandServe extends CommandSourceFileBase {
 
     print('- Project directory: $directory');
     print('- API Class: $apiRootClass\n');
+
+    if (!await _inspectReflection(spawner, allowBuild)) {
+      print('\n** EXITING:');
+      print('  - Fix reflection files before serve the API: $apiRootClass');
+      print('  - Or use `--build` option for automatic reflection build.\n');
+      return false;
+    }
 
     print('Building API Server...');
 
@@ -275,6 +315,100 @@ class CommandServe extends CommandSourceFileBase {
     print('API Server exit: $exit');
 
     return true;
+  }
+
+  Future<bool> _inspectReflection(DartSpawner spawner, bool allowBuild) async {
+    var reflectionInspector =
+        ReflectionInspector(await spawner.projectDirectory);
+
+    var reflectionOK = true;
+
+    void openReflectionIssues() {
+      if (!reflectionOK) return;
+      reflectionOK = false;
+
+      print(
+          '--------------------------------------------------------------------------------');
+      print('\nReflection files inspection:');
+    }
+
+    var missingGeneratedReflection =
+        reflectionInspector.dartFilesMissingGeneratedReflection;
+
+    if (missingGeneratedReflection.isNotEmpty) {
+      openReflectionIssues();
+
+      print('\n** WARNING: Missing Reflection files for:');
+      for (var f in missingGeneratedReflection) {
+        print('  - ${f.path}');
+      }
+      print('');
+    }
+
+    var expiredReflection = reflectionInspector.dartFilesWithExpiredReflection;
+
+    if (expiredReflection.isNotEmpty) {
+      openReflectionIssues();
+
+      print('\n** WARNING: Expired reflection files for:');
+      for (var f in expiredReflection) {
+        print('  - ${f.path}');
+      }
+      print('');
+    }
+
+    if (!reflectionOK) {
+      if (allowBuild) {
+        reflectionOK = await _runReflectionBuild(spawner);
+      } else {
+        print('** Some reflection files need to be generated!');
+        print('  - See option `--build` for automatic reflection build.');
+        print('  - Build command:  dart run build_runner build');
+      }
+
+      print(
+          '\n--------------------------------------------------------------------------------');
+    } else {
+      print('Reflection files inspection: OK\n');
+    }
+
+    return reflectionOK;
+  }
+
+  Future<bool> _runReflectionBuild(DartSpawner spawner) async {
+    print('** Running reflection build:');
+    print(' \$> dart run build_runner build\n');
+    print(
+        ' >------------------------------------------------------------------------------');
+
+    var outputCount = <int>[0];
+
+    var dartProcess = await spawner.runProcess(
+        'dart', ['run', 'build_runner', 'build'],
+        redirectOutput: true,
+        stdoutFilter: (o) => _filterOutput(o, outputCount),
+        stderrFilter: (o) => _filterOutput(o, outputCount));
+
+    var ok = await dartProcess.checkExitCode(0);
+    print(
+        '\n >------------------------------------------------------------------------------');
+    print(' > Reflection build: ${ok ? 'OK' : 'Error!'}');
+
+    if (ok) {
+      print('\n** Reflection files have been automatically fixed! ;-)');
+    }
+
+    return ok;
+  }
+
+  String _filterOutput(String o, List<int> count) {
+    var c = ++count[0];
+    var o2 =
+        o.replaceAllMapped(RegExp(r'(\r?\n)'), (m) => m.group(1)! + ' >> ');
+    if (c == 1) {
+      o2 = ' >> $o2';
+    }
+    return o2;
   }
 
   Future<void> _spawnDartVMForHotReload(
@@ -384,14 +518,14 @@ void main(List<String> args, dynamic parentPort) {
   }
 }
 
-class CommandConsole extends CommandSourceFileBase {
+class MyCommandConsole extends CommandSourceFileBase {
   @override
   final String description = 'API Console';
 
   @override
   final String name = 'console';
 
-  CommandConsole() {
+  MyCommandConsole() {
     argParser.addOption('class',
         abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
   }
@@ -508,4 +642,61 @@ void main(List<String> args, dynamic parentPort) {
 
     return script;
   }
+}
+
+mixin DefaultTemplate {
+  static Uri? _defaultTemplateUri;
+
+  Future<bool> configure() async {
+    if (_defaultTemplateUri == null) {
+      var resource =
+          Resource('package:bones_api/src/template/bones_api_template.tar.gz');
+      _defaultTemplateUri = await resource.uriResolved;
+    }
+
+    return true;
+  }
+
+  String? get defaultTemplate {
+    return _defaultTemplateUri!.toFilePath();
+  }
+
+  String usageWithDefaultTemplate(String usage) {
+    var lines = usage.split(RegExp(r'[\r\n]'));
+
+    var idx = lines.lastIndexOf('');
+
+    lines.insert(
+      idx,
+      '\nDefault Template:\n'
+      '  ** Bones_API Backend:\n'
+      '     $defaultTemplate\n\n'
+      'See also:\n'
+      '  https://pub.dev/packages/bones_api#cli',
+    );
+
+    return lines.join('\n');
+  }
+}
+
+class MyCommandInfo extends CommandInfo with DefaultTemplate {
+  MyCommandInfo(String cliTitle, ConsolePrinter consolePrinter)
+      : super(cliTitle, consolePrinter);
+
+  @override
+  String get usage => usageWithDefaultTemplate(super.usage);
+
+  @override
+  String? get argTemplate => super.argTemplate ?? defaultTemplate;
+}
+
+class MyCommandCreate extends CommandCreate with DefaultTemplate {
+  MyCommandCreate(String cliTitle, ConsolePrinter consolePrinter)
+      : super(cliTitle, consolePrinter);
+
+  @override
+  String get usage => usageWithDefaultTemplate(super.usage);
+
+  @override
+  String? get argTemplate => super.argTemplate ?? defaultTemplate;
 }
