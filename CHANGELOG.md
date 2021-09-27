@@ -5,7 +5,7 @@
   - Added commands:
     - `create`: creates a `bones_api` backend project tree.
     - `info`: show information about the `bones_api` backend project template.
-- reflection_factory: ^1.0.9
+- reflection_factory: ^1.0.10
 - project_template: ^1.0.2
 - resource_portable: ^3.0.0
 
