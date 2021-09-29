@@ -866,14 +866,18 @@ class EntityRepositoryProvider with Closable {
         entityRepository = null;
       }
 
-      if (entityRepository == null && obj != null) {
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      } else if (obj != null) {
         entityRepository = _entityRepositories[obj.runtimeType];
         if (entityRepository != null && entityRepository.isClosed) {
           entityRepository = null;
         }
       }
 
-      if (entityRepository == null && type != null) {
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      } else if (type != null) {
         entityRepository = _entityRepositories[type];
         if (entityRepository != null && entityRepository.isClosed) {
           entityRepository = null;
@@ -882,9 +886,7 @@ class EntityRepositoryProvider with Closable {
 
       if (entityRepository != null) {
         return entityRepository as EntityRepository<O>;
-      }
-
-      if (name != null) {
+      } else if (name != null) {
         entityRepository =
             _entityRepositories.values.where((e) => e.name == name).firstOrNull;
         if (entityRepository != null && entityRepository.isClosed) {
