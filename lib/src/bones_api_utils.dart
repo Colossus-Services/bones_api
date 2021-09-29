@@ -99,6 +99,7 @@ typedef TypeElementParser<T> = T? Function(Object? o);
 
 /// Lenient parsers for basic Dart types.
 class TypeParser {
+  /// Returns the parser for the desired type, defined by [T], [obj] or [type].
   static TypeElementParser? parserFor<T>({Object? obj, Type? type}) {
     if (obj != null) {
       if (obj is String) {
