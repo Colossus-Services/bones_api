@@ -2,8 +2,8 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_condition.dart';
-import 'bones_api_mixin.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_mixin.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -45,6 +45,63 @@ class TableFieldReference {
   }
 }
 
+/// A relationship table between two tables.
+class TableRelationshipReference {
+  /// The source table name.
+  final String relationshipTable;
+
+  /// The source table field name.
+  final String sourceTable;
+
+  /// The source table field name.
+  final String sourceField;
+
+  /// The source relationship field name, int the [relationshipTable].
+  final String sourceRelationshipField;
+
+  /// The target table name.
+  final String targetTable;
+
+  /// The target table field name.
+  final String targetField;
+
+  /// The target relationship field name, int the [relationshipTable].
+  final String targetRelationshipField;
+
+  TableRelationshipReference(
+      this.relationshipTable,
+      this.sourceTable,
+      this.sourceField,
+      this.sourceRelationshipField,
+      this.targetTable,
+      this.targetField,
+      this.targetRelationshipField);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TableRelationshipReference &&
+          runtimeType == other.runtimeType &&
+          relationshipTable == other.relationshipTable &&
+          sourceTable == other.sourceTable &&
+          sourceField == other.sourceField &&
+          targetTable == other.targetTable &&
+          targetField == other.targetField;
+
+  @override
+  int get hashCode =>
+      relationshipTable.hashCode ^
+      sourceTable.hashCode ^
+      sourceField.hashCode ^
+      targetTable.hashCode ^
+      targetField.hashCode;
+
+  @override
+  String toString() {
+    return 'TableRelationshipReference[$relationshipTable]{"$sourceTable"."$sourceField" -> "$targetTable"."$targetField"}';
+  }
+}
+
 /// A generic table scheme.
 class TableScheme with FieldsFromMap {
   /// The table name
@@ -62,20 +119,35 @@ class TableScheme with FieldsFromMap {
   /// Fields that are references to another table field.
   final Map<String, TableFieldReference> fieldsReferencedTables;
 
+  /// Reference tables (many-to-many).
+  final Set<TableRelationshipReference> relationshipTables;
+
   late final Map<String, int> _fieldsNamesIndexes;
   late final List<String> _fieldsNamesLC;
   late final List<String> _fieldsNamesSimple;
 
+  final Map<String, TableRelationshipReference> _tableRelationshipReference =
+      <String, TableRelationshipReference>{};
+
   TableScheme(this.name, this.idFieldName, Map<String, Type> fieldsTypes,
       [Map<String, TableFieldReference> fieldsReferencedTables =
-          const <String, TableFieldReference>{}])
+          const <String, TableFieldReference>{},
+      Iterable<TableRelationshipReference>? relationshipTables])
       : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
         fieldsTypes = Map.unmodifiable(fieldsTypes),
         fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
-            fieldsReferencedTables) {
+            fieldsReferencedTables),
+        relationshipTables = Set<TableRelationshipReference>.unmodifiable(
+            relationshipTables ?? <TableRelationshipReference>[]) {
     _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
     _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
     _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
+
+    for (var t in this.relationshipTables) {
+      if (t.sourceTable == name) {
+        _tableRelationshipReference[t.targetTable] = t;
+      }
+    }
   }
 
   /// Returns a [Map] with the table fields values populated from the provided [map].
@@ -88,9 +160,19 @@ class TableScheme with FieldsFromMap {
         fieldsNamesSimple: _fieldsNamesSimple);
   }
 
+  /// Returns the [TableRelationshipReference] with the [targetTable].
+  TableRelationshipReference? getTableRelationshipReference(
+          String targetTable) =>
+      _tableRelationshipReference[targetTable];
+
   @override
   String toString() {
-    return 'TableScheme{name: $name, idFieldName: $idFieldName, fieldsNames: $fieldsNames, fieldsTypes: $fieldsTypes, fieldsReferencedTables: $fieldsReferencedTables}';
+    return 'TableScheme{name: $name, '
+        'idFieldName: $idFieldName, '
+        'fieldsNames: $fieldsNames, '
+        'fieldsTypes: $fieldsTypes, '
+        'fieldsReferencedTables: $fieldsReferencedTables, '
+        'relationshipTables: $relationshipTables}';
   }
 }
 
