@@ -1,6 +1,7 @@
 import 'dart:convert' as dart_convert;
 
 import 'package:collection/collection.dart';
+import 'package:reflection_factory/builder.dart';
 
 /// JSON utility class.
 class Json {
@@ -158,20 +159,16 @@ class TypeParser {
     if (value == null) return def;
 
     var l = _parseListImpl(value);
-    if (elementParser != null && l != null) {
-      l = l.map(elementParser).toList();
-    }
+    if (l == null) return def;
 
-    if (l == null) {
-      return def;
+    if (elementParser != null) {
+      l = l.map(elementParser).toList();
     }
 
     if (l is List<T>) {
       return l;
-    }
-
-    if (elementParser != null) {
-      l = l.map(elementParser).toList();
+    } else if (elementParser != null) {
+      l = l.whereType<T>().toList();
     } else {
       var parser = parserFor<T>();
       if (parser != null) {
@@ -430,5 +427,126 @@ class TypeParser {
       var s = '$value'.trim();
       return DateTime.tryParse(s) ?? def;
     }
+  }
+
+  /// Returns `true` if [type] is primitive ([String], [int], [double], [num], [bool]).
+  static bool isPrimitiveType<T>([Type? type]) {
+    type ??= T;
+    return type == String ||
+        type == int ||
+        type == double ||
+        type == num ||
+        type == bool;
+  }
+}
+
+/// Represents a [Type] and its [arguments].
+class TypeInfo {
+  static final TypeInfo tString = TypeInfo.from(String);
+  static final TypeInfo tBool = TypeInfo.from(bool);
+  static final TypeInfo tInt = TypeInfo.from(int);
+  static final TypeInfo tDouble = TypeInfo.from(double);
+  static final TypeInfo tNum = TypeInfo.from(num);
+
+  /// The main [Type].
+  final Type type;
+
+  /// The [type] arguments (generics).
+  final List<TypeInfo> arguments;
+
+  static final _emptyArguments = List<TypeInfo>.unmodifiable([]);
+
+  TypeInfo(this.type, [Iterable<Object>? arguments])
+      : arguments = arguments == null || arguments.isEmpty
+            ? _emptyArguments
+            : List<TypeInfo>.unmodifiable(
+                arguments.map((o) => TypeInfo.from(o)));
+
+  factory TypeInfo.from(Object o) {
+    if (o is TypeInfo) return o;
+    if (o is Type) return TypeInfo(o);
+
+    if (o is FieldReflection) {
+      return TypeInfo(
+          o.type.type, o.type.arguments.map((o) => TypeInfo.from(o)));
+    }
+
+    return TypeInfo(o.runtimeType);
+  }
+
+  /// The [arguments] length.
+  int get argumentsLength => arguments.length;
+
+  /// Returns `true` if [type] has [arguments].
+  bool get hasArguments => arguments.isNotEmpty;
+
+  /// Returns the [type] parser.
+  ///
+  /// See [TypeParser.parserFor].
+  TypeElementParser? get parser => TypeParser.parserFor(type: type);
+
+  /// Returns the parser of the argument at [index].
+  TypeElementParser? argumentParser(int index) =>
+      index < argumentsLength ? arguments[index].parser : null;
+
+  /// Parse [value] or return [def].
+  ///
+  /// See [TypeParser.parserFor].
+  T? parse<T>(Object? value, [T? def]) {
+    if (value == null) return def;
+
+    switch (type) {
+      case String:
+        return TypeParser.parseString(value, def as String?) as T?;
+      case int:
+        return TypeParser.parseInt(value, def as int?) as T?;
+      case double:
+        return TypeParser.parseDouble(value, def as double?) as T?;
+      case num:
+        return TypeParser.parseNum(value, def as num?) as T?;
+      case DateTime:
+        return TypeParser.parseDateTime(value, def as DateTime?) as T?;
+      case List:
+      case Iterable:
+        return TypeParser.parseList(value, elementParser: argumentParser(0))
+            as T?;
+      case Set:
+        return TypeParser.parseSet(value, elementParser: argumentParser(0))
+            as T?;
+      case Map:
+        return TypeParser.parseMap(value,
+            keyParser: argumentParser(0), valueParser: argumentParser(1)) as T?;
+      case MapEntry:
+        return TypeParser.parseMapEntry(value,
+            keyParser: argumentParser(0), valueParser: argumentParser(1)) as T?;
+      default:
+        {
+          if (value.runtimeType == type) {
+            return value as T;
+          }
+
+          return null;
+        }
+    }
+  }
+
+  /// Returns `true` if [type] is primitive.
+  ///
+  /// See [TypeParser.isPrimitiveType].
+  bool get isPrimitiveType => TypeParser.isPrimitiveType(type);
+
+  /// Returns `true` if [type] is [List].
+  bool get isList => type == List;
+
+  /// Returns `true` if [type] is a [List] of entities.
+  bool get isListEntity =>
+      isList && hasArguments && !arguments.first.isPrimitiveType;
+
+  /// The [TypeInfo] of the [List] elements type.
+  TypeInfo? get listEntityType => isListEntity ? arguments.first : null;
+
+  @override
+  String toString() {
+    return hasArguments ? '$type<${arguments.join(',')}>' : '$type';
   }
 }
