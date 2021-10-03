@@ -152,6 +152,30 @@ class ConditionParameter extends ConditionElement {
     return myValue == otherValue;
   }
 
+  bool matchesIn(List values,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var myValue = getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+
+    for (var value in values) {
+      var otherValue = value is ConditionParameter
+          ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters)
+          : value;
+
+      var match = myValue == otherValue;
+      if (match) return true;
+    }
+
+    return false;
+  }
+
   @override
   String toString() {
     if (hasKey) {
@@ -278,6 +302,32 @@ abstract class Condition<O> extends ConditionElement
     } else {
       return value1 == value2;
     }
+  }
+
+  bool inConditionValues(Object? value1, List value2,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    if (value1 is ConditionParameter) {
+      return value1.matchesIn(value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+    }
+
+    for (var v2 in value2) {
+      if (v2 is ConditionParameter) {
+        var match = v2.matches(value1,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters);
+        if (match) return true;
+      } else {
+        if (value1 == v2) return true;
+      }
+    }
+
+    return false;
   }
 
   Condition<T> cast<T>();
@@ -575,9 +625,9 @@ class ConditionKeyIndex extends ConditionKey {
   String encode() => '[$index]';
 }
 
-abstract class KeyCondition<O> extends Condition<O> {
+abstract class KeyCondition<O, V> extends Condition<O> {
   List<ConditionKey> keys;
-  dynamic value;
+  V value;
 
   KeyCondition(this.keys, this.value) : super._() {
     if (keys.isEmpty) {
@@ -684,7 +734,7 @@ abstract class KeyCondition<O> extends Condition<O> {
   }
 }
 
-class KeyConditionEQ<O> extends KeyCondition<O> {
+class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionEQ(List<ConditionKey> keys, dynamic value) : super(keys, value);
 
   @override
@@ -726,7 +776,7 @@ class KeyConditionEQ<O> extends KeyCondition<O> {
   String encode() => '$encodeKey == $encodeValue';
 }
 
-class KeyConditionNotEQ<O> extends KeyCondition<O> {
+class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionNotEQ(List<ConditionKey> keys, dynamic value)
       : super(keys, value);
 
@@ -767,6 +817,90 @@ class KeyConditionNotEQ<O> extends KeyCondition<O> {
 
   @override
   String encode() => '$encodeKey != $encodeValue';
+}
+
+class KeyConditionIN<O> extends KeyCondition<O, List<Object?>> {
+  KeyConditionIN(List<ConditionKey> keys, List values) : super(keys, values);
+
+  @override
+  KeyConditionIN<T> cast<T>() => this is KeyConditionIN<T>
+      ? this as KeyConditionIN<T>
+      : KeyConditionIN<T>(keys, value);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return inConditionValues(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return inConditionValues(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey =~ $encodeValue';
+}
+
+class KeyConditionNotIN<O> extends KeyCondition<O, List<Object?>> {
+  KeyConditionNotIN(List<ConditionKey> keys, List values) : super(keys, values);
+
+  @override
+  KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>
+      ? this as KeyConditionNotIN<T>
+      : KeyConditionNotIN<T>(keys, value);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return !inConditionValues(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return !inConditionValues(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey !~ $encodeValue';
 }
 
 class ConditionParseCache<O> {
