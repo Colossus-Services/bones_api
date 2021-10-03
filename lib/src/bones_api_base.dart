@@ -11,7 +11,7 @@ import 'bones_api_extension.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.12';
+  static const String VERSION = '1.0.13';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 

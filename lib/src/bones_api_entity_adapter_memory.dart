@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_condition_encoder.dart';
@@ -59,8 +60,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doInsertSQL(
-      Transaction transaction, String table, SQL sql, int connection) {
+  FutureOr doInsertSQL(String table, SQL sql, int connection) {
     var map = _getTableMap(table, true)!;
 
     var id = nextID(table);
@@ -75,6 +75,27 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     map[id] = entry;
 
     return id;
+  }
+
+  @override
+  FutureOr doUpdateSQL(String table, SQL sql, int connection) {
+    var map = _getTableMap(table, true)!;
+
+    var tablesScheme = tablesSchemes[table];
+    var idField = tablesScheme?.idFieldName ?? 'id';
+
+    var entry = sql.parameters;
+    var id = entry[idField];
+
+    map[id] = entry;
+
+    return id;
+  }
+
+  @override
+  FutureOr<bool> doConstrainSQL(String table, SQL sql, int connection,
+      dynamic id, String otherTable, List otherIds) {
+    return doDeleteSQL(table, sql, connection).resolveWithValue(true);
   }
 
   Object nextID(String table) {
@@ -94,20 +115,40 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var entityHandler = getEntityRepository(name: table)?.entityHandler;
 
     if (tableScheme == null || tableScheme.fieldsReferencedTables.isEmpty) {
-      return map.values.where((e) {
+      var sel = map.values.where((e) {
         return sql.condition!.matchesEntityMap(e,
             namedParameters: sql.parameters, entityHandler: entityHandler);
       }).toList();
+
+      sel = _filterReturnColumns(sql, sel);
+      return sel;
     }
 
     var fieldsReferencedTables = tableScheme.fieldsReferencedTables;
 
-    return map.values.where((obj) {
+    var sel = map.values.where((obj) {
       obj = _resolveEntityMap(obj, fieldsReferencedTables);
 
       return sql.condition!.matchesEntityMap(obj,
           namedParameters: sql.parameters, entityHandler: entityHandler);
     }).toList();
+
+    sel = _filterReturnColumns(sql, sel);
+    return sel;
+  }
+
+  List<Map<String, dynamic>> _filterReturnColumns(
+      SQL sql, List<Map<String, dynamic>> sel) {
+    var returnColumns = sql.returnColumns;
+
+    if (returnColumns != null && returnColumns.isNotEmpty) {
+      return sel.map((e) {
+        return Map<String, dynamic>.fromEntries(
+            e.entries.where((e) => returnColumns.contains(e.key)));
+      }).toList();
+    } else {
+      return sel;
+    }
   }
 
   @override
@@ -209,6 +250,12 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   bool get sqlAcceptsInsertReturning => true;
+
+  @override
+  bool get sqlAcceptsInsertIgnore => true;
+
+  @override
+  bool get sqlAcceptsInsertOnConflict => false;
 
   @override
   String toString() {

@@ -1,3 +1,16 @@
+## 1.0.13
+
+- Added `TypeInfo` to represent better types with generics.
+- Added `TableRelationshipReference` for use in `TableScheme`.
+- Added `TimedMap` to help with timed caches.
+- Added `KeyConditionIN` and `KeyConditionNotIN`.
+- Entities:
+  - Added support to relationship fields.
+  - Added support for List fields pointing to another entity.
+- `SQLEntityRepository`:
+  - Added support to UPDATE.
+  - Added support to relationship tables.
+
 ## 1.0.12
 
 - CLI:

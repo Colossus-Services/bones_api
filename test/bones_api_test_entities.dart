@@ -9,6 +9,9 @@ part 'bones_api_test_entities.reflection.g.dart';
 final addressEntityHandler = GenericEntityHandler<Address>(
     instantiatorFromMap: (m) => Address.fromMap(m));
 
+final roleEntityHandler =
+    GenericEntityHandler<Role>(instantiatorFromMap: (m) => Role.fromMap(m));
+
 final userEntityHandler =
     GenericEntityHandler<User>(instantiatorFromMap: (m) => User.fromMap(m));
 
@@ -19,6 +22,11 @@ class AddressAPIRepository extends APIRepository<Address> {
   FutureOr<Iterable<Address>> selectByState(String state) {
     return selectByQuery(' state == ? ', parameters: {'state': state});
   }
+}
+
+class RoleAPIRepository extends APIRepository<Role> {
+  RoleAPIRepository(EntityRepositoryProvider provider)
+      : super(provider: provider);
 }
 
 class UserAPIRepository extends APIRepository<User> {
@@ -44,17 +52,23 @@ class User extends Entity {
 
   Address address;
 
+  List<Role> roles;
+
   DateTime creationTime;
 
-  User(this.email, this.password, this.address,
+  User(this.email, this.password, this.address, this.roles,
       {this.id, DateTime? creationTime})
       : creationTime = creationTime ?? DateTime.now();
 
-  User.empty() : this('', '', Address.empty());
+  User.empty() : this('', '', Address.empty(), <Role>[]);
 
-  static FutureOr<User> fromMap(Map<String, dynamic> map) =>
-      User(map['email'], map['password'], map['address']!,
-          id: map['id'], creationTime: map['creationTime']);
+  static FutureOr<User> fromMap(Map<String, dynamic> map) => User(
+      map.getAsString('email')!,
+      map.getAsString('password')!,
+      map.get<Address>('address')!,
+      map.getAsList<Role>('roles', def: [])!,
+      id: map['id'],
+      creationTime: map['creationTime']);
 
   @override
   bool operator ==(Object other) =>
@@ -68,8 +82,14 @@ class User extends Entity {
   String get idFieldName => 'id';
 
   @override
-  List<String> get fieldsNames =>
-      const <String>['id', 'email', 'password', 'address', 'creationTime'];
+  List<String> get fieldsNames => const <String>[
+        'id',
+        'email',
+        'password',
+        'address',
+        'roles',
+        'creationTime'
+      ];
 
   @override
   V? getField<V>(String key) {
@@ -82,6 +102,8 @@ class User extends Entity {
         return password as V?;
       case 'address':
         return address as V?;
+      case 'roles':
+        return roles as V?;
       case 'creationTime':
         return creationTime as V?;
       default:
@@ -90,18 +112,20 @@ class User extends Entity {
   }
 
   @override
-  Type? getFieldType(String key) {
+  TypeInfo? getFieldType(String key) {
     switch (key) {
       case 'id':
-        return int;
+        return TypeInfo.tInt;
       case 'email':
-        return String;
+        return TypeInfo.tString;
       case 'password':
-        return String;
+        return TypeInfo.tString;
       case 'address':
-        return Address;
+        return TypeInfo(Address);
+      case 'roles':
+        return TypeInfo(List, [Role]);
       case 'creationTime':
-        return DateTime;
+        return TypeInfo(DateTime);
       default:
         return null;
     }
@@ -112,7 +136,7 @@ class User extends Entity {
     switch (key) {
       case 'id':
         {
-          id = value as int;
+          id = value as int?;
           break;
         }
       case 'email':
@@ -128,6 +152,11 @@ class User extends Entity {
       case 'address':
         {
           address = value as Address;
+          break;
+        }
+      case 'roles':
+        {
+          roles = value as List<Role>;
           break;
         }
       case 'creationTime':
@@ -146,6 +175,7 @@ class User extends Entity {
         'email': email,
         'password': password,
         'address': address.toJson(),
+        'roles': roles.map((e) => e.toJson()).toList(),
         'creationTime': creationTime.millisecondsSinceEpoch,
       };
 }
@@ -173,8 +203,9 @@ class Address extends Entity {
   Address.empty() : this('', '', '', 0);
 
   Address.fromMap(Map<String, dynamic> map)
-      : this(map['state'], map['city'], map['street'], map['number'],
-            id: map['id']);
+      : this(map.getAsString('state')!, map.getAsString('city')!,
+            map.getAsString('street')!, map.getAsInt('number')!,
+            id: map.getAsInt('id'));
 
   @override
   bool operator ==(Object other) =>
@@ -221,18 +252,18 @@ class Address extends Entity {
   }
 
   @override
-  Type? getFieldType(String key) {
+  TypeInfo? getFieldType(String key) {
     switch (key) {
       case 'id':
-        return int;
+        return TypeInfo.tInt;
       case 'state':
-        return String;
+        return TypeInfo.tString;
       case 'city':
-        return String;
+        return TypeInfo.tString;
       case 'street':
-        return String;
+        return TypeInfo.tString;
       case 'number':
-        return int;
+        return TypeInfo.tInt;
       default:
         return null;
     }
@@ -243,7 +274,7 @@ class Address extends Entity {
     switch (key) {
       case 'id':
         {
-          id = value as int;
+          id = value as int?;
           break;
         }
       case 'state':
@@ -278,5 +309,98 @@ class Address extends Entity {
         'city': city,
         'street': street,
         'number': number,
+      };
+}
+
+@EnableReflection()
+class Role extends Entity {
+  int? id;
+
+  String type;
+
+  bool enabled;
+
+  Role(this.type, {this.id, this.enabled = true});
+
+  Role.empty() : this('');
+
+  Role.fromMap(Map<String, dynamic> map)
+      : this(map.getAsString('type')!,
+            enabled: map.getAsBool('enabled', false)!, id: map.getAsInt('id'));
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Role &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          type == other.type &&
+          enabled == other.enabled;
+
+  @override
+  int get hashCode => id.hashCode ^ type.hashCode ^ enabled.hashCode;
+
+  @override
+  String get idFieldName => 'id';
+
+  @override
+  List<String> get fieldsNames => const <String>['id', 'type', 'enabled'];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'type':
+        return type as V?;
+      case 'enabled':
+        return enabled as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tInt;
+      case 'type':
+        return TypeInfo.tString;
+      case 'enabled':
+        return TypeInfo.tBool;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        {
+          id = value as int?;
+          break;
+        }
+      case 'type':
+        {
+          type = value as String;
+          break;
+        }
+      case 'enabled':
+        {
+          enabled = value as bool;
+          break;
+        }
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        'type': type,
+        'enabled': enabled,
       };
 }

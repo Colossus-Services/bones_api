@@ -214,17 +214,71 @@ void main() {
 
   group('TimedMap', () {
     test('basic', () async {
+      var m = TimedMap<String, int>(Duration(seconds: 1), {'a': 1, 'b': 2});
+
+      expect(m.isEmpty, isFalse);
+      expect(m.isNotEmpty, isTrue);
+      expect(m.length, equals(2));
+      expect(m.keys, equals(['a', 'b']));
+
+      expect(m['a'], equals(1));
+      expect(m['b'], equals(2));
+
+      expect(m.cast<String, num>().toString(), equals('{a: 1, b: 2}'));
+
+      m['a'] = 10;
+      expect(m['a'], equals(10));
+
+      m.update('b', (v) => v * 2);
+      m.updateTimed('c', (v) => v * 2, ifAbsent: () => 3);
+
+      m.putIfAbsent('b', () => 200);
+      m.putIfAbsentChecked('c', () => 300);
+
+      expect(m.toString(), equals('{a: 10, b: 4, c: 3}'));
+
+      m.updateAll((key, value) => value * 2);
+
+      expect(m.toString(), equals('{a: 20, b: 8, c: 6}'));
+
+      m.removeWhere((key, value) => value > 10);
+
+      expect(m.toString(), equals('{b: 8, c: 6}'));
+
+      m.clear();
+      expect(m.isEmpty, isTrue);
+      expect(m.keys, equals([]));
+
+      await m.putIfAbsentCheckedAsync('d', () => Future.value(4));
+      expect(m.keys, equals(['d']));
+    });
+
+    test('timed', () async {
       var m = TimedMap<String, int>(Duration(seconds: 1));
 
       expect(m.isEmpty, isTrue);
       expect(m.isNotEmpty, isFalse);
       expect(m.length, equals(0));
 
+      expect(m.keys, equals([]));
+      expect(m.values, equals([]));
+      expect(m.entries, equals([]));
+
       m.addAll({'a': 1, 'b': 2});
 
       expect(m.isEmpty, isFalse);
       expect(m.isNotEmpty, isTrue);
       expect(m.length, equals(2));
+
+      expect(m.keys, equals(['a', 'b']));
+      expect(m.values, equals([1, 2]));
+      expect(m.entries.map((e) => e.key), equals(['a', 'b']));
+      expect(m.entries.map((e) => e.value), equals([1, 2]));
+
+      expect(m.keysChecked(), equals(['a', 'b']));
+      expect(m.valuesChecked(), equals([1, 2]));
+      expect(m.entriesChecked().map((e) => e.key), equals(['a', 'b']));
+      expect(m.entriesChecked().map((e) => e.value), equals([1, 2]));
 
       expect(m['a'], equals(1));
       expect(m['b'], equals(2));
@@ -252,6 +306,8 @@ void main() {
       expect(m.length, equals(4));
 
       await Future.delayed(Duration(milliseconds: 1100));
+
+      expect(m.getElapsedTime('a')!.inMilliseconds > 1000, isTrue);
 
       expect(m.getChecked('a'), isNull);
       expect(m.getChecked('b'), isNull);

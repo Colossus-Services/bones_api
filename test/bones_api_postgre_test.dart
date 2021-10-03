@@ -22,6 +22,7 @@ class PostgreEntityRepositoryProvider extends EntityRepositoryProvider {
   EntityHandler<User> userEntityHandler;
 
   late final AddressAPIRepository addressAPIRepository;
+  late final RoleAPIRepository roleAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
   PostgreEntityRepositoryProvider(
@@ -37,9 +38,13 @@ class PostgreEntityRepositoryProvider extends EntityRepositoryProvider {
     SQLEntityRepository<Address>(
         postgreAdapter, 'address', addressEntityHandler);
 
+    SQLEntityRepository<Role>(postgreAdapter, 'role', roleEntityHandler);
+
     SQLEntityRepository<User>(postgreAdapter, 'user', userEntityHandler);
 
     addressAPIRepository = AddressAPIRepository(this)..ensureConfigured();
+
+    roleAPIRepository = RoleAPIRepository(this)..ensureConfigured();
 
     userAPIRepository = UserAPIRepository(this)..ensureConfigured();
   }
@@ -142,30 +147,60 @@ void main() {
 
       var sqlCreateUser = '''
       CREATE TABLE IF NOT EXISTS "user" (
-      "id" serial,
-      "email" text,
-      "password" text,
-      "address" integer CONSTRAINT address_ref_account_fk REFERENCES address(id),
-      "creation_time" timestamp,
-      PRIMARY KEY( id )
+        "id" serial,
+        "email" text NOT NULL,
+        "password" text NOT NULL,
+        "address" integer NOT NULL CONSTRAINT address_ref_account_fk REFERENCES address(id),
+        "creation_time" timestamp NOT NULL,
+        PRIMARY KEY( id )
       );
       ''';
 
       var process2 = await postgreContainer.runSQL(sqlCreateUser);
       expect(process2, contains('CREATE TABLE'));
 
-      var process3 = await postgreContainer.psqlCMD('\\d');
+      var sqlCreateRole = '''
+      CREATE TABLE IF NOT EXISTS "role" (
+        "id" serial,
+        "type" text NOT NULL,
+        "enabled" boolean NOT NULL,
+        PRIMARY KEY( id )
+      );
+      ''';
+
+      var process3 = await postgreContainer.runSQL(sqlCreateRole);
+      expect(process3, contains('CREATE TABLE'));
+
+      var sqlCreateUserRole = '''
+      CREATE TABLE IF NOT EXISTS "user_role_ref" (
+        "user_id" integer REFERENCES "user"(id) ON DELETE CASCADE,
+        "role_id" integer REFERENCES "role"(id) ON DELETE CASCADE,
+        CONSTRAINT user_role_ref_pkey PRIMARY KEY ("user_id", "role_id")
+      );
+      ''';
+
+      var process4 = await postgreContainer.runSQL(sqlCreateUserRole);
+      expect(process4, contains('CREATE TABLE'));
+
+      var processList = await postgreContainer.psqlCMD('\\d');
+
+      print(processList);
 
       expect(
-          process3,
+          processList,
           allOf(
-              contains(RegExp(r'\Waddress\W')), contains(RegExp(r'\Wuser\W'))));
+            contains(RegExp(r'\Waddress\W')),
+            contains(RegExp(r'\Wuser\W')),
+            contains(RegExp(r'\Wrole\W')),
+            contains(RegExp(r'\Wuser_role_ref\W')),
+          ));
     });
 
     test('PostgreEntityRepositoryProvider', () async {
       if (!checkDockerRunning('PostgreEntityRepositoryProvider')) return;
 
       var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
+      var roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
 
       expect(await userAPIRepository.length(), equals(0));
@@ -180,13 +215,18 @@ void main() {
         expect(del, isEmpty);
       }
 
+      {
+        var role = await roleAPIRepository.selectByID(1);
+        expect(role, isNull);
+      }
+
       var user1Time = DateTime.utc(2021, 9, 20, 10, 11, 12, 0, 0);
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
 
-        var user =
-            User('joe@postgre.com', '123', address, creationTime: user1Time);
+        var user = User('joe@postgre.com', '123', address, [Role('admin')],
+            creationTime: user1Time);
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
       }
@@ -195,8 +235,8 @@ void main() {
 
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
-        var user =
-            User('smith@postgre.com', 'abc', address, creationTime: user2Time);
+        var user = User('smith@postgre.com', 'abc', address, [Role('guest')],
+            creationTime: user2Time);
         var id = await userAPIRepository.store(user);
         expect(id, equals(2));
       }
@@ -208,6 +248,11 @@ void main() {
         var user = await userAPIRepository.selectByID(1);
         expect(user!.email, equals('joe@postgre.com'));
         expect(user.address.state, equals('NY'));
+        expect(
+            user.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 1, 'type': 'admin', 'enabled': true}
+            ]));
         expect(user.creationTime, equals(user1Time));
       }
 
@@ -215,6 +260,11 @@ void main() {
         var user = await userAPIRepository.selectByID(2);
         expect(user!.email, equals('smith@postgre.com'));
         expect(user.address.state, equals('CA'));
+        expect(
+            user.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 2, 'type': 'guest', 'enabled': true}
+            ]));
         expect(user.creationTime, equals(user2Time));
       }
 
@@ -246,10 +296,23 @@ void main() {
       }
 
       {
+        var sel = await userAPIRepository.selectByAddressState('CA');
+
+        var user = sel.first;
+        expect(user.email, equals('smith@postgre.com'));
+        expect(user.address.state, equals('CA'));
+
+        user.email = 'smith2@postgre.com';
+
+        var ok = await userAPIRepository.store(user);
+        expect(ok, equals(user.id));
+      }
+
+      {
         var del = await userAPIRepository
             .deleteByQuery(' #ID == ? ', parameters: [2]);
         var user = del.first;
-        expect(user.email, equals('smith@postgre.com'));
+        expect(user.email, equals('smith2@postgre.com'));
         expect(user.address.state, equals('CA'));
         expect(user.creationTime, equals(user2Time));
       }

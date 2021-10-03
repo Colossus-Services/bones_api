@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.10
+// BUILDER: reflection_factory/1.0.11
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -50,7 +50,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             () => (APIRoot apiRoot) => MyInfoModule(apiRoot),
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection(APIRoot), 'apiRoot', false, true, null)
+                  TypeReflection(APIRoot), 'apiRoot', false, true, null, null)
             ],
             null,
             null,
@@ -109,9 +109,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             false,
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection.tString, 'msg', false, true, null),
-              ParameterReflection(
-                  TypeReflection(APIRequest), 'request', false, true, null)
+                  TypeReflection.tString, 'msg', false, true, null, null),
+              ParameterReflection(TypeReflection(APIRequest), 'request', false,
+                  true, null, null)
             ],
             null,
             null,

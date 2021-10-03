@@ -567,6 +567,9 @@ class TimedMap<K, V> implements Map<K, V> {
 
   final Map<K, DateTime> _entriesPutTime = <K, DateTime>{};
 
+  @override
+  String toString() => _entries.toString();
+
   /// Sets a [key] [value]. See [put].
   @override
   void operator []=(K key, V value) {
@@ -587,7 +590,7 @@ class TimedMap<K, V> implements Map<K, V> {
   }
 
   /// Returns the time ([DateTime]) of a [key].
-  DateTime? getTime(K key) {
+  DateTime? getTime(Object? key) {
     return _entriesPutTime[key];
   }
 
@@ -687,7 +690,7 @@ class TimedMap<K, V> implements Map<K, V> {
 
   /// Returns the elapsed time of [key], since the put.
   Duration? getElapsedTime(Object? key, {DateTime? now}) {
-    var time = _entriesPutTime[key];
+    var time = getTime(key);
     if (time == null) return null;
 
     now ??= DateTime.now();

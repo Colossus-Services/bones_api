@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_condition_encoder.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
@@ -145,15 +146,16 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       return MapEntry(k, v);
     }));
 
-    var fieldsNames = fieldsTypes.keys.toList(growable: false);
-
     var fieldsReferencedTables =
-        await _findFieldsReferencedTables(connection, table, fieldsNames);
+        await _findFieldsReferencedTables(connection, table);
+
+    var relationshipTables =
+        await _findRelationshipTables(connection, table, idFieldName);
 
     await releaseIntoPool(connection);
 
-    var tableScheme =
-        TableScheme(table, idFieldName, fieldsTypes, fieldsReferencedTables);
+    var tableScheme = TableScheme(table, idFieldName, fieldsTypes,
+        fieldsReferencedTables, relationshipTables);
 
     _log.log(logging.Level.INFO, '$tableScheme');
 
@@ -206,10 +208,73 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     }
   }
 
-  Future<Map<String, TableFieldReference>> _findFieldsReferencedTables(
+  Future<List<TableRelationshipReference>> _findRelationshipTables(
       PostgreSQLExecutionContext connection,
       String table,
-      List<String> fieldsNames) async {
+      String idFieldName) async {
+    var tablesNames = await _listTablesNames(connection);
+
+    var tablesReferences = await tablesNames
+        .map((t) => _findFieldsReferencedTables(connection, t))
+        .resolveAll();
+
+    tablesReferences = tablesReferences.where((m) {
+      return m.length > 1 &&
+          m.values.where((r) => r.targetTable == table).isNotEmpty &&
+          m.values.where((r) => r.targetTable != table).isNotEmpty;
+    }).toList();
+
+    var relationships = tablesReferences.map((e) {
+      var refToTable = e.values.where((r) => r.targetTable == table).first;
+      var otherRef = e.values.where((r) => r.targetTable != table).first;
+      return TableRelationshipReference(
+        refToTable.sourceTable,
+        refToTable.targetTable,
+        refToTable.targetField,
+        refToTable.sourceField,
+        otherRef.targetTable,
+        otherRef.targetField,
+        otherRef.sourceField,
+      );
+    }).toList();
+
+    return relationships;
+  }
+
+  Future<List<String>> _listTablesNames(
+      PostgreSQLExecutionContext connection) async {
+    var sql = '''
+    SELECT table_name FROM information_schema.tables WHERE table_schema='public'
+    ''';
+
+    var results = await connection.mappedResultsQuery(sql);
+
+    var names = results
+        .map((e) {
+          var v = e.values.first;
+          if (v is Map) {
+            return v.values.first;
+          } else {
+            return v;
+          }
+        })
+        .map((e) => '$e')
+        .toList();
+
+    return names;
+  }
+
+  final TimedMap<String, Map<String, TableFieldReference>>
+      _findFieldsReferencedTablesCache =
+      TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
+
+  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
+          PostgreSQLExecutionContext connection, String table) =>
+      _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
+          table, () => _findFieldsReferencedTablesImpl(connection, table));
+
+  Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
+      PostgreSQLExecutionContext connection, String table) async {
     var sql = '''
     SELECT
       o.conname AS constraint_name,
@@ -301,41 +366,73 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   bool get sqlAcceptsInsertReturning => true;
 
   @override
-  FutureOr<dynamic> doInsertSQL(Transaction transaction, String table, SQL sql,
-      PostgreSQLExecutionContext connection) {
+  bool get sqlAcceptsInsertIgnore => false;
+
+  @override
+  bool get sqlAcceptsInsertOnConflict => true;
+
+  @override
+  FutureOr<dynamic> doInsertSQL(
+      String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
-        .resolveMapped((results) {
-      if (results.isEmpty) {
-        return null;
-      }
+        .resolveMapped((results) => _resolveResultID(results, table, sql));
+  }
 
-      var returning = results.first[table];
+  @override
+  FutureOr doUpdateSQL(
+      String table, SQL sql, PostgreSQLExecutionContext connection) {
+    return connection
+        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .resolveMapped((results) => _resolveResultID(results, table, sql));
+  }
 
-      if (returning == null || returning.isEmpty) {
-        return null;
-      } else if (returning.length == 1) {
-        var id = returning.values.first;
+  _resolveResultID(
+      List<Map<String, Map<String, dynamic>>> results, String table, SQL sql) {
+    if (results.isEmpty) {
+      return null;
+    }
+
+    var returning = results.first[table];
+
+    if (returning == null || returning.isEmpty) {
+      return null;
+    } else if (returning.length == 1) {
+      var id = returning.values.first;
+      return id;
+    } else {
+      var idFieldName = sql.idFieldName;
+
+      if (idFieldName != null) {
+        var id = returning[idFieldName];
         return id;
       } else {
-        var idFieldName = sql.idFieldName;
-
-        if (idFieldName != null) {
-          var id = returning[idFieldName];
-          return id;
-        } else {
-          var id = returning.values.first;
-          return id;
-        }
+        var id = returning.values.first;
+        return id;
       }
+    }
+  }
+
+  @override
+  FutureOr<bool> doConstrainSQL(
+      String table,
+      SQL sql,
+      PostgreSQLExecutionContext connection,
+      dynamic id,
+      String otherTable,
+      List otherIds) {
+    return connection
+        .query(sql.sql, substitutionValues: sql.parameters)
+        .resolveMapped((result) {
+      return true;
     });
   }
 
   @override
-  FutureOr<R> executeTransaction<R>(
-      Transaction transaction,
-      TransactionOperation op,
+  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
       TransactionExecution<R, PostgreSQLExecutionContext> f) {
+    var transaction = op.transaction;
+
     if (transaction.length == 1) {
       return executeWithPool((connection) => f(connection));
     }

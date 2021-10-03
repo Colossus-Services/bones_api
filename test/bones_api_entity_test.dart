@@ -17,6 +17,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   late final MemorySQLAdapter sqlAdapter;
 
   late final SQLEntityRepository<Address> addressSQLRepository;
+  late final SQLEntityRepository<Role> roleSQLRepository;
   late final SQLEntityRepository<User> userSQLRepository;
 
   late final AddressAPIRepository addressAPIRepository;
@@ -25,21 +26,18 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   APIEntityRepositoryProvider._() {
     sqlAdapter = MemorySQLAdapter(parentRepositoryProvider: this)
       ..addTableSchemes([
-        TableScheme(
-          'user',
-          'id',
-          {
-            'id': int,
-            'email': String,
-            'password': String,
-            'address': int,
-            'creationTime': DateTime,
-          },
-          {
-            'address':
-                TableFieldReference('account', 'address', 'address', 'id')
-          },
-        ),
+        TableScheme('user', 'id', {
+          'id': int,
+          'email': String,
+          'password': String,
+          'address': int,
+          'creationTime': DateTime,
+        }, {
+          'address': TableFieldReference('user', 'address', 'address', 'id')
+        }, [
+          TableRelationshipReference(
+              'user_role', 'user', 'id', 'user_id', 'role', 'id', 'role_id')
+        ]),
         TableScheme(
           'address',
           'id',
@@ -50,12 +48,25 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
             'street': String,
             'number': int
           },
+        ),
+        TableScheme(
+          'role',
+          'id',
+          {
+            'id': int,
+            'type': String,
+            'enabled': bool,
+          },
         )
       ]);
 
     addressSQLRepository = SQLEntityRepository<Address>(
         sqlAdapter, 'address', addressEntityHandler)
       ..ensureInitialized();
+
+    roleSQLRepository =
+        SQLEntityRepository<Role>(sqlAdapter, 'role', roleEntityHandler)
+          ..ensureInitialized();
 
     userSQLRepository =
         SQLEntityRepository<User>(sqlAdapter, 'user', userEntityHandler)
@@ -72,12 +83,16 @@ void main() {
 
   group('Entity', () {
     late final SetEntityRepository<Address> addressRepository;
+    late final SetEntityRepository<Role> roleRepository;
     late final SetEntityRepository<User> userRepository;
 
     setUpAll(() {
       addressRepository =
           SetEntityRepository<Address>('address', addressEntityHandler);
       addressRepository.ensureInitialized();
+
+      roleRepository = SetEntityRepository<Role>('role', roleEntityHandler);
+      roleRepository.ensureInitialized();
 
       userRepository = SetEntityRepository<User>('user', userEntityHandler);
       userRepository.ensureInitialized();
@@ -89,19 +104,23 @@ void main() {
     });
 
     test('basic', () async {
-      var user1 = User(
-          'joe@mail.com', '123', Address('NY', 'New York', 'Fifth Avenue', 101),
+      var user1 = User('joe@mail.com', '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
           creationTime: DateTime.utc(2020, 10, 11, 12, 13, 14, 0, 0));
-      var user2 = User('smith@mail.com', 'abc',
+      var user2 = User(
+          'smith@mail.com',
+          'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          [Role('guest')],
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"creationTime":1602418394000}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"type":"admin","enabled":true}],"creationTime":1602418394000}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"creationTime":1633954394000}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"type":"guest","enabled":true}],"creationTime":1633954394000}';
 
       addressEntityHandler.inspectObject(user1.address);
+      roleEntityHandler.inspectObject(user1.roles.first);
       userEntityHandler.inspectObject(user1);
 
       expect(userEntityHandler.encodeJson(user1), equals(user1Json));
@@ -125,11 +144,14 @@ void main() {
       var user1Time = DateTime.utc(2019, 1, 2, 3, 4, 5);
       var user2Time = DateTime.utc(2019, 12, 2, 3, 4, 5);
 
-      var user1 = User(
-          'joe@setl.com', '123', Address('NY', 'New York', 'Fifth Avenue', 101),
+      var user1 = User('joe@setl.com', '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
           creationTime: user1Time);
-      var user2 = User('smith@setl.com', 'abc',
+      var user2 = User(
+          'smith@setl.com',
+          'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          [Role('guest')],
           creationTime: user2Time);
 
       userRepository.store(user1);
@@ -249,8 +271,8 @@ void main() {
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
-        var user =
-            User('joe@memory.com', '123', address, creationTime: user1Time);
+        var user = User('joe@memory.com', '123', address, [Role('admin')],
+            creationTime: user1Time);
         var id = await userSQLRepository.store(user);
         expect(id, equals(1));
       }
@@ -260,8 +282,8 @@ void main() {
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
 
-        var user =
-            User('smith@memory.com', 'abc', address, creationTime: user2Time);
+        var user = User('smith@memory.com', 'abc', address, [Role('guest')],
+            creationTime: user2Time);
         var id = await userSQLRepository.store(user);
         expect(id, equals(2));
       }
@@ -278,6 +300,11 @@ void main() {
         var user = await userSQLRepository.selectByID(1);
         expect(user!.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
+        expect(
+            user.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 1, 'type': 'admin', 'enabled': true}
+            ]));
         expect(user.creationTime, equals(user1Time));
       }
 
@@ -285,6 +312,11 @@ void main() {
         var user = await userSQLRepository.selectByID(2);
         expect(user!.email, equals('smith@memory.com'));
         expect(user.address.state, equals('CA'));
+        expect(
+            user.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 2, 'type': 'guest', 'enabled': true}
+            ]));
         expect(user.creationTime, equals(user2Time));
       }
 
@@ -417,7 +449,12 @@ void main() {
       // Add User:
       {
         var address = Address('FL', 'Miami', 'Ocean Drive', 11);
-        var user = User('mary@memory.com', 'xyz', address);
+        var user = User(
+          'mary@memory.com',
+          'xyz',
+          address,
+          [Role('guest')],
+        );
         var id = await userAPIRepository.store(user);
         expect(id, equals(3));
       }
@@ -475,7 +512,12 @@ void main() {
         var t = Transaction();
         await t.execute(() async {
           var address = Address('TX', 'Austin', 'Main street', 22);
-          var user = User('bill@memory.com', 'txs', address);
+          var user = User(
+            'bill@memory.com',
+            'txs',
+            address,
+            [Role('guest')],
+          );
           var id = await userAPIRepository.store(user);
           expect(id, equals(4));
 
@@ -491,7 +533,7 @@ void main() {
         });
 
         expect(t.isCommitted, isTrue);
-        expect(t.length, equals(4));
+        expect(t.length, equals(9));
         expect(t.isExecuting, isFalse);
         expect((t.result as List).first, isA<User>());
       }
