@@ -211,6 +211,66 @@ void main() {
           equals({'a': 1, 'b': 2}));
     });
   });
+
+  group('TimedMap', () {
+    test('basic', () async {
+      var m = TimedMap<String, int>(Duration(seconds: 1));
+
+      expect(m.isEmpty, isTrue);
+      expect(m.isNotEmpty, isFalse);
+      expect(m.length, equals(0));
+
+      m.addAll({'a': 1, 'b': 2});
+
+      expect(m.isEmpty, isFalse);
+      expect(m.isNotEmpty, isTrue);
+      expect(m.length, equals(2));
+
+      expect(m['a'], equals(1));
+      expect(m['b'], equals(2));
+
+      expect(m.containsKey('a'), isTrue);
+      expect(m.containsKey('b'), isTrue);
+      expect(m.containsKey('c'), isFalse);
+
+      expect(m.containsValue(1), isTrue);
+      expect(m.containsValue(2), isTrue);
+      expect(m.containsValue(3), isFalse);
+
+      expect(m.getChecked('a'), equals(1));
+      expect(m.getChecked('b'), equals(2));
+      expect(m.getChecked('c'), isNull);
+
+      m.put('d', 4, now: DateTime.now().add(Duration(seconds: 1)));
+      m.put('e', 5, now: DateTime.now().add(Duration(seconds: 2)));
+
+      expect(m.getChecked('a'), equals(1));
+      expect(m.getChecked('b'), equals(2));
+      expect(m.getChecked('c'), isNull);
+      expect(m.getChecked('d'), equals(4));
+      expect(m.getChecked('e'), equals(5));
+      expect(m.length, equals(4));
+
+      await Future.delayed(Duration(milliseconds: 1100));
+
+      expect(m.getChecked('a'), isNull);
+      expect(m.getChecked('b'), isNull);
+      expect(m.getChecked('c'), isNull);
+      expect(m.getChecked('d'), equals(4));
+      expect(m.getChecked('e'), equals(5));
+      expect(m.length, equals(2));
+
+      expect(m.remove('d'), equals(4));
+
+      expect(m.getChecked('e'), equals(5));
+      expect(m.length, equals(1));
+
+      await Future.delayed(Duration(milliseconds: 2100));
+      m.checkAllEntries();
+
+      expect(m.length, equals(0));
+    });
+  });
 }
 
 class AB {
