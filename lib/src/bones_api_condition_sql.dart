@@ -93,7 +93,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
     });
   }
 
-  FutureOr<String> keyToSQL(KeyCondition<dynamic> c, EncodingContext context) {
+  FutureOr<String> keyToSQL(
+      KeyCondition<dynamic, dynamic> c, EncodingContext context) {
     var keys = c.keys;
 
     if (keys.first is! ConditionKeyField) {
@@ -110,7 +111,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
   }
 
   String keyFieldToSQL(
-    KeyCondition<dynamic> c,
+    KeyCondition<dynamic, dynamic> c,
     EncodingContext context,
   ) {
     var entityAlias = context.resolveEntityAlias(context.entityName);
@@ -121,7 +122,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
   }
 
   FutureOr<String> keyFieldReferenceToSQL(
-    KeyCondition<dynamic> c,
+    KeyCondition<dynamic, dynamic> c,
     EncodingContext context,
   ) {
     var schemeProvider = this.schemeProvider;
