@@ -302,6 +302,97 @@ void main() {
       }
     });
   });
+
+  group('Condition match', () {
+    test('KeyConditionEQ', () {
+      expect(
+          KeyConditionEQ([ConditionKeyField('foo')], 123)
+              .matchesEntity({'foo': 123}),
+          isTrue);
+
+      expect(
+          KeyConditionEQ([ConditionKeyField('foo')], 123)
+              .matchesEntity({'foo': 456}),
+          isFalse);
+    });
+
+    test('KeyConditionNotEQ', () {
+      expect(
+          KeyConditionNotEQ([ConditionKeyField('foo')], 123)
+              .matchesEntity({'foo': 123}),
+          isFalse);
+
+      expect(
+          KeyConditionNotEQ([ConditionKeyField('foo')], 123)
+              .matchesEntity({'foo': 456}),
+          isTrue);
+    });
+
+    test('KeyConditionIN', () {
+      var conditionIN = KeyConditionIN([ConditionKeyField('foo')], [1, 2, 3]);
+
+      expect(conditionIN.matchesEntity({'foo': 1}), isTrue);
+      expect(conditionIN.matchesEntity({'foo': 2}), isTrue);
+      expect(conditionIN.matchesEntity({'foo': 3}), isTrue);
+      expect(conditionIN.matchesEntity({'foo': 4}), isFalse);
+    });
+
+    test('KeyConditionNotIN', () {
+      var conditionIN =
+          KeyConditionNotIN([ConditionKeyField('foo')], [1, 2, 3]);
+
+      expect(conditionIN.matchesEntity({'foo': 1}), isFalse);
+      expect(conditionIN.matchesEntity({'foo': 2}), isFalse);
+      expect(conditionIN.matchesEntity({'foo': 3}), isFalse);
+      expect(conditionIN.matchesEntity({'foo': 4}), isTrue);
+    });
+
+    test('GroupConditionAND', () {
+      expect(
+          GroupConditionAND([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 123, 'bar': 456}),
+          isTrue);
+
+      expect(
+          GroupConditionAND([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 123, 'bar': 654}),
+          isFalse);
+
+      expect(
+          GroupConditionAND([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 321, 'bar': 654}),
+          isFalse);
+    });
+
+    test('GroupConditionOR', () {
+      expect(
+          GroupConditionOR([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 123, 'bar': 456}),
+          isTrue);
+
+      expect(
+          GroupConditionOR([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 123, 'bar': 654}),
+          isTrue);
+
+      expect(
+          GroupConditionOR([
+            KeyConditionEQ([ConditionKeyField('foo')], 123),
+            KeyConditionEQ([ConditionKeyField('bar')], 456),
+          ]).matchesEntity({'foo': 321, 'bar': 654}),
+          isFalse);
+    });
+  });
 }
 
 class _TestSchemeProvider extends SchemeProvider {
