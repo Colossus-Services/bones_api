@@ -19,6 +19,24 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       : super(1, 3, 'generic',
             parentRepositoryProvider: parentRepositoryProvider);
 
+  @override
+  String get sqlElementQuote => '';
+
+  @override
+  bool get sqlAcceptsOutputSyntax => false;
+
+  @override
+  bool get sqlAcceptsReturningSyntax => true;
+
+  @override
+  bool get sqlAcceptsTemporaryTableForReturning => false;
+
+  @override
+  bool get sqlAcceptsInsertIgnore => true;
+
+  @override
+  bool get sqlAcceptsInsertOnConflict => false;
+
   int _connectionCount = 0;
 
   @override
@@ -78,24 +96,13 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doUpdateSQL(String table, SQL sql, int connection) {
+  FutureOr doUpdateSQL(String table, SQL sql, Object id, int connection) {
     var map = _getTableMap(table, true)!;
 
-    var tablesScheme = tablesSchemes[table];
-    var idField = tablesScheme?.idFieldName ?? 'id';
-
     var entry = sql.parameters;
-    var id = entry[idField];
-
     map[id] = entry;
 
     return id;
-  }
-
-  @override
-  FutureOr<bool> doConstrainSQL(String table, SQL sql, int connection,
-      dynamic id, String otherTable, List otherIds) {
-    return doDeleteSQL(table, sql, connection).resolveWithValue(true);
   }
 
   Object nextID(String table) {
@@ -244,18 +251,6 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
-
-  @override
-  bool get sqlAcceptsInsertOutput => false;
-
-  @override
-  bool get sqlAcceptsInsertReturning => true;
-
-  @override
-  bool get sqlAcceptsInsertIgnore => true;
-
-  @override
-  bool get sqlAcceptsInsertOnConflict => false;
 
   @override
   String toString() {

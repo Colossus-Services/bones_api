@@ -533,7 +533,7 @@ void main() {
         });
 
         expect(t.isCommitted, isTrue);
-        expect(t.length, equals(9));
+        expect(t.length, equals(8));
         expect(t.isExecuting, isFalse);
         expect((t.result as List).first, isA<User>());
       }

@@ -16,13 +16,51 @@ final _log = logging.Logger('SQLRepositoryAdapter');
 
 typedef PasswordProvider = FutureOr<String> Function(String user);
 
+/// [SQL] wrapper interface.
+abstract class SQLWrapper {
+  /// The amount of [SQL]s.
+  int get sqlsLength;
+
+  /// Returns the main [SQL].
+  SQL get mainSQL;
+
+  /// Returns all wrapped [SQL]s.
+  Iterable<SQL> get allSQLs;
+}
+
+/// Class to wrap multiple [SQL]s.
+class MultipleSQL implements SQLWrapper {
+  final List<SQL> sqls;
+
+  MultipleSQL(this.sqls);
+
+  @override
+  Iterable<SQL> get allSQLs => sqls;
+
+  @override
+  SQL get mainSQL => sqls.first;
+
+  @override
+  int get sqlsLength => sqls.length;
+}
+
 /// An encoded SQL representation.
 /// This is used by a [SQLAdapter] to execute queries.
-class SQL {
+class SQL implements SQLWrapper {
+  @override
+  int get sqlsLength => 1;
+
+  @override
+  SQL get mainSQL => this;
+
+  @override
+  Iterable<SQL> get allSQLs => [this];
+
   final Condition? condition;
   final String? entityName;
 
   final String sql;
+  final String? sqlCondition;
 
   final Map<String, dynamic> parameters;
 
@@ -31,13 +69,86 @@ class SQL {
   final Set<String>? returnColumns;
 
   final String? mainTable;
+  final Map<String, String>? tablesAliases;
+
+  final RegExp placeholderRegexp;
+
+  static final RegExp _defaultPlaceholderRegexp = RegExp(r'@(\w+)');
+
+  String? _sqlPositional;
+
+  List<String>? _parametersKeysByPosition;
+
+  List<Object?>? _parametersValuesByPosition;
+
+  List<SQL>? preSQL;
+
+  List<SQL>? posSQL;
+  int? posSQLReturnIndex;
+
+  bool get hasPreSQL => preSQL != null && preSQL!.isNotEmpty;
+
+  bool get hasPosSQL => posSQL != null && posSQL!.isNotEmpty;
+
+  bool get hasPreOrPosSQL => hasPreSQL || hasPosSQL;
 
   SQL(this.sql, this.parameters,
-      {this.condition,
+      {this.sqlCondition,
+      String? sqlPositional,
+      List<String>? parametersKeysByPosition,
+      List<Object?>? parametersValuesByPosition,
+      this.condition,
       this.entityName,
       this.idFieldName,
       this.returnColumns,
-      required this.mainTable});
+      required this.mainTable,
+      this.tablesAliases,
+      RegExp? placeholderRegexp})
+      : _sqlPositional = sqlPositional,
+        _parametersKeysByPosition = parametersKeysByPosition,
+        _parametersValuesByPosition = parametersValuesByPosition,
+        placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
+
+  String get sqlPositional {
+    if (_sqlPositional == null) _computeSQLPositional();
+    return _sqlPositional!;
+  }
+
+  List<String> get parametersKeysByPosition {
+    if (_parametersKeysByPosition == null) _computeSQLPositional();
+    return _parametersKeysByPosition!;
+  }
+
+  List<Object?> get parametersValuesByPosition {
+    if (_parametersValuesByPosition == null) _computeSQLPositional();
+    return _parametersValuesByPosition!;
+  }
+
+  void _computeSQLPositional() {
+    var keys = <String>[];
+    var values = <Object?>[];
+
+    if (parameters.isEmpty) {
+      _sqlPositional ??= sql;
+      _parametersKeysByPosition ??= keys;
+      _parametersValuesByPosition ??= values;
+
+      return;
+    }
+
+    var sqlPositional = sql.replaceAllMapped(placeholderRegexp, (m) {
+      var k = m.group(1)!;
+      var v = parameters[k];
+      keys.add(k);
+      values.add(v);
+      return '?';
+    });
+
+    _sqlPositional ??= sqlPositional;
+
+    _parametersKeysByPosition ??= keys;
+    _parametersValuesByPosition ??= values;
+  }
 
   @override
   String toString() {
@@ -55,6 +166,17 @@ class SQL {
     if (returnColumns != null && returnColumns!.isNotEmpty) {
       s += ' ; returnColumns: $returnColumns';
     }
+
+    if (preSQL != null) {
+      s += '\n - preSQL: ';
+      s += preSQL.toString();
+    }
+
+    if (posSQL != null) {
+      s += '\n - posSQL: ';
+      s += posSQL.toString();
+    }
+
     return s;
   }
 
@@ -86,18 +208,25 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
   SQLAdapter(this.minConnections, this.maxConnections, this.dialect,
       {this.parentRepositoryProvider}) {
-    _conditionSQLGenerator = ConditionSQLEncoder(this);
+    _conditionSQLGenerator =
+        ConditionSQLEncoder(this, sqlElementQuote: sqlElementQuote);
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
   @override
   void initialize();
 
-  /// If `true` indicates that this adapter SQL uses the `OUTPUT` syntax for inserts.
-  bool get sqlAcceptsInsertOutput;
+  /// The type of "quote" to use to reference elements (tables and columns).
+  String get sqlElementQuote;
 
-  /// If `true` indicates that this adapter SQL uses the `RETURNING` syntax for inserts.
-  bool get sqlAcceptsInsertReturning;
+  /// If `true` indicates that this adapter SQL uses the `OUTPUT` syntax for inserts/deletes.
+  bool get sqlAcceptsOutputSyntax;
+
+  /// If `true` indicates that this adapter SQL uses the `RETURNING` syntax for inserts/deletes.
+  bool get sqlAcceptsReturningSyntax;
+
+  /// If `true` indicates that this adapter SQL needs a temporary table to return rows for inserts/deletes.
+  bool get sqlAcceptsTemporaryTableForReturning;
 
   /// If `true` indicates that this adapter SQL uses the `IGNORE` syntax for inserts.
   bool get sqlAcceptsInsertIgnore;
@@ -171,8 +300,10 @@ abstract class SQLAdapter<C> extends SchemeProvider
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
+    var q = sqlElementQuote;
+
     if (matcher == null) {
-      var sqlQuery = 'SELECT count(*) as "count" FROM "$table" ';
+      var sqlQuery = 'SELECT count(*) as ${q}count$q FROM $q$table$q ';
       return SQL(sqlQuery, {}, mainTable: table);
     } else {
       return _generateSQLFrom(transaction, table, matcher,
@@ -181,14 +312,15 @@ abstract class SQLAdapter<C> extends SchemeProvider
           namedParameters: namedParameters,
           sqlBuilder: (String from, EncodingContext context) {
         var tableAlias = context.resolveEntityAlias(table);
-        return 'SELECT count("$tableAlias".*) as "count" $from';
+        return 'SELECT count($q$tableAlias$q.*) as ${q}count$q $from';
       });
     }
   }
 
   FutureOr<int> countSQL(TransactionOperation op, String table, SQL sql) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'countSQL> $sql');
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] countSQL> $sql');
       return doCountSQL(table, sql, connection);
     });
   }
@@ -228,15 +360,17 @@ abstract class SQLAdapter<C> extends SchemeProvider
           .resolveMapped((values) {
         var idFieldName = tableScheme.idFieldName;
 
+        var q = sqlElementQuote;
+
         var sql = StringBuffer();
 
-        sql.write('INSERT INTO "');
+        sql.write('INSERT INTO $q');
         sql.write(table);
-        sql.write('" ("');
-        sql.write(fieldsNotNull.join('","'));
-        sql.write('")');
+        sql.write('$q ($q');
+        sql.write(fieldsNotNull.join('$q,$q'));
+        sql.write('$q)');
 
-        if (sqlAcceptsInsertOutput) {
+        if (sqlAcceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
           sql.write(idFieldName);
         }
@@ -245,8 +379,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
         sql.write(values.join(' , '));
         sql.write(')');
 
-        if (sqlAcceptsInsertReturning) {
-          sql.write(' RETURNING "$table"."$idFieldName"');
+        if (sqlAcceptsReturningSyntax) {
+          sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
         return SQL(sql.toString(), fieldsValuesInSQL,
@@ -258,8 +392,9 @@ abstract class SQLAdapter<C> extends SchemeProvider
   FutureOr<dynamic> insertSQL(TransactionOperation op, String table, SQL sql,
       Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'insertSQL> $sql');
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] insertSQL> $sql');
       var retInsert = doInsertSQL(table, sql, connection);
 
       if (mapper != null) {
@@ -303,11 +438,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
+        var q = sqlElementQuote;
         var sql = StringBuffer();
 
-        sql.write('UPDATE "');
+        sql.write('UPDATE $q');
         sql.write(table);
-        sql.write('" SET ');
+        sql.write('$q SET ');
 
         for (var i = 0; i < values.length; ++i) {
           var f = fieldsNotNull[i];
@@ -319,22 +455,25 @@ abstract class SQLAdapter<C> extends SchemeProvider
           sql.write(v);
         }
 
-        if (sqlAcceptsInsertOutput) {
+        if (sqlAcceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
           sql.write(idFieldName);
         }
 
         sql.write(' WHERE ');
-        sql.write(idFieldName);
-        sql.write(' = ');
-        sql.write(idPlaceholder);
 
-        if (sqlAcceptsInsertReturning) {
-          sql.write(' RETURNING "$table"."$idFieldName"');
+        var conditionSQL = '$idFieldName = $idPlaceholder';
+        sql.write(conditionSQL);
+
+        if (sqlAcceptsReturningSyntax) {
+          sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
         return SQL(sql.toString(), fieldsValuesInSQL,
-            entityName: table, idFieldName: idFieldName, mainTable: table);
+            sqlCondition: conditionSQL,
+            entityName: table,
+            idFieldName: idFieldName,
+            mainTable: table);
       });
     });
   }
@@ -342,9 +481,10 @@ abstract class SQLAdapter<C> extends SchemeProvider
   FutureOr<dynamic> updateSQL(TransactionOperation op, String table, SQL sql,
       Object id, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'updateSQL> $sql');
-      var retInsert = doUpdateSQL(table, sql, connection);
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] updateSQL> $sql');
+      var retInsert = doUpdateSQL(table, sql, id, connection);
 
       if (mapper != null) {
         return retInsert.resolveMapped((e) => mapper(e));
@@ -354,7 +494,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
     });
   }
 
-  FutureOr<dynamic> doUpdateSQL(String table, SQL sql, C connection);
+  FutureOr<dynamic> doUpdateSQL(String table, SQL sql, Object id, C connection);
 
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(Transaction transaction,
       String table, dynamic id, String otherTableName, List otherIds) {
@@ -377,6 +517,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
           .map((otherId) =>
               _generateInsertRelationshipSQL(relationship, id, otherId))
           .toList();
+
+      var constrainSQL = _generateConstrainRelationshipSQL(
+          tableScheme, table, id, otherTableName, otherIds);
+
+      sqls.last.posSQL = [constrainSQL];
+
       return sqls;
     });
   }
@@ -389,6 +535,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
     var parameters = {sourceIdField: id, targetIdField: otherId};
 
+    var q = sqlElementQuote;
     var sql = StringBuffer();
 
     sql.write('INSERT ');
@@ -397,13 +544,13 @@ abstract class SQLAdapter<C> extends SchemeProvider
       sql.write('IGNORE ');
     }
 
-    sql.write('INTO "');
+    sql.write('INTO $q');
     sql.write(relationshipTable);
-    sql.write('" ("');
+    sql.write('$q ($q');
     sql.write(sourceIdField);
-    sql.write('" , "');
+    sql.write('$q , $q');
     sql.write(targetIdField);
-    sql.write('")');
+    sql.write('$q)');
     sql.write(' VALUES ( @$sourceIdField , @$targetIdField )');
 
     if (sqlAcceptsInsertOnConflict) {
@@ -413,86 +560,86 @@ abstract class SQLAdapter<C> extends SchemeProvider
     return SQL(sql.toString(), parameters, mainTable: relationshipTable);
   }
 
+  SQL _generateConstrainRelationshipSQL(TableScheme tableScheme, String table,
+      dynamic id, String otherTableName, List otherIds) {
+    var relationship =
+        tableScheme.getTableRelationshipReference(otherTableName);
+
+    if (relationship == null) {
+      throw StateError(
+          "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+    }
+
+    var relationshipTable = relationship.relationshipTable;
+    var sourceIdField = relationship.sourceRelationshipField;
+    var targetIdField = relationship.targetRelationshipField;
+
+    var parameters = {sourceIdField: id};
+
+    var otherIdsParameters = <String>[];
+
+    var keyPrefix = sourceIdField != 'p' ? 'p' : 'i';
+
+    for (var otherId in otherIds) {
+      var i = otherIdsParameters.length + 1;
+      var key = '$keyPrefix$i';
+      parameters[key] = otherId;
+      otherIdsParameters.add('@$key');
+    }
+
+    var q = sqlElementQuote;
+
+    var sqlCondition = StringBuffer();
+
+    sqlCondition.write(q);
+    sqlCondition.write(sourceIdField);
+    sqlCondition.write('$q = @$sourceIdField AND $q');
+    sqlCondition.write(targetIdField);
+    sqlCondition.write('$q NOT IN ( ${otherIdsParameters.join(',')} )');
+
+    var conditionSQL = sqlCondition.toString();
+
+    var sql = StringBuffer();
+
+    sql.write('DELETE FROM $q');
+    sql.write(relationshipTable);
+    sql.write('$q WHERE ( ');
+    sql.write(conditionSQL);
+    sql.write(' )');
+
+    var condition = GroupConditionAND([
+      KeyConditionEQ([ConditionKeyField(sourceIdField)], id),
+      KeyConditionNotIN([ConditionKeyField(targetIdField)], otherIds),
+    ]);
+
+    return SQL(sql.toString(), parameters,
+        condition: condition,
+        sqlCondition: conditionSQL,
+        mainTable: relationshipTable);
+  }
+
   FutureOr<bool> insertRelationshipSQLs(TransactionOperation op, String table,
       List<SQL> sqls, dynamic id, String otherTable, List otherIds) {
-    return executeTransactionOperation(op, (connection) {
+    return executeTransactionOperation(op, sqls.first, (connection) {
       _log.log(logging.Level.INFO,
-          'insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
+          '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
 
-      var retInserts = sqls
-          .map((sql) => doInsertSQL(sql.mainTable ?? table, sql, connection))
-          .resolveAll();
+      var retInserts = sqls.map((sql) {
+        var ret = doInsertSQL(sql.mainTable ?? table, sql, connection);
+
+        if (sql.hasPosSQL) {
+          sql.posSQL!.map((e) {
+            _log.log(logging.Level.INFO,
+                '[transaction:${op.transactionId}] insertRelationship[POS]> $e');
+            return doDeleteSQL(e.mainTable!, e, connection);
+          }).resolveAllWithValue(ret);
+        } else {
+          return ret;
+        }
+      }).resolveAll();
       return retInserts.resolveWithValue(true);
     });
   }
-
-  FutureOr<SQL> generateConstrainRelationshipSQL(Transaction transaction,
-      String table, dynamic id, String otherTableName, List otherIds) {
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
-      }
-
-      var relationship =
-          tableScheme.getTableRelationshipReference(otherTableName);
-
-      if (relationship == null) {
-        throw StateError(
-            "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
-      }
-
-      var relationshipTable = relationship.relationshipTable;
-      var sourceIdField = relationship.sourceRelationshipField;
-      var targetIdField = relationship.targetRelationshipField;
-
-      var parameters = {sourceIdField: id};
-
-      var otherIdsParameters = <String>[];
-
-      var keyPrefix = sourceIdField != 'p' ? 'p' : 'i';
-
-      for (var otherId in otherIds) {
-        var i = otherIdsParameters.length + 1;
-        var key = '$keyPrefix$i';
-        parameters[key] = otherId;
-        otherIdsParameters.add('@$key');
-      }
-
-      var sql = StringBuffer();
-
-      sql.write('DELETE FROM "');
-      sql.write(relationshipTable);
-      sql.write('" WHERE ("');
-      sql.write(sourceIdField);
-      sql.write('" = @$sourceIdField AND "');
-      sql.write(targetIdField);
-      sql.write('" NOT IN ( ${otherIdsParameters.join(',')} ) )');
-
-      var condition = GroupConditionAND([
-        KeyConditionEQ([ConditionKeyField(sourceIdField)], id),
-        KeyConditionNotIN([ConditionKeyField(targetIdField)], otherIds),
-      ]);
-
-      return SQL(sql.toString(), parameters,
-          condition: condition, mainTable: relationshipTable);
-    });
-  }
-
-  FutureOr<bool> executeConstrainRelationshipSQL(TransactionOperation op,
-      String table, SQL sql, dynamic id, String otherTable, List otherIds) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'executeConstrainRelationshipSQL> $sql');
-
-      var ret = doConstrainSQL(
-          sql.mainTable ?? table, sql, connection, id, otherTable, otherIds);
-      return ret;
-    });
-  }
-
-  FutureOr<bool> doConstrainSQL(String table, SQL sql, C connection, dynamic id,
-      String otherTable, List otherIds);
 
   FutureOr<SQL> generateSelectRelationshipSQL(Transaction transaction,
       String table, dynamic id, String otherTableName) {
@@ -513,15 +660,19 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       var parameters = {'source_id': id};
 
+      var q = sqlElementQuote;
+
+      var conditionSQL =
+          '$q${relationship.sourceRelationshipField}$q = @source_id';
+
       var sql = StringBuffer();
 
-      sql.write('SELECT "');
+      sql.write('SELECT $q');
       sql.write(relationship.targetRelationshipField);
-      sql.write('" FROM "');
+      sql.write('$q FROM $q');
       sql.write(relationship.relationshipTable);
-      sql.write('" WHERE ("');
-      sql.write(relationship.sourceRelationshipField);
-      sql.write('" = @source_id ');
+      sql.write('$q WHERE ( ');
+      sql.write(conditionSQL);
       sql.write(' )');
 
       var condition = KeyConditionEQ(
@@ -529,6 +680,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       return SQL(sql.toString(), parameters,
           condition: condition,
+          sqlCondition: conditionSQL,
           returnColumns: {relationship.targetRelationshipField},
           mainTable: relationship.relationshipTable);
     });
@@ -540,16 +692,17 @@ abstract class SQLAdapter<C> extends SchemeProvider
       SQL sql,
       dynamic id,
       String otherTable) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'selectRelationshipSQL> $sql');
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] selectRelationshipSQL> $sql');
 
       var ret = doSelectSQL(sql.mainTable ?? table, sql, connection);
       return ret;
     });
   }
 
-  FutureOr<R> executeTransactionOperation<R>(
-          TransactionOperation op, FutureOr<R> Function(C connection) f) =>
+  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
+          SQLWrapper sql, FutureOr<R> Function(C connection) f) =>
       executeWithPool(f);
 
   FutureOr<SQL> generateSelectSQL(
@@ -564,8 +717,9 @@ abstract class SQLAdapter<C> extends SchemeProvider
         namedParameters: namedParameters,
         sqlBuilder: (String from, EncodingContext context) {
       var tableAlias = context.resolveEntityAlias(table);
+      var q = sqlElementQuote;
       var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
-      var sql = 'SELECT "$tableAlias".* $from$limitStr';
+      var sql = 'SELECT $q$tableAlias$q.* $from$limitStr';
       return sql;
     });
   }
@@ -589,20 +743,24 @@ abstract class SQLAdapter<C> extends SchemeProvider
         var tableAlias =
             _conditionSQLGenerator.resolveEntityAlias(encodedSQL, table);
 
+        var q = sqlElementQuote;
+
         if (encodedSQL.fieldsReferencedTables.isEmpty) {
           String from;
           if (conditionSQL.isNotEmpty) {
-            from = 'FROM "$table" as "$tableAlias" WHERE $conditionSQL';
+            from = 'FROM $q$table$q as $q$tableAlias$q WHERE $conditionSQL';
           } else {
-            from = 'FROM $table as "$tableAlias"';
+            from = 'FROM $q$table$q as $q$tableAlias$q';
           }
 
           var sqlQuery = sqlBuilder(from, encodedSQL);
 
           return SQL(sqlQuery, encodedSQL.parametersPlaceholders,
               condition: matcher,
+              sqlCondition: conditionSQL,
               entityName: encodedSQL.entityName,
-              mainTable: table);
+              mainTable: table,
+              tablesAliases: encodedSQL.tableAliases);
         } else {
           var referencedTablesFields = encodedSQL.referencedTablesFields;
 
@@ -613,7 +771,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
             var refTableAlias = encodedSQL.resolveEntityAlias(refTable);
 
-            innerJoin.write('INNER JOIN "$refTable" as "$refTableAlias" ON ');
+            innerJoin
+                .write('INNER JOIN $q$refTable$q as $q$refTableAlias$q ON ');
 
             for (var fieldRef in e.value) {
               var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
@@ -621,34 +780,36 @@ abstract class SQLAdapter<C> extends SchemeProvider
               var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
                   encodedSQL, fieldRef.targetTable);
 
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write(sourceTableAlias);
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write('.');
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write(fieldRef.sourceField);
-              innerJoin.write('"');
+              innerJoin.write(q);
 
               innerJoin.write(' = ');
 
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write(targetTableAlias);
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write('.');
-              innerJoin.write('"');
+              innerJoin.write(q);
               innerJoin.write(fieldRef.targetField);
-              innerJoin.write('"');
+              innerJoin.write(q);
             }
           }
 
           var from =
-              'FROM "$table" as "$tableAlias" $innerJoin WHERE $conditionSQL';
+              'FROM $q$table$q as $q$tableAlias$q $innerJoin WHERE $conditionSQL';
           var sqlQuery = sqlBuilder(from, encodedSQL);
 
           return SQL(sqlQuery, encodedSQL.parametersPlaceholders,
               condition: matcher,
+              sqlCondition: conditionSQL,
               entityName: encodedSQL.entityName,
-              mainTable: table);
+              mainTable: table,
+              tablesAliases: encodedSQL.tableAliases);
         }
       });
     } else {
@@ -659,8 +820,9 @@ abstract class SQLAdapter<C> extends SchemeProvider
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
       TransactionOperation op, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'selectSQL> $sql');
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] selectSQL> $sql');
 
       var retSel = doSelectSQL(table, sql, connection);
 
@@ -670,6 +832,14 @@ abstract class SQLAdapter<C> extends SchemeProvider
         return retSel;
       }
     });
+  }
+
+  static int temporaryTableIdCount = 0;
+
+  static String createTemporaryTableName(String prefix) {
+    var id = ++temporaryTableIdCount;
+    var seed = DateTime.now().microsecondsSinceEpoch;
+    return '${prefix}_${seed}_$id';
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
@@ -683,7 +853,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    return _generateSQLFrom(transaction, table, matcher,
+    var retDeleteSQL = _generateSQLFrom(transaction, table, matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
@@ -693,25 +863,63 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var sql = StringBuffer();
       sql.write('DELETE ');
 
-      if (sqlAcceptsInsertOutput) {
+      if (sqlAcceptsOutputSyntax) {
         sql.write(' OUTPUT DELETED.* ');
       }
 
       sql.write(from);
 
-      if (sqlAcceptsInsertReturning) {
+      if (sqlAcceptsReturningSyntax) {
         sql.write(' RETURNING "$tableAlias".*');
       }
 
       return sql.toString();
     });
+
+    if (sqlAcceptsTemporaryTableForReturning &&
+        !sqlAcceptsOutputSyntax &&
+        !sqlAcceptsReturningSyntax) {
+      return retDeleteSQL.resolveMapped((deleteSQL) {
+        var conditionSQL = deleteSQL.sqlCondition;
+
+        var tableAlias = deleteSQL.tablesAliases?[table];
+
+        var tmpTable = createTemporaryTableName(table);
+
+        var q = sqlElementQuote;
+
+        var sqlSelAll = tableAlias != null ? ' $q$tableAlias$q.* ' : '*';
+        var sqlAsTableAlias = tableAlias != null ? ' as $q$tableAlias$q ' : '';
+
+        var preSql = SQL(
+            'CREATE TEMPORARY TABLE IF NOT EXISTS $q$tmpTable$q AS ('
+            ' SELECT $sqlSelAll FROM $q$table$q$sqlAsTableAlias WHERE $conditionSQL '
+            ')',
+            deleteSQL.parameters,
+            mainTable: tmpTable);
+
+        var posSql1 =
+            SQL('SELECT * FROM $q$tmpTable$q', {}, mainTable: tmpTable);
+
+        var posSql2 = SQL('DROP TABLE $q$tmpTable$q', {}, mainTable: tmpTable);
+
+        deleteSQL.preSQL = [preSql];
+        deleteSQL.posSQL = [posSql1, posSql2];
+        deleteSQL.posSQLReturnIndex = 0;
+
+        return deleteSQL;
+      });
+    }
+
+    return retDeleteSQL;
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
       TransactionOperation op, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
-    return executeTransactionOperation(op, (connection) {
-      _log.log(logging.Level.INFO, 'deleteSQL> $sql');
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.log(logging.Level.INFO,
+          '[transaction:${op.transactionId}] deleteSQL> $sql');
 
       var retSel = doDeleteSQL(table, sql, connection);
 
@@ -1071,31 +1279,6 @@ class SQLRepositoryAdapter<O> with Initializable {
             op.transaction, id, otherTableName, otherIds)
         .resolveMapped((sqls) {
       return insertRelationshipSQLs(op, sqls, id, otherTableName, otherIds)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
-  }
-
-  FutureOr<SQL> generateConstrainRelationshipSQL(Transaction transaction,
-      dynamic id, String otherTableName, List othersIds) {
-    return databaseAdapter.generateConstrainRelationshipSQL(
-        transaction, tableName, id, otherTableName, othersIds);
-  }
-
-  FutureOr<bool> executeConstrainRelationshipSQL(TransactionOperation op,
-      SQL sql, dynamic id, String otherTableName, List otherIds) {
-    return databaseAdapter.executeConstrainRelationshipSQL(
-        op, tableName, sql, id, otherTableName, otherIds);
-  }
-
-  FutureOr<bool> doConstrainRelationship(TransactionOperation op, dynamic id,
-      String otherTableName, List othersIds,
-      [PreFinishSQLOperation<bool, bool>? preFinish]) {
-    return databaseAdapter
-        .generateConstrainRelationshipSQL(
-            op.transaction, tableName, id, otherTableName, othersIds)
-        .resolveMapped((sql) {
-      return executeConstrainRelationshipSQL(
-              op, sql, id, otherTableName, othersIds)
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }

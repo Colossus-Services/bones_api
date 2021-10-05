@@ -1,6 +1,7 @@
 import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/builder.dart';
 
@@ -849,4 +850,66 @@ class TimedMap<K, V> implements Map<K, V> {
       }
     }
   }
+}
+
+/// Helper to work with positional fields.
+class PositionalFields {
+  late final Set<String> _fields;
+  late final List<String> _fieldsOrder;
+  final Map<String, int> _fieldsIndexes = <String, int>{};
+
+  PositionalFields(Iterable<String> fields) {
+    var list = fields.toList();
+    _fields = Set<String>.unmodifiable(list.toSet());
+
+    if (list.length != _fields.length) {
+      throw ArgumentError("fields not uniques: $fields");
+    }
+
+    _fieldsOrder = List<String>.unmodifiable(list);
+
+    for (var i = 0; i < list.length; ++i) {
+      var f = list[i];
+      _fieldsIndexes[f] = i;
+    }
+  }
+
+  /// The fields names.
+  Set<String> get fields => _fields;
+
+  /// The fields order.
+  List<String> get fieldsOrder => _fieldsOrder;
+
+  /// Returns the index of a [field].
+  int? getFieldIndex(String field) => _fieldsIndexes[field];
+
+  /// Returns a [field] value from [row].
+  V? get<V>(String field, Iterable<Object?> row) {
+    var idx = getFieldIndex(field);
+    if (idx == null) return null;
+
+    var val = row.elementAt(idx);
+    return val as V?;
+  }
+
+  /// Returns a [field] [MapEntry] from [row].
+  MapEntry<String, V?>? getMapEntry<V>(String field, Iterable<Object?> row) {
+    var idx = getFieldIndex(field);
+    if (idx == null) return null;
+
+    var val = row.elementAt(idx);
+    return MapEntry(field, val as V?);
+  }
+
+  /// Converts [row] to a collection of [MapEntry].
+  Iterable<MapEntry<String, Object?>> toEntries(Iterable<Object?> row) =>
+      fieldsOrder.map((f) => getMapEntry<Object>(f, row)).whereNotNull();
+
+  /// Converts [row] to a [Map].
+  Map<String, Object?> toMap(Iterable<Object?> row) =>
+      Map<String, Object?>.fromEntries(toEntries(row));
+
+  /// Converts [rows] to a list of [Map].
+  List<Map<String, Object?>> toListOfMap(Iterable<Iterable<Object?>> rows) =>
+      rows.map((r) => toMap(r)).toList();
 }

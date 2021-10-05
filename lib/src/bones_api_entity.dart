@@ -581,7 +581,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   ClassReflectionEntityHandler(this.classType,
       {EntityHandlerProvider? provider, ClassReflection<O>? reflection})
       : _reflection = reflection,
-        super(provider);
+        super(provider, type: classType);
 
   ClassReflection<O> get reflection {
     _reflection ??=
@@ -1492,6 +1492,8 @@ abstract class TransactionOperation {
 
     resolvedTransaction.addOperation(this);
   }
+
+  int get transactionId => transaction.id;
 
   TransactionExecution? execution;
 

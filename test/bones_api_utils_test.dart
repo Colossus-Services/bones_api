@@ -327,6 +327,37 @@ void main() {
       expect(m.length, equals(0));
     });
   });
+
+  group('TimedMap', () {
+    test('basic', () async {
+      var positionalFields = PositionalFields(['a', 'b', 'c']);
+
+      expect(positionalFields.fields, equals(['a', 'b', 'c']));
+      expect(positionalFields.fieldsOrder, equals(['a', 'b', 'c']));
+
+      expect(positionalFields.getFieldIndex('a'), equals(0));
+      expect(positionalFields.getFieldIndex('b'), equals(1));
+      expect(positionalFields.getFieldIndex('c'), equals(2));
+
+      expect(positionalFields.get('b', [1, 2, 3]), equals(2));
+
+      expect(positionalFields.getMapEntry('b', [1, 2, 3])!.key, equals('b'));
+      expect(positionalFields.getMapEntry('b', [1, 2, 3])!.value, equals(2));
+
+      expect(
+          positionalFields.toMap([1, 2, 3]), equals({'a': 1, 'b': 2, 'c': 3}));
+
+      expect(
+          positionalFields.toListOfMap([
+            [1, 2, 3],
+            [10, 20, 30]
+          ]),
+          equals([
+            {'a': 1, 'b': 2, 'c': 3},
+            {'a': 10, 'b': 20, 'c': 30}
+          ]));
+    });
+  });
 }
 
 class AB {

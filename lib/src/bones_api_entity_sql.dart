@@ -319,18 +319,8 @@ class SQLEntityRepository<O> extends EntityRepository<O>
     var oId = entityHandler.getID(o);
     var othersIds = values.map((e) => valuesEntityHandler.getID(e)).toList();
 
-    return sqlRepositoryAdapter
-        .doInsertRelationship(op, oId, valuesTableName, othersIds, (ok) {
-      if (ok) {
-        var op2 = TransactionOperationConstrainRelationship(
-            o, values, op.transaction);
-
-        return sqlRepositoryAdapter.doConstrainRelationship(
-            op2, oId, valuesTableName, othersIds);
-      } else {
-        return ok;
-      }
-    });
+    return sqlRepositoryAdapter.doInsertRelationship(
+        op, oId, valuesTableName, othersIds);
   }
 
   @override

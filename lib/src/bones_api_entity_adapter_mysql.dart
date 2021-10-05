@@ -5,15 +5,15 @@ import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_condition_encoder.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:postgres/postgres.dart';
+import 'package:mysql1/mysql1.dart';
 
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 
-final _log = logging.Logger('PostgreAdapter');
+final _log = logging.Logger('MySQLAdapter');
 
 /// A PostgreSQL adapter.
-class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
+class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   final String host;
   final int port;
   final String databaseName;
@@ -23,16 +23,16 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
-  PostgreSQLAdapter(this.databaseName, this.username,
+  MySQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
       PasswordProvider? passwordProvider,
-      int? port = 5432,
+      int? port = 3306,
       int minConnections = 1,
       int maxConnections = 3,
       EntityRepositoryProvider? parentRepositoryProvider})
       : host = host ?? 'localhost',
-        port = port ?? 5432,
+        port = port ?? 3306,
         _password = (password != null && password is! PasswordProvider
             ? password.toString()
             : null),
@@ -47,7 +47,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory PostgreSQLAdapter.fromConfig(Map<String, dynamic> config,
+  factory MySQLAdapter.fromConfig(Map<String, dynamic> config,
       {String? defaultDatabase,
       String? defaultUsername,
       String? defaultHost,
@@ -61,7 +61,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     var username = config['username'] ?? config['user'] ?? defaultUsername;
     var password = config['password'] ?? config['pass'];
 
-    return PostgreSQLAdapter(
+    return MySQLAdapter(
       database,
       username,
       password: password,
@@ -82,62 +82,69 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  String get sqlElementQuote => '"';
+  String get sqlElementQuote => '';
 
   @override
   bool get sqlAcceptsOutputSyntax => false;
 
   @override
-  bool get sqlAcceptsReturningSyntax => true;
+  bool get sqlAcceptsReturningSyntax => false;
 
   @override
-  bool get sqlAcceptsTemporaryTableForReturning => false;
+  bool get sqlAcceptsTemporaryTableForReturning => true;
 
   @override
-  bool get sqlAcceptsInsertIgnore => false;
+  bool get sqlAcceptsInsertIgnore => true;
 
   @override
-  bool get sqlAcceptsInsertOnConflict => true;
+  bool get sqlAcceptsInsertOnConflict => false;
 
   @override
-  String getConnectionURL(PostgreSQLExecutionContext connection) {
-    var c = connection as PostgreSQLConnection;
-    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
+  String getConnectionURL(MySqlConnectionWrapper connection) {
+    return 'mysql://$username@$host:$port/$databaseName';
   }
 
   int _connectionCount = 0;
 
   @override
-  FutureOr<PostgreSQLConnection> createConnection() async {
+  FutureOr<MySqlConnectionWrapper> createConnection() async {
     var password = await _getPassword();
 
     var count = ++_connectionCount;
 
-    var connection = PostgreSQLConnection(host, port, databaseName,
-        username: username, password: password);
-    await connection.open();
+    var connSettings = ConnectionSettings(
+      host: host,
+      port: port,
+      user: username,
+      db: databaseName,
+      password: password,
+      timeout: Duration(seconds: 60),
+    );
 
-    var connUrl = getConnectionURL(connection);
+    var connection = await MySqlConnection.connect(connSettings);
+
+    var connWrapper = _MySqlConnectionWrapped(connection);
+
+    var connUrl = getConnectionURL(connWrapper);
 
     _log.log(
         logging.Level.INFO, 'createConnection[$count]> $connUrl > $connection');
 
-    return connection;
+    return connWrapper;
   }
 
   @override
-  FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
+  FutureOr<bool> closeConnection(MySqlConnectionWrapper connection) {
     _log.log(logging.Level.INFO, 'closeConnection> $connection');
 
-    if (connection is PostgreSQLConnection) {
-      connection.close();
-    }
+    connection.connection.close();
+
     return true;
   }
 
   @override
-  FutureOr<bool> isConnectionValid(PostgreSQLExecutionContext connection) {
-    return connection is PostgreSQLConnection && !connection.isClosed;
+  FutureOr<bool> isConnectionValid(MySqlConnectionWrapper connection) {
+    return true;
   }
 
   @override
@@ -146,22 +153,21 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     _log.log(logging.Level.INFO, 'getTableSchemeImpl> $table');
 
-    var sql =
-        "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+    var sql = "SHOW COLUMNS FROM `$table`";
 
-    var results = await connection.mappedResultsQuery(sql);
+    var results = await connection.query(sql);
 
     if (results.isEmpty) return null;
 
-    var scheme = results.map((e) => e['']!).toList(growable: false);
+    var scheme = results;
 
     if (scheme.isEmpty) return null;
 
     var idFieldName = await _findIDField(connection, table, scheme);
 
     var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
-      var k = e['column_name'] as String;
-      var v = _toFieldType(e['data_type'] as String);
+      var k = e['Field'] as String;
+      var v = _toFieldType(e['Type'].toString());
       return MapEntry(k, v);
     }));
 
@@ -181,37 +187,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     return tableScheme;
   }
 
-  Future<String> _findIDField(PostgreSQLExecutionContext connection,
-      String table, List<Map<String, dynamic>> scheme) async {
-    var sql = '''
-    SELECT
-      c.column_name, c.data_type
-    FROM
-      information_schema.table_constraints tc 
-    JOIN
-      information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name) 
-    JOIN
-      information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
-    WHERE
-      constraint_type = 'PRIMARY KEY' and tc.table_name = '$table';
-    ''';
+  FutureOr<String> _findIDField(
+      MySqlConnectionWrapper connection, String table, Results scheme) async {
+    var field = scheme.firstWhereOrNull((f) => f['Key'] == 'PRI');
+    var name = field?['Field'] ?? 'id';
 
-    var results = await connection.mappedResultsQuery(sql);
-
-    var columns = results.map((r) {
-      return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList(growable: false);
-
-    var primaryFields = Map.fromEntries(
-        columns.map((m) => MapEntry(m['column_name'], m['data_type'])));
-
-    if (primaryFields.length == 1) {
-      return primaryFields.keys.first;
-    } else if (primaryFields.length > 1) {
-      return primaryFields.keys.first;
-    }
-
-    return 'id';
+    return name;
   }
 
   static final RegExp _regExpSpaces = RegExp(r'\s+');
@@ -220,6 +201,16 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   Type _toFieldType(String dataType) {
     dataType = dataType.toLowerCase();
+    dataType = dataType.replaceAll(_regExpSpaces, ' ');
+    dataType = dataType.trim();
+
+    switch (dataType) {
+      case 'tinyint(1)':
+        return bool;
+      default:
+        break;
+    }
+
     dataType = dataType.replaceAll(_regExpIgnoreWords, ' ');
     dataType = dataType.replaceAll(_regExpSpaces, ' ');
     dataType = dataType.trim();
@@ -228,34 +219,25 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       case 'boolean':
       case 'bool':
         return bool;
-      case 'integer':
+      case 'tinyint':
+      case 'smallint':
+      case 'mediumint':
       case 'int':
-      case 'int2':
-      case 'int4':
-      case 'int8':
       case 'bigint':
-      case 'serial':
-      case 'serial2':
-      case 'serial4':
-      case 'serial8':
-      case 'bigserial':
+      case 'integer':
         return int;
       case 'decimal':
       case 'float':
-      case 'float4':
-      case 'float8':
       case 'double':
         return double;
       case 'text':
       case 'char':
-      case 'character':
       case 'varchar':
+      case 'enum':
         return String;
       case 'timestamp':
-      case 'timestampz':
       case 'date':
       case 'time':
-      case 'timez':
       case 'datetime':
         return DateTime;
       default:
@@ -264,7 +246,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   Future<List<TableRelationshipReference>> _findRelationshipTables(
-      PostgreSQLExecutionContext connection,
+      MySqlConnectionWrapper connection,
       String table,
       String idFieldName) async {
     var tablesNames = await _listTablesNames(connection);
@@ -297,24 +279,14 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   Future<List<String>> _listTablesNames(
-      PostgreSQLExecutionContext connection) async {
+      MySqlConnectionWrapper connection) async {
     var sql = '''
-    SELECT table_name FROM information_schema.tables WHERE table_schema='public'
+    SHOW TABLES
     ''';
 
-    var results = await connection.mappedResultsQuery(sql);
+    var results = await connection.query(sql);
 
-    var names = results
-        .map((e) {
-          var v = e.values.first;
-          if (v is Map) {
-            return v.values.first;
-          } else {
-            return v;
-          }
-        })
-        .map((e) => '$e')
-        .toList();
+    var names = results.map((r) => r[0]).map((e) => '$e').toList();
 
     return names;
   }
@@ -324,39 +296,32 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-          PostgreSQLExecutionContext connection, String table) =>
+          MySqlConnectionWrapper connection, String table) =>
       _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
           table, () => _findFieldsReferencedTablesImpl(connection, table));
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
-      PostgreSQLExecutionContext connection, String table) async {
+      MySqlConnectionWrapper connection, String table) async {
     var sql = '''
-    SELECT
-      o.conname AS constraint_name,
-      (SELECT nspname FROM pg_namespace WHERE oid=m.relnamespace) AS source_schema,
-      m.relname AS source_table,
-      (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = m.oid AND a.attnum = o.conkey[1] AND a.attisdropped = false) AS source_column,
-      (SELECT nspname FROM pg_namespace WHERE oid=f.relnamespace) AS target_schema,
-      f.relname AS target_table,
-      (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = f.oid AND a.attnum = o.confkey[1] AND a.attisdropped = false) AS target_column
+    SELECT 
+      CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
     FROM
-      pg_constraint o LEFT JOIN pg_class f ON f.oid = o.confrelid LEFT JOIN pg_class m ON m.oid = o.conrelid
+      INFORMATION_SCHEMA.KEY_COLUMN_USAGE
     WHERE
-      o.contype = 'f' AND m.relname = '$table' AND o.conrelid IN (SELECT oid FROM pg_class c WHERE c.relkind = 'r') 
+      TABLE_SCHEMA = '$databaseName' AND TABLE_NAME = '$table' 
+      AND REFERENCED_TABLE_NAME IS NOT NULL AND REFERENCED_COLUMN_NAME IS NOT NULL
     ''';
 
-    var results = await connection.mappedResultsQuery(sql);
+    var results = await connection.query(sql);
 
-    var referenceFields = results.map((r) {
-      return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList(growable: false);
+    var referenceFields = results.map((r) => r.fields).toList(growable: false);
 
     var map =
         Map<String, TableFieldReference>.fromEntries(referenceFields.map((e) {
-      var sourceTable = e['source_table'];
-      var sourceField = e['source_column'];
-      var targetTable = e['target_table'];
-      var targetField = e['target_column'];
+      var sourceTable = e['TABLE_NAME'];
+      var sourceField = e['COLUMN_NAME'];
+      var targetTable = e['REFERENCED_TABLE_NAME'];
+      var targetField = e['REFERENCED_COLUMN_NAME'];
       if (targetTable == null || targetField == null) return null;
 
       var reference = TableFieldReference(
@@ -369,81 +334,103 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr<int> doCountSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+      String table, SQL sql, MySqlConnectionWrapper connection) {
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
-      var count = results
-          .map((e) {
-            var tableResults = e[table] ?? e[''];
-            var count = tableResults?['count'] ?? 0;
-            return count is int ? count : int.tryParse(count.toString().trim());
-          })
-          .whereType<int>()
-          .first;
-      return count;
+      var count = results.map((r) => r.values?.first).firstOrNull ?? 0;
+      return count is int ? count : int.tryParse(count.toString().trim()) ?? 0;
     });
   }
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+      String table, SQL sql, MySqlConnectionWrapper connection) {
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
-        .resolveMapped((results) {
-      var entries = results
-          .map((e) => e[table])
-          .whereType<Map<String, dynamic>>()
-          .toList();
-
-      return entries;
-    });
+        .query(sql.sqlPositional, sql.parametersValuesByPosition)
+        .resolveMapped(_resultsToEntitiesMaps);
   }
+
+  List<Map<String, dynamic>> _resultsToEntitiesMaps(Results results) =>
+      results.map((e) => e.fields).whereType<Map<String, dynamic>>().toList();
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
-    return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
-        .resolveMapped((results) {
-      var entries = results
-          .map((e) => e[table])
-          .whereType<Map<String, dynamic>>()
-          .toList();
+      String table, SQL sql, MySqlConnectionWrapper connection) {
+    var preSQLs = sql.preSQL;
 
-      return entries;
-    });
+    if (preSQLs != null) {
+      return _executeSQLs(preSQLs, connection)
+          .resolveWith(() => _doDeleteSQLImpl(table, sql, connection));
+    } else {
+      return _doDeleteSQLImpl(table, sql, connection);
+    }
+  }
+
+  FutureOr<List<Results>> _executeSQLs(
+          List<SQL> sql, MySqlConnectionWrapper connection) =>
+      sql
+          .map((e) =>
+              connection.query(e.sqlPositional, e.parametersValuesByPosition))
+          .resolveAll();
+
+  FutureOr<Iterable<Map<String, dynamic>>> _doDeleteSQLImpl(
+      String table, SQL sql, MySqlConnectionWrapper connection) {
+    FutureOr<Results> sqlRet =
+        connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
+
+    var posSQLs = sql.posSQL;
+
+    if (posSQLs != null) {
+      sqlRet = sqlRet.resolveMapped((results) {
+        var retPosSQLs = _executeSQLs(posSQLs, connection);
+        return retPosSQLs.resolveMapped((posResults) {
+          var idx = sql.posSQLReturnIndex;
+          return idx != null ? posResults[idx] : results;
+        });
+      });
+    }
+
+    return sqlRet.resolveMapped(_resultsToEntitiesMaps);
   }
 
   @override
   FutureOr<dynamic> doInsertSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+      String table, SQL sql, MySqlConnectionWrapper connection) {
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
   }
 
   @override
   FutureOr doUpdateSQL(
-      String table, SQL sql, Object id, PostgreSQLExecutionContext connection) {
+      String table, SQL sql, Object id, MySqlConnectionWrapper connection) {
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql, id));
   }
 
-  _resolveResultID(
-      List<Map<String, Map<String, dynamic>>> results, String table, SQL sql,
-      [Object? entityId]) {
+  _resolveResultID(Results results, String table, SQL sql, [Object? entityId]) {
+    if (entityId != null && (results.affectedRows ?? 0) > 0) {
+      return entityId;
+    }
+
+    var insertId = results.insertId;
+
+    if (insertId != null) {
+      return insertId;
+    }
+
     if (results.isEmpty) {
       return null;
     }
 
-    var returning = results.first[table];
+    var returning = results.firstOrNull;
 
     if (returning == null || returning.isEmpty) {
       return null;
     } else if (returning.length == 1) {
-      var id = returning.values.first;
+      var id = returning.values!.first;
       return id;
     } else {
       var idFieldName = sql.idFieldName;
@@ -452,7 +439,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         var id = returning[idFieldName];
         return id;
       } else {
-        var id = returning.values.first;
+        var id = returning.values!.first;
         return id;
       }
     }
@@ -460,10 +447,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      SQLWrapper sql, TransactionExecution<R, PostgreSQLExecutionContext> f) {
+      SQLWrapper sql, TransactionExecution<R, MySqlConnectionWrapper> f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1) {
+    if (transaction.length == 1 &&
+        sql.sqlsLength == 1 &&
+        !sql.mainSQL.hasPreOrPosSQL) {
       return executeWithPool((connection) => f(connection));
     }
 
@@ -472,20 +461,19 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     }
 
     return transaction.onOpen<R>(() {
-      return transaction
-          .addExecution<R, PostgreSQLExecutionContext>((c) => f(c));
+      return transaction.addExecution<R, MySqlConnectionWrapper>((c) => f(c));
     });
   }
 
   void _openTransaction(Transaction transaction) {
     transaction.open(() {
-      var contextCompleter = Completer<PostgreSQLExecutionContext>();
+      var contextCompleter = Completer<MySqlConnectionWrapper>();
 
       var ret = executeWithPool((connection) {
-        var theConnection = connection as PostgreSQLConnection;
-
-        return theConnection.transaction((c) {
-          contextCompleter.complete(c);
+        return connection.connection.transaction((t) {
+          var transactionWrap =
+              _MySqlConnectionTransaction(connection.connection, t);
+          contextCompleter.complete(transactionWrap);
           return transaction.transactionFuture;
         });
       });
@@ -495,4 +483,46 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       return contextCompleter.future;
     });
   }
+}
+
+abstract class MySqlConnectionWrapper {
+  MySqlConnection get connection;
+
+  Future<Results> query(String sql, [List<Object?>? values]);
+
+  Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values);
+}
+
+class _MySqlConnectionWrapped implements MySqlConnectionWrapper {
+  @override
+  final MySqlConnection connection;
+
+  _MySqlConnectionWrapped(this.connection);
+
+  @override
+  Future<Results> query(String sql, [List<Object?>? values]) =>
+      connection.query(sql, values);
+
+  @override
+  Future<List<Results>> queryMulti(
+          String sql, Iterable<List<Object?>> values) =>
+      connection.queryMulti(sql, values);
+}
+
+class _MySqlConnectionTransaction implements MySqlConnectionWrapper {
+  @override
+  final MySqlConnection connection;
+
+  final dynamic transaction;
+
+  _MySqlConnectionTransaction(this.connection, this.transaction);
+
+  @override
+  Future<Results> query(String sql, [List<Object?>? values]) =>
+      transaction.query(sql, values?.cast<Object>());
+
+  @override
+  Future<List<Results>> queryMulti(
+          String sql, Iterable<List<Object?>> values) =>
+      transaction.queryMulti(sql, values.map((e) => e.cast<Object>()));
 }

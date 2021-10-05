@@ -272,7 +272,8 @@ void main() {
     test('SQL Encoder', () async {
       var parser = ConditionParser();
 
-      var sqlEncoder = ConditionSQLEncoder(_TestSchemeProvider());
+      var sqlEncoder =
+          ConditionSQLEncoder(_TestSchemeProvider(), sqlElementQuote: '"');
 
       {
         var sql = await sqlEncoder.encode(

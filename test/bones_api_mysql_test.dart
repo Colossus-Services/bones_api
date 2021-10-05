@@ -1,30 +1,32 @@
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/bones_api_adapter_postgre.dart';
+import 'package:bones_api/bones_api_adapter_mysql.dart';
 import 'package:docker_commander/docker_commander.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:test/test.dart';
 
 import 'bones_api_test_adapter.dart';
 
-final dbUser = 'postgre';
-final dbPass = '123456';
-final dbName = 'postgre';
+final dbUser = 'myuser';
+final dbPass = 'mypass';
+final dbName = 'mydb';
 
-class PostgreTestContainer extends DBTestContainer {
-  late final PostgreSQLContainerConfig containerConfig;
-  late PostgreSQLContainer container;
+class MySQLTestContainer extends DBTestContainer {
+  late final MySQLContainerConfig containerConfig;
+  late MySQLContainer container;
 
   @override
   Future<bool> start(DockerCommander dockerCommander, int dbPort) async {
-    containerConfig = PostgreSQLContainerConfig(
-        pgUser: dbUser,
-        pgPassword: dbPass,
-        pgDatabase: dbName,
-        hostPort: dbPort);
+    containerConfig = MySQLContainerConfig(
+      dbUser: dbUser,
+      dbPassword: dbPass,
+      dbName: dbName,
+      hostPort: dbPort,
+      forceNativePasswordAuthentication: true,
+    );
 
     container = await containerConfig.run(dockerCommander,
-        name: 'dc_test_postgre', cleanContainer: true);
+        name: 'dc_test_mysql', cleanContainer: true);
     return true;
   }
 
@@ -39,7 +41,7 @@ class PostgreTestContainer extends DBTestContainer {
 
   @override
   Future<String> listTables() async {
-    var out = await container.psqlCMD('\\d');
+    var out = await container.mysqlCMD('SHOW TABLES');
     return out ?? '';
   }
 
@@ -49,18 +51,19 @@ class PostgreTestContainer extends DBTestContainer {
 
 void main() {
   runAdapterTests(
-    'PostgreSQL',
-    PostgreTestContainer(),
-    5432,
-    (provider, dbPort) => PostgreSQLAdapter(
+    'MySQL',
+    MySQLTestContainer(),
+    3306,
+    (provider, dbPort) => MySQLAdapter(
       dbName,
       dbUser,
       password: dbPass,
+      host: '127.0.0.1',
       port: dbPort,
       parentRepositoryProvider: provider,
     ),
-    '"',
-    'bigint',
-    contains('CREATE TABLE'),
+    '`',
+    'bigint unsigned',
+    anyOf(isNull, isEmpty),
   );
 }

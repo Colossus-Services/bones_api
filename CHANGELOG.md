@@ -1,3 +1,14 @@
+## 1.0.14
+
+- Added `SQLAdapter` for `MySQL`.
+- SQL: 
+  - Improve generated SQL, to adapt to different dialects.
+  - Allow generation of SQL with only positional parameters (needed for MySQL).
+  - Improve return of DELETE, to circumvent SQL dialects without `RETURNNG` and `OUTPUT`.
+  - Improved supported types.
+- mysql1: ^0.19.2
+- docker_commander: ^2.0.13 
+
 ## 1.0.13
 
 - Added `TypeInfo` to represent better types with generics.

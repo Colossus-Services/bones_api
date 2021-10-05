@@ -5,7 +5,10 @@ import 'bones_api_condition_encoder.dart';
 
 /// A [Condition] encoder for SQL.
 class ConditionSQLEncoder extends ConditionEncoder {
-  ConditionSQLEncoder(SchemeProvider schemeProvider) : super(schemeProvider);
+  final String sqlElementQuote;
+  ConditionSQLEncoder(SchemeProvider schemeProvider,
+      {required this.sqlElementQuote})
+      : super(schemeProvider);
 
   @override
   String get groupOpener => '(';
@@ -51,7 +54,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var idKey = context.addEncodingParameter(idFieldName, c.idValue);
         var valueSQL = valueToSQL(context, c.idValue, idKey);
 
-        context.write(' "$entityAlias"."$idFieldName" = ');
+        var q = sqlElementQuote;
+
+        context.write(' $q$entityAlias$q.$q$idFieldName$q = ');
         context.write(valueSQL);
         context.write(' ');
 
@@ -98,7 +103,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var keys = c.keys;
 
     if (keys.first is! ConditionKeyField) {
-      throw ConditionEncodingError("Root Key should be a field key: $c");
+      throw ConditionEncodingError('Root Key should be a field key: $c');
     }
 
     if (keys.length == 1) {
@@ -106,7 +111,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     } else if (keys.length == 2) {
       return keyFieldReferenceToSQL(c, context);
     } else {
-      throw ConditionEncodingError("keys > 2: $c");
+      throw ConditionEncodingError('keys > 2: $c');
     }
   }
 
@@ -118,7 +123,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     var keys = c.keys;
     var key0 = keys.first as ConditionKeyField;
-    return '"$entityAlias"."${key0.name}"';
+
+    var q = sqlElementQuote;
+    return '$q$entityAlias$q.$q${key0.name}$q';
   }
 
   FutureOr<String> keyFieldReferenceToSQL(
@@ -130,7 +137,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     if (schemeProvider == null) {
       throw ConditionEncodingError(
-          "No SchemeProvider> entityName: $entityName > $this");
+          'No SchemeProvider> entityName: $entityName > $this');
     }
 
     var keys = c.keys;
@@ -147,7 +154,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       if (fieldRef == null) {
         throw ConditionEncodingError(
-            "No referenced table for key[0]> keys: $keys ; entityName: $entityName > $this");
+            'No referenced table for key[0]> keys: $keys ; entityName: $entityName > $this');
       }
 
       context.fieldsReferencedTables.add(fieldRef);
@@ -157,9 +164,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var key1 = keys[1];
 
       if (key1 is ConditionKeyField) {
-        return '"$entityAlias"."${key1.name}"';
+        var q = sqlElementQuote;
+        return '$q$entityAlias$q.$q${key1.name}$q';
       } else {
-        throw ConditionEncodingError("Key: $c");
+        throw ConditionEncodingError('Key: $c');
       }
     });
   }

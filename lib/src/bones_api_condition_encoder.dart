@@ -169,7 +169,6 @@ class TableScheme with FieldsFromMap {
   String toString() {
     return 'TableScheme{name: $name, '
         'idFieldName: $idFieldName, '
-        'fieldsNames: $fieldsNames, '
         'fieldsTypes: $fieldsTypes, '
         'fieldsReferencedTables: $fieldsReferencedTables, '
         'relationshipTables: $relationshipTables}';
