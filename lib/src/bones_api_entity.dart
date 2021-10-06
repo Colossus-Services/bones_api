@@ -197,7 +197,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return resolveValueByType(fieldType, value);
   }
 
-  T? resolveValueByType<T>(TypeInfo? type, Object? value) {
+  FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value) {
     if (type == null) {
       return value as T?;
     }
@@ -218,22 +218,39 @@ abstract class EntityHandler<O> with FieldsFromMap {
         var valEntityHandler = _resolveEntityHandler(elementType);
 
         if (valEntityHandler != null) {
-          var list = TypeParser.parseList(value,
+          var listFutures = TypeParser.parseList(value,
               elementParser: (e) =>
                   valEntityHandler.resolveValueByType(elementType, e));
 
-          if (list == null) return null;
-          return valEntityHandler.castList(list, elementType.type)! as T;
+          if (listFutures == null) return null;
+
+          return listFutures.resolveAll().resolveMapped((l) {
+            return valEntityHandler.castList(l, elementType.type)! as T;
+          });
         } else {
-          var list = TypeParser.parseList(value,
+          var listFutures = TypeParser.parseList(value,
               elementParser: (e) => resolveValueByType(elementType, e));
 
-          if (list == null) return null;
-          return list as T;
+          if (listFutures == null) return null;
+          return listFutures.resolveAll().resolveMapped((l) => l as T);
         }
       } else {
         return type.parse<T>(value);
       }
+    } else if (value != null && !type.isBasicType) {
+      var parsed = type.parse<T>(value);
+      if (parsed != null) return parsed;
+
+      var valEntityHandler = _resolveEntityHandler(type);
+      var entityRepository =
+          valEntityHandler?.getEntityRepository(type: type.type);
+
+      if (entityRepository == null) {
+        throw StateError("Can't resolve value for type: $type -> $value");
+      }
+
+      var retEntity = entityRepository.selectByID(value);
+      return retEntity.resolveMapped((val) => val as T?);
     } else {
       return type.parse<T>(value);
     }
@@ -589,6 +606,9 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     return _reflection!;
   }
 
+  ClassReflection<O> reflectionWithObject([O? o]) =>
+      o == null ? reflection : reflection.withObject(o);
+
   @override
   void inspectObject(O? o) {}
 
@@ -637,13 +657,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
         fieldsNames(o);
       }
 
-      var fieldName = findIdFieldName();
+      var fieldName = findIdFieldName(o);
       _idFieldsName = fieldName ?? 'id';
     }
     return _idFieldsName!;
   }
 
-  String? findIdFieldName() {
+  String? findIdFieldName([O? o]) {
+    var reflection = reflectionWithObject(o);
+
     var possibleFields = reflection.fieldsWhere((f) {
       return f.type.isPrimitiveType;
     }).toList(growable: false);
@@ -690,14 +712,28 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   List<String>? _fieldsNames;
 
   @override
-  List<String> fieldsNames([O? o]) => _fieldsNames ??= reflection.fieldsNames;
+  List<String> fieldsNames([O? o]) =>
+      _fieldsNames ??= fieldsTypes(o).keys.toList();
 
   Map<String, TypeInfo>? _fieldsTypes;
 
   @override
-  Map<String, TypeInfo> fieldsTypes([O? o]) => _fieldsTypes ??=
-      Map<String, TypeInfo>.unmodifiable(Map<String, TypeInfo>.fromEntries(
-          _fieldsNames!.map((f) => MapEntry(f, getFieldType(o, f)!))));
+  Map<String, TypeInfo> fieldsTypes([O? o]) {
+    if (_fieldsTypes == null) {
+      var reflection = reflectionWithObject(o);
+
+      var types = reflection.fieldsNames.map((f) {
+        var field = reflection.field(f, o);
+        if (field == null || !field.hasSetter) return null;
+        var type = TypeInfo.from(field);
+        return MapEntry(f, type);
+      });
+
+      _fieldsTypes = Map<String, TypeInfo>.unmodifiable(
+          Map<String, TypeInfo>.fromEntries(types.whereNotNull()));
+    }
+    return _fieldsTypes!;
+  }
 
   @override
   FutureOr<O> createFromMap(Map<String, dynamic> fields) {

@@ -344,7 +344,11 @@ class SQLEntityRepository<O> extends EntityRepository<O>
 
   String _resolveTableName(Type type) {
     var repositoryAdapter =
-        sqlRepositoryAdapter.databaseAdapter.getRepositoryAdapterByType(type)!;
+        sqlRepositoryAdapter.databaseAdapter.getRepositoryAdapterByType(type);
+    if (repositoryAdapter == null) {
+      throw StateError("Can't resolve `SQLRepositoryAdapter` for type: $type");
+    }
+
     return repositoryAdapter.tableName;
   }
 

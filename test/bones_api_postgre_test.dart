@@ -24,7 +24,7 @@ class PostgreTestContainer extends DBTestContainer {
         hostPort: dbPort);
 
     container = await containerConfig.run(dockerCommander,
-        name: 'dc_test_postgre', cleanContainer: true);
+        name: 'dc_test_postgre_$dbPort', cleanContainer: true);
     return true;
   }
 
@@ -48,6 +48,11 @@ class PostgreTestContainer extends DBTestContainer {
 }
 
 void main() {
+  _runTest(true);
+  _runTest(false);
+}
+
+void _runTest(bool useReflection) {
   runAdapterTests(
     'PostgreSQL',
     PostgreTestContainer(),
@@ -62,5 +67,6 @@ void main() {
     '"',
     'bigint',
     contains('CREATE TABLE'),
+    entityHandlerByReflection: useReflection,
   );
 }

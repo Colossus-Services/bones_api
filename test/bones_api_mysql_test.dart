@@ -26,7 +26,7 @@ class MySQLTestContainer extends DBTestContainer {
     );
 
     container = await containerConfig.run(dockerCommander,
-        name: 'dc_test_mysql', cleanContainer: true);
+        name: 'dc_test_mysql_$dbPort', cleanContainer: true);
     return true;
   }
 
@@ -50,6 +50,11 @@ class MySQLTestContainer extends DBTestContainer {
 }
 
 void main() {
+  _runTest(false);
+  _runTest(true);
+}
+
+void _runTest(bool useReflection) {
   runAdapterTests(
     'MySQL',
     MySQLTestContainer(),
@@ -65,5 +70,6 @@ void main() {
     '`',
     'bigint unsigned',
     anyOf(isNull, isEmpty),
+    entityHandlerByReflection: useReflection,
   );
 }

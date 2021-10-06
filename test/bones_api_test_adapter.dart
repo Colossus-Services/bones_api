@@ -67,12 +67,14 @@ void runAdapterTests(
     SQLAdapterCreator sqlAdapterCreator,
     String cmdQuote,
     String serialIntType,
-    dynamic createTableMatcher) {
+    dynamic createTableMatcher,
+    {required bool entityHandlerByReflection}) {
   _log.handler.logToConsole();
 
   var testDomain = dbName.toLowerCase() + '.com';
 
-  group('SQLAdapter[$dbName]', () {
+  group('SQLAdapter[$dbName${entityHandlerByReflection ? '+reflection' : ''}]',
+      () {
     late final DockerHostLocal dockerHostLocal;
     late final DockerCommander dockerCommander;
     late bool dockerRunning;
@@ -105,9 +107,15 @@ void runAdapterTests(
         _log.info('Container start: $startOk > $dbTestContainer');
 
         entityRepositoryProvider = TestEntityRepositoryProvider(
-          addressEntityHandler,
-          roleEntityHandler,
-          userEntityHandler,
+          entityHandlerByReflection
+              ? Address$reflection().entityHandler
+              : addressEntityHandler,
+          entityHandlerByReflection
+              ? Role$reflection().entityHandler
+              : roleEntityHandler,
+          entityHandlerByReflection
+              ? User$reflection().entityHandler
+              : userEntityHandler,
           sqlAdapterCreator,
           dbPort,
         );

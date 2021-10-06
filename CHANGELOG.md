@@ -1,3 +1,13 @@
+## 1.0.15
+
+- `EntityHandler`:
+  - `resolveValueByType` now can select an entity by its ID when necessary.
+- `ClassReflectionEntityHandler`:
+  - Fixed `fieldsTypes` and `findIdFieldName`, to ignore fields that are final or doesn't have a setter.
+  - Fixed use of `reflection` to ensure that current object is used.
+- Improved tests to run `Entity` tests repositories with reflection and without reflection.
+- reflection_factory: ^1.0.12
+
 ## 1.0.14
 
 - Added `SQLAdapter` for `MySQL`.

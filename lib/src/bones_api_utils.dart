@@ -468,6 +468,10 @@ class TypeInfo {
     if (o is TypeInfo) return o;
     if (o is Type) return TypeInfo(o);
 
+    if (o is TypeReflection) {
+      return TypeInfo(o.type, o.arguments.map((o) => TypeInfo.from(o)));
+    }
+
     if (o is FieldReflection) {
       return TypeInfo(
           o.type.type, o.type.arguments.map((o) => TypeInfo.from(o)));
@@ -502,6 +506,8 @@ class TypeInfo {
         return TypeParser.parseString(value, def as String?) as T?;
       case int:
         return TypeParser.parseInt(value, def as int?) as T?;
+      case bool:
+        return TypeParser.parseBool(value, def as bool?) as T?;
       case double:
         return TypeParser.parseDouble(value, def as double?) as T?;
       case num:
@@ -537,8 +543,23 @@ class TypeInfo {
   /// See [TypeParser.isPrimitiveType].
   bool get isPrimitiveType => TypeParser.isPrimitiveType(type);
 
-  /// Returns `true` if [type] is [List].
+  /// Returns `true` if [type] is a [List].
   bool get isList => type == List;
+
+  /// Returns `true` if [type] is a [Iterable].
+  bool get isIterable => type == Iterable;
+
+  /// Returns `true` if [type] is a [Map].
+  bool get isMap => type == Map;
+
+  /// Returns `true` if [type] is a [Set].
+  bool get isSet => type == Set;
+
+  /// Returns `true` if [type] is a collection ([List], [Iterable], [Map] or [Set]).
+  bool get isCollection => isList || isIterable || isMap || isSet;
+
+  /// Returns `true` if [type] [isPrimitiveType] or [isCollection].
+  bool get isBasicType => isPrimitiveType || isCollection;
 
   /// Returns `true` if [type] is a [List] of entities.
   bool get isListEntity =>
