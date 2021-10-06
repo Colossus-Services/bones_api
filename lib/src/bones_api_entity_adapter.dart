@@ -407,6 +407,11 @@ abstract class SQLAdapter<C> extends SchemeProvider
     });
   }
 
+  FutureOr<dynamic> doInsertRelationshipSQL(
+      String table, SQL sql, C connection) {
+    return doInsertSQL(table, sql, connection);
+  }
+
   FutureOr<dynamic> doInsertSQL(String table, SQL sql, C connection);
 
   FutureOr<SQL> generateUpdateSQL(Transaction transaction, String table,
@@ -631,7 +636,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
           '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
 
       var retInserts = sqls.map((sql) {
-        var ret = doInsertSQL(sql.mainTable ?? table, sql, connection);
+        var ret =
+            doInsertRelationshipSQL(sql.mainTable ?? table, sql, connection);
 
         if (sql.hasPosSQL) {
           sql.posSQL!.map((e) {

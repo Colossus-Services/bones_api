@@ -1,3 +1,11 @@
+## 1.0.19
+
+- Improved `SQLEntityRepository` tests.
+- Fixed `MemorySQLAdapter`:
+  - Ensure that relationships entries are unique.
+  - Update previous entity fields.
+- Improved tests tags: `version`, `docker` and `build`.
+
 ## 1.0.18
 
 - `APIResponseStatus`:

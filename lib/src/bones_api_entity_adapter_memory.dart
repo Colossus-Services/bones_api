@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_condition_encoder.dart';
@@ -78,6 +79,24 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
+  FutureOr doInsertRelationshipSQL(String table, SQL sql, int connection) {
+    var entry = sql.parameters;
+
+    var map = _getTableMap(table, true)!;
+
+    var prevEntry =
+        map.entries.firstWhereOrNull((e) => isEqualsDeep(e.value, entry));
+    if (prevEntry != null) {
+      return prevEntry.key;
+    }
+
+    var id = nextID(table);
+    map[id] = entry;
+
+    return id;
+  }
+
+  @override
   FutureOr doInsertSQL(String table, SQL sql, int connection) {
     var map = _getTableMap(table, true)!;
 
@@ -100,7 +119,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var map = _getTableMap(table, true)!;
 
     var entry = sql.parameters;
-    map[id] = entry;
+
+    var prevEntry = map[id];
+
+    prevEntry!.addAll(entry);
 
     return id;
   }

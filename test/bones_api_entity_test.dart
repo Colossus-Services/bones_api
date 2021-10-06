@@ -461,8 +461,64 @@ void main() {
       {
         var sel = await userAPIRepository.selectByAddressState('FL');
         var user = sel.first;
+
         expect(user.email, equals('mary@memory.com'));
         expect(user.address.state, equals('FL'));
+        expect(
+            user.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 3, 'type': 'guest', 'enabled': true}
+            ]));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByEmail('mary@memory.com');
+        var user = sel.first;
+
+        expect(user.email, equals('mary@memory.com'));
+        expect(user.address.state, equals('FL'));
+
+        user.email = 'mary2@memory.com';
+
+        expect(await userAPIRepository.store(user), equals(user.id));
+
+        var sel2 = await userAPIRepository.selectByEmail('mary2@memory.com');
+        var user2 = sel2.first;
+
+        expect(user2.email, equals('mary2@memory.com'));
+        expect(user2.address.state, equals('FL'));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByEmail('mary2@memory.com');
+        var user = sel.first;
+
+        expect(user.email, equals('mary2@memory.com'));
+        expect(user.address.state, equals('FL'));
+
+        user.roles.add(Role('foo'));
+
+        expect(await userAPIRepository.store(user), equals(user.id));
+
+        var user2 = await userAPIRepository.selectByID(user.id);
+        expect(user2!.email, equals('mary2@memory.com'));
+        expect(
+            user2.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 3, 'type': 'guest', 'enabled': true},
+              {'id': 4, 'type': 'foo', 'enabled': true}
+            ]));
+
+        user2.roles.removeWhere((r) => r.type == 'guest');
+        expect(await userAPIRepository.store(user2), equals(user.id));
+
+        var user3 = await userAPIRepository.selectByID(user.id);
+        expect(user3!.email, equals('mary2@memory.com'));
+        expect(
+            user3.roles.map((e) => e.toJson()),
+            equals([
+              {'id': 4, 'type': 'foo', 'enabled': true}
+            ]));
       }
 
       // Del User:
