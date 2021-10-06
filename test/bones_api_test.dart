@@ -1,8 +1,8 @@
 import 'dart:convert' as convert;
 import 'dart:io';
 
+import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
-import 'package:bones_api/src/bones_api_console.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';

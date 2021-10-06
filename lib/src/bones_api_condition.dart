@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:bones_api/src/bones_api_condition_parser.dart';
-
+import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
 
 abstract class ConditionElement {

@@ -1,5 +1,6 @@
-import 'package:bones_api/bones_api.dart';
 import 'package:petitparser/petitparser.dart';
+
+import 'bones_api_condition.dart';
 
 const Map<String, String> jsonEscapeChars = {
   '\\': '\\',

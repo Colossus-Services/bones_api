@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_condition_encoder.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
 
+import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('PostgreAdapter');
 

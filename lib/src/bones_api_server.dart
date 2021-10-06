@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
+import 'bones_api_base.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
 

@@ -1,5 +1,5 @@
+import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
-import 'package:bones_api/src/bones_api_utils.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 

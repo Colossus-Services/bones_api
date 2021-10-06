@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:bones_api/bones_api.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_utils.dart';
 
 /// [ClassReflection] extension.
 extension ClassReflectionExtension<O> on ClassReflection<O> {

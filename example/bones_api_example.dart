@@ -1,5 +1,4 @@
-import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_server.dart';
+import 'package:bones_api/bones_api_server.dart';
 
 void main() async {
   var configJson = '{"not_found_msg": "This is 404!"}';

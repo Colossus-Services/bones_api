@@ -1,9 +1,8 @@
 import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
-import 'package:reflection_factory/builder.dart';
+import 'package:reflection_factory/reflection_factory.dart';
 
 /// JSON utility class.
 class Json {

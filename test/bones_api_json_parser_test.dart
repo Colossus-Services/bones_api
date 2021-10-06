@@ -1,4 +1,4 @@
-import 'package:bones_api/src/bones_api_condition_parser.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 
 void main() {

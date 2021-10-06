@@ -1,3 +1,8 @@
+## 1.0.17
+
+- Optimize imports.
+- Fix wrong import, that was preventing to use in JS/Browser platforms.
+
 ## 1.0.16
 
 - Better handling of `APIServer` errors and logging.

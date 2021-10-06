@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bones_api/bones_api.dart';
+import 'bones_api_base.dart';
 
 /// API Console
 class APIConsole {

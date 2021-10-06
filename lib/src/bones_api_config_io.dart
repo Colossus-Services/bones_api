@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bones_api/bones_api.dart';
 import 'package:mercury_client/mercury_client.dart';
+
+import 'bones_api_config.dart';
 
 FutureOr<APIConfig?> loadAPIConfigFromUri(Uri o, {bool allowAsync = true}) {
   if (o is Uri) {

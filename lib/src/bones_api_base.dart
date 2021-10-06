@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
-import 'package:bones_api/src/bones_api_config.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
+import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.16';
+  static const String VERSION = '1.0.17';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
