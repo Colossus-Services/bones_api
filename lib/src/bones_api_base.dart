@@ -1067,6 +1067,8 @@ enum APIResponseStatus {
   // ignore: constant_identifier_names
   UNAUTHORIZED,
   // ignore: constant_identifier_names
+  BAD_REQUEST,
+  // ignore: constant_identifier_names
   ERROR,
 }
 
@@ -1140,7 +1142,7 @@ class APIResponse<T> extends APIPayload {
         metrics: metrics);
   }
 
-  /// Transform this response to a `notFound` response.
+  /// Transform this response to a `NOT_FOUND` response.
   APIResponse asNotFound(
       {T? payload,
       Map<String, dynamic>? headers,
@@ -1167,13 +1169,40 @@ class APIResponse<T> extends APIPayload {
         metrics: metrics);
   }
 
-  /// Transform this response to an `unauthorized` response.
+  /// Transform this response to an `UNAUTHORIZED` response.
   APIResponse asUnauthorized(
       {T? payload,
       Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.unauthorized(
+        payload: payload,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
+  }
+
+  /// Creates a response of status `BAD_REQUEST`.
+  factory APIResponse.badRequest(
+      {Map<String, dynamic>? headers,
+      T? payload,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse(APIResponseStatus.BAD_REQUEST,
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `BAD_REQUEST` response.
+  APIResponse asBadRequest(
+      {T? payload,
+      Map<String, dynamic>? headers,
+      String? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.badRequest(
         payload: payload,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
@@ -1192,7 +1221,7 @@ class APIResponse<T> extends APIPayload {
         metrics: metrics);
   }
 
-  /// Transform this response to an `error` response.
+  /// Transform this response to an `ERROR` response.
   APIResponse asError(
       {Map<String, dynamic>? headers,
       dynamic error,

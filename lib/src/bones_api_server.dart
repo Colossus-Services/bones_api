@@ -263,6 +263,8 @@ class APIServer {
           return Response.notFound(payload, headers: headers);
         case APIResponseStatus.UNAUTHORIZED:
           return Response.forbidden(payload, headers: headers);
+        case APIResponseStatus.BAD_REQUEST:
+          return Response(400, body: payload, headers: headers);
         case APIResponseStatus.ERROR:
           {
             var retError = resolveBody(apiResponse.error, apiResponse);

@@ -1,3 +1,9 @@
+## 1.0.18
+
+- `APIResponseStatus`: added `BAD_REQUEST`.
+- SQL:
+  - Fix update syntax.
+
 ## 1.0.17
 
 - Optimize imports.

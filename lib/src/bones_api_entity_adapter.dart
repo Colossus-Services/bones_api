@@ -372,7 +372,9 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
         if (sqlAcceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
+          sql.write(q);
           sql.write(idFieldName);
+          sql.write(q);
         }
 
         sql.write(' VALUES (');
@@ -450,14 +452,18 @@ abstract class SQLAdapter<C> extends SchemeProvider
           var v = values[i];
 
           if (i > 0) sql.write(' , ');
+          sql.write(q);
           sql.write(f);
+          sql.write(q);
           sql.write(' = ');
           sql.write(v);
         }
 
         if (sqlAcceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
+          sql.write(q);
           sql.write(idFieldName);
+          sql.write(q);
         }
 
         sql.write(' WHERE ');
