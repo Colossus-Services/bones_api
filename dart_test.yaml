@@ -1,0 +1,6 @@
+
+tags:
+  # Tests that depends on `build` framework:
+  build:
+    timeout: 60s
+
