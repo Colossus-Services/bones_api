@@ -337,10 +337,64 @@ void runAdapterTests(
       }
 
       {
+        var sel = await userAPIRepository.selectByEmail('smith2@$testDomain');
+
+        var user = sel.first;
+        expect(user.email, equals('smith2@$testDomain'));
+        expect(user.address.state, equals('CA'));
+
+        user.email = 'smith3@$testDomain';
+
+        var ok = await userAPIRepository.store(user);
+        expect(ok, equals(user.id));
+
+        var sel2 = await userAPIRepository.selectByEmail('smith3@$testDomain');
+        var user2 = sel2.first;
+
+        expect(user2.id, equals(user.id));
+        expect(user2.email, equals('smith3@$testDomain'));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByEmail('smith3@$testDomain');
+        var user = sel.first;
+
+        expect(user.email, equals('smith3@$testDomain'));
+
+        user.roles.add(Role('foo2'));
+
+        var ok = await userAPIRepository.store(user);
+        expect(ok, equals(user.id));
+
+        var rolesJson2 = [
+          {'id': 2, 'type': 'guest', 'enabled': true},
+          {'id': 3, 'type': 'foo2', 'enabled': true}
+        ];
+        expect(user.roles.map((e) => e.toJson()), equals(rolesJson2));
+
+        var user2 = await userAPIRepository.selectByID(user.id);
+        expect(user2!.email, equals(user.email));
+        expect(user2.roles.map((e) => e.toJson()), equals(rolesJson2));
+
+        user2.roles.removeWhere((r) => r.type == 'guest');
+
+        var ok2 = await userAPIRepository.store(user2);
+        expect(ok2, equals(user.id));
+
+        var user3 = await userAPIRepository.selectByID(user.id);
+        expect(user3!.email, equals(user.email));
+
+        var rolesJson3 = [
+          {'id': 3, 'type': 'foo2', 'enabled': true}
+        ];
+        expect(user3.roles.map((e) => e.toJson()), equals(rolesJson3));
+      }
+
+      {
         var del = await userAPIRepository
             .deleteByQuery(' #ID == ? ', parameters: [2]);
         var user = del.first;
-        expect(user.email, equals('smith2@$testDomain'));
+        expect(user.email, equals('smith3@$testDomain'));
         expect(user.address.state, equals('CA'));
         expect(user.creationTime, equals(user2Time));
       }

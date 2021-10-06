@@ -430,7 +430,7 @@ class TypeParser {
     }
   }
 
-  /// Returns `true` if [type] is primitive ([String], [int], [double], [num], [bool]).
+  /// Returns `true` if [type] is primitive ([String], [int], [double], [num] or [bool]).
   static bool isPrimitiveType<T>([Type? type]) {
     type ??= T;
     return type == String ||
@@ -438,6 +438,26 @@ class TypeParser {
         type == double ||
         type == num ||
         type == bool;
+  }
+
+  /// Returns `true` if [value] is primitive ([String], [int], [double], [num] or [bool]).
+  static bool isPrimitiveValue(Object value) {
+    return value is String ||
+        value is int ||
+        value is double ||
+        value is num ||
+        value is bool;
+  }
+
+  /// Returns `true` if [type] is a collection ([List], [Iterable], [Map] or [Set]).
+  static bool isCollectionType<T>([Type? type]) {
+    type ??= T;
+    return type == List || type == Iterable || type == Map || type == Set;
+  }
+
+  /// Returns `true` if [value] is a collection ([List], [Iterable], [Map] or [Set]).
+  static bool isCollectionValue(Object value) {
+    return value is List || value is Iterable || value is Map || value is Set;
   }
 }
 
@@ -932,4 +952,197 @@ class PositionalFields {
   /// Converts [rows] to a list of [Map].
   List<Map<String, Object?>> toListOfMap(Iterable<Iterable<Object?>> rows) =>
       rows.map((r) => toMap(r)).toList();
+}
+
+typedef ValueEquality = bool Function(Object v1, Object v2);
+
+/// Returns [true] if [o1] and [o2] are equals deeply.
+bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
+  if (identical(o1, o2)) return true;
+
+  if (o1 == null) return o2 == null;
+  if (o2 == null) return false;
+
+  if (o1 is List) {
+    if (o2 is List) {
+      return isEqualsListDeep(o1, o2, valueEquality: valueEquality);
+    }
+    return false;
+  } else if (o1 is Map) {
+    if (o2 is Map) {
+      return isEqualsMapDeep(o1, o2, valueEquality: valueEquality);
+    }
+    return false;
+  } else if (o1 is Set) {
+    if (o2 is Set) {
+      return isEqualsSetDeep(o1, o2, valueEquality: valueEquality);
+    }
+    return false;
+  } else if (o1 is Iterable) {
+    if (o2 is Iterable) {
+      return isEqualsIteratorDeep(o1, o2, valueEquality: valueEquality);
+    }
+    return false;
+  }
+
+  if (valueEquality != null) {
+    return valueEquality(o1, o2);
+  } else {
+    return o1 == o2;
+  }
+}
+
+/// Returns [true] if [l1] and [l2] are equals deeply (including values tree equality).
+bool isEqualsListDeep(List? l1, List? l2, {ValueEquality? valueEquality}) {
+  if (identical(l1, l2)) return true;
+
+  if (l1 == null) return false;
+  if (l2 == null) return false;
+
+  var length = l1.length;
+  if (length != l2.length) return false;
+
+  for (var i = 0; i < length; ++i) {
+    var v1 = l1[i];
+    var v2 = l2[i];
+
+    if (!isEqualsDeep(v1, v2, valueEquality: valueEquality)) return false;
+  }
+
+  return true;
+}
+
+/// Same as [isEqualsListDeep] but for [Iterable].
+bool isEqualsIteratorDeep(Iterable? it1, Iterable? it2,
+    {ValueEquality? valueEquality}) {
+  if (identical(it1, it2)) return true;
+
+  if (it1 == null) return false;
+  if (it2 == null) return false;
+
+  var length = it1.length;
+  if (length != it2.length) return false;
+
+  for (var i = 0; i < length; i++) {
+    var v1 = it1.elementAt(i);
+    var v2 = it2.elementAt(i);
+
+    if (!isEqualsDeep(v1, v2, valueEquality: valueEquality)) return false;
+  }
+
+  return true;
+}
+
+/// Same as [isEqualsListDeep] but for [Set].
+bool isEqualsSetDeep(Set? set1, Set? set2, {ValueEquality? valueEquality}) {
+  if (identical(set1, set2)) return true;
+
+  if (set1 == null) return false;
+  if (set2 == null) return false;
+
+  var length = set1.length;
+  if (length != set2.length) return false;
+
+  var l1 = set1.toList();
+  var l2 = set2.toList();
+
+  l1.sort();
+  l2.sort();
+
+  return isEqualsListDeep(l1, l2, valueEquality: valueEquality);
+}
+
+/// Returns [true] if [m1] and [m2] are equals deeply (including values tree equality).
+bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
+  if (identical(m1, m2)) return true;
+
+  if (m1 == null) return false;
+  if (m2 == null) return false;
+
+  if (m1.length != m2.length) return false;
+
+  var k1 = List.from(m1.keys);
+  var k2 = List.from(m2.keys);
+
+  k1.sort();
+  k2.sort();
+
+  if (!isEqualsListDeep(k1, k2, valueEquality: valueEquality)) return false;
+
+  for (var k in k1) {
+    var v1 = m1[k];
+    var v2 = m2[k];
+
+    if (!isEqualsDeep(v1, v2, valueEquality: valueEquality)) return false;
+  }
+
+  return true;
+}
+
+typedef InstanceInfoExtractor<O, I> = I Function(O o);
+
+/// Tracks an instance with a info relationship.
+///
+/// Uses [Expando].
+class InstanceTracker<O extends Object, I extends Object> {
+  /// Name of this instance tracker.
+  final String name;
+
+  /// The info extractor.
+  final InstanceInfoExtractor<O, I> instanceInfoExtractor;
+
+  final Expando<I> _instancesInfo;
+
+  InstanceTracker(this.name, this.instanceInfoExtractor)
+      : _instancesInfo = Expando(name);
+
+  /// Extract the info of instance [o].
+  I extractInfo(O o) => instanceInfoExtractor(o);
+
+  /// Returns `true` if instance [o] is tracked.
+  bool isTrackedInstance(O o) => getTrackedInstanceInfo(o) != null;
+
+  /// returns the [o] info, if tracked.
+  I? getTrackedInstanceInfo(O o) {
+    var trackedInfo = _instancesInfo[o];
+    return trackedInfo;
+  }
+
+  /// Tracks instance [o]
+  O trackInstance(O o) {
+    var info = extractInfo(o);
+
+    _instancesInfo[o] = info;
+
+    return o;
+  }
+
+  /// Untracks instance [o].
+  void untrackInstance(O? o) {
+    if (o == null) return;
+
+    _instancesInfo[o] = null;
+  }
+
+  /// Same as [trackInstance] with a nullable [o].
+  O? trackInstanceNullable(O? o) {
+    return o != null ? trackInstance(o) : null;
+  }
+
+  /// Tracks instances [os].
+  List<O> trackInstances(Iterable<O> os) {
+    return os.map((o) => trackInstance(o)).toList();
+  }
+
+  /// Same as [trackInstanceNullable] with a nullable [os].
+  List<O?> trackInstancesNullable(Iterable<O?> os) {
+    return os.map((o) => trackInstanceNullable(o)).toList();
+  }
+
+  /// Untrack instances [os].
+  void untrackInstances(Iterable<O?> os) {
+    for (var o in os) {
+      untrackInstance(o);
+    }
+  }
 }

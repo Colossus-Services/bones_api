@@ -12,7 +12,7 @@ import 'bones_api_utils.dart';
 
 final _log = logging.Logger('SQLEntityRepository');
 
-class SQLEntityRepository<O> extends EntityRepository<O>
+class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     with EntityFieldAccessor<O> {
   final SQLRepositoryAdapter<O> sqlRepositoryAdapter;
 
@@ -190,11 +190,19 @@ class SQLEntityRepository<O> extends EntityRepository<O>
         }
       });
 
-      return ret.resolveMapped((entities) => entities.resolveAll());
+      return ret
+          .resolveMapped((entities) => entities.resolveAll())
+          .resolveMapped(trackEntities);
     } else {
-      return _resolveEntitiesSimple(results).resolveAll();
+      return _resolveEntitiesSimple(results)
+          .resolveAll()
+          .resolveMapped(trackEntities);
     }
   }
+
+  List<FutureOr<O>> _resolveEntitiesSimple(
+          Iterable<Map<String, dynamic>> result) =>
+      result.map((e) => entityHandler.createFromMap(e)).toList();
 
   Iterable<FutureOr<bool>> _resolveRelationshipFields(
     Transaction transaction,
@@ -244,10 +252,6 @@ class SQLEntityRepository<O> extends EntityRepository<O>
     });
   }
 
-  List<FutureOr<O>> _resolveEntitiesSimple(
-          Iterable<Map<String, dynamic>> result) =>
-      result.map((e) => entityHandler.createFromMap(e)).toList();
-
   FutureOr<Map<String, TableRelationshipReference>> _getRelationshipFields(
       Map<String, TypeInfo> fieldsListEntity,
       [FutureOr<TableScheme>? retTableScheme]) {
@@ -296,8 +300,11 @@ class SQLEntityRepository<O> extends EntityRepository<O>
         return sqlRepositoryAdapter.doInsert(op, o, fields,
             idFieldName: idFieldsName, preFinish: (id) {
           entityHandler.setID(o, id);
-          return _ensureRelationshipsStored(o, op.transaction)
-              .resolveWithValue(id);
+
+          return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+            trackEntity(o);
+            return id;
+          });
         });
       });
     } catch (e, s) {
@@ -319,10 +326,24 @@ class SQLEntityRepository<O> extends EntityRepository<O>
       var id = entityHandler.getID(o);
       var fields = entityHandler.getFields(o);
 
+      var changedFields = getEntityChangedFields(o);
+      if (changedFields != null) {
+        if (changedFields.isEmpty) {
+          return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+            trackEntity(o);
+            return op.finish(id);
+          });
+        }
+
+        fields.removeWhere((key, value) => !changedFields.contains(key));
+      }
+
       return sqlRepositoryAdapter.doUpdate(op, o, id, fields,
           idFieldName: idFieldsName, preFinish: (id) {
-        return _ensureRelationshipsStored(o, op.transaction)
-            .resolveWithValue(id);
+        return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+          trackEntity(o);
+          return id;
+        });
       });
     });
   }
@@ -341,7 +362,8 @@ class SQLEntityRepository<O> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<bool> setRelationship<E>(O o, String field, List<E> values,
+  FutureOr<bool> setRelationship<E extends Object>(
+      O o, String field, List<E> values,
       {TypeInfo? fieldType, Transaction? transaction}) {
     fieldType ??= entityHandler.getFieldType(o, field)!;
 

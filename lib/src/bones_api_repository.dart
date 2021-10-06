@@ -4,9 +4,9 @@ import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 
 /// A entity repository API.
-abstract class APIRepository<O> {
+abstract class APIRepository<O extends Object> {
   /// Resolves a [EntityRepository].
-  static EntityRepository<O>? resolveEntityRepository<O>(
+  static EntityRepository<O>? resolveEntityRepository<O extends Object>(
       {EntityRepository<O>? entityRepository,
       EntityRepositoryProvider? provider,
       Type? type}) {

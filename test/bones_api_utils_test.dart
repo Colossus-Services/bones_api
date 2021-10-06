@@ -328,7 +328,7 @@ void main() {
     });
   });
 
-  group('TimedMap', () {
+  group('PositionalFields', () {
     test('basic', () async {
       var positionalFields = PositionalFields(['a', 'b', 'c']);
 
@@ -356,6 +356,44 @@ void main() {
             {'a': 1, 'b': 2, 'c': 3},
             {'a': 10, 'b': 20, 'c': 30}
           ]));
+    });
+  });
+
+  group('InstanceTracker', () {
+    test('basic', () async {
+      var tracker = InstanceTracker<Map<String, Object>, List<Object>>(
+          'test', (m) => m.values.toList());
+
+      var m1 = {'a': 1, 'b': 2};
+      var m2 = {'a': 2, 'b': 20};
+
+      expect(tracker.isTrackedInstance(m1), isFalse);
+      expect(tracker.isTrackedInstance(m2), isFalse);
+
+      expect(tracker.trackInstance(m1), equals(m1));
+
+      expect(tracker.isTrackedInstance(m1), isTrue);
+
+      expect(tracker.getTrackedInstanceInfo(m1), equals(m1.values.toList()));
+      expect(tracker.getTrackedInstanceInfo(m2), isNull);
+
+      tracker.untrackInstance(m1);
+      expect(tracker.isTrackedInstance(m1), isFalse);
+      expect(tracker.isTrackedInstance(m2), isFalse);
+
+      expect(tracker.getTrackedInstanceInfo(m1), isNull);
+      expect(tracker.getTrackedInstanceInfo(m2), isNull);
+
+      tracker.trackInstances([m1, m2]);
+      expect(tracker.isTrackedInstance(m1), isTrue);
+      expect(tracker.isTrackedInstance(m2), isTrue);
+
+      expect(tracker.getTrackedInstanceInfo(m1), equals(m1.values.toList()));
+      expect(tracker.getTrackedInstanceInfo(m2), equals(m2.values.toList()));
+
+      tracker.untrackInstances([m1, m2]);
+      expect(tracker.isTrackedInstance(m1), isFalse);
+      expect(tracker.isTrackedInstance(m2), isFalse);
     });
   });
 }

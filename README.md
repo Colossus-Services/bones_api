@@ -87,6 +87,12 @@ To serve an API project:
   $> bones_api serve --directory path/to/project --class MyAPIRoot
 ```
 
+To create an API project:
+
+```bash
+  $> bones_api  create -o /path_to/workspace/foo_api -p project_name_dir=foo_api -p "project_name=Foo API" -p "project_description=API for Foo stuffs." -p homepage=http://foo.com 
+```
+
 ## Hot Reload
 
 `APIServer` supports Hot Reload when the Dart VM is running with `--enable-vm-service`:

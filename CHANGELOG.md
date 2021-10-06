@@ -1,8 +1,13 @@
 ## 1.0.18
 
-- `APIResponseStatus`: added `BAD_REQUEST`.
+- `APIResponseStatus`:
+  - Added `BAD_REQUEST`.
+- Added `InstanceTracker` to track entities fields changes.
+- `EntityRepository`:
+  - tracking entity fields changes.
 - SQL:
   - Fix update syntax.
+  - Improved `UPDATE` to set only modified fields.
 
 ## 1.0.17
 

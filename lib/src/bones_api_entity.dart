@@ -64,7 +64,7 @@ class EntityHandlerProvider {
     return entityHandler as EntityHandler<O>?;
   }
 
-  EntityRepository<O>? getEntityRepository<O>(
+  EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj, Type? type, String? name}) {
     var entityHandler = getEntityHandler<O>(obj: obj, type: type);
 
@@ -129,9 +129,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
     }
   }
 
-  V? getID<V>(O o) => getField(o, 'id');
+  V? getID<V>(O o) => getField(o, idFieldsName(o));
 
-  void setID<V>(O o, V id) => setField(o, 'id', id);
+  void setID<V>(O o, V id) => setField(o, idFieldsName(o), id);
 
   String idFieldsName([O? o]);
 
@@ -373,6 +373,70 @@ abstract class EntityHandler<O> with FieldsFromMap {
   String encodeJson(dynamic o) =>
       dart_convert.json.encode(o, toEncodable: jsonToEncodable);
 
+  bool equalsFieldValues(String field, Object? value1, Object? value2, [O? o]) {
+    if (field == idFieldsName(o)) {
+      return isEqualsDeep(value1, value2);
+    }
+
+    return equalsValues(value1, value2);
+  }
+
+  bool equalsValues(Object? value1, Object? value2) {
+    //if (identical(value1, value2)) return true ;
+
+    if (value1 == null) return value2 == null;
+    if (value2 == null) return false;
+
+    if (value1 is DateTime || value2 is DateTime) {
+      var t1 = TypeParser.parseInt(value1);
+      var t2 = TypeParser.parseInt(value2);
+      return t1 == t2;
+    }
+
+    var primitive1 = TypeParser.isPrimitiveValue(value1);
+    var primitive2 = TypeParser.isPrimitiveValue(value2);
+
+    if (primitive1 && primitive2) {
+      return value1 == value2;
+    }
+
+    var collection1 = TypeParser.isCollectionValue(value1);
+    var collection2 = TypeParser.isCollectionValue(value2);
+
+    if (collection1 && collection2) {
+      return isEqualsDeep(value1, value2, valueEquality: equalsValues);
+    }
+
+    var maybeEntity1 = !primitive1 && !collection1;
+    var maybeEntity2 = !primitive2 && !collection2;
+
+    var entityHandler1 = maybeEntity1 ? getEntityHandler(obj: value1) : null;
+    var entityHandler2 = maybeEntity2 ? getEntityHandler(obj: value2) : null;
+
+    if (entityHandler1 != null || entityHandler2 != null) {
+      Object? id1;
+      Object? id2;
+      if (entityHandler1 == entityHandler2) {
+        id1 = entityHandler1!.getID(value1);
+        id2 = entityHandler1.getID(value2);
+      } else if (entityHandler1 == null) {
+        id1 = value1;
+        id2 = entityHandler2!.getID(value2);
+      } else if (entityHandler2 == null) {
+        id1 = entityHandler1.getID(value1);
+        id2 = value2;
+      }
+
+      if (id1 == null && id2 == null) {
+        return isEqualsDeep(value1, value2);
+      } else {
+        return isEqualsDeep(id1, id2);
+      }
+    }
+
+    return value1 == value2;
+  }
+
   FutureOr<O> createFromMap(Map<String, dynamic> fields);
 
   FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields) {
@@ -407,7 +471,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
     }
   }
 
-  EntityRepository<T>? getEntityRepository<T>(
+  EntityRepository<T>? getEntityRepository<T extends Object>(
       {T? obj, Type? type, String? name}) {
     for (var provider in _knownEntityRepositoryProviders) {
       var repository =
@@ -817,13 +881,13 @@ mixin EntityFieldAccessor<O> {
 
 class EntityFieldAccessorGeneric<O> with EntityFieldAccessor<O> {}
 
-abstract class EntityAccessor<O> {
+abstract class EntityAccessor<O extends Object> {
   final String name;
 
   EntityAccessor(this.name);
 }
 
-abstract class EntitySource<O> extends EntityAccessor<O> {
+abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   EntitySource(String name) : super(name);
 
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
@@ -912,7 +976,7 @@ abstract class EntitySource<O> extends EntityAccessor<O> {
       Transaction? transaction});
 }
 
-abstract class EntityStorage<O> extends EntityAccessor<O> {
+abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
   EntityStorage(String name) : super(name);
 
   bool isStored(O o, {Transaction? transaction});
@@ -921,7 +985,8 @@ abstract class EntityStorage<O> extends EntityAccessor<O> {
 
   FutureOr<Iterable> storeAll(Iterable<O> o, {Transaction? transaction});
 
-  FutureOr<bool> setRelationship<E>(O o, String field, List<E> values,
+  FutureOr<bool> setRelationship<E extends Object>(
+      O o, String field, List<E> values,
       {TypeInfo? fieldType, Transaction? transaction});
 }
 
@@ -940,7 +1005,8 @@ class EntityRepositoryProvider with Closable {
 
   EntityRepositoryProvider._global();
 
-  void registerEntityRepository<O>(EntityRepository<O> entityRepository) {
+  void registerEntityRepository<O extends Object>(
+      EntityRepository<O> entityRepository) {
     checkNotClosed();
 
     _entityRepositories[entityRepository.type] = entityRepository;
@@ -951,7 +1017,7 @@ class EntityRepositoryProvider with Closable {
 
   bool _callingGetEntityRepository = false;
 
-  EntityRepository<O>? getEntityRepository<O>(
+  EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj, Type? type, String? name}) {
     if (isClosed) return null;
 
@@ -976,7 +1042,7 @@ class EntityRepositoryProvider with Closable {
     }
   }
 
-  EntityRepository<O>? _getEntityRepositoryImpl<O>(
+  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>(
       {O? obj, Type? type, String? name}) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[O];
@@ -1038,7 +1104,7 @@ class EntityRepositoryProvider with Closable {
   }
 }
 
-abstract class EntityRepository<O> extends EntityAccessor<O>
+abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     with Initializable, Closable
     implements EntitySource<O>, EntityStorage<O> {
   static FutureOr<Map<String, dynamic>> resolveSubEntitiesFields(
@@ -1081,7 +1147,7 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
     });
   }
 
-  static FutureOr<E?> resolveEntityFromMap<E>(
+  static FutureOr<E?> resolveEntityFromMap<E extends Object>(
       {Object? entityMap,
       Map<String, dynamic>? parentMap,
       String? entityField,
@@ -1131,7 +1197,7 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
     }
   }
 
-  static EntityRepository<E>? _resolveEntityRepository<E>(
+  static EntityRepository<E>? _resolveEntityRepository<E extends Object>(
       String? entityField,
       Type? entityType,
       EntityRepositoryProvider? entityRepositoryProvider,
@@ -1156,6 +1222,8 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
   final EntityHandler<O> entityHandler;
   final Type type;
 
+  late final InstanceTracker<O, Map<String, Object?>> _entitiesTracker;
+
   EntityRepository(
       EntityRepositoryProvider? provider, String name, this.entityHandler,
       {Type? type})
@@ -1166,13 +1234,55 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
       throw StateError('Invalid EntityRepository type: $type ?? $O');
     }
 
+    _entitiesTracker =
+        InstanceTracker<O, Map<String, Object?>>(name, getEntityFields);
+
     this.provider.registerEntityRepository(this);
 
     entityHandler.notifyKnownEntityRepositoryProvider(this.provider);
   }
 
+  Map<String, Object?> getEntityFields(O o) {
+    var fields = entityHandler.getFields(o);
+    return fields;
+  }
+
   FutureOr<O> fromMap(Map<String, dynamic> fields) =>
       entityHandler.createFromMap(fields);
+
+  O trackEntity(O o) => _entitiesTracker.trackInstance(o);
+
+  void untrackEntity(O? o) => _entitiesTracker.untrackInstance(o);
+
+  O? trackEntityNullable(O? o) => _entitiesTracker.trackInstanceNullable(o);
+
+  List<O> trackEntities(Iterable<O> os) => _entitiesTracker.trackInstances(os);
+
+  List<O?> trackEntitiesNullable(Iterable<O?> os) =>
+      _entitiesTracker.trackInstancesNullable(os);
+
+  void untrackEntities(Iterable<O?> os) =>
+      _entitiesTracker.untrackInstances(os);
+
+  List<String>? getEntityChangedFields(O o) {
+    var prevFields = _entitiesTracker.getTrackedInstanceInfo(o);
+    if (prevFields == null) {
+      return null;
+    }
+
+    var fields = getEntityFields(o);
+
+    var changed = fields.entries.where((e) {
+      var key = e.key;
+      var val = e.value;
+      var prevVal = prevFields[key];
+      var eq = entityHandler.equalsFieldValues(key, val, prevVal);
+      return !eq;
+    });
+
+    var changedFields = changed.map((e) => e.key).toList();
+    return changedFields;
+  }
 
   @override
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
@@ -1181,14 +1291,14 @@ abstract class EntityRepository<O> extends EntityAccessor<O>
     return select(ConditionID(id), transaction: transaction)
         .resolveMapped((sel) {
       return sel.isNotEmpty ? sel.first : null;
-    });
+    }).resolveMapped(trackEntityNullable);
   }
 
   @override
   FutureOr<List<O?>> selectByIDs(List<dynamic> ids,
       {Transaction? transaction}) {
     var ret = ids.map((id) => selectByID(id, transaction: transaction));
-    return ret.resolveAll();
+    return ret.resolveAll().resolveMapped(trackEntitiesNullable);
   }
 
   FutureOr<dynamic> ensureStored(O o, {Transaction? transaction});
@@ -1693,8 +1803,8 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
   }
 }
 
-abstract class IterableEntityRepository<O> extends EntityRepository<O>
-    with EntityFieldAccessor<O> {
+abstract class IterableEntityRepository<O extends Object>
+    extends EntityRepository<O> with EntityFieldAccessor<O> {
   IterableEntityRepository(String name, EntityHandler<O> entityHandler,
       {EntityRepositoryProvider? provider})
       : super(provider, name, entityHandler);
@@ -1740,21 +1850,25 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
       int? limit}) {
     checkNotClosed();
 
-    return matches(matcher,
+    var os = matches(matcher,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         limit: limit);
+
+    return trackEntities(os);
   }
 
   @override
   O? selectByID(id, {Transaction? transaction}) {
     checkNotClosed();
 
-    return iterable().firstWhereOrNull((o) {
+    var o = iterable().firstWhereOrNull((o) {
       var oId = getID(o, entityHandler: entityHandler);
       return oId == id;
     });
+
+    return trackEntityNullable(o);
   }
 
   @override
@@ -1794,7 +1908,8 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<bool> setRelationship<E>(O o, String field, List<E> values,
+  FutureOr<bool> setRelationship<E extends Object>(
+      O o, String field, List<E> values,
       {TypeInfo? fieldType, Transaction? transaction}) {
     checkNotClosed();
 
@@ -1915,6 +2030,8 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
       remove(o);
     }
 
+    untrackEntities(del);
+
     return del;
   }
 
@@ -1947,7 +2064,8 @@ abstract class IterableEntityRepository<O> extends EntityRepository<O>
       };
 }
 
-class SetEntityRepository<O> extends IterableEntityRepository<O> {
+class SetEntityRepository<O extends Object>
+    extends IterableEntityRepository<O> {
   SetEntityRepository(String name, EntityHandler<O> entityHandler,
       {EntityRepositoryProvider? provider})
       : super(name, entityHandler, provider: provider);

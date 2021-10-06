@@ -1028,7 +1028,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
       <Type, EntityRepository>{};
 
   @override
-  void registerEntityRepository<O>(EntityRepository<O> entityRepository) {
+  void registerEntityRepository<O extends Object>(
+      EntityRepository<O> entityRepository) {
     checkNotClosed();
 
     _entityRepositories[entityRepository.type] = entityRepository;
@@ -1041,7 +1042,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
   bool _callingGetEntityRepository = false;
 
   @override
-  EntityRepository<O>? getEntityRepository<O>(
+  EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj, Type? type, String? name}) {
     if (isClosed) return null;
 
@@ -1057,7 +1058,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
     }
   }
 
-  EntityRepository<O>? _getEntityRepositoryImpl<O>(
+  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>(
       {O? obj, Type? type, String? name}) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[O];
