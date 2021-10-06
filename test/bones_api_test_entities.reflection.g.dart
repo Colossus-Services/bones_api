@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.11
+// BUILDER: reflection_factory/1.0.12
 // BUILD COMMAND: dart run build_runner build
 //
 
