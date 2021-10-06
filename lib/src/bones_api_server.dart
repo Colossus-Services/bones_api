@@ -132,10 +132,48 @@ class APIServer {
   }
 
   FutureOr<Response> _process(Request request) {
-    var apiRequest = toAPIRequest(request);
-    var apiResponse = apiRoot.call(apiRequest);
-    return apiResponse
-        .resolveMapped((res) => _processAPIResponse(request, apiRequest, res));
+    APIRequest? apiRequest;
+    try {
+      apiRequest = toAPIRequest(request);
+      var apiResponse = apiRoot.call(apiRequest);
+      return apiResponse.resolveMapped(
+          (res) => _processAPIResponse(request, apiRequest!, res));
+    } catch (e, s) {
+      var requestStr = apiRequest ?? _requestToString(request);
+
+      var message = 'ERROR processing request:\n\n$requestStr';
+      _log.log(logging.Level.SEVERE, message, e, s);
+
+      return Response.internalServerError(body: '$message\n\n$e\n$s');
+    }
+  }
+
+  String _requestToString(Request request) {
+    var s = StringBuffer();
+    s.write('METHOD: ');
+    s.write(request.method);
+    s.write('\n');
+
+    s.write('URI: ');
+    s.write(request.requestedUri);
+    s.write('\n');
+
+    if (request.contentLength != null) {
+      s.write('Content-Length: ');
+      s.write(request.contentLength);
+      s.write('\n');
+    }
+
+    s.write('HEADERS:\n');
+    for (var e in request.headers.entries) {
+      s.write('  - ');
+      s.write(e.key);
+      s.write(': ');
+      s.write(e.value);
+      s.write('\n');
+    }
+
+    return s.toString();
   }
 
   /// Convers a [request] to an [APIRequest].
@@ -156,10 +194,36 @@ class APIServer {
       return MapEntry(e.key, vals.length == 1 ? vals[0] : vals);
     }));
 
-    var req =
-        APIRequest(method, path, parameters: parameters, headers: headers);
+    var scheme = request.requestedUri.scheme;
+
+    var connectionInfo = _getConnectionInfo(request);
+    var requesterAddress = connectionInfo?.remoteAddress.address;
+
+    var requesterSource = requesterAddress == null
+        ? APIRequesterSource.unknown
+        : (_isLocalAddress(requesterAddress)
+            ? APIRequesterSource.local
+            : APIRequesterSource.remote);
+
+    var req = APIRequest(method, path,
+        parameters: parameters,
+        requesterSource: requesterSource,
+        requesterAddress: requesterAddress,
+        headers: headers,
+        scheme: scheme);
 
     return req;
+  }
+
+  bool _isLocalAddress(String address) =>
+      address == '127.0.0.1' ||
+      address == '0.0.0.0' ||
+      address == '::1' ||
+      address == '::';
+
+  HttpConnectionInfo? _getConnectionInfo(Request request) {
+    var val = request.context['shelf.io.connection_info'];
+    return val is HttpConnectionInfo ? val : null;
   }
 
   FutureOr<Response> _processAPIResponse(

@@ -1,3 +1,10 @@
+## 1.0.16
+
+- Better handling of `APIServer` errors and logging.
+- Added `runErrorZone` helper.
+- Added logging for entity operations errors.
+- reflection_factory: ^1.0.13
+
 ## 1.0.15
 
 - `EntityHandler`:

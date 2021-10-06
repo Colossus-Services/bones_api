@@ -11,7 +11,7 @@ import 'bones_api_extension.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.15';
+  static const String VERSION = '1.0.16';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -567,6 +567,23 @@ abstract class APIPayload {
 
 enum APIRequesterSource { internal, local, remote, unknown }
 
+extension APIRequesterSourceExtension on APIRequesterSource {
+  String get name {
+    switch (this) {
+      case APIRequesterSource.internal:
+        return 'internal';
+      case APIRequesterSource.local:
+        return 'local';
+      case APIRequesterSource.remote:
+        return 'remote';
+      case APIRequesterSource.unknown:
+        return 'unknown';
+      default:
+        throw ArgumentError('Unknown: $this');
+    }
+  }
+}
+
 /// Represents an API request.
 class APIRequest extends APIPayload {
   /// The request method.
@@ -1030,7 +1047,14 @@ class APIRequest extends APIPayload {
 
   @override
   String toString() {
-    return 'APIRequest{ method: $method, path: $path, parameters: $parameters, requester: $requesterSource @ $requesterAddress, headers: $headers${hasPayload ? ', payloadLength: $payloadLength' : ''} }';
+    return 'APIRequest{ method: ${method.name}, '
+        'path: $path, '
+        'parameters: $parameters, '
+        'requester: ${requesterAddress != null ? '$requesterAddress ' : ''}(${requesterSource.name}), '
+        'scheme: $scheme, '
+        'origin: $origin, '
+        'headers: $headers${hasPayload ? ', '
+            'payloadLength: $payloadLength, payloadMimeType: $payloadMimeType' : ''} }';
   }
 }
 

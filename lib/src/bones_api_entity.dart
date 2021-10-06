@@ -2,11 +2,14 @@ import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_utils.dart';
+
+final _log = logging.Logger('Entity');
 
 typedef JsonToEncodable = Object? Function(dynamic object);
 
@@ -560,7 +563,13 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   @override
   void setField<V>(O o, String key, V? value) {
     inspectObject(o);
-    return o.setField<V>(key, value);
+    try {
+      return o.setField<V>(key, value);
+    } catch (e, s) {
+      var message = "Error setting `$type` field: $key = $value";
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   @override
@@ -622,8 +631,16 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }
 
   @override
-  void setField<V>(O o, String key, V? value) =>
+  void setField<V>(O o, String key, V? value) {
+    try {
       reflection.setField(key, value, o);
+    } catch (e, s) {
+      var message =
+          "Error setting `$type` field using reflection[$reflection]: $key = $value";
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
+  }
 
   @override
   bool trySetField<V>(O o, String key, V? value) {

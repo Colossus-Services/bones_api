@@ -469,48 +469,53 @@ import 'package:bones_api/bones_api_dart_spawner.dart';
 import 'package:$projectPackageName/$projectLibraryName.dart';
 
 void main(List<String> args, dynamic parentPort) {
-  spawnedMain(args, parentPort, $isolateID, (args) async {
-    print('________________________________________________________________________________');
-    print('[Bones_API/${APIRoot.VERSION}] :: HTTP Server\\n');
-    print('- API Package: $projectPackageName/$projectLibraryName');
-    print('- API Class: $apiRootClass');
-    
-    var address = args[0];
-    var port = int.parse(args[1]);
-    var hotReload = args[2] == 'true';
-    var hotReloadIgnoreIsolate = args[3];
-    var config = args[4];
-    
-    print('- API Server: \$address:\$port\\n');
-    
-    if (hotReloadIgnoreIsolate.isNotEmpty) {
-      print('Adding Isolate ID `\$hotReloadIgnoreIsolate` to Hot Reload ignore list...');
-      APIHotReload.get().ignoreIsolate(hotReloadIgnoreIsolate);
+  runErrorZone(
+    () => spawnedMain(args, parentPort, $isolateID, runAPIServer) ,
+    uncaughtErrorTitle: 'APIServer Unhandled exception:',
+  );
+}
+
+Future<void> runAPIServer(List<String> args) async {
+  print('________________________________________________________________________________');
+  print('[Bones_API/${APIRoot.VERSION}] :: HTTP Server\\n');
+  print('- API Package: $projectPackageName/$projectLibraryName');
+  print('- API Class: $apiRootClass');
+  
+  var address = args[0];
+  var port = int.parse(args[1]);
+  var hotReload = args[2] == 'true';
+  var hotReloadIgnoreIsolate = args[3];
+  var config = args[4];
+  
+  print('- API Server: \$address:\$port\\n');
+  
+  if (hotReloadIgnoreIsolate.isNotEmpty) {
+    print('Adding Isolate ID `\$hotReloadIgnoreIsolate` to Hot Reload ignore list...');
+    APIHotReload.get().ignoreIsolate(hotReloadIgnoreIsolate);
+  }
+  
+  print('Starting APIServer...\\n');
+  
+  var api = $apiRootClass();
+  
+  if (config.isNotEmpty) {
+    var apiConfig = APIConfig.fromSync(config);
+    if (apiConfig != null) {
+      print('\$apiConfig\\n\\n');
+      api.apiConfig = apiConfig;
     }
-    
-    print('Starting APIServer...\\n');
-    
-    var api = $apiRootClass();
-    
-    if (config.isNotEmpty) {
-      var apiConfig = APIConfig.fromSync(config);
-      if (apiConfig != null) {
-        print('\$apiConfig\\n\\n');
-        api.apiConfig = apiConfig;
-      }
-    }
-    
-    var apiServer = APIServer(api, address, port, hotReload: hotReload);
-    await apiServer.start();
-    
-    print('\\n** APIServer Started.\\n');
-    
-    print('\$apiServer\\n');
-    print('URL: \${ apiServer.url }');
-    print('________________________________________________________________________________');
-    
-    await apiServer.waitStopped();
-  });
+  }
+  
+  var apiServer = APIServer(api, address, port, hotReload: hotReload);
+  await apiServer.start();
+  
+  print('\\n** APIServer Started.\\n');
+  
+  print('\$apiServer\\n');
+  print('URL: \${ apiServer.url }');
+  print('________________________________________________________________________________');
+  
+  await apiServer.waitStopped();
 }
     ''';
 

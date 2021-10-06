@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+
+final _log = logging.Logger('SQLEntityRepository');
 
 class SQLEntityRepository<O> extends EntityRepository<O>
     with EntityFieldAccessor<O> {
@@ -104,11 +107,22 @@ class SQLEntityRepository<O> extends EntityRepository<O>
 
     var op = TransactionOperationCount(null, transaction);
 
-    return sqlRepositoryAdapter.doCount(op,
-        matcher: matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    try {
+      return sqlRepositoryAdapter.doCount(op,
+          matcher: matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters);
+    } catch (e, s) {
+      var message = 'count> '
+          'matcher: $matcher ; '
+          'parameters: $parameters ; '
+          'positionalParameters: $positionalParameters ; '
+          'namedParameters: $namedParameters ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   @override
@@ -122,13 +136,24 @@ class SQLEntityRepository<O> extends EntityRepository<O>
 
     var op = TransactionOperationSelect(matcher, transaction);
 
-    return sqlRepositoryAdapter.doSelect(op, matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        limit: limit, preFinish: (results) {
-      return _resolveEntities(op.transaction, results);
-    });
+    try {
+      return sqlRepositoryAdapter.doSelect(op, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit, preFinish: (results) {
+        return _resolveEntities(op.transaction, results);
+      });
+    } catch (e, s) {
+      var message = 'select> '
+          'matcher: $matcher ; '
+          'parameters: $parameters ; '
+          'positionalParameters: $positionalParameters ; '
+          'namedParameters: $namedParameters ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   FutureOr<List<O>> _resolveEntities(
@@ -261,18 +286,27 @@ class SQLEntityRepository<O> extends EntityRepository<O>
 
     var op = TransactionOperationStore(o, transaction);
 
-    return ensureReferencesStored(o, transaction: op.transaction)
-        .resolveWith(() {
-      var idFieldsName = entityHandler.idFieldsName(o);
-      var fields = entityHandler.getFields(o);
+    try {
+      return ensureReferencesStored(o, transaction: op.transaction)
+          .resolveWith(() {
+        var idFieldsName = entityHandler.idFieldsName(o);
+        var fields = entityHandler.getFields(o);
 
-      return sqlRepositoryAdapter
-          .doInsert(op, o, fields, idFieldName: idFieldsName, preFinish: (id) {
-        entityHandler.setID(o, id);
-        return _ensureRelationshipsStored(o, op.transaction)
-            .resolveWithValue(id);
+        return sqlRepositoryAdapter.doInsert(op, o, fields,
+            idFieldName: idFieldsName, preFinish: (id) {
+          entityHandler.setID(o, id);
+          return _ensureRelationshipsStored(o, op.transaction)
+              .resolveWithValue(id);
+        });
       });
-    });
+    } catch (e, s) {
+      var message = 'store> '
+          'o: $o ; '
+          'transaction: $transaction ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   FutureOr<dynamic> _update(O o, Transaction? transaction) {
@@ -319,8 +353,19 @@ class SQLEntityRepository<O> extends EntityRepository<O>
     var oId = entityHandler.getID(o);
     var othersIds = values.map((e) => valuesEntityHandler.getID(e)).toList();
 
-    return sqlRepositoryAdapter.doInsertRelationship(
-        op, oId, valuesTableName, othersIds);
+    try {
+      return sqlRepositoryAdapter.doInsertRelationship(
+          op, oId, valuesTableName, othersIds);
+    } catch (e, s) {
+      var message = 'setRelationship> '
+          'o: $o ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'values: $values ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   @override
@@ -335,11 +380,22 @@ class SQLEntityRepository<O> extends EntityRepository<O>
     var valuesType = fieldType.listEntityType!.type;
     String valuesTableName = _resolveTableName(valuesType);
 
-    return sqlRepositoryAdapter.doSelectRelationship(op, oId, valuesTableName,
-        (sel) {
-      var valuesIds = sel.map((e) => e.values.first).cast<E>().toList();
-      return valuesIds;
-    });
+    try {
+      return sqlRepositoryAdapter.doSelectRelationship(op, oId, valuesTableName,
+          (sel) {
+        var valuesIds = sel.map((e) => e.values.first).cast<E>().toList();
+        return valuesIds;
+      });
+    } catch (e, s) {
+      var message = 'selectRelationship> '
+          'o: $o ; '
+          'oId: $oId ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 
   String _resolveTableName(Type type) {
@@ -383,11 +439,22 @@ class SQLEntityRepository<O> extends EntityRepository<O>
 
     var op = TransactionOperationDelete(matcher, transaction);
 
-    return sqlRepositoryAdapter.doDelete(op, matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters, preFinish: (results) {
-      return _resolveEntities(op.transaction, results);
-    });
+    try {
+      return sqlRepositoryAdapter.doDelete(op, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters, preFinish: (results) {
+        return _resolveEntities(op.transaction, results);
+      });
+    } catch (e, s) {
+      var message = 'delete> '
+          'matcher: $matcher ; '
+          'parameters: $parameters ; '
+          'positionalParameters: $positionalParameters ; '
+          'namedParameters: $namedParameters ; '
+          'op: $op';
+      _log.log(logging.Level.SEVERE, message, e, s);
+      throw StateError(message);
+    }
   }
 }
