@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
@@ -456,13 +457,19 @@ class APIRouteBuilder<M extends APIModule> {
       return request;
     }
 
-    if (typeReflection.isOfType(Uint8List) ||
-        (typeReflection.isOfType(List) &&
-            typeReflection.equalsArgumentsTypes([int]))) {
+    if (typeReflection.isOfType(Uint8List)) {
       return request.payloadAsBytes;
     }
 
-    return request.getParameterIgnoreCase(parameter.name);
+    var value = request.getParameterIgnoreCase(parameter.name);
+    if (value == null) {
+      return null;
+    }
+
+    var typeInfo = TypeInfo.from(typeReflection);
+    var parsed = typeInfo.parse(value);
+
+    return parsed ?? value;
   }
 }
 

@@ -1,3 +1,11 @@
+## 1.0.20
+
+- `APIRouteBuilder`:
+  - Better conversion of parameters types.
+  - Payload only for parameter of type `Uint8List`.
+- `APIServer`:
+  - Better handling of errors of async payloads (`Future` resolution). 
+
 ## 1.0.19
 
 - Improved `SQLEntityRepository` tests.

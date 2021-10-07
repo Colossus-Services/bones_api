@@ -246,40 +246,53 @@ class APIServer {
     var retPayload = resolveBody(apiResponse.payload, apiResponse);
 
     return retPayload.resolveMapped((payload) {
-      apiResponse.setMetric('API-call', apiRequest.elapsedTime);
-      apiResponse.stopAllMetrics();
-
-      var contentType = apiResponse.payloadMimeType;
-      if (contentType != null && contentType.isNotEmpty) {
-        headers['content-type'] = contentType;
-      }
-
-      headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
-
-      switch (apiResponse.status) {
-        case APIResponseStatus.OK:
-          return Response.ok(payload, headers: headers);
-        case APIResponseStatus.NOT_FOUND:
-          return Response.notFound(payload, headers: headers);
-        case APIResponseStatus.UNAUTHORIZED:
-          return Response.forbidden(payload, headers: headers);
-        case APIResponseStatus.BAD_REQUEST:
-          return Response(400, body: payload, headers: headers);
-        case APIResponseStatus.ERROR:
-          {
-            var retError = resolveBody(apiResponse.error, apiResponse);
-
-            return retError.resolveMapped((error) {
-              return Response.internalServerError(
-                  body: error, headers: headers);
-            });
-          }
-        default:
-          return Response.notFound(
-              'NOT FOUND[${request.method}]: ${request.url}',
-              headers: headers);
+      if (payload is APIResponse) {
+        var apiResponse2 = payload;
+        return resolveBody(apiResponse2.payload, apiResponse2)
+            .resolveMapped((payload2) {
+          return _sendResponse(
+              request, apiRequest, apiResponse2, headers, payload2);
+        });
+      } else {
+        return _sendResponse(
+            request, apiRequest, apiResponse, headers, payload);
       }
     });
+  }
+
+  FutureOr<Response> _sendResponse(Request request, APIRequest apiRequest,
+      APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
+    apiResponse.setMetric('API-call', apiRequest.elapsedTime);
+    apiResponse.stopAllMetrics();
+
+    var contentType = apiResponse.payloadMimeType;
+    if (contentType != null && contentType.isNotEmpty) {
+      headers['content-type'] = contentType;
+    }
+
+    headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
+
+    switch (apiResponse.status) {
+      case APIResponseStatus.OK:
+        return Response.ok(payload, headers: headers);
+      case APIResponseStatus.NOT_FOUND:
+        return Response.notFound(payload, headers: headers);
+      case APIResponseStatus.UNAUTHORIZED:
+        return Response.forbidden(payload, headers: headers);
+      case APIResponseStatus.BAD_REQUEST:
+        return Response(400, body: payload, headers: headers);
+      case APIResponseStatus.ERROR:
+        {
+          var retError = resolveBody(apiResponse.error, apiResponse);
+
+          return retError.resolveMapped((error) {
+            return Response.internalServerError(body: error, headers: headers);
+          });
+        }
+      default:
+        return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',
+            headers: headers);
+    }
   }
 
   /// Resolves a [payload] to a HTTP body.
@@ -290,6 +303,8 @@ class APIServer {
     if (payload is Future) {
       return payload.then((value) {
         return resolveBody(value, apiResponse);
+      }, onError: (e, s) {
+        return apiResponse.asError(error: 'ERROR: $e\n$s');
       });
     }
 
