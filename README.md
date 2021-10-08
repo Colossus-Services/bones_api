@@ -139,8 +139,8 @@ OUTPUT:
 ```text
 Starting APIServer...
 
-2021-10-08 02:15:17.924328 [CONFIG]  (main) APIHotReload > pkgConfigURL: file:///Volumes/safezone/workspace-eneuralnet/bones_api/.dart_tool/package_config.json
-2021-10-08 02:15:17.959068 [CONFIG]  (main) APIHotReload > Watching [/Volumes/safezone/workspace-eneuralnet/bones_api] with [MacOSDirectoryWatcher]...
+2021-10-08 02:15:17.924328 [CONFIG]  (main) APIHotReload > pkgConfigURL: ~/workspace/bones_api/.dart_tool/package_config.json
+2021-10-08 02:15:17.959068 [CONFIG]  (main) APIHotReload > Watching [~/workspace/bones_api] with [MacOSDirectoryWatcher]...
 2021-10-08 02:15:18.185128 [INFO]    (main) APIHotReload > Created HotReloader
 2021-10-08 02:15:18.185624 [INFO]    (main) APIHotReload > Enabled Hot Reload: true
 2021-10-08 02:15:18.185852 [INFO]    (main) APIServer    > Started HTTP server: 0.0.0.0:8088
