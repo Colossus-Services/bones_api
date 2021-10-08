@@ -30,6 +30,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
   String get dialect => sqlRepositoryAdapter.dialect;
 
+  String get tableName => sqlRepositoryAdapter.tableName;
+
   @override
   Map<String, dynamic> information() =>
       {'queryType': 'SQL', 'dialect': dialect};
@@ -120,9 +122,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'parameters: $parameters ; '
           'positionalParameters: $positionalParameters ; '
           'namedParameters: $namedParameters ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 
@@ -151,9 +154,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'parameters: $parameters ; '
           'positionalParameters: $positionalParameters ; '
           'namedParameters: $namedParameters ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 
@@ -311,9 +315,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       var message = 'store> '
           'o: $o ; '
           'transaction: $transaction ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 
@@ -385,9 +390,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'field: $field ; '
           'fieldType: $fieldType ; '
           'values: $values ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 
@@ -415,9 +421,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'oId: $oId ; '
           'field: $field ; '
           'fieldType: $fieldType ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 
@@ -475,9 +482,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'parameters: $parameters ; '
           'positionalParameters: $positionalParameters ; '
           'namedParameters: $namedParameters ; '
-          'op: $op';
+          'op: $op > '
+          '[ERROR] $e';
       _log.log(logging.Level.SEVERE, message, e, s);
-      throw StateError(message);
+      rethrow;
     }
   }
 }

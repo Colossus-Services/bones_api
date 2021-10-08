@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_utils.dart';
 
 abstract class ConditionElement {
   bool _resolved = false;
@@ -147,6 +148,19 @@ class ConditionParameter extends ConditionElement {
             positionalParameters: positionalParameters,
             namedParameters: namedParameters)
         : value;
+
+    if (myValue is Iterable) {
+      if (otherValue is Iterable) {
+        var equals = isEqualsIterableDeep(myValue, otherValue);
+        return equals;
+      } else {
+        var contains = myValue.contains(otherValue);
+        return contains;
+      }
+    } else if (otherValue is Iterable) {
+      var contains = otherValue.contains(myValue);
+      return contains;
+    }
 
     return myValue == otherValue;
   }
@@ -707,6 +721,20 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       if (key is ConditionKeyField) {
         if (obj is Map) {
           value = obj[key.name];
+        } else if (obj is Iterable) {
+          return obj.map((e) {
+            if (e is Map) {
+              return e[key.name];
+            } else {
+              var handler = entityHandler?.getEntityHandler(obj: e);
+              if (handler != null) {
+                var v = handler.getField(e, key.name);
+                return v;
+              } else {
+                return e;
+              }
+            }
+          }).toList();
         } else {
           throw StateError(
               "Can't access key[${key.name}] for type: ${obj.runtimeType}");

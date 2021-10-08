@@ -347,6 +347,28 @@ void main() {
         expect(user.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
+
+      {
+        var sel = await userSQLRepository
+            .selectByQuery('roles.type == ? ', parameters: ['admin']);
+
+        var user = sel.first;
+        print(user.toJson());
+
+        expect(user.email, equals('joe@memory.com'));
+        expect(user.address.state, equals('NY'));
+      }
+
+      {
+        var sel = await userSQLRepository
+            .selectByQuery('roles.type == ? ', parameters: ['guest']);
+
+        var user = sel.first;
+        print(user.toJson());
+
+        expect(user.email, equals('smith@memory.com'));
+        expect(user.address.state, equals('CA'));
+      }
     });
   });
 

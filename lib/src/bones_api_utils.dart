@@ -508,6 +508,10 @@ class TypeInfo {
   /// Returns `true` if [type] has [arguments].
   bool get hasArguments => arguments.isNotEmpty;
 
+  /// Returns the [TypeInfo] of the argument at [index].
+  TypeInfo? argumentType(int index) =>
+      index < argumentsLength ? arguments[index] : null;
+
   /// Returns the [type] parser.
   ///
   /// See [TypeParser.parserFor].
@@ -998,7 +1002,7 @@ bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
     return false;
   } else if (o1 is Iterable) {
     if (o2 is Iterable) {
-      return isEqualsIteratorDeep(o1, o2, valueEquality: valueEquality);
+      return isEqualsIterableDeep(o1, o2, valueEquality: valueEquality);
     }
     return false;
   }
@@ -1031,7 +1035,7 @@ bool isEqualsListDeep(List? l1, List? l2, {ValueEquality? valueEquality}) {
 }
 
 /// Same as [isEqualsListDeep] but for [Iterable].
-bool isEqualsIteratorDeep(Iterable? it1, Iterable? it2,
+bool isEqualsIterableDeep(Iterable? it1, Iterable? it2,
     {ValueEquality? valueEquality}) {
   if (identical(it1, it2)) return true;
 

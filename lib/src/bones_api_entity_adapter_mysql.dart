@@ -82,7 +82,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  String get sqlElementQuote => '';
+  String get sqlElementQuote => '`';
 
   @override
   bool get sqlAcceptsOutputSyntax => false;
@@ -333,8 +333,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<int> doCountSQL(
-      String table, SQL sql, MySqlConnectionWrapper connection) {
+  FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
+      MySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
@@ -344,7 +344,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
       String table, SQL sql, MySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
@@ -355,7 +355,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       results.map((e) => e.fields).whereType<Map<String, dynamic>>().toList();
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
       String table, SQL sql, MySqlConnectionWrapper connection) {
     var preSQLs = sql.preSQL;
 
@@ -395,16 +395,16 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<dynamic> doInsertSQL(
-      String table, SQL sql, MySqlConnectionWrapper connection) {
+  FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
+      MySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
   }
 
   @override
-  FutureOr doUpdateSQL(
-      String table, SQL sql, Object id, MySqlConnectionWrapper connection) {
+  FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
+      MySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql, id));

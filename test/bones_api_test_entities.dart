@@ -40,6 +40,10 @@ class UserAPIRepository extends APIRepository<User> {
   FutureOr<Iterable<User>> selectByAddressState(String state) {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
+
+  FutureOr<Iterable<User>> selectByRoleType(String type) {
+    return selectByQuery(' roles.type == ? ', parameters: [type]);
+  }
 }
 
 @EnableReflection()

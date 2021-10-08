@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_utils.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -117,10 +118,10 @@ class TableScheme with FieldsFromMap {
   final Map<String, Type> fieldsTypes;
 
   /// Fields that are references to another table field.
-  final Map<String, TableFieldReference> fieldsReferencedTables;
+  final Map<String, TableFieldReference> _fieldsReferencedTables;
 
   /// Reference tables (many-to-many).
-  final Set<TableRelationshipReference> relationshipTables;
+  final Set<TableRelationshipReference> _relationshipTables;
 
   late final Map<String, int> _fieldsNamesIndexes;
   late final List<String> _fieldsNamesLC;
@@ -135,20 +136,27 @@ class TableScheme with FieldsFromMap {
       Iterable<TableRelationshipReference>? relationshipTables])
       : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
         fieldsTypes = Map.unmodifiable(fieldsTypes),
-        fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
+        _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
             fieldsReferencedTables),
-        relationshipTables = Set<TableRelationshipReference>.unmodifiable(
+        _relationshipTables = Set<TableRelationshipReference>.unmodifiable(
             relationshipTables ?? <TableRelationshipReference>[]) {
     _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
     _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
     _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
 
-    for (var t in this.relationshipTables) {
+    for (var t in _relationshipTables) {
       if (t.sourceTable == name) {
         _tableRelationshipReference[t.targetTable] = t;
       }
     }
   }
+
+  /// Returns [_fieldsReferencedTables] length.
+  int get fieldsReferencedTablesLength => _fieldsReferencedTables.length;
+
+  /// Returns [_tableRelationshipReference] length.
+  int get tableRelationshipReferenceLength =>
+      _tableRelationshipReference.length;
 
   /// Returns a [Map] with the table fields values populated from the provided [map].
   ///
@@ -161,17 +169,55 @@ class TableScheme with FieldsFromMap {
   }
 
   /// Returns the [TableRelationshipReference] with the [targetTable].
-  TableRelationshipReference? getTableRelationshipReference(
-          String targetTable) =>
-      _tableRelationshipReference[targetTable];
+  TableRelationshipReference? getTableRelationshipReference(String targetTable,
+          [String? sourceTable]) =>
+      _tableRelationshipReference[targetTable] ??
+      _tableRelationshipReference[sourceTable];
+
+  /// Returns a [TableFieldReference] from [_fieldsReferencedTables] with a resolved [fieldKey].
+  /// See [resolveTableFiledName].
+  TableFieldReference? getFieldsReferencedTables(String fieldKey) {
+    var ref = _fieldsReferencedTables[fieldKey];
+    if (ref != null) return ref;
+
+    var resolvedName = resolveTableFiledName(fieldKey);
+    if (resolvedName == null) return null;
+
+    ref = _fieldsReferencedTables[resolvedName];
+    return ref;
+  }
+
+  /// Resolves [key] to a matching field in [fieldsNames].
+  String? resolveTableFiledName(String key) {
+    if (fieldsNames.contains(key)) {
+      return key;
+    }
+
+    var keyLC = fieldToLCKey(key);
+    var keySimple = fieldToSimpleKey(key);
+
+    for (var name in fieldsNames) {
+      var nameLC = fieldToLCKey(name);
+      if (nameLC == keyLC) {
+        return name;
+      }
+
+      var nameSimple = fieldToSimpleKey(name);
+      if (nameSimple == keySimple) {
+        return name;
+      }
+    }
+
+    return null;
+  }
 
   @override
   String toString() {
     return 'TableScheme{name: $name, '
         'idFieldName: $idFieldName, '
         'fieldsTypes: $fieldsTypes, '
-        'fieldsReferencedTables: $fieldsReferencedTables, '
-        'relationshipTables: $relationshipTables}';
+        'fieldsReferencedTables: $_fieldsReferencedTables, '
+        'relationshipTables: $_relationshipTables}';
   }
 }
 
@@ -217,6 +263,13 @@ abstract class SchemeProvider {
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
   TableScheme? disposeTableSchemeCache(String table) =>
       _tablesSchemes.remove(table);
+
+  /// Returns the table name for [type].
+  FutureOr<String?> getTableForType(TypeInfo type);
+
+  /// Returns the [type] for the [field] at [tableName] or by [entityName].
+  FutureOr<TypeInfo?> getFieldType(String field,
+      {String? entityName, String? tableName});
 }
 
 /// An encoding context for [ConditionEncoder].
@@ -234,6 +287,8 @@ class EncodingContext {
 
   Transaction? transaction;
 
+  String? tableName;
+
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
 
@@ -246,11 +301,18 @@ class EncodingContext {
   final Set<TableFieldReference> fieldsReferencedTables =
       <TableFieldReference>{};
 
+  /// The relationship tables fields in the encoded [Condition].
+  final Map<String, TableRelationshipReference> relationshipTables =
+      <String, TableRelationshipReference>{};
+
   EncodingContext(this.entityName,
       {this.parameters,
       this.positionalParameters,
       this.namedParameters,
-      this.transaction});
+      this.transaction,
+      this.tableName});
+
+  String get tableNameOrEntityName => tableName ?? entityName;
 
   String get outputString => output.toString();
 
@@ -367,12 +429,14 @@ abstract class ConditionEncoder {
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
-      Transaction? transaction}) {
+      Transaction? transaction,
+      String? tableName}) {
     var context = EncodingContext(entityName,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
-        transaction: transaction);
+        transaction: transaction,
+        tableName: tableName);
 
     var rootIsGroup = condition is GroupCondition;
 

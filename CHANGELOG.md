@@ -1,3 +1,12 @@
+## 1.0.22
+
+- `Condition`:
+  - Improved sub-field match.
+- `SQL`:
+  - Allow `Condition` with fields that are a relationship table. 
+- `MySQLAdapter`: 
+  - Using `sqlElementQuote` "`" to avoid issues with reserved words.
+
 ## 1.0.21
 
 - Better handling of route parameters with `null` and empty values.

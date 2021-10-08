@@ -621,7 +621,11 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   @override
   TypeInfo? getFieldType(O? o, String key) {
     inspectObject(o);
-    return o?.getFieldType(key);
+    if (o != null) {
+      return o.getFieldType(key);
+    } else {
+      return _fieldsTypes?[key];
+    }
   }
 
   @override

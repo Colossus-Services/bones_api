@@ -368,8 +368,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<int> doCountSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+  FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
+      PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -386,7 +386,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
       String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
@@ -401,7 +401,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
       String table, SQL sql, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
@@ -416,16 +416,16 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<dynamic> doInsertSQL(
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+  FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
+      PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
   }
 
   @override
-  FutureOr doUpdateSQL(
-      String table, SQL sql, Object id, PostgreSQLExecutionContext connection) {
+  FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
+      PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) => _resolveResultID(results, table, sql, id));

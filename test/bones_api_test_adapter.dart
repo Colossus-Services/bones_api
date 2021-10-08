@@ -324,6 +324,26 @@ void runAdapterTests(
       }
 
       {
+        var sel = await userAPIRepository.selectByRoleType('admin');
+
+        var user = sel.first;
+        print(user.toJson());
+
+        expect(user.email, equals('joe@$testDomain'));
+        expect(user.address.state, equals('NY'));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByRoleType('guest');
+
+        var user = sel.first;
+        print(user.toJson());
+
+        expect(user.email, equals('smith@$testDomain'));
+        expect(user.address.state, equals('CA'));
+      }
+
+      {
         var sel = await userAPIRepository.selectByAddressState('CA');
 
         var user = sel.first;

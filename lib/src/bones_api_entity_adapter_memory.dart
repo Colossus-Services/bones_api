@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_utils.dart';
 
 /// A [SQLAdapter] that stores tables data in memory.
 ///
@@ -73,13 +73,15 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<int> doCountSQL(String table, SQL sql, int connection) {
+  FutureOr<int> doCountSQL(
+      String entityName, String table, SQL sql, int connection) {
     var map = _getTableMap(table, false);
     return map == null ? 0 : map.length;
   }
 
   @override
-  FutureOr doInsertRelationshipSQL(String table, SQL sql, int connection) {
+  FutureOr doInsertRelationshipSQL(
+      String entityName, String table, SQL sql, int connection) {
     var entry = sql.parameters;
 
     var map = _getTableMap(table, true)!;
@@ -97,7 +99,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doInsertSQL(String table, SQL sql, int connection) {
+  FutureOr doInsertSQL(
+      String entityName, String table, SQL sql, int connection) {
     var map = _getTableMap(table, true)!;
 
     var id = nextID(table);
@@ -115,7 +118,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doUpdateSQL(String table, SQL sql, Object id, int connection) {
+  FutureOr doUpdateSQL(
+      String entityName, String table, SQL sql, Object id, int connection) {
     var map = _getTableMap(table, true)!;
 
     var entry = sql.parameters;
@@ -133,7 +137,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
-      String table, SQL sql, int connection) {
+      String entityName, String table, SQL sql, int connection) {
     var map = _getTableMap(table, false);
     if (map == null) {
       return <Map<String, dynamic>>[];
@@ -143,7 +147,9 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var entityHandler = getEntityRepository(name: table)?.entityHandler;
 
-    if (tableScheme == null || tableScheme.fieldsReferencedTables.isEmpty) {
+    if (tableScheme == null ||
+        (tableScheme.fieldsReferencedTablesLength == 0 &&
+            tableScheme.tableRelationshipReferenceLength == 0)) {
       var sel = map.values.where((e) {
         return sql.condition!.matchesEntityMap(e,
             namedParameters: sql.parameters, entityHandler: entityHandler);
@@ -153,10 +159,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       return sel;
     }
 
-    var fieldsReferencedTables = tableScheme.fieldsReferencedTables;
-
     var sel = map.values.where((obj) {
-      obj = _resolveEntityMap(obj, fieldsReferencedTables);
+      obj = _resolveEntityMap(obj, tableScheme);
 
       return sql.condition!.matchesEntityMap(obj,
           namedParameters: sql.parameters, entityHandler: entityHandler);
@@ -182,7 +186,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
-      String table, SQL sql, int connection) {
+      String entityName, String table, SQL sql, int connection) {
     var map = _getTableMap(table, false);
     if (map == null) {
       return <Map<String, dynamic>>[];
@@ -192,7 +196,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var entityHandler = getEntityRepository(name: table)?.entityHandler;
 
-    if (tableScheme == null || tableScheme.fieldsReferencedTables.isEmpty) {
+    if (tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0) {
       var entries = map.entries.where((e) {
         return sql.condition!.matchesEntityMap(e.value,
             namedParameters: sql.parameters, entityHandler: entityHandler);
@@ -201,11 +205,9 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       return _removeEntries(entries, map);
     }
 
-    var fieldsReferencedTables = tableScheme.fieldsReferencedTables;
-
     var entries = map.entries
         .map((e) {
-          var obj = _resolveEntityMap(e.value, fieldsReferencedTables);
+          var obj = _resolveEntityMap(e.value, tableScheme);
 
           var match = sql.condition!.matchesEntityMap(obj,
               namedParameters: sql.parameters, entityHandler: entityHandler);
@@ -230,10 +232,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     return del;
   }
 
-  Map<String, dynamic> _resolveEntityMap(Map<String, dynamic> obj,
-      Map<String, TableFieldReference> fieldsReferencedTables) {
+  Map<String, dynamic> _resolveEntityMap(
+      Map<String, dynamic> obj, TableScheme tableScheme) {
     return obj.map((key, value) {
-      var refField = fieldsReferencedTables[key];
+      var refField = tableScheme.getFieldsReferencedTables(key);
       if (refField != null) {
         var id = obj[key];
 
@@ -245,9 +247,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
                 getTableScheme(refField.targetTable) as TableScheme?;
 
             if (tableScheme2 != null &&
-                tableScheme2.fieldsReferencedTables.isNotEmpty) {
-              obj2 =
-                  _resolveEntityMap(obj2, tableScheme2.fieldsReferencedTables);
+                tableScheme2.fieldsReferencedTablesLength > 0) {
+              obj2 = _resolveEntityMap(obj2, tableScheme2);
             }
           }
 

@@ -426,4 +426,31 @@ class _TestSchemeProvider extends SchemeProvider {
         throw StateError("Unknown table: $table");
     }
   }
+
+  @override
+  FutureOr<String?> getTableForType(TypeInfo type) {
+    var typeName = type.toString().toLowerCase();
+
+    if (typeName.contains('address')) {
+      return 'address';
+    } else if (typeName.contains('account')) {
+      return 'account';
+    }
+
+    return null;
+  }
+
+  @override
+  FutureOr<TypeInfo?> getFieldType(String field,
+      {String? entityName, String? tableName}) {
+    var tableScheme =
+        tableName != null ? getTableScheme(tableName) as TableScheme? : null;
+    tableScheme ??=
+        entityName != null ? getTableScheme(entityName) as TableScheme? : null;
+
+    var fieldsType = tableScheme?.fieldsTypes[field];
+    if (fieldsType != null) return TypeInfo.from(fieldsType);
+
+    return null;
+  }
 }

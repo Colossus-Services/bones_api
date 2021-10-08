@@ -6,6 +6,7 @@ import 'bones_api_condition_encoder.dart';
 /// A [Condition] encoder for SQL.
 class ConditionSQLEncoder extends ConditionEncoder {
   final String sqlElementQuote;
+
   ConditionSQLEncoder(SchemeProvider schemeProvider,
       {required this.sqlElementQuote})
       : super(schemeProvider);
@@ -28,25 +29,25 @@ class ConditionSQLEncoder extends ConditionEncoder {
   @override
   FutureOr<EncodingContext> encodeIDCondition(
       ConditionID c, EncodingContext context) {
-    var entityName = context.entityName;
-    var entityAlias = context.resolveEntityAlias(entityName);
+    var tableName = context.tableNameOrEntityName;
+    var tableAlias = context.resolveEntityAlias(tableName);
 
     var schemeProvider = this.schemeProvider;
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idValue);
       var valueSQL = valueToSQL(context, c.idValue, idKey);
 
-      context.write(' $entityAlias.id = ');
+      context.write(' $tableAlias.id = ');
       context.write(valueSQL);
       context.write(' ');
 
       return context;
     } else {
-      var tableSchemeRet = schemeProvider.getTableScheme(entityName);
+      var tableSchemeRet = schemeProvider.getTableScheme(tableName);
 
       return tableSchemeRet.resolveMapped((tableScheme) {
         if (tableScheme == null) {
-          throw StateError("Can't find TableScheme for entity: $entityName");
+          throw StateError("Can't find TableScheme for entity: $tableName");
         }
 
         var idFieldName = tableScheme.idFieldName ?? 'id';
@@ -56,7 +57,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
         var q = sqlElementQuote;
 
-        context.write(' $q$entityAlias$q.$q$idFieldName$q = ');
+        context.write(' $q$tableAlias$q.$q$idFieldName$q = ');
         context.write(valueSQL);
         context.write(' ');
 
@@ -119,13 +120,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
     KeyCondition<dynamic, dynamic> c,
     EncodingContext context,
   ) {
-    var entityAlias = context.resolveEntityAlias(context.entityName);
+    var tableName = context.tableNameOrEntityName;
+    var tableAlias = context.resolveEntityAlias(tableName);
 
     var keys = c.keys;
     var key0 = keys.first as ConditionKeyField;
 
     var q = sqlElementQuote;
-    return '$q$entityAlias$q.$q${key0.name}$q';
+    return '$q$tableAlias$q.$q${key0.name}$q';
   }
 
   FutureOr<String> keyFieldReferenceToSQL(
@@ -133,42 +135,79 @@ class ConditionSQLEncoder extends ConditionEncoder {
     EncodingContext context,
   ) {
     var schemeProvider = this.schemeProvider;
-    var entityName = context.entityName;
+    var tableName = context.tableNameOrEntityName;
 
     if (schemeProvider == null) {
       throw ConditionEncodingError(
-          'No SchemeProvider> entityName: $entityName > $this');
+          'No SchemeProvider> entityName: $tableName > $this');
     }
 
     var keys = c.keys;
     var key0 = keys.first as ConditionKeyField;
 
-    var tableSchemeRet = schemeProvider.getTableScheme(entityName);
+    var tableSchemeRet = schemeProvider.getTableScheme(tableName);
 
     return tableSchemeRet.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for entity: $entityName");
+        throw StateError("Can't find TableScheme for: $tableName");
       }
 
-      var fieldRef = tableScheme.fieldsReferencedTables[key0.name];
+      var fieldRef = tableScheme.getFieldsReferencedTables(key0.name);
 
-      if (fieldRef == null) {
-        throw ConditionEncodingError(
-            'No referenced table for key[0]> keys: $keys ; entityName: $entityName > $this');
+      if (fieldRef != null) {
+        context.fieldsReferencedTables.add(fieldRef);
+        var entityAlias = context.resolveEntityAlias(fieldRef.targetTable);
+
+        var key1 = keys[1];
+
+        if (key1 is ConditionKeyField) {
+          var q = sqlElementQuote;
+          return '$q$entityAlias$q.$q${key1.name}$q';
+        } else {
+          throw ConditionEncodingError('Key: $c');
+        }
       }
 
-      context.fieldsReferencedTables.add(fieldRef);
+      var retFieldType = schemeProvider.getFieldType(key0.name,
+          entityName: context.entityName, tableName: context.tableName);
 
-      var entityAlias = context.resolveEntityAlias(fieldRef.targetTable);
+      return retFieldType.resolveMapped((fieldType) {
+        if (fieldType == null) {
+          throw ConditionEncodingError(
+              'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme');
+        }
 
-      var key1 = keys[1];
+        var retTableNameRef = schemeProvider.getTableForType(fieldType);
 
-      if (key1 is ConditionKeyField) {
-        var q = sqlElementQuote;
-        return '$q$entityAlias$q.$q${key1.name}$q';
-      } else {
-        throw ConditionEncodingError('Key: $c');
-      }
+        return retTableNameRef.resolveMapped((tableNameRef) {
+          if (tableNameRef == null) {
+            throw ConditionEncodingError(
+                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+          }
+
+          var relationship = tableScheme.getTableRelationshipReference(
+              tableNameRef, tableNameRef);
+
+          if (relationship == null) {
+            throw ConditionEncodingError(
+                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+          }
+
+          context.relationshipTables[tableNameRef] ??= relationship;
+
+          var targetAlias =
+              context.resolveEntityAlias(relationship.targetTable);
+
+          var key1 = keys[1];
+
+          if (key1 is ConditionKeyField) {
+            var q = sqlElementQuote;
+            return '$q$targetAlias$q.$q${key1.name}$q';
+          } else {
+            throw ConditionEncodingError('Key: $c');
+          }
+        });
+      });
     });
   }
 
