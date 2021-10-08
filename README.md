@@ -16,53 +16,146 @@ routes handler, entity handler, SQL translator, and DB adapters.
 
 ## Usage
 
-A simple usage example:
+A simple `BTC-USD` API example:
 
 ```dart
-import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_server.dart';
+import 'package:bones_api/bones_api_server.dart';
+import 'package:mercury_client/mercury_client.dart';
 
-void main() async {
-  var api = MyAPI();
+/// APIs are organized in modules:
+class MyBTCModule extends APIModule {
+  MyBTCModule(APIRoot apiRoot) : super(apiRoot, 'btc');
 
-  // Calling the API directly:
-  var r1 = await api.call(APIRequest.get('/service/base/foo'));
-  print(r1);
-  
-  // Serving the API trough a HTTP Server:
-  var apiServer = APIServer(api, '*', 8088);
-  
-  await apiServer.start();
-
-  print('Running: $apiServer');
-  print('URL: ${apiServer.url}');
-}
-
-class MyAPI extends APIRoot {
-  MyAPI() : super('example', '1.0');
-
-  @override
-  Set<APIModule> loadModules() => {MyBaseModule()};
-}
-
-class MyBaseModule extends APIModule {
-  MyBaseModule() : super('base');
-
+  /// The default route for not matching routes:
   @override
   String? get defaultRouteName => '404';
 
+  /// A configuration property from `apiConfig`.
+  String get notFoundMsg => apiConfig['not_found_msg'] ?? 'Unknown route!';
+
   @override
   void configure() {
-    routes.get('foo', (request) => APIResponse.ok('Hi[GET]!'));
-    routes.post(
-            'foo', (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'));
+    routes.get('usd', (request) => fetchBtcUsd());
 
     routes.any('time', (request) => APIResponse.ok(DateTime.now()));
 
-    routes.any('404',
-                    (request) => APIResponse.notFound(payload: '404: ${request.path}'));
+    routes.any('404', notFound);
+  }
+
+  /// A HTTP client for `fetchBtcUsd`:
+  static final coinDeskClient = HttpClient("https://api.coindesk.com/v1/bpi");
+
+  /// Fetches the BTS-USD price.
+  Future<APIResponse<num>> fetchBtcUsd() async {
+    var response = await coinDeskClient.get('currentprice.json');
+    if (response.isNotOK) {
+      return APIResponse.notFound();
+    }
+
+    var btcUsd = response.json['bpi']['USD']['rate_float'] as num?;
+    return btcUsd != null ? APIResponse.ok(btcUsd) : APIResponse.notFound();
+  }
+
+  /// Not found route (`404`):
+  FutureOr<APIResponse> notFound(request) {
+    // The requested path:
+    var path = request.path;
+
+    var body = '''
+    <h1>404</h1><br>
+    <b>PATH:<b> $path
+    <p>
+    <i>$notFoundMsg</i>
+    ''';
+
+    // `APIResponse` with `content-type` and `cache-control`:
+    return APIResponse.notFound(payload: body)
+      ..payloadMimeType = 'text/html'
+      ..headers['cache-control'] = 'no-store';
   }
 }
+
+/// The `APIRoot` defines the version and modules to use:
+class MyAPI extends APIRoot {
+  MyAPI({dynamic apiConfig}) : super('example', '1.0', apiConfig: apiConfig);
+
+  // Load the modules used by this API:
+  @override
+  Set<APIModule> loadModules() => {MyBTCModule(this)};
+}
+
+/// Starts an [APIServer] and calls the routes through [HttpClient]:
+void main() async {
+  // A JSON to configure the API:
+  var apiConfigJson = '''
+    {"not_found_msg": "This is 404!"}
+  ''';
+
+  var api = MyAPI(apiConfig: apiConfigJson);
+
+  int? serverPort = await startAPIServer(api);
+
+  var httpClient = HttpClient("http://localhost:$serverPort/");
+
+  var btcUsd = (await httpClient.get('/btc/usd')).bodyAsString;
+  print('BTC-USD: $btcUsd');
+
+  var time = (await httpClient.post('/btc/time')).bodyAsString;
+  print('TIME: $time');
+
+  var foo = (await httpClient.get('/btc/foo')).bodyAsString;
+  print('FOO:\n$foo');
+
+  await stopAPIServer();
+}
+
+late final APIServer apiServer;
+
+/// Starts the [APIServer] (HTTP Server) and returns the port.
+/// - With Hot Reload if `--enable-vm-service` is passed to the Dart VM.
+Future<int?> startAPIServer(MyAPI api) async {
+  var serverPort = 8088;
+
+  print('Starting APIServer...\n');
+
+  apiServer = APIServer(api, '*', serverPort, hotReload: true);
+  await apiServer.start();
+
+  print('\n$apiServer');
+  print('URL: ${apiServer.url}\n');
+
+  return serverPort;
+}
+
+/// Stops the [APIServer].
+Future<bool> stopAPIServer() async {
+  await apiServer.stop();
+  return true;
+}
+```
+
+OUTPUT:
+
+```text
+Starting APIServer...
+
+2021-10-08 02:15:17.924328 [CONFIG]  (main) APIHotReload > pkgConfigURL: file:///Volumes/safezone/workspace-eneuralnet/bones_api/.dart_tool/package_config.json
+2021-10-08 02:15:17.959068 [CONFIG]  (main) APIHotReload > Watching [/Volumes/safezone/workspace-eneuralnet/bones_api] with [MacOSDirectoryWatcher]...
+2021-10-08 02:15:18.185128 [INFO]    (main) APIHotReload > Created HotReloader
+2021-10-08 02:15:18.185624 [INFO]    (main) APIHotReload > Enabled Hot Reload: true
+2021-10-08 02:15:18.185852 [INFO]    (main) APIServer    > Started HTTP server: 0.0.0.0:8088
+
+APIServer{ apiType: MyAPI, apiRoot: example[1.0]{btc}, address: 0.0.0.0, port: 8088, hotReload: true, started: true, stopped: false }
+URL: http://0.0.0.0:8088/
+
+BTC-USD: 53742.76
+TIME: 2021-10-08 02:15:18.294076
+FOO:
+    <h1>404</h1><br>
+    <b>PATH:<b> /btc/foo
+    <p>
+    <i>This is 404!</i>
+
 ```
 
 ## CLI
@@ -259,13 +352,13 @@ File: `repositories.dart`
 ```dart
 import 'package:bones_api/bones_api.dart';
 
-// The PostgreSQL Adapter:
+// Import the PostgreSQL Adapter:
 import 'package:bones_api/bones_api_adapter_postgre.dart';
 
-// The above entities file:
+// Import the above entities file:
 import 'entities.dart';
 
-// The `EntityRepository` provider:
+/// The API `EntityRepositoryProvider`:
 class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   static final APIEntityRepositoryProvider _instance =
       APIEntityRepositoryProvider._();
@@ -299,26 +392,26 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   }
 }
 
-// The Address repository:
+/// The [Address] APIRepository:
 class AddressAPIRepository extends APIRepository<Address> {
   AddressAPIRepository() : super(provider: APIEntityRepositoryProvider());
 
-  // Selects an Address by field `state`:
+  /// Selects an [Address] by field `state`:
   FutureOr<Iterable<Address>> selectByState(String state) {
     return selectByQuery(' state == ? ', parameters: {'state': state});
   }
 }
 
-// The Account repository:
+/// The [Account] APIRepository:
 class AccountAPIRepository extends APIRepository<Account> {
   AccountAPIRepository() : super(provider: APIEntityRepositoryProvider());
 
-  // Selects an Account by field `email`:
+  /// Selects an [Account] by field `email`:
   FutureOr<Iterable<Account>> selectAccountByEmail(String email) {
     return selectByQuery(' email == ? ', parameters: {'email': email});
   }
 
-  // Selects an Account by field `address` and sub-field `state`:
+  /// Selects an Account by field `address` and sub-field `state`:
   FutureOr<Iterable<Account>> selectAccountByAddressState(String state) {
     // This condition will be translated to a SQL with INNER JOIN (when using an SQLAdapter):
     return selectByQuery(' address.state == ? ', parameters: [state]);
@@ -336,6 +429,19 @@ postgres:
   username: postgres
   password: 123456
 ```
+## SQLAdapter
+
+To use a SQL database with your `EntityRepository` you need a `SQLAdapter`:
+
+- `PostgreSQLAdapter`: a [PostgreSQL][postgre] adapter.
+- `MySQLAdapter`: A [MySQL][mysql] adapter.
+- `MemorySQLAdapter`: a portable `SQLAdapter` that stores entities in memory.
+
+The `SQLAdapter` is responsible to connect to the database, manage the connection
+pool and also to adjust the generated SQLs to the correct dialect.
+
+[postgre]: https://www.postgresql.org/
+[mysql]: https://www.mysql.com/
 
 ## Bones_UI
 

@@ -190,6 +190,11 @@ class SQL implements SQLWrapper {
 }
 
 /// Base class for SQL adapters.
+///
+/// A [SQLAdapter] implementation is responsible to connect to the database and
+/// adjust the generated `SQL`s to the correct dialect.
+///
+/// All [SQLAdapter]s comes with a built-in connection pool.
 abstract class SQLAdapter<C> extends SchemeProvider
     with Initializable, Pool<C>, Closable
     implements EntityRepositoryProvider {

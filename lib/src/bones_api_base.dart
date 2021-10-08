@@ -12,7 +12,7 @@ import 'bones_api_extension.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.20';
+  static const String VERSION = '1.0.21';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -467,9 +467,17 @@ class APIRouteBuilder<M extends APIModule> {
     }
 
     var typeInfo = TypeInfo.from(typeReflection);
-    var parsed = typeInfo.parse(value);
 
-    return parsed ?? value;
+    if (typeInfo.isNumber) {
+      var n = typeInfo.parse(value);
+      return n;
+    } else if (typeInfo.isString) {
+      var s = typeInfo.parse(value);
+      return s;
+    } else {
+      var parsed = typeInfo.parse(value);
+      return parsed ?? value;
+    }
   }
 }
 

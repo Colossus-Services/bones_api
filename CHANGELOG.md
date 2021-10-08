@@ -1,3 +1,9 @@
+## 1.0.21
+
+- Better handling of route parameters with `null` and empty values.
+- Improve example and `README.md`.
+- mercury_client: ^2.1.1
+
 ## 1.0.20
 
 - `APIRouteBuilder`:

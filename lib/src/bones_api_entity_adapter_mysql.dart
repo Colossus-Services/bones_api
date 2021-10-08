@@ -12,7 +12,7 @@ import 'bones_api_utils.dart';
 
 final _log = logging.Logger('MySQLAdapter');
 
-/// A PostgreSQL adapter.
+/// A MySQL adapter.
 class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   final String host;
   final int port;
@@ -38,7 +38,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
             : null),
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
-        super(minConnections, maxConnections, 'postgre',
+        super(minConnections, maxConnections, 'mysql',
             parentRepositoryProvider: parentRepositoryProvider) {
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");

@@ -318,6 +318,9 @@ class TypeParser {
 
   static num? _parseNumString(Object value) {
     var s = _valueAsString(value);
+    if (s.isEmpty) {
+      return null;
+    }
 
     var n = num.tryParse(s);
     if (n == null) {
@@ -561,6 +564,21 @@ class TypeInfo {
   ///
   /// See [TypeParser.isPrimitiveType].
   bool get isPrimitiveType => TypeParser.isPrimitiveType(type);
+
+  /// Returns `true` if [type] is `int`.
+  bool get isInt => type == int;
+
+  /// Returns `true` if [type] is `double`.
+  bool get isDouble => type == double;
+
+  /// Returns `true` if [type] is `num`.
+  bool get isNum => type == num;
+
+  /// Returns `true` if [type] is `int`, `double` or `num`.
+  bool get isNumber => isInt || isDouble || isNum;
+
+  /// Returns `true` if [type] is `String`.
+  bool get isString => type == String;
 
   /// Returns `true` if [type] is a [List].
   bool get isList => type == List;
