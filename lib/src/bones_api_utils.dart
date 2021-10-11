@@ -150,6 +150,25 @@ class TypeParser {
     return null;
   }
 
+  /// Parses [value] using a [parserFor] [type].
+  /// Returns [value] if can't parse.
+  static V? parseValueForType<V>(Type type, Object? value, [V? def]) {
+    if (value == null) return def;
+
+    if (value.runtimeType == type) {
+      return value as V;
+    }
+
+    var parser = parserFor(type: type);
+
+    if (parser != null) {
+      var parsed = parser(value);
+      return parsed ?? def;
+    } else {
+      return def;
+    }
+  }
+
   static final RegExp _regexpListDelimiter = RegExp(r'\s*[,;]\s*');
 
   /// Tries to parse a [List].

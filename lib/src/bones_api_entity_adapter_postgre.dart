@@ -161,6 +161,32 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
+  FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
+    var connection = await catchFromPool();
+
+    _log.log(logging.Level.INFO, 'getTableFieldsTypesImpl> $table');
+
+    var sql =
+        "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+
+    var results = await connection.mappedResultsQuery(sql);
+
+    if (results.isEmpty) return null;
+
+    var scheme = results.map((e) => e['']!).toList(growable: false);
+
+    if (scheme.isEmpty) return null;
+
+    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+      var k = e['column_name'] as String;
+      var v = _toFieldType(e['data_type'] as String);
+      return MapEntry(k, v);
+    }));
+
+    return fieldsTypes;
+  }
+
+  @override
   Future<TableScheme?> getTableSchemeImpl(String table) async {
     var connection = await catchFromPool();
 
@@ -184,6 +210,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       var v = _toFieldType(e['data_type'] as String);
       return MapEntry(k, v);
     }));
+
+    notifyTableFieldTypes(table, fieldsTypes);
 
     var fieldsReferencedTables =
         await _findFieldsReferencedTables(connection, table);
@@ -306,9 +334,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         refToTable.sourceTable,
         refToTable.targetTable,
         refToTable.targetField,
+        refToTable.targetFieldType,
         refToTable.sourceField,
         otherRef.targetTable,
         otherRef.targetField,
+        otherRef.targetFieldType,
         otherRef.sourceField,
       );
     }).toList();
@@ -353,14 +383,23 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     var sql = '''
     SELECT
       o.conname AS constraint_name,
-      (SELECT nspname FROM pg_namespace WHERE oid=m.relnamespace) AS source_schema,
+      
       m.relname AS source_table,
-      (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = m.oid AND a.attnum = o.conkey[1] AND a.attisdropped = false) AS source_column,
-      (SELECT nspname FROM pg_namespace WHERE oid=f.relnamespace) AS target_schema,
+      stc_attr.attname AS source_column,
+      src_inf.data_type AS source_column_type,
+
       f.relname AS target_table,
-      (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = f.oid AND a.attnum = o.confkey[1] AND a.attisdropped = false) AS target_column
+      targ_attr.attname AS target_column,
+      targ_inf.data_type AS target_column_type
+      
     FROM
-      pg_constraint o LEFT JOIN pg_class f ON f.oid = o.confrelid LEFT JOIN pg_class m ON m.oid = o.conrelid
+      pg_constraint o 
+      LEFT JOIN pg_class f ON f.oid = o.confrelid 
+      LEFT JOIN pg_class m ON m.oid = o.conrelid
+	  INNER JOIN pg_attribute stc_attr ON stc_attr.attrelid = m.oid AND stc_attr.attnum = o.conkey[1] AND stc_attr.attisdropped = false
+	  INNER JOIN information_schema.columns src_inf ON src_inf.table_name = m.relname and src_inf.column_name = stc_attr.attname
+	  INNER JOIN pg_attribute targ_attr ON targ_attr.attrelid = f.oid AND targ_attr.attnum = o.confkey[1] AND targ_attr.attisdropped = false
+	  INNER JOIN information_schema.columns targ_inf ON targ_inf.table_name = f.relname and targ_inf.column_name = targ_attr.attname
     WHERE
       o.contype = 'f' AND m.relname = '$table' AND o.conrelid IN (SELECT oid FROM pg_class c WHERE c.relkind = 'r') 
     ''';
@@ -375,12 +414,21 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         Map<String, TableFieldReference>.fromEntries(referenceFields.map((e) {
       var sourceTable = e['source_table'];
       var sourceField = e['source_column'];
+      var sourceFieldDataType = e['source_column_type'];
       var targetTable = e['target_table'];
       var targetField = e['target_column'];
+      var targetFieldDataType = e['target_column_type'];
       if (targetTable == null || targetField == null) return null;
 
-      var reference = TableFieldReference(
-          sourceTable, sourceField, targetTable, targetField);
+      var sourceFieldType = sourceFieldDataType != null
+          ? _toFieldType(sourceFieldDataType)
+          : String;
+      var targetFieldType = targetFieldDataType != null
+          ? _toFieldType(targetFieldDataType)
+          : String;
+
+      var reference = TableFieldReference(sourceTable, sourceField,
+          sourceFieldType, targetTable, targetField, targetFieldType);
       return MapEntry<String, TableFieldReference>(sourceField, reference);
     }).whereNotNull());
 

@@ -273,6 +273,11 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       tablesSchemes[table];
 
   @override
+  FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) {
+    return tablesSchemes[table]?.fieldsTypes;
+  }
+
+  @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
   @override

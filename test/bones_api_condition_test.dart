@@ -298,8 +298,9 @@ void main() {
         expect(sql.parametersPlaceholders,
             equals({'email': 'joe@m.com', 'state': 'NY'}));
         expect(sql.tableAliases, equals({'account': 'ac', 'address': 'ad'}));
-        expect(sql.fieldsReferencedTables,
-            {TableFieldReference('account', 'address', 'address', 'id')});
+        expect(sql.fieldsReferencedTables, {
+          TableFieldReference('account', 'address', int, 'address', 'id', int)
+        });
       }
     });
   });
@@ -398,7 +399,7 @@ void main() {
 
 class _TestSchemeProvider extends SchemeProvider {
   @override
-  FutureOr<TableScheme> getTableSchemeImpl(String table) {
+  TableScheme? getTableSchemeImpl(String table) {
     switch (table) {
       case 'account':
         return TableScheme(
@@ -412,8 +413,8 @@ class _TestSchemeProvider extends SchemeProvider {
             'admin': bool
           },
           {
-            'address':
-                TableFieldReference('account', 'address', 'address', 'id')
+            'address': TableFieldReference(
+                'account', 'address', int, 'address', 'id', int)
           },
         );
       case 'address':
@@ -423,8 +424,13 @@ class _TestSchemeProvider extends SchemeProvider {
           {'id': int, 'state': String, 'city': String, 'street': String},
         );
       default:
-        throw StateError("Unknown table: $table");
+        return null;
     }
+  }
+
+  @override
+  FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) {
+    return getTableSchemeImpl(table)?.fieldsTypes;
   }
 
   @override
@@ -452,5 +458,16 @@ class _TestSchemeProvider extends SchemeProvider {
     if (fieldsType != null) return TypeInfo.from(fieldsType);
 
     return null;
+  }
+
+  @override
+  FutureOr<Object?> getEntityID(Object entity,
+      {String? entityName, String? tableName, Type? entityType}) {
+    if (entity is Entity) {
+      return entity.getID();
+    } else if (entity is Map) {
+      return entity['id'];
+    }
+    throw StateError("Unknown entity type: $entity");
   }
 }

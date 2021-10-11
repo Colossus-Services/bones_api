@@ -331,6 +331,10 @@ void runAdapterTests(
 
         expect(user.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
+
+        var sel2 = await userAPIRepository.selectByRole(user.roles.first);
+        var user2 = sel2.first;
+        expect(user2.id, equals(user.id));
       }
 
       {
@@ -341,6 +345,10 @@ void runAdapterTests(
 
         expect(user.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
+
+        var sel2 = await userAPIRepository.selectByRole(user.roles.first);
+        var user2 = sel2.first;
+        expect(user2.id, equals(user.id));
       }
 
       {
@@ -442,8 +450,6 @@ void runAdapterTests(
       }
 
       {
-        await Future.delayed(Duration(seconds: 2));
-
         var user = await userAPIRepository.selectByID(2);
 
         expect(user!.email, equals('smith4@$testDomain'));

@@ -1,3 +1,9 @@
+## 1.0.24
+
+- `TableFieldReference` and `TableFieldReference` now also have the fields type.
+- `SchemeProvider` now can resolve an entity ID.
+- Fix `Condition` value when an entity is passed or referenced.
+
 ## 1.0.23
 
 - `Transaction`:

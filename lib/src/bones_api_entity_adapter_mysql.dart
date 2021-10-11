@@ -168,6 +168,31 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
+  Future<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
+    var connection = await catchFromPool();
+
+    _log.log(logging.Level.INFO, 'getTableFieldsTypesImpl> $table');
+
+    var sql = "SHOW COLUMNS FROM `$table`";
+
+    var results = await connection.query(sql);
+
+    if (results.isEmpty) return null;
+
+    var scheme = results;
+
+    if (scheme.isEmpty) return null;
+
+    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+      var k = e['Field'] as String;
+      var v = _toFieldType(e['Type'].toString());
+      return MapEntry(k, v);
+    }));
+
+    return fieldsTypes;
+  }
+
+  @override
   Future<TableScheme?> getTableSchemeImpl(String table) async {
     var connection = await catchFromPool();
 
@@ -190,6 +215,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       var v = _toFieldType(e['Type'].toString());
       return MapEntry(k, v);
     }));
+
+    notifyTableFieldTypes(table, fieldsTypes);
 
     var fieldsReferencedTables =
         await _findFieldsReferencedTables(connection, table);
@@ -288,9 +315,11 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
         refToTable.sourceTable,
         refToTable.targetTable,
         refToTable.targetField,
+        refToTable.targetFieldType,
         refToTable.sourceField,
         otherRef.targetTable,
         otherRef.targetField,
+        otherRef.targetFieldType,
         otherRef.sourceField,
       );
     }).toList();
@@ -316,15 +345,25 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-          MySqlConnectionWrapper connection, String table) =>
-      _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-          table, () => _findFieldsReferencedTablesImpl(connection, table));
+      MySqlConnectionWrapper connection, String table) {
+    var prev = _findFieldsReferencedTablesCache[table];
+    if (prev != null) return prev;
+
+    var referencedTablesRet =
+        _findFieldsReferencedTablesImpl(connection, table);
+
+    return referencedTablesRet.resolveMapped((referencedTables) {
+      _findFieldsReferencedTablesCache[table] = referencedTables;
+      return referencedTables;
+    });
+  }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
       MySqlConnectionWrapper connection, String table) async {
     var sql = '''
     SELECT 
-      CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+      CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
+      REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
     FROM
       INFORMATION_SCHEMA.KEY_COLUMN_USAGE
     WHERE
@@ -336,20 +375,36 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
     var referenceFields = results.map((r) => r.fields).toList(growable: false);
 
-    var map =
-        Map<String, TableFieldReference>.fromEntries(referenceFields.map((e) {
-      var sourceTable = e['TABLE_NAME'];
-      var sourceField = e['COLUMN_NAME'];
-      var targetTable = e['REFERENCED_TABLE_NAME'];
-      var targetField = e['REFERENCED_COLUMN_NAME'];
-      if (targetTable == null || targetField == null) return null;
+    var mapEntriesRet = referenceFields
+        .map((e) {
+          var sourceTable = e['TABLE_NAME'];
+          var sourceField = e['COLUMN_NAME'];
+          var targetTable = e['REFERENCED_TABLE_NAME'];
+          var targetField = e['REFERENCED_COLUMN_NAME'];
+          if (targetTable == null || targetField == null) return null;
 
-      var reference = TableFieldReference(
-          sourceTable, sourceField, targetTable, targetField);
-      return MapEntry<String, TableFieldReference>(sourceField, reference);
-    }).whereNotNull());
+          var sourceFieldsTypesRet = getTableFieldsTypes(table);
+          var targetFieldsTypesRet = getTableFieldsTypes(targetTable);
 
-    return map;
+          return sourceFieldsTypesRet.resolveBoth(targetFieldsTypesRet,
+              (sourceFieldsTypes, targetFieldsTypes) {
+            var sourceFieldType = sourceFieldsTypes?[sourceField] ?? String;
+            var targetFieldType = targetFieldsTypes?[targetField] ?? String;
+
+            var reference = TableFieldReference(sourceTable, sourceField,
+                sourceFieldType, targetTable, targetField, targetFieldType);
+
+            return MapEntry<String, TableFieldReference>(
+                sourceField, reference);
+          });
+        })
+        .whereNotNull()
+        .resolveAll();
+
+    return mapEntriesRet.resolveMapped((mapEntries) {
+      var map = Map<String, TableFieldReference>.fromEntries(mapEntries);
+      return map;
+    });
   }
 
   @override

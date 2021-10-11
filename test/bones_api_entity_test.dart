@@ -32,10 +32,11 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
           'address': int,
           'creationTime': DateTime,
         }, {
-          'address': TableFieldReference('user', 'address', 'address', 'id')
+          'address':
+              TableFieldReference('user', 'address', int, 'address', 'id', int)
         }, [
-          TableRelationshipReference(
-              'user_role', 'user', 'id', 'user_id', 'role', 'id', 'role_id')
+          TableRelationshipReference('user_role', 'user', 'id', int, 'user_id',
+              'role', 'id', int, 'role_id')
         ]),
         TableScheme(
           'address',

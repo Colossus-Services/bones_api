@@ -14,14 +14,20 @@ class TableFieldReference {
   /// The source table field name.
   final String sourceField;
 
+  /// The source table field type.
+  final Type sourceFieldType;
+
   /// The target table name.
   final String targetTable;
 
   /// The target table field name.
   final String targetField;
 
-  TableFieldReference(
-      this.sourceTable, this.sourceField, this.targetTable, this.targetField);
+  /// The target table field type.
+  final Type targetFieldType;
+
+  TableFieldReference(this.sourceTable, this.sourceField, this.sourceFieldType,
+      this.targetTable, this.targetField, this.targetFieldType);
 
   @override
   bool operator ==(Object other) =>
@@ -42,7 +48,7 @@ class TableFieldReference {
 
   @override
   String toString() {
-    return 'TableFieldReference{"$sourceTable"."$sourceField" -> "$targetTable"."$targetField"}';
+    return 'TableFieldReference{"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)}';
   }
 }
 
@@ -57,6 +63,9 @@ class TableRelationshipReference {
   /// The source table field name.
   final String sourceField;
 
+  /// The source table field type.
+  final Type sourceFieldType;
+
   /// The source relationship field name, int the [relationshipTable].
   final String sourceRelationshipField;
 
@@ -66,6 +75,9 @@ class TableRelationshipReference {
   /// The target table field name.
   final String targetField;
 
+  /// The target table field type.
+  final Type targetFieldType;
+
   /// The target relationship field name, int the [relationshipTable].
   final String targetRelationshipField;
 
@@ -73,9 +85,11 @@ class TableRelationshipReference {
       this.relationshipTable,
       this.sourceTable,
       this.sourceField,
+      this.sourceFieldType,
       this.sourceRelationshipField,
       this.targetTable,
       this.targetField,
+      this.targetFieldType,
       this.targetRelationshipField);
 
   @override
@@ -99,7 +113,7 @@ class TableRelationshipReference {
 
   @override
   String toString() {
-    return 'TableRelationshipReference[$relationshipTable]{"$sourceTable"."$sourceField" -> "$targetTable"."$targetField"}';
+    return 'TableRelationshipReference[$relationshipTable]{"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)}';
   }
 }
 
@@ -228,6 +242,10 @@ abstract class SchemeProvider {
   final Map<String, Completer<TableScheme?>> _tablesSchemesResolving =
       <String, Completer<TableScheme?>>{};
 
+  TableScheme? getTableSchemeIfLoaded(String table) {
+    return _tablesSchemes[table];
+  }
+
   /// Returns a [TableScheme] for [table].
   FutureOr<TableScheme?> getTableScheme(String table) {
     var tablesScheme = _tablesSchemes[table];
@@ -260,6 +278,37 @@ abstract class SchemeProvider {
   /// Implementation that returns a [TableScheme] for [table].
   FutureOr<TableScheme?> getTableSchemeImpl(String table);
 
+  final Map<String, Map<String, Type>> _tablesFieldsTypes =
+      <String, Map<String, Type>>{};
+
+  /// Returns a [TableScheme.fieldsTypes] for [table].
+  FutureOr<Map<String, Type>?> getTableFieldsTypes(String table) {
+    var prev = _tablesFieldsTypes[table];
+    if (prev != null) return prev;
+
+    var tableSchemeLoaded = getTableSchemeIfLoaded(table);
+    if (tableSchemeLoaded != null) {
+      var fieldsTypes = tableSchemeLoaded.fieldsTypes;
+      return notifyTableFieldTypes(table, fieldsTypes);
+    }
+
+    return getTableFieldsTypesImpl(table).resolveMapped((fieldsTypes) {
+      if (fieldsTypes != null) {
+        return notifyTableFieldTypes(table, fieldsTypes);
+      } else {
+        return null;
+      }
+    });
+  }
+
+  FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table);
+
+  Map<String, Type> notifyTableFieldTypes(
+      String table, Map<String, Type> fieldsTypes) {
+    return _tablesFieldsTypes.putIfAbsent(
+        table, () => Map<String, Type>.unmodifiable(fieldsTypes));
+  }
+
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
   TableScheme? disposeTableSchemeCache(String table) =>
       _tablesSchemes.remove(table);
@@ -267,9 +316,21 @@ abstract class SchemeProvider {
   /// Returns the table name for [type].
   FutureOr<String?> getTableForType(TypeInfo type);
 
+  /// Returns a [TableScheme] for [type].
+  FutureOr<TableScheme?> getTableSchemeForType(TypeInfo type) {
+    return getTableForType(type).resolveMapped((table) {
+      if (table == null) return null;
+      return getTableScheme(table);
+    });
+  }
+
   /// Returns the [type] for the [field] at [tableName] or by [entityName].
   FutureOr<TypeInfo?> getFieldType(String field,
       {String? entityName, String? tableName});
+
+  /// Returns the [entity] ID for [entityName], [tableName] or [entityType].
+  FutureOr<Object?> getEntityID(Object entity,
+      {String? entityName, String? tableName, Type? entityType});
 }
 
 /// An encoding context for [ConditionEncoder].
@@ -549,18 +610,50 @@ abstract class ConditionEncoder {
   FutureOr<EncodingContext> encodeKeyConditionNotEQ(
       KeyConditionNotEQ c, EncodingContext context);
 
-  String resolveParameterValue(
-      String valueKey, ConditionParameter value, EncodingContext context) {
-    context.parametersPlaceholders.putIfAbsent(
-        valueKey,
-        () => value.getValue(
-            parameters: context.parameters,
-            positionalParameters: context.positionalParameters,
-            namedParameters: context.namedParameters,
-            encodingParameters: context.encodingParameters));
+  String resolveParameterValue(String valueKey, ConditionParameter value,
+      EncodingContext context, Type? valueType) {
+    context.parametersPlaceholders.putIfAbsent(valueKey, () {
+      var paramValue = value.getValue(
+          parameters: context.parameters,
+          positionalParameters: context.positionalParameters,
+          namedParameters: context.namedParameters,
+          encodingParameters: context.encodingParameters);
+
+      if (valueType != null) {
+        return resolveValueToType(paramValue, valueType);
+      } else {
+        return paramValue;
+      }
+    });
 
     var placeholder = parameterPlaceholder(valueKey);
     return placeholder;
+  }
+
+  FutureOr<Object?> resolveValueToType(Object? value, Type valueType) {
+    if (value == null) {
+      return null;
+    }
+
+    var parsedValue = TypeParser.parseValueForType(valueType, value);
+    if (parsedValue != null) {
+      return parsedValue;
+    }
+
+    var schemeProvider = this.schemeProvider;
+
+    if (schemeProvider != null) {
+      if (!TypeParser.isPrimitiveType(valueType)) {
+        var entityID = schemeProvider.getEntityID(value, entityType: valueType);
+        return entityID;
+      } else {
+        var entityID =
+            schemeProvider.getEntityID(value, entityType: value.runtimeType);
+        return entityID;
+      }
+    } else {
+      return value;
+    }
   }
 
   String resolveEntityAlias(EncodingContext context, String entityName) =>

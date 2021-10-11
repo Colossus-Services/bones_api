@@ -10,9 +10,9 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_sql.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_entity_sql.dart';
 
 final _log = logging.Logger('SQLRepositoryAdapter');
 
@@ -248,9 +248,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
     return null;
   }
 
-  @override
-  FutureOr<TypeInfo?> getFieldType(String field,
-      {String? entityName, String? tableName}) {
+  EntityRepository? _geAdapterEntityRepository(
+      {String? entityName, String? tableName, Type? entityType}) {
     EntityRepository? entityRepository;
 
     if (entityName != null) {
@@ -263,9 +262,42 @@ abstract class SQLAdapter<C> extends SchemeProvider
       entityRepository = getEntityRepository(tableName: tableName);
     }
 
+    if (entityRepository == null && entityType != null) {
+      entityRepository = getEntityRepository(type: entityType);
+    }
+
+    return entityRepository;
+  }
+
+  @override
+  FutureOr<TypeInfo?> getFieldType(String field,
+      {String? entityName, String? tableName, Type? entityType}) {
+    var entityRepository = _geAdapterEntityRepository(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
     if (entityRepository != null) {
       var type = entityRepository.entityHandler.getFieldType(null, field);
       return type;
+    }
+
+    return null;
+  }
+
+  @override
+  FutureOr<Object?> getEntityID(Object entity,
+      {String? entityName, String? tableName, Type? entityType}) {
+    var entityRepository = _geAdapterEntityRepository(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
+    if (entityRepository != null) {
+      var entityHandler = entityRepository.entityHandler;
+
+      if (entity is Map) {
+        var idFieldsName = entityHandler.idFieldsName();
+        return entity[idFieldsName];
+      } else {
+        return entityHandler.getID(entity);
+      }
     }
 
     return null;
