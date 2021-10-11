@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api_server.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
@@ -44,6 +45,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
 
+    _register();
+
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
@@ -71,6 +74,15 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       maxConnections: maxConnections,
       parentRepositoryProvider: parentRepositoryProvider,
     );
+  }
+
+  static bool _registered = false;
+
+  static void _register() {
+    if (_registered) return;
+    _registered = true;
+
+    Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
   }
 
   FutureOr<String> _getPassword() {
@@ -105,6 +117,13 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
   }
 
+  Zone? _errorZoneInstance;
+
+  Zone get _errorZone {
+    return _errorZoneInstance ??=
+        createErrorZone(uncaughtErrorTitle: 'PostgreSQLAdapter ERROR:');
+  }
+
   int _connectionCount = 0;
 
   @override
@@ -115,7 +134,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     var connection = PostgreSQLConnection(host, port, databaseName,
         username: username, password: password);
-    await connection.open();
+
+    await _errorZone.runGuardedAsync(() => connection.open());
 
     var connUrl = getConnectionURL(connection);
 
@@ -463,7 +483,10 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       SQLWrapper sql, TransactionExecution<R, PostgreSQLExecutionContext> f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1) {
+    if (transaction.length == 1 &&
+        !transaction.isExecuting &&
+        sql.sqlsLength == 1 &&
+        !sql.mainSQL.hasPreOrPosSQL) {
       return executeWithPool((connection) => f(connection));
     }
 
@@ -481,14 +504,21 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     transaction.open(() {
       var contextCompleter = Completer<PostgreSQLExecutionContext>();
 
-      var ret = executeWithPool((connection) {
-        var theConnection = connection as PostgreSQLConnection;
+      var ret = executeWithPool(
+        (connection) {
+          var theConnection = connection as PostgreSQLConnection;
 
-        return theConnection.transaction((c) {
-          contextCompleter.complete(c);
-          return transaction.transactionFuture;
-        });
-      });
+          return theConnection.transaction((c) {
+            contextCompleter.complete(c);
+
+            return transaction.transactionFuture.catchError((e) {
+              c.cancelTransaction();
+              return null;
+            });
+          });
+        },
+        validator: (c) => !transaction.isAborted,
+      );
 
       transaction.transactionResult = ret;
 

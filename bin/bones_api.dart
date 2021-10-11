@@ -469,10 +469,11 @@ import 'package:bones_api/bones_api_dart_spawner.dart';
 import 'package:$projectPackageName/$projectLibraryName.dart';
 
 void main(List<String> args, dynamic parentPort) {
-  runErrorZone(
-    () => spawnedMain(args, parentPort, $isolateID, runAPIServer) ,
-    uncaughtErrorTitle: 'APIServer Unhandled exception:',
-  );
+  var errorZone = createErrorZone(uncaughtErrorTitle: 'APIServer Unhandled exception:');
+  
+  errorZone.runGuarded(() {
+    spawnedMain(args, parentPort, $isolateID, runAPIServer);
+  });
 }
 
 Future<void> runAPIServer(List<String> args) async {

@@ -8,6 +8,7 @@ import 'package:mysql1/mysql1.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_error_zone.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('MySQLAdapter');
@@ -44,6 +45,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
 
+    _register();
+
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
@@ -71,6 +74,15 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       maxConnections: maxConnections,
       parentRepositoryProvider: parentRepositoryProvider,
     );
+  }
+
+  static bool _registered = false;
+
+  static void _register() {
+    if (_registered) return;
+    _registered = true;
+
+    Transaction.registerErrorFilter((e, s) => e is MySqlException);
   }
 
   FutureOr<String> _getPassword() {
@@ -104,6 +116,13 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     return 'mysql://$username@$host:$port/$databaseName';
   }
 
+  Zone? _errorZoneInstance;
+
+  Zone get _errorZone {
+    return _errorZoneInstance ??=
+        createErrorZone(uncaughtErrorTitle: 'MySQLAdapter ERROR:');
+  }
+
   int _connectionCount = 0;
 
   @override
@@ -121,7 +140,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       timeout: Duration(seconds: 60),
     );
 
-    var connection = await MySqlConnection.connect(connSettings);
+    var connection = await _errorZone
+        .runGuardedAsync(() => MySqlConnection.connect(connSettings));
 
     var connWrapper = _MySqlConnectionWrapped(connection);
 
@@ -451,6 +471,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     var transaction = op.transaction;
 
     if (transaction.length == 1 &&
+        !transaction.isExecuting &&
         sql.sqlsLength == 1 &&
         !sql.mainSQL.hasPreOrPosSQL) {
       return executeWithPool((connection) => f(connection));
@@ -469,14 +490,18 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     transaction.open(() {
       var contextCompleter = Completer<MySqlConnectionWrapper>();
 
-      var ret = executeWithPool((connection) {
-        return connection.connection.transaction((t) {
-          var transactionWrap =
-              _MySqlConnectionTransaction(connection.connection, t);
-          contextCompleter.complete(transactionWrap);
-          return transaction.transactionFuture;
-        });
-      });
+      var ret = executeWithPool(
+        (connection) {
+          return connection.connection.transaction((t) {
+            var transactionWrap =
+                _MySqlConnectionTransaction(connection.connection, t);
+            contextCompleter.complete(transactionWrap);
+
+            return transaction.transactionFuture;
+          });
+        },
+        validator: (c) => !transaction.isAborted,
+      );
 
       transaction.transactionResult = ret;
 

@@ -6,6 +6,7 @@ import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
+import 'bones_api_error_zone.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_utils.dart';
 
@@ -1375,8 +1376,24 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 }
 
+/// A [Transaction] abortion error.
+class TransactionAbortedError extends Error {
+  String? reason;
+  Object? payload;
+
+  TransactionAbortedError({this.reason, this.payload});
+
+  @override
+  String toString() {
+    return 'TransactionAbortedError{reason: $reason, payload: $payload}';
+  }
+}
+
+typedef ErrorFilter = bool Function(Object, StackTrace);
+
 typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
 
+/// An [EntityRepository] transaction.
 class Transaction {
   static Transaction? _executingTransaction;
 
@@ -1392,12 +1409,60 @@ class Transaction {
 
   final bool autoCommit;
 
-  Transaction({this.autoCommit = false});
+  late final Completer _transactionCompleter;
+
+  Future get transactionFuture => _transactionCompleter.future;
+
+  late final Completer _resultCompleter;
+
+  Future get resultFuture => _resultCompleter.future;
+
+  late final Completer<bool> _openCompleter;
+
+  Transaction({this.autoCommit = false}) {
+    _transactionCompleter = _errorZone.createCompleter();
+    _resultCompleter = _errorZone.createCompleter();
+    _openCompleter = _errorZone.createCompleter<bool>();
+  }
 
   Transaction.autoCommit() : this(autoCommit: true);
 
   factory Transaction.executingOrNew({bool autoCommit = true}) {
     return _executingTransaction ?? Transaction(autoCommit: autoCommit);
+  }
+
+  static Zone? _errorZoneInstance;
+
+  static Zone get _errorZone {
+    return _errorZoneInstance ??= createErrorZone(
+        uncaughtErrorTitle: '', onUncaughtError: _onErrorZoneUncaughtError);
+  }
+
+  static void _onErrorZoneUncaughtError(Object error, StackTrace stackTrace) {
+    if (error is TransactionAbortedError ||
+        isFilteredError(error, stackTrace)) {
+      return;
+    }
+
+    printZoneError(error, stackTrace, title: '[Transaction ERROR]');
+  }
+
+  static final Set<ErrorFilter> _errorFilters = <ErrorFilter>{};
+
+  static void registerErrorFilter(ErrorFilter errorFilter) {
+    _errorFilters.add(errorFilter);
+  }
+
+  static bool isFilteredError(Object error, StackTrace stackTrace) {
+    if (_errorFilters.isEmpty) return false;
+
+    for (var f in _errorFilters) {
+      if (f(error, stackTrace)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   bool get isExecuting => identical(Transaction.executingTransaction, this);
@@ -1438,10 +1503,15 @@ class Transaction {
 
   void open(FutureOr<Object> Function() opener) {
     _opening = true;
-    opener().resolveMapped(_setContext);
-  }
 
-  final Completer<bool> _openCompleter = Completer<bool>();
+    asyncTry(opener, then: (c) {
+      _setContext(c!);
+      return c;
+    }, onError: (e, s) {
+      print(e);
+      print(s);
+    });
+  }
 
   bool _open = false;
 
@@ -1469,14 +1539,6 @@ class Transaction {
 
   FutureOr? transactionResult;
 
-  final Completer _transactionCompleter = Completer();
-
-  Future get transactionFuture => _transactionCompleter.future;
-
-  final Completer _resultCompleter = Completer();
-
-  Future get resultFuture => _resultCompleter.future;
-
   Object? _result;
 
   Object? get result => _result;
@@ -1499,7 +1561,7 @@ class Transaction {
     }
   }
 
-  Completer<bool>? _waitingExecutedOperation = Completer<bool>();
+  Completer<bool>? _waitingExecutedOperation;
 
   Object? _lastResult;
 
@@ -1545,6 +1607,10 @@ class Transaction {
   bool _commitCalled = false;
 
   FutureOr<R?> commit<R>() {
+    if (_aborted) {
+      return _abortImpl().resolveMapped((_) => null);
+    }
+
     if (_commitCalled) {
       FutureOr<dynamic> retFuture;
       if (transactionResult != null) {
@@ -1557,7 +1623,7 @@ class Transaction {
 
     _commitCalled = true;
 
-    return waitAllExecuted().resolveMapped((_) => _commitImpl());
+    return waitAllExecuted().resolveMapped((_) => _commitImpl<R>());
   }
 
   FutureOr<R?> _commitImpl<R>() {
@@ -1568,15 +1634,74 @@ class Transaction {
 
     if (transactionResult != null) {
       return transactionResult!.resolveMapped((r) {
-        _resultCompleter.complete(r);
         _committed = true;
+        _resultCompleter.complete(r);
         return r as R?;
       });
     } else {
       return _transactionCompleter.future.then((r) {
-        _resultCompleter.complete(r);
         _committed = true;
+        _resultCompleter.complete(r);
         return r as R?;
+      });
+    }
+  }
+
+  bool _aborted = false;
+
+  /// Returns `true` if this transaction as aborted. See [abort].
+  bool get isAborted => _aborted;
+
+  TransactionAbortedError? _abortedError;
+
+  /// Returns the abort error ([TransactionAbortedError]).
+  TransactionAbortedError? get abortedError => _abortedError;
+
+  /// Abort this transaction.
+  FutureOr<TransactionAbortedError?> abort({String? reason, Object? payload}) {
+    if (_commitCalled) {
+      return null;
+    }
+
+    if (_aborted) {
+      return _abortedError;
+    }
+
+    payload ??= _lastResult;
+    var abortError = TransactionAbortedError(reason: reason, payload: payload);
+
+    _abortedError = abortError;
+    _aborted = true;
+
+    return abortError;
+  }
+
+  FutureOr<TransactionAbortedError> _abortImpl() {
+    var abortError = _abortedError!;
+
+    _transactionCompleter.completeError(abortError);
+
+    if (transactionResult != null) {
+      if (transactionResult is Future) {
+        return (transactionResult as Future).then((r) {
+          _resultCompleter.complete(null);
+          return abortError;
+        }, onError: (e) {
+          return abortError;
+        });
+      } else {
+        return transactionResult!.resolveMapped((r) {
+          _resultCompleter.complete(null);
+          return abortError;
+        });
+      }
+    } else {
+      return _transactionCompleter.future.then((r) {
+        _resultCompleter.complete(null);
+        return abortError;
+      }, onError: (e) {
+        _resultCompleter.complete(null);
+        return abortError;
       });
     }
   }
@@ -1594,10 +1719,9 @@ class Transaction {
 
     _executingTransaction = this;
 
-    return block().resolveMapped((r) {
-      return commit().resolveMapped((result) {
+    return _errorZone.asyncTry<R?>(block, onFinally: () {
+      return asyncTry(() => commit<Object?>(), onFinally: () {
         _executingTransaction = null;
-        return r;
       });
     });
   }
@@ -1625,6 +1749,11 @@ class Transaction {
   String toString() {
     return [
       'Transaction[#$id]{\n',
+      '  open: $isOpen\n',
+      '  executing: $isExecuting\n',
+      '  committed: $isCommitted\n',
+      '  aborted: $isAborted\n',
+      '  abortedError: $abortedError\n',
       '  operations: [\n',
       if (_operations.isNotEmpty) '    ${_operations.join(',\n    ')}',
       '\n  ],\n',

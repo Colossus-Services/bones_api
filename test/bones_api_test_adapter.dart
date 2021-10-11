@@ -376,10 +376,77 @@ void runAdapterTests(
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('smith3@$testDomain');
-        var user = sel.first;
+        var transaction = Transaction();
 
-        expect(user.email, equals('smith3@$testDomain'));
+        var result = await transaction.execute(() async {
+          var sel = await userAPIRepository.selectByEmail('smith3@$testDomain');
+
+          var user = sel.first;
+          expect(user.email, equals('smith3@$testDomain'));
+          expect(user.address.state, equals('CA'));
+
+          user.email = 'smith4@$testDomain';
+          var ok = await userAPIRepository.store(user);
+          expect(ok, equals(user.id));
+
+          var sel2 =
+              await userAPIRepository.selectByEmail('smith4@$testDomain');
+          var user2 = sel2.first;
+
+          expect(user2.email, equals('smith4@$testDomain'));
+
+          return user2.email;
+        });
+
+        print(transaction);
+
+        expect(result, equals('smith4@$testDomain'));
+
+        expect(transaction.isAborted, isFalse);
+        expect(transaction.isCommitted, isTrue);
+        expect(transaction.length, equals(10));
+        expect(transaction.abortedError, isNull);
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          try {
+            var sel =
+                await userAPIRepository.selectByEmail('smith4@$testDomain');
+
+            var user = sel.first;
+            expect(user.email, equals('smith4@$testDomain'));
+
+            user.email = 'smith5@$testDomain';
+            var ok = await userAPIRepository.store(user);
+            expect(ok, equals(user.id));
+
+            transaction.abort(reason: 'Test');
+          } catch (e, s) {
+            print(e);
+            print(s);
+          }
+        });
+
+        print(transaction);
+
+        expect(result, isNull);
+
+        expect(transaction.isAborted, isTrue);
+        expect(transaction.isCommitted, isFalse);
+        expect(transaction.length, equals(6));
+        expect(transaction.abortedError, isNotNull);
+        expect(transaction.abortedError?.reason, equals('Test'));
+      }
+
+      {
+        await Future.delayed(Duration(seconds: 2));
+
+        var user = await userAPIRepository.selectByID(2);
+
+        expect(user!.email, equals('smith4@$testDomain'));
 
         user.roles.add(Role('foo2'));
 
@@ -414,7 +481,7 @@ void runAdapterTests(
         var del = await userAPIRepository
             .deleteByQuery(' #ID == ? ', parameters: [2]);
         var user = del.first;
-        expect(user.email, equals('smith3@$testDomain'));
+        expect(user.email, equals('smith4@$testDomain'));
         expect(user.address.state, equals('CA'));
         expect(user.creationTime, equals(user2Time));
       }

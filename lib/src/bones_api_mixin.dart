@@ -105,6 +105,7 @@ mixin Pool<O> {
   int get poolSize => _pool.length;
 
   bool get isPoolEmpty => poolSize == 0;
+
   bool get isPoolNotEmpty => !isPoolEmpty;
 
   int get poolCreatedElementsCount => _createElementCount;
@@ -298,12 +299,16 @@ mixin Pool<O> {
   }
 
   FutureOr<R> executeWithPool<R>(FutureOr<R> Function(O o) f,
-      {Duration? timeout}) {
-    return catchFromPool(timeout: timeout).resolveMapped((o) {
+      {Duration? timeout, bool Function(O o)? validator}) {
+    return catchFromPool(timeout: timeout).then((o) {
       try {
         var ret = f(o);
         return ret.resolveMapped((val) {
-          releaseIntoPool(o);
+          if (validator == null || validator(o)) {
+            releaseIntoPool(o);
+          } else {
+            disposePoolElement(o);
+          }
           return val;
         });
       } catch (_) {

@@ -1,3 +1,13 @@
+## 1.0.23
+
+- `Transaction`:
+  - Added `abort` to cancel the current executing transaction.
+  - Better error handling. 
+- Error Zone:
+  - `runErrorZone` transformed into `createErrorZone` and an extension with `runGuardedAsync` and `asyncTry`.
+- `executeWithPool`: added `validator` parameter.
+- async_extension: ^1.0.8
+
 ## 1.0.22
 
 - `Condition`:
