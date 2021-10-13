@@ -1,3 +1,7 @@
+## 1.0.25 
+
+- Update template: `lib/src/template/bones_api_template.tar.gz`
+
 ## 1.0.24
 
 - `TableFieldReference` and `TableFieldReference` now also have the fields type.
