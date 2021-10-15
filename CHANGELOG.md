@@ -6,6 +6,8 @@
 - `DataTime`: `toJson` now converts to a `UTC` string.
 - Added `MapMultiValueExtension`.
 - Updated `bones_api_template.tar.gz`.
+- reflection_factory: ^1.0.14
+- crypto: ^3.0.1
 
 ## 1.0.25
 

@@ -27,6 +27,7 @@ dependencies:
   mercury_client: ^2.1.1
   project_template: ^1.0.2
   resource_portable: ^3.0.0
+  crypto: ^3.0.1
 
 dev_dependencies:
   lints: ^1.0.1
