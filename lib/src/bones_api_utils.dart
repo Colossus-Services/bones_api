@@ -20,6 +20,10 @@ class Json {
       return o as T;
     }
 
+    if (o is DateTime) {
+      return _dateTimeToJson(o) as T;
+    }
+
     if (maskField != null) {
       if (o is Map) {
         o = _mapToJson(o, maskField, maskText);
@@ -31,6 +35,10 @@ class Json {
     }
 
     return o as T;
+  }
+
+  static String _dateTimeToJson(DateTime o) {
+    return o.toUtc().toString();
   }
 
   static Map<dynamic, dynamic> _mapToJson(
@@ -54,6 +62,10 @@ class Json {
 
     if (o is String || o is num || o is bool) {
       return o;
+    }
+
+    if (o is DateTime) {
+      return _dateTimeToJson(o);
     }
 
     if (o is Map) {
@@ -485,6 +497,10 @@ class TypeParser {
 
 /// Represents a [Type] and its [arguments].
 class TypeInfo {
+  static bool accepts<T>(Type type) {
+    return T == type || T == Object || T == dynamic;
+  }
+
   static final TypeInfo tString = TypeInfo.from(String);
   static final TypeInfo tBool = TypeInfo.from(bool);
   static final TypeInfo tInt = TypeInfo.from(int);

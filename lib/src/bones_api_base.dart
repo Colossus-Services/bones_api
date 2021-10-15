@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:convert' as dart_convert;
+import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
+import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_utils.dart';
@@ -12,7 +16,7 @@ import 'bones_api_utils.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.25';
+  static const String VERSION = '1.0.26';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -114,7 +118,11 @@ abstract class APIRoot {
   /// Returns a module with [name].
   APIModule? getModule(String name) {
     _ensureModulesLoaded();
-    return _modules![name];
+    var module = _modules![name];
+    if (module != null) {
+      module._ensureConfigured();
+    }
+    return module;
   }
 
   /// Returns an [APIModule] based in the [request].
@@ -144,8 +152,36 @@ abstract class APIRoot {
 
   /// Calls the API.
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
+    _ensureModulesLoaded();
+
+    var apiSecurity = security;
+
+    if (apiSecurity != null &&
+        request.credential != null &&
+        request.authentication == null) {
+      return apiSecurity.authenticateByRequest(request).resolveWith(() {
+        return _callImpl<T>(request, apiSecurity);
+      });
+    } else {
+      return _callImpl<T>(request, apiSecurity);
+    }
+  }
+
+  FutureOr<APIResponse<T>> _callImpl<T>(
+      APIRequest request, APISecurity? apiSecurity) {
     var module = getModuleByRequest(request);
 
+    if (module == null &&
+        apiSecurity != null &&
+        request.lastPathPart == authenticationRoute) {
+      return apiSecurity.doRequestAuthentication(request);
+    }
+
+    return _callModule<T>(module, request);
+  }
+
+  FutureOr<APIResponse<T>> _callModule<T>(
+      APIModule? module, APIRequest request) {
     if (module == null) {
       var def = defaultModuleName;
       if (def != null) {
@@ -154,10 +190,48 @@ abstract class APIRoot {
     }
 
     if (module == null) {
-      return APIResponse.notFound();
+      return _responseNotFoundNoRouteForPath<T>(request);
     }
 
     return module.call(request);
+  }
+
+  String get authenticationRoute => 'authenticate';
+
+  String? get securityModuleName => null;
+
+  APIModule? get securityModule => _securityModuleImpl();
+
+  APIModule? _securityModule;
+
+  APIModule? _securityModuleImpl() {
+    if (_securityModule != null) return _securityModule;
+
+    var securityModuleName = this.securityModuleName;
+    if (securityModuleName != null) {
+      var module = getModule(securityModuleName);
+      if (module != null) {
+        return _securityModule = module;
+      } else {
+        throw StateError(
+            "Can't find security module with name: $securityModuleName");
+      }
+    }
+
+    return null;
+  }
+
+  APISecurity? get security => _securityImpl();
+
+  APISecurity? _security;
+  bool _securityResolved = false;
+
+  APISecurity? _securityImpl() {
+    if (_securityResolved) return _security;
+    _securityResolved = true;
+
+    var securityModule = this.securityModule;
+    return _security = securityModule?.security;
   }
 
   @override
@@ -173,8 +247,58 @@ abstract class APIRoot {
 }
 
 /// An API route handler
-typedef APIRouteHandler<T> = FutureOr<APIResponse<T>> Function(
+typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
     APIRequest request);
+
+/// A route handler, with its [function] and [rules].
+class APIRouteHandler<T> {
+  final APIRequestMethod? requestMethod;
+  final String routeName;
+
+  APIRouteFunction<T> function;
+
+  List<APIRouteRule> rules;
+
+  APIRouteHandler(this.requestMethod, this.routeName, this.function,
+      Iterable<APIRouteRule>? rules)
+      : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]);
+
+  /// Calls this route.
+  FutureOr<APIResponse<T>> call(APIRequest request) {
+    if (!checkRules(request)) {
+      return APIResponse.unauthorized(
+          payloadDynamic: 'UNAUTHORIZED: Rules issues $rules');
+    }
+
+    return function(request);
+  }
+
+  /// Check the rules of this route.
+  bool checkRules(APIRequest request) {
+    if (rules.isEmpty) return true;
+
+    for (var rule in rules) {
+      if (!rule.validate(request)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  @override
+  String toString() {
+    return 'APIRouteHandler${requestMethod != null ? '[${requestMethod!.name}]' : ''}'
+        '{routeName: $routeName'
+        '${rules.isNotEmpty ? ', rules: $rules' : ''}'
+        '}';
+  }
+}
+
+APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {
+  var payload = 'NOT FOUND: No route for path "' + request.path + '"';
+  return APIResponse.notFound(payloadDynamic: payload);
+}
 
 /// A module of an API.
 abstract class APIModule {
@@ -245,11 +369,12 @@ abstract class APIModule {
   /// Adds a route, of [name], to this module.
   ///
   /// [method] The route method. If `null` accepts any method.
-  /// [handler] The route handler, to process calls.
+  /// [function] The route handler, to process calls.
   APIModule addRoute(
-      APIRequestMethod? method, String name, APIRouteHandler handler) {
+      APIRequestMethod? method, String name, APIRouteFunction function,
+      [Iterable<APIRouteRule>? rules]) {
     var routesHandlers = _getRoutesHandlers(method);
-    routesHandlers[name] = handler;
+    routesHandlers[name] = APIRouteHandler(method, name, function, rules);
     return this;
   }
 
@@ -297,25 +422,57 @@ abstract class APIModule {
 
   /// Resolves the route name of the [request].
   String resolveRoute(APIRequest request) {
-    var routeName = request.pathPart(0, reversed: true);
+    var routeName = request.lastPathPart;
     return routeName;
   }
 
   /// Calls a route for [request].
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
+    _ensureConfigured();
+
+    var apiSecurity = security;
+
+    if (apiSecurity != null) {
+      if (request.lastPathPart == authenticationRoute) {
+        return apiSecurity.doRequestAuthentication(request);
+      } else {
+        return apiSecurity.resumeAuthenticationByRequest(request).then((_) {
+          return _callImpl<T>(request);
+        });
+      }
+    } else {
+      return _callImpl<T>(request);
+    }
+  }
+
+  FutureOr<APIResponse<T>> _callImpl<T>(APIRequest request) {
     var handler = getRouteHandlerByRequest<T>(request);
 
     if (handler == null) {
-      return APIResponse.notFound();
+      return _responseNotFoundNoRouteForPath<T>(request);
     }
 
     try {
-      var response = handler(request);
+      var response = handler.call(request);
       return response;
     } catch (e, s) {
       var error = 'ERROR: $e\n$s';
       return APIResponse.error(error: error);
     }
+  }
+
+  String get authenticationRoute => 'authenticate';
+
+  APISecurity? get security => _securityImpl();
+
+  APISecurity? _security;
+  bool _securityResolved = false;
+
+  APISecurity? _securityImpl() {
+    if (_securityResolved) return _security;
+    _securityResolved = true;
+
+    return _security = apiRoot.security;
   }
 
   @override
@@ -337,33 +494,40 @@ class APIRouteBuilder<M extends APIModule> {
   APIRouteBuilder(this.module);
 
   /// Adds a route of [name] with [handler] for ANY request method.
-  APIModule any(String name, APIRouteHandler handler) =>
-      add(null, name, handler);
+  APIModule any(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(null, name, function, rules);
 
   /// Adds a route of [name] with [handler] for `GET` request method.
-  APIModule get(String name, APIRouteHandler handler) =>
-      add(APIRequestMethod.GET, name, handler);
+  APIModule get(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(APIRequestMethod.GET, name, function, rules);
 
   /// Adds a route of [name] with [handler] for `POST` request method.
-  APIModule post(String name, APIRouteHandler handler) =>
-      add(APIRequestMethod.POST, name, handler);
+  APIModule post(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(APIRequestMethod.POST, name, function, rules);
 
   /// Adds a route of [name] with [handler] for `PUT` request method.
-  APIModule put(String name, APIRouteHandler handler) =>
-      add(APIRequestMethod.PUT, name, handler);
+  APIModule put(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(APIRequestMethod.PUT, name, function, rules);
 
   /// Adds a route of [name] with [handler] for `DELETE` request method.
-  APIModule delete(String name, APIRouteHandler handler) =>
-      add(APIRequestMethod.DELETE, name, handler);
+  APIModule delete(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(APIRequestMethod.DELETE, name, function, rules);
 
   /// Adds a route of [name] with [handler] for `PATCH` request method.
-  APIModule patch(String name, APIRouteHandler handler) =>
-      add(APIRequestMethod.PATCH, name, handler);
+  APIModule patch(String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      add(APIRequestMethod.PATCH, name, function, rules);
 
   /// Adds a route of [name] with [handler] for the request [method].
   APIModule add(
-          APIRequestMethod? method, String name, APIRouteHandler handler) =>
-      module.addRoute(method, name, handler);
+          APIRequestMethod? method, String name, APIRouteFunction function,
+          [Iterable<APIRouteRule>? rules]) =>
+      module.addRoute(method, name, function, rules);
 
   /// Adds routes from [provider] for ANY request method.
   void anyFrom(Object? provider) => from(null, provider);
@@ -432,29 +596,41 @@ class APIRouteBuilder<M extends APIModule> {
       [APIRequestMethod? requestMethod]) {
     var returnsAPIResponse = apiMethod.returnsAPIResponse;
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
+    var rules = apiMethod.annotations.whereType<APIRouteRule>().toList();
+
+    if (rules.isEmpty) {
+      rules = apiMethod.classReflection.classAnnotations
+          .whereType<APIRouteRule>()
+          .toList();
+    }
 
     if (returnsAPIResponse && receivesAPIRequest) {
       add(requestMethod, apiMethod.name, (req) {
         return apiMethod.invoke([req]);
-      });
+      }, rules);
     } else if (receivesAPIRequest) {
       add(requestMethod, apiMethod.name, (req) {
         var ret = apiMethod.invoke([req]);
         return APIResponse.from(ret);
-      });
+      }, rules);
     } else if (returnsAPIResponse) {
       add(requestMethod, apiMethod.name, (req) {
         var methodInvocation =
             apiMethod.methodInvocation((p) => _resolveRequestParameter(req, p));
         return methodInvocation.invoke(apiMethod.method);
-      });
+      }, rules);
     }
   }
 
-  _resolveRequestParameter(APIRequest request, ParameterReflection parameter) {
+  Object? _resolveRequestParameter(
+      APIRequest request, ParameterReflection parameter) {
     var typeReflection = parameter.type;
     if (typeReflection.isOfType(APIRequest)) {
       return request;
+    }
+
+    if (typeReflection.isOfType(APICredential)) {
+      return request.credential;
     }
 
     if (typeReflection.isOfType(Uint8List)) {
@@ -599,6 +775,142 @@ extension APIRequesterSourceExtension on APIRequesterSource {
   }
 }
 
+/// Handles a set of [APISession].
+class APISessionSet {
+  /// The session timeout.
+  final Duration timeout;
+
+  late final Duration autoCheckInterval;
+
+  APISessionSet(this.timeout, {Duration? autoCheckInterval}) {
+    var autoCheckIntervalResolved = autoCheckInterval;
+    if (autoCheckIntervalResolved == null) {
+      autoCheckIntervalResolved =
+          Duration(milliseconds: timeout.inMilliseconds ~/ 3);
+      if (autoCheckIntervalResolved.inMinutes > 5) {
+        autoCheckIntervalResolved = Duration(minutes: 5);
+      }
+    }
+
+    this.autoCheckInterval = autoCheckIntervalResolved;
+  }
+
+  final Map<String, APISession> _sessions = <String, APISession>{};
+
+  int get length => _sessions.length;
+
+  APISession? get(String sessionID) {
+    autoCheckSessions();
+    return _sessions[sessionID];
+  }
+
+  APISession? getMarkingAccess(String sessionID) {
+    var session = get(sessionID);
+    session?.markAccessTime();
+    return session;
+  }
+
+  put(APISession session) {
+    autoCheckSessions();
+    return _sessions[session.id] = session;
+  }
+
+  List<APISession> expiredSessions(DateTime now) =>
+      _sessions.values.where((e) => e.isExpired(timeout, now: now)).toList();
+
+  void checkSessions() {
+    var now = DateTime.now();
+    var expired = expiredSessions(now);
+
+    for (var e in expired) {
+      _sessions.remove(e.id);
+    }
+  }
+
+  DateTime _autoCheckSessionsLastTime = DateTime.now();
+
+  void autoCheckSessions() {
+    var now = DateTime.now();
+    var elapsedTime = now.difference(_autoCheckSessionsLastTime);
+
+    if (elapsedTime.inMilliseconds < autoCheckInterval.inMilliseconds) return;
+    _autoCheckSessionsLastTime = now;
+
+    checkSessions();
+  }
+
+  void clear() => _sessions.clear();
+}
+
+class APISession {
+  static final Random _sessionIdPeriodRandom = Random();
+  static SecureRandom? _sessionIdRandomInstance;
+
+  static int _sessionIdRandomUseCount = 0;
+
+  static SecureRandom get _sessionIdRandom {
+    if (_sessionIdRandomUseCount > 500 &&
+        _sessionIdRandomUseCount > 500 + _sessionIdPeriodRandom.nextInt(1000)) {
+      _sessionIdRandomInstance = null;
+      _sessionIdRandomUseCount = 0;
+    }
+
+    var random = _sessionIdRandomInstance ??= SecureRandom();
+    ++_sessionIdRandomUseCount;
+
+    return random;
+  }
+
+  static String generateSessionID(
+      {int length = 128, int variableLength = 32, String? prefix}) {
+    if (length < 32) {
+      length = 32;
+    }
+
+    if (prefix != null) {
+      prefix = prefix.trim();
+    } else {
+      prefix = 'SID';
+    }
+
+    return APIToken.generateToken(length,
+        variableLength: variableLength,
+        prefix: prefix,
+        random: _sessionIdRandom);
+  }
+
+  String id;
+
+  APISession(this.id);
+
+  DateTime lastAccessTime = DateTime.now();
+
+  void markAccessTime() => lastAccessTime = DateTime.now();
+
+  Duration get lastAccessElapsedTime =>
+      DateTime.now().difference(lastAccessTime);
+
+  bool isExpired(Duration timeout, {DateTime? now}) {
+    now ??= DateTime.now();
+
+    var elapsedTime = lastAccessElapsedTime;
+    return elapsedTime.compareTo(timeout) > 0;
+  }
+
+  Set<APIToken>? _tokens;
+
+  Set<APIToken> get tokens => _tokens ??= <APIToken>{};
+
+  Set<APIToken> validateTokens() {
+    var tokens = this.tokens;
+    if (tokens.isEmpty) return tokens;
+
+    var now = DateTime.now();
+    tokens.removeWhere((t) => t.isExpired(now: now));
+    return tokens;
+  }
+}
+
 /// Represents an API request.
 class APIRequest extends APIPayload {
   /// The request method.
@@ -620,6 +932,7 @@ class APIRequest extends APIPayload {
   @override
   final dynamic payload;
 
+  /// Returns [payload] as bytes ([Uint8List]).
   Uint8List? get payloadAsBytes {
     var payload = this.payload;
 
@@ -649,6 +962,18 @@ class APIRequest extends APIPayload {
   @override
   String? payloadFileExtension;
 
+  /// The session ID (usually from a session cookie).
+  final String? sessionID;
+
+  /// If `true` indicates that [sessionID] is new (was created in this request).
+  final bool newSession;
+
+  /// The request credential.
+  APICredential? credential;
+
+  /// The authentication of this request, processed by [APISecurity].
+  APIAuthentication? authentication;
+
   final String? scheme;
 
   final APIRequesterSource requesterSource;
@@ -662,6 +987,9 @@ class APIRequest extends APIPayload {
       this.payload,
       this.payloadMimeType,
       this.payloadFileExtension,
+      this.sessionID,
+      this.newSession = false,
+      this.credential,
       String? scheme,
       APIRequesterSource? requesterSource,
       String? requesterAddress,
@@ -846,17 +1174,32 @@ class APIRequest extends APIPayload {
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
 
+  /// Sames as [pathPart] but with a reversed [index].
+  String pathPartReversed(int index) {
+    var length = _pathParts.length;
+
+    var idx = length - (index + 1);
+    return idx >= 0 && idx < length ? _pathParts[idx] : '';
+  }
+
+  String? _lastPathPart;
+
+  /// Returns the last [pathParts]. Sames as [pathPartReversed] for index `0`.
+  String get lastPathPart => _lastPathPart ??= pathPartReversed(0);
+
   /// Returns from [parameters] a value for [name1] or [name1] .. [name9].
-  V? getParameter<V>(
+  V? getParameter<V>(String name1, [V? def]) {
+    var val = parameters[name1];
+    return val ?? def;
+  }
+
+  V? getParameterFirstOf<V>(
     String name1, [
     String? name2,
     String? name3,
     String? name4,
     String? name5,
     String? name6,
-    String? name7,
-    String? name8,
-    String? name9,
   ]) {
     var val = parameters[name1];
     if (val != null) return val;
@@ -886,42 +1229,33 @@ class APIRequest extends APIPayload {
       if (val != null) return val;
     }
 
-    if (name7 != null) {
-      val = parameters[name7];
-      if (val != null) return val;
-    }
-
-    if (name8 != null) {
-      val = parameters[name8];
-      if (val != null) return val;
-    }
-
-    if (name9 != null) {
-      val = parameters[name9];
-      if (val != null) return val;
-    }
-
     return null;
   }
 
   /// Returns from [parameters] a value for [name] or [name1] .. [name9] ignoring case.
   /// See [getParameter].
-  V? getParameterIgnoreCase<V>(
-    String name, [
-    String? name2,
-    String? name3,
-    String? name4,
-    String? name5,
-    String? name6,
-    String? name7,
-    String? name8,
-    String? name9,
-  ]) {
-    var val = getParameter(name, name2, name3, name4, name5);
+  V? getParameterIgnoreCase<V>(String name, [V? def]) {
+    var val = parameters[name];
     if (val != null) return val;
 
     for (var k in parameters.keys) {
       if (equalsIgnoreAsciiCase(k, name)) return parameters[k];
+    }
+
+    return def;
+  }
+
+  V? getParameterIgnoreCaseFirstOf<V>(String name1,
+      [String? name2,
+      String? name3,
+      String? name4,
+      String? name5,
+      String? name6]) {
+    var val = getParameterFirstOf(name1, name2, name3, name4, name5);
+    if (val != null) return val;
+
+    for (var k in parameters.keys) {
+      if (equalsIgnoreAsciiCase(k, name1)) return parameters[k];
 
       if (name2 != null && equalsIgnoreAsciiCase(k, name2)) {
         return parameters[k];
@@ -942,41 +1276,101 @@ class APIRequest extends APIPayload {
       if (name6 != null && equalsIgnoreAsciiCase(k, name6)) {
         return parameters[k];
       }
+    }
 
-      if (name7 != null && equalsIgnoreAsciiCase(k, name7)) {
-        return parameters[k];
+    return null;
+  }
+
+  String? getHeader(String key, {String? def}) {
+    var val = headers[key];
+    if (val != null) return val;
+
+    key = key.trim();
+
+    for (var k in headers.keys) {
+      if (equalsIgnoreAsciiCase(k, key)) {
+        return headers[k];
+      }
+    }
+
+    return def;
+  }
+
+  String? getHeaderFirstOf(
+    String key1, [
+    String? key2,
+    String? key3,
+    String? key4,
+    String? key5,
+    String? key6,
+  ]) {
+    var val = _getHeaderFirstOf(key1, key2, key3, key4, key5, key6);
+    if (val != null) return val;
+
+    for (var k in headers.keys) {
+      if (equalsIgnoreAsciiCase(k, key1)) return parameters[k];
+
+      if (key2 != null && equalsIgnoreAsciiCase(k, key2)) {
+        return headers[k];
       }
 
-      if (name8 != null && equalsIgnoreAsciiCase(k, name8)) {
-        return parameters[k];
+      if (key3 != null && equalsIgnoreAsciiCase(k, key3)) {
+        return headers[k];
       }
 
-      if (name9 != null && equalsIgnoreAsciiCase(k, name9)) {
-        return parameters[k];
+      if (key4 != null && equalsIgnoreAsciiCase(k, key4)) {
+        return headers[k];
+      }
+
+      if (key5 != null && equalsIgnoreAsciiCase(k, key5)) {
+        return headers[k];
+      }
+
+      if (key6 != null && equalsIgnoreAsciiCase(k, key6)) {
+        return headers[k];
       }
     }
 
     return null;
   }
 
-  String? getHeader(String headerKey, {String? def}) {
-    var val = headers[headerKey];
+  String? _getHeaderFirstOf(
+    String key1, [
+    String? key2,
+    String? key3,
+    String? key4,
+    String? key5,
+    String? key6,
+  ]) {
+    var val = headers[key1];
     if (val != null) return val;
 
-    headerKey = headerKey.trim().toLowerCase();
-
-    val = headers[headerKey];
-    if (val != null) return val;
-
-    for (var k in headers.keys) {
-      var kLC = k.toLowerCase();
-
-      if (kLC == headerKey) {
-        return headers[k];
-      }
+    if (key2 != null) {
+      val = headers[key2];
+      if (val != null) return val;
     }
 
-    return def;
+    if (key3 != null) {
+      val = headers[key3];
+      if (val != null) return val;
+    }
+
+    if (key4 != null) {
+      val = headers[key4];
+      if (val != null) return val;
+    }
+
+    if (key5 != null) {
+      val = headers[key5];
+      if (val != null) return val;
+    }
+
+    if (key6 != null) {
+      val = headers[key6];
+      if (val != null) return val;
+    }
+
+    return null;
   }
 
   String get hostname {
@@ -1107,37 +1501,69 @@ class APIResponse<T> extends APIPayload {
   @override
   String? payloadFileExtension;
 
+  bool _requiresAuthentication = false;
+
+  /// If `true` this response should require `Authentication`.
+  /// See [authenticationType] and [authenticationRealm].
+  bool get requiresAuthentication => _requiresAuthentication;
+
+  String? _authenticationType;
+
+  /// The type of the required `Authentication`.
+  String? get authenticationType => _authenticationType;
+
+  String? _authenticationRealm;
+
+  /// The real of the required `Authentication`.
+  String? get authenticationRealm => _authenticationRealm;
+
   /// The response error.
   final dynamic error;
 
+  /// Constructs an [APIResponse].
+  ///
+  /// - [payloadDynamic] is only used if [payload] is `null` and [T] accepts the [payloadDynamic] value.
   APIResponse(this.status,
       {this.headers = const <String, dynamic>{},
-      this.payload,
+      T? payload,
+      Object? payloadDynamic,
       this.payloadMimeType,
       this.payloadFileExtension,
       this.error,
       Map<String, Duration>? metrics})
-      : _metrics = metrics;
+      : payload = _resolvePayload(payload, payloadDynamic),
+        _metrics = metrics;
+
+  static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) =>
+      payload ??
+      (payloadDynamic != null && TypeInfo.accepts<T>(payloadDynamic.runtimeType)
+          ? payloadDynamic as T
+          : null);
 
   /// Creates a response of status `OK`.
   factory APIResponse.ok(T? payload,
-      {Map<String, dynamic>? headers,
+      {Object? payloadDynamic,
+      Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
         metrics: metrics);
   }
 
   /// Transform this response to an `OK` response.
-  APIResponse asOk(
+  APIResponse<T> asOk(
       {T? payload,
+      Object? payloadDynamic,
       Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
-    return APIResponse.ok(payload ?? this.payload,
+    return APIResponse.ok(
+        payload ?? (payloadDynamic == null ? this.payload : null),
+        payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
@@ -1148,23 +1574,27 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.notFound(
       {Map<String, dynamic>? headers,
       T? payload,
+      Object? payloadDynamic,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
         metrics: metrics);
   }
 
   /// Transform this response to a `NOT_FOUND` response.
-  APIResponse asNotFound(
+  APIResponse<T> asNotFound(
       {T? payload,
+      Object? payloadDynamic,
       Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.notFound(
-        payload: payload,
+        payload: payload ?? (payloadDynamic == null ? this.payload : null),
+        payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
@@ -1175,23 +1605,27 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.unauthorized(
       {Map<String, dynamic>? headers,
       T? payload,
+      Object? payloadDynamic,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
         metrics: metrics);
   }
 
   /// Transform this response to an `UNAUTHORIZED` response.
-  APIResponse asUnauthorized(
+  APIResponse<T> asUnauthorized(
       {T? payload,
+      Object? payloadDynamic,
       Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.unauthorized(
-        payload: payload,
+        payload: payload ?? (payloadDynamic == null ? this.payload : null),
+        payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
@@ -1202,23 +1636,27 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.badRequest(
       {Map<String, dynamic>? headers,
       T? payload,
+      Object? payloadDynamic,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.BAD_REQUEST,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
         metrics: metrics);
   }
 
   /// Transform this response to an `BAD_REQUEST` response.
-  APIResponse asBadRequest(
+  APIResponse<T> asBadRequest(
       {T? payload,
+      Object? payloadDynamic,
       Map<String, dynamic>? headers,
       String? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.badRequest(
-        payload: payload,
+        payload: payload ?? (payloadDynamic == null ? this.payload : null),
+        payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
@@ -1237,7 +1675,7 @@ class APIResponse<T> extends APIPayload {
   }
 
   /// Transform this response to an `ERROR` response.
-  APIResponse asError(
+  APIResponse<T> asError(
       {Map<String, dynamic>? headers,
       dynamic error,
       Map<String, Duration>? metrics}) {
@@ -1257,6 +1695,18 @@ class APIResponse<T> extends APIPayload {
     } else {
       return APIResponse.ok(o);
     }
+  }
+
+  /// Defines that this response requires authentication.
+  ///
+  /// Depending of the serve implementation (usually HTTP),
+  /// it will send to the client the request for authentication
+  /// (in HTTP is the headers `WWW-Authenticate`).
+  void requireAuthentication(
+      {bool require = true, String type = 'Basic', String realm = 'API'}) {
+    _requiresAuthentication = require;
+    _authenticationType = type;
+    _authenticationRealm = realm;
   }
 
   Map<String, Duration>? _metrics;
@@ -1389,7 +1839,7 @@ class APIResponse<T> extends APIPayload {
     }
 
     headers["Access-Control-Expose-Headers"] =
-        exposeHeaders?.join(', ') ?? exposeHeaders;
+        exposeHeaders?.join(', ') ?? APIResponse.exposeHeaders;
   }
 
   /// Response infos.

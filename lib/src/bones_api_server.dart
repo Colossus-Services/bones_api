@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/src/bones_api_authentication.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -10,6 +11,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'bones_api_base.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
 
@@ -205,14 +207,83 @@ class APIServer {
             ? APIRequesterSource.local
             : APIRequesterSource.remote);
 
+    String? sessionID;
+    bool newSession = false;
+
+    var cookies = _parseCookies(request);
+    if (cookies != null && cookies.isNotEmpty) {
+      sessionID = cookies['SESSIONID'] ?? cookies['SESSION_ID'];
+    }
+
+    if (sessionID == null) {
+      sessionID = APISession.generateSessionID();
+      newSession = true;
+    }
+
+    var credential = _resolveCredential(request);
+
     var req = APIRequest(method, path,
         parameters: parameters,
         requesterSource: requesterSource,
         requesterAddress: requesterAddress,
         headers: headers,
+        sessionID: sessionID,
+        newSession: newSession,
+        credential: credential,
         scheme: scheme);
 
     return req;
+  }
+
+  Map<String, String>? _parseCookies(Request request) {
+    var headerCookies = request.headersAll['cookie'];
+    if (headerCookies == null || headerCookies.isEmpty) return null;
+
+    var cookies = <String, String>{};
+
+    for (var line in headerCookies) {
+      for (var c in line.split(';')) {
+        var idx = c.indexOf('=');
+        if (idx > 0) {
+          var k = c.substring(0, idx).trim();
+          var v = c.substring(idx + 1).trim();
+          cookies[k] = v;
+        }
+      }
+    }
+
+    return cookies;
+  }
+
+  static final RegExp _regExpSpace = RegExp(r'\s+');
+
+  APICredential? _resolveCredential(Request request) {
+    var headerAuthorization = request.headers.getIgnoreCase('Authorization');
+    if (headerAuthorization == null) return null;
+
+    var idx = headerAuthorization.indexOf(_regExpSpace);
+    if (idx <= 0) return null;
+
+    var credentialType =
+        headerAuthorization.substring(0, idx).trim().toLowerCase();
+    var credential = headerAuthorization.substring(idx + 1).trim();
+
+    if (credentialType == 'basic') {
+      var decoded = base64.decode(credential);
+      var decodedStr = utf8.decode(decoded);
+      var idx2 = decodedStr.indexOf(':');
+
+      var username = decodedStr.substring(0, idx2);
+      var password = decodedStr.substring(idx2 + 1);
+
+      return APICredential(username, passwordHash: password);
+    } else if (credentialType == 'bearer') {
+      return APICredential('', token: credential);
+    } else if (credentialType == 'digest') {
+      throw UnsupportedError('Unsupported `Authorization` type: digest');
+    }
+
+    return null;
   }
 
   bool _isLocalAddress(String address) =>
@@ -234,6 +305,20 @@ class APIServer {
       apiResponse.setCORS(apiRequest);
     }
 
+    if (apiResponse.requiresAuthentication) {
+      var type = apiResponse.authenticationType;
+      if (type == null || type.trim().isEmpty) {
+        type = 'Basic';
+      }
+
+      var realm = apiResponse.authenticationRealm;
+      if (realm == null || type.trim().isEmpty) {
+        realm = 'API';
+      }
+
+      headers['WWW-Authenticate'] = '$type realm="$realm"';
+    }
+
     for (var e in apiResponse.headers.entries) {
       var value = e.value;
       if (value != null) {
@@ -242,6 +327,21 @@ class APIServer {
     }
 
     headers['server'] ??= serverName;
+
+    if (apiRequest.newSession) {
+      var setSessionID = 'SESSIONID=${apiRequest.sessionID}';
+      headers.setMultiValue('Set-Cookie', setSessionID, ignoreCase: true);
+    }
+
+    var authentication = apiRequest.authentication;
+    if (authentication != null) {
+      var tokenKey = authentication.tokenKey;
+
+      if (authentication.resumed ||
+          _needToSendHeaderXAcessToken(headers, tokenKey)) {
+        headers.setMultiValue('X-Access-Token', tokenKey, ignoreCase: true);
+      }
+    }
 
     var retPayload = resolveBody(apiResponse.payload, apiResponse);
 
@@ -258,6 +358,23 @@ class APIServer {
             request, apiRequest, apiResponse, headers, payload);
       }
     });
+  }
+
+  bool _needToSendHeaderXAcessToken(
+      Map<String, Object> headers, String tokenKey) {
+    var headerAuthorization = headers.getFirstValue('authorization');
+    var notSentByAuthentication =
+        headerAuthorization == null || !headerAuthorization.contains(tokenKey);
+
+    var headerAccessToken =
+        headers.getMultiValue('x-access-token', ignoreCase: true);
+    var notSentByAccessToken =
+        headerAccessToken == null || !headerAccessToken.contains(tokenKey);
+
+    var needToSendHeaderXAcessToken =
+        notSentByAuthentication && notSentByAccessToken;
+
+    return needToSendHeaderXAcessToken;
   }
 
   FutureOr<Response> _sendResponse(Request request, APIRequest apiRequest,
@@ -278,7 +395,16 @@ class APIServer {
       case APIResponseStatus.NOT_FOUND:
         return Response.notFound(payload, headers: headers);
       case APIResponseStatus.UNAUTHORIZED:
-        return Response.forbidden(payload, headers: headers);
+        {
+          var wwwAuthenticate =
+              headers.getAsString('WWW-Authenticate', ignoreCase: true);
+
+          if (wwwAuthenticate != null && wwwAuthenticate.isNotEmpty) {
+            return Response(401, body: payload, headers: headers);
+          } else {
+            return Response.forbidden(payload, headers: headers);
+          }
+        }
       case APIResponseStatus.BAD_REQUEST:
         return Response(400, body: payload, headers: headers);
       case APIResponseStatus.ERROR:

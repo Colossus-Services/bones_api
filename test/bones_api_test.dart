@@ -85,7 +85,8 @@ void main() {
 
     test('404 module', () async {
       var res = await api.call(APIRequest.get('/service/baseX/foo'));
-      expect(res.toString(), equals('APIResponseStatus.NOT_FOUND'));
+      expect(res.toString(),
+          equals('NOT FOUND: No route for path "/service/baseX/foo"'));
     });
 
     test('404 route', () async {
@@ -149,7 +150,8 @@ void main() {
     test('404 module /base', () async {
       var res = await _getURL('${apiServer.url}service/baseX/foo',
           method: APIRequestMethod.GET);
-      expect(res.toString(), equals('Not Found'));
+      expect(res.toString(),
+          equals('NOT FOUND: No route for path "/service/baseX/foo"'));
     });
 
     test('404 route /base', () async {

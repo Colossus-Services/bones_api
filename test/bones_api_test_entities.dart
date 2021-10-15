@@ -73,7 +73,7 @@ class User extends Entity {
   static FutureOr<User> fromMap(Map<String, dynamic> map) => User(
       map.getAsString('email')!,
       map.getAsString('password')!,
-      map.get<Address>('address')!,
+      map.getAs<Address>('address')!,
       map.getAsList<Role>('roles', def: [])!,
       id: map['id'],
       creationTime: map['creationTime']);
@@ -334,7 +334,8 @@ class Role extends Entity {
 
   Role.fromMap(Map<String, dynamic> map)
       : this(map.getAsString('type')!,
-            enabled: map.getAsBool('enabled', false)!, id: map.getAsInt('id'));
+            enabled: map.getAsBool('enabled', defaultValue: false)!,
+            id: map.getAsInt('id'));
 
   @override
   bool operator ==(Object other) =>

@@ -7,6 +7,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_error_zone.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_utils.dart';
 
@@ -678,14 +679,37 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       : _reflection = reflection,
         super(provider, type: classType);
 
-  ClassReflection<O> get reflection {
-    _reflection ??=
-        ReflectionFactory().getRegisterClassReflection<O>(classType);
-    return _reflection!;
-  }
+  ClassReflection<O> get reflection => _reflection ??=
+      ReflectionFactory().getRegisterClassReflection<O>(classType)!;
 
   ClassReflection<O> reflectionWithObject([O? o]) =>
       o == null ? reflection : reflection.withObject(o);
+
+  List<ClassReflectionEntityHandler>? _siblingsEntityHandlers;
+
+  List<ClassReflectionEntityHandler> siblingsEntityHandlers() =>
+      _siblingsEntityHandlers ??=
+          List<ClassReflectionEntityHandler>.unmodifiable(
+              reflection.siblingsClassReflection().map((c) => c.entityHandler));
+
+  @override
+  EntityHandler<T>? getEntityHandler<T>({T? obj, Type? type}) {
+    var entityHandler = super.getEntityHandler(obj: obj, type: type);
+    if (entityHandler != null) {
+      return entityHandler;
+    }
+
+    var classReflectionForType =
+        reflection.siblingClassReflectionFor<T>(obj: obj, type: type);
+
+    if (classReflectionForType != null) {
+      return classReflectionForType.entityHandler as EntityHandler<T>;
+    }
+
+    entityHandler = ReflectionFactory()
+        .getRegisterEntityHandler<T>(type ?? obj?.runtimeType);
+    return entityHandler;
+  }
 
   @override
   void inspectObject(O? o) {}

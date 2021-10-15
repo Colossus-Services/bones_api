@@ -1,4 +1,13 @@
-## 1.0.25 
+## 1.0.26
+
+- Added `APICredential`, `APIPassword` and `APISecurity`.
+- Routes now can have `APIRouteRule` annotations.
+- `EntityHandler`: now using also using sibling reflections to resolve.
+- `DataTime`: `toJson` now converts to a `UTC` string.
+- Added `MapMultiValueExtension`.
+- Updated `bones_api_template.tar.gz`.
+
+## 1.0.25
 
 - Update template: `lib/src/template/bones_api_template.tar.gz`
 
