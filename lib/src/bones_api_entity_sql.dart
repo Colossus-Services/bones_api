@@ -88,7 +88,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
             return repository.ensureStored(value, transaction: transaction);
           }
         })
-        .whereNotNull()
+        .whereNotNullSync()
         .toList(growable: false);
 
     return futures.resolveAllWithValue(true);

@@ -1,3 +1,12 @@
+## 1.0.27
+
+- Improved resolution of `ClassReflectionEntityHandler`.
+- Extension:
+  - `ReflectionFactory.createFromMap`.
+  - `ClassReflection.createFromMap`.
+- async_extension: ^1.0.9
+- reflection_factory: ^1.0.16
+
 ## 1.0.26
 
 - Added `APICredential`, `APIPassword` and `APISecurity`.

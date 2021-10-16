@@ -137,6 +137,25 @@ void main() {
       expect(user1b, equals(user2));
     });
 
+    test('basic', () async {
+      var user1 = User('joe@mail.com', '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
+          creationTime: DateTime.utc(2020, 10, 11, 12, 13, 14, 0, 0));
+      var user2 = User(
+          'smith@mail.com',
+          'abc',
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          [Role('guest')],
+          creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
+
+      var reflectionEntityHandler = user1.reflection.entityHandler;
+      print(reflectionEntityHandler);
+      expect(reflectionEntityHandler, isNotNull);
+
+      expect(identical(reflectionEntityHandler, user2.reflection.entityHandler),
+          isTrue);
+    });
+
     test('SetEntityRepository', () async {
       expect(userRepository.nextID(), equals(1));
       expect(userRepository.selectByID(1), isNull);

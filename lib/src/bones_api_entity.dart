@@ -98,7 +98,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       : provider = provider ?? EntityHandlerProvider.globalProvider,
         type = type ?? O {
     if (!isValidType(this.type)) {
-      throw StateError('Invalid EntityHandler type: $type ?? $O');
+      throw StateError('Invalid EntityHandler type: $type (O: $O)');
     }
 
     if (O != type) {
@@ -703,7 +703,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
         reflection.siblingClassReflectionFor<T>(obj: obj, type: type);
 
     if (classReflectionForType != null) {
-      return classReflectionForType.entityHandler as EntityHandler<T>;
+      return classReflectionForType.entityHandler;
     }
 
     entityHandler = ReflectionFactory()

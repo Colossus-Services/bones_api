@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.14
+// BUILDER: reflection_factory/1.0.16
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -23,7 +23,15 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
+  Version get reflectionFactoryVersion => Version.parse('1.0.16');
+
+  @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
+
+  static Address$reflection? _withoutObjectInstance;
+  @override
+  Address$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as Address$reflection;
 
   @override
   bool get hasDefaultConstructor => false;
@@ -333,7 +341,15 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
+  Version get reflectionFactoryVersion => Version.parse('1.0.16');
+
+  @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
+
+  static Role$reflection? _withoutObjectInstance;
+  @override
+  Role$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as Role$reflection;
 
   @override
   bool get hasDefaultConstructor => false;
@@ -610,7 +626,15 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
+  Version get reflectionFactoryVersion => Version.parse('1.0.16');
+
+  @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
+
+  static User$reflection? _withoutObjectInstance;
+  @override
+  User$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as User$reflection;
 
   @override
   bool get hasDefaultConstructor => false;

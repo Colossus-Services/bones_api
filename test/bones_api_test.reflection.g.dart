@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.14
+// BUILDER: reflection_factory/1.0.16
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -23,8 +23,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
+  Version get reflectionFactoryVersion => Version.parse('1.0.16');
+
+  @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
       MyInfoModule$reflection(obj);
+
+  static MyInfoModule$reflection? _withoutObjectInstance;
+  @override
+  MyInfoModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as MyInfoModule$reflection;
 
   @override
   bool get hasDefaultConstructor => false;

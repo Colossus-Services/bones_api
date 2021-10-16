@@ -15,13 +15,50 @@ extension ReflectionFactoryExtension on ReflectionFactory {
     var classReflection = getRegisterClassReflection<O>(classType);
     return classReflection?.entityHandler;
   }
+
+  /// Creates an instance [O] from [map] for [classType] (or [O]).
+  ///
+  /// - Requires a registered [ClassReflection] for [O] or [classType].
+  /// - Uses a [ClassReflectionEntityHandler] for [O] or [classType].
+  FutureOr<O?> createFromMap<O>(Map<String, dynamic> map, [Type? classType]) {
+    var entityHandler = getRegisterEntityHandler<O>(classType);
+    return entityHandler?.createFromMap(map);
+  }
 }
 
 /// [ClassReflection] extension.
 extension ClassReflectionExtension<O> on ClassReflection<O> {
+  static final Expando<ClassReflectionEntityHandler> _expandoEntityHandlers =
+      Expando<ClassReflectionEntityHandler>();
+
   /// Returns a [ClassReflectionEntityHandler] for instances of this reflected class ([classType]).
-  ClassReflectionEntityHandler<O> get entityHandler =>
-      ClassReflectionEntityHandler<O>(O);
+  ClassReflectionEntityHandler<O> get entityHandler {
+    var classReflection = withoutObjectInstance();
+
+    var entityHandler = _expandoEntityHandlers[classReflection]
+        as ClassReflectionEntityHandler<O>?;
+
+    if (entityHandler == null) {
+      entityHandler = _createEntityHandler();
+      _expandoEntityHandlers[classReflection] = entityHandler;
+    }
+
+    return entityHandler;
+  }
+
+  ClassReflectionEntityHandler<O> _createEntityHandler() {
+    return callCasted<ClassReflectionEntityHandler<O>>(<T>(classReflection) {
+      var classType = classReflection.classType;
+      var reflection = classReflection.withoutObjectInstance();
+      return ClassReflectionEntityHandler<T>(classType, reflection: reflection)
+          as ClassReflectionEntityHandler<O>;
+    });
+  }
+
+  /// Creates an instance [O] from [map].
+  FutureOr<O> createFromMap(Map<String, dynamic> map) {
+    return entityHandler.createFromMap(map);
+  }
 
   /// Lists the API methods of this reflected class.
   /// See [MethodReflectionExtension.isAPIMethod].

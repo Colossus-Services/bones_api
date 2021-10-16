@@ -342,8 +342,8 @@ abstract class APISecurity {
   }
 
   String getRequestParameterPassword(APIRequest request) {
-    return (request.getParameterIgnoreCaseFirstOf(
-                'password', 'pass', 'passphrase') ??
+    return (request.getParameterIgnoreCaseFirstOf('password', 'pass',
+                'passphrase', 'passwordHash', 'passwordOrHash') ??
             '')
         .toString();
   }

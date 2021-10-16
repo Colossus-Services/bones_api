@@ -16,6 +16,7 @@ class APICredential {
   /// The [APIPassword] of this credential.
   final APIPassword? password;
 
+  /// The token of this credential.
   final String? token;
 
   APICredential(this.username,
