@@ -16,7 +16,7 @@ import 'bones_api_utils.dart';
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.27';
+  static const String VERSION = '1.0.28';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -168,17 +168,28 @@ abstract class APIRoot {
   }
 
   FutureOr<APIResponse<T>> _callImpl<T>(
-      APIRequest request, APISecurity? apiSecurity) {
-    var module = getModuleByRequest(request);
+      APIRequest apiRequest, APISecurity? apiSecurity) {
+    var pathPartRoot = apiRequest.pathParts[0];
+
+    if (pathPartRoot == 'API-INFO') {
+      var info = apiInfo(apiRequest);
+      return APIResponse.ok(info as T)..payloadMimeType = 'application/json';
+    }
+
+    var module = getModuleByRequest(apiRequest);
 
     if (module == null &&
         apiSecurity != null &&
-        request.lastPathPart == authenticationRoute) {
-      return apiSecurity.doRequestAuthentication(request);
+        apiRequest.lastPathPart == authenticationRoute) {
+      return apiSecurity.doRequestAuthentication(apiRequest);
     }
 
-    return _callModule<T>(module, request);
+    return _callModule<T>(module, apiRequest);
   }
+
+  /// Returns a [APIRootInfo].
+  APIRootInfo apiInfo([APIRequest? apiRequest]) =>
+      APIRootInfo(this, apiRequest);
 
   FutureOr<APIResponse<T>> _callModule<T>(
       APIModule? module, APIRequest request) {
@@ -246,12 +257,36 @@ abstract class APIRoot {
   }
 }
 
+/// The [APIRoot] information.
+///
+/// Returned by `API-INFO`.
+class APIRootInfo {
+  final APIRoot apiRoot;
+  final APIRequest? apiRequest;
+
+  APIRootInfo(this.apiRoot, [this.apiRequest]);
+
+  /// Returns the name of the [apiRoot].
+  String get name => apiRoot.name;
+
+  /// Returns the version of the [apiRoot].
+  String get version => apiRoot.version;
+
+  /// Returns the modules of the [apiRoot].
+  List<APIModuleInfo> get modules =>
+      apiRoot.modules.map((e) => e.apiInfo(apiRequest)).toList();
+
+  Map<String, dynamic> toJson() =>
+      {'name': name, 'version': version, 'modules': modules};
+}
+
 /// An API route handler
 typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
     APIRequest request);
 
 /// A route handler, with its [function] and [rules].
 class APIRouteHandler<T> {
+  final APIModule module;
   final APIRequestMethod? requestMethod;
   final String routeName;
 
@@ -259,8 +294,10 @@ class APIRouteHandler<T> {
 
   List<APIRouteRule> rules;
 
-  APIRouteHandler(this.requestMethod, this.routeName, this.function,
-      Iterable<APIRouteRule>? rules)
+  Map<String, TypeInfo>? parameters;
+
+  APIRouteHandler(this.module, this.requestMethod, this.routeName,
+      this.function, this.parameters, Iterable<APIRouteRule>? rules)
       : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]);
 
   /// Calls this route.
@@ -286,6 +323,9 @@ class APIRouteHandler<T> {
     return true;
   }
 
+  APIRouteInfo apiInfo([APIRequest? apiRequest]) =>
+      APIRouteInfo(this, apiRequest);
+
   @override
   String toString() {
     return 'APIRouteHandler${requestMethod != null ? '[${requestMethod!.name}]' : ''}'
@@ -293,6 +333,83 @@ class APIRouteHandler<T> {
         '${rules.isNotEmpty ? ', rules: $rules' : ''}'
         '}';
   }
+}
+
+/// A route information.
+///
+/// Returned by `API-INFO`.
+class APIRouteInfo {
+  final APIRouteHandler routeHandler;
+  final APIRequest? apiRequest;
+
+  APIRouteInfo(this.routeHandler, [this.apiRequest]);
+
+  /// Returns the name of the route.
+  String get name => routeHandler.routeName;
+
+  /// Returns the module of the route.
+  APIModule get module => routeHandler.module;
+
+  /// Returns the method of the route.
+  APIRequestMethod? get method => routeHandler.requestMethod;
+
+  /// Returns the parameters of the route.
+  Map<String, TypeInfo>? get parameters => routeHandler.parameters;
+
+  /// Returns `true` if this route has parameters.
+  bool get hasParameters => parameters != null && parameters!.isNotEmpty;
+
+  /// Returns the [Uri] of the route.
+  Uri get uri {
+    var baseUri = apiRequest != null
+        ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
+        : Uri.base;
+    var module = routeHandler.module;
+    var path = module.name + '/' + name;
+
+    var parameters = hasParameters ? parametersAsJson : null;
+
+    var scheme = baseUri.scheme;
+
+    var uri = Uri(
+        scheme: scheme,
+        host: baseUri.host,
+        port: baseUri.port,
+        userInfo: baseUri.userInfo,
+        path: path,
+        queryParameters: parameters);
+
+    return uri;
+  }
+
+  String get uriAsJson {
+    var uri = this.uri;
+
+    if (uri.scheme == 'file') {
+      var path = uri.path;
+      var query = uri.query;
+      return query.isEmpty ? path : '$path?$query';
+    } else {
+      return uri.toString();
+    }
+  }
+
+  /// Returns the rules of the route.
+  List<APIRouteRule> get rules => routeHandler.rules;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (method != null) 'method': method!.name,
+        if (parameters != null && parameters!.isNotEmpty)
+          'parameters': parametersAsJson,
+        'uri': uriAsJson,
+        if (rules.isNotEmpty) 'rules': rules,
+      };
+
+  Map<String, String> get parametersAsJson =>
+      Map<String, String>.fromEntries(parameters!.entries
+          .where((e) => !e.value.isOf(APIRequest))
+          .map((e) => MapEntry(e.key, e.value.toString())));
 }
 
 APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {
@@ -308,9 +425,13 @@ abstract class APIModule {
   /// The name of this API module.
   final String name;
 
+  /// Optional module version.
+  final String? version;
+
   late final APIRouteBuilder _routeBuilder;
 
-  APIModule(this.apiRoot, this.name) {
+  APIModule(this.apiRoot, String name, {this.version})
+      : name = name.trim().toLowerCase() {
     _routeBuilder = APIRouteBuilder(this);
   }
 
@@ -372,9 +493,10 @@ abstract class APIModule {
   /// [function] The route handler, to process calls.
   APIModule addRoute(
       APIRequestMethod? method, String name, APIRouteFunction function,
-      [Iterable<APIRouteRule>? rules]) {
+      {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) {
     var routesHandlers = _getRoutesHandlers(method);
-    routesHandlers[name] = APIRouteHandler(method, name, function, rules);
+    routesHandlers[name] =
+        APIRouteHandler(this, method, name, function, parameters, rules);
     return this;
   }
 
@@ -445,21 +567,32 @@ abstract class APIModule {
     }
   }
 
-  FutureOr<APIResponse<T>> _callImpl<T>(APIRequest request) {
-    var handler = getRouteHandlerByRequest<T>(request);
+  FutureOr<APIResponse<T>> _callImpl<T>(APIRequest apiRequest) {
+    var routeName = apiRequest.lastPathPart;
+
+    if (routeName == 'API-INFO') {
+      var info = apiInfo(apiRequest);
+      return APIResponse.ok(info as T)..payloadMimeType = 'application/json';
+    }
+
+    var handler = getRouteHandlerByRequest<T>(apiRequest);
 
     if (handler == null) {
-      return _responseNotFoundNoRouteForPath<T>(request);
+      return _responseNotFoundNoRouteForPath<T>(apiRequest);
     }
 
     try {
-      var response = handler.call(request);
+      var response = handler.call(apiRequest);
       return response;
     } catch (e, s) {
       var error = 'ERROR: $e\n$s';
       return APIResponse.error(error: error);
     }
   }
+
+  /// Returns a [APIModuleInfo].
+  APIModuleInfo apiInfo([APIRequest? apiRequest]) =>
+      APIModuleInfo(this, apiRequest);
 
   String get authenticationRoute => 'authenticate';
 
@@ -486,6 +619,28 @@ abstract class APIModule {
   int get hashCode => name.hashCode;
 }
 
+/// The [APIModule] information.
+///
+/// Returned by `API-INFO`.
+class APIModuleInfo {
+  final APIModule module;
+  final APIRequest? apiRequest;
+
+  APIModuleInfo(this.module, [this.apiRequest]);
+
+  /// Returns the name of the [module].
+  String get name => module.name;
+
+  /// Returns the version of the [module].
+  String? get version => module.version;
+
+  /// Returns the routes of the [module].
+  List<APIRouteInfo> get routes => module.routes.apiInfo(apiRequest);
+
+  Map<String, dynamic> toJson() =>
+      {'name': name, if (version != null) 'version': version, 'routes': routes};
+}
+
 /// A route builder.
 class APIRouteBuilder<M extends APIModule> {
   /// The API module of this route builder.
@@ -495,39 +650,45 @@ class APIRouteBuilder<M extends APIModule> {
 
   /// Adds a route of [name] with [handler] for ANY request method.
   APIModule any(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(null, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(null, name, function, parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `GET` request method.
   APIModule get(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(APIRequestMethod.GET, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.GET, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `POST` request method.
   APIModule post(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(APIRequestMethod.POST, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.POST, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `PUT` request method.
   APIModule put(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(APIRequestMethod.PUT, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.PUT, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `DELETE` request method.
   APIModule delete(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(APIRequestMethod.DELETE, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.DELETE, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `PATCH` request method.
   APIModule patch(String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      add(APIRequestMethod.PATCH, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.PATCH, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for the request [method].
   APIModule add(
           APIRequestMethod? method, String name, APIRouteFunction function,
-          [Iterable<APIRouteRule>? rules]) =>
-      module.addRoute(method, name, function, rules);
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      module.addRoute(method, name, function,
+          parameters: parameters, rules: rules);
 
   /// Adds routes from [provider] for ANY request method.
   void anyFrom(Object? provider) => from(null, provider);
@@ -605,20 +766,29 @@ class APIRouteBuilder<M extends APIModule> {
     }
 
     if (returnsAPIResponse && receivesAPIRequest) {
+      var paramName = apiMethod.normalParametersNames.first;
+      var parameters = {paramName: TypeInfo.tAPIRequest};
+
       add(requestMethod, apiMethod.name, (req) {
         return apiMethod.invoke([req]);
-      }, rules);
+      }, parameters: parameters, rules: rules);
     } else if (receivesAPIRequest) {
+      var paramName = apiMethod.normalParametersNames.first;
+      var parameters = {paramName: TypeInfo.tAPIRequest};
+
       add(requestMethod, apiMethod.name, (req) {
         var ret = apiMethod.invoke([req]);
         return APIResponse.from(ret);
-      }, rules);
+      }, parameters: parameters, rules: rules);
     } else if (returnsAPIResponse) {
+      var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
+          .map((p) => MapEntry(p.name, TypeInfo.from(p.type))));
+
       add(requestMethod, apiMethod.name, (req) {
         var methodInvocation =
             apiMethod.methodInvocation((p) => _resolveRequestParameter(req, p));
         return methodInvocation.invoke(apiMethod.method);
-      }, rules);
+      }, parameters: parameters, rules: rules);
     }
   }
 
@@ -654,6 +824,13 @@ class APIRouteBuilder<M extends APIModule> {
       var parsed = typeInfo.parse(value);
       return parsed ?? value;
     }
+  }
+
+  List<APIRouteInfo> apiInfo([APIRequest? apiRequest]) {
+    var info = module._routesHandlers.values
+        .map((e) => e.apiInfo(apiRequest))
+        .toList();
+    return info;
   }
 }
 
@@ -973,6 +1150,10 @@ class APIRequest extends APIPayload {
 
   /// The authentication of this request, processed by [APISecurity].
   APIAuthentication? authentication;
+
+  /// Returns `true` if this request is authenticated and the token is not expired.
+  bool get isAuthenticated =>
+      authentication != null && authentication!.isExpired();
 
   final String? scheme;
 

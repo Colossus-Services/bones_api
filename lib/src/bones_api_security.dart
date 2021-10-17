@@ -370,9 +370,13 @@ abstract class APISecurity {
 abstract class APIRouteRule {
   const APIRouteRule();
 
+  /// Returns `true` if the [request] is valid by this rule.
   bool validate(APIRequest request);
+
+  Map<String, Object> toJson();
 }
 
+/// A route rule for public access.
 class APIRoutePublicRule extends APIRouteRule {
   const APIRoutePublicRule() : super();
 
@@ -385,8 +389,12 @@ class APIRoutePublicRule extends APIRouteRule {
   String toString() {
     return 'APIRoutePublicRule{}';
   }
+
+  @override
+  Map<String, Object> toJson() => {'rule': 'public'};
 }
 
+/// A route rule for access only for NOT authenticated requests.
 class APIRouteNotAuthenticatedRule extends APIRouteRule {
   const APIRouteNotAuthenticatedRule() : super();
 
@@ -401,8 +409,12 @@ class APIRouteNotAuthenticatedRule extends APIRouteRule {
   String toString() {
     return 'APIRouteNotAuthenticatedRule{}';
   }
+
+  @override
+  Map<String, Object> toJson() => {'rule': 'not_authenticated'};
 }
 
+/// A route rule for access only for authenticated requests ([APIAuthentication]).
 class APIRouteAuthenticatedRule extends APIRouteRule {
   const APIRouteAuthenticatedRule() : super();
 
@@ -417,8 +429,12 @@ class APIRouteAuthenticatedRule extends APIRouteRule {
   String toString() {
     return 'APIRouteAuthenticatedRule{}';
   }
+
+  @override
+  Map<String, Object> toJson() => {'rule': 'authenticated'};
 }
 
+/// A route rule for access only for authenticated requests with the required permissions ([APIAuthentication.permissions]).
 class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   final Iterable<String> _requiredPermissionTypes;
 
@@ -429,6 +445,7 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   static final Expando<Set<String>> _expandoNormalizedTypes =
       Expando<Set<String>>();
 
+  /// The required permission types.
   Set<String> get requiredPermissionTypes {
     var normalizedType = _expandoNormalizedTypes[this];
     if (normalizedType != null) return normalizedType;
@@ -437,6 +454,7 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
         .map(APIPermission.normalizeType)
         .where(APIPermission.validateType)
         .toSet();
+
     _expandoNormalizedTypes[this] = normalizedType;
     return normalizedType;
   }
@@ -461,6 +479,10 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   String toString() {
     return 'APIRoutePermissionTypeRule{${requiredPermissionTypes.join(', ')}}';
   }
+
+  @override
+  Map<String, Object> toJson() =>
+      {'rule': 'permission', 'types': requiredPermissionTypes.toList()};
 }
 
 class SecureRandom implements Random {

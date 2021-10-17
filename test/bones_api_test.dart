@@ -204,6 +204,26 @@ void main() {
           equals('[method: POST ; msg: HELLO! ; agent: BonesAPI/Test]'));
     });
 
+    test('/API-INFO', () async {
+      var res = await _getURL('${apiServer.url}API-INFO');
+
+      var expectedInfo = '{"name":"example","version":"1.0","modules":['
+          '{"name":"base","routes":['
+          '{"name":"time","uri":"http://localhost:0/base/time"},{"name":"auth","uri":"http://localhost:0/base/auth"},'
+          '{"name":"404","uri":"http://localhost:0/base/404"},'
+          '{"name":"err","uri":"http://localhost:0/base/err"}'
+          ']},'
+          '{"name":"info","routes":['
+          '{"name":"echo","parameters":{"msg":"String","request":"APIRequest"},"uri":"http://localhost:0/info/echo?msg=String&request=APIRequest"}'
+          ']}'
+          ']}';
+
+      expectedInfo = expectedInfo.replaceAll(
+          'localhost:0', '${apiServer.address}:${apiServer.port}');
+
+      expect(res.toString(), equals(expectedInfo));
+    });
+
     tearDownAll(() async {
       await apiServer.stop();
     });

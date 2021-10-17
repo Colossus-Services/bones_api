@@ -384,6 +384,7 @@ class APIServer {
 
     var contentType = apiResponse.payloadMimeType;
     if (contentType != null && contentType.isNotEmpty) {
+      contentType = _fixContentType(contentType);
       headers['content-type'] = contentType;
     }
 
@@ -418,6 +419,29 @@ class APIServer {
       default:
         return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',
             headers: headers);
+    }
+  }
+
+  String _fixContentType(String contentType) {
+    var contentTypeLC = contentType.trim().toLowerCase();
+
+    switch (contentTypeLC) {
+      case 'json':
+        return 'application/json';
+      case 'js':
+      case 'javascript':
+        return 'application/javascript';
+      case 'text':
+        return 'text/plain';
+      case 'html':
+        return 'text/html';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      default:
+        return contentType;
     }
   }
 

@@ -1,3 +1,7 @@
+## 1.0.28
+
+- Added `API-INFO` path: describes the API routes.
+
 ## 1.0.27
 
 - Improved resolution of `ClassReflectionEntityHandler`.

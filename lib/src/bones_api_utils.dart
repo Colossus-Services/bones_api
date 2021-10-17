@@ -1,6 +1,7 @@
 import 'dart:convert' as dart_convert;
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
@@ -507,6 +508,9 @@ class TypeInfo {
   static final TypeInfo tDouble = TypeInfo.from(double);
   static final TypeInfo tNum = TypeInfo.from(num);
 
+  static final TypeInfo tAPIRequest = TypeInfo.from(APIRequest);
+  static final TypeInfo tAPIResponse = TypeInfo.from(APIResponse);
+
   /// The main [Type].
   final Type type;
 
@@ -644,9 +648,23 @@ class TypeInfo {
   /// The [TypeInfo] of the [List] elements type.
   TypeInfo? get listEntityType => isListEntity ? arguments.first : null;
 
+  static final ListEquality<TypeInfo> _listTypeInfoEquality =
+      ListEquality<TypeInfo>();
+
+  /// Returns `true` if this instances has the same [type] and [arguments].
+  bool isOf(Type type, [List<TypeInfo>? arguments]) =>
+      this.type == type &&
+      (arguments != null && arguments.isNotEmpty) &&
+      hasArguments &&
+      _listTypeInfoEquality.equals(arguments, arguments);
+
   @override
   String toString() {
-    return hasArguments ? '$type<${arguments.join(',')}>' : '$type';
+    var typeStr = type.toString();
+    var idx = typeStr.indexOf('<');
+    if (idx > 0) typeStr = typeStr.substring(0, idx);
+
+    return hasArguments ? '$typeStr<${arguments.join(',')}>' : typeStr;
   }
 }
 
