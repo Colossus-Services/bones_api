@@ -5,51 +5,103 @@ import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
+typedef ToEncodableJson = Object? Function(Object? object);
+
+typedef JsonFieldMatcher = bool Function(String key);
+
 /// JSON utility class.
 class Json {
+  /// A standard implementation of mask filed.
+  ///
+  /// - [extraKeys] is the extra keys to mask.
+  static bool standardJsonMaskField(String key, {Iterable<String>? extraKeys}) {
+    key = key.trim().toLowerCase();
+    return key == 'password' ||
+        key == 'pass' ||
+        key == 'passwordhash' ||
+        key == 'passhash' ||
+        key == 'passphrase' ||
+        key == 'ping' ||
+        key == 'secret' ||
+        key == 'privatekey' ||
+        key == 'pkey' ||
+        (extraKeys != null && extraKeys.contains(key));
+  }
+
   /// Converts [o] to a JSON collection/data.
   /// - [maskField] when preset indicates if a field value should be masked with [maskText].
   static T? toJson<T>(Object? o,
-      {bool Function(String key)? maskField,
+      {JsonFieldMatcher? maskField,
       String maskText = '***',
-      Object? Function(dynamic object)? toEncodable}) {
+      JsonFieldMatcher? removeField,
+      ToEncodableJson? toEncodable}) {
+    return _valueToJson(o, maskField, maskText, removeField, toEncodable) as T;
+  }
+
+  static Object? _valueToJson(o, JsonFieldMatcher? maskField, String maskText,
+      JsonFieldMatcher? removeField, ToEncodableJson? toEncodable) {
     if (o == null) {
       return null;
+    } else if (o is String || o is num || o is bool) {
+      return o;
+    } else if (o is DateTime) {
+      return _dateTimeToJson(o);
+    } else if (o is Map) {
+      return _mapToJson(o, maskField, maskText, removeField, toEncodable);
+    } else if (o is Set) {
+      return _iterableToJson(o, maskField, maskText, removeField, toEncodable)
+          .toSet();
+    } else if (o is Iterable) {
+      return _iterableToJson(o, maskField, maskText, removeField, toEncodable)
+          .toList();
+    } else {
+      return _entityToJson(o, toEncodable);
+    }
+  }
+
+  static Iterable<Object?> _iterableToJson(
+      Iterable<dynamic> o,
+      JsonFieldMatcher? maskField,
+      String maskText,
+      JsonFieldMatcher? removeField,
+      ToEncodableJson? toEncodable) {
+    return o.map(
+        (e) => _valueToJson(e, maskField, maskText, removeField, toEncodable));
+  }
+
+  static Map<String, dynamic> _mapToJson(
+      Map<dynamic, dynamic> o,
+      JsonFieldMatcher? maskField,
+      String maskText,
+      JsonFieldMatcher? removeField,
+      ToEncodableJson? toEncodable) {
+    var oEntries = o.entries;
+
+    if (removeField != null) {
+      oEntries = oEntries.where((e) => !removeField(e.key));
     }
 
-    if (o is String || o is num || o is bool) {
-      return o as T;
-    }
+    var entries = oEntries.map((e) {
+      var key = e.key;
+      var value = _mapKeyValueToJson(
+          key, e.value, maskField, maskText, removeField, toEncodable);
+      return MapEntry<String, dynamic>(key, value);
+    });
 
-    if (o is DateTime) {
-      return _dateTimeToJson(o) as T;
-    }
-
-    if (maskField != null) {
-      if (o is Map) {
-        o = _mapToJson(o, maskField, maskText);
-      } else if (o is Iterable) {
-        o = o.map((e) {
-          return e is Map ? _mapToJson(o as Map, maskField, maskText) : e;
-        }).toList();
-      }
-    }
-
-    return o as T;
+    return Map<String, dynamic>.fromEntries(entries);
   }
 
   static String _dateTimeToJson(DateTime o) {
     return o.toUtc().toString();
   }
 
-  static Map<dynamic, dynamic> _mapToJson(
-      Map o, bool Function(String key)? maskField, String maskText) {
-    return o.map((key, value) =>
-        MapEntry(key, _mapKeyToJson(key, value, maskField, maskText)));
-  }
-
-  static dynamic _mapKeyToJson(String k, dynamic o,
-      bool Function(String key)? maskField, String maskText) {
+  static Object? _mapKeyValueToJson(
+      String k,
+      dynamic o,
+      JsonFieldMatcher? maskField,
+      String maskText,
+      JsonFieldMatcher? removeField,
+      ToEncodableJson? toEncodable) {
     if (o == null) {
       return null;
     }
@@ -61,27 +113,41 @@ class Json {
       }
     }
 
-    if (o is String || o is num || o is bool) {
-      return o;
-    }
+    return _valueToJson(o, maskField, maskText, removeField, toEncodable);
+  }
 
-    if (o is DateTime) {
-      return _dateTimeToJson(o);
-    }
-
-    if (o is Map) {
-      return o.map((key, value) =>
-          MapEntry(key, _mapKeyToJson(key, value, maskField, maskText)));
-    } else if (o is Set) {
-      return o.map((e) => _mapKeyToJson(k, e, maskField, maskText)).toSet();
-    } else if (o is Iterable) {
-      return o.map((e) => _mapKeyToJson(k, e, maskField, maskText)).toList();
-    } else {
+  static Object? _entityToJson(dynamic o, ToEncodableJson? toEncodable) {
+    if (toEncodable != null) {
       try {
-        return o.toJson();
+        return toEncodable(o);
       } catch (_) {
-        return '$o';
+        return _entityToJsonImpl(o);
       }
+    } else {
+      return _entityToJsonImpl(o);
+    }
+  }
+
+  static Object? _entityToJsonImpl(dynamic o) {
+    var classReflection =
+        ReflectionFactory().getRegisterClassReflection(o.runtimeType);
+
+    if (classReflection != null) {
+      try {
+        return classReflection.toJson(o);
+      } catch (_) {
+        return _entityToJsonDefault(o);
+      }
+    } else {
+      return _entityToJsonDefault(o);
+    }
+  }
+
+  static _entityToJsonDefault(dynamic o) {
+    try {
+      return o.toJson();
+    } catch (_) {
+      return '$o';
     }
   }
 
@@ -91,15 +157,15 @@ class Json {
   /// - [toEncodable] converts a not encodable [Object] to a encodable JSON collection/data. See [dart_convert.JsonEncoder].
   static String encode(Object? o,
       {bool pretty = false,
-      bool Function(String key)? maskField,
+      JsonFieldMatcher? maskField,
       String maskText = '***',
       Object? Function(dynamic object)? toEncodable}) {
+    var json = toJson(o,
+        maskField: maskField, maskText: maskText, toEncodable: toEncodable);
     if (pretty) {
-      return dart_convert.JsonEncoder.withIndent('  ').convert(toJson(o,
-          maskField: maskField, maskText: maskText, toEncodable: toEncodable));
+      return dart_convert.JsonEncoder.withIndent('  ').convert(json);
     } else {
-      return dart_convert.json.encode(toJson(o,
-          maskField: maskField, maskText: maskText, toEncodable: toEncodable));
+      return dart_convert.json.encode(json);
     }
   }
 

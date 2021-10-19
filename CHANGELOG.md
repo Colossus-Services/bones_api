@@ -1,3 +1,9 @@
+## 1.0.29
+
+- Improved `Json.toJson`.
+- Added field `APIAuthentication.data`.
+- `APISecurity`: added `getAuthenticationData`.
+
 ## 1.0.28
 
 - Added `API-INFO` path: describes the API routes.

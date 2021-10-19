@@ -5,11 +5,47 @@ import 'package:test/test.dart';
 
 final _log = logging.Logger('bones_api_test');
 
+class Foo {
+  int id;
+
+  String name;
+
+  Foo(this.id, this.name);
+
+  @override
+  String toString() {
+    return '#$id[$name]';
+  }
+}
+
 void main() {
   _log.handler.logToConsole();
 
   group('Utils', () {
     setUp(() {});
+
+    test('Json.toJson', () async {
+      expect(Json.toJson(123), equals(123));
+      expect(Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),
+          equals('2021-01-02 03:04:05.000Z'));
+
+      expect(
+          Json.toJson({'a': 1, 'b': 2, 'p': 123}, removeField: (k) => k == 'p'),
+          equals({'a': 1, 'b': 2}));
+
+      expect(
+          Json.toJson({'a': 1, 'b': 2, 'p': 123}, maskField: (k) => k == 'p'),
+          equals({'a': 1, 'b': 2, 'p': '***'}));
+
+      expect(Json.toJson({'a': 1, 'b': 2, 'foo': Foo(51, 'x')}),
+          equals({'a': 1, 'b': 2, 'foo': '#51[x]'}));
+
+      expect(
+          Json.toJson({'a': 1, 'b': 2, 'foo': Foo(51, 'x')}, toEncodable: (o) {
+            return o is Foo ? '${o.id}:${o.name}' : o;
+          }),
+          equals({'a': 1, 'b': 2, 'foo': '51:x'}));
+    });
 
     test('Json.encode', () async {
       expect(Json.encode({'a': 1, 'b': 2}), equals('{"a":1,"b":2}'));

@@ -50,15 +50,24 @@ abstract class APISecurity {
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
-
-      return getCredentialPermissions(credential)
-          .then((permissions) => createAuthentication(credential, permissions));
+      return _resolveAuthentication(credential, false);
     });
+  }
+
+  FutureOr<APIAuthentication?> _resolveAuthentication(
+      APICredential credential, bool resumed) {
+    var permissionRet = getCredentialPermissions(credential);
+    var dataRet = getAuthenticationData(credential);
+
+    return permissionRet.resolveOther(
+        dataRet,
+        (permissions, data) => createAuthentication(credential, permissions,
+            data: data, resumed: resumed));
   }
 
   APIAuthentication createAuthentication(
       APICredential credential, List<APIPermission> permissions,
-      [bool resumed = false]) {
+      {Object? data, bool resumed = false}) {
     APIToken? token;
     if (credential.token != null) {
       token =
@@ -67,7 +76,8 @@ abstract class APISecurity {
 
     token ??= getValidToken(credential.username)!;
 
-    return APIAuthentication(token, permissions: permissions, resumed: resumed);
+    return APIAuthentication(token,
+        permissions: permissions, data: data, resumed: resumed);
   }
 
   FutureOr<APIAuthentication?> resumeAuthentication(APIToken? token) {
@@ -78,8 +88,7 @@ abstract class APISecurity {
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
 
-      return getCredentialPermissions(credential).then(
-          (permissions) => createAuthentication(credential, permissions, true));
+      return _resolveAuthentication(credential, true);
     });
   }
 
@@ -185,6 +194,8 @@ abstract class APISecurity {
 
   FutureOr<List<APIPermission>> getCredentialPermissions(
       APICredential credential);
+
+  FutureOr<Object?> getAuthenticationData(APICredential credential) => null;
 
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request) {
     var credential = resolveRequestCredential(request);

@@ -5,6 +5,8 @@ import 'package:bones_api/src/bones_api_security.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
 
+import 'bones_api_utils.dart';
+
 /// Represents a authentication credential.
 class APICredential {
   /// The username/email of this credential.
@@ -161,8 +163,10 @@ class APIAuthentication {
 
   final bool resumed;
 
+  final dynamic data;
+
   APIAuthentication(this.token,
-      {List<APIPermission>? permissions, this.resumed = false})
+      {List<APIPermission>? permissions, this.resumed = false, this.data})
       : permissions =
             List<APIPermission>.unmodifiable(permissions ?? <APIPermission>[]);
 
@@ -205,9 +209,12 @@ class APIAuthentication {
       enabledPermissionsOfType(type).firstOrNull;
 
   Map<String, dynamic> toJson() => {
-        'token': token,
-        'permissions': permissions,
+        'token': token.toJson(),
+        if (permissions.isNotEmpty)
+          'permissions': permissions.map((e) => e.toJson()).toList(),
         if (resumed) 'resumed': resumed,
+        if (data != null)
+          'data': Json.toJson(data, maskField: Json.standardJsonMaskField),
       };
 }
 

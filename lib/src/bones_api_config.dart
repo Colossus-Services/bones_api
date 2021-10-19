@@ -407,12 +407,6 @@ class APIConfig {
     return 'APIConfig$src$json';
   }
 
-  bool _maskField(f) {
-    var k = f.toLowerCase();
-    return k.contains('pass') ||
-        k.contains('passphrase') ||
-        k.contains('pin') ||
-        k.contains('secret') ||
-        k.contains('token');
-  }
+  bool _maskField(String key) =>
+      Json.standardJsonMaskField(key, extraKeys: const <String>{'token'});
 }
