@@ -3,6 +3,8 @@ import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
+import 'bones_api_test_entities.dart';
+
 final _log = logging.Logger('bones_api_test');
 
 class Foo {
@@ -45,6 +47,17 @@ void main() {
             return o is Foo ? '${o.id}:${o.name}' : o;
           }),
           equals({'a': 1, 'b': 2, 'foo': '51:x'}));
+
+      expect(
+          Json.toJson(Role('foo')), equals({'type': 'foo', 'enabled': true}));
+
+      roleEntityHandler.toString();
+
+      expect(Json.toJson(Role('foo'), removeField: (k) => k == 'enabled'),
+          equals({'id': null, 'type': 'foo'}));
+
+      expect(Json.toJson(Role('foo', enabled: false), removeNullFields: true),
+          equals({'type': 'foo', 'enabled': false}));
     });
 
     test('Json.encode', () async {

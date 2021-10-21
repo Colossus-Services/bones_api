@@ -106,10 +106,12 @@ abstract class EntityHandler<O> with FieldsFromMap {
           'EntityHandler generic type `O` should be the same of parameter `type`: O:$O != type:$type');
     }
 
-    this.provider._register(this);
-
     _jsonReviver = _defaultJsonReviver;
+
+    ensureRegistered();
   }
+
+  void ensureRegistered() => provider._register(this);
 
   static bool isValidType<T>([Type? type]) {
     type ??= T;

@@ -34,12 +34,21 @@ class Json {
       {JsonFieldMatcher? maskField,
       String maskText = '***',
       JsonFieldMatcher? removeField,
-      ToEncodableJson? toEncodable}) {
-    return _valueToJson(o, maskField, maskText, removeField, toEncodable) as T;
+      bool removeNullFields = false,
+      ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    return _valueToJson(o, maskField, maskText, removeField, removeNullFields,
+        toEncodable, entityHandlerProvider) as T;
   }
 
-  static Object? _valueToJson(o, JsonFieldMatcher? maskField, String maskText,
-      JsonFieldMatcher? removeField, ToEncodableJson? toEncodable) {
+  static Object? _valueToJson(
+      o,
+      JsonFieldMatcher? maskField,
+      String maskText,
+      JsonFieldMatcher? removeField,
+      bool removeNullFields,
+      ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
     if (o == null) {
       return null;
     } else if (o is String || o is num || o is bool) {
@@ -47,15 +56,28 @@ class Json {
     } else if (o is DateTime) {
       return _dateTimeToJson(o);
     } else if (o is Map) {
-      return _mapToJson(o, maskField, maskText, removeField, toEncodable);
+      return _mapToJson(o, maskField, maskText, removeField, removeNullFields,
+          toEncodable, entityHandlerProvider);
     } else if (o is Set) {
-      return _iterableToJson(o, maskField, maskText, removeField, toEncodable)
+      return _iterableToJson(o, maskField, maskText, removeField,
+              removeNullFields, toEncodable, entityHandlerProvider)
           .toSet();
     } else if (o is Iterable) {
-      return _iterableToJson(o, maskField, maskText, removeField, toEncodable)
+      return _iterableToJson(o, maskField, maskText, removeField,
+              removeNullFields, toEncodable, entityHandlerProvider)
           .toList();
     } else {
-      return _entityToJson(o, toEncodable);
+      var entity = _entityToJson(o, toEncodable, entityHandlerProvider);
+
+      if ((removeNullFields || removeField != null || maskField != null) &&
+          !identical(o, entity)) {
+        var json = _valueToJson(entity, maskField, maskText, removeField,
+            removeNullFields, toEncodable, entityHandlerProvider);
+
+        return json;
+      } else {
+        return entity;
+      }
     }
   }
 
@@ -64,9 +86,11 @@ class Json {
       JsonFieldMatcher? maskField,
       String maskText,
       JsonFieldMatcher? removeField,
-      ToEncodableJson? toEncodable) {
-    return o.map(
-        (e) => _valueToJson(e, maskField, maskText, removeField, toEncodable));
+      bool removeNullFields,
+      ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
+    return o.map((e) => _valueToJson(e, maskField, maskText, removeField,
+        removeNullFields, toEncodable, entityHandlerProvider));
   }
 
   static Map<String, dynamic> _mapToJson(
@@ -74,17 +98,26 @@ class Json {
       JsonFieldMatcher? maskField,
       String maskText,
       JsonFieldMatcher? removeField,
-      ToEncodableJson? toEncodable) {
+      bool removeNullFields,
+      ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
     var oEntries = o.entries;
 
     if (removeField != null) {
-      oEntries = oEntries.where((e) => !removeField(e.key));
+      if (removeNullFields) {
+        oEntries =
+            oEntries.where((e) => e.value != null || !removeField(e.key));
+      } else {
+        oEntries = oEntries.where((e) => !removeField(e.key));
+      }
+    } else if (removeNullFields) {
+      oEntries = oEntries.where((e) => e.value != null);
     }
 
     var entries = oEntries.map((e) {
       var key = e.key;
-      var value = _mapKeyValueToJson(
-          key, e.value, maskField, maskText, removeField, toEncodable);
+      var value = _mapKeyValueToJson(key, e.value, maskField, maskText,
+          removeField, removeNullFields, toEncodable, entityHandlerProvider);
       return MapEntry<String, dynamic>(key, value);
     });
 
@@ -101,7 +134,9 @@ class Json {
       JsonFieldMatcher? maskField,
       String maskText,
       JsonFieldMatcher? removeField,
-      ToEncodableJson? toEncodable) {
+      bool removeNullFields,
+      ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
     if (o == null) {
       return null;
     }
@@ -113,24 +148,40 @@ class Json {
       }
     }
 
-    return _valueToJson(o, maskField, maskText, removeField, toEncodable);
+    return _valueToJson(o, maskField, maskText, removeField, removeNullFields,
+        toEncodable, entityHandlerProvider);
   }
 
-  static Object? _entityToJson(dynamic o, ToEncodableJson? toEncodable) {
+  static Object? _entityToJson(dynamic o, ToEncodableJson? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
     if (toEncodable != null) {
       try {
         return toEncodable(o);
       } catch (_) {
-        return _entityToJsonImpl(o);
+        return _entityToJsonImpl(o, entityHandlerProvider);
       }
     } else {
-      return _entityToJsonImpl(o);
+      return _entityToJsonImpl(o, entityHandlerProvider);
     }
   }
 
-  static Object? _entityToJsonImpl(dynamic o) {
-    var classReflection =
-        ReflectionFactory().getRegisterClassReflection(o.runtimeType);
+  static Object? _entityToJsonImpl(
+      dynamic o, EntityHandlerProvider? entityHandlerProvider) {
+    var oType = o.runtimeType;
+
+    if (entityHandlerProvider != null) {
+      var entityHandler = entityHandlerProvider.getEntityHandler(type: oType);
+
+      if (entityHandler != null) {
+        try {
+          return entityHandler.getFields(o);
+        } catch (_) {
+          return _entityToJsonDefault(o);
+        }
+      }
+    }
+
+    var classReflection = ReflectionFactory().getRegisterClassReflection(oType);
 
     if (classReflection != null) {
       try {
@@ -138,9 +189,20 @@ class Json {
       } catch (_) {
         return _entityToJsonDefault(o);
       }
-    } else {
-      return _entityToJsonDefault(o);
     }
+
+    var entityHandler =
+        EntityHandlerProvider.globalProvider.getEntityHandler(type: oType);
+
+    if (entityHandler != null) {
+      try {
+        return entityHandler.getFields(o);
+      } catch (_) {
+        return _entityToJsonDefault(o);
+      }
+    }
+
+    return _entityToJsonDefault(o);
   }
 
   static _entityToJsonDefault(dynamic o) {

@@ -1,3 +1,9 @@
+## 1.0.30
+
+- `Json.toJson`:
+  - Added parameters: `removeNullFields` and `entityHandlerProvider`.
+  - Fixed application of `removeField` and `maskField` over an entity.
+
 ## 1.0.29
 
 - Improved `Json.toJson`.
