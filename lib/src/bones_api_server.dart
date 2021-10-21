@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_authentication.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
@@ -82,6 +83,11 @@ class APIServer {
   /// The local URL of this server.
   String get url {
     return 'http://$address:$port/';
+  }
+
+  /// The local `API-INFO` URL of this server.
+  String get apiInfoURL {
+    return 'http://$address:$port/API-INFO';
   }
 
   bool _started = false;
@@ -538,6 +544,7 @@ class APIServer {
     String address;
     int port;
     var hotReload = false;
+    String? configFile;
 
     if (args.isEmpty) {
       address = 'localhost';
@@ -567,6 +574,15 @@ class APIServer {
               .toLowerCase();
 
       hotReload = hotReloadStr == 'true' || hotReloadStr == 'hotreload';
+
+      configFile = _parseArg(args, 'config', 'i', 'api-local.yaml', 3);
+    }
+
+    if (configFile != null) {
+      var apiConfig = APIConfig.fromSync(configFile);
+      if (apiConfig != null) {
+        apiRoot.apiConfig = apiConfig;
+      }
     }
 
     var apiServer = APIServer(apiRoot, address, port, hotReload: hotReload);
@@ -582,8 +598,9 @@ class APIServer {
     await apiServer.start();
 
     if (verbose) {
-      print('Running: $apiServer');
-      print('URL: ${apiServer.url}');
+      print('\nRunning: $apiServer\n');
+      print('${apiRoot.apiConfig}\n');
+      print('URL: ${apiServer.apiInfoURL}\n');
     }
 
     return apiServer;
@@ -609,7 +626,15 @@ class APIServer {
     }
 
     if (index < args.length) {
-      return args[index];
+      var val = args[index];
+      if (val.startsWith('-')) return def;
+
+      if (index > 0) {
+        var prev = args[index - 1];
+        return prev.startsWith('-') ? def : val;
+      } else {
+        return val;
+      }
     }
 
     return def;

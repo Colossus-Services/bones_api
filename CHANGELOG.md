@@ -1,3 +1,9 @@
+## 1.0.31
+
+- Added `APIServer.apiInfoURL`.
+- Updated `bones_api_template.tar.gz`.
+- CLI `serve`: fix an issue when mixing parameters `-b` and `-r`. 
+
 ## 1.0.30
 
 - `Json.toJson`:

@@ -50,7 +50,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory MySQLAdapter.fromConfig(Map<String, dynamic> config,
+  factory MySQLAdapter.fromConfig(Map<String, dynamic>? config,
       {String? defaultDatabase,
       String? defaultUsername,
       String? defaultHost,
@@ -58,11 +58,11 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       int minConnections = 1,
       int maxConnections = 3,
       EntityRepositoryProvider? parentRepositoryProvider}) {
-    var host = config['host'] ?? defaultHost;
-    var port = config['port'] ?? defaultPort;
-    var database = config['database'] ?? config['db'] ?? defaultDatabase;
-    var username = config['username'] ?? config['user'] ?? defaultUsername;
-    var password = config['password'] ?? config['pass'];
+    var host = config?['host'] ?? defaultHost;
+    var port = config?['port'] ?? defaultPort;
+    var database = config?['database'] ?? config?['db'] ?? defaultDatabase;
+    var username = config?['username'] ?? config?['user'] ?? defaultUsername;
+    var password = config?['password'] ?? config?['pass'];
 
     return MySQLAdapter(
       database,

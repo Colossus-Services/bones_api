@@ -227,7 +227,7 @@ class MyCommandServe extends CommandSourceFileBase {
       var hotReloadAllowed = await APIHotReload.get().isHotReloadAllowed();
       if (!hotReloadAllowed) {
         await _spawnDartVMForHotReload(spawner, directory, apiRootClass!,
-            address, port, apiConfig, parametersMessage);
+            address, port, apiConfig, allowBuild, parametersMessage);
         return true;
       }
     }
@@ -418,6 +418,7 @@ class MyCommandServe extends CommandSourceFileBase {
       String address,
       String port,
       String apiConfig,
+      bool allowBuild,
       List<String> parametersMessage) async {
     print(
         '________________________________________________________________________________');
@@ -447,6 +448,7 @@ class MyCommandServe extends CommandSourceFileBase {
           address,
           '--port',
           port,
+          if (allowBuild) '--build',
           '--hotreload',
           if (apiConfig.isNotEmpty) ...['--config', apiConfig]
         ],
@@ -513,7 +515,7 @@ Future<void> runAPIServer(List<String> args) async {
   print('\\n** APIServer Started.\\n');
   
   print('\$apiServer\\n');
-  print('URL: \${ apiServer.url }');
+  print('URL: \${ apiServer.apiInfoURL }');
   print('________________________________________________________________________________');
   
   await apiServer.waitStopped();
