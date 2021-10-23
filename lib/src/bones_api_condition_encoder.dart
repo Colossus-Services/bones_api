@@ -179,7 +179,8 @@ class TableScheme with FieldsFromMap {
     return getFieldsValuesFromMap(fieldsNames, map,
         fieldsNamesIndexes: _fieldsNamesIndexes,
         fieldsNamesLC: _fieldsNamesLC,
-        fieldsNamesSimple: _fieldsNamesSimple);
+        fieldsNamesSimple: _fieldsNamesSimple,
+        includeAbsentFields: true);
   }
 
   /// Returns the [TableRelationshipReference] with the [targetTable].

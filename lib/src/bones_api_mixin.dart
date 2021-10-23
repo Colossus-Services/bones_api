@@ -342,11 +342,12 @@ mixin FieldsFromMap {
     Map<String, int>? fieldsNamesIndexes,
     List<String>? fieldsNamesLC,
     List<String>? fieldsNamesSimple,
+    bool includeAbsentFields = false,
   }) {
     var mapLC = <String, Object?>{};
     var mapSimple = <String, Object?>{};
 
-    var fields = Map<String, Object?>.fromEntries(fieldsNames.map((f) {
+    var entries = fieldsNames.map((f) {
       String? fLC, fSimple;
       if (fieldsNamesIndexes != null) {
         var idx = fieldsNamesIndexes[f]!;
@@ -354,20 +355,29 @@ mixin FieldsFromMap {
         fSimple = fieldsNamesSimple?[idx];
       }
 
-      var value =
+      var entry =
           _getFieldValueFromMapImpl(f, fLC, fSimple, map, mapLC, mapSimple);
-      return MapEntry(f, value);
-    }));
+
+      if (entry == null && includeAbsentFields) {
+        entry = MapEntry(f, null);
+      }
+
+      return entry;
+    }).whereNotNull();
+
+    var fields = Map<String, Object?>.fromEntries(entries);
 
     return fields;
   }
 
   /// Returns a [field] value from [map].
   /// - [field] is case insensitive.
-  Object? getFieldValueFromMap(String field, Map<String, Object?> map) =>
-      _getFieldValueFromMapImpl(field, null, null, map, null, null);
+  Object? getFieldValueFromMap(String field, Map<String, Object?> map) {
+    var entry = _getFieldValueFromMapImpl(field, null, null, map, null, null);
+    return entry?.value;
+  }
 
-  Object? _getFieldValueFromMapImpl(
+  MapEntry<String, Object?>? _getFieldValueFromMapImpl(
       String field,
       String? fieldLC,
       String? fieldSimple,
@@ -377,17 +387,17 @@ mixin FieldsFromMap {
     if (map.isEmpty) return null;
 
     var val = map[field];
-    if (val != null) return val;
+    if (val != null) return MapEntry(field, val);
 
     fieldLC ??= fieldToLCKey(field);
 
     val = map[fieldLC];
-    if (val != null) return val;
+    if (val != null) return MapEntry(field, val);
 
     fieldSimple ??= fieldToSimpleKey(field);
 
     val = map[fieldSimple];
-    if (val != null) return val;
+    if (val != null) return MapEntry(field, val);
 
     if (mapLC != null) {
       if (mapLC.isEmpty) {
@@ -399,13 +409,14 @@ mixin FieldsFromMap {
 
       val = mapLC[fieldLC];
       if (val != null) {
-        return val;
+        return MapEntry(field, val);
       }
     } else {
       for (var k in map.keys) {
         var kLC = fieldToLCKey(k);
         if (kLC == fieldLC) {
-          return map[k];
+          val = map[k];
+          return MapEntry(field, val);
         }
       }
     }
@@ -420,13 +431,14 @@ mixin FieldsFromMap {
 
       val = mapSimple[fieldSimple];
       if (val != null) {
-        return val;
+        return MapEntry(field, val);
       }
     } else {
       for (var k in map.keys) {
         var kSimple = fieldToSimpleKey(k);
         if (kSimple == fieldSimple) {
-          return map[k];
+          val = map[k];
+          return MapEntry(field, val);
         }
       }
     }

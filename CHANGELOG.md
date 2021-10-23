@@ -1,3 +1,7 @@
+## 1.0.32
+
+- `FieldsFromMap.getFieldsValuesFromMap`: added parameter `includeAbsentFields`.
+
 ## 1.0.31
 
 - Added `APIServer.apiInfoURL`.
