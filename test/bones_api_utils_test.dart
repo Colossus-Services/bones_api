@@ -85,13 +85,15 @@ void main() {
       expect(Json.decode('{"a":1,"b":2}'), equals({'a': 1, 'b': 2}));
 
       expect(
-          Json.decode('{"ab": {"a":1,"b":2}}', reviver: (k, v) {
-            switch (k) {
-              case 'ab':
-                return AB.fromMap(v as Map<String, dynamic>);
-              default:
-                return v;
-            }
+          Json.decode('{"ab": {"a":1,"b":2}}', jsomMapDecoder: (map, j) {
+            return map.map((k, v) {
+              switch (k) {
+                case 'ab':
+                  return MapEntry(k, AB.fromMap(v as Map<String, dynamic>));
+                default:
+                  return MapEntry(k, v);
+              }
+            });
           }),
           equals({'ab': AB(1, 2)}));
     });

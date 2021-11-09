@@ -72,6 +72,6 @@ void _runTest(bool useReflection) {
     '`',
     'bigint unsigned',
     anyOf(isNull, isEmpty),
-    entityHandlerByReflection: useReflection,
+    entityByReflection: useReflection,
   );
 }

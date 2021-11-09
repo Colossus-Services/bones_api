@@ -68,13 +68,12 @@ void runAdapterTests(
     String cmdQuote,
     String serialIntType,
     dynamic createTableMatcher,
-    {required bool entityHandlerByReflection}) {
+    {required bool entityByReflection}) {
   _log.handler.logToConsole();
 
   var testDomain = dbName.toLowerCase() + '.com';
 
-  group('SQLAdapter[$dbName${entityHandlerByReflection ? '+reflection' : ''}]',
-      () {
+  group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
     late final DockerHostLocal dockerHostLocal;
     late final DockerCommander dockerCommander;
     late bool dockerRunning;
@@ -107,13 +106,13 @@ void runAdapterTests(
         _log.info('Container start: $startOk > $dbTestContainer');
 
         entityRepositoryProvider = TestEntityRepositoryProvider(
-          entityHandlerByReflection
+          entityByReflection
               ? Address$reflection().entityHandler
               : addressEntityHandler,
-          entityHandlerByReflection
+          entityByReflection
               ? Role$reflection().entityHandler
               : roleEntityHandler,
-          entityHandlerByReflection
+          entityByReflection
               ? User$reflection().entityHandler
               : userEntityHandler,
           sqlAdapterCreator,
@@ -176,6 +175,7 @@ void runAdapterTests(
         ${q}email$q text NOT NULL,
         ${q}password$q text NOT NULL,
         ${q}address$q $serialIntType NOT NULL,
+        ${q}level$q integer,
         ${q}creation_time$q timestamp NOT NULL,
         PRIMARY KEY( ${q}id$q ),
         CONSTRAINT user_ref_address_fk FOREIGN KEY (${q}address$q) REFERENCES ${q}address$q(${q}id$q)
@@ -254,7 +254,7 @@ void runAdapterTests(
         var address = Address('NY', 'New York', 'street A', 101);
 
         var user = User('joe@$testDomain', '123', address, [Role('admin')],
-            creationTime: user1Time);
+            level: 100, creationTime: user1Time);
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
       }
@@ -277,10 +277,12 @@ void runAdapterTests(
         expect(user!.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
         expect(
-            user.roles.map((e) => e.toJson()),
+            user.roles.map(
+                (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals([
               {'id': 1, 'type': 'admin', 'enabled': true}
             ]));
+        expect(user.level, equals(100));
         expect(user.creationTime, equals(user1Time));
       }
 
@@ -289,10 +291,12 @@ void runAdapterTests(
         expect(user!.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
         expect(
-            user.roles.map((e) => e.toJson()),
+            user.roles.map(
+                (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals([
               {'id': 2, 'type': 'guest', 'enabled': true}
             ]));
+        expect(user.level, isNull);
         expect(user.creationTime, equals(user2Time));
       }
 
@@ -327,7 +331,7 @@ void runAdapterTests(
         var sel = await userAPIRepository.selectByRoleType('admin');
 
         var user = sel.first;
-        print(user.toJson());
+        print(entityByReflection ? user.toJsonFromFields() : user.toJson());
 
         expect(user.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
@@ -341,7 +345,7 @@ void runAdapterTests(
         var sel = await userAPIRepository.selectByRoleType('guest');
 
         var user = sel.first;
-        print(user.toJson());
+        print(entityByReflection ? user.toJsonFromFields() : user.toJson());
 
         expect(user.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
@@ -463,11 +467,17 @@ void runAdapterTests(
           {'id': 2, 'type': 'guest', 'enabled': true},
           {'id': 3, 'type': 'foo2', 'enabled': true}
         ];
-        expect(user.roles.map((e) => e.toJson()), equals(rolesJson2));
+        expect(
+            user.roles.map(
+                (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
+            equals(rolesJson2));
 
         var user2 = await userAPIRepository.selectByID(user.id);
         expect(user2!.email, equals(user.email));
-        expect(user2.roles.map((e) => e.toJson()), equals(rolesJson2));
+        expect(
+            user2.roles.map(
+                (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
+            equals(rolesJson2));
 
         user2.roles.removeWhere((r) => r.type == 'guest');
 
@@ -480,7 +490,10 @@ void runAdapterTests(
         var rolesJson3 = [
           {'id': 3, 'type': 'foo2', 'enabled': true}
         ];
-        expect(user3.roles.map((e) => e.toJson()), equals(rolesJson3));
+        expect(
+            user3.roles.map(
+                (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
+            equals(rolesJson3));
       }
 
       {

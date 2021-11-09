@@ -448,8 +448,10 @@ mixin FieldsFromMap {
 
   String fieldToLCKey(String key) => key.toLowerCase();
 
+  String fieldToSimpleKey(String key) => defaultFieldToSimpleKey(key);
+
   static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z0-9]');
 
-  String fieldToSimpleKey(String key) =>
+  static String defaultFieldToSimpleKey(String key) =>
       key.toLowerCase().replaceAll(_regexpLettersAndDigits, '');
 }

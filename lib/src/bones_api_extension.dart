@@ -69,7 +69,8 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
 /// [MethodReflection] extension.
 extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
   /// Returns `true` if this reflected method is an API method ([returnsAPIResponse] OR [receivesAPIRequest]).
-  bool get isAPIMethod => returnsAPIResponse || receivesAPIRequest;
+  bool get isAPIMethod =>
+      (returnsAPIResponse || receivesAPIRequest) && declaringType != APIModule;
 
   /// Returns `true` if this reflected method is [returnsAPIResponse] AND [receivesAPIRequest].
   bool get isFullAPIMethod => returnsAPIResponse && receivesAPIRequest;

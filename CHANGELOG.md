@@ -1,6 +1,13 @@
 ## 1.0.32
 
+- `Json`:
+  - Integrated with `reflection_factory` `JsonCodec`.
 - `FieldsFromMap.getFieldsValuesFromMap`: added parameter `includeAbsentFields`.
+- `isAPIMethod`: now ignores methods declared by `APIModule`, since `reflection_factory` now supports supper classes.
+- reflection_factory: ^1.0.17
+- postgres: ^2.4.2
+- build_runner: ^2.1.5
+- test: ^1.19.3
 
 ## 1.0.31
 

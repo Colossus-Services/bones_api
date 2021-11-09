@@ -1,13 +1,13 @@
 import 'dart:convert' as dart_convert;
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/src/bones_api_mixin.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
-typedef ToEncodableJson = Object? Function(Object? object);
-
-typedef JsonFieldMatcher = bool Function(String key);
+typedef ToEncodable = Object? Function(Object? object);
 
 /// JSON utility class.
 class Json {
@@ -35,182 +35,12 @@ class Json {
       String maskText = '***',
       JsonFieldMatcher? removeField,
       bool removeNullFields = false,
-      ToEncodableJson? toEncodable,
+      ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider}) {
-    return _valueToJson(o, maskField, maskText, removeField, removeNullFields,
-        toEncodable, entityHandlerProvider) as T;
-  }
+    var jsonCodec = _buildJsonEncoder(maskField, maskText, removeField,
+        removeNullFields, toEncodable, entityHandlerProvider);
 
-  static Object? _valueToJson(
-      o,
-      JsonFieldMatcher? maskField,
-      String maskText,
-      JsonFieldMatcher? removeField,
-      bool removeNullFields,
-      ToEncodableJson? toEncodable,
-      EntityHandlerProvider? entityHandlerProvider) {
-    if (o == null) {
-      return null;
-    } else if (o is String || o is num || o is bool) {
-      return o;
-    } else if (o is DateTime) {
-      return _dateTimeToJson(o);
-    } else if (o is Map) {
-      return _mapToJson(o, maskField, maskText, removeField, removeNullFields,
-          toEncodable, entityHandlerProvider);
-    } else if (o is Set) {
-      return _iterableToJson(o, maskField, maskText, removeField,
-              removeNullFields, toEncodable, entityHandlerProvider)
-          .toSet();
-    } else if (o is Iterable) {
-      return _iterableToJson(o, maskField, maskText, removeField,
-              removeNullFields, toEncodable, entityHandlerProvider)
-          .toList();
-    } else {
-      var entity = _entityToJson(o, toEncodable, entityHandlerProvider);
-
-      if ((removeNullFields || removeField != null || maskField != null) &&
-          !identical(o, entity)) {
-        var json = _valueToJson(entity, maskField, maskText, removeField,
-            removeNullFields, toEncodable, entityHandlerProvider);
-
-        return json;
-      } else {
-        return entity;
-      }
-    }
-  }
-
-  static Iterable<Object?> _iterableToJson(
-      Iterable<dynamic> o,
-      JsonFieldMatcher? maskField,
-      String maskText,
-      JsonFieldMatcher? removeField,
-      bool removeNullFields,
-      ToEncodableJson? toEncodable,
-      EntityHandlerProvider? entityHandlerProvider) {
-    return o.map((e) => _valueToJson(e, maskField, maskText, removeField,
-        removeNullFields, toEncodable, entityHandlerProvider));
-  }
-
-  static Map<String, dynamic> _mapToJson(
-      Map<dynamic, dynamic> o,
-      JsonFieldMatcher? maskField,
-      String maskText,
-      JsonFieldMatcher? removeField,
-      bool removeNullFields,
-      ToEncodableJson? toEncodable,
-      EntityHandlerProvider? entityHandlerProvider) {
-    var oEntries = o.entries;
-
-    if (removeField != null) {
-      if (removeNullFields) {
-        oEntries =
-            oEntries.where((e) => e.value != null || !removeField(e.key));
-      } else {
-        oEntries = oEntries.where((e) => !removeField(e.key));
-      }
-    } else if (removeNullFields) {
-      oEntries = oEntries.where((e) => e.value != null);
-    }
-
-    var entries = oEntries.map((e) {
-      var key = e.key;
-      var value = _mapKeyValueToJson(key, e.value, maskField, maskText,
-          removeField, removeNullFields, toEncodable, entityHandlerProvider);
-      return MapEntry<String, dynamic>(key, value);
-    });
-
-    return Map<String, dynamic>.fromEntries(entries);
-  }
-
-  static String _dateTimeToJson(DateTime o) {
-    return o.toUtc().toString();
-  }
-
-  static Object? _mapKeyValueToJson(
-      String k,
-      dynamic o,
-      JsonFieldMatcher? maskField,
-      String maskText,
-      JsonFieldMatcher? removeField,
-      bool removeNullFields,
-      ToEncodableJson? toEncodable,
-      EntityHandlerProvider? entityHandlerProvider) {
-    if (o == null) {
-      return null;
-    }
-
-    if (maskField != null) {
-      var masked = maskField(k);
-      if (masked) {
-        return maskText;
-      }
-    }
-
-    return _valueToJson(o, maskField, maskText, removeField, removeNullFields,
-        toEncodable, entityHandlerProvider);
-  }
-
-  static Object? _entityToJson(dynamic o, ToEncodableJson? toEncodable,
-      EntityHandlerProvider? entityHandlerProvider) {
-    if (toEncodable != null) {
-      try {
-        return toEncodable(o);
-      } catch (_) {
-        return _entityToJsonImpl(o, entityHandlerProvider);
-      }
-    } else {
-      return _entityToJsonImpl(o, entityHandlerProvider);
-    }
-  }
-
-  static Object? _entityToJsonImpl(
-      dynamic o, EntityHandlerProvider? entityHandlerProvider) {
-    var oType = o.runtimeType;
-
-    if (entityHandlerProvider != null) {
-      var entityHandler = entityHandlerProvider.getEntityHandler(type: oType);
-
-      if (entityHandler != null) {
-        try {
-          return entityHandler.getFields(o);
-        } catch (_) {
-          return _entityToJsonDefault(o);
-        }
-      }
-    }
-
-    var classReflection = ReflectionFactory().getRegisterClassReflection(oType);
-
-    if (classReflection != null) {
-      try {
-        return classReflection.toJson(o);
-      } catch (_) {
-        return _entityToJsonDefault(o);
-      }
-    }
-
-    var entityHandler =
-        EntityHandlerProvider.globalProvider.getEntityHandler(type: oType);
-
-    if (entityHandler != null) {
-      try {
-        return entityHandler.getFields(o);
-      } catch (_) {
-        return _entityToJsonDefault(o);
-      }
-    }
-
-    return _entityToJsonDefault(o);
-  }
-
-  static _entityToJsonDefault(dynamic o) {
-    try {
-      return o.toJson();
-    } catch (_) {
-      return '$o';
-    }
+    return jsonCodec.toJson(o);
   }
 
   /// Transforms [o] to an encoded JSON.
@@ -221,21 +51,262 @@ class Json {
       {bool pretty = false,
       JsonFieldMatcher? maskField,
       String maskText = '***',
-      Object? Function(dynamic object)? toEncodable}) {
-    var json = toJson(o,
-        maskField: maskField, maskText: maskText, toEncodable: toEncodable);
-    if (pretty) {
-      return dart_convert.JsonEncoder.withIndent('  ').convert(json);
-    } else {
-      return dart_convert.json.encode(json);
+      JsonFieldMatcher? removeField,
+      bool removeNullFields = false,
+      ToEncodable? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
+        removeNullFields, toEncodable, entityHandlerProvider);
+
+    return jsonEncoder.encode(o, pretty: pretty);
+  }
+
+  /// Sames as [encode] but returns a [Uint8List].
+  static Uint8List encodeToBytes(Object? o,
+      {bool pretty = false,
+      JsonFieldMatcher? maskField,
+      String maskText = '***',
+      JsonFieldMatcher? removeField,
+      bool removeNullFields = false,
+      ToEncodable? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
+        removeNullFields, toEncodable, entityHandlerProvider);
+
+    return jsonEncoder.encodeToBytes(o, pretty: pretty);
+  }
+
+  static JsonEncoder _buildJsonEncoder(
+      JsonFieldMatcher? maskField,
+      String maskText,
+      JsonFieldMatcher? removeField,
+      bool removeNullFields,
+      ToEncodable? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider) {
+    return JsonEncoder(
+        maskField: maskField,
+        maskText: maskText,
+        removeField: removeField,
+        removeNullFields: removeNullFields,
+        toEncodable: toEncodable == null ? null : (o, j) => toEncodable(o),
+        toEncodableProvider: (o) =>
+            _jsonEncodableProvider(o, entityHandlerProvider));
+  }
+
+  static ToEncodableJson? _jsonEncodableProvider(
+      Object object, EntityHandlerProvider? entityHandlerProvider) {
+    var oType = object.runtimeType;
+
+    if (entityHandlerProvider != null) {
+      var entityHandler = entityHandlerProvider.getEntityHandler(type: oType);
+
+      if (entityHandler != null) {
+        return (o, j) => entityHandler.getFields(o);
+      }
+    }
+
+    var entityHandler =
+        EntityHandlerProvider.globalProvider.getEntityHandler(type: oType);
+
+    if (entityHandler != null) {
+      return (o, j) => entityHandler.getFields(o);
     }
   }
 
+  /// Converts [o] to [type].
+  static T? fromJson<T>(Object? o,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJson<T>(o, type: type);
+  }
+
+  /// Converts [o] to [type] allowing async calls ([Future] and [FutureOr]).
+  static FutureOr<T?> fromJsonAsync<T>(Object? o,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJsonAsync<T>(o, type: type);
+  }
+
+  /// Converts [o] to as [List] of [type].
+  static List<T?> fromJsonList<T>(Iterable o,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJsonList<T>(o, type: type);
+  }
+
+  /// Converts [o] to as [List] of [type] allowing async calls ([Future] and [FutureOr]).
+  static FutureOr<List<T?>> fromJsonListAsync<T>(FutureOr<Iterable> o,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJsonListAsync<T>(o, type: type);
+  }
+
+  /// Converts [map] to [type].
+  static T fromJsonMap<T>(Map<String, Object?> map,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJsonMap<T>(map, type: type);
+  }
+
+  /// Converts [map] to [type] allowing async calls ([Future] and [FutureOr]).
+  static FutureOr<T> fromJsonMapAsync<T>(FutureOr<Map<String, Object?>> map,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.fromJsonMapAsync<T>(map, type: type);
+  }
+
   /// Decodes [encodedJson] to a JSON collection/data.
-  /// - [reviver] transforms a JSON value to another [Object]. See [dart_convert.JsonDecoder].
   static T decode<T>(String encodedJson,
-          {Object? Function(Object? key, Object? value)? reviver}) =>
-      dart_convert.json.decode(encodedJson, reviver: reviver);
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.decode(encodedJson, type: type);
+  }
+
+  /// Sames as [decode] but from a [Uint8List].
+  static T decodeFromBytes<T>(Uint8List encodedJsonBytes,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.decodeFromBytes(encodedJsonBytes, type: type);
+  }
+
+  /// Decodes [encodedJson] to a JSON collection/data accepting async values.
+  static FutureOr<T> decodeAsync<T>(FutureOr<String> encodedJson,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.decodeAsync(encodedJson, type: type);
+  }
+
+  /// Sames as [decodeAsync] but from a [Uint8List].
+  static FutureOr<T> decodeFromBytesAsync<T>(
+      FutureOr<Uint8List> encodedJsonBytes,
+      {Type? type,
+      JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var jsonDecoder = _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider);
+
+    return jsonDecoder.decodeFromBytesAsync(encodedJsonBytes, type: type);
+  }
+
+  static JsonDecoder _buildJsonDecoder(JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider) {
+    return JsonDecoder(
+        jsomMapDecoder: jsomMapDecoder,
+        jsomMapDecoderAsyncProvider: (m) =>
+            _jsomMapDecoderAsyncProvider(m, entityHandlerProvider),
+        iterableCaster: (v, t) => _iterableCaster(v, t, entityHandlerProvider));
+  }
+
+  static JsomMapDecoderAsync? _jsomMapDecoderAsyncProvider(
+      Object identifier, EntityHandlerProvider? entityHandlerProvider) {
+    var type = identifier is Type ? identifier : identifier.runtimeType;
+
+    if (entityHandlerProvider != null) {
+      var entityHandler = entityHandlerProvider.getEntityHandler(type: type);
+
+      if (entityHandler != null) {
+        return (m, j) => entityHandler.createFromMap(m);
+      }
+    }
+
+    var classReflection = ReflectionFactory().getRegisterClassReflection(type);
+
+    if (classReflection != null) {
+      return (m, j) => classReflection.createInstanceFromMap(m,
+          fieldNameResolver: _fieldNameResolver,
+          fieldValueResolver: (f, v, t) =>
+              _fieldValueResolver(f, v, t, j, entityHandlerProvider));
+    }
+
+    var entityHandler =
+        EntityHandlerProvider.globalProvider.getEntityHandler(type: type);
+
+    if (entityHandler != null) {
+      return (m, j) => entityHandler.createFromMap(m);
+    }
+  }
+
+  static String _fieldNameResolver(String field, Map<String, Object?> map) {
+    if (map.containsKey(field)) {
+      return field;
+    }
+
+    var fieldLC = field.toLowerCase();
+    if (map.containsKey(fieldLC)) {
+      return fieldLC;
+    }
+
+    var fieldSimple = FieldsFromMap.defaultFieldToSimpleKey(field);
+    if (map.containsKey(fieldSimple)) {
+      return fieldSimple;
+    }
+
+    for (var k in map.keys) {
+      if (equalsIgnoreAsciiCase(fieldLC, k)) {
+        return k;
+      }
+
+      if (equalsIgnoreAsciiCase(fieldSimple, k)) {
+        return k;
+      }
+    }
+
+    return field;
+  }
+
+  static Object? _fieldValueResolver(
+      String field,
+      Object? value,
+      TypeReflection type,
+      JsonDecoder jsonDecoder,
+      EntityHandlerProvider? entityHandlerProvider) {
+    if (type.isListEntity && value is Iterable) {
+      return _iterableCaster(value, type, entityHandlerProvider);
+    } else {
+      return jsonDecoder.fromJson(value, type: type.type);
+    }
+  }
+
+  static Object? _iterableCaster(Iterable value, TypeReflection type,
+      EntityHandlerProvider? entityHandlerProvider) {
+    if (entityHandlerProvider != null) {
+      var entityType = type.isListEntity ? type.listEntityType! : type;
+      var entityHandler =
+          entityHandlerProvider.getEntityHandler(type: entityType.type);
+
+      if (entityHandler != null) {
+        return entityHandler.castIterable(value, entityType.type);
+      }
+    }
+
+    return null;
+  }
 }
 
 typedef TypeElementParser<T> = T? Function(Object? o);
@@ -775,6 +846,12 @@ class TypeInfo {
 
   /// The [TypeInfo] of the [List] elements type.
   TypeInfo? get listEntityType => isListEntity ? arguments.first : null;
+
+  TypeReflection? _typeReflection;
+
+  /// Returns this instance as [TypeReflection].
+  TypeReflection get asTypeReflection =>
+      _typeReflection ??= TypeReflection(type, arguments);
 
   static final ListEquality<TypeInfo> _listTypeInfoEquality =
       ListEquality<TypeInfo>();

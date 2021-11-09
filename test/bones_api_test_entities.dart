@@ -62,10 +62,12 @@ class User extends Entity {
 
   List<Role> roles;
 
+  int? level;
+
   DateTime creationTime;
 
   User(this.email, this.password, this.address, this.roles,
-      {this.id, DateTime? creationTime})
+      {this.id, this.level, DateTime? creationTime})
       : creationTime = creationTime ?? DateTime.now();
 
   User.empty() : this('', '', Address.empty(), <Role>[]);
@@ -76,6 +78,7 @@ class User extends Entity {
       map.getAs<Address>('address')!,
       map.getAsList<Role>('roles', def: [])!,
       id: map['id'],
+      level: map['level'],
       creationTime: map['creationTime']);
 
   @override
@@ -89,6 +92,7 @@ class User extends Entity {
   @override
   String get idFieldName => 'id';
 
+  @JsonField.hidden()
   @override
   List<String> get fieldsNames => const <String>[
         'id',
@@ -96,6 +100,7 @@ class User extends Entity {
         'password',
         'address',
         'roles',
+        'level',
         'creationTime'
       ];
 
@@ -112,6 +117,8 @@ class User extends Entity {
         return address as V?;
       case 'roles':
         return roles as V?;
+      case 'level':
+        return level as V?;
       case 'creationTime':
         return creationTime as V?;
       default:
@@ -132,6 +139,8 @@ class User extends Entity {
         return TypeInfo(Address);
       case 'roles':
         return TypeInfo(List, [Role]);
+      case 'level':
+        return TypeInfo.tInt;
       case 'creationTime':
         return TypeInfo(DateTime);
       default:
@@ -167,6 +176,11 @@ class User extends Entity {
           roles = value as List<Role>;
           break;
         }
+      case 'level':
+        {
+          level = value as int?;
+          break;
+        }
       case 'creationTime':
         {
           creationTime = value as DateTime;
@@ -184,6 +198,7 @@ class User extends Entity {
         'password': password,
         'address': address.toJson(),
         'roles': roles.map((e) => e.toJson()).toList(),
+        'level': level,
         'creationTime': creationTime.millisecondsSinceEpoch,
       };
 }
@@ -237,6 +252,7 @@ class Address extends Entity {
   @override
   String get idFieldName => 'id';
 
+  @JsonField.hidden()
   @override
   List<String> get fieldsNames =>
       const <String>['id', 'state', 'city', 'street', 'number'];
@@ -352,6 +368,7 @@ class Role extends Entity {
   @override
   String get idFieldName => 'id';
 
+  @JsonField.hidden()
   @override
   List<String> get fieldsNames => const <String>['id', 'type', 'enabled'];
 
@@ -408,8 +425,8 @@ class Role extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
+        'enabled': enabled,
         if (id != null) 'id': id,
         'type': type,
-        'enabled': enabled,
       };
 }

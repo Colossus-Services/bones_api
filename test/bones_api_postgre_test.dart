@@ -69,6 +69,6 @@ void _runTest(bool useReflection) {
     '"',
     'bigint',
     contains('CREATE TABLE'),
-    entityHandlerByReflection: useReflection,
+    entityByReflection: useReflection,
   );
 }
