@@ -253,7 +253,8 @@ void runAdapterTests(
       {
         var address = Address('NY', 'New York', 'street A', 101);
 
-        var user = User('joe@$testDomain', '123', address, [Role('admin')],
+        var user = User(
+            'joe@$testDomain', '123', address, [Role(RoleType.admin)],
             level: 100, creationTime: user1Time);
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
@@ -263,7 +264,8 @@ void runAdapterTests(
 
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
-        var user = User('smith@$testDomain', 'abc', address, [Role('guest')],
+        var user = User(
+            'smith@$testDomain', 'abc', address, [Role(RoleType.guest)],
             creationTime: user2Time);
         var id = await userAPIRepository.store(user);
         expect(id, equals(2));
@@ -458,14 +460,14 @@ void runAdapterTests(
 
         expect(user!.email, equals('smith4@$testDomain'));
 
-        user.roles.add(Role('foo2'));
+        user.roles.add(Role(RoleType.unknown));
 
         var ok = await userAPIRepository.store(user);
         expect(ok, equals(user.id));
 
         var rolesJson2 = [
           {'id': 2, 'type': 'guest', 'enabled': true},
-          {'id': 3, 'type': 'foo2', 'enabled': true}
+          {'id': 3, 'type': 'unknown', 'enabled': true}
         ];
         expect(
             user.roles.map(
@@ -479,7 +481,7 @@ void runAdapterTests(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals(rolesJson2));
 
-        user2.roles.removeWhere((r) => r.type == 'guest');
+        user2.roles.removeWhere((r) => r.type == RoleType.guest);
 
         var ok2 = await userAPIRepository.store(user2);
         expect(ok2, equals(user.id));
@@ -488,7 +490,7 @@ void runAdapterTests(
         expect(user3!.email, equals(user.email));
 
         var rolesJson3 = [
-          {'id': 3, 'type': 'foo2', 'enabled': true}
+          {'id': 3, 'type': 'unknown', 'enabled': true}
         ];
         expect(
             user3.roles.map(

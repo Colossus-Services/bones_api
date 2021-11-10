@@ -1359,6 +1359,25 @@ bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
   return true;
 }
 
+/// Returns an [Enum] name.
+String enumToName(Enum enumValue) {
+  var s = enumValue.toString();
+  var idx = s.indexOf('.');
+  var name = s.substring(idx + 1);
+  return name;
+}
+
+/// Returns an [Enum] from [enumValues] that matches [name].
+Enum? enumFromName(String name, Iterable<Enum> enumValues) {
+  for (var e in enumValues) {
+    var n = enumToName(e);
+    if (n == name) {
+      return e;
+    }
+  }
+  return null;
+}
+
 typedef InstanceInfoExtractor<O, I> = I Function(O o);
 
 /// Tracks an instance with a info relationship.

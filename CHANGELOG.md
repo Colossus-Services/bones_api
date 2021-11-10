@@ -1,3 +1,10 @@
+## 1.0.33
+
+- `Entity` & `EntityHandler`:
+  - Added support for enums.
+- Added `enumToName` and `enumFromName`
+- reflection_factory: ^1.0.18
+
 ## 1.0.32
 
 - `Json`:

@@ -252,12 +252,22 @@ abstract class EntityHandler<O> with FieldsFromMap {
       var entityRepository =
           valEntityHandler?.getEntityRepository(type: type.type);
 
-      if (entityRepository == null) {
-        throw StateError("Can't resolve value for type: $type -> $value");
+      if (entityRepository != null) {
+        var retEntity = entityRepository.selectByID(value);
+        return retEntity.resolveMapped((val) => val as T?);
       }
 
-      var retEntity = entityRepository.selectByID(value);
-      return retEntity.resolveMapped((val) => val as T?);
+      try {
+        var value2 = Json.fromJson(value, type: type.type);
+
+        if (value2 != null) {
+          return value2 as T?;
+        } else {
+          return value as T?;
+        }
+      } catch (e) {
+        throw StateError("ERROR resolving value for type: $type -> $value. $e");
+      }
     } else {
       return type.parse<T>(value);
     }
@@ -386,23 +396,18 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   bool equalsValues(Object? value1, Object? value2) {
-    //if (identical(value1, value2)) return true ;
-
     if (value1 == null) return value2 == null;
     if (value2 == null) return false;
+    if (identical(value1, value2) || value1 == value2) return true;
 
-    if (value1 is DateTime || value2 is DateTime) {
-      var t1 = TypeParser.parseInt(value1);
-      var t2 = TypeParser.parseInt(value2);
-      return t1 == t2;
-    }
+    var equals = equalsValuesDateTime(value1, value2);
+    if (equals != null) return equals;
 
-    var primitive1 = TypeParser.isPrimitiveValue(value1);
-    var primitive2 = TypeParser.isPrimitiveValue(value2);
+    equals = equalsValuesPrimitive(value1, value2);
+    if (equals != null) return equals;
 
-    if (primitive1 && primitive2) {
-      return value1 == value2;
-    }
+    equals = equalsValuesEnum(value1, value2);
+    if (equals != null) return equals;
 
     var collection1 = TypeParser.isCollectionValue(value1);
     var collection2 = TypeParser.isCollectionValue(value2);
@@ -411,8 +416,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return isEqualsDeep(value1, value2, valueEquality: equalsValues);
     }
 
-    var maybeEntity1 = !primitive1 && !collection1;
-    var maybeEntity2 = !primitive2 && !collection2;
+    var maybeEntity1 = !collection1 && !TypeParser.isPrimitiveValue(value1);
+    var maybeEntity2 = !collection2 && !TypeParser.isPrimitiveValue(value2);
 
     var entityHandler1 = maybeEntity1 ? getEntityHandler(obj: value1) : null;
     var entityHandler2 = maybeEntity2 ? getEntityHandler(obj: value2) : null;
@@ -438,7 +443,75 @@ abstract class EntityHandler<O> with FieldsFromMap {
       }
     }
 
-    return value1 == value2;
+    return false;
+  }
+
+  static bool equalsValuesBasic(Object? value1, Object? value2) {
+    if (value1 == null) return value2 == null;
+    if (value2 == null) return false;
+    if (identical(value1, value2) || value1 == value2) return true;
+
+    var equals = equalsValuesDateTime(value1, value2);
+    if (equals != null) return equals;
+
+    equals = equalsValuesPrimitive(value1, value2);
+    if (equals != null) return equals;
+
+    equals = equalsValuesEnum(value1, value2);
+    if (equals != null) return equals;
+
+    equals = equalsValuesCollection(value1, value2);
+    if (equals != null) return equals;
+
+    return false;
+  }
+
+  static bool? equalsValuesDateTime(Object value1, Object value2) {
+    if (value1 is DateTime || value2 is DateTime) {
+      var t1 = TypeParser.parseInt(value1);
+      var t2 = TypeParser.parseInt(value2);
+      return t1 == t2;
+    }
+
+    return null;
+  }
+
+  static bool? equalsValuesPrimitive(Object value1, Object value2) {
+    var primitive1 = TypeParser.isPrimitiveValue(value1);
+    var primitive2 = TypeParser.isPrimitiveValue(value2);
+
+    if (primitive1 && primitive2) {
+      return value1 == value2;
+    }
+
+    return null;
+  }
+
+  static bool? equalsValuesEnum(Object value1, Object value2) {
+    var enum1 = value1 is Enum;
+    var enum2 = value2 is Enum;
+
+    if (enum1 && enum2) {
+      return value1 == value2;
+    } else if (enum1 || enum2) {
+      var enumName1 = value1 is Enum ? enumToName(value1) : value1.toString();
+      var enumName2 = value2 is Enum ? enumToName(value2) : value2.toString();
+
+      return equalsIgnoreAsciiCase(enumName1, enumName2);
+    }
+
+    return null;
+  }
+
+  static bool? equalsValuesCollection(Object value1, Object value2) {
+    var collection1 = TypeParser.isCollectionValue(value1);
+    var collection2 = TypeParser.isCollectionValue(value2);
+
+    if (collection1 && collection2) {
+      return isEqualsDeep(value1, value2, valueEquality: equalsValuesBasic);
+    }
+
+    return null;
   }
 
   FutureOr<O> createFromMap(Map<String, dynamic> fields);

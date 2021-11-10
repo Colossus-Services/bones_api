@@ -321,6 +321,23 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// If `true` indicates that this adapter SQL uses the `ON CONFLICT` syntax for inserts.
   bool get sqlAcceptsInsertOnConflict;
 
+  Object? valueToSQL(Object? value) {
+    if (value == null) {
+      return null;
+    } else if (value is Enum) {
+      var enumType = value.runtimeType;
+      var enumReflection =
+          ReflectionFactory().getRegisterEnumReflection(enumType);
+
+      var name = enumReflection?.getName(value);
+      name ??= enumToName(value);
+
+      return name;
+    } else {
+      return value;
+    }
+  }
+
   FutureOr<String> fieldValueToSQL(
       EncodingContext context,
       TableScheme tableScheme,
@@ -330,7 +347,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
     var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
 
     if (fieldRef == null) {
-      fieldsValues.putIfAbsent(fieldName, () => value);
+      fieldsValues.putIfAbsent(fieldName, () => valueToSQL(value));
       var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
       return valueSQL;
     } else {

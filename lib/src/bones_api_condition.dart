@@ -151,18 +151,23 @@ class ConditionParameter extends ConditionElement {
 
     if (myValue is Iterable) {
       if (otherValue is Iterable) {
-        var equals = isEqualsIterableDeep(myValue, otherValue);
+        var equals = isEqualsIterableDeep(myValue, otherValue,
+            valueEquality: EntityHandler.equalsValuesBasic);
         return equals;
       } else {
-        var contains = myValue.contains(otherValue);
+        var contains = myValue
+            .where((v) => EntityHandler.equalsValuesBasic(v, otherValue))
+            .isNotEmpty;
         return contains;
       }
     } else if (otherValue is Iterable) {
-      var contains = otherValue.contains(myValue);
+      var contains = otherValue
+          .where((v) => EntityHandler.equalsValuesBasic(v, myValue))
+          .isNotEmpty;
       return contains;
     }
 
-    return myValue == otherValue;
+    return EntityHandler.equalsValuesBasic(myValue, otherValue);
   }
 
   bool matchesIn(List values,
@@ -556,7 +561,7 @@ class ConditionID<O> extends Condition<O> {
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
     } else {
-      return id == idValue;
+      return EntityHandler.equalsValuesBasic(id, idValue);
     }
   }
 

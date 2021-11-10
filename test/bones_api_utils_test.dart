@@ -48,16 +48,37 @@ void main() {
           }),
           equals({'a': 1, 'b': 2, 'foo': '51:x'}));
 
-      expect(
-          Json.toJson(Role('foo')), equals({'type': 'foo', 'enabled': true}));
+      expect(Json.toJson(Role(RoleType.unknown)),
+          equals({'type': 'unknown', 'enabled': true}));
 
       roleEntityHandler.toString();
 
-      expect(Json.toJson(Role('foo'), removeField: (k) => k == 'enabled'),
-          equals({'id': null, 'type': 'foo'}));
+      expect(
+          Json.toJson(Role(RoleType.admin), removeField: (k) => k == 'enabled'),
+          equals({'id': null, 'type': 'admin'}));
 
-      expect(Json.toJson(Role('foo', enabled: false), removeNullFields: true),
-          equals({'type': 'foo', 'enabled': false}));
+      expect(
+          Json.toJson(Role(RoleType.guest, enabled: false),
+              removeNullFields: true),
+          equals({'type': 'guest', 'enabled': false}));
+    });
+
+    test('Json.fromJson', () async {
+      Role$reflection.staticInstance;
+
+      {
+        var json = Json.toJson(Role(RoleType.guest, enabled: false));
+
+        expect(Json.fromJson<Role>(json),
+            equals(Role(RoleType.guest, enabled: false)));
+      }
+
+      {
+        var json = Json.toJson(Role(RoleType.admin));
+
+        expect(Json.fromJson<Role>(json),
+            equals(Role(RoleType.admin, enabled: true)));
+      }
     });
 
     test('Json.encode', () async {
@@ -96,6 +117,25 @@ void main() {
             });
           }),
           equals({'ab': AB(1, 2)}));
+    });
+
+    test('Json.decodeFromBytes', () async {
+      Role$reflection.staticInstance;
+
+      {
+        var jsonBytes =
+            Json.encodeToBytes(Role(RoleType.guest, enabled: false));
+
+        expect(Json.decodeFromBytes<Role>(jsonBytes),
+            equals(Role(RoleType.guest, enabled: false)));
+      }
+
+      {
+        var jsonBytes = Json.encodeToBytes(Role(RoleType.admin));
+
+        expect(Json.decodeFromBytes<Role>(jsonBytes),
+            equals(Role(RoleType.admin, enabled: true)));
+      }
     });
 
     test('TypeParser.parseInt', () async {

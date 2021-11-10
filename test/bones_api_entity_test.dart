@@ -104,15 +104,18 @@ void main() {
     });
 
     test('basic', () async {
-      var user1 = User('joe@mail.com', '123',
-          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
+      var user1 = User(
+          'joe@mail.com',
+          '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101),
+          [Role(RoleType.admin)],
           level: 10,
           creationTime: DateTime.utc(2020, 10, 11, 12, 13, 14, 0, 0));
       var user2 = User(
           'smith@mail.com',
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          [Role('guest')],
+          [Role(RoleType.guest)],
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var user1Json =
@@ -139,14 +142,17 @@ void main() {
     });
 
     test('basic', () async {
-      var user1 = User('joe@mail.com', '123',
-          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
+      var user1 = User(
+          'joe@mail.com',
+          '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101),
+          [Role(RoleType.admin)],
           creationTime: DateTime.utc(2020, 10, 11, 12, 13, 14, 0, 0));
       var user2 = User(
           'smith@mail.com',
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          [Role('guest')],
+          [Role(RoleType.guest)],
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var reflectionEntityHandler = user1.reflection.entityHandler;
@@ -164,14 +170,17 @@ void main() {
       var user1Time = DateTime.utc(2019, 1, 2, 3, 4, 5);
       var user2Time = DateTime.utc(2019, 12, 2, 3, 4, 5);
 
-      var user1 = User('joe@setl.com', '123',
-          Address('NY', 'New York', 'Fifth Avenue', 101), [Role('admin')],
+      var user1 = User(
+          'joe@setl.com',
+          '123',
+          Address('NY', 'New York', 'Fifth Avenue', 101),
+          [Role(RoleType.admin)],
           creationTime: user1Time);
       var user2 = User(
           'smith@setl.com',
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          [Role('guest')],
+          [Role(RoleType.guest)],
           creationTime: user2Time);
 
       userRepository.store(user1);
@@ -291,7 +300,8 @@ void main() {
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
-        var user = User('joe@memory.com', '123', address, [Role('admin')],
+        var user = User(
+            'joe@memory.com', '123', address, [Role(RoleType.admin)],
             creationTime: user1Time);
         var id = await userSQLRepository.store(user);
         expect(id, equals(1));
@@ -302,7 +312,8 @@ void main() {
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
 
-        var user = User('smith@memory.com', 'abc', address, [Role('guest')],
+        var user = User(
+            'smith@memory.com', 'abc', address, [Role(RoleType.guest)],
             creationTime: user2Time);
         var id = await userSQLRepository.store(user);
         expect(id, equals(2));
@@ -495,7 +506,7 @@ void main() {
           'mary@memory.com',
           'xyz',
           address,
-          [Role('guest')],
+          [Role(RoleType.guest)],
         );
         var id = await userAPIRepository.store(user);
         expect(id, equals(3));
@@ -539,7 +550,7 @@ void main() {
         expect(user.email, equals('mary2@memory.com'));
         expect(user.address.state, equals('FL'));
 
-        user.roles.add(Role('foo'));
+        user.roles.add(Role(RoleType.unknown));
 
         expect(await userAPIRepository.store(user), equals(user.id));
 
@@ -549,10 +560,10 @@ void main() {
             user2.roles.map((e) => e.toJson()),
             equals([
               {'id': 3, 'type': 'guest', 'enabled': true},
-              {'id': 4, 'type': 'foo', 'enabled': true}
+              {'id': 4, 'type': 'unknown', 'enabled': true}
             ]));
 
-        user2.roles.removeWhere((r) => r.type == 'guest');
+        user2.roles.removeWhere((r) => r.type == RoleType.guest);
         expect(await userAPIRepository.store(user2), equals(user.id));
 
         var user3 = await userAPIRepository.selectByID(user.id);
@@ -560,7 +571,7 @@ void main() {
         expect(
             user3.roles.map((e) => e.toJson()),
             equals([
-              {'id': 4, 'type': 'foo', 'enabled': true}
+              {'id': 4, 'type': 'unknown', 'enabled': true}
             ]));
       }
 
@@ -614,7 +625,7 @@ void main() {
             'bill@memory.com',
             'txs',
             address,
-            [Role('guest')],
+            [Role(RoleType.guest)],
           );
           var id = await userAPIRepository.store(user);
           expect(id, equals(4));

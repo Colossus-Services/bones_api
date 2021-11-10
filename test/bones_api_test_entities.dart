@@ -337,19 +337,26 @@ class Address extends Entity {
 }
 
 @EnableReflection()
+enum RoleType {
+  admin,
+  guest,
+  unknown,
+}
+
+@EnableReflection()
 class Role extends Entity {
   int? id;
 
-  String type;
+  RoleType type;
 
   bool enabled;
 
   Role(this.type, {this.id, this.enabled = true});
 
-  Role.empty() : this('');
+  Role.empty() : this(RoleType.unknown);
 
   Role.fromMap(Map<String, dynamic> map)
-      : this(map.getAsString('type')!,
+      : this(RoleType$from(map.getAsString('type')) ?? RoleType.unknown,
             enabled: map.getAsBool('enabled', defaultValue: false)!,
             id: map.getAsInt('id'));
 
@@ -392,7 +399,7 @@ class Role extends Entity {
       case 'id':
         return TypeInfo.tInt;
       case 'type':
-        return TypeInfo.tString;
+        return TypeInfo(RoleType);
       case 'enabled':
         return TypeInfo.tBool;
       default:
@@ -410,7 +417,7 @@ class Role extends Entity {
         }
       case 'type':
         {
-          type = value as String;
+          type = RoleType$from(value)!;
           break;
         }
       case 'enabled':
@@ -427,6 +434,6 @@ class Role extends Entity {
   Map<String, dynamic> toJson() => {
         'enabled': enabled,
         if (id != null) 'id': id,
-        'type': type,
+        'type': type.enumName,
       };
 }
