@@ -356,7 +356,7 @@ class Role extends Entity {
   Role.empty() : this(RoleType.unknown);
 
   Role.fromMap(Map<String, dynamic> map)
-      : this(RoleType$from(map.getAsString('type')) ?? RoleType.unknown,
+      : this(RoleType$from(map.get('type')) ?? RoleType.unknown,
             enabled: map.getAsBool('enabled', defaultValue: false)!,
             id: map.getAsInt('id'));
 
@@ -377,7 +377,7 @@ class Role extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames => const <String>['id', 'type', 'enabled'];
+  List<String> get fieldsNames => const <String>['enabled', 'id', 'type'];
 
   @override
   V? getField<V>(String key) {

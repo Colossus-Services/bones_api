@@ -76,6 +76,9 @@ class Json {
     return jsonEncoder.encodeToBytes(o, pretty: pretty);
   }
 
+  static final JsonEncoder defaultEncoder =
+      JsonEncoder(toEncodableProvider: (o) => _jsonEncodableProvider(o, null));
+
   static JsonEncoder _buildJsonEncoder(
       JsonFieldMatcher? maskField,
       String maskText,
@@ -83,6 +86,14 @@ class Json {
       bool removeNullFields,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider) {
+    if (entityHandlerProvider == null &&
+        toEncodable == null &&
+        !removeNullFields &&
+        removeField == null &&
+        maskField == null) {
+      return defaultEncoder;
+    }
+
     return JsonEncoder(
         maskField: maskField,
         maskText: maskText,
@@ -214,8 +225,16 @@ class Json {
     return jsonDecoder.decodeFromBytesAsync(encodedJsonBytes, type: type);
   }
 
+  static final JsonDecoder defaultDecoder = JsonDecoder(
+    jsomMapDecoderAsyncProvider: (m) => _jsomMapDecoderAsyncProvider(m, null),
+  );
+
   static JsonDecoder _buildJsonDecoder(JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider) {
+    if (jsomMapDecoder == null && entityHandlerProvider == null) {
+      return defaultDecoder;
+    }
+
     return JsonDecoder(
         jsomMapDecoder: jsomMapDecoder,
         jsomMapDecoderAsyncProvider: (m) =>
@@ -239,9 +258,9 @@ class Json {
 
     if (classReflection != null) {
       return (m, j) => classReflection.createInstanceFromMap(m,
-          fieldNameResolver: _fieldNameResolver,
+          fieldNameResolver: defaultFieldNameResolver,
           fieldValueResolver: (f, v, t) =>
-              _fieldValueResolver(f, v, t, j, entityHandlerProvider));
+              defaultFieldValueResolver(f, v, t, j, entityHandlerProvider));
     }
 
     var entityHandler =
@@ -252,7 +271,8 @@ class Json {
     }
   }
 
-  static String _fieldNameResolver(String field, Map<String, Object?> map) {
+  static String defaultFieldNameResolver(
+      String field, Map<String, Object?> map) {
     if (map.containsKey(field)) {
       return field;
     }
@@ -280,7 +300,7 @@ class Json {
     return field;
   }
 
-  static Object? _fieldValueResolver(
+  static Object? defaultFieldValueResolver(
       String field,
       Object? value,
       TypeReflection type,

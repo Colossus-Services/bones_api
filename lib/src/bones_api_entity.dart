@@ -181,22 +181,19 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   FutureOr<Object?> resolveFieldValue(
       String fieldName, TypeInfo? fieldType, Object? value) {
-    if (value == null) return null;
+    return resolveValueByType(fieldType, value);
+  }
 
-    var resolved = fieldType?.parse(value);
-    if (resolved != null) {
-      return resolved;
-    }
+  FutureOr<Map<String, Object?>> resolveFieldsNamesAndValues(
+      Map<String, dynamic> fields) {
+    var fieldsNames = this.fieldsNames();
 
-    if (value is num || value is String || value is Map<String, dynamic>) {
-      var o = EntityRepository.resolveEntityFromMap(
-          entityMap: value,
-          entityType: fieldType?.type,
-          entityHandlerProvider: provider);
-      return o ?? value;
-    }
+    var fieldsValues = getFieldsValuesFromMap(fieldsNames, fields,
+        fieldsNamesIndexes: fieldsNamesIndexes(),
+        fieldsNamesLC: fieldsNamesLC(),
+        fieldsNamesSimple: fieldsNamesSimple());
 
-    return value;
+    return resolveFieldsValues(fieldsValues);
   }
 
   FutureOr<dynamic> resolveEntityFieldValue(O o, String key, dynamic value) {
@@ -207,6 +204,10 @@ abstract class EntityHandler<O> with FieldsFromMap {
   FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value) {
     if (type == null) {
       return value as T?;
+    }
+
+    if (type.type == value.runtimeType && value is T) {
+      return value;
     }
 
     if (value is Map<String, Object?>) {
@@ -922,6 +923,25 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   FutureOr<O> createFromMap(Map<String, dynamic> fields) {
+    return resolveFieldsNamesAndValues(fields).resolveMapped((resolvedFields) {
+      try {
+        var o = reflection.createInstanceFromMap(resolvedFields,
+            fieldNameResolver: (f, _) => f);
+
+        if (o != null) {
+          return o;
+        } else {
+          return _createFromMapDefaultImpl(resolvedFields);
+        }
+      } catch (e, s) {
+        print(e);
+        print(s);
+        return _createFromMapDefaultImpl(fields);
+      }
+    });
+  }
+
+  FutureOr<O> _createFromMapDefaultImpl(Map<String, dynamic> fields) {
     var o = reflection.createInstance()!;
     return setFieldsFromMap(o, fields);
   }

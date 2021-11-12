@@ -344,8 +344,8 @@ mixin FieldsFromMap {
     List<String>? fieldsNamesSimple,
     bool includeAbsentFields = false,
   }) {
-    var mapLC = <String, Object?>{};
-    var mapSimple = <String, Object?>{};
+    var mapLC = <String, String>{};
+    var mapSimple = <String, String>{};
 
     var entries = fieldsNames.map((f) {
       String? fLC, fSimple;
@@ -372,8 +372,13 @@ mixin FieldsFromMap {
 
   /// Returns a [field] value from [map].
   /// - [field] is case insensitive.
-  Object? getFieldValueFromMap(String field, Map<String, Object?> map) {
-    var entry = _getFieldValueFromMapImpl(field, null, null, map, null, null);
+  Object? getFieldValueFromMap(String field, Map<String, Object?> map,
+      {String? fieldLC,
+      String? fieldSimple,
+      Map<String, String>? mapLC,
+      Map<String, String>? mapSimple}) {
+    var entry = _getFieldValueFromMapImpl(
+        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
     return entry?.value;
   }
 
@@ -382,41 +387,64 @@ mixin FieldsFromMap {
       String? fieldLC,
       String? fieldSimple,
       Map<String, Object?> map,
-      Map<String, Object?>? mapLC,
-      Map<String, Object?>? mapSimple) {
+      Map<String, String>? mapLC,
+      Map<String, String>? mapSimple) {
     if (map.isEmpty) return null;
 
-    var val = map[field];
-    if (val != null) return MapEntry(field, val);
+    var key = _getFieldKeyInMapImpl(
+        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
+    if (key == null) return null;
+
+    var value = map[key];
+    return MapEntry(field, value);
+  }
+
+  /// Returns a [field] value from [map].
+  /// - [field] is case insensitive.
+  String? getFieldKeyInMap(String field, Map<String, Object?> map,
+      {String? fieldLC,
+      String? fieldSimple,
+      Map<String, String>? mapLC,
+      Map<String, String>? mapSimple}) {
+    return _getFieldKeyInMapImpl(
+        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
+  }
+
+  String? _getFieldKeyInMapImpl(
+      String field,
+      String? fieldLC,
+      String? fieldSimple,
+      Map<String, Object?> map,
+      Map<String, String>? mapLC,
+      Map<String, String>? mapSimple) {
+    if (map.isEmpty) return null;
+
+    if (map.containsKey(field)) return field;
 
     fieldLC ??= fieldToLCKey(field);
-
-    val = map[fieldLC];
-    if (val != null) return MapEntry(field, val);
+    if (map.containsKey(fieldLC)) return fieldLC;
 
     fieldSimple ??= fieldToSimpleKey(field);
-
-    val = map[fieldSimple];
-    if (val != null) return MapEntry(field, val);
+    if (map.containsKey(fieldSimple)) return fieldSimple;
 
     if (mapLC != null) {
       if (mapLC.isEmpty) {
         for (var e in map.entries) {
-          var kLC = fieldToLCKey(e.key);
-          mapLC[kLC] = e.value;
+          var k = e.key;
+          var kLC = fieldToLCKey(k);
+          mapLC[kLC] = k;
         }
       }
 
-      val = mapLC[fieldLC];
-      if (val != null) {
-        return MapEntry(field, val);
+      var mapKey = mapLC[fieldLC];
+      if (mapKey != null) {
+        return mapKey;
       }
     } else {
       for (var k in map.keys) {
         var kLC = fieldToLCKey(k);
         if (kLC == fieldLC) {
-          val = map[k];
-          return MapEntry(field, val);
+          return k;
         }
       }
     }
@@ -424,21 +452,21 @@ mixin FieldsFromMap {
     if (mapSimple != null) {
       if (mapSimple.isEmpty) {
         for (var e in map.entries) {
-          var kSimple = fieldToSimpleKey(e.key);
-          mapSimple[kSimple] = e.value;
+          var k = e.key;
+          var kSimple = fieldToSimpleKey(k);
+          mapSimple[kSimple] = k;
         }
       }
 
-      val = mapSimple[fieldSimple];
-      if (val != null) {
-        return MapEntry(field, val);
+      var mapKey = mapSimple[fieldSimple];
+      if (mapKey != null) {
+        return mapKey;
       }
     } else {
       for (var k in map.keys) {
         var kSimple = fieldToSimpleKey(k);
         if (kSimple == fieldSimple) {
-          val = map[k];
-          return MapEntry(field, val);
+          return k;
         }
       }
     }

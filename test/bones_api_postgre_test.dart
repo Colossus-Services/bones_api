@@ -1,6 +1,5 @@
-@Tags(['docker'])
+@Tags(['docker', 'postgre', 'entities'])
 @Timeout(Duration(seconds: 180))
-
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_adapter_postgre.dart';
 import 'package:docker_commander/docker_commander.dart';

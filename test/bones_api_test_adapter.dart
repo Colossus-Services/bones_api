@@ -282,7 +282,7 @@ void runAdapterTests(
             user.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals([
-              {'id': 1, 'type': 'admin', 'enabled': true}
+              {'enabled': true, 'id': 1, 'type': 'admin'}
             ]));
         expect(user.level, equals(100));
         expect(user.creationTime, equals(user1Time));

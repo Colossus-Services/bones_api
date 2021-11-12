@@ -3,8 +3,14 @@ tags:
   # Test the package version self-references.
   version:
     timeout: 10s
+  # Tests that uses entities.
+  entities:
+    timeout: 180s
   # Tests that uses `Docker` containers.
   docker:
+    timeout: 180s
+  # Tests that uses `PostgreSQL`.
+  postgre:
     timeout: 180s
   # Tests that depends on `build` framework:
   build:

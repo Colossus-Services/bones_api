@@ -1,3 +1,8 @@
+## 1.0.34
+
+- Improved `EntityHandler` resolution of fields while creating instances from `Map`.
+- reflection_factory: ^1.0.19
+
 ## 1.0.33
 
 - `Entity` & `EntityHandler`:

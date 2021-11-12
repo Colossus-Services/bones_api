@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.18
+// BUILDER: reflection_factory/1.0.19
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -47,7 +47,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.18');
+  Version get reflectionFactoryVersion => Version.parse('1.0.19');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -454,7 +454,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.18');
+  Version get reflectionFactoryVersion => Version.parse('1.0.19');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -826,7 +826,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.18');
+  Version get reflectionFactoryVersion => Version.parse('1.0.19');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -880,7 +880,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.18');
+  Version get reflectionFactoryVersion => Version.parse('1.0.19');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);

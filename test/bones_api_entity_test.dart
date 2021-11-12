@@ -1,3 +1,5 @@
+@Tags(['entities'])
+
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
@@ -334,7 +336,7 @@ void main() {
         expect(
             user.roles.map((e) => e.toJson()),
             equals([
-              {'id': 1, 'type': 'admin', 'enabled': true}
+              {'enabled': true, 'id': 1, 'type': 'admin'}
             ]));
         expect(user.creationTime, equals(user1Time));
       }
