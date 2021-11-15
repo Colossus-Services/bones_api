@@ -26,6 +26,24 @@ void main() {
   group('Utils', () {
     setUp(() {});
 
+    test('TypeInfo', () async {
+      var t1 = TypeInfo(List);
+      var t2 = TypeInfo(List);
+
+      expect(t1.type, equals(t2.type));
+
+      var t3 = TypeInfo.from([]);
+      expect(t3.type, equals(t1.type));
+
+      var fieldRolesType = User.empty().getFieldType('roles')!;
+
+      expect(fieldRolesType.type, equals(t1.type));
+
+      var t4 = TypeInfo.from([Role.empty()], [Role.empty()]);
+      expect(fieldRolesType.type, equals(t4.type));
+      expect(fieldRolesType, equals(t4));
+    });
+
     test('Json.toJson', () async {
       expect(Json.toJson(123), equals(123));
       expect(Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),

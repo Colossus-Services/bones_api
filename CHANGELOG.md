@@ -1,3 +1,8 @@
+## 1.0.35
+
+- Fix `TypeInfo`:
+  - Now `TypeInfo` handles `Type` comparison in a special way (to keep consistence between VM and JS/Web).    
+
 ## 1.0.34
 
 - Improved `EntityHandler` resolution of fields while creating instances from `Map`.

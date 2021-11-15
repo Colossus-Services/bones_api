@@ -206,12 +206,17 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return value as T?;
     }
 
-    if (type.type == value.runtimeType && value is T) {
+    var tType = TypeInfo.from(T);
+    var valueType = value != null ? TypeInfo.from(value) : null;
+
+    if (type.equalsType(valueType) &&
+        value is T &&
+        (!tType.isAnyType && type.equalsType(tType) && !type.hasArguments)) {
       return value;
     }
 
     if (value is Map<String, Object?>) {
-      if (type.type == Map) {
+      if (type.isMap) {
         return type.parse<T>(value);
       } else {
         var valEntityHandler = _resolveEntityHandler(type);
@@ -221,7 +226,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
         return resolved as T?;
       }
     } else if (value is List<Object?>) {
-      if (type.type == List && type.hasArguments) {
+      if (type.isList && type.hasArguments) {
         var elementType = type.arguments.first;
         var valEntityHandler = _resolveEntityHandler(elementType);
 

@@ -214,7 +214,7 @@ void main() {
           '{"name":"err","uri":"http://localhost:0/base/err"}'
           ']},'
           '{"name":"info","routes":['
-          '{"name":"echo","parameters":{"msg":"String","request":"APIRequest"},"uri":"http://localhost:0/info/echo?msg=String&request=APIRequest"}'
+          '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"}'
           ']}'
           ']}';
 

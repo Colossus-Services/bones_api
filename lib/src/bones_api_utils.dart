@@ -703,6 +703,12 @@ class TypeParser {
         value is bool;
   }
 
+  /// Returns `true` if [type] is [Object] or [dynamic].
+  static bool isAnyType<T>([Type? type]) {
+    type ??= T;
+    return type == Object || type == dynamic;
+  }
+
   /// Returns `true` if [type] is a collection ([List], [Iterable], [Map] or [Set]).
   static bool isCollectionType<T>([Type? type]) {
     type ??= T;
@@ -712,6 +718,146 @@ class TypeParser {
   /// Returns `true` if [value] is a collection ([List], [Iterable], [Map] or [Set]).
   static bool isCollectionValue(Object value) {
     return value is List || value is Iterable || value is Map || value is Set;
+  }
+}
+
+enum BasicDartType {
+  none,
+  object,
+  dynamic,
+  list,
+  set,
+  map,
+  iterable,
+  string,
+  int,
+  double,
+  num,
+  bool,
+}
+
+class _TypeWrapper {
+  final Type type;
+
+  final BasicDartType basicDartType;
+
+  _TypeWrapper(Type type, {BasicDartType? basicType, Object? object})
+      : type = detectType(type, object),
+        basicDartType = basicType ?? detectBasicType(type, object);
+
+  static BasicDartType detectBasicType(Type type, [Object? object]) {
+    if (type == tString || object is String) return BasicDartType.string;
+    if (type == tInt || object is int) return BasicDartType.int;
+    if (type == tDouble || object is double) return BasicDartType.double;
+    if (type == tNum || object is num) return BasicDartType.num;
+    if (type == tBool || object is bool) return BasicDartType.bool;
+
+    if (type == tMap || object is Map) return BasicDartType.map;
+    if (type == tSet || object is Set) return BasicDartType.set;
+    if (type == tList || object is List) return BasicDartType.list;
+    if (type == tIterable || object is Iterable) return BasicDartType.iterable;
+
+    if (type == tObject) return BasicDartType.object;
+    if (type == tDynamic) return BasicDartType.dynamic;
+
+    return BasicDartType.none;
+  }
+
+  static final Type tString = String;
+  static final Type tInt = int;
+  static final Type tDouble = double;
+  static final Type tNum = num;
+  static final Type tBool = bool;
+  static final Type tList = List;
+  static final Type tSet = Set;
+  static final Type tMap = Map;
+  static final Type tIterable = Iterable;
+  static final Type tObject = Object;
+  static final Type tDynamic = dynamic;
+
+  static Type detectType(Type type, [Object? object]) {
+    if (type == tString || object is String) return tString;
+    if (type == tInt || object is int) return tInt;
+    if (type == tDouble || object is double) return tDouble;
+    if (type == tNum || object is num) return tNum;
+    if (type == tBool || object is bool) return tBool;
+
+    if (type == tMap || object is Map) return tMap;
+    if (type == tSet || object is Set) return tSet;
+    if (type == tList || object is List) return tList;
+    if (type == tIterable || object is Iterable) return tIterable;
+
+    if (type == tObject) return tObject;
+    if (type == tDynamic) return tDynamic;
+
+    return type;
+  }
+
+  /// Returns `true` if [type] is primitive ([bool], [int], [double], [num] or [String]).
+  bool get isPrimitiveType => isString || isInt || isDouble || isNum || isBool;
+
+  /// Returns `true` if [type] is a collection ([List], [Iterable], [Map] or [Set]).
+  bool get isCollection => isList || isIterable || isMap || isSet;
+
+  /// Returns `true` if [type] [isPrimitiveType] or [isCollection].
+  bool get isBasicType => isPrimitiveType || isCollection;
+
+  /// Returns `true` if [type] is `Object` or `dynamic`.
+  bool get isAnyType => isObject || isDynamic;
+
+  /// Returns `true` if [type] is `Object`.
+  bool get isObject => basicDartType == BasicDartType.object;
+
+  /// Returns `true` if [type] is `dynamic`.
+  bool get isDynamic => basicDartType == BasicDartType.dynamic;
+
+  /// Returns `true` if [type] is `bool`.
+  bool get isBool => basicDartType == BasicDartType.bool;
+
+  /// Returns `true` if [type] is `int`.
+  bool get isInt => basicDartType == BasicDartType.int;
+
+  /// Returns `true` if [type] is `double`.
+  bool get isDouble => basicDartType == BasicDartType.double;
+
+  /// Returns `true` if [type] is `num`.
+  bool get isNum => basicDartType == BasicDartType.num;
+
+  /// Returns `true` if [type] is `int`, `double` or `num`.
+  bool get isNumber => isInt || isDouble || isNum;
+
+  /// Returns `true` if [type] is `String`.
+  bool get isString => basicDartType == BasicDartType.string;
+
+  /// Returns `true` if [type] is a [List].
+  bool get isList => basicDartType == BasicDartType.list;
+
+  /// Returns `true` if [type] is a [Iterable].
+  bool get isIterable => basicDartType == BasicDartType.iterable;
+
+  /// Returns `true` if [type] is a [Map].
+  bool get isMap => basicDartType == BasicDartType.map;
+
+  /// Returns `true` if [type] is a [Set].
+  bool get isSet => basicDartType == BasicDartType.set;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _TypeWrapper &&
+          runtimeType == other.runtimeType &&
+          ((basicDartType != BasicDartType.none &&
+                  basicDartType == other.basicDartType) ||
+              type == other.type);
+
+  @override
+  int get hashCode =>
+      (basicDartType != BasicDartType.none ? type.hashCode : 0) ^
+      basicDartType.hashCode;
+
+  @override
+  String toString() {
+    return '_TypeWrapper{type: $type, basicDartType: $basicDartType}';
   }
 }
 
@@ -727,38 +873,54 @@ class TypeInfo {
   static final TypeInfo tDouble = TypeInfo.from(double);
   static final TypeInfo tNum = TypeInfo.from(num);
 
+  static final TypeInfo tList = TypeInfo.from(List);
+  static final TypeInfo tSet = TypeInfo.from(Set);
+  static final TypeInfo tMap = TypeInfo.from(Map);
+  static final TypeInfo tIterable = TypeInfo.from(Iterable);
+
   static final TypeInfo tAPIRequest = TypeInfo.from(APIRequest);
   static final TypeInfo tAPIResponse = TypeInfo.from(APIResponse);
 
+  final _TypeWrapper _typeWrapper;
+
   /// The main [Type].
-  final Type type;
+  Type get type => _typeWrapper.type;
 
   /// The [type] arguments (generics).
   final List<TypeInfo> arguments;
 
   static final _emptyArguments = List<TypeInfo>.unmodifiable([]);
 
-  TypeInfo(this.type, [Iterable<Object>? arguments])
-      : arguments = arguments == null || arguments.isEmpty
+  TypeInfo(Type type, [Iterable<Object>? arguments])
+      : this._(type, arguments, null);
+
+  TypeInfo._(Type type, [Iterable<Object>? arguments, Object? object])
+      : _typeWrapper = _TypeWrapper(type, object: object),
+        arguments = arguments == null || arguments.isEmpty
             ? _emptyArguments
             : List<TypeInfo>.unmodifiable(
                 arguments.map((o) => TypeInfo.from(o)));
 
-  factory TypeInfo.from(Object o) {
+  factory TypeInfo.from(Object o, [Iterable<Object>? arguments]) {
     if (o is TypeInfo) return o;
-    if (o is Type) return TypeInfo(o);
+    if (o is Type) return TypeInfo._(o);
 
     if (o is TypeReflection) {
-      return TypeInfo(o.type, o.arguments.map((o) => TypeInfo.from(o)));
+      return TypeInfo._(o.type, o.arguments.map((o) => TypeInfo.from(o)));
     }
 
     if (o is FieldReflection) {
-      return TypeInfo(
+      return TypeInfo._(
           o.type.type, o.type.arguments.map((o) => TypeInfo.from(o)));
     }
 
-    return TypeInfo(o.runtimeType);
+    return TypeInfo._(o.runtimeType, arguments, o);
   }
+
+  /// Returns `true` if `this`.[type] equals to [other].[type].
+  ///
+  /// Resolves some [Type] singleton issues with [List], [Set] and [Map].
+  bool equalsType(TypeInfo? other) => _typeWrapper == other?._typeWrapper;
 
   /// The [arguments] length.
   int get argumentsLength => arguments.length;
@@ -822,43 +984,53 @@ class TypeInfo {
     }
   }
 
-  /// Returns `true` if [type] is primitive.
-  ///
-  /// See [TypeParser.isPrimitiveType].
-  bool get isPrimitiveType => TypeParser.isPrimitiveType(type);
-
-  /// Returns `true` if [type] is `int`.
-  bool get isInt => type == int;
-
-  /// Returns `true` if [type] is `double`.
-  bool get isDouble => type == double;
-
-  /// Returns `true` if [type] is `num`.
-  bool get isNum => type == num;
-
-  /// Returns `true` if [type] is `int`, `double` or `num`.
-  bool get isNumber => isInt || isDouble || isNum;
-
-  /// Returns `true` if [type] is `String`.
-  bool get isString => type == String;
-
-  /// Returns `true` if [type] is a [List].
-  bool get isList => type == List;
-
-  /// Returns `true` if [type] is a [Iterable].
-  bool get isIterable => type == Iterable;
-
-  /// Returns `true` if [type] is a [Map].
-  bool get isMap => type == Map;
-
-  /// Returns `true` if [type] is a [Set].
-  bool get isSet => type == Set;
+  /// Returns `true` if [type] is primitive ([bool], [int], [double], [num] or [String]).
+  bool get isPrimitiveType => _typeWrapper.isPrimitiveType;
 
   /// Returns `true` if [type] is a collection ([List], [Iterable], [Map] or [Set]).
-  bool get isCollection => isList || isIterable || isMap || isSet;
+  bool get isCollection => _typeWrapper.isCollection;
 
   /// Returns `true` if [type] [isPrimitiveType] or [isCollection].
-  bool get isBasicType => isPrimitiveType || isCollection;
+  bool get isBasicType => _typeWrapper.isBasicType;
+
+  /// Returns `true` if [type] is `Object` or `dynamic`.
+  bool get isAnyType => _typeWrapper.isAnyType;
+
+  /// Returns `true` if [type] is `Object`.
+  bool get isObject => _typeWrapper.isObject;
+
+  /// Returns `true` if [type] is `dynamic`.
+  bool get isDynamic => _typeWrapper.isDynamic;
+
+  /// Returns `true` if [type] is `bool`.
+  bool get isBool => _typeWrapper.isBool;
+
+  /// Returns `true` if [type] is `int`.
+  bool get isInt => _typeWrapper.isInt;
+
+  /// Returns `true` if [type] is `double`.
+  bool get isDouble => _typeWrapper.isDouble;
+
+  /// Returns `true` if [type] is `num`.
+  bool get isNum => _typeWrapper.isNum;
+
+  /// Returns `true` if [type] is `int`, `double` or `num`.
+  bool get isNumber => _typeWrapper.isNumber;
+
+  /// Returns `true` if [type] is `String`.
+  bool get isString => _typeWrapper.isString;
+
+  /// Returns `true` if [type] is a [List].
+  bool get isList => _typeWrapper.isList;
+
+  /// Returns `true` if [type] is a [Iterable].
+  bool get isIterable => _typeWrapper.isIterable;
+
+  /// Returns `true` if [type] is a [Map].
+  bool get isMap => _typeWrapper.isMap;
+
+  /// Returns `true` if [type] is a [Set].
+  bool get isSet => _typeWrapper.isSet;
 
   /// Returns `true` if [type] is a [List] of entities.
   bool get isListEntity =>
@@ -877,11 +1049,32 @@ class TypeInfo {
       ListEquality<TypeInfo>();
 
   /// Returns `true` if this instances has the same [type] and [arguments].
-  bool isOf(Type type, [List<TypeInfo>? arguments]) =>
-      this.type == type &&
-      (arguments != null && arguments.isNotEmpty) &&
-      hasArguments &&
-      _listTypeInfoEquality.equals(arguments, arguments);
+  bool isOf(Type type, [List<TypeInfo>? arguments]) {
+    var t = TypeInfo.from(type);
+
+    if (!equalsType(t)) return false;
+
+    if (hasArguments) {
+      return _listTypeInfoEquality.equals(this.arguments, arguments);
+    } else {
+      return arguments == null || arguments.isEmpty;
+    }
+  }
+
+  static final ListEquality<TypeInfo> _listEqualityTypeInfo =
+      ListEquality<TypeInfo>();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TypeInfo &&
+          runtimeType == other.runtimeType &&
+          _typeWrapper == other._typeWrapper &&
+          _listEqualityTypeInfo.equals(arguments, other.arguments);
+
+  @override
+  int get hashCode =>
+      _typeWrapper.hashCode ^ _listEqualityTypeInfo.hash(arguments);
 
   @override
   String toString() {
