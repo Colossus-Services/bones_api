@@ -81,6 +81,8 @@ library bones_api;
 
 export 'dart:async';
 
+export 'package:reflection_factory/reflection_factory.dart';
+
 export 'src/bones_api_authentication.dart';
 export 'src/bones_api_base.dart';
 export 'src/bones_api_condition.dart';

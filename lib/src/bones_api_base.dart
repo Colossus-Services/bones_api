@@ -11,12 +11,11 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
-import 'bones_api_utils.dart';
 
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.35';
+  static const String VERSION = '1.0.36';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -767,14 +766,14 @@ class APIRouteBuilder<M extends APIModule> {
 
     if (returnsAPIResponse && receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: TypeInfo.tAPIRequest};
+      var parameters = {paramName: APIRequest.typeInfo};
 
       add(requestMethod, apiMethod.name, (req) {
         return apiMethod.invoke([req]);
       }, parameters: parameters, rules: rules);
     } else if (receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: TypeInfo.tAPIRequest};
+      var parameters = {paramName: APIRequest.typeInfo};
 
       add(requestMethod, apiMethod.name, (req) {
         var ret = apiMethod.invoke([req]);
@@ -782,7 +781,7 @@ class APIRouteBuilder<M extends APIModule> {
       }, parameters: parameters, rules: rules);
     } else if (returnsAPIResponse) {
       var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
-          .map((p) => MapEntry(p.name, TypeInfo.from(p.type))));
+          .map((p) => MapEntry(p.name, TypeInfo.from(p))));
 
       add(requestMethod, apiMethod.name, (req) {
         var methodInvocation =
@@ -1090,6 +1089,8 @@ class APISession {
 
 /// Represents an API request.
 class APIRequest extends APIPayload {
+  static final TypeInfo typeInfo = TypeInfo.from(APIRequest);
+
   /// The request method.
   final APIRequestMethod method;
 
@@ -1664,6 +1665,8 @@ enum APIResponseStatus {
 
 /// Represents an API response.
 class APIResponse<T> extends APIPayload {
+  static final TypeInfo typeInfo = TypeInfo.from(APIResponse);
+
   /// The response status.
   final APIResponseStatus status;
 

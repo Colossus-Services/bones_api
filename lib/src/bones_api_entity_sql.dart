@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
-import 'bones_api_utils.dart';
 
 final _log = logging.Logger('SQLEntityRepository');
 

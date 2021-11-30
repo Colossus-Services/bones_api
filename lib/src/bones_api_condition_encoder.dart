@@ -1,10 +1,10 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_mixin.dart';
-import 'bones_api_utils.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {

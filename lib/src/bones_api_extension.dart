@@ -5,7 +5,6 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_utils.dart';
 
 /// [ReflectionFactory] extension.
 extension ReflectionFactoryExtension on ReflectionFactory {
@@ -76,18 +75,19 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
   bool get isFullAPIMethod => returnsAPIResponse && receivesAPIRequest;
 
   /// Returns `true` if this reflected method receives an [APIRequest] as parameter.
-  bool get receivesAPIRequest => equalsNormalParametersTypes([APIRequest]);
+  bool get receivesAPIRequest =>
+      equalsNormalParametersTypes([APIRequest], equivalency: true);
 
   /// Returns `true` if this reflected method returns an [APIResponse].
   bool get returnsAPIResponse {
     var returnType = this.returnType;
     if (returnType == null) return false;
 
-    var type = returnType.type;
+    var typeInfo = returnType.typeInfo;
 
-    return type == APIResponse ||
-        ((type == Future || type == FutureOr) &&
-            (returnType.equalsArgumentsTypes([APIResponse])));
+    return typeInfo.isOf(APIResponse) ||
+        ((typeInfo.isFuture || typeInfo.isDynamic) &&
+            (typeInfo.equivalentArgumentsTypes([APIResponse])));
   }
 }
 

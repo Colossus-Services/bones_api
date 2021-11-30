@@ -1,3 +1,8 @@
+## 1.0.36
+
+- `TypeParser` and `TypeInfo` moved to package `reflection_factory`.
+- reflection_factory: ^1.0.20
+
 ## 1.0.35
 
 - Fix `TypeInfo`:
