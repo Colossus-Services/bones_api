@@ -91,6 +91,12 @@ void main() {
 
       expect(conditionParser.parse(' ( foo == {"a": 1 , "b": 2} ) ').toString(),
           equals('foo == {"a":1,"b":2}'));
+
+      expect(conditionParser.parse(' ( foo =~ [1 , 2] ) ').toString(),
+          equals('foo =~ [1,2]'));
+
+      expect(conditionParser.parse(' ( foo =~ 123 ) ').toString(),
+          equals('foo =~ [123]'));
     });
 
     test('group AND', () async {

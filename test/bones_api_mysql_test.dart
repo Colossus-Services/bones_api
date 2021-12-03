@@ -1,4 +1,4 @@
-@Tags(['docker'])
+@Tags(['docker', 'mysql'])
 @Timeout(Duration(seconds: 180))
 
 import 'package:bones_api/bones_api.dart';
@@ -34,6 +34,23 @@ class MySQLTestContainer extends DBTestContainer {
 
   @override
   Future<bool> waitReady() => container.waitReady();
+
+  static const String configFile = '/etc/mysql/my.cnf';
+  static const String configDirectory = '/etc/mysql/conf.d';
+
+  @override
+  Future<String?> prepare() async {
+    var out = await container.execCat(configFile);
+    var out2 = await container
+        .execAndWaitStdoutAsString('ls', ['-al', configDirectory]);
+    return '\n*** $configFile:\n$out\n*** configDirectory:\n$out2';
+  }
+
+  @override
+  Future<String?> finalize() async {
+    var out = await container.mysqlCMD('SHOW TABLES');
+    return out;
+  }
 
   @override
   Future<bool> stop() => container.stop(timeout: Duration(seconds: 30));

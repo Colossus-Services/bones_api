@@ -51,6 +51,10 @@ abstract class DBTestContainer {
 
   Future<bool> waitReady();
 
+  Future<String?> prepare() async => null;
+
+  Future<String?> finalize() async => null;
+
   Future<bool> stop();
 
   Future<String?> runSQL(String sqlInline);
@@ -105,6 +109,10 @@ void runAdapterTests(
 
         _log.info('Container start: $startOk > $dbTestContainer');
 
+        var prepareOutput = await dbTestContainer.prepare();
+
+        _log.info('Prepare: $prepareOutput');
+
         entityRepositoryProvider = TestEntityRepositoryProvider(
           entityByReflection
               ? Address$reflection().entityHandler
@@ -128,6 +136,9 @@ void runAdapterTests(
 
       if (dockerRunning) {
         entityRepositoryProvider.close();
+
+        var finalizeMsg = await dbTestContainer.finalize();
+        _log.info('Finalize:\n$finalizeMsg');
 
         await dbTestContainer.stop();
         await dockerCommander.close();
@@ -327,6 +338,52 @@ void runAdapterTests(
         var user = sel.first;
         expect(user.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+        expect(sel.length, equals(2));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+      }
+
+      {
+        var sel = await userAPIRepository
+            .selectByINAddressStates(['NY', 'CA', 'N/A']);
+
+        expect(sel.length, equals(2));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByINAddressStates(['NY']);
+
+        expect(sel.length, equals(1));
+        expect(sel.map((e) => e.address.state), equals(['NY']));
+      }
+
+      {
+        var sel =
+            await userAPIRepository.selectByINAddressStatesSingleValue('CA');
+
+        expect(sel.length, equals(1));
+        expect(sel.map((e) => e.address.state), equals(['CA']));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByINAddressStates(
+            ['NY', 'CA', ...List.generate(10, (i) => '$i')]);
+
+        expect(sel.length, equals(2));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+      }
+
+      {
+        var sel = await userAPIRepository.selectByINAddressStates(
+            ['NY', 'CA', ...List.generate(100, (i) => '$i')]);
+
+        expect(sel.length, equals(2));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
       }
 
       {

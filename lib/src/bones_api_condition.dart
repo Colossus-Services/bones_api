@@ -9,8 +9,8 @@ abstract class ConditionElement {
 
   bool get resolved => _resolved;
 
-  void _markResolved() {
-    _resolved = true;
+  void _markResolved([bool resolved = true]) {
+    _resolved = resolved;
   }
 
   void resolve(
@@ -387,7 +387,8 @@ class GroupConditionAND<O> extends GroupCondition<O> {
     if (this is GroupConditionAND<T>) {
       return this as GroupConditionAND<T>;
     }
-    return GroupConditionAND<T>(conditions.map((e) => e.cast<T>()).toList());
+    return GroupConditionAND<T>(conditions.map((e) => e.cast<T>()).toList())
+      .._markResolved(resolved);
   }
 
   @override
@@ -448,7 +449,8 @@ class GroupConditionOR<O> extends GroupCondition<O> {
     if (this is GroupConditionOR<T>) {
       return this as GroupConditionOR<T>;
     }
-    return GroupConditionOR<T>(conditions.map((e) => cast<T>()).toList());
+    return GroupConditionOR<T>(conditions.map((e) => cast<T>()).toList())
+      .._markResolved(resolved);
   }
 
   @override
@@ -508,7 +510,8 @@ class ConditionID<O> extends Condition<O> {
 
   @override
   ConditionID<T> cast<T>() =>
-      this is ConditionID<T> ? this as ConditionID<T> : ConditionID<T>(idValue);
+      this is ConditionID<T> ? this as ConditionID<T> : ConditionID<T>(idValue)
+        .._markResolved(resolved);
 
   @override
   void resolve(
@@ -664,6 +667,13 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     if (value is ConditionParameter) {
       value.resolve(parent: this, parameters: parameters);
       _setParameters([value]);
+    } else if (value is List) {
+      for (var v in value) {
+        if (v is ConditionParameter) {
+          v.resolve(parent: this, parameters: parameters);
+        }
+      }
+      _setParameters(value.whereType<ConditionParameter>());
     } else {
       _setParameters([]);
     }
@@ -772,7 +782,8 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   @override
   KeyConditionEQ<T> cast<T>() => this is KeyConditionEQ<T>
       ? this as KeyConditionEQ<T>
-      : KeyConditionEQ<T>(keys, value);
+      : KeyConditionEQ<T>(keys, value)
+    .._markResolved(resolved);
 
   @override
   bool matchesEntity(O o,
@@ -815,7 +826,8 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   @override
   KeyConditionNotEQ<T> cast<T>() => this is KeyConditionNotEQ<T>
       ? this as KeyConditionNotEQ<T>
-      : KeyConditionNotEQ<T>(keys, value);
+      : KeyConditionNotEQ<T>(keys, value)
+    .._markResolved(resolved);
 
   @override
   bool matchesEntity(O o,
@@ -852,12 +864,26 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionIN<O> extends KeyCondition<O, List<Object?>> {
-  KeyConditionIN(List<ConditionKey> keys, List values) : super(keys, values);
+  static List<Object?> valuesAsList(dynamic value) {
+    if (value == null) return [null];
+
+    if (value is List) return value;
+
+    if (value is Iterable) return value.toList();
+
+    if (value is Map) return value.values.toList();
+
+    return [value];
+  }
+
+  KeyConditionIN(List<ConditionKey> keys, dynamic values)
+      : super(keys, valuesAsList(values));
 
   @override
   KeyConditionIN<T> cast<T>() => this is KeyConditionIN<T>
       ? this as KeyConditionIN<T>
-      : KeyConditionIN<T>(keys, value);
+      : KeyConditionIN<T>(keys, value)
+    .._markResolved(resolved);
 
   @override
   bool matchesEntity(O o,
@@ -899,7 +925,8 @@ class KeyConditionNotIN<O> extends KeyCondition<O, List<Object?>> {
   @override
   KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>
       ? this as KeyConditionNotIN<T>
-      : KeyConditionNotIN<T>(keys, value);
+      : KeyConditionNotIN<T>(keys, value)
+    .._markResolved(resolved);
 
   @override
   bool matchesEntity(O o,

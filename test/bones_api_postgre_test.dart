@@ -32,6 +32,20 @@ class PostgreTestContainer extends DBTestContainer {
   @override
   Future<bool> waitReady() => container.waitReady();
 
+  static const String configFile = '/var/lib/postgresql/data/postgresql.conf';
+
+  @override
+  Future<String?> prepare() async {
+    var out = await container.execCat(configFile);
+    return '$configFile: ${out?.length}';
+  }
+
+  @override
+  Future<String?> finalize() async {
+    var out = await container.psqlCMD('\\d');
+    return out;
+  }
+
   @override
   Future<bool> stop() => container.stop(timeout: Duration(seconds: 30));
 

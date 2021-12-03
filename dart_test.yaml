@@ -12,6 +12,9 @@ tags:
   # Tests that uses `PostgreSQL`.
   postgre:
     timeout: 180s
+  # Tests that uses `MySQL`.
+  mysql:
+    timeout: 180s
   # Tests that depends on `build` framework:
   build:
     timeout: 60s

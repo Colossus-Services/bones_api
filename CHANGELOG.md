@@ -1,3 +1,11 @@
+## 1.0.37
+
+- Added support to `Condition` operator `=~` (`IN`).
+- Added support to SQL operator `IN`.
+- postgres: ^2.4.3
+- test: ^1.19.5
+- dependency_validator: ^3.1.2
+
 ## 1.0.36
 
 - `TypeParser` and `TypeInfo` moved to package `reflection_factory`.

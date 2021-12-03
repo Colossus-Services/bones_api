@@ -600,6 +600,8 @@ abstract class ConditionEncoder {
       return encodeKeyConditionEQ(c, context);
     } else if (c is KeyConditionNotEQ) {
       return encodeKeyConditionNotEQ(c, context);
+    } else if (c is KeyConditionIN) {
+      return encodeKeyConditionIN(c, context);
     } else {
       throw ConditionEncodingError("$c");
     }
@@ -611,27 +613,88 @@ abstract class ConditionEncoder {
   FutureOr<EncodingContext> encodeKeyConditionNotEQ(
       KeyConditionNotEQ c, EncodingContext context);
 
-  String resolveParameterValue(String valueKey, ConditionParameter value,
-      EncodingContext context, Type? valueType) {
-    context.parametersPlaceholders.putIfAbsent(valueKey, () {
-      var paramValue = value.getValue(
-          parameters: context.parameters,
-          positionalParameters: context.positionalParameters,
-          namedParameters: context.namedParameters,
-          encodingParameters: context.encodingParameters);
+  FutureOr<EncodingContext> encodeKeyConditionIN(
+      KeyConditionIN c, EncodingContext context);
 
-      if (valueType != null) {
-        return resolveValueToType(paramValue, valueType);
+  FutureOr<EncodingValue<String, Object?>> resolveParameterValue(
+      String valueKey,
+      ConditionParameter value,
+      EncodingContext context,
+      Type? valueType,
+      {bool valueAsList = false}) {
+    if (valueAsList) {
+      return _resolveParameterValueImpl(value, context, valueType, true)
+          .resolveMapped((values) {
+        var list = values is List
+            ? values
+            : (values is Iterable ? values.toList(growable: false) : [values]);
+
+        var placeHolders = list.mapIndexed((i, v) {
+          var k = parameterPlaceholderIndexKey(valueKey, i);
+          context.parametersPlaceholders[k] ??= v;
+          var placeholder = parameterPlaceholder(k);
+          return EncodingPlaceholderIndex(valueKey, valueType, placeholder, i,
+              encodeEncodingPlaceholderIndex);
+        }).toList();
+
+        return EncodingValueList(
+            valueKey, valueType, placeHolders, encodeEncodingValueList);
+      });
+    } else {
+      var placeholder = parameterPlaceholder(valueKey);
+
+      if (!context.parametersPlaceholders.containsKey(valueKey)) {
+        return _resolveParameterValueImpl(value, context, valueType, false)
+            .resolveMapped((val) {
+          context.parametersPlaceholders[valueKey] ??= val;
+          return EncodingPlaceholder(
+              valueKey, valueType, placeholder, encodeEncodingPlaceholder);
+        });
       } else {
-        return paramValue;
+        return EncodingPlaceholder(
+            valueKey, valueType, placeholder, encodeEncodingPlaceholder);
       }
-    });
-
-    var placeholder = parameterPlaceholder(valueKey);
-    return placeholder;
+    }
   }
 
-  FutureOr<Object?> resolveValueToType(Object? value, Type valueType) {
+  FutureOr<Object?> _resolveParameterValueImpl(ConditionParameter value,
+      EncodingContext context, Type? valueType, bool valueAsList) {
+    var paramValue = value.getValue(
+        parameters: context.parameters,
+        positionalParameters: context.positionalParameters,
+        namedParameters: context.namedParameters,
+        encodingParameters: context.encodingParameters);
+
+    if (valueType != null) {
+      return resolveValueToType(paramValue, valueType,
+          valueAsList: valueAsList);
+    } else {
+      return paramValue;
+    }
+  }
+
+  FutureOr<Object?> resolveValueToType(Object? value, Type valueType,
+      {bool valueAsList = false}) {
+    if (valueAsList) {
+      if (value == null) {
+        return [];
+      } else if (value is Iterable) {
+        var list = value
+            .map((v) => _resolveValueToTypeImpl(v, valueType))
+            .toList(growable: false)
+            .resolveAll();
+        return list;
+      } else {
+        var list = _resolveValueToTypeImpl(value, valueType)
+            .resolveMapped((val) => [val]);
+        return list;
+      }
+    } else {
+      return _resolveValueToTypeImpl(value, valueType);
+    }
+  }
+
+  FutureOr<Object?> _resolveValueToTypeImpl(Object? value, Type valueType) {
     if (value == null) {
       return null;
     }
@@ -657,10 +720,149 @@ abstract class ConditionEncoder {
     }
   }
 
+  String encodeEncodingValueNull(EncodingValueNull<String> p) => 'null';
+
+  String encodeEncodingValuePrimitive(
+          EncodingValuePrimitive<String, Object?> p) =>
+      p.resolvedValue.toString();
+
+  String encodeEncodingValueText(EncodingValueText<String> p) {
+    var valueStr = p.resolvedValue.toString();
+    valueStr = escapeStringQuotes(valueStr, "'");
+    return "'$valueStr'";
+  }
+
+  String encodeEncodingValueList(EncodingValueList p) =>
+      '( ${p.list.map((e) => e.encode).join(' , ')} )';
+
+  String encodeEncodingPlaceholder(EncodingPlaceholder p) => p.placeholder;
+
+  String encodeEncodingPlaceholderIndex(EncodingPlaceholderIndex p) =>
+      p.placeholder;
+
+  String escapeStringQuotes(String valueStr, String quote) =>
+      valueStr.replaceAll(quote, "\\$quote");
+
   String resolveEntityAlias(EncodingContext context, String entityName) =>
       context.resolveEntityAlias(entityName);
 
   String parameterPlaceholder(String parameterKey);
+
+  String parameterPlaceholderIndexKey(String parameterKey, int index) =>
+      '${parameterKey}__$index';
+}
+
+typedef ValueEncoder<E, P extends EncodingValue<E, P>> = E Function(
+    P parameterValue);
+
+abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
+  final String key;
+  final Type? type;
+
+  EncodingValue(this.key, this.type);
+
+  E get encode;
+
+  List<EncodingValue<E, Object?>> get asList =>
+      <EncodingValue<E, Object?>>[this];
+
+  @override
+  String toString() => encode.toString();
+}
+
+abstract class EncodingValueResolved<E, T extends EncodingValueResolved<E, T>>
+    extends EncodingValue<E, T> {
+  EncodingValueResolved(String key, Type? type) : super(key, type);
+
+  Object? get resolvedValue;
+}
+
+class EncodingValueNull<E>
+    extends EncodingValueResolved<E, EncodingValueNull<E>> {
+  final ValueEncoder<E, EncodingValueNull<E>> valueEncoder;
+
+  EncodingValueNull(String key, Type? type, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  Object? get resolvedValue => null;
+
+  @override
+  E get encode => valueEncoder(this);
+}
+
+class EncodingValuePrimitive<E, T>
+    extends EncodingValueResolved<E, EncodingValuePrimitive<E, T>> {
+  final ValueEncoder<E, EncodingValuePrimitive<E, T>> valueEncoder;
+
+  @override
+  final T resolvedValue;
+
+  EncodingValuePrimitive(
+      String key, Type? type, this.resolvedValue, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  E get encode => valueEncoder(this);
+}
+
+class EncodingValueText<E>
+    extends EncodingValueResolved<E, EncodingValueText<E>> {
+  final ValueEncoder<E, EncodingValueText<E>> valueEncoder;
+
+  @override
+  final String resolvedValue;
+
+  EncodingValueText(
+      String key, Type? type, this.resolvedValue, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  E get encode => valueEncoder(this);
+}
+
+class EncodingPlaceholder<E> extends EncodingValue<E, EncodingPlaceholder<E>> {
+  final ValueEncoder<E, EncodingPlaceholder<E>> valueEncoder;
+
+  final String placeholder;
+
+  EncodingPlaceholder(
+      String key, Type? type, this.placeholder, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  E get encode => valueEncoder(this);
+}
+
+class EncodingPlaceholderIndex<E>
+    extends EncodingValue<E, EncodingPlaceholderIndex<E>> {
+  final ValueEncoder<E, EncodingPlaceholderIndex<E>> valueEncoder;
+
+  final String placeholder;
+  final int index;
+
+  EncodingPlaceholderIndex(
+      String key, Type? type, this.placeholder, this.index, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  E get encode => valueEncoder(this);
+}
+
+class EncodingValueList<E> extends EncodingValue<E, EncodingValueList<E>> {
+  final ValueEncoder<E, EncodingValueList<E>> valueEncoder;
+
+  final List<EncodingValue<E, Object?>> list;
+
+  EncodingValueList(String key, Type? type, this.list, this.valueEncoder)
+      : super(key, type);
+
+  @override
+  List<EncodingValue<E, Object?>> get asList =>
+      list.expand((v) => v.asList).toList();
+
+  @override
+  E get encode => valueEncoder(this);
 }
 
 class ConditionEncodingError extends Error {

@@ -86,8 +86,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
     return encodeKeyConditionOperator(c, context, '!=');
   }
 
+  @override
+  FutureOr<EncodingContext> encodeKeyConditionIN(
+      KeyConditionIN c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, 'IN', valueAsList: true);
+  }
+
   FutureOr<EncodingContext> encodeKeyConditionOperator(
-      KeyCondition c, EncodingContext context, String operator) {
+      KeyCondition c, EncodingContext context, String operator,
+      {bool valueAsList = false}) {
     var retKeySQL = keyToSQL(c, context);
 
     return retKeySQL.resolveMapped((keySQL) {
@@ -101,7 +108,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
       context.write(operator);
       context.write(' ');
 
-      var valueSQLRet = valueToSQL(context, c.value, fieldType: keyType);
+      var valueSQLRet = valueToSQL(context, c.value,
+          fieldType: keyType, valueAsList: valueAsList);
 
       return valueSQLRet.resolveMapped((valueSQL) {
         context.write(valueSQL);
@@ -320,56 +328,138 @@ class ConditionSQLEncoder extends ConditionEncoder {
     });
   }
 
+  static List<T> _valueToList<T>(Object value) {
+    if (value is List<T>) {
+      return value;
+    } else if (value is List) {
+      return value.cast<T>();
+    } else if (value is Iterable<T>) {
+      return value.toList();
+    } else if (value is Iterable) {
+      return value.cast<T>().toList();
+    } else {
+      return <T>[value as T];
+    }
+  }
+
   FutureOr<String> valueToSQL(EncodingContext context, dynamic value,
-      {String? fieldKey, Type? fieldType}) {
+          {String? fieldKey, Type? fieldType, bool valueAsList = false}) =>
+      valueToParameterValue(context, value,
+              fieldKey: fieldKey,
+              fieldType: fieldType,
+              valueAsList: valueAsList)
+          .resolveMapped((val) => val.encode);
+
+  FutureOr<EncodingValue<String, Object?>> valueToParameterValue(
+      EncodingContext context, dynamic value,
+      {String? fieldKey, Type? fieldType, bool valueAsList = false}) {
     if (value == null || value == Null) {
-      return 'null';
-    } else if (value is ConditionParameter) {
-      return conditionParameterToSQL(value, context, fieldKey, fieldType);
+      return _valueToParameterValueImpl(value, fieldType,
+          key: fieldKey, valueAsList: valueAsList);
     }
 
-    if (fieldType != null) {
-      return resolveValueToType(value, fieldType).resolveMapped((resolvedVal) {
-        return valueToPlainSQL(resolvedVal);
+    if (value is Iterable) {
+      var values = _valueToList(value);
+
+      if (values.isEmpty) {
+        return EncodingValueNull(
+            fieldKey ?? '?', fieldType, encodeEncodingValueNull);
+      } else if (values.length == 1) {
+        var v = value.first;
+        value = v;
+      }
+    }
+
+    if (value is ConditionParameter) {
+      return conditionParameterToParameterValue(
+          value, context, fieldKey, fieldType,
+          valueAsList: valueAsList);
+    } else if (value is List &&
+        value.whereType<ConditionParameter>().isNotEmpty) {
+      var parametersValues = value.map((v) {
+        if (v is ConditionParameter) {
+          return conditionParameterToParameterValue(
+              value, context, fieldKey, fieldType,
+              valueAsList: valueAsList);
+        } else {
+          return _valueToParameterValueImpl(value, fieldType,
+              key: fieldKey, valueAsList: valueAsList);
+        }
+      }).resolveAll();
+
+      return parametersValues.resolveMapped((values) => EncodingValueList(
+          fieldKey ?? '?', fieldType, values, encodeEncodingValueList));
+    } else {
+      return _valueToParameterValueImpl(value, fieldType,
+          key: fieldKey, valueAsList: valueAsList);
+    }
+  }
+
+  FutureOr<EncodingValue<String, Object?>> _valueToParameterValueImpl(
+      Object? value, Type? type,
+      {String? key, bool valueAsList = false}) {
+    if (type != null) {
+      return resolveValueToType(value, type, valueAsList: valueAsList)
+          .resolveMapped((resolvedVal) {
+        if (valueAsList) {
+          return valueToParameterValueList(resolvedVal, type, key: key);
+        } else {
+          return valueToSQLPlain(resolvedVal, type, key: key);
+        }
       });
     } else {
-      return valueToPlainSQL(value);
+      if (valueAsList) {
+        return valueToParameterValueList(value, null, key: key);
+      } else {
+        return valueToSQLPlain(value, null, key: key);
+      }
     }
   }
 
-  String valueToPlainSQL(Object? value) {
+  EncodingValue<String, Object?> valueToSQLPlain(Object? value, Type? type,
+      {String? key}) {
+    key ??= '?';
+
     if (value == null || value == Null) {
-      return 'null';
+      return EncodingValueNull(key, type, encodeEncodingValueNull);
     } else if (value is num || value is bool) {
-      return value.toString();
+      return EncodingValuePrimitive(
+          key, type, value, encodeEncodingValuePrimitive);
     } else {
-      var valueStr = '$value';
-      valueStr = escapeStringQuotes(valueStr, "'");
-      return "'$valueStr'";
+      return EncodingValueText(
+          key, type, value.toString(), encodeEncodingValueText);
     }
   }
 
-  String escapeStringQuotes(String valueStr, String quote) =>
-      valueStr.replaceAll(quote, "\\$quote");
+  EncodingValueList<String> valueToParameterValueList(Object? value, Type? type,
+      {String? key}) {
+    key ??= '?';
 
-  String conditionParameterToSQL(ConditionParameter parameter,
-      EncodingContext context, String? fieldKey, Type? fieldType) {
-    if (parameter.hasKey) {
-      return resolveParameterValue(
-          parameter.key!, parameter, context, fieldType);
+    var list = value is Iterable
+        ? value.map((v) => valueToSQLPlain(v, type, key: key)).toList()
+        : [valueToSQLPlain(value, type, key: key)];
+
+    return EncodingValueList(key, type, list, encodeEncodingValueList);
+  }
+
+  FutureOr<EncodingValue<String, Object?>> conditionParameterToParameterValue(
+      ConditionParameter parameter,
+      EncodingContext context,
+      String? fieldKey,
+      Type? fieldType,
+      {bool valueAsList = false}) {
+    var parameterKey =
+        (parameter.hasKey ? parameter.key : parameter.contextKey) ?? fieldKey;
+
+    if (parameterKey == null) {
+      throw ConditionEncodingError(
+          'Field key not in context: $parameter > $this');
     }
 
-    var contextKey = parameter.contextKey;
+    var parameterValue = resolveParameterValue(
+        parameterKey, parameter, context, fieldType,
+        valueAsList: valueAsList);
 
-    if (contextKey != null) {
-      return resolveParameterValue(contextKey, parameter, context, fieldType);
-    }
-
-    if (fieldKey != null) {
-      return resolveParameterValue(fieldKey, parameter, context, fieldType);
-    }
-
-    throw ConditionEncodingError(
-        'Field key not in context: $parameter > $this');
+    return parameterValue;
   }
 }

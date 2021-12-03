@@ -274,6 +274,8 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
             return KeyConditionEQ(keys, value);
           case '!=':
             return KeyConditionNotEQ(keys, value);
+          case '=~':
+            return KeyConditionIN(keys, value);
           default:
             throw FormatException('Unknown operator: $keys $op $value');
         }
@@ -317,7 +319,7 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
       });
 
   Parser<String> conditionOperator() =>
-      (string('==') | string('!=')).flatten().trim();
+      (string('==') | string('!=') | string('=~')).flatten().trim();
 
   Parser conditionValue() => (jsonValue2() | conditionParameter());
 
