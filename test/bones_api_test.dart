@@ -5,7 +5,6 @@ import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:reflection_factory/reflection_factory.dart';
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';

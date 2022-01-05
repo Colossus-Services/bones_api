@@ -1,7 +1,6 @@
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
-import 'package:docker_commander/docker_commander.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
