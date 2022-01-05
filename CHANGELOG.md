@@ -1,3 +1,11 @@
+## 1.0.38
+
+- Fix references and naming: `postgre` to `postgres`.
+- `APIServer`: added support for `Gzip` encoding, through package `shelf_gzip`.
+- shelf_gzip: ^4.0.0
+- reflection_factory: ^1.0.21
+- data_serializer: ^1.0.3
+
 ## 1.0.37
 
 - Added support to `Condition` operator `=~` (`IN`).

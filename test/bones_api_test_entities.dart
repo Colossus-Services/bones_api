@@ -74,10 +74,12 @@ class User extends Entity {
 
   int? level;
 
+  Time? wakeUpTime;
+
   DateTime creationTime;
 
   User(this.email, this.password, this.address, this.roles,
-      {this.id, this.level, DateTime? creationTime})
+      {this.id, this.level, this.wakeUpTime, DateTime? creationTime})
       : creationTime = creationTime ?? DateTime.now();
 
   User.empty() : this('', '', Address.empty(), <Role>[]);
@@ -89,6 +91,7 @@ class User extends Entity {
       map.getAsList<Role>('roles', def: [])!,
       id: map['id'],
       level: map['level'],
+      wakeUpTime: map['wakeUpTime'],
       creationTime: map['creationTime']);
 
   @override
@@ -111,6 +114,7 @@ class User extends Entity {
         'address',
         'roles',
         'level',
+        'wakeUpTime',
         'creationTime'
       ];
 
@@ -129,6 +133,8 @@ class User extends Entity {
         return roles as V?;
       case 'level':
         return level as V?;
+      case 'wakeUpTime':
+        return wakeUpTime as V?;
       case 'creationTime':
         return creationTime as V?;
       default:
@@ -151,6 +157,8 @@ class User extends Entity {
         return TypeInfo(List, [Role]);
       case 'level':
         return TypeInfo.tInt;
+      case 'wakeUpTime':
+        return TypeInfo(Time);
       case 'creationTime':
         return TypeInfo(DateTime);
       default:
@@ -191,6 +199,11 @@ class User extends Entity {
           level = value as int?;
           break;
         }
+      case 'wakeUpTime':
+        {
+          wakeUpTime = value as Time?;
+          break;
+        }
       case 'creationTime':
         {
           creationTime = value as DateTime;
@@ -209,6 +222,7 @@ class User extends Entity {
         'address': address.toJson(),
         'roles': roles.map((e) => e.toJson()).toList(),
         'level': level,
+        'wakeUpTime': wakeUpTime,
         'creationTime': creationTime.millisecondsSinceEpoch,
       };
 }

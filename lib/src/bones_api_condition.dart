@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_utils.dart';
@@ -269,7 +267,7 @@ abstract class Condition<O> extends ConditionElement
       r'\{\s*"ConditionParameter":\s*"(?:(#(?:-?\d+)?)|(:\w*)|\?)"\s*\}');
 
   static String encodeConditionValue(dynamic o) {
-    var s = json.encode(o, toEncodable: toJsonEncodable);
+    var s = Json.encode(o, toEncodable: toJsonEncodable);
 
     s = s.replaceAllMapped(_conditionParameterRegExp, (m) {
       var groupIdx = m.group(1);

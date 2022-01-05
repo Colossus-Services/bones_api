@@ -118,12 +118,13 @@ void main() {
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
           [Role(RoleType.guest)],
+          wakeUpTime: Time(12, 13, 14, 150),
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":1602418394000}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":"2020-10-11 12:13:14.000Z"}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest"}],"level":null,"creationTime":1633954394000}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
 
       addressEntityHandler.inspectObject(user1.address);
       roleEntityHandler.inspectObject(user1.roles.first);
@@ -131,6 +132,8 @@ void main() {
 
       expect(userEntityHandler.encodeJson(user1), equals(user1Json));
       expect(userEntityHandler.decodeJson(user1Json), equals(user1));
+      expect(userEntityHandler.decodeJson(user1Json), equals(user1));
+
       expect(userEntityHandler.decodeObjectJson(user1Json), equals(user1));
 
       expect(userEntityHandler.encodeObjectJson(user2), equals(user2Json));

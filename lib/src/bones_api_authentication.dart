@@ -1,10 +1,10 @@
 import 'dart:convert' as dart_convert;
 import 'dart:math';
 
-import 'package:bones_api/src/bones_api_security.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
 
+import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
 
 /// Represents a authentication credential.

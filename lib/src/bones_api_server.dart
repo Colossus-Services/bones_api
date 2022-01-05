@@ -3,18 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_authentication.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:shelf_gzip/shelf_gzip.dart';
 
+import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
+import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('APIServer');
 
@@ -344,7 +346,7 @@ class APIServer {
       var tokenKey = authentication.tokenKey;
 
       if (authentication.resumed ||
-          _needToSendHeaderXAcessToken(headers, tokenKey)) {
+          _needToSendHeaderXAccessToken(headers, tokenKey)) {
         headers.setMultiValue('X-Access-Token', tokenKey, ignoreCase: true);
       }
     }
@@ -356,17 +358,28 @@ class APIServer {
         var apiResponse2 = payload;
         return resolveBody(apiResponse2.payload, apiResponse2)
             .resolveMapped((payload2) {
-          return _sendResponse(
+          var response = _sendResponse(
               request, apiRequest, apiResponse2, headers, payload2);
+          return _applyGzipEncoding(request, response);
         });
       } else {
-        return _sendResponse(
-            request, apiRequest, apiResponse, headers, payload);
+        var response =
+            _sendResponse(request, apiRequest, apiResponse, headers, payload);
+        return _applyGzipEncoding(request, response);
       }
     });
   }
 
-  bool _needToSendHeaderXAcessToken(
+  FutureOr<Response> _applyGzipEncoding(
+      Request request, FutureOr<Response> response) {
+    if (!acceptsGzipEncoding(request)) {
+      return response;
+    } else {
+      return response.resolveMapped(gzipEncodeResponse);
+    }
+  }
+
+  bool _needToSendHeaderXAccessToken(
       Map<String, Object> headers, String tokenKey) {
     var headerAuthorization = headers.getFirstValue('authorization');
     var notSentByAuthentication =
@@ -486,7 +499,7 @@ class APIServer {
       return payload;
     }
 
-    if (payload is DateTime) {
+    if (payload is DateTime || payload is Time) {
       apiResponse.payloadMimeType ??=
           lookupMimeType(apiResponse.payloadFileExtension ?? 'text') ??
               'text/plain';
@@ -495,7 +508,7 @@ class APIServer {
 
     try {
       var s =
-          json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
+          Json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
       apiResponse.payloadMimeType ??= 'application/json';
       return s;
     } catch (e) {

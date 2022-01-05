@@ -433,14 +433,14 @@ postgres:
 
 To use a SQL database with your `EntityRepository` you need a `SQLAdapter`:
 
-- `PostgreSQLAdapter`: a [PostgreSQL][postgre] adapter.
+- `PostgreSQLAdapter`: a [PostgreSQL][postgres] adapter.
 - `MySQLAdapter`: A [MySQL][mysql] adapter.
 - `MemorySQLAdapter`: a portable `SQLAdapter` that stores entities in memory.
 
 The `SQLAdapter` is responsible to connect to the database, manage the connection
 pool and also to adjust the generated SQLs to the correct dialect.
 
-[postgre]: https://www.postgresql.org/
+[postgres]: https://www.postgresql.org/
 [mysql]: https://www.mysql.com/
 
 ## Bones_UI

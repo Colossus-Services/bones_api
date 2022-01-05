@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api_server.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
@@ -9,6 +8,7 @@ import 'package:postgres/postgres.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_error_zone.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('PostgreAdapter');
@@ -39,7 +39,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
             : null),
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
-        super(minConnections, maxConnections, 'postgre',
+        super(minConnections, maxConnections, 'postgres',
             parentRepositoryProvider: parentRepositoryProvider) {
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");
@@ -301,11 +301,16 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         return String;
       case 'timestamp':
       case 'timestampz':
+      case 'timestamp without time zone':
+      case 'timestamp with time zone':
       case 'date':
-      case 'time':
-      case 'timez':
       case 'datetime':
         return DateTime;
+      case 'time':
+      case 'timez':
+      case 'time without time zone':
+      case 'time with time zone':
+        return Time;
       default:
         return String;
     }

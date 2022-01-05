@@ -187,6 +187,7 @@ void runAdapterTests(
         ${q}password$q text NOT NULL,
         ${q}address$q $serialIntType NOT NULL,
         ${q}level$q integer,
+        ${q}wake_up_time$q time,
         ${q}creation_time$q timestamp NOT NULL,
         PRIMARY KEY( ${q}id$q ),
         CONSTRAINT user_ref_address_fk FOREIGN KEY (${q}address$q) REFERENCES ${q}address$q(${q}id$q)
@@ -259,25 +260,27 @@ void runAdapterTests(
         expect(role, isNull);
       }
 
-      var user1Time = DateTime.utc(2021, 9, 20, 10, 11, 12, 0, 0);
+      var user1CreationTime = DateTime.utc(2021, 9, 20, 10, 11, 12, 0, 0);
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
 
         var user = User(
             'joe@$testDomain', '123', address, [Role(RoleType.admin)],
-            level: 100, creationTime: user1Time);
+            level: 100, creationTime: user1CreationTime);
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
       }
 
-      var user2Time = DateTime.utc(2021, 9, 21, 22, 11, 12, 0, 0);
+      var user2CreationTime = DateTime.utc(2021, 9, 21, 22, 11, 12, 0, 0);
+      var user2WakeupTime = Time(9, 10, 11);
 
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
+
         var user = User(
             'smith@$testDomain', 'abc', address, [Role(RoleType.guest)],
-            creationTime: user2Time);
+            wakeUpTime: user2WakeupTime, creationTime: user2CreationTime);
         var id = await userAPIRepository.store(user);
         expect(id, equals(2));
       }
@@ -296,7 +299,8 @@ void runAdapterTests(
               {'enabled': true, 'id': 1, 'type': 'admin'}
             ]));
         expect(user.level, equals(100));
-        expect(user.creationTime, equals(user1Time));
+        expect(user.wakeUpTime, isNull);
+        expect(user.creationTime, equals(user1CreationTime));
       }
 
       {
@@ -310,7 +314,8 @@ void runAdapterTests(
               {'id': 2, 'type': 'guest', 'enabled': true}
             ]));
         expect(user.level, isNull);
-        expect(user.creationTime, equals(user2Time));
+        expect(user.wakeUpTime, user2WakeupTime);
+        expect(user.creationTime, equals(user2CreationTime));
       }
 
       {
@@ -561,7 +566,8 @@ void runAdapterTests(
         var user = del.first;
         expect(user.email, equals('smith4@$testDomain'));
         expect(user.address.state, equals('CA'));
-        expect(user.creationTime, equals(user2Time));
+        expect(user.wakeUpTime, equals(user2WakeupTime));
+        expect(user.creationTime, equals(user2CreationTime));
       }
 
       expect(await userAPIRepository.length(), equals(1));

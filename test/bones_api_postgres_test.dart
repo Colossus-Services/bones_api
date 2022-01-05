@@ -1,4 +1,4 @@
-@Tags(['docker', 'postgre', 'entities'])
+@Tags(['docker', 'postgres', 'entities'])
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_adapter_postgre.dart';
@@ -8,9 +8,9 @@ import 'package:test/test.dart';
 
 import 'bones_api_test_adapter.dart';
 
-final dbUser = 'postgre';
+final dbUser = 'postgres';
 final dbPass = '123456';
-final dbName = 'postgre';
+final dbName = 'postgres';
 
 class PostgreTestContainer extends DBTestContainer {
   late final PostgreSQLContainerConfig containerConfig;
@@ -42,8 +42,9 @@ class PostgreTestContainer extends DBTestContainer {
 
   @override
   Future<String?> finalize() async {
-    var out = await container.psqlCMD('\\d');
-    return out;
+    var out1 = await container.psqlCMD('\\d');
+    var out2 = await container.psqlCMD('select * from "user";');
+    return '$out1\n$out2';
   }
 
   @override

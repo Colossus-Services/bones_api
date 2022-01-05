@@ -201,6 +201,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return resolveValueByType(fieldType, value);
   }
 
+  static final TypeInfo _typeInfoTime = TypeInfo(Time);
+
   FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value) {
     if (type == null) {
       return value as T?;
@@ -213,6 +215,10 @@ abstract class EntityHandler<O> with FieldsFromMap {
         value is T &&
         (!tType.isAnyType && type.equalsType(tType) && !type.hasArguments)) {
       return value;
+    }
+
+    if (type.equalsType(_typeInfoTime)) {
+      return Time.from(value) as T?;
     }
 
     if (value is Map<String, Object?>) {
@@ -272,7 +278,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
           return value as T?;
         }
       } catch (e) {
-        throw StateError("ERROR resolving value for type: $type -> $value. $e");
+        return value as T?;
       }
     } else {
       return type.parse<T>(value);
@@ -370,28 +376,27 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return value;
   }
 
-  O decodeObjectJson(String json) =>
-      dart_convert.json.decode(json, reviver: jsonReviver);
+  O decodeObjectJson(String json) => decodeJson<O>(json)!;
 
   List<O> decodeObjectListJson(String json) {
-    var itr =
-        dart_convert.json.decode(json, reviver: jsonReviver) as Iterable<O>;
+    var itr = decodeObjectJson(json) as Iterable<O>;
     return itr is List<O> ? itr : itr.toList();
   }
 
-  dynamic decodeJson(String json) =>
-      dart_convert.json.decode(json, reviver: jsonReviver);
+  T? decodeJson<T>(String json) {
+    return dart_convert.json.decode(json, reviver: jsonReviver) as T?;
+  }
 
   JsonToEncodable? jsonToEncodable;
 
   String encodeObjectJson(O o) =>
-      dart_convert.json.encode(o, toEncodable: jsonToEncodable);
+      Json.encode(o, toEncodable: jsonToEncodable, removeNullFields: true);
 
-  String encodeObjectListJson(Iterable<O> list) =>
-      dart_convert.json.encode(list.toList(), toEncodable: jsonToEncodable);
+  String encodeObjectListJson(Iterable<O> list) => Json.encode(list.toList(),
+      toEncodable: jsonToEncodable, removeNullFields: true);
 
   String encodeJson(dynamic o) =>
-      dart_convert.json.encode(o, toEncodable: jsonToEncodable);
+      Json.encode(o, toEncodable: jsonToEncodable, removeNullFields: true);
 
   bool equalsFieldValues(String field, Object? value1, Object? value2, [O? o]) {
     if (field == idFieldsName(o)) {
@@ -407,6 +412,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
     if (identical(value1, value2) || value1 == value2) return true;
 
     var equals = equalsValuesDateTime(value1, value2);
+    if (equals != null) return equals;
+
+    equals = equalsValuesTime(value1, value2);
     if (equals != null) return equals;
 
     equals = equalsValuesPrimitive(value1, value2);
@@ -460,6 +468,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
     var equals = equalsValuesDateTime(value1, value2);
     if (equals != null) return equals;
 
+    equals = equalsValuesTime(value1, value2);
+    if (equals != null) return equals;
+
     equals = equalsValuesPrimitive(value1, value2);
     if (equals != null) return equals;
 
@@ -476,6 +487,20 @@ abstract class EntityHandler<O> with FieldsFromMap {
     if (value1 is DateTime || value2 is DateTime) {
       var t1 = TypeParser.parseInt(value1);
       var t2 = TypeParser.parseInt(value2);
+      return t1 == t2;
+    }
+
+    return null;
+  }
+
+  static bool? equalsValuesTime(Object value1, Object value2) {
+    if (value1 is Time || value2 is Time) {
+      var t1 = value1 is Time
+          ? value1.totalMilliseconds
+          : TypeParser.parseInt(value1);
+      var t2 = value2 is Time
+          ? value2.totalMilliseconds
+          : TypeParser.parseInt(value2);
       return t1 == t2;
     }
 
@@ -949,6 +974,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   FutureOr<O> _createFromMapDefaultImpl(Map<String, dynamic> fields) {
     var o = reflection.createInstance()!;
     return setFieldsFromMap(o, fields);
+  }
+
+  @override
+  T? decodeJson<T>(String json) {
+    try {
+      return Json.decode<T>(json, type: type);
+    } catch (_) {
+      return dart_convert.json.decode(json, reviver: jsonReviver) as T?;
+    }
   }
 
   @override

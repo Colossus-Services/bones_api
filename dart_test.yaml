@@ -10,7 +10,7 @@ tags:
   docker:
     timeout: 180s
   # Tests that uses `PostgreSQL`.
-  postgre:
+  postgres:
     timeout: 180s
   # Tests that uses `MySQL`.
   mysql:

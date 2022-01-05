@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
@@ -155,7 +154,7 @@ class SQL implements SQLWrapper {
   @override
   String toString() {
     var s =
-        'SQL<< $sql >>( ${json.encode(parameters, toEncodable: _toEncodable)} )';
+        'SQL<< $sql >>( ${Json.encode(parameters, toEncodable: _toEncodable)} )';
     if (condition != null) {
       s += ' ; Condition<< $condition >>';
     }
@@ -321,9 +320,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// If `true` indicates that this adapter SQL uses the `ON CONFLICT` syntax for inserts.
   bool get sqlAcceptsInsertOnConflict;
 
+  /// Converts [value] to an acceptable SQL value for the adapter.
   Object? valueToSQL(Object? value) {
     if (value == null) {
       return null;
+    } else if (value is Time) {
+      return value.toString();
     } else if (value is Enum) {
       var enumType = value.runtimeType;
       var enumReflection =

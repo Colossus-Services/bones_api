@@ -48,8 +48,9 @@ class MySQLTestContainer extends DBTestContainer {
 
   @override
   Future<String?> finalize() async {
-    var out = await container.mysqlCMD('SHOW TABLES');
-    return out;
+    var out1 = await container.mysqlCMD('SHOW TABLES');
+    var out2 = await container.mysqlCMD('select * from `user`;');
+    return '$out1\n$out2';
   }
 
   @override

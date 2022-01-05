@@ -2,10 +2,12 @@ import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_mixin.dart';
 import 'package:collection/collection.dart';
+import 'package:data_serializer/data_serializer.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+
+import 'bones_api_entity.dart';
+import 'bones_api_mixin.dart';
 
 typedef ToEncodable = Object? Function(Object? object);
 
@@ -106,6 +108,10 @@ class Json {
 
   static ToEncodableJson? _jsonEncodableProvider(
       Object object, EntityHandlerProvider? entityHandlerProvider) {
+    if (object is Time) {
+      return (o, j) => object.toString();
+    }
+
     var oType = object.runtimeType;
 
     if (entityHandlerProvider != null) {
@@ -226,7 +232,9 @@ class Json {
   }
 
   static final JsonDecoder defaultDecoder = JsonDecoder(
-    jsomMapDecoderAsyncProvider: (m) => _jsomMapDecoderAsyncProvider(m, null),
+    jsonValueDecoderProvider: _jsonValueDecoderProvider,
+    jsomMapDecoderAsyncProvider: (type, map) =>
+        _jsomMapDecoderAsyncProvider(type, null),
   );
 
   static JsonDecoder _buildJsonDecoder(JsomMapDecoder? jsomMapDecoder,
@@ -236,16 +244,27 @@ class Json {
     }
 
     return JsonDecoder(
+        jsonValueDecoderProvider: _jsonValueDecoderProvider,
         jsomMapDecoder: jsomMapDecoder,
-        jsomMapDecoderAsyncProvider: (m) =>
-            _jsomMapDecoderAsyncProvider(m, entityHandlerProvider),
+        jsomMapDecoderAsyncProvider: (type, map) =>
+            _jsomMapDecoderAsyncProvider(type, entityHandlerProvider),
         iterableCaster: (v, t) => _iterableCaster(v, t, entityHandlerProvider));
   }
 
-  static JsomMapDecoderAsync? _jsomMapDecoderAsyncProvider(
-      Object identifier, EntityHandlerProvider? entityHandlerProvider) {
-    var type = identifier is Type ? identifier : identifier.runtimeType;
+  static JsonValueDecoder<O>? _jsonValueDecoderProvider<O>(
+      Type type, Object? value) {
+    if (type == Time) {
+      return (o, t, j) {
+        var time = o != null ? Time.parse(o.toString()) : null;
+        return time as O?;
+      };
+    }
 
+    return null;
+  }
+
+  static JsomMapDecoderAsync? _jsomMapDecoderAsyncProvider(
+      Type type, EntityHandlerProvider? entityHandlerProvider) {
     if (entityHandlerProvider != null) {
       var entityHandler = entityHandlerProvider.getEntityHandler(type: type);
 
@@ -900,4 +919,342 @@ class InstanceTracker<O extends Object, I extends Object> {
       untrackInstance(o);
     }
   }
+}
+
+/// A [Time] represents the time of the day,
+/// independently of the day of the year, timezone or [DateTime].
+class Time implements Comparable<Time> {
+  int hour;
+  int minute = 0;
+  int second = 0;
+  int millisecond = 0;
+  int microsecond = 0;
+
+  Time(this.hour,
+      [this.minute = 0,
+      this.second = 0,
+      this.millisecond = 0,
+      this.microsecond = 0]) {
+    if (hour < 0 || hour > 24) {
+      throw ArgumentError.value(hour, 'hour', 'Not in range: 0..24');
+    }
+
+    if (minute < 0 || minute > 59) {
+      throw ArgumentError.value(minute, 'minute', 'Not in range: 0..59');
+    }
+
+    if (second < 0 || second > 59) {
+      throw ArgumentError.value(second, 'second', 'Not in range: 0..59');
+    }
+
+    if (millisecond < 0 || millisecond > 1000) {
+      throw ArgumentError.value(
+          millisecond, 'millisecond', 'Not in range: 0..999');
+    }
+
+    if (microsecond < 0 || microsecond > 1000) {
+      throw ArgumentError.value(
+          microsecond, 'microsecond', 'Not in range: 0..999');
+    }
+  }
+
+  /// Creates a [Time] instance from [duration].
+  factory Time.fromDuration(Duration duration) {
+    var h = duration.inHours;
+    var m = duration.inMinutes - Duration(hours: h).inMinutes;
+    var s = duration.inSeconds - Duration(hours: h, minutes: m).inSeconds;
+    var ms = duration.inMilliseconds -
+        Duration(hours: h, minutes: m, seconds: s).inMilliseconds;
+    var mic = duration.inMicroseconds -
+        Duration(hours: h, minutes: m, seconds: s, milliseconds: ms)
+            .inMicroseconds;
+    return Time(h, m, s, ms, mic);
+  }
+
+  /// Creates a [Time] instance from [dateTime].
+  factory Time.fromDateTime(DateTime dateTime) {
+    var h = dateTime.hour;
+    var m = dateTime.minute;
+    var s = dateTime.second;
+    var ms = dateTime.millisecond;
+    var mic = dateTime.microsecond;
+    return Time(h, m, s, ms, mic);
+  }
+
+  /// Creates a [Time] period instance from a total [microseconds].
+  factory Time.fromMicroseconds(int microseconds) {
+    return Time.fromDuration(Duration(microseconds: microseconds));
+  }
+
+  /// Creates a [Time] period instance from a total [milliseconds].
+  factory Time.fromMilliseconds(int milliseconds) {
+    return Time.fromDuration(Duration(milliseconds: milliseconds));
+  }
+
+  /// Creates a [Time] period instance from a total [seconds].
+  factory Time.fromSeconds(int seconds) {
+    return Time.fromDuration(Duration(seconds: seconds));
+  }
+
+  /// Creates a [Time] period instance from a total [minutes].
+  factory Time.fromMinutes(int minutes) {
+    return Time.fromDuration(Duration(minutes: minutes));
+  }
+
+  static final int _char0 = '0'.codeUnitAt(0);
+  static final int _char9 = '9'.codeUnitAt(0);
+  static final int _charColon = ':'.codeUnitAt(0);
+  static final int _charDot = '.'.codeUnitAt(0);
+
+  static bool _isDigitByte(int b) {
+    return b >= _char0 && b <= _char9;
+  }
+
+  static bool _bytesInStringFormat(List<int> value) {
+    if (value.isEmpty) return false;
+
+    if (!_isDigitByte(value[0])) return false;
+    if (value.length < 2 && !_isDigitByte(value[1])) return false;
+
+    if (value.length == 8 &&
+        value[2] == _charColon &&
+        value[5] == _charColon &&
+        _isDigitByte(value[3]) &&
+        _isDigitByte(value[4]) &&
+        _isDigitByte(value[6]) &&
+        _isDigitByte(value[7])) {
+      return true;
+    } else if (value.length >= 10 &&
+        value[2] == _charColon &&
+        value[5] == _charColon &&
+        value[8] == _charDot &&
+        _isDigitByte(value[3]) &&
+        _isDigitByte(value[4]) &&
+        _isDigitByte(value[6]) &&
+        _isDigitByte(value[7]) &&
+        _isDigitByte(value[9])) {
+      for (var i = 10; i < value.length; ++i) {
+        if (!_isDigitByte(value[i])) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Parses [bytes] to [Time]. See [toBytes32] and [toBytes64].
+  factory Time.fromBytes(List<int> bytes, {bool allowParseString = true}) {
+    if (bytes.length == 4) {
+      var milliseconds = bytes.asUint8List.getInt32(0);
+      if (milliseconds >= 0) {
+        var time = Time.fromMilliseconds(milliseconds);
+        return time;
+      }
+    } else if (bytes.length >= 8 && !_bytesInStringFormat(bytes)) {
+      var microseconds = bytes.asUint8List.getInt64();
+      if (microseconds >= 0) {
+        var time = Time.fromMicroseconds(microseconds);
+        return time;
+      }
+    } else if (allowParseString) {
+      try {
+        var s = String.fromCharCodes(bytes);
+        return Time.parse(s, allowFromBytes: false);
+      } catch (_) {
+        throw FormatException(
+            'Invalid bytes or string format: ${bytes.runtimeType}:${bytes.toList()}');
+      }
+    }
+
+    throw FormatException(
+        'Invalid bytes format: ${bytes.runtimeType}:${bytes.toList()}');
+  }
+
+  /// Parses [s] to [Time].
+  factory Time.parse(String s, {bool allowFromBytes = true}) {
+    s = s.trim();
+    if (s.isEmpty) {
+      throw FormatException('Invalid `Time` format: $s');
+    }
+
+    var idx1 = s.indexOf(':');
+    var idx2 = s.indexOf('.');
+
+    if (idx1 != 2 || (idx2 > 0 && idx2 < idx1)) {
+      if (allowFromBytes) {
+        try {
+          var bs = dart_convert.latin1.encode(s);
+          return Time.fromBytes(bs, allowParseString: false);
+        } catch (_) {
+          throw FormatException('Invalid string or bytes format: $s');
+        }
+      }
+
+      throw FormatException('Invalid string format: $s');
+    }
+
+    int ms = 0;
+    int mic = 0;
+
+    String hmsStr;
+    if (idx2 >= 0) {
+      hmsStr = s.substring(0, idx2).trim();
+      var msMicStr = s.substring(idx2 + 1).trim();
+
+      if (msMicStr.length <= 3) {
+        ms = int.parse(msMicStr);
+      } else {
+        var msEnd = msMicStr.length - 3;
+        var msStr = msMicStr.substring(0, msEnd);
+        var micStr = msMicStr.substring(msEnd);
+
+        ms = int.parse(msStr);
+        mic = int.parse(micStr);
+      }
+    } else {
+      hmsStr = s;
+    }
+
+    var parts = hmsStr.split(':');
+
+    var hStr = parts[0].trim();
+    var mStr = (parts.length > 1 ? parts[1] : '0').trim();
+    var secStr = (parts.length > 2 ? parts[2] : '0').trim();
+
+    var h = int.parse(hStr);
+    var m = int.parse(mStr);
+    var sec = int.parse(secStr);
+
+    return Time(h, m, sec, ms, mic);
+  }
+
+  static Time? from(Object? o) {
+    if (o == null) return null;
+    if (o is Time) return o;
+
+    if (o is Duration) return Time.fromDuration(o);
+    if (o is DateTime) return Time.fromDateTime(o);
+    if (o is List<int>) return Time.fromBytes(o);
+
+    if (o is int) return Time.fromMilliseconds(o);
+
+    return Time.parse(o.toString());
+  }
+
+  /// Converts this to 64-bits bytes ([Uint8List]), encoding [totalMicrosecond].
+  Uint8List toBytes64() {
+    var bytes = Uint8List(8);
+    bytes.asByteData().setInt64(0, totalMicrosecond);
+    return bytes;
+  }
+
+  /// Converts this to 32-bits bytes ([Uint8List]), encoding [totalMilliseconds].
+  Uint8List toBytes32() {
+    var bytes = Uint8List(4);
+    bytes.asByteData().setInt32(0, totalMilliseconds);
+    return bytes;
+  }
+
+  @override
+  String toString(
+      {bool withSeconds = true, bool? withMillisecond, bool? withMicrosecond}) {
+    var h = _intToPaddedString(hour);
+    var m = _intToPaddedString(minute);
+    var s = _intToPaddedString(second);
+
+    withMillisecond ??= millisecond != 0;
+    if (withMillisecond) {
+      var ms = _intToPaddedString(millisecond, 3);
+
+      withMicrosecond ??= microsecond != 0;
+      if (withMicrosecond) {
+        var mic = _intToPaddedString(microsecond, 3);
+        return '$h:$m:$s.$ms$mic';
+      } else {
+        return '$h:$m:$s.$ms';
+      }
+    } else {
+      return '$h:$m:$s';
+    }
+  }
+
+  static String _intToPaddedString(int n, [int padding = 2]) =>
+      n.toString().padLeft(padding, '0');
+
+  /// Converts this [Time] to [DateTime].
+  DateTime toDateTime(int year,
+          [int month = 1, int day = 1, bool utc = true]) =>
+      utc
+          ? DateTime.utc(
+              year, month, day, hour, minute, second, millisecond, microsecond)
+          : DateTime(
+              year, month, day, hour, minute, second, millisecond, microsecond);
+
+  /// Returns the total minutes of this [Time] period.
+  int get totalMinutes => (hour * 60) + minute;
+
+  /// Returns the total seconds of this [Time] period.
+  int get totalSeconds => (totalMinutes * 60) + second;
+
+  /// Returns the total milliseconds of this [Time] period.
+  int get totalMilliseconds => (totalSeconds * 1000) + millisecond;
+
+  /// Returns the total microsecond of this [Time] period.
+  int get totalMicrosecond => (totalMilliseconds * 1000) + microsecond;
+
+  /// Converts `this` instance to [Duration].
+  Duration get asDuration => Duration(
+      hours: hour,
+      minutes: minute,
+      seconds: second,
+      milliseconds: millisecond,
+      microseconds: microsecond);
+
+  @override
+  int compareTo(Time other) {
+    var cmp = hour.compareTo(other.hour);
+    if (cmp == 0) {
+      cmp = minute.compareTo(other.minute);
+      if (cmp == 0) {
+        cmp = second.compareTo(other.second);
+        if (cmp == 0) {
+          cmp = millisecond.compareTo(other.millisecond);
+          if (cmp == 0) {
+            cmp = microsecond.compareTo(other.microsecond);
+          }
+        }
+      }
+    }
+    return cmp;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Time &&
+          runtimeType == other.runtimeType &&
+          hour == other.hour &&
+          minute == other.minute &&
+          second == other.second &&
+          millisecond == other.millisecond &&
+          microsecond == other.microsecond;
+
+  @override
+  int get hashCode =>
+      hour.hashCode ^
+      minute.hashCode ^
+      second.hashCode ^
+      millisecond.hashCode ^
+      microsecond.hashCode;
+
+  operator <(Time other) => totalMicrosecond < other.totalMicrosecond;
+
+  operator <=(Time other) => totalMicrosecond <= other.totalMicrosecond;
+
+  operator >(Time other) => totalMicrosecond > other.totalMicrosecond;
+
+  operator >=(Time other) => totalMicrosecond >= other.totalMicrosecond;
 }

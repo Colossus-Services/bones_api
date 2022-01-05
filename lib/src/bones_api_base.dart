@@ -4,18 +4,18 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_security.dart';
 
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.37';
+  static const String VERSION = '1.0.38';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 

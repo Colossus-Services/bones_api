@@ -3,9 +3,9 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 
 import 'bones_api_authentication.dart';
+import 'bones_api_base.dart';
 
 abstract class APISecurity {
   final Duration tokenDuration;

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.20
+// BUILDER: reflection_factory/1.0.21
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -47,7 +47,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.20');
+  Version get reflectionFactoryVersion => Version.parse('1.0.21');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -454,7 +454,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.20');
+  Version get reflectionFactoryVersion => Version.parse('1.0.21');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -826,7 +826,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.20');
+  Version get reflectionFactoryVersion => Version.parse('1.0.21');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -880,7 +880,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.13.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.20');
+  Version get reflectionFactoryVersion => Version.parse('1.0.21');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -922,9 +922,15 @@ class User$reflection extends ClassReflection<User> {
             '',
             () => (String email, String password, Address address,
                     List<Role> roles,
-                    {int? id, int? level, DateTime? creationTime}) =>
+                    {int? id,
+                    int? level,
+                    Time? wakeUpTime,
+                    DateTime? creationTime}) =>
                 User(email, password, address, roles,
-                    id: id, level: level, creationTime: creationTime),
+                    id: id,
+                    level: level,
+                    wakeUpTime: wakeUpTime,
+                    creationTime: creationTime),
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tString, 'email', false, true, null, null),
@@ -942,7 +948,9 @@ class User$reflection extends ClassReflection<User> {
               'id': ParameterReflection(
                   TypeReflection.tInt, 'id', true, false, null, null),
               'level': ParameterReflection(
-                  TypeReflection.tInt, 'level', true, false, null, null)
+                  TypeReflection.tInt, 'level', true, false, null, null),
+              'wakeUpTime': ParameterReflection(
+                  TypeReflection(Time), 'wakeUpTime', true, false, null, null)
             },
             null);
       case 'empty':
@@ -986,7 +994,8 @@ class User$reflection extends ClassReflection<User> {
         'idFieldName',
         'level',
         'password',
-        'roles'
+        'roles',
+        'wakeUpTime'
       ];
 
   @override
@@ -1075,6 +1084,20 @@ class User$reflection extends ClassReflection<User> {
           true,
           (o) => () => o!.level as T,
           (o) => (T? v) => o!.level = v as int?,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'wakeuptime':
+        return FieldReflection<User, T>(
+          this,
+          User,
+          TypeReflection(Time),
+          'wakeUpTime',
+          true,
+          (o) => () => o!.wakeUpTime as T,
+          (o) => (T? v) => o!.wakeUpTime = v as Time?,
           obj,
           false,
           false,

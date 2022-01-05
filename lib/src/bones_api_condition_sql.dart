@@ -1,5 +1,4 @@
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
