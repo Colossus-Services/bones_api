@@ -360,11 +360,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     var names = results
         .map((e) {
           var v = e.values.first;
-          if (v is Map) {
-            return v.values.first;
-          } else {
-            return v;
-          }
+          return v.values.first;
         })
         .map((e) => '$e')
         .toList();
