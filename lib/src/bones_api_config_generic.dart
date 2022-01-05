@@ -5,7 +5,7 @@ import 'package:mercury_client/mercury_client.dart';
 import 'bones_api_config.dart';
 
 FutureOr<APIConfig?> loadAPIConfigFromUri(Uri o, {bool allowAsync = true}) {
-  if (o is Uri && allowAsync) {
+  if (allowAsync) {
     if (o.scheme == 'http' || o.scheme == 'https') {
       var url = o.toString();
       var ext = APIConfig.resolveFileExtension(url);
