@@ -63,6 +63,36 @@ void main() {
       expect(res2.toString(), equals(res.toString()));
     });
 
+    test('pre-request', () async {
+      var apiRequest = APIRequest.get('/pre-request/foo');
+
+      expect(apiRequest.pathParts, equals(['pre-request', 'foo']));
+
+      var res = await api.call(apiRequest);
+      expect(res.toString(), equals('Pre request: /pre-request/foo'));
+      expect(
+          res.toInfos(),
+          equals(
+              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }'));
+
+      expect(res.payloadLength, equals(29));
+    });
+
+    test('pos-request', () async {
+      var apiRequest = APIRequest.get('/pos-request/bar');
+
+      expect(apiRequest.pathParts, equals(['pos-request', 'bar']));
+
+      var res = await api.call(apiRequest);
+      expect(res.toString(), equals('Pos request: /pos-request/bar'));
+      expect(
+          res.toInfos(),
+          equals(
+              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }'));
+
+      expect(res.payloadLength, equals(29));
+    });
+
     test('foo[POST]', () async {
       var res = await api
           .call(APIRequest.post('/service/base/foo', parameters: {'a': 1}));
@@ -126,6 +156,39 @@ void main() {
 
     setUp(() async {
       await apiServer.start();
+    });
+
+    test('parseDomains', () async {
+      expect(APIServer.parseDomains(MapEntry('', '')), isNull);
+
+      expect(
+          APIServer.parseDomains(MapEntry('foo.com', '/var/www'))
+              ?.map((key, value) => MapEntry(key, value.path)),
+          equals({'foo.com': '/var/www'}));
+
+      expect(
+          APIServer.parseDomains(MapEntry('foo.com', Directory('/var/www0')))
+              ?.map((key, value) => MapEntry(key, value.path)),
+          equals({'foo.com': '/var/www0'}));
+
+      expect(
+          APIServer.parseDomains('foo.com=/var/www&bar.com=/var/www2')
+              ?.map((key, value) => MapEntry(key, value.path)),
+          equals({'foo.com': '/var/www', 'bar.com': '/var/www2'}));
+
+      expect(
+          APIServer.parseDomains(
+                  r'r/(\w+\.)?foo.com/=/var/www&bar.com=/var/www2')
+              ?.map((key, value) => MapEntry(key, value.path)),
+          equals({
+            RegExp(r'(\w+\.)?foo.com'): '/var/www',
+            'bar.com': '/var/www2'
+          }));
+
+      expect(
+          APIServer.parseDomains('bar.com=/var/www2')
+              ?.map((key, value) => MapEntry(key, value.path)),
+          equals({'bar.com': '/var/www2'}));
     });
 
     test('foo[GET] /base', () async {
@@ -379,7 +442,24 @@ class MyAPI extends APIRoot {
 
   factory MyAPI() => _instance ??= MyAPI._();
 
-  MyAPI._() : super('example', '1.0');
+  MyAPI._()
+      : super('example', '1.0',
+            preApiRequestHandlers: [_preRequest],
+            posApiRequestHandlers: [_posRequest]);
+
+  static APIResponse<T>? _preRequest<T>(APIRoot apiRoot, APIRequest request) {
+    if (request.pathPartFirst.startsWith('pre')) {
+      return APIResponse.ok('Pre request: ${request.path}' as T);
+    }
+    return null;
+  }
+
+  static APIResponse<T>? _posRequest<T>(APIRoot apiRoot, APIRequest request) {
+    if (request.pathPartFirst.startsWith('pos')) {
+      return APIResponse.ok('Pos request: ${request.path}' as T);
+    }
+    return null;
+  }
 
   @override
   Set<APIModule> loadModules() => {MyBaseModule(this), MyInfoModule(this)};

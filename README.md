@@ -177,7 +177,7 @@ Now you can use the CLI directly:
 To serve an API project:
 
 ```bash
-  $> bones_api serve --directory path/to/project --class MyAPIRoot
+  $> bones_api serve --directory path/to/project --class MyAPIRoot --config api-prod.conf --port 80 --address 0.0.0.0 --build --hotreload --domain mydomain.com=/var/www
 ```
 
 To create an API project file tree:

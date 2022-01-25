@@ -2,12 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
+import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_gzip/shelf_gzip.dart';
+import 'package:shelf_letsencrypt/shelf_letsencrypt.dart';
+import 'package:shelf_static/shelf_static.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -27,8 +31,24 @@ class APIServer {
   /// The bind address of this server.
   final String address;
 
-  /// The listen port of this server.
+  /// The listen port of this server (HTTP).
   final int port;
+
+  /// The listen secure port of this server (HTTPS).
+  final int securePort;
+
+  /// If `true` enabled Let's Encrypt.
+  ///
+  /// - See [LetsEncrypt].
+  final bool letsEncrypt;
+
+  /// The Let's Encrypt certificates [Directory].
+  ///
+  /// - See [LetsEncrypt].
+  final Directory? letsEncryptDirectory;
+
+  /// If `true` runs Let's Encrypt in production mode.
+  final bool letsEncryptProduction;
 
   /// The name of this server.
   ///
@@ -43,6 +63,12 @@ class APIServer {
   /// If `true` enables Hot Reload ([APIHotReload.enable]).
   final bool hotReload;
 
+  /// The domains root directories.
+  final Map<Pattern, Directory> domainsRoots;
+
+  /// Returns a list of domains at [domainsRoots] keys (non [RegExp] entries).
+  List<String> get domains => domainsRoots.keys.whereType<String>().toList();
+
   /// If `true` log messages to [stdout] (console).
   final bool logToConsole;
 
@@ -50,11 +76,182 @@ class APIServer {
     this.apiRoot,
     String address,
     this.port, {
+    int? securePort,
+    this.letsEncrypt = false,
+    this.letsEncryptProduction = false,
+    Object? letsEncryptDirectory,
     this.name = 'Bones_API',
     this.version = APIRoot.VERSION,
     this.hotReload = false,
+    Object? domains,
     this.logToConsole = true,
-  }) : address = _normalizeAddress(address);
+  })  : securePort = letsEncrypt
+            ? (securePort != null && securePort > 10 ? securePort : 443)
+            : (securePort ?? -1),
+        letsEncryptDirectory = resolveLetsEncryptDirectory(
+            directory: letsEncryptDirectory, letsEncrypt: letsEncrypt),
+        address = _normalizeAddress(address),
+        domainsRoots = parseDomains(domains) ?? <Pattern, Directory>{} {
+    _configureAPIRoot(apiRoot);
+  }
+
+  static Directory? resolveLetsEncryptDirectory(
+      {Object? directory, bool letsEncrypt = false}) {
+    if (directory != null) {
+      Directory? dir;
+      if (directory is Directory) {
+        dir = directory;
+      } else if (directory is String) {
+        directory = directory.trim();
+        if (directory.isNotEmpty) {
+          dir = Directory(directory);
+        }
+      }
+
+      if (dir != null) {
+        if (letsEncrypt && !dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+        return dir.existsSync() ? dir.absolute : dir;
+      }
+    }
+
+    var paths = ['/etc/letsencrypt/live', '/etc/letsencrypt'];
+
+    var userDir = _getUserDirectory();
+    if (userDir != null) {
+      paths.add(pack_path.join(userDir.path, '.letsencrypt'));
+      paths.add(pack_path.join(userDir.path, '.lets-encrypt'));
+      paths.add(pack_path.join(userDir.path, 'letsencrypt'));
+      paths.add(pack_path.join(userDir.path, 'lets-encrypt'));
+    }
+
+    for (var p in paths) {
+      var dir = Directory(p);
+      if (dir.existsSync() && dir.statSync().canWrite) {
+        return dir.absolute;
+      }
+    }
+
+    if (letsEncrypt && userDir != null) {
+      var dir = Directory(pack_path.join(userDir.path, '.letsencrypt'));
+      dir.create();
+      return dir;
+    }
+
+    return null;
+  }
+
+  static Directory? _getUserDirectory() {
+    var envVars = Platform.environment;
+
+    String? home;
+    if (Platform.isMacOS) {
+      home = envVars['HOME'];
+    } else if (Platform.isLinux) {
+      home = envVars['HOME'];
+    } else if (Platform.isWindows) {
+      home = envVars['UserProfile'];
+    }
+
+    if (home != null) {
+      var dir = Directory(home);
+      if (dir.existsSync()) {
+        return dir.absolute;
+      }
+    }
+
+    var dir = Directory('~/');
+    if (dir.existsSync()) {
+      return dir.absolute;
+    }
+
+    return null;
+  }
+
+  /// Parses a set of domains to serve static files.
+  ///
+  /// - See: [APIServer.domainsRoots], [parseDomainPattern], [parseDomainDirectory].
+  static Map<Pattern, Directory>? parseDomains(Object? o) {
+    if (o == null) return null;
+
+    if (o is Map) {
+      var map = o.map((key, value) =>
+          MapEntry(parseDomainPattern(key), parseDomainDirectory(value)));
+      _removeInvalidDomains(map);
+      return map.isNotEmpty ? map : null;
+    }
+
+    List values;
+
+    if (o is List) {
+      values = o;
+    } else if (o is String) {
+      values = o.split('&');
+    } else {
+      values = [o];
+    }
+
+    var entries = values.map(parseDomainEntry).whereNotNull().toList();
+    if (entries.isEmpty) return null;
+
+    var map = Map<Pattern, Directory>.fromEntries(entries);
+    _removeInvalidDomains(map);
+
+    return map.isNotEmpty ? map : null;
+  }
+
+  static void _removeInvalidDomains(Map<Pattern, Directory> domains) {
+    domains.removeWhere((key, value) => (key is String && key.isEmpty));
+  }
+
+  /// Parses a domain entry as [MapEntry].
+  ///
+  /// - See [APIServer.domainsRoots].
+  static MapEntry<Pattern, Directory>? parseDomainEntry(Object? o) {
+    if (o == null) return null;
+    if (o is MapEntry) {
+      return MapEntry(parseDomainPattern(o.key), parseDomainDirectory(o.value));
+    }
+
+    var s = o.toString();
+
+    var parts = s.split('=');
+    var domain = parts[0].trim();
+    var path = parts.length > 1 ? parts[1].trim() : '';
+
+    return MapEntry(parseDomainPattern(domain), parseDomainDirectory(path));
+  }
+
+  /// Parses a domain pattern.
+  ///
+  /// - If is in the format `r/.../` it will be parsed as a [RegExp]. Example: `r/(www\.)?mydomain.com/`
+  /// - See [APIServer.domainsRoots].
+  static Pattern parseDomainPattern(Pattern domainPatter) {
+    if (domainPatter is RegExp) return domainPatter;
+
+    var s = domainPatter.toString().trim();
+
+    if (s.startsWith('r/') && s.endsWith('/')) {
+      var re = s.substring(2, s.length - 1);
+      return RegExp(re);
+    }
+
+    if (s == '*' || s == '.') {
+      return RegExp(r'.*');
+    }
+
+    return s;
+  }
+
+  /// Parses a domain [Directory].
+  ///
+  /// - See [APIServer.domainsRoots].
+  static Directory parseDomainDirectory(Object dir) {
+    if (dir is Directory) return dir;
+    var p = dir.toString();
+    return Directory(p);
+  }
 
   static String _normalizeAddress(String address) {
     address = address.trim();
@@ -78,6 +275,39 @@ class APIServer {
     return address;
   }
 
+  void _configureAPIRoot(APIRoot apiRoot) {
+    apiRoot.posApiRequestHandlers.add(_handleStaticFiles);
+  }
+
+  FutureOr<APIResponse<T>?> _handleStaticFiles<T>(
+      APIRoot apiRoot, APIRequest apiRequest) {
+    if (domainsRoots.isEmpty) return null;
+
+    for (var e in domainsRoots.entries) {
+      if (apiRequest.matchesHostname(e.key)) {
+        return _serveFile<T>(apiRequest, e.value);
+      }
+    }
+
+    return null;
+  }
+
+  FutureOr<APIResponse<T>> _serveFile<T>(
+      APIRequest apiRequest, Directory rootDirectory) {
+    var staticHandler = _getDirectoryStaticHandler(rootDirectory);
+
+    return staticHandler(apiRequest.toRequest()).resolveMapped((response) {
+      return _APIResponseStaticFile<T>(response);
+    });
+  }
+
+  final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
+
+  Handler _getDirectoryStaticHandler(Directory rootDirectory) {
+    return _directoriesStaticHandlers.putIfAbsent(
+        rootDirectory.path, () => createStaticHandler(rootDirectory.path));
+  }
+
   /// The `server` header value.
   String get serverName => '$name/$version';
 
@@ -91,12 +321,21 @@ class APIServer {
     return 'http://$address:$port/API-INFO';
   }
 
+  /// Returns `true` if the basic conditions for Let's Encrypt are configured.
+  ///
+  /// - See: [letsEncrypt], [letsEncryptDirectory], [domainsRoots].
+  bool get canUseLetsEncrypt {
+    return letsEncrypt && letsEncryptDirectory != null && domains.isNotEmpty;
+  }
+
   bool _started = false;
 
   /// Returns `true` if this servers is started.
   bool get isStarted => _started;
 
   late HttpServer _httpServer;
+
+  HttpServer? _httpSecureServer;
 
   /// Starts this server.
   Future<bool> start() async {
@@ -107,8 +346,11 @@ class APIServer {
       _log.handler.logToConsole();
     }
 
-    _httpServer = await shelf_io.serve(_process, address, port);
-    _httpServer.autoCompress = true;
+    if (canUseLetsEncrypt) {
+      await _startLetsEncrypt();
+    } else {
+      await _startNormal();
+    }
 
     if (hotReload) {
       await APIHotReload.get().enable();
@@ -117,6 +359,77 @@ class APIServer {
     _log.info('Started HTTP server: $address:$port');
 
     return true;
+  }
+
+  Future<void> _startNormal() async {
+    _httpServer = await shelf_io.serve(_process, address, port);
+    _httpServer.autoCompress = true;
+
+    _configureServer(_httpServer);
+  }
+
+  void _configureServer(HttpServer server) {
+    // Enable built-in [HttpServer] gzip:
+    server.autoCompress = true;
+  }
+
+  Future<void> _startLetsEncrypt() async {
+    var letsEncryptDirectory = this.letsEncryptDirectory;
+
+    if (letsEncryptDirectory == null) {
+      throw StateError("Let's Encrypt directory not set!");
+    } else if (!letsEncryptDirectory.existsSync()) {
+      throw StateError(
+          "Let's Encrypt directory doesn't exists: $letsEncryptDirectory");
+    }
+
+    final certificatesHandler = CertificatesHandlerIO(letsEncryptDirectory);
+
+    final LetsEncrypt letsEncrypt =
+        LetsEncrypt(certificatesHandler, production: letsEncryptProduction);
+
+    var pipeline = const Pipeline().addMiddleware(_redirectToHttpsMiddleware);
+
+    var handler = pipeline.addHandler(_process);
+
+    final domains = this.domains;
+
+    var domain = domains.first;
+    var domainEmail = 'contact@$domain';
+
+    var servers = await letsEncrypt.startSecureServer(
+      handler,
+      domain,
+      domainEmail,
+      port: port,
+      securePort: securePort,
+      bindingAddress: address,
+    );
+
+    var server = servers[0]; // HTTP Server.
+    var secureServer = servers[1]; // HTTPS Server.
+
+    _httpServer = server;
+    _httpSecureServer = secureServer;
+
+    _configureServer(server);
+    _configureServer(secureServer);
+  }
+
+  Handler _redirectToHttpsMiddleware(Handler innerHandler) {
+    return (request) {
+      var requestedUri = request.requestedUri;
+
+      if (requestedUri.scheme == 'http') {
+        final domains = this.domains;
+        if (domains.contains(requestedUri.host)) {
+          var secureUri = requestedUri.replace(scheme: 'https');
+          return Response.seeOther(secureUri);
+        }
+      }
+
+      return innerHandler(request);
+    };
   }
 
   /// Returns `true` if this server is closed.type
@@ -137,6 +450,11 @@ class APIServer {
     _stopping = true;
 
     await _httpServer.close();
+
+    if (_httpSecureServer != null) {
+      await _httpSecureServer!.close();
+    }
+
     _stopped.complete(true);
   }
 
@@ -237,7 +555,9 @@ class APIServer {
         sessionID: sessionID,
         newSession: newSession,
         credential: credential,
-        scheme: scheme);
+        scheme: scheme,
+        requestedUri: request.requestedUri,
+        originalRequest: request);
 
     return req;
   }
@@ -306,6 +626,10 @@ class APIServer {
 
   FutureOr<Response> _processAPIResponse(
       Request request, APIRequest apiRequest, APIResponse apiResponse) {
+    if (apiResponse is _APIResponseStaticFile) {
+      return apiResponse.fileResponse;
+    }
+
     var headers = <String, Object>{};
 
     if (!apiResponse.hasCORS) {
@@ -539,7 +863,18 @@ class APIServer {
 
   @override
   String toString() {
-    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port, hotReload: $hotReload, started: $isStarted, stopped: $isStopped }';
+    var domainsStr = domainsRoots.isNotEmpty
+        ? ', domains: ${domainsRoots.entries.map((e) => '${e.key}=${e.value}').join(';')}'
+        : '';
+
+    var secureStr = securePort < 10
+        ? ''
+        : ', securePort: $securePort, '
+            'letsEncrypt: $letsEncrypt'
+            '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
+            'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
+
+    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port$secureStr, hotReload: $hotReload, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].
@@ -666,5 +1001,28 @@ class APIServer {
     }
 
     return s.toString();
+  }
+}
+
+extension _FileStatExtension on FileStat {
+  bool get canWrite => modeString().contains('w');
+}
+
+class _APIResponseStaticFile<T> extends APIResponse<T> {
+  Response fileResponse;
+
+  _APIResponseStaticFile(this.fileResponse)
+      : super(parseAPIResponseStatus(fileResponse.statusCode) ??
+            APIResponseStatus.NOT_FOUND);
+}
+
+extension _APIRequestExtension on APIRequest {
+  Request toRequest() {
+    var originalRequest = this.originalRequest;
+    if (originalRequest is Request) {
+      return originalRequest;
+    }
+
+    return Request(method.name, requestedUri);
   }
 }

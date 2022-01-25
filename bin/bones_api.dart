@@ -133,13 +133,40 @@ class MyCommandServe extends CommandSourceFileBase {
         valueHelp: 'localhost|*');
 
     argParser.addOption('port',
-        abbr: 'p', help: 'Server listen port.', defaultsTo: '8080');
+        abbr: 'p', help: 'Server listen port (HTTP).', defaultsTo: '8080');
+
+    argParser.addOption('secure-port',
+        abbr: 's',
+        help: 'Server listen secure port (HTTPS).',
+        aliases: ['secureport']);
 
     argParser.addOption('class',
         abbr: 'c', help: 'Project APIRoot Class name.');
 
     argParser.addOption('config',
         abbr: 'i', help: 'API Configuration.', valueHelp: 'file|url|json');
+
+    argParser.addMultiOption('domain',
+        abbr: 'f',
+        help: 'Domain root directory (for static files).',
+        valueHelp: 'domain=directory');
+
+    argParser.addFlag('lets-encrypt',
+        abbr: 'l',
+        help: "Enables Let's Encrypt (through package `shelf_letsencrypt`).",
+        aliases: ['letsencrypt']);
+
+    argParser.addFlag('lets-encrypt-production',
+        help: "Enables Let's Encrypt in PRODUCTION mode. Default mode: staging",
+        aliases: ['letsencrypt-production']);
+
+    argParser.addOption('lets-encrypt-dir',
+        help: "The Let's Encrypt certificates directory.",
+        aliases: [
+          'letsencrypt-dir',
+          'lets-encrypt-directory',
+          'letsencrypt-directory'
+        ]);
 
     argParser.addFlag('hotreload',
         abbr: 'r',
@@ -158,11 +185,39 @@ class MyCommandServe extends CommandSourceFileBase {
 
   String get argPort => argResults!['port']!;
 
+  String get argSecurePort => argResults!['secure-port'] ?? '-1';
+
+  bool get argLetsEncrypt => argResults!['lets-encrypt']! as bool;
+
+  bool get argLetsEncryptProduction =>
+      argResults!['lets-encrypt-production']! as bool;
+
+  String get argLetsEncryptDir => argResults!['lets-encrypt-dir'] ?? '';
+
   bool get argHotReload => argResults!['hotreload']! as bool;
 
   bool get argBuild => argResults!['build']! as bool;
 
   String get argApiConfig => (argResults!['config'] ?? '') as String;
+
+  Map<String, String> get argDomains {
+    var val = argResults!['domain'];
+    if (val == null) return <String, String>{};
+
+    var values = (val is List ? val : [val])
+        .map((e) => e != null ? '$e'.trim() : '')
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    var entries = values.map((e) {
+      var parts = e.split('=');
+      var domain = parts[0].trim();
+      var path = parts.length > 1 ? parts[1].trim() : '';
+      return MapEntry(domain, path);
+    }).toList();
+
+    return Map<String, String>.fromEntries(entries);
+  }
 
   @override
   FutureOr<bool> run() async {
@@ -170,9 +225,14 @@ class MyCommandServe extends CommandSourceFileBase {
     var apiRootClass = argClass;
     var address = argAddress;
     var port = argPort;
+    var securePort = argSecurePort;
+    var letsEncrypt = argLetsEncrypt;
+    var letsEncryptProduction = argLetsEncryptProduction;
+    var letsEncryptDir = argLetsEncryptDir;
     var hotReload = argHotReload;
     var allowBuild = argBuild;
     var apiConfig = argApiConfig;
+    var domains = argDomains;
 
     var parametersMessage = <String>[];
 
@@ -225,8 +285,20 @@ class MyCommandServe extends CommandSourceFileBase {
     if (hotReload) {
       var hotReloadAllowed = await APIHotReload.get().isHotReloadAllowed();
       if (!hotReloadAllowed) {
-        await _spawnDartVMForHotReload(spawner, directory, apiRootClass!,
-            address, port, apiConfig, allowBuild, parametersMessage);
+        await _spawnDartVMForHotReload(
+            spawner,
+            directory,
+            apiRootClass!,
+            address,
+            port,
+            securePort,
+            letsEncrypt,
+            letsEncryptProduction,
+            letsEncryptDir,
+            apiConfig,
+            domains,
+            allowBuild,
+            parametersMessage);
         return true;
       }
     }
@@ -238,9 +310,14 @@ class MyCommandServe extends CommandSourceFileBase {
         spawner,
         address,
         port,
+        securePort,
+        letsEncrypt,
+        letsEncryptProduction,
+        letsEncryptDir,
         hotReload,
         allowBuild,
-        apiConfig);
+        apiConfig,
+        domains);
   }
 
   Future<bool> _spawnAPIServerIsolate(
@@ -250,9 +327,14 @@ class MyCommandServe extends CommandSourceFileBase {
       DartSpawner spawner,
       String address,
       String port,
+      String securePort,
+      bool letsEncrypt,
+      bool letsEncryptProduction,
+      String letsEncryptDir,
       bool hotReload,
       bool allowBuild,
-      String apiConfig) async {
+      String apiConfig,
+      Map<String, String> domains) async {
     print(
         '________________________________________________________________________________');
     print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
@@ -298,9 +380,26 @@ class MyCommandServe extends CommandSourceFileBase {
           APIHotReload.get().getIsolateID(Isolate.current) ?? '';
     }
 
+    var domainsInline = '';
+    if (domains.isNotEmpty) {
+      domainsInline =
+          domains.entries.map((e) => '${e.key}=${e.value}').join('&');
+    }
+
     var process = await spawner.spawnDartScript(
       dartScript,
-      [address, port, '$hotReload', hotReloadIgnoreIsolate, apiConfig],
+      [
+        address,
+        port,
+        securePort,
+        '$letsEncrypt',
+        '$letsEncryptProduction',
+        letsEncryptDir,
+        '$hotReload',
+        hotReloadIgnoreIsolate,
+        apiConfig,
+        domainsInline
+      ],
       usesSpawnedMain: true,
       debugName: apiRootClass,
     );
@@ -380,10 +479,13 @@ class MyCommandServe extends CommandSourceFileBase {
     print(
         ' >------------------------------------------------------------------------------');
 
+    var projectDirectory = await spawner.projectDirectory;
+
     var outputCount = <int>[0];
 
     var dartProcess = await spawner.runProcess(
         'dart', ['run', 'build_runner', 'build'],
+        workingDirectory: projectDirectory.path,
         redirectOutput: true,
         stdoutFilter: (o) => _filterOutput(o, outputCount),
         stderrFilter: (o) => _filterOutput(o, outputCount));
@@ -416,7 +518,12 @@ class MyCommandServe extends CommandSourceFileBase {
       String apiRootClass,
       String address,
       String port,
+      String securePort,
+      bool letsEncrypt,
+      bool letsEncryptProduction,
+      String letsEncryptDir,
       String apiConfig,
+      Map<String, String> domains,
       bool allowBuild,
       List<String> parametersMessage) async {
     print(
@@ -447,9 +554,19 @@ class MyCommandServe extends CommandSourceFileBase {
           address,
           '--port',
           port,
+          '--secure-port',
+          securePort,
+          if (letsEncrypt) '--lets-encrypt',
+          if (letsEncryptProduction) '--lets-encrypt-production',
+          if (letsEncryptDir.isNotEmpty) ...[
+            '--lets-encrypt-dir',
+            letsEncryptDir
+          ],
           if (allowBuild) '--build',
           '--hotreload',
-          if (apiConfig.isNotEmpty) ...['--config', apiConfig]
+          if (apiConfig.isNotEmpty) ...['--config', apiConfig],
+          if (domains.isNotEmpty)
+            ...domains.entries.expand((e) => ['--domain', e.key, e.value]),
         ],
         enableVMService: true,
         handleSignals: true,
@@ -472,8 +589,8 @@ import 'package:$projectPackageName/$projectLibraryName.dart';
 void main(List<String> args, dynamic parentPort) {
   var errorZone = createErrorZone(uncaughtErrorTitle: 'APIServer Unhandled exception:');
   
-  errorZone.runGuarded(() {
-    spawnedMain(args, parentPort, $isolateID, runAPIServer);
+  errorZone.runGuarded(() async {
+    await spawnedMain(args, parentPort, $isolateID, runAPIServer);
   });
 }
 
@@ -485,9 +602,14 @@ Future<void> runAPIServer(List<String> args) async {
   
   var address = args[0];
   var port = int.parse(args[1]);
-  var hotReload = args[2] == 'true';
-  var hotReloadIgnoreIsolate = args[3];
-  var config = args[4];
+  var securePort = int.parse(args[2]);
+  var letsEncrypt = args[3] == 'true';
+  var letsEncryptProduction = args[4] == 'true';
+  var letsEncryptDir = args[5];
+  var hotReload = args[6] == 'true';
+  var hotReloadIgnoreIsolate = args[7];
+  var config = args[8];
+  var domains = args[9];
   
   print('- API Server: \$address:\$port\\n');
   
@@ -508,7 +630,15 @@ Future<void> runAPIServer(List<String> args) async {
     }
   }
   
-  var apiServer = APIServer(api, address, port, hotReload: hotReload);
+  var apiServer = APIServer(api, address, port,
+    hotReload: hotReload, 
+    domains: domains,
+    securePort: securePort,
+    letsEncrypt: letsEncrypt,
+    letsEncryptProduction: letsEncryptProduction,
+    letsEncryptDirectory: letsEncryptDir,
+  );
+  
   await apiServer.start();
   
   print('\\n** APIServer Started.\\n');

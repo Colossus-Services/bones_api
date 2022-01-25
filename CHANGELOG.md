@@ -1,3 +1,21 @@
+## 1.0.39
+
+- Added support to Let's Encrypt HTTPS certificates.
+- `bones_api.dart` CLI:
+  - Allow domain static files. 
+- `APIRoot`:
+  - `APILogger`: to allow logging of `APIRoot` events.
+  - `APIRequestHandler`: for personalized request handlers.
+  - New fields `preApiRequestHandlers` and `posApiRequestHandlers`.
+- Added test tag: `slow`
+- shelf_static: ^1.1.0
+- shelf_letsencrypt: ^1.0.0
+- dart_spawner: ^1.0.6
+- data_serializer: ^1.0.5
+- mercury_client: ^2.1.3
+- build_verify: ^3.0.0
+- sdk: '>=2.14.0 <3.0.0'
+
 ## 1.0.38
 
 - Fix references and naming: `postgre` to `postgres`.
