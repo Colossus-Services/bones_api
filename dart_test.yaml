@@ -15,6 +15,9 @@ tags:
   # Tests that uses `MySQL`.
   mysql:
     timeout: 180s
+  # Slow tests.
+  slow:
+    timeout: 180s
   # Tests that depends on `build` framework:
   build:
     timeout: 60s
