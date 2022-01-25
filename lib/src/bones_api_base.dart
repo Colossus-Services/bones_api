@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert' as dart_convert;
 import 'dart:math';
 import 'dart:typed_data';
@@ -11,10 +12,20 @@ import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_security.dart';
 
+/// An [APIRoot] [APIRequest] handler.
+///
+/// See [APIRoot.preApiRequestHandlers] and [APIRoot.posApiRequestHandlers].
+typedef APIRequestHandler = FutureOr<APIResponse<T>?> Function<T>(
+    APIRoot apiRoot, APIRequest request);
+
+/// An [APIRoot] logger function.
+typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
+    [Object? error, StackTrace? stackTrace]);
+
 /// Root class of an API.
 abstract class APIRoot {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.0.38';
+  static const String VERSION = '1.0.39';
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
@@ -82,11 +93,42 @@ abstract class APIRoot {
   /// The API Configuration.
   APIConfig apiConfig;
 
+  /// [APIRequestHandler] list to try before attempt an API call.
+  ///
+  /// - The first [APIRequestHandler] to return an [APIResponse] will defined the [APIRequest] response.
+  /// - This [APIRequestHandler] list is ALWAYS called.
+  /// - An API call will be attempted ONLY if NO [APIRequestHandler] returns an [APIResponse].
+  final Set<APIRequestHandler> preApiRequestHandlers;
+
+  /// [APIRequestHandler] list to try after attempt an API call.
+  ///
+  /// - This [APIRequestHandler] list is ONLY called if there's no successful API call.
+  final Set<APIRequestHandler> posApiRequestHandlers;
+
+  /// The logger of this [APIRoot] instance. See [APILogger].
+  APILogger? logger;
+
   APIRoot(this.name, this.version,
-      {dynamic apiConfig, APIConfigProvider? apiConfigProvider})
-      : apiConfig =
+      {dynamic apiConfig,
+      APIConfigProvider? apiConfigProvider,
+      Iterable<APIRequestHandler>? preApiRequestHandlers,
+      Iterable<APIRequestHandler>? posApiRequestHandlers})
+      : preApiRequestHandlers =
+            LinkedHashSet.from(preApiRequestHandlers ?? <APIRequestHandler>{}),
+        posApiRequestHandlers =
+            LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
+        apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
     _instances[name] = this;
+  }
+
+  /// Logs to [logger], if present.
+  void log(String type, String? message,
+      [Object? error, StackTrace? stackTrace]) {
+    var logger = this.logger;
+    if (logger != null) {
+      logger(this, type, message, error, stackTrace);
+    }
   }
 
   /// The default module to use when request module doesn't match.
@@ -134,7 +176,7 @@ abstract class APIRoot {
 
   /// Resolves the module name of a [request].
   String resolveModule(APIRequest request) {
-    var moduleName = request.pathPart(1, reversed: true);
+    var moduleName = request.pathPartReversed(1);
     return moduleName;
   }
 
@@ -148,8 +190,96 @@ abstract class APIRoot {
     return call(request);
   }
 
+  /// Attempt to process [request] using an [APIRequestHandler] at [handlers].
+  FutureOr<APIResponse<T>?> callHandlers<T>(
+      Iterable<APIRequestHandler> handlers, APIRequest request,
+      [String handlersType = 'external']) {
+    if (handlers.isEmpty) return null;
+
+    Iterator<APIRequestHandler> handlersIterator = handlers.iterator;
+
+    while (handlersIterator.moveNext()) {
+      var handler = handlersIterator.current;
+
+      try {
+        var response = handler<T>(this, request);
+
+        if (response == null) continue;
+
+        if (response is APIResponse) {
+          return response;
+        } else if (response is Future<APIResponse<T>?>) {
+          return response.then((resp) {
+            if (resp != null) return resp;
+            return _callHandlersAsync(handlersIterator, request, handlersType);
+          }, onError: (e, s) {
+            _logCallHandlersError(handlersType, handler, e, s);
+            return _callHandlersAsync(handlersIterator, request, handlersType);
+          });
+        } else {
+          continue;
+        }
+      } catch (e, s) {
+        _logCallHandlersError(handlersType, handler, e, s);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  void _logCallHandlersError(
+          String handlersType, APIRequestHandler handler, error, stackTrace) =>
+      log(
+          'APIRoot',
+          'Error calling `APIRequestHandler` ($handlersType): $handler',
+          error,
+          stackTrace);
+
+  Future<APIResponse<T>?> _callHandlersAsync<T>(
+      Iterator<APIRequestHandler> handlersIterator,
+      APIRequest request,
+      String handlersType) async {
+    while (handlersIterator.moveNext()) {
+      var handler = handlersIterator.current;
+
+      try {
+        var response = handler<T>(this, request);
+        if (response == null) continue;
+
+        if (response is APIResponse) {
+          return response;
+        } else if (response is Future<APIResponse<T>?>) {
+          var resp = await response;
+          if (resp != null) {
+            return resp;
+          }
+        } else {
+          continue;
+        }
+      } catch (e, s) {
+        _logCallHandlersError(handlersType, handler, e, s);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
   /// Calls the API.
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
+    var preResponse = callHandlers<T>(
+        preApiRequestHandlers, request, 'preApiRequestHandlers');
+
+    if (preResponse != null) {
+      return preResponse
+          .resolveMapped((response) => response ?? _callAPI(request));
+    }
+
+    return _callAPI(request);
+  }
+
+  FutureOr<APIResponse<T>> _callAPI<T>(APIRequest request) {
     _ensureModulesLoaded();
 
     var apiSecurity = security;
@@ -199,10 +329,23 @@ abstract class APIRoot {
     }
 
     if (module == null) {
-      return _responseNotFoundNoRouteForPath<T>(request);
+      return onNoRouteForPath<T>(request);
     }
 
     return module.call(request);
+  }
+
+  FutureOr<APIResponse<T>> onNoRouteForPath<T>(APIRequest request) {
+    var posResponse = callHandlers<T>(
+        posApiRequestHandlers, request, 'posApiRequestHandlers');
+
+    if (posResponse != null) {
+      return posResponse.resolveMapped((response) {
+        return response ?? _responseNotFoundNoRouteForPath<T>(request);
+      });
+    }
+
+    return _responseNotFoundNoRouteForPath<T>(request);
   }
 
   String get authenticationRoute => 'authenticate';
@@ -576,7 +719,7 @@ abstract class APIModule {
     var handler = getRouteHandlerByRequest<T>(apiRequest);
 
     if (handler == null) {
-      return _responseNotFoundNoRouteForPath<T>(apiRequest);
+      return apiRoot.onNoRouteForPath(apiRequest);
     }
 
     try {
@@ -1160,6 +1303,9 @@ class APIRequest extends APIPayload {
   final APIRequesterSource requesterSource;
   final String? _requesterAddress;
 
+  final Uri requestedUri;
+  final Object? originalRequest;
+
   late final List<String> _pathParts;
 
   APIRequest(this.method, this.path,
@@ -1174,13 +1320,26 @@ class APIRequest extends APIPayload {
       String? scheme,
       APIRequesterSource? requesterSource,
       String? requesterAddress,
-      DateTime? time})
+      DateTime? time,
+      Uri? requestedUri,
+      this.originalRequest})
       : parameters = parameters ?? <String, dynamic>{},
         headers = headers ?? <String, dynamic>{},
         _pathParts = _buildPathParts(path),
         scheme = scheme?.trim(),
         requesterSource = _resolveRestSource(requesterAddress),
         _requesterAddress = requesterAddress,
+        requestedUri = requestedUri ??
+            Uri(
+                host: requesterSource == APIRequesterSource.local
+                    ? 'localhost'
+                    : null,
+                path: path,
+                queryParameters: parameters?.map((key, value) => MapEntry(
+                    key,
+                    value is List
+                        ? value.map((e) => '$e').toList()
+                        : '$value'))),
         time = time ?? DateTime.now();
 
   static APIRequesterSource _resolveRestSource(String? requestAddress) {
@@ -1338,6 +1497,12 @@ class APIRequest extends APIPayload {
 
   /// Returns the parts of the [path].
   List<String> get pathParts => _pathParts.toList();
+
+  /// First of [pathParts].
+  String get pathPartFirst => _pathParts.isEmpty ? '' : _pathParts.first;
+
+  /// Last of [pathParts].
+  String get pathPartLast => _pathParts.isEmpty ? '' : _pathParts.last;
 
   /// Returns a path part at [index].
   ///
@@ -1554,7 +1719,21 @@ class APIRequest extends APIPayload {
     return null;
   }
 
-  String get hostname {
+  /// Returns `true` if [patterns] matches [hostname].
+  bool matchesHostname(Pattern pattern) {
+    var hostname = this.hostname;
+    if (pattern is RegExp) {
+      return pattern.hasMatch(hostname);
+    } else {
+      return hostname == pattern;
+    }
+  }
+
+  String? _hostname;
+
+  String get hostname => _hostname ??= _hostnameImpl();
+
+  String _hostnameImpl() {
     var host = getHeader('host');
     if (host == null) {
       return 'localhost';
@@ -1574,7 +1753,11 @@ class APIRequest extends APIPayload {
     return host;
   }
 
-  int get port {
+  int? _port;
+
+  int get port => _port ??= _portImpl();
+
+  int _portImpl() {
     var port = getHeader('port');
     if (port != null) {
       var p = int.tryParse(port.trim());
@@ -1598,7 +1781,12 @@ class APIRequest extends APIPayload {
 
   String get hostnameAndPort => '$hostname:$port';
 
-  String? get requesterAddress {
+  String? _requesterAddressResolved;
+
+  String? get requesterAddress =>
+      _requesterAddressResolved ??= _requesterAddressImpl();
+
+  String? _requesterAddressImpl() {
     if (_requesterAddress != null) return _requesterAddress;
 
     String? client;
@@ -1619,7 +1807,11 @@ class APIRequest extends APIPayload {
     return null;
   }
 
-  String get origin {
+  String? _origin;
+
+  String get origin => _origin ??= _originImpl();
+
+  String _originImpl() {
     var origin = getHeader('origin');
     if (origin != null) {
       origin = origin.trim();
@@ -1629,6 +1821,10 @@ class APIRequest extends APIPayload {
     }
 
     var host = hostnameAndPort;
+    if (host.endsWith(':0')) {
+      host = host.substring(0, host.length - 2);
+    }
+
     var scheme = this.scheme ?? 'http';
 
     origin = "$scheme://$host/";
@@ -1660,6 +1856,64 @@ enum APIResponseStatus {
   BAD_REQUEST,
   // ignore: constant_identifier_names
   ERROR,
+}
+
+/// Parses a [APIResponseStatus].
+APIResponseStatus? parseAPIResponseStatus(Object o) {
+  if (o is APIResponseStatus) return o;
+
+  if (o is int) {
+    switch (o) {
+      case 200:
+      case 201:
+      case 202:
+      case 204:
+      case 205:
+      case 206:
+        return APIResponseStatus.OK;
+      case 400:
+        return APIResponseStatus.BAD_REQUEST;
+      case 401:
+      case 402:
+      case 403:
+        return APIResponseStatus.UNAUTHORIZED;
+      case 404:
+      case 405:
+      case 410:
+        return APIResponseStatus.NOT_FOUND;
+      case 429:
+      case 500:
+      case 501:
+      case 503:
+        return APIResponseStatus.ERROR;
+      default:
+        return null;
+    }
+  }
+
+  var s = o.toString().trim().toLowerCase();
+
+  switch (s) {
+    case 'ok':
+      return APIResponseStatus.OK;
+    case 'internalservererror':
+    case 'internal server error':
+    case 'internal_server_error':
+    case 'error':
+      return APIResponseStatus.ERROR;
+    case 'notfound':
+    case 'not found':
+    case 'not_found':
+      return APIResponseStatus.NOT_FOUND;
+    case 'unauthorized':
+      return APIResponseStatus.UNAUTHORIZED;
+    case 'badrequest':
+    case 'bad request':
+    case 'bad_request':
+      return APIResponseStatus.BAD_REQUEST;
+    default:
+      return null;
+  }
 }
 
 /// Represents an API response.
