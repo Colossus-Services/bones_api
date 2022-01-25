@@ -44,7 +44,7 @@ class Address$reflection extends ClassReflection<Address> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.13.0');
+  Version get languageVersion => Version.parse('2.14.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.0.21');
@@ -451,7 +451,7 @@ class Role$reflection extends ClassReflection<Role> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.13.0');
+  Version get languageVersion => Version.parse('2.14.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.0.21');
@@ -823,7 +823,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.13.0');
+  Version get languageVersion => Version.parse('2.14.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.0.21');
@@ -877,7 +877,7 @@ class User$reflection extends ClassReflection<User> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.13.0');
+  Version get languageVersion => Version.parse('2.14.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.0.21');
