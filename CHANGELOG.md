@@ -14,6 +14,7 @@
 - data_serializer: ^1.0.5
 - mercury_client: ^2.1.3
 - build_verify: ^3.0.0
+- path: ^1.8.1
 - sdk: '>=2.14.0 <3.0.0'
 
 ## 1.0.38
