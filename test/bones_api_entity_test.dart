@@ -1,5 +1,4 @@
 @Tags(['entities'])
-
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
@@ -120,11 +119,17 @@ void main() {
           [Role(RoleType.guest)],
           wakeUpTime: Time(12, 13, 14, 150),
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
+      var user3 = User('john@mail.com', '456',
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101), [],
+          wakeUpTime: Time(0, 13, 14, 150),
+          creationTime: DateTime.utc(2021, 10, 12, 12, 13, 14, 0, 0));
 
       var user1Json =
           '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":"2020-10-11 12:13:14.000Z"}';
       var user2Json =
           '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
+      var user3Json =
+          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101},"roles":[],"wakeUpTime":"00:13:14.150","creationTime":"2021-10-12 12:13:14.000Z"}';
 
       addressEntityHandler.inspectObject(user1.address);
       roleEntityHandler.inspectObject(user1.roles.first);
@@ -137,6 +142,8 @@ void main() {
       expect(userEntityHandler.decodeObjectJson(user1Json), equals(user1));
 
       expect(userEntityHandler.encodeObjectJson(user2), equals(user2Json));
+
+      expect(userEntityHandler.encodeObjectJson(user3), equals(user3Json));
 
       var user1b = userEntityHandler.decodeObjectJson(user1Json);
 
@@ -174,6 +181,7 @@ void main() {
 
       var user1Time = DateTime.utc(2019, 1, 2, 3, 4, 5);
       var user2Time = DateTime.utc(2019, 12, 2, 3, 4, 5);
+      var user3Time = DateTime.utc(2019, 13, 2, 3, 4, 5);
 
       var user1 = User(
           'joe@setl.com',
@@ -187,14 +195,19 @@ void main() {
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
           [Role(RoleType.guest)],
           creationTime: user2Time);
+      var user3 = User('john@setl.com', '456',
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101), [],
+          creationTime: user3Time);
 
       userRepository.store(user1);
       userRepository.store(user2);
+      userRepository.store(user3);
 
       var user1Json = user1.toJsonEncoded();
       var user2Json = user2.toJsonEncoded();
+      var user3Json = user3.toJsonEncoded();
 
-      expect(userRepository.nextID(), equals(3));
+      expect(userRepository.nextID(), equals(4));
 
       expect(userRepository.selectByID(1)!.toJsonEncoded(), equals(user1Json));
 
@@ -208,13 +221,13 @@ void main() {
           userRepository
               .select(Condition.parse('email != "smith@setl.com"'))
               .map((e) => e.toJsonEncoded()),
-          equals([user1Json]));
+          equals([user1Json, user3Json]));
 
       expect(
           userRepository
               .select(Condition.parse(' email != "joe@setl.com" '))
               .map((e) => e.toJsonEncoded()),
-          equals([user2Json]));
+          equals([user2Json, user3Json]));
 
       expect(userRepository.select(Condition.parse('email == "foo@setl.com"')),
           isEmpty);
@@ -223,7 +236,7 @@ void main() {
           userRepository
               .select(Condition.parse('email != "foo@setl.com"'))
               .map((e) => e.toJsonEncoded()),
-          equals([user1Json, user2Json]));
+          equals([user1Json, user2Json, user3Json]));
 
       expect(
           userRepository
@@ -243,17 +256,17 @@ void main() {
       expect(
           userRepository
               .selectByQuery('address.state == ?', parameters: {'state': 'CA'}),
-          equals([user2]));
+          equals([user2, user3]));
 
       expect(
           userRepository.selectByQuery('address.state == ?:the_state',
               parameters: {'the_state': 'CA'}),
-          equals([user2]));
+          equals([user2, user3]));
 
       expect(
           userRepository.selectByQuery('address.state == ?:',
               parameters: {'state': 'CA'}),
-          equals([user2]));
+          equals([user2, user3]));
 
       expect(
           (await userRepository.selectByQuery('address.state == ?',
@@ -270,7 +283,7 @@ void main() {
         expect(user.creationTime, equals(user2Time));
       }
 
-      expect(userRepository.length(), equals(1));
+      expect(userRepository.length(), equals(2));
 
       {
         var user = userRepository.selectByID(2);

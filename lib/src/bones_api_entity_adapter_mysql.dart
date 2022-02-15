@@ -419,6 +419,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
       String table, SQL sql, MySqlConnectionWrapper connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped(_resultsToEntitiesMaps);
@@ -430,6 +432,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
       String table, SQL sql, MySqlConnectionWrapper connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     var preSQLs = sql.preSQL;
 
     if (preSQLs != null) {
@@ -470,6 +474,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
       MySqlConnectionWrapper connection) {
+    if (sql.isDummy) return null;
+
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
@@ -478,6 +484,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
       MySqlConnectionWrapper connection) {
+    if (sql.isDummy) return null;
+
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) => _resolveResultID(results, table, sql, id));

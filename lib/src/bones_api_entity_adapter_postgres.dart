@@ -455,6 +455,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
       String table, SQL sql, PostgreSQLExecutionContext connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -470,6 +472,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
       String table, SQL sql, PostgreSQLExecutionContext connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) {
@@ -485,6 +489,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
       PostgreSQLExecutionContext connection) {
+    if (sql.isDummy) return null;
+
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
@@ -493,6 +499,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
       PostgreSQLExecutionContext connection) {
+    if (sql.isDummy) return null;
+
     return connection
         .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
         .resolveMapped((results) => _resolveResultID(results, table, sql, id));

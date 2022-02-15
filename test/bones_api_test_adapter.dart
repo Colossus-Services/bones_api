@@ -284,8 +284,20 @@ void runAdapterTests(
         expect(id, equals(2));
       }
 
-      expect(await addressAPIRepository.length(), equals(2));
-      expect(await userAPIRepository.length(), equals(2));
+      var user3CreationTime = DateTime.utc(2021, 9, 22);
+      var user3WakeupTime = Time(12, 10, 11);
+
+      {
+        var address = Address('CA', 'Los Angeles', 'street B', 101);
+
+        var user = User('john@$testDomain', '456', address, [],
+            wakeUpTime: user3WakeupTime, creationTime: user3CreationTime);
+        var id = await userAPIRepository.store(user);
+        expect(id, equals(3));
+      }
+
+      expect(await addressAPIRepository.length(), equals(3));
+      expect(await userAPIRepository.length(), equals(3));
 
       {
         var user = await userAPIRepository.selectByID(1);
@@ -318,6 +330,16 @@ void runAdapterTests(
       }
 
       {
+        var user = await userAPIRepository.selectByID(3);
+        expect(user!.email, equals('john@$testDomain'));
+        expect(user.address.state, equals('CA'));
+        expect(user.roles, isEmpty);
+        expect(user.level, isNull);
+        expect(user.wakeUpTime, user3WakeupTime);
+        expect(user.creationTime, equals(user3CreationTime));
+      }
+
+      {
         var user = await userAPIRepository.selectByID(3000);
         expect(user, isNull);
       }
@@ -347,16 +369,16 @@ void runAdapterTests(
       {
         var sel = await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
 
-        expect(sel.length, equals(2));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+        expect(sel.length, equals(3));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
       }
 
       {
         var sel = await userAPIRepository
             .selectByINAddressStates(['NY', 'CA', 'N/A']);
 
-        expect(sel.length, equals(2));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+        expect(sel.length, equals(3));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
       }
 
       {
@@ -370,24 +392,24 @@ void runAdapterTests(
         var sel =
             await userAPIRepository.selectByINAddressStatesSingleValue('CA');
 
-        expect(sel.length, equals(1));
-        expect(sel.map((e) => e.address.state), equals(['CA']));
+        expect(sel.length, equals(2));
+        expect(sel.map((e) => e.address.state), equals(['CA', 'CA']));
       }
 
       {
         var sel = await userAPIRepository.selectByINAddressStates(
             ['NY', 'CA', ...List.generate(10, (i) => '$i')]);
 
-        expect(sel.length, equals(2));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+        expect(sel.length, equals(3));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
       }
 
       {
         var sel = await userAPIRepository.selectByINAddressStates(
             ['NY', 'CA', ...List.generate(100, (i) => '$i')]);
 
-        expect(sel.length, equals(2));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA']));
+        expect(sel.length, equals(3));
+        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
       }
 
       {
@@ -569,7 +591,7 @@ void runAdapterTests(
         expect(user.creationTime, equals(user2CreationTime));
       }
 
-      expect(await userAPIRepository.length(), equals(1));
+      expect(await userAPIRepository.length(), equals(2));
 
       {
         var user = await userAPIRepository.selectByID(2);

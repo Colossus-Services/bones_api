@@ -46,6 +46,8 @@ class MultipleSQL implements SQLWrapper {
 /// An encoded SQL representation.
 /// This is used by a [SQLAdapter] to execute queries.
 class SQL implements SQLWrapper {
+  static final SQL dummy = SQL('dummy', <String, dynamic>{}, mainTable: '_');
+
   @override
   int get sqlsLength => 1;
 
@@ -107,6 +109,8 @@ class SQL implements SQLWrapper {
         _parametersKeysByPosition = parametersKeysByPosition,
         _parametersValuesByPosition = parametersValuesByPosition,
         placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
+
+  bool get isDummy => this == dummy;
 
   String get sqlPositional {
     if (_sqlPositional == null) _computeSQLPositional();
@@ -638,12 +642,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
             "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
       }
 
-      if (otherIds.isEmpty) return <SQL>[];
-
-      var sqls = otherIds
-          .map((otherId) =>
-              _generateInsertRelationshipSQL(relationship, id, otherId))
-          .toList();
+      var sqls = otherIds.isEmpty
+          ? [SQL.dummy]
+          : otherIds
+              .map((otherId) =>
+                  _generateInsertRelationshipSQL(relationship, id, otherId))
+              .toList();
 
       var constrainSQL = _generateConstrainRelationshipSQL(
           tableScheme, table, id, otherTableName, otherIds);
@@ -720,9 +724,13 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
     sqlCondition.write(q);
     sqlCondition.write(sourceIdField);
-    sqlCondition.write('$q = @$sourceIdField AND $q');
-    sqlCondition.write(targetIdField);
-    sqlCondition.write('$q NOT IN ( ${otherIdsParameters.join(',')} )');
+    sqlCondition.write('$q = @$sourceIdField');
+
+    if (otherIdsParameters.isNotEmpty) {
+      sqlCondition.write(' AND $q');
+      sqlCondition.write(targetIdField);
+      sqlCondition.write('$q NOT IN ( ${otherIdsParameters.join(',')} )');
+    }
 
     var conditionSQL = sqlCondition.toString();
 

@@ -80,6 +80,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr doInsertRelationshipSQL(
       String entityName, String table, SQL sql, int connection) {
+    if (sql.isDummy) return null;
+
     var entry = sql.parameters;
 
     var map = _getTableMap(table, true)!;
@@ -99,6 +101,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr doInsertSQL(
       String entityName, String table, SQL sql, int connection) {
+    if (sql.isDummy) return null;
+
     var map = _getTableMap(table, true)!;
 
     var id = nextID(table);
@@ -118,6 +122,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr doUpdateSQL(
       String entityName, String table, SQL sql, Object id, int connection) {
+    if (sql.isDummy) return null;
+
     var map = _getTableMap(table, true)!;
 
     var entry = sql.parameters;
@@ -136,6 +142,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
       String entityName, String table, SQL sql, int connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     var map = _getTableMap(table, false);
     if (map == null) {
       return <Map<String, dynamic>>[];
@@ -185,6 +193,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
       String entityName, String table, SQL sql, int connection) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     var map = _getTableMap(table, false);
     if (map == null) {
       return <Map<String, dynamic>>[];
