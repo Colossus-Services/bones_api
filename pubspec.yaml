@@ -18,7 +18,7 @@ dependencies:
   dart_spawner: ^1.0.6
   args: ^2.2.0
   reflection_factory: ^1.0.21
-  data_serializer: ^1.0.5
+  data_serializer: ^1.0.6
   petitparser: ^4.2.0
   hotreloader: ^3.0.1
   logging: ^1.0.1

@@ -12,7 +12,7 @@
 - shelf_static: ^1.1.0
 - shelf_letsencrypt: ^1.0.0
 - dart_spawner: ^1.0.6
-- data_serializer: ^1.0.5
+- data_serializer: ^1.0.6
 - mercury_client: ^2.1.3
 - build_verify: ^3.0.0
 - path: ^1.8.1
