@@ -638,6 +638,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
             "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
       }
 
+      if (otherIds.isEmpty) return <SQL>[];
+
       var sqls = otherIds
           .map((otherId) =>
               _generateInsertRelationshipSQL(relationship, id, otherId))

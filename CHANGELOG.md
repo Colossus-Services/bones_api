@@ -7,6 +7,7 @@
   - `APILogger`: to allow logging of `APIRoot` events.
   - `APIRequestHandler`: for personalized request handlers.
   - New fields `preApiRequestHandlers` and `posApiRequestHandlers`.
+- Fix `SQLAdapter.generateInsertRelationshipSQLs`.
 - Added test tag: `slow`
 - shelf_static: ^1.1.0
 - shelf_letsencrypt: ^1.0.0
