@@ -9,8 +9,9 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
-import 'bones_api_extension.dart';
+import 'bones_api_module.dart';
 import 'bones_api_security.dart';
+import 'bones_api_utils.dart';
 
 /// An [APIRoot] [APIRequest] handler.
 ///
@@ -22,11 +23,22 @@ typedef APIRequestHandler = FutureOr<APIResponse<T>?> Function<T>(
 typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
     [Object? error, StackTrace? stackTrace]);
 
+class BonesAPI {
+  // ignore: constant_identifier_names
+  static const String VERSION = '1.1.0';
+
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    Json.boot();
+  }
+}
+
 /// Root class of an API.
 abstract class APIRoot {
-  // ignore: constant_identifier_names
-  static const String VERSION = '1.0.39';
-
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
   /// Returns the last [APIRoot] if instantiated.
@@ -43,6 +55,8 @@ abstract class APIRoot {
             "Multiple APIRoot instances> singleton: $singleton ; length: ${_instances.length} ; names: ${_instances.keys.toList()}");
       }
       return _instances.values.last;
+    } else {
+      return null;
     }
   }
 
@@ -119,6 +133,7 @@ abstract class APIRoot {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+    BonesAPI.boot();
     _instances[name] = this;
   }
 
@@ -160,7 +175,7 @@ abstract class APIRoot {
     _ensureModulesLoaded();
     var module = _modules![name];
     if (module != null) {
-      module._ensureConfigured();
+      module.ensureConfigured();
     }
     return module;
   }
@@ -556,423 +571,6 @@ class APIRouteInfo {
 APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {
   var payload = 'NOT FOUND: No route for path "' + request.path + '"';
   return APIResponse.notFound(payloadDynamic: payload);
-}
-
-/// A module of an API.
-abstract class APIModule {
-  /// The API root, that is loading this module.
-  final APIRoot apiRoot;
-
-  /// The name of this API module.
-  final String name;
-
-  /// Optional module version.
-  final String? version;
-
-  late final APIRouteBuilder _routeBuilder;
-
-  APIModule(this.apiRoot, String name, {this.version})
-      : name = name.trim().toLowerCase() {
-    _routeBuilder = APIRouteBuilder(this);
-  }
-
-  /// The [APIConfig] from [apiRoot].
-  APIConfig get apiConfig => apiRoot.apiConfig;
-
-  /// The default route to use when the request doesn't match.
-  String? get defaultRouteName => null;
-
-  /// Configures this API module. Usually defines the routes of this instance.
-  void configure();
-
-  bool _configured = false;
-
-  void _ensureConfigured() {
-    if (_configured) return;
-    _configured = true;
-    configure();
-  }
-
-  final Map<String, APIRouteHandler> _routesHandlers =
-      <String, APIRouteHandler>{};
-
-  final Map<String, APIRouteHandler> _routesHandlersGET =
-      <String, APIRouteHandler>{};
-
-  final Map<String, APIRouteHandler> _routesHandlersPOST =
-      <String, APIRouteHandler>{};
-
-  final Map<String, APIRouteHandler> _routesHandlersPUT =
-      <String, APIRouteHandler>{};
-
-  final Map<String, APIRouteHandler> _routesHandlersDELETE =
-      <String, APIRouteHandler>{};
-
-  final Map<String, APIRouteHandler> _routesHandlersPATH =
-      <String, APIRouteHandler>{};
-
-  Map<String, APIRouteHandler> _getRoutesHandlers(APIRequestMethod? method) {
-    switch (method) {
-      case APIRequestMethod.GET:
-        return _routesHandlersGET;
-      case APIRequestMethod.POST:
-        return _routesHandlersPOST;
-      case APIRequestMethod.PUT:
-        return _routesHandlersPUT;
-      case APIRequestMethod.DELETE:
-        return _routesHandlersDELETE;
-      case APIRequestMethod.PATCH:
-        return _routesHandlersPATH;
-      default:
-        return _routesHandlers;
-    }
-  }
-
-  /// Adds a route, of [name], to this module.
-  ///
-  /// [method] The route method. If `null` accepts any method.
-  /// [function] The route handler, to process calls.
-  APIModule addRoute(
-      APIRequestMethod? method, String name, APIRouteFunction function,
-      {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) {
-    var routesHandlers = _getRoutesHandlers(method);
-    routesHandlers[name] =
-        APIRouteHandler(this, method, name, function, parameters, rules);
-    return this;
-  }
-
-  /// Returns the routes builder of this module.
-  APIRouteBuilder get routes => _routeBuilder;
-
-  /// Returns a route handler for [name].
-  APIRouteHandler<T>? getRouteHandler<T>(String name,
-      [APIRequestMethod? method]) {
-    var handler = _getRouteHandlerImpl<T>(name, method);
-
-    if (handler == null) {
-      var def = defaultRouteName;
-      if (def != null) {
-        handler = _getRouteHandlerImpl<T>(def, method);
-      }
-    }
-
-    return handler;
-  }
-
-  APIRouteHandler<T>? _getRouteHandlerImpl<T>(
-      String name, APIRequestMethod? method) {
-    _ensureConfigured();
-
-    var routesHandlers = _getRoutesHandlers(method);
-    var handler = routesHandlers[name];
-
-    if (handler == null && method != null) {
-      handler = _routesHandlers[name];
-    }
-
-    return handler as APIRouteHandler<T>?;
-  }
-
-  /// Returns a route handler for [request].
-  ///
-  /// Calls [resolveRoute] to determine the route name of the [request].
-  APIRouteHandler<T>? getRouteHandlerByRequest<T>(APIRequest request) {
-    _ensureConfigured();
-
-    var route = resolveRoute(request);
-    return getRouteHandler(route, request.method);
-  }
-
-  /// Resolves the route name of the [request].
-  String resolveRoute(APIRequest request) {
-    var routeName = request.lastPathPart;
-    return routeName;
-  }
-
-  /// Calls a route for [request].
-  FutureOr<APIResponse<T>> call<T>(APIRequest request) {
-    _ensureConfigured();
-
-    var apiSecurity = security;
-
-    if (apiSecurity != null) {
-      if (request.lastPathPart == authenticationRoute) {
-        return apiSecurity.doRequestAuthentication(request);
-      } else {
-        return apiSecurity.resumeAuthenticationByRequest(request).then((_) {
-          return _callImpl<T>(request);
-        });
-      }
-    } else {
-      return _callImpl<T>(request);
-    }
-  }
-
-  FutureOr<APIResponse<T>> _callImpl<T>(APIRequest apiRequest) {
-    var routeName = apiRequest.lastPathPart;
-
-    if (routeName == 'API-INFO') {
-      var info = apiInfo(apiRequest);
-      return APIResponse.ok(info as T)..payloadMimeType = 'application/json';
-    }
-
-    var handler = getRouteHandlerByRequest<T>(apiRequest);
-
-    if (handler == null) {
-      return apiRoot.onNoRouteForPath(apiRequest);
-    }
-
-    try {
-      var response = handler.call(apiRequest);
-      return response;
-    } catch (e, s) {
-      var error = 'ERROR: $e\n$s';
-      return APIResponse.error(error: error);
-    }
-  }
-
-  /// Returns a [APIModuleInfo].
-  APIModuleInfo apiInfo([APIRequest? apiRequest]) =>
-      APIModuleInfo(this, apiRequest);
-
-  String get authenticationRoute => 'authenticate';
-
-  APISecurity? get security => _securityImpl();
-
-  APISecurity? _security;
-  bool _securityResolved = false;
-
-  APISecurity? _securityImpl() {
-    if (_securityResolved) return _security;
-    _securityResolved = true;
-
-    return _security = apiRoot.security;
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is APIModule &&
-          runtimeType == other.runtimeType &&
-          name == other.name;
-
-  @override
-  int get hashCode => name.hashCode;
-}
-
-/// The [APIModule] information.
-///
-/// Returned by `API-INFO`.
-class APIModuleInfo {
-  final APIModule module;
-  final APIRequest? apiRequest;
-
-  APIModuleInfo(this.module, [this.apiRequest]);
-
-  /// Returns the name of the [module].
-  String get name => module.name;
-
-  /// Returns the version of the [module].
-  String? get version => module.version;
-
-  /// Returns the routes of the [module].
-  List<APIRouteInfo> get routes => module.routes.apiInfo(apiRequest);
-
-  Map<String, dynamic> toJson() =>
-      {'name': name, if (version != null) 'version': version, 'routes': routes};
-}
-
-/// A route builder.
-class APIRouteBuilder<M extends APIModule> {
-  /// The API module of this route builder.
-  final M module;
-
-  APIRouteBuilder(this.module);
-
-  /// Adds a route of [name] with [handler] for ANY request method.
-  APIModule any(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(null, name, function, parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for `GET` request method.
-  APIModule get(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.GET, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for `POST` request method.
-  APIModule post(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.POST, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for `PUT` request method.
-  APIModule put(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.PUT, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for `DELETE` request method.
-  APIModule delete(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.DELETE, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for `PATCH` request method.
-  APIModule patch(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.PATCH, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds a route of [name] with [handler] for the request [method].
-  APIModule add(
-          APIRequestMethod? method, String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      module.addRoute(method, name, function,
-          parameters: parameters, rules: rules);
-
-  /// Adds routes from [provider] for ANY request method.
-  void anyFrom(Object? provider) => from(null, provider);
-
-  /// Adds routes from [provider] for `GET` request method.
-  void getFrom(Object? provider) => from(APIRequestMethod.GET, provider);
-
-  /// Adds routes from [provider] for `POS` request method.
-  void postFrom(Object? provider) => from(APIRequestMethod.POST, provider);
-
-  /// Adds routes from [provider] for `PUT` request method.
-  void putFrom(Object? provider) => from(APIRequestMethod.PUT, provider);
-
-  /// Adds routes from [provider] for `DELETE` request method.
-  void deleteFrom(Object? provider) => from(APIRequestMethod.DELETE, provider);
-
-  /// Adds routes from [provider] for `PATCH` request method.
-  void patchFrom(Object? provider) => from(APIRequestMethod.PATCH, provider);
-
-  /// Adds routes from [provider] for the request [requestMethod].
-  ///
-  /// [provider] can be one of the types below:
-  /// - [MethodReflection]: a route from a reflection method (uses the method name as route name). See [apiMethod].
-  /// - [Iterable<MethodReflection>]: a list of many routes from [MethodReflection]. See [apiMethods].
-  /// - [ClassReflection]: uses the API methods in the reflected class. See [apiReflection].
-  /// - [Iterable]: a list of any of the provider types above.
-  void from(APIRequestMethod? requestMethod, Object? provider) {
-    if (provider == null) return;
-
-    if (provider is MethodReflection) {
-      apiMethod(provider, requestMethod);
-    } else if (provider is Iterable<MethodReflection>) {
-      apiMethods(provider, requestMethod);
-    } else if (provider is ClassReflection) {
-      apiReflection(provider, requestMethod);
-    } else if (provider is Iterable) {
-      for (var e in provider) {
-        from(e, requestMethod);
-      }
-    }
-  }
-
-  /// Adds routes from a [reflection], one for each API method in the reflected class.
-  /// See [ClassReflectionExtension.apiMethods].
-  ///
-  /// - [requestMethod] the route request method.
-  void apiReflection(ClassReflection reflection,
-      [APIRequestMethod? requestMethod]) {
-    var methods = reflection.apiMethods();
-    apiMethods(methods, requestMethod);
-  }
-
-  /// Adds the routes from [apiMethods]. See [apiMethod].
-  void apiMethods(Iterable<MethodReflection> apiMethods,
-      [APIRequestMethod? requestMethod]) {
-    for (var m in apiMethods) {
-      apiMethod(m, requestMethod);
-    }
-  }
-
-  /// Adds a route from [apiMethod], using the same name of the methods as route.
-  /// See [MethodReflectionExtension.isAPIMethod].
-  ///
-  /// - [requestMethod] the route request method.
-  void apiMethod(MethodReflection apiMethod,
-      [APIRequestMethod? requestMethod]) {
-    var returnsAPIResponse = apiMethod.returnsAPIResponse;
-    var receivesAPIRequest = apiMethod.receivesAPIRequest;
-    var rules = apiMethod.annotations.whereType<APIRouteRule>().toList();
-
-    if (rules.isEmpty) {
-      rules = apiMethod.classReflection.classAnnotations
-          .whereType<APIRouteRule>()
-          .toList();
-    }
-
-    if (returnsAPIResponse && receivesAPIRequest) {
-      var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: APIRequest.typeInfo};
-
-      add(requestMethod, apiMethod.name, (req) {
-        return apiMethod.invoke([req]);
-      }, parameters: parameters, rules: rules);
-    } else if (receivesAPIRequest) {
-      var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: APIRequest.typeInfo};
-
-      add(requestMethod, apiMethod.name, (req) {
-        var ret = apiMethod.invoke([req]);
-        return APIResponse.from(ret);
-      }, parameters: parameters, rules: rules);
-    } else if (returnsAPIResponse) {
-      var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
-          .map((p) => MapEntry(p.name, TypeInfo.from(p))));
-
-      add(requestMethod, apiMethod.name, (req) {
-        var methodInvocation =
-            apiMethod.methodInvocation((p) => _resolveRequestParameter(req, p));
-        return methodInvocation.invoke(apiMethod.method);
-      }, parameters: parameters, rules: rules);
-    }
-  }
-
-  Object? _resolveRequestParameter(
-      APIRequest request, ParameterReflection parameter) {
-    var typeReflection = parameter.type;
-    if (typeReflection.isOfType(APIRequest)) {
-      return request;
-    }
-
-    if (typeReflection.isOfType(APICredential)) {
-      return request.credential;
-    }
-
-    if (typeReflection.isOfType(Uint8List)) {
-      return request.payloadAsBytes;
-    }
-
-    var value = request.getParameterIgnoreCase(parameter.name);
-    if (value == null) {
-      return null;
-    }
-
-    var typeInfo = TypeInfo.from(typeReflection);
-
-    if (typeInfo.isNumber) {
-      var n = typeInfo.parse(value);
-      return n;
-    } else if (typeInfo.isString) {
-      var s = typeInfo.parse(value);
-      return s;
-    } else {
-      var parsed = typeInfo.parse(value);
-      return parsed ?? value;
-    }
-  }
-
-  List<APIRouteInfo> apiInfo([APIRequest? apiRequest]) {
-    var info = module._routesHandlers.values
-        .map((e) => e.apiInfo(apiRequest))
-        .toList();
-    return info;
-  }
 }
 
 /// API Methods

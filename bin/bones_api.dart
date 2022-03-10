@@ -17,7 +17,7 @@ void _consolePrinter(Object? o) {
   print(o);
 }
 
-const String cliTitle = '[Bones_API/${APIRoot.VERSION}]';
+const String cliTitle = '[Bones_API/${BonesAPI.VERSION}]';
 
 void main(List<String> args) async {
   var commandInfo = MyCommandInfo(cliTitle, _consolePrinter);
@@ -48,7 +48,7 @@ void main(List<String> args) async {
 }
 
 void showVersion() {
-  print('Bones_API/${APIRoot.VERSION} - CLI Tool');
+  print('Bones_API/${BonesAPI.VERSION} - CLI Tool');
 }
 
 abstract class CommandSourceFileBase extends Command<bool> {
@@ -262,7 +262,7 @@ class MyCommandServe extends CommandSourceFileBase {
     }
 
     if (requiredParameters.isNotEmpty) {
-      print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
+      print('[Bones_API/${BonesAPI.VERSION}] :: CLI :: serve\n');
 
       if (parametersMessage.isNotEmpty) {
         for (var m in parametersMessage) {
@@ -337,7 +337,7 @@ class MyCommandServe extends CommandSourceFileBase {
       Map<String, String> domains) async {
     print(
         '________________________________________________________________________________');
-    print('[Bones_API/${APIRoot.VERSION}] :: CLI :: serve\n');
+    print('[Bones_API/${BonesAPI.VERSION}] :: CLI :: serve\n');
 
     if (parametersMessage.isNotEmpty) {
       for (var m in parametersMessage) {
@@ -528,7 +528,7 @@ class MyCommandServe extends CommandSourceFileBase {
       List<String> parametersMessage) async {
     print(
         '________________________________________________________________________________');
-    print('[Bones_API/${APIRoot.VERSION}]\n');
+    print('[Bones_API/${BonesAPI.VERSION}]\n');
 
     if (parametersMessage.isNotEmpty) {
       for (var m in parametersMessage) {
@@ -596,7 +596,7 @@ void main(List<String> args, dynamic parentPort) {
 
 Future<void> runAPIServer(List<String> args) async {
   print('________________________________________________________________________________');
-  print('[Bones_API/${APIRoot.VERSION}] :: HTTP Server\\n');
+  print('[Bones_API/${BonesAPI.VERSION}] :: HTTP Server\\n');
   print('- API Package: $projectPackageName/$projectLibraryName');
   print('- API Class: $apiRootClass');
   

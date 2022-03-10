@@ -1,10 +1,12 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.21
+// BUILDER: reflection_factory/1.0.23
 // BUILD COMMAND: dart run build_runner build
 //
 
 // ignore_for_file: unnecessary_const
+// ignore_for_file: unnecessary_cast
+// ignore_for_file: unnecessary_type_check
 
 part of 'bones_api_test_entities.dart';
 
@@ -47,7 +49,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.21');
+  Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -59,6 +61,13 @@ class Address$reflection extends ClassReflection<Address> {
 
   static Address$reflection get staticInstance =>
       _withoutObjectInstance ??= Address$reflection();
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Address$reflection.staticInstance;
+  }
 
   @override
   bool get hasDefaultConstructor => false;
@@ -350,7 +359,7 @@ class Address$reflection extends ClassReflection<Address> {
             this,
             Address,
             'setField',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setField,
             obj,
@@ -397,7 +406,7 @@ class Address$reflection extends ClassReflection<Address> {
             this,
             Entity,
             'setID',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setID,
             obj,
@@ -454,7 +463,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.21');
+  Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -466,6 +475,13 @@ class Role$reflection extends ClassReflection<Role> {
 
   static Role$reflection get staticInstance =>
       _withoutObjectInstance ??= Role$reflection();
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Role$reflection.staticInstance;
+  }
 
   @override
   bool get hasDefaultConstructor => false;
@@ -722,7 +738,7 @@ class Role$reflection extends ClassReflection<Role> {
             this,
             Role,
             'setField',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setField,
             obj,
@@ -769,7 +785,7 @@ class Role$reflection extends ClassReflection<Role> {
             this,
             Entity,
             'setID',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setID,
             obj,
@@ -826,7 +842,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.21');
+  Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -838,6 +854,13 @@ class RoleType$reflection extends EnumReflection<RoleType> {
 
   static RoleType$reflection get staticInstance =>
       _withoutObjectInstance ??= RoleType$reflection();
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    RoleType$reflection.staticInstance;
+  }
 
   @override
   List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
@@ -880,7 +903,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.21');
+  Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -892,6 +915,13 @@ class User$reflection extends ClassReflection<User> {
 
   static User$reflection get staticInstance =>
       _withoutObjectInstance ??= User$reflection();
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    User$reflection.staticInstance;
+  }
 
   @override
   bool get hasDefaultConstructor => false;
@@ -1229,7 +1259,7 @@ class User$reflection extends ClassReflection<User> {
             this,
             User,
             'setField',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setField,
             obj,
@@ -1276,7 +1306,7 @@ class User$reflection extends ClassReflection<User> {
             this,
             Entity,
             'setID',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.setID,
             obj,

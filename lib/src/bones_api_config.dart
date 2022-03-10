@@ -4,6 +4,7 @@ import 'dart:convert' as dart_convert;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
+import 'bones_api_base.dart';
 import 'bones_api_config_generic.dart'
     if (dart.library.io) 'bones_api_config_io.dart';
 import 'bones_api_utils.dart';
@@ -17,6 +18,7 @@ class APIConfig {
   String? _source;
 
   APIConfig([Map<String, dynamic> properties = const <String, dynamic>{}]) {
+    BonesAPI.boot();
     _properties.addAll(properties);
   }
 
@@ -86,6 +88,8 @@ class APIConfig {
 
   static FutureOr<APIConfig?> _fromImpl(dynamic o,
       {required bool allowAsync, Object? def}) {
+    BonesAPI.boot();
+
     if (o == null) {
       return def == null ? null : _fromImpl(def, allowAsync: allowAsync);
     }

@@ -82,6 +82,7 @@ library bones_api;
 export 'dart:async';
 
 export 'package:reflection_factory/reflection_factory.dart';
+export 'package:meta/meta_meta.dart';
 
 export 'src/bones_api_authentication.dart';
 export 'src/bones_api_base.dart';
@@ -95,6 +96,7 @@ export 'src/bones_api_entity_adapter.dart';
 export 'src/bones_api_entity_adapter_memory.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_extension.dart';
+export 'src/bones_api_module.dart';
 export 'src/bones_api_repository.dart';
 export 'src/bones_api_security.dart';
 export 'src/bones_api_utils.dart';

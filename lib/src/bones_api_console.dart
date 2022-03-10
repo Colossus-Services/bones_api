@@ -18,7 +18,9 @@ class APIConsole {
   final String version;
 
   APIConsole(this.apiRoot,
-      {this.name = 'APIConsole', this.version = APIRoot.VERSION});
+      {this.name = 'APIConsole', this.version = BonesAPI.VERSION}) {
+    BonesAPI.boot();
+  }
 
   /// Processes an API [line] request.
   FutureOr<APIResponse> processRequestLine(String line) {

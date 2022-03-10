@@ -13,6 +13,15 @@ typedef ToEncodable = Object? Function(Object? object);
 
 /// JSON utility class.
 class Json {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    Time.boot();
+  }
+
   /// A standard implementation of mask filed.
   ///
   /// - [extraKeys] is the extra keys to mask.
@@ -128,6 +137,8 @@ class Json {
     if (entityHandler != null) {
       return (o, j) => entityHandler.getFields(o);
     }
+
+    return null;
   }
 
   /// Converts [o] to [type].
@@ -255,7 +266,7 @@ class Json {
       Type type, Object? value) {
     if (type == Time) {
       return (o, t, j) {
-        var time = o != null ? Time.parse(o.toString()) : null;
+        var time = Time.from(o);
         return time as O?;
       };
     }
@@ -288,6 +299,8 @@ class Json {
     if (entityHandler != null) {
       return (m, j) => entityHandler.createFromMap(m);
     }
+
+    return null;
   }
 
   static String defaultFieldNameResolver(
@@ -924,6 +937,15 @@ class InstanceTracker<O extends Object, I extends Object> {
 /// A [Time] represents the time of the day,
 /// independently of the day of the year, timezone or [DateTime].
 class Time implements Comparable<Time> {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    JsonDecoder.registerTypeDecoder(Time, (o) => Time.from(o));
+  }
+
   int hour;
   int minute = 0;
   int second = 0;
@@ -1140,6 +1162,16 @@ class Time implements Comparable<Time> {
     if (o is List<int>) return Time.fromBytes(o);
 
     if (o is int) return Time.fromMilliseconds(o);
+
+    if (o is Map) {
+      return Time(
+        TypeParser.parseInt(o['hour'], 0)!,
+        TypeParser.parseInt(o['minute'], 0)!,
+        TypeParser.parseInt(o['second'], 0)!,
+        TypeParser.parseInt(o['millisecond'], 0)!,
+        TypeParser.parseInt(o['microsecond'], 0)!,
+      );
+    }
 
     return Time.parse(o.toString());
   }

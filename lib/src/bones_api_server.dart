@@ -81,7 +81,7 @@ class APIServer {
     this.letsEncryptProduction = false,
     Object? letsEncryptDirectory,
     this.name = 'Bones_API',
-    this.version = APIRoot.VERSION,
+    this.version = BonesAPI.VERSION,
     this.hotReload = false,
     Object? domains,
     this.logToConsole = true,

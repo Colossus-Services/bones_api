@@ -1,3 +1,9 @@
+## 1.1.0
+
+- Added `APIModuleProxy` and `APIModuleHttpProxy`.
+- reflection_factory: ^1.0.23
+- meta: ^1.7.0
+
 ## 1.0.39
 
 - Added support to Let's Encrypt HTTPS certificates.

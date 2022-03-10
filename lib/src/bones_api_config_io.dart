@@ -32,4 +32,6 @@ FutureOr<APIConfig?> loadAPIConfigFromUri(Uri o, {bool allowAsync = true}) {
       return null;
     }
   }
+
+  return null;
 }

@@ -3,6 +3,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_module.dart';
 
 /// [ReflectionFactory] extension.
 extension ReflectionFactoryExtension on ReflectionFactory {

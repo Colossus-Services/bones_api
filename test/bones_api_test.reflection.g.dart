@@ -1,10 +1,12 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.21
+// BUILDER: reflection_factory/1.0.23
 // BUILD COMMAND: dart run build_runner build
 //
 
 // ignore_for_file: unnecessary_const
+// ignore_for_file: unnecessary_cast
+// ignore_for_file: unnecessary_type_check
 
 part of 'bones_api_test.dart';
 
@@ -32,7 +34,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.21');
+  Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -45,6 +47,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
 
   static MyInfoModule$reflection get staticInstance =>
       _withoutObjectInstance ??= MyInfoModule$reflection();
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    MyInfoModule$reflection.staticInstance;
+  }
 
   @override
   bool get hasDefaultConstructor => false;
@@ -272,6 +281,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'call',
         'configure',
         'echo',
+        'ensureConfigured',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'resolveRoute'
@@ -290,7 +300,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'configure',
-            null,
+            TypeReflection.tVoid,
             false,
             (o) => o!.configure,
             obj,
@@ -317,6 +327,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
               ParameterReflection(TypeReflection(APIRequest), 'request', false,
                   true, null, null)
             ],
+            null,
+            null,
+            null);
+      case 'ensureconfigured':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            APIModule,
+            'ensureConfigured',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.ensureConfigured,
+            obj,
+            false,
+            null,
             null,
             null,
             null);
