@@ -8,17 +8,17 @@
 // ignore_for_file: unnecessary_cast
 // ignore_for_file: unnecessary_type_check
 
-part of 'bones_api_test.dart';
+part of 'bones_api_test_modules.dart';
 
 // ignore: non_constant_identifier_names
-MyInfoModule MyInfoModule$fromJson(Map<String, Object?> map) =>
-    MyInfoModule$reflection.staticInstance.fromJson(map);
+UserModule UserModule$fromJson(Map<String, Object?> map) =>
+    UserModule$reflection.staticInstance.fromJson(map);
 // ignore: non_constant_identifier_names
-MyInfoModule MyInfoModule$fromJsonEncoded(String jsonEncoded) =>
-    MyInfoModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+UserModule UserModule$fromJsonEncoded(String jsonEncoded) =>
+    UserModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
-class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
-  MyInfoModule$reflection([MyInfoModule? object]) : super(MyInfoModule, object);
+class UserModule$reflection extends ClassReflection<UserModule> {
+  UserModule$reflection([UserModule? object]) : super(UserModule, object);
 
   static bool _registered = false;
   @override
@@ -37,52 +37,52 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get reflectionFactoryVersion => Version.parse('1.0.23');
 
   @override
-  MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
-      MyInfoModule$reflection(obj);
+  UserModule$reflection withObject([UserModule? obj]) =>
+      UserModule$reflection(obj);
 
-  static MyInfoModule$reflection? _withoutObjectInstance;
+  static UserModule$reflection? _withoutObjectInstance;
   @override
-  MyInfoModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as MyInfoModule$reflection;
+  UserModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as UserModule$reflection;
 
-  static MyInfoModule$reflection get staticInstance =>
-      _withoutObjectInstance ??= MyInfoModule$reflection();
+  static UserModule$reflection get staticInstance =>
+      _withoutObjectInstance ??= UserModule$reflection();
 
   static bool _boot = false;
   static void boot() {
     if (_boot) return;
     _boot = true;
-    MyInfoModule$reflection.staticInstance;
+    UserModule$reflection.staticInstance;
   }
 
   @override
   bool get hasDefaultConstructor => false;
   @override
-  MyInfoModule? createInstanceWithDefaultConstructor() => null;
+  UserModule? createInstanceWithDefaultConstructor() => null;
 
   @override
   bool get hasEmptyConstructor => false;
   @override
-  MyInfoModule? createInstanceWithEmptyConstructor() => null;
+  UserModule? createInstanceWithEmptyConstructor() => null;
   @override
   bool get hasNoRequiredArgsConstructor => false;
   @override
-  MyInfoModule? createInstanceWithNoRequiredArgsConstructor() => null;
+  UserModule? createInstanceWithNoRequiredArgsConstructor() => null;
 
   @override
   List<String> get constructorsNames => const <String>[''];
 
   @override
-  ConstructorReflection<MyInfoModule>? constructor<R>(String constructorName) {
+  ConstructorReflection<UserModule>? constructor<R>(String constructorName) {
     var lc = constructorName.trim().toLowerCase();
 
     switch (lc) {
       case '':
-        return ConstructorReflection<MyInfoModule>(
+        return ConstructorReflection<UserModule>(
             this,
-            MyInfoModule,
+            UserModule,
             '',
-            () => (APIRoot apiRoot) => MyInfoModule(apiRoot),
+            () => (APIRoot apiRoot) => UserModule(apiRoot),
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection(APIRoot), 'apiRoot', false, true, null, null)
@@ -112,7 +112,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   bool get hasMethodToJson => false;
 
   @override
-  Object? callMethodToJson([MyInfoModule? obj]) => null;
+  Object? callMethodToJson([UserModule? obj]) => null;
 
   @override
   List<String> get fieldsNames => const <String>[
@@ -129,15 +129,15 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
       ];
 
   @override
-  FieldReflection<MyInfoModule, T>? field<T>(String fieldName,
-      [MyInfoModule? obj]) {
+  FieldReflection<UserModule, T>? field<T>(String fieldName,
+      [UserModule? obj]) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
 
     switch (lc) {
       case 'apiroot':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection(APIRoot),
@@ -151,7 +151,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'name':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tString,
@@ -165,7 +165,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'version':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tString,
@@ -179,7 +179,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'apiconfig':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection(APIConfig),
@@ -193,7 +193,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'defaultroutename':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tString,
@@ -207,7 +207,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'allroutesnames':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tSetString,
@@ -221,7 +221,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'routes':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection(APIRouteBuilder, [APIModule]),
@@ -235,7 +235,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'authenticationroute':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tString,
@@ -249,7 +249,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'security':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection(APISecurity),
@@ -263,7 +263,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           null,
         );
       case 'hashcode':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<UserModule, T>(
           this,
           APIModule,
           TypeReflection.tInt,
@@ -285,7 +285,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   List<String> get staticFieldsNames => const <String>[];
 
   @override
-  FieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) {
+  FieldReflection<UserModule, T>? staticField<T>(String fieldName) {
     return null;
   }
 
@@ -295,26 +295,32 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'apiInfo',
         'call',
         'configure',
-        'echo',
         'ensureConfigured',
+        'geDynamicAsync',
+        'geDynamicAsync2',
+        'getDynamic',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'getRoutesHandlersNames',
+        'getUser',
+        'getUserAsync',
+        'notARoute',
+        'notARouteAsync',
         'resolveRoute'
       ];
 
   @override
-  MethodReflection<MyInfoModule, R>? method<R>(String methodName,
-      [MyInfoModule? obj]) {
+  MethodReflection<UserModule, R>? method<R>(String methodName,
+      [UserModule? obj]) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
 
     switch (lc) {
       case 'configure':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
-            MyInfoModule,
+            UserModule,
             'configure',
             TypeReflection.tVoid,
             false,
@@ -325,29 +331,131 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             [override]);
-      case 'echo':
-        return MethodReflection<MyInfoModule, R>(
+      case 'notaroute':
+        return MethodReflection<UserModule, R>(
             this,
-            MyInfoModule,
-            'echo',
-            TypeReflection(FutureOr, [
-              TypeReflection(APIResponse, [dynamic])
-            ]),
+            UserModule,
+            'notARoute',
+            TypeReflection.tString,
             false,
-            (o) => o!.echo,
+            (o) => o!.notARoute,
             obj,
             false,
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection.tString, 'msg', false, true, null, null),
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+                  TypeReflection.tInt, 'n', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'notarouteasync':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'notARouteAsync',
+            TypeReflection.tFutureString,
+            false,
+            (o) => o!.notARouteAsync,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'n', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'getuser':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'getUser',
+            TypeReflection(APIResponse, [User]),
+            false,
+            (o) => o!.getUser,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'getdynamic':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'getDynamic',
+            TypeReflection(APIResponse, [dynamic]),
+            false,
+            (o) => o!.getDynamic,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'getuserasync':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'getUserAsync',
+            TypeReflection(Future, [
+              TypeReflection(APIResponse, [User])
+            ]),
+            false,
+            (o) => o!.getUserAsync,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'gedynamicasync':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'geDynamicAsync',
+            TypeReflection(Future, [
+              TypeReflection(APIResponse, [dynamic])
+            ]),
+            false,
+            (o) => o!.geDynamicAsync,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'gedynamicasync2':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'geDynamicAsync2',
+            TypeReflection.tFutureDynamic,
+            false,
+            (o) => o!.geDynamicAsync2,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tInt, 'id', false, true, null, null)
             ],
             null,
             null,
             null);
       case 'ensureconfigured':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'ensureConfigured',
@@ -361,7 +469,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null);
       case 'getrouteshandlersnames':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'getRoutesHandlersNames',
@@ -378,7 +486,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             },
             null);
       case 'addroute':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'addRoute',
@@ -414,7 +522,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             },
             null);
       case 'getroutehandler':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'getRouteHandler',
@@ -434,7 +542,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null);
       case 'getroutehandlerbyrequest':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'getRouteHandlerByRequest',
@@ -451,7 +559,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null);
       case 'resolveroute':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'resolveRoute',
@@ -468,7 +576,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null);
       case 'call':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'call',
@@ -487,7 +595,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null);
       case 'apiinfo':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<UserModule, R>(
             this,
             APIModule,
             'apiInfo',
@@ -512,31 +620,31 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   List<String> get staticMethodsNames => const <String>[];
 
   @override
-  MethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) {
+  MethodReflection<UserModule, R>? staticMethod<R>(String methodName) {
     return null;
   }
 }
 
-extension MyInfoModule$reflectionExtension on MyInfoModule {
-  /// Returns a [ClassReflection] for type [MyInfoModule]. (Generated by [ReflectionFactory])
-  ClassReflection<MyInfoModule> get reflection => MyInfoModule$reflection(this);
+extension UserModule$reflectionExtension on UserModule {
+  /// Returns a [ClassReflection] for type [UserModule]. (Generated by [ReflectionFactory])
+  ClassReflection<UserModule> get reflection => UserModule$reflection(this);
 
-  /// Returns a JSON for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  /// Returns a JSON for type [UserModule]. (Generated by [ReflectionFactory])
   Object? toJson() => reflection.toJson();
 
-  /// Returns a JSON [Map] for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  /// Returns a JSON [Map] for type [UserModule]. (Generated by [ReflectionFactory])
   Map<String, dynamic>? toJsonMap() => reflection.toJsonMap();
 
-  /// Returns an encoded JSON [String] for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  /// Returns an encoded JSON [String] for type [UserModule]. (Generated by [ReflectionFactory])
   String toJsonEncoded({bool pretty = false}) =>
       reflection.toJsonEncoded(pretty: pretty);
 
-  /// Returns a JSON for type [MyInfoModule] using the class fields. (Generated by [ReflectionFactory])
+  /// Returns a JSON for type [UserModule] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields() => reflection.toJsonFromFields();
 }
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
-      MyInfoModule$reflection(),
+      UserModule$reflection(),
     ];
 
 List<Reflection>? _siblingsReflectionList;

@@ -1,3 +1,7 @@
+## 1.1.1
+
+- Fix `MethodReflectionExtension.returnsAPIResponse`.
+
 ## 1.1.0
 
 - Added `APIModuleProxy` and `APIModuleHttpProxy`.

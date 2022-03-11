@@ -68,7 +68,7 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
 extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
   /// Returns `true` if this reflected method is an API method ([returnsAPIResponse] OR [receivesAPIRequest]).
   bool get isAPIMethod =>
-      (returnsAPIResponse || receivesAPIRequest) && declaringType != APIModule;
+      declaringType != APIModule && (returnsAPIResponse || receivesAPIRequest);
 
   /// Returns `true` if this reflected method is [returnsAPIResponse] AND [receivesAPIRequest].
   bool get isFullAPIMethod => returnsAPIResponse && receivesAPIRequest;
@@ -84,9 +84,16 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
 
     var typeInfo = returnType.typeInfo;
 
-    return typeInfo.isOf(APIResponse) ||
-        ((typeInfo.isFuture || typeInfo.isDynamic) &&
-            (typeInfo.equivalentArgumentsTypes([APIResponse])));
+    if (typeInfo.isOf(APIResponse) || typeInfo.isDynamic) return true;
+
+    if (typeInfo.isFuture) {
+      var arg = typeInfo.argumentType(0);
+      if (arg == null) return false;
+
+      if (arg.isOf(APIResponse) || arg.isDynamic) return true;
+    }
+
+    return false;
   }
 }
 

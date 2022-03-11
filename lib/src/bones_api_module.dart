@@ -65,6 +65,22 @@ abstract class APIModule {
   final Map<String, APIRouteHandler> _routesHandlersPATH =
       <String, APIRouteHandler>{};
 
+  /// Returns all the routes names.
+  Set<String> get allRoutesNames => {
+        ..._routesHandlers.keys,
+        ..._routesHandlersGET.keys,
+        ..._routesHandlersPOST.keys,
+        ..._routesHandlersPUT.keys,
+        ..._routesHandlersDELETE.keys,
+        ..._routesHandlersPATH.keys,
+      };
+
+  /// Returns the routes names for [method].
+  Iterable<String> getRoutesHandlersNames({APIRequestMethod? method}) {
+    var handlers = _getRoutesHandlers(method);
+    return handlers.keys;
+  }
+
   Map<String, APIRouteHandler> _getRoutesHandlers(APIRequestMethod? method) {
     switch (method) {
       case APIRequestMethod.GET:
