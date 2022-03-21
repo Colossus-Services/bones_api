@@ -285,8 +285,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
         var entityAsync = entityProvider.getEntityByID(value, type: type.type);
 
         if (entityAsync != null) {
-          return entityAsync.resolveMapped((entity) {
-            if (entity != null) return entity as T;
+          return entityAsync.resolveMapped<T?>((entity) {
+            if (entity != null) return entity as T?;
             return _resolveValueByEntityHandler<T>(value, type, entityProvider);
           });
         }

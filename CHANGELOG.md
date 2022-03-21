@@ -1,3 +1,8 @@
+## 1.1.3
+
+- `EntityHandler.resolveValueByType`:
+  - Avoid `dev_compiler` bug https://github.com/dart-lang/sdk/issues/48631 when generating JS code.
+
 ## 1.1.2
 
 - Added `ConditionIdIN`: to allow optimized selection of multiple IDs with one query.
