@@ -12,7 +12,7 @@ final dbUser = 'postgres';
 final dbPass = '123456';
 final dbName = 'postgres';
 
-class PostgreTestContainer extends DBTestContainer {
+class PostgresTestContainer extends DBTestContainer {
   late final PostgreSQLContainerConfig containerConfig;
   late PostgreSQLContainer container;
 
@@ -71,7 +71,7 @@ void main() {
 void _runTest(bool useReflection) {
   runAdapterTests(
     'PostgreSQL',
-    PostgreTestContainer(),
+    PostgresTestContainer(),
     5432,
     (provider, dbPort) => PostgreSQLAdapter(
       dbName,

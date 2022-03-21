@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.23
+// BUILDER: reflection_factory/1.0.24
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -49,7 +49,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.23');
+  Version get reflectionFactoryVersion => Version.parse('1.0.24');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -61,6 +61,9 @@ class Address$reflection extends ClassReflection<Address> {
 
   static Address$reflection get staticInstance =>
       _withoutObjectInstance ??= Address$reflection();
+
+  @override
+  Address$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {
@@ -463,7 +466,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.23');
+  Version get reflectionFactoryVersion => Version.parse('1.0.24');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -475,6 +478,9 @@ class Role$reflection extends ClassReflection<Role> {
 
   static Role$reflection get staticInstance =>
       _withoutObjectInstance ??= Role$reflection();
+
+  @override
+  Role$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {
@@ -842,7 +848,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.23');
+  Version get reflectionFactoryVersion => Version.parse('1.0.24');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -854,6 +860,9 @@ class RoleType$reflection extends EnumReflection<RoleType> {
 
   static RoleType$reflection get staticInstance =>
       _withoutObjectInstance ??= RoleType$reflection();
+
+  @override
+  RoleType$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {
@@ -903,7 +912,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.23');
+  Version get reflectionFactoryVersion => Version.parse('1.0.24');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -915,6 +924,9 @@ class User$reflection extends ClassReflection<User> {
 
   static User$reflection get staticInstance =>
       _withoutObjectInstance ??= User$reflection();
+
+  @override
+  User$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {

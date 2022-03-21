@@ -1,5 +1,6 @@
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
+import 'package:collection/collection.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
@@ -312,6 +313,22 @@ void runAdapterTests(
         expect(user.level, equals(100));
         expect(user.wakeUpTime, isNull);
         expect(user.creationTime, equals(user1CreationTime));
+
+        var user2 =
+            (await userAPIRepository.selectByEmail('joe@$testDomain')).first;
+        expect(user2.toJsonEncoded(), equals(user.toJsonEncoded()));
+
+        var user3 = (await userAPIRepository.select(
+                Condition.parse('email == ?'),
+                parameters: ['joe@$testDomain']))
+            .first;
+        expect(user3.toJsonEncoded(), equals(user.toJsonEncoded()));
+
+        var user4 = (await userAPIRepository.select(
+                Condition.parse('email == ?'),
+                parameters: ['joex@$testDomain']))
+            .firstOrNull;
+        expect(user4, isNull);
       }
 
       {
@@ -501,7 +518,7 @@ void runAdapterTests(
 
         expect(transaction.isAborted, isFalse);
         expect(transaction.isCommitted, isTrue);
-        expect(transaction.length, equals(10));
+        expect(transaction.length, equals(9));
         expect(transaction.abortedError, isNull);
       }
 
@@ -596,6 +613,23 @@ void runAdapterTests(
       {
         var user = await userAPIRepository.selectByID(2);
         expect(user, isNull);
+      }
+
+      {
+        var del1 = await userAPIRepository.delete(
+            Condition.parse(' email == ? '),
+            parameters: {'email': 'joex@$testDomain'});
+        expect(del1, isEmpty);
+
+        print('!!! sel all:');
+        print((await userAPIRepository.selectByQuery('email != 123'))
+            .map((e) => e.toJson()));
+
+        var del2 = await userAPIRepository.delete(
+            Condition.parse(' email == ? '),
+            parameters: {'email': 'joe@$testDomain'});
+        expect(del2.length, equals(1));
+        expect(del2.first.email, equals('joe@$testDomain'));
       }
     });
   });

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.23
+// BUILDER: reflection_factory/1.0.24
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.23');
+  Version get reflectionFactoryVersion => Version.parse('1.0.24');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -47,6 +47,9 @@ class UserModule$reflection extends ClassReflection<UserModule> {
 
   static UserModule$reflection get staticInstance =>
       _withoutObjectInstance ??= UserModule$reflection();
+
+  @override
+  UserModule$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {

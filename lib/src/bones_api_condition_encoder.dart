@@ -525,6 +525,8 @@ abstract class ConditionEncoder {
       return encodeGroupCondition(c, context);
     } else if (c is ConditionID) {
       return encodeIDCondition(c, context);
+    } else if (c is ConditionIdIN) {
+      return encodeIDConditionIN(c, context);
     } else {
       throw ConditionEncodingError("$c");
     }
@@ -532,6 +534,9 @@ abstract class ConditionEncoder {
 
   FutureOr<EncodingContext> encodeIDCondition(
       ConditionID c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeIDConditionIN(
+      ConditionIdIN c, EncodingContext context);
 
   FutureOr<EncodingContext> encodeGroupCondition(
       GroupCondition c, EncodingContext context) {

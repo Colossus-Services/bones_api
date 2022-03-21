@@ -280,7 +280,8 @@ class Json {
       var entityHandler = entityHandlerProvider.getEntityHandler(type: type);
 
       if (entityHandler != null) {
-        return (m, j) => entityHandler.createFromMap(m);
+        return (m, j) => entityHandler.createFromMap(m,
+            entityProvider: EntityRepositoryProvider.globalProvider);
       }
     }
 
@@ -297,7 +298,8 @@ class Json {
         EntityHandlerProvider.globalProvider.getEntityHandler(type: type);
 
     if (entityHandler != null) {
-      return (m, j) => entityHandler.createFromMap(m);
+      return (m, j) => entityHandler.createFromMap(m,
+          entityProvider: EntityRepositoryProvider.globalProvider);
     }
 
     return null;

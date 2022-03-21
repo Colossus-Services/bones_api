@@ -5,6 +5,7 @@ import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:mercury_client/mercury_client.dart' as mercury_client;
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';
@@ -266,6 +267,17 @@ void main() {
           equals('[method: POST ; msg: HELLO! ; agent: BonesAPI/Test]'));
     });
 
+    test('proxy: toUpperCase', () async {
+      var infoProxy = MyInfoModuleProxy(mercury_client.HttpClient(
+          '${apiServer.url}service', _MyHttpClientRequester()));
+
+      expect(await infoProxy.toUpperCase('abc'), equals('Upper case: ABC'));
+
+      expect(await infoProxy.toUpperCase('abc X'), equals('Upper case: ABC X'));
+
+      expect(await infoProxy.toUpperCase('AAA'), equals('Upper case: AAA'));
+    });
+
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
@@ -276,7 +288,8 @@ void main() {
           '{"name":"err","uri":"http://localhost:0/base/err"}'
           ']},'
           '{"name":"info","routes":['
-          '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"}'
+          '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"},'
+          '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:5544/info/toUpperCase?msg=String"}'
           ']}'
           ']}';
 
@@ -493,6 +506,12 @@ class MyBaseModule extends APIModule {
   }
 }
 
+@APIModuleProxy('MyInfoModule')
+class MyInfoModuleProxy extends APIModuleHttpProxy {
+  MyInfoModuleProxy(mercury_client.HttpClient httpClient)
+      : super(httpClient, moduleRoute: 'info');
+}
+
 @EnableReflection()
 class MyInfoModule extends APIModule {
   MyInfoModule(APIRoot apiRoot) : super(apiRoot, 'info');
@@ -502,10 +521,15 @@ class MyInfoModule extends APIModule {
     routes.anyFrom(reflection);
   }
 
-  FutureOr<APIResponse> echo(String msg, APIRequest request) {
+  FutureOr<APIResponse<String>> echo(String msg, APIRequest request) {
     var method = request.method.name;
     var agent = request.headers['user-agent'];
     var reply = '[method: $method ; msg: ${msg.toUpperCase()} ; agent: $agent]';
+    return APIResponse.ok(reply);
+  }
+
+  FutureOr<APIResponse<String>> toUpperCase(String msg) {
+    var reply = 'Upper case: ${msg.toUpperCase()}';
     return APIResponse.ok(reply);
   }
 }
@@ -578,4 +602,21 @@ Future<String> _getURL(String url,
   var body = data.join();
 
   return body;
+}
+
+class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
+  @override
+  Future<mercury_client.HttpResponse> doHttpRequest(
+      mercury_client.HttpClient client,
+      mercury_client.HttpRequest request,
+      mercury_client.ProgressListener? progressListener,
+      bool log) async {
+    var responseContent = await _getURL(request.requestURL);
+    return mercury_client.HttpResponse(
+        mercury_client.getHttpMethod(request.method.name)!,
+        request.url,
+        request.requestURL,
+        200,
+        mercury_client.HttpBody.from(responseContent));
+  }
 }

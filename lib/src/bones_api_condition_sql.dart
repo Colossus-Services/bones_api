@@ -35,16 +35,11 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var schemeProvider = this.schemeProvider;
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idValue);
-      var valueSQLRet =
-          valueToSQL(context, c.idValue, fieldKey: idKey, fieldType: int);
+      var q = sqlElementQuote;
+      var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
-      return valueSQLRet.resolveMapped((valueSQL) {
-        context.write(' $tableAlias.id = ');
-        context.write(valueSQL);
-        context.write(' ');
-
-        return context;
-      });
+      return encodeConditionValuesWithOperator(
+          context, int, idKey, tableKey, '=', c.idValue, false);
     } else {
       var tableSchemeRet = schemeProvider.getTableScheme(tableName);
 
@@ -54,21 +49,49 @@ class ConditionSQLEncoder extends ConditionEncoder {
         }
 
         var idFieldName = tableScheme.idFieldName ?? 'id';
-        var idType = tableScheme.fieldsTypes[idFieldName];
+        var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
 
         var idKey = context.addEncodingParameter(idFieldName, c.idValue);
-        var valueSQLRet =
-            valueToSQL(context, c.idValue, fieldKey: idKey, fieldType: idType);
+        var q = sqlElementQuote;
+        var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
-        return valueSQLRet.resolveMapped((valueSQL) {
-          var q = sqlElementQuote;
+        return encodeConditionValuesWithOperator(
+            context, idType, idKey, tableKey, '=', c.idValue, false);
+      });
+    }
+  }
 
-          context.write(' $q$tableAlias$q.$q$idFieldName$q = ');
-          context.write(valueSQL);
-          context.write(' ');
+  @override
+  FutureOr<EncodingContext> encodeIDConditionIN(
+      ConditionIdIN c, EncodingContext context) {
+    var tableName = context.tableNameOrEntityName;
+    var tableAlias = context.resolveEntityAlias(tableName);
 
-          return context;
-        });
+    var schemeProvider = this.schemeProvider;
+    if (schemeProvider == null) {
+      var idKey = context.addEncodingParameter('id', c.idsValues);
+      var q = sqlElementQuote;
+      var tableKey = '$q$tableAlias$q.$q$idKey$q';
+
+      return encodeConditionValuesWithOperator(
+          context, int, idKey, tableKey, 'IN', c.idsValues, true);
+    } else {
+      var tableSchemeRet = schemeProvider.getTableScheme(tableName);
+
+      return tableSchemeRet.resolveMapped((tableScheme) {
+        if (tableScheme == null) {
+          throw StateError("Can't find TableScheme for entity: $tableName");
+        }
+
+        var idFieldName = tableScheme.idFieldName ?? 'id';
+        var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
+
+        var idKey = context.addEncodingParameter(idFieldName, c.idsValues);
+        var q = sqlElementQuote;
+        var tableKey = '$q$tableAlias$q.$q$idKey$q';
+
+        return encodeConditionValuesWithOperator(
+            context, idType, idFieldName, tableKey, 'IN', c.idsValues, true);
       });
     }
   }
@@ -98,24 +121,34 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     return retKeySQL.resolveMapped((keySQL) {
       var keyType = keySQL.key;
-      var keyName = keySQL.value;
+      var tableKey = keySQL.value;
 
+      return encodeConditionValuesWithOperator(
+          context, keyType, null, tableKey, operator, c.value, valueAsList);
+    });
+  }
+
+  FutureOr<EncodingContext> encodeConditionValuesWithOperator(
+      EncodingContext context,
+      Type keyType,
+      String? fieldKey,
+      String tableKey,
+      String operator,
+      dynamic values,
+      bool valueAsList) {
+    context.write(' ');
+    context.write(tableKey);
+    context.write(' ');
+    context.write(operator);
+    context.write(' ');
+
+    var valueSQLRet = valueToSQL(context, values,
+        fieldKey: fieldKey, fieldType: keyType, valueAsList: valueAsList);
+
+    return valueSQLRet.resolveMapped((valueSQL) {
+      context.write(valueSQL);
       context.write(' ');
-      context.write(keyName);
-
-      context.write(' ');
-      context.write(operator);
-      context.write(' ');
-
-      var valueSQLRet = valueToSQL(context, c.value,
-          fieldType: keyType, valueAsList: valueAsList);
-
-      return valueSQLRet.resolveMapped((valueSQL) {
-        context.write(valueSQL);
-        context.write(' ');
-
-        return context;
-      });
+      return context;
     });
   }
 

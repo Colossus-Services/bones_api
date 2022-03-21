@@ -90,6 +90,10 @@ class EntityHandlerProvider {
   }
 }
 
+abstract class EntityProvider {
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type});
+}
+
 abstract class EntityHandler<O> with FieldsFromMap {
   final EntityHandlerProvider provider;
   final Type type;
@@ -137,6 +141,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   void setID<V>(O o, V id) => setField(o, idFieldsName(o), id);
 
+  Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
+      Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
+
   String idFieldsName([O? o]);
 
   List<String> fieldsNames([O? o]);
@@ -147,6 +154,12 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   Map<String, TypeInfo> fieldsWithTypeList([O? o]) => _fieldsWithTypeList ??=
       fieldsWithType((_, fieldType) => fieldType.isList, o);
+
+  Map<String, TypeInfo>? _fieldsWithTypeEntity;
+
+  Map<String, TypeInfo> fieldsWithTypeEntity([O? o]) =>
+      _fieldsWithTypeEntity ??=
+          fieldsWithType((_, fieldType) => !fieldType.isBasicType, o);
 
   Map<String, TypeInfo>? _fieldsWithTypeListEntity;
 
@@ -167,12 +180,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   FutureOr<Map<String, Object?>> resolveFieldsValues(
       Map<String, Object?> fields,
-      [O? o]) {
+      [O? o,
+      EntityProvider? entityProvider]) {
     var fieldsTypes = this.fieldsTypes(o);
 
     var resolved = fields.map((f, v) {
       var t = fieldsTypes[f];
-      var v2 = resolveFieldValue(f, t, v);
+      var v2 = resolveFieldValue(f, t, v, entityProvider: entityProvider);
       return MapEntry(f, v2);
     });
 
@@ -180,12 +194,14 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   FutureOr<Object?> resolveFieldValue(
-      String fieldName, TypeInfo? fieldType, Object? value) {
-    return resolveValueByType(fieldType, value);
+      String fieldName, TypeInfo? fieldType, Object? value,
+      {EntityProvider? entityProvider}) {
+    return resolveValueByType(fieldType, value, entityProvider: entityProvider);
   }
 
   FutureOr<Map<String, Object?>> resolveFieldsNamesAndValues(
-      Map<String, dynamic> fields) {
+      Map<String, dynamic> fields,
+      {EntityProvider? entityProvider}) {
     var fieldsNames = this.fieldsNames();
 
     var fieldsValues = getFieldsValuesFromMap(fieldsNames, fields,
@@ -193,17 +209,19 @@ abstract class EntityHandler<O> with FieldsFromMap {
         fieldsNamesLC: fieldsNamesLC(),
         fieldsNamesSimple: fieldsNamesSimple());
 
-    return resolveFieldsValues(fieldsValues);
+    return resolveFieldsValues(fieldsValues, null, entityProvider);
   }
 
-  FutureOr<dynamic> resolveEntityFieldValue(O o, String key, dynamic value) {
+  FutureOr<dynamic> resolveEntityFieldValue(O o, String key, dynamic value,
+      {EntityProvider? entityProvider}) {
     var fieldType = getFieldType(o, key);
-    return resolveValueByType(fieldType, value);
+    return resolveValueByType(fieldType, value, entityProvider: entityProvider);
   }
 
   static final TypeInfo _typeInfoTime = TypeInfo(Time);
 
-  FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value) {
+  FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value,
+      {EntityProvider? entityProvider}) {
     if (type == null) {
       return value as T?;
     }
@@ -227,7 +245,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
       } else {
         var valEntityHandler = _resolveEntityHandler(type);
         var resolved = valEntityHandler != null
-            ? valEntityHandler.createFromMap(value)
+            ? valEntityHandler.createFromMap(value,
+                entityProvider: entityProvider)
             : value;
         return resolved as T?;
       }
@@ -238,8 +257,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
         if (valEntityHandler != null) {
           var listFutures = TypeParser.parseList(value,
-              elementParser: (e) =>
-                  valEntityHandler.resolveValueByType(elementType, e));
+              elementParser: (e) => valEntityHandler.resolveValueByType(
+                  elementType, e,
+                  entityProvider: entityProvider));
 
           if (listFutures == null) return null;
 
@@ -248,7 +268,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
           });
         } else {
           var listFutures = TypeParser.parseList(value,
-              elementParser: (e) => resolveValueByType(elementType, e));
+              elementParser: (e) => resolveValueByType(elementType, e,
+                  entityProvider: entityProvider));
 
           if (listFutures == null) return null;
           return listFutures.resolveAll().resolveMapped((l) => l as T);
@@ -260,28 +281,47 @@ abstract class EntityHandler<O> with FieldsFromMap {
       var parsed = type.parse<T>(value);
       if (parsed != null) return parsed;
 
-      var valEntityHandler = _resolveEntityHandler(type);
-      var entityRepository =
-          valEntityHandler?.getEntityRepository(type: type.type);
+      if (entityProvider != null) {
+        var entityAsync = entityProvider.getEntityByID(value, type: type.type);
 
-      if (entityRepository != null) {
-        var retEntity = entityRepository.selectByID(value);
-        return retEntity.resolveMapped((val) => val as T?);
-      }
-
-      try {
-        var value2 = Json.fromJson(value, type: type.type);
-
-        if (value2 != null) {
-          return value2 as T?;
-        } else {
-          return value as T?;
+        if (entityAsync != null) {
+          return entityAsync.resolveMapped((entity) {
+            if (entity != null) return entity as T;
+            return _resolveValueByEntityHandler<T>(value, type, entityProvider);
+          });
         }
-      } catch (e) {
-        return value as T?;
       }
+
+      return _resolveValueByEntityHandler<T>(value, type, entityProvider);
     } else {
       return type.parse<T>(value);
+    }
+  }
+
+  FutureOr<T?> _resolveValueByEntityHandler<T>(
+      Object value, TypeInfo type, EntityProvider? entityProvider) {
+    var valEntityHandler = _resolveEntityHandler(type);
+    var entityRepository =
+        valEntityHandler?.getEntityRepository(type: type.type);
+
+    if (entityRepository != null) {
+      var transaction = entityProvider is Transaction ? entityProvider : null;
+      var retEntity =
+          entityRepository.selectByID(value, transaction: transaction);
+      return retEntity.resolveMapped((val) => val as T?);
+    }
+
+    try {
+      var value2 = Json.fromJson(value,
+          type: type.type, entityHandlerProvider: provider);
+
+      if (value2 != null) {
+        return value2 as T?;
+      } else {
+        return value as T?;
+      }
+    } catch (e) {
+      return value as T?;
     }
   }
 
@@ -370,7 +410,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
     }
 
     if (value is Map<String, dynamic>) {
-      return createFromMap(value);
+      return createFromMap(value,
+          entityProvider: EntityRepositoryProvider.globalProvider);
     }
 
     return value;
@@ -545,9 +586,11 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return null;
   }
 
-  FutureOr<O> createFromMap(Map<String, dynamic> fields);
+  FutureOr<O> createFromMap(Map<String, dynamic> fields,
+      {EntityProvider? entityProvider});
 
-  FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields) {
+  FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields,
+      {EntityProvider? entityProvider}) {
     var fieldsNames = this.fieldsNames(o);
 
     var fieldsValues = getFieldsValuesFromMap(fieldsNames, fields,
@@ -556,14 +599,18 @@ abstract class EntityHandler<O> with FieldsFromMap {
         fieldsNamesSimple: fieldsNamesSimple(o));
 
     var setFutures = fieldsValues.entries.map((e) {
-      return setFieldValueDynamic(o, e.key, e.value).resolveWithValue(true);
+      return setFieldValueDynamic(o, e.key, e.value,
+              entityProvider: entityProvider)
+          .resolveWithValue(true);
     });
 
     return setFutures.resolveAllWithValue(o);
   }
 
-  FutureOr<dynamic> setFieldValueDynamic(O o, String key, dynamic value) {
-    var retValue2 = resolveEntityFieldValue(o, key, value);
+  FutureOr<dynamic> setFieldValueDynamic(O o, String key, dynamic value,
+      {EntityProvider? entityProvider}) {
+    var retValue2 =
+        resolveEntityFieldValue(o, key, value, entityProvider: entityProvider);
     return retValue2.resolveMapped((value2) {
       setField(o, key, value2);
       return value2;
@@ -749,7 +796,8 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
-  FutureOr<O> createFromMap(Map<String, dynamic> fields) {
+  FutureOr<O> createFromMap(Map<String, dynamic> fields,
+      {EntityProvider? entityProvider}) {
     if (instantiatorFromMap != null) {
       var fieldsNames = this.fieldsNames();
 
@@ -758,14 +806,16 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
           fieldsNamesLC: fieldsNamesLC(),
           fieldsNamesSimple: fieldsNamesSimple());
 
-      var retFieldsResolved = resolveFieldsValues(fieldsValues);
+      var retFieldsResolved =
+          resolveFieldsValues(fieldsValues, null, entityProvider);
 
       return retFieldsResolved.resolveMapped((fieldsResolved) {
         return instantiatorFromMap!(fieldsResolved);
       });
     } else {
       var oRet = instantiatorDefault!();
-      return oRet.resolveMapped((o) => setFieldsFromMap(o, fields));
+      return oRet.resolveMapped(
+          (o) => setFieldsFromMap(o, fields, entityProvider: entityProvider));
     }
   }
 
@@ -952,8 +1002,10 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }
 
   @override
-  FutureOr<O> createFromMap(Map<String, dynamic> fields) {
-    return resolveFieldsNamesAndValues(fields).resolveMapped((resolvedFields) {
+  FutureOr<O> createFromMap(Map<String, dynamic> fields,
+      {EntityProvider? entityProvider}) {
+    return resolveFieldsNamesAndValues(fields, entityProvider: entityProvider)
+        .resolveMapped((resolvedFields) {
       try {
         var o = reflection.createInstanceFromMap(resolvedFields,
             fieldNameResolver: (f, _) => f);
@@ -961,19 +1013,20 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
         if (o != null) {
           return o;
         } else {
-          return _createFromMapDefaultImpl(resolvedFields);
+          return _createFromMapDefaultImpl(resolvedFields, entityProvider);
         }
       } catch (e, s) {
         print(e);
         print(s);
-        return _createFromMapDefaultImpl(fields);
+        return _createFromMapDefaultImpl(fields, entityProvider);
       }
     });
   }
 
-  FutureOr<O> _createFromMapDefaultImpl(Map<String, dynamic> fields) {
+  FutureOr<O> _createFromMapDefaultImpl(
+      Map<String, dynamic> fields, EntityProvider? entityProvider) {
     var o = reflection.createInstance()!;
-    return setFieldsFromMap(o, fields);
+    return setFieldsFromMap(o, fields, entityProvider: entityProvider);
   }
 
   @override
@@ -1153,7 +1206,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       {TypeInfo? fieldType, Transaction? transaction});
 }
 
-class EntityRepositoryProvider with Closable {
+class EntityRepositoryProvider with Closable implements EntityProvider {
   static final EntityRepositoryProvider _globalProvider =
       EntityRepositoryProvider._global();
 
@@ -1265,6 +1318,13 @@ class EntityRepositoryProvider with Closable {
       _knownEntityRepositoryProviders.add(provider);
     }
   }
+
+  @override
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
+    if (id == null) return null;
+    var entityRepository = getEntityRepository(type: type);
+    return entityRepository?.selectByID(id).resolveMapped((o) => o as O?);
+  }
 }
 
 abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
@@ -1275,7 +1335,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       {Object? Function(String field, Map<String, dynamic> map)? fromMap,
       Object? Function(String field)? empty,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityHandlerProvider? entityHandlerProvider}) {
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityProvider? entityProvider}) {
     if (subEntitiesFields.isEmpty) return fields;
 
     var entries = subEntitiesFields.entries.toList(growable: false);
@@ -1294,7 +1355,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           empty: emptyField,
           entityType: t,
           entityRepositoryProvider: entityRepositoryProvider,
-          entityHandlerProvider: entityHandlerProvider);
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider);
     });
 
     return futures.resolveAllJoined((resolvedEntities) {
@@ -1318,7 +1380,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       E? Function()? empty,
       Type? entityType,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityHandlerProvider? entityHandlerProvider}) {
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityProvider? entityProvider}) {
     if (entityMap == null) {
       if (parentMap == null || entityField == null) {
         throw ArgumentError(
@@ -1338,14 +1401,16 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       if (entity == null) {
         var entityRepository = _resolveEntityRepository<E>(entityField,
             entityType, entityRepositoryProvider, entityHandlerProvider);
-        entity = entityRepository?.fromMap(entityMap);
+        entity = entityRepository?.fromMap(entityMap,
+            entityProvider: entityProvider);
       }
 
       if (entity == null) {
         entityHandlerProvider ??= EntityHandlerProvider.globalProvider;
         var entityHandler =
             entityHandlerProvider.getEntityHandler<E>(type: entityType);
-        entity = entityHandler?.createFromMap(entityMap);
+        entity = entityHandler?.createFromMap(entityMap,
+            entityProvider: entityProvider);
       }
     } else if (entityMap is num || entityMap is String) {
       var entityRepository = _resolveEntityRepository<E>(entityField,
@@ -1405,13 +1470,13 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     entityHandler.notifyKnownEntityRepositoryProvider(this.provider);
   }
 
-  Map<String, Object?> getEntityFields(O o) {
-    var fields = entityHandler.getFields(o);
-    return fields;
-  }
+  Object? getEntityID(O o) => entityHandler.getID(o);
 
-  FutureOr<O> fromMap(Map<String, dynamic> fields) =>
-      entityHandler.createFromMap(fields);
+  Map<String, Object?> getEntityFields(O o) => entityHandler.getFields(o);
+
+  FutureOr<O> fromMap(Map<String, dynamic> fields,
+          {EntityProvider? entityProvider}) =>
+      entityHandler.createFromMap(fields, entityProvider: entityProvider);
 
   O trackEntity(O o) => _entitiesTracker.trackInstance(o);
 
@@ -1451,6 +1516,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
     checkNotClosed();
 
+    var cachedEntity = transaction?.getCachedEntity(id);
+    if (cachedEntity != null) {
+      return cachedEntity;
+    }
+
     return select(ConditionID(id), transaction: transaction)
         .resolveMapped((sel) {
       return sel.isNotEmpty ? sel.first : null;
@@ -1460,8 +1530,46 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   @override
   FutureOr<List<O?>> selectByIDs(List<dynamic> ids,
       {Transaction? transaction}) {
-    var ret = ids.map((id) => selectByID(id, transaction: transaction));
-    return ret.resolveAll().resolveMapped(trackEntitiesNullable);
+    if (ids.isEmpty) return <O?>[];
+
+    var idsUnique = ids.length == 1 ? ids : ids.toSet().toList();
+
+    if (idsUnique.length == 1) {
+      var id = idsUnique.first;
+
+      var cachedEntity = transaction?.getCachedEntity(id);
+      if (cachedEntity != null) return cachedEntity;
+
+      var ret = selectByID(id, transaction: transaction);
+      return ret.resolveMapped((o) => _idsToUniqueEntityList(ids, o));
+    }
+
+    var cachedEntities = transaction?.getCachedEntitiesByID<O>(idsUnique,
+        type: type, removeCachedIDs: true);
+
+    if (idsUnique.isEmpty) {
+      var entities = _idsToEntitiesList(ids, null, cachedEntities);
+      trackEntitiesNullable(entities);
+      return entities;
+    }
+
+    var ret = select(ConditionIdIN(idsUnique), transaction: transaction);
+
+    return ret
+        .resolveMapped((results) => _idsToEntitiesList(
+            ids, entityHandler.toEntitiesByIdMap(results), cachedEntities))
+        .resolveMapped(trackEntitiesNullable);
+  }
+
+  List<O?> _idsToEntitiesList(List<dynamic> ids, Map<dynamic, O>? entitiesByID,
+          [Map<dynamic, Object>? cachedEntities]) =>
+      ids.map((id) => entitiesByID?[id] ?? cachedEntities?[id] as O?).toList();
+
+  List<O?> _idsToUniqueEntityList(List<dynamic> ids, O? o) {
+    if (o == null) return List<O?>.filled(ids.length, null);
+    var oID = getEntityID(o);
+    if (ids.length == 1) return <O?>[o];
+    return ids.map((id) => id == oID ? o : null).toList();
   }
 
   FutureOr<dynamic> ensureStored(O o, {Transaction? transaction});
@@ -1552,7 +1660,7 @@ typedef ErrorFilter = bool Function(Object, StackTrace);
 typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
 
 /// An [EntityRepository] transaction.
-class Transaction {
+class Transaction implements EntityProvider {
   static Transaction? _executingTransaction;
 
   static Transaction? get executingTransaction => _executingTransaction;
@@ -1923,6 +2031,103 @@ class Transaction {
       '}'
     ].join();
   }
+
+  final Map<Type, Map<dynamic, Object>> _entities =
+      <Type, Map<dynamic, Object>>{};
+
+  /// Clears all cached entities of this transaction.
+  void clearCachedEntities() {
+    _entities.clear();
+  }
+
+  /// Returns all cached entities of this transaction.
+  List<Object> get cachedEntities =>
+      _entities.entries.expand((e) => e.value.values).toList();
+
+  /// Returns the total cached entities of this transaction.
+  int get cachedEntitiesLength =>
+      _entities.entries.map((e) => e.value.values.length).sum;
+
+  /// Returns the cached entities of [type].
+  Map<dynamic, Object>? getCachedEntities<O>({Type? type}) {
+    type ??= O;
+    var typeEntities = _entities[type];
+    return typeEntities != null ? UnmodifiableMapView(typeEntities) : null;
+  }
+
+  /// Returns the cached entities of [type] with [ids].
+  ///
+  /// - If [removeCachedIDs] is `true` it will remove the matching cached entities from [ids].
+  Map<dynamic, Object>? getCachedEntitiesByID<O>(List<dynamic> ids,
+      {Type? type, bool removeCachedIDs = false}) {
+    type ??= O;
+
+    var cachedEntities = _entities[type];
+    if (cachedEntities == null) return null;
+
+    var cachedEntitiesByIDs = Map<dynamic, Object>.fromEntries(ids.map((id) {
+      var entity = cachedEntities[id];
+      return entity != null ? MapEntry(id, entity) : null;
+    }).whereNotNull());
+
+    if (cachedEntitiesByIDs.isEmpty) return null;
+
+    if (removeCachedIDs) {
+      ids.removeWhere((id) => cachedEntitiesByIDs.containsKey(id));
+    }
+
+    return cachedEntitiesByIDs;
+  }
+
+  /// Returns a cached entity of [type] with [id].
+  O? getCachedEntity<O>(dynamic id, {Type? type}) {
+    if (id == null) return null;
+    type ??= O;
+    var typeEntities = _entities[type];
+    var entity = typeEntities?[id] as O?;
+
+    return entity;
+  }
+
+  /// Removes an entity of [type] with [id] of this transaction cache.
+  O? removeCachedEntity<O>(dynamic id, {Type? type}) {
+    if (id == null) return null;
+    type ??= O;
+    var typeEntities = _entities[type];
+    var entity = typeEntities?.remove(id) as O?;
+    return entity;
+  }
+
+  /// Caches [entity] into this transaction. This is called by the [EntityRepository] implementation.
+  void cacheEntity<O>(O entity, dynamic Function(O o) idGetter) {
+    var id = idGetter(entity);
+    if (id == null) return;
+
+    var type = entity.runtimeType;
+    var typeEntities = _entities.putIfAbsent(type, () => <dynamic, Object>{});
+    typeEntities[id] = entity!;
+  }
+
+  void cacheEntities<O>(List<O> entities, dynamic Function(O o) idGetter) {
+    Type? entityTYpe;
+    Map<dynamic, Object>? typeEntities;
+
+    for (var e in entities) {
+      var id = idGetter(e);
+      if (id == null) continue;
+
+      if (entityTYpe != e.runtimeType) {
+        entityTYpe = e.runtimeType;
+        typeEntities =
+            _entities.putIfAbsent(entityTYpe, () => <dynamic, Object>{});
+      }
+
+      typeEntities![id] = e!;
+    }
+  }
+
+  @override
+  O? getEntityByID<O>(id, {Type? type}) => getCachedEntity<O>(id, type: type);
 }
 
 abstract class TransactionOperation {

@@ -163,6 +163,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       Transaction transaction, Iterable<Map<String, dynamic>> results) {
     if (results.isEmpty) return <O>[];
 
+    var fieldsEntity = entityHandler.fieldsWithTypeEntity();
     var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
 
     if (fieldsListEntity.isNotEmpty) {
@@ -175,7 +176,6 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           (tableScheme, relationshipFields) {
         if (relationshipFields.isNotEmpty) {
           results = results is List ? results : results.toList();
-          if (results.isEmpty) return <O>[];
 
           var resolveRelationshipsFields = _resolveRelationshipFields(
             transaction,
@@ -185,26 +185,99 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
             fieldsListEntity,
           );
 
-          return resolveRelationshipsFields
-              .resolveAllWith(() => _resolveEntitiesSimple(results));
+          return resolveRelationshipsFields.resolveAllWith(() =>
+              _resolveEntitiesSubEntities(transaction, results, fieldsEntity));
         } else {
-          return _resolveEntitiesSimple(results);
+          return _resolveEntitiesSubEntities(
+              transaction, results, fieldsEntity);
         }
       });
 
-      return ret
-          .resolveMapped((entities) => entities.resolveAll())
-          .resolveMapped(trackEntities);
+      return _resolveEntitiesFutures(transaction, ret);
     } else {
-      return _resolveEntitiesSimple(results)
-          .resolveAll()
-          .resolveMapped(trackEntities);
+      var ret = _resolveEntitiesSubEntities(transaction, results, fieldsEntity);
+      return _resolveEntitiesFutures(transaction, ret);
     }
   }
 
+  FutureOr<List<O>> _resolveEntitiesFutures(
+          Transaction transaction, FutureOr<List<FutureOr<O>>> entitiesAsync) =>
+      entitiesAsync
+          .resolveMapped((e) => e.resolveAll().resolveMapped((entities) {
+                transaction.cacheEntities<O>(entities, getEntityID);
+                return trackEntities(entities);
+              }));
+
   List<FutureOr<O>> _resolveEntitiesSimple(
-          Iterable<Map<String, dynamic>> result) =>
-      result.map((e) => entityHandler.createFromMap(e)).toList();
+      Transaction transaction, Iterable<Map<String, dynamic>> results) {
+    return results
+        .map((e) => entityHandler.createFromMap(e, entityProvider: transaction))
+        .toList();
+  }
+
+  FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
+      Transaction transaction,
+      Iterable<Map<String, dynamic>> results,
+      Map<String, TypeInfo> fieldsEntity) {
+    if (fieldsEntity.isEmpty) {
+      return _resolveEntitiesSimple(transaction, results);
+    }
+
+    var resultsList =
+        results is List<Map<String, dynamic>> ? results : results.toList();
+
+    if (resultsList.length == 1) {
+      return _resolveEntitiesSimple(transaction, resultsList);
+    }
+
+    var fieldsEntityRepositories =
+        Map.fromEntries(fieldsEntity.entries.map((e) {
+      var fieldEntityRepository = _resolveEntityRepository(e.value.type);
+      return fieldEntityRepository != null
+          ? MapEntry(e.key, fieldEntityRepository)
+          : null;
+    }).whereNotNull());
+
+    if (fieldsEntityRepositories.isNotEmpty) {
+      var fieldsEntitiesAsync = fieldsEntityRepositories.map((field, repo) {
+        var fieldValues = resultsList.map((e) => e[field]).toList();
+        var fieldValuesUniques = fieldValues.toSet().toList();
+
+        var entitiesAsync =
+            repo.selectByIDs(fieldValuesUniques, transaction: transaction);
+
+        var entities = entitiesAsync.resolveMapped((entities) {
+          var entries = List<MapEntry<dynamic, Object?>>.generate(
+              fieldValuesUniques.length,
+              (i) => MapEntry(fieldValuesUniques[i], entities[i]));
+
+          return entries;
+        });
+
+        return MapEntry(field, entities);
+      }).resolveAllValues();
+
+      return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
+        for (var e in fieldsEntities.entries) {
+          var field = e.key;
+          var fieldEntities = Map.fromEntries(e.value);
+
+          var length = resultsList.length;
+
+          for (var i = 0; i < length; ++i) {
+            var result = resultsList[i];
+            var entityId = result[field];
+            var entity = fieldEntities[entityId];
+            result[field] = entity;
+          }
+        }
+
+        return _resolveEntitiesSimple(transaction, resultsList);
+      });
+    }
+
+    return _resolveEntitiesSimple(transaction, results);
+  }
 
   Iterable<FutureOr<bool>> _resolveRelationshipFields(
     Transaction transaction,
@@ -230,18 +303,16 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           provider.getEntityRepository(type: targetType)!;
 
       var retRelationships = Map.fromEntries(ids.map((id) {
-        var retTargetIds = selectRelationship(null, fieldName,
+        var targetIdsAsync = selectRelationship(null, fieldName,
             oId: id, transaction: transaction, fieldType: fieldType);
 
-        var ret = retTargetIds.resolveMapped((targetIds) {
-          return targetIds
-              .map((targetId) => targetEntityRepository.selectByID(targetId,
-                  transaction: transaction))
-              .resolveAll();
-        }).resolveMapped((l) =>
-            targetEntityRepository.entityHandler.castList(l, targetType)!);
+        var targetEntities = targetIdsAsync
+            .resolveMapped((targetIds) => targetEntityRepository
+                .selectByIDs(targetIds.toList(), transaction: transaction))
+            .resolveMapped((l) =>
+                targetEntityRepository.entityHandler.castList(l, targetType)!);
 
-        return MapEntry(id, ret);
+        return MapEntry(id, targetEntities);
       })).resolveAllValues();
 
       return retRelationships.resolveMapped((relationships) {
@@ -444,6 +515,22 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       throw StateError("Can't resolve EntityHandler for type: $type");
     }
     return entityHandler2 as EntityHandler<E>;
+  }
+
+  EntityRepository<E>? _resolveEntityRepository<E extends Object>(Type type) {
+    var entityRepository = entityHandler.getEntityRepository(type: type);
+    if (entityRepository != null) {
+      return entityRepository as EntityRepository<E>;
+    }
+
+    var typeEntityHandler = entityHandler.getEntityHandler(type: type);
+    if (typeEntityHandler != null) {
+      entityRepository = typeEntityHandler.getEntityRepository(type: type);
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<E>;
+      }
+    }
+    return null;
   }
 
   @override

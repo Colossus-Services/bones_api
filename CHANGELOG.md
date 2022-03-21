@@ -1,3 +1,11 @@
+## 1.1.2
+
+- Added `ConditionIdIN`: to allow optimized selection of multiple IDs with one query.
+- Added `EntityProvider` to all entity field resolution related operations, like `createFromMap` and `Json.decode`.
+- Improve `APIModuleHttpProxy` response body decoding. 
+- reflection_factory: ^1.0.24
+- mercury_client: ^2.1.4
+
 ## 1.1.1
 
 - Fix `MethodReflectionExtension.returnsAPIResponse`.

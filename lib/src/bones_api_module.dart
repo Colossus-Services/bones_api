@@ -4,12 +4,14 @@ import 'package:async_extension/async_extension.dart';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_security.dart';
+import 'bones_api_utils.dart';
 
 /// A module of an API.
 abstract class APIModule {
@@ -461,6 +463,7 @@ class APIModuleProxy extends ClassProxy {
               'addRoute',
               'getRouteHandler',
               'getRouteHandlerByRequest',
+              'getRoutesHandlersNames',
               'resolveRoute',
               'call',
               'apiInfo',
@@ -476,10 +479,18 @@ typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
 
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].
 class APIModuleHttpProxy implements ClassProxyListener {
+  /// The [httpClient] ot perform the proxy calls.
   final HttpClient httpClient;
+
+  /// The module path in the [httpClient] base URL.
   final String modulePath;
 
-  APIModuleHttpProxy(this.httpClient, {String? moduleRoute})
+  /// If `true` all the returned responses of [httpClient] requests will be decoded as JSON.
+  /// If `false` will treat as response only of `Content-Type` is JSON or JavaScript ([HttpResponse.isBodyTypeJSON]).
+  final bool responsesAsJson;
+
+  APIModuleHttpProxy(this.httpClient,
+      {String? moduleRoute, this.responsesAsJson = true})
       : modulePath = _normalizeModulePath(moduleRoute) {
     BonesAPI.boot();
   }
@@ -512,7 +523,49 @@ class APIModuleHttpProxy implements ClassProxyListener {
 
     var path = modulePath.isNotEmpty ? '$modulePath/$methodName' : methodName;
     var response = await httpClient.get(path, parameters: parameters);
-    return response.isOK ? response.json : null;
+    return parseResponse(response);
+  }
+
+  FutureOr<dynamic> parseResponse(HttpResponse response) {
+    if (response.isNotOK) return null;
+
+    var body = response.body;
+    if (body == null) return null;
+
+    MimeType? mimeType = body.mimeType;
+
+    if (isJsonResponse(response, mimeType)) {
+      var content = response.bodyAsString;
+      if (content == null) return null;
+      return decodeJson(content);
+    } else if (mimeType == null || isTextResponse(response, mimeType)) {
+      return body.asString;
+    } else if (isByteArrayResponse(response, mimeType)) {
+      return body.asByteArray;
+    } else if (mimeType.isFormURLEncoded) {
+      return Uri.splitQueryString(body.asString ?? '');
+    } else {
+      return body.asString;
+    }
+  }
+
+  bool isJsonResponse(HttpResponse response, MimeType? mimeType) =>
+      responsesAsJson || response.isBodyTypeJSON;
+
+  bool isTextResponse(HttpResponse response, MimeType? mimeType) =>
+      mimeType != null &&
+      (mimeType.isText || mimeType.isXHTML || mimeType.isXML);
+
+  bool isByteArrayResponse(HttpResponse response, MimeType? mimeType) =>
+      mimeType != null &&
+      (mimeType.isImage || mimeType.isAudio || mimeType.isVideo);
+
+  FutureOr<dynamic> decodeJson(String content) {
+    try {
+      return Json.decode(content);
+    } on FormatException {
+      return content;
+    }
   }
 
   @override
