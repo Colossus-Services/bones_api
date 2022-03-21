@@ -621,10 +621,6 @@ void runAdapterTests(
             parameters: {'email': 'joex@$testDomain'});
         expect(del1, isEmpty);
 
-        print('!!! sel all:');
-        print((await userAPIRepository.selectByQuery('email != 123'))
-            .map((e) => e.toJson()));
-
         var del2 = await userAPIRepository.delete(
             Condition.parse(' email == ? '),
             parameters: {'email': 'joe@$testDomain'});

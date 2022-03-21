@@ -34,6 +34,7 @@ dependencies:
   resource_portable: ^3.0.0
   crypto: ^3.0.1
   path: ^1.8.1
+  swiss_knife: ^3.0.8
 
 dev_dependencies:
   lints: ^1.0.1
