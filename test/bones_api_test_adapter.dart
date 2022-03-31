@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -202,6 +203,7 @@ void runAdapterTests(
         ${q}id$q serial,
         ${q}type$q text NOT NULL,
         ${q}enabled$q boolean NOT NULL,
+        ${q}value$q decimal(10,4) NULL,
         PRIMARY KEY( ${q}id$q )
       );
       ''';
@@ -278,8 +280,8 @@ void runAdapterTests(
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
 
-        var user = User(
-            'smith@$testDomain', 'abc', address, [Role(RoleType.guest)],
+        var user = User('smith@$testDomain', 'abc', address,
+            [Role(RoleType.guest, value: Decimal.parse('123.45'))],
             wakeUpTime: user2WakeupTime, creationTime: user2CreationTime);
         var id = await userAPIRepository.store(user);
         expect(id, equals(2));
@@ -308,7 +310,7 @@ void runAdapterTests(
             user.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals([
-              {'enabled': true, 'id': 1, 'type': 'admin'}
+              {'enabled': true, 'id': 1, 'type': 'admin', 'value': null}
             ]));
         expect(user.level, equals(100));
         expect(user.wakeUpTime, isNull);
@@ -338,9 +340,23 @@ void runAdapterTests(
         expect(
             user.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
-            equals([
-              {'id': 2, 'type': 'guest', 'enabled': true}
-            ]));
+            anyOf(
+                equals([
+                  {
+                    'id': 2,
+                    'type': 'guest',
+                    'enabled': true,
+                    'value': '123.4500'
+                  }
+                ]),
+                equals([
+                  {
+                    'id': 2,
+                    'type': 'guest',
+                    'enabled': true,
+                    'value': '123.45',
+                  }
+                ])));
         expect(user.level, isNull);
         expect(user.wakeUpTime, user2WakeupTime);
         expect(user.creationTime, equals(user2CreationTime));
@@ -565,21 +581,27 @@ void runAdapterTests(
         var ok = await userAPIRepository.store(user);
         expect(ok, equals(user.id));
 
-        var rolesJson2 = [
-          {'id': 2, 'type': 'guest', 'enabled': true},
-          {'id': 3, 'type': 'unknown', 'enabled': true}
+        var rolesJson2a = [
+          {'id': 2, 'type': 'guest', 'enabled': true, 'value': '123.4500'},
+          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
         ];
+
+        var rolesJson2b = [
+          {'id': 2, 'type': 'guest', 'enabled': true, 'value': '123.45'},
+          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
+        ];
+
         expect(
             user.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
-            equals(rolesJson2));
+            anyOf(equals(rolesJson2a), equals(rolesJson2b)));
 
         var user2 = await userAPIRepository.selectByID(user.id);
         expect(user2!.email, equals(user.email));
         expect(
             user2.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
-            equals(rolesJson2));
+            anyOf(equals(rolesJson2a), equals(rolesJson2b)));
 
         user2.roles.removeWhere((r) => r.type == RoleType.guest);
 
@@ -590,7 +612,7 @@ void runAdapterTests(
         expect(user3!.email, equals(user.email));
 
         var rolesJson3 = [
-          {'id': 3, 'type': 'unknown', 'enabled': true}
+          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
         ];
         expect(
             user3.roles.map(

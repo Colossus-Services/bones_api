@@ -1,3 +1,9 @@
+## 1.1.4
+
+- Integrate `Decimal` to entities, repositories, JSON and SQL.
+- Improve `APIPlatform`.
+- statistics: ^1.0.19
+
 ## 1.1.3
 
 - `EntityHandler.resolveValueByType`:

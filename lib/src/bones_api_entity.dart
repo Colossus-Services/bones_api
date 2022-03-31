@@ -4,11 +4,13 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
 
 import 'bones_api_condition.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('Entity');
@@ -219,6 +221,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   static final TypeInfo _typeInfoTime = TypeInfo(Time);
+  static final TypeInfo _typeInfoDecimal = TypeInfo(Decimal);
+  static final TypeInfo _typeInfoDynamicInt = TypeInfo(DynamicInt);
 
   FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value,
       {EntityProvider? entityProvider}) {
@@ -237,6 +241,10 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
     if (type.equalsType(_typeInfoTime)) {
       return Time.from(value) as T?;
+    } else if (type.equalsType(_typeInfoDecimal)) {
+      return Decimal.from(value) as T?;
+    } else if (type.equalsType(_typeInfoDynamicInt)) {
+      return DynamicInt.from(value) as T?;
     }
 
     if (value is Map<String, Object?>) {

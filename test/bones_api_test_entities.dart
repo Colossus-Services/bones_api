@@ -1,4 +1,5 @@
 import 'package:bones_api/bones_api.dart';
+import 'package:statistics/statistics.dart';
 
 part 'bones_api_test_entities.reflection.g.dart';
 
@@ -371,13 +372,16 @@ class Role extends Entity {
 
   bool enabled;
 
-  Role(this.type, {this.id, this.enabled = true});
+  Decimal? value;
+
+  Role(this.type, {this.id, this.enabled = true, this.value});
 
   Role.empty() : this(RoleType.unknown);
 
   Role.fromMap(Map<String, dynamic> map)
       : this(RoleType$from(map.get('type')) ?? RoleType.unknown,
             enabled: map.getAsBool('enabled', defaultValue: false)!,
+            value: Decimal.from(map.get('value')),
             id: map.getAsInt('id'));
 
   @override
@@ -397,7 +401,8 @@ class Role extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames => const <String>['enabled', 'id', 'type'];
+  List<String> get fieldsNames =>
+      const <String>['enabled', 'id', 'type', 'value'];
 
   @override
   V? getField<V>(String key) {
@@ -408,6 +413,8 @@ class Role extends Entity {
         return type as V?;
       case 'enabled':
         return enabled as V?;
+      case 'value':
+        return value as V?;
       default:
         return null;
     }
@@ -422,6 +429,8 @@ class Role extends Entity {
         return TypeInfo(RoleType);
       case 'enabled':
         return TypeInfo.tBool;
+      case 'value':
+        return TypeInfo(Decimal);
       default:
         return null;
     }
@@ -445,6 +454,11 @@ class Role extends Entity {
           enabled = value as bool;
           break;
         }
+      case 'value':
+        {
+          this.value = value as Decimal?;
+          break;
+        }
       default:
         return;
     }
@@ -455,5 +469,6 @@ class Role extends Entity {
         'enabled': enabled,
         if (id != null) 'id': id,
         'type': type.enumName,
+        'value': value?.toStringStandard(),
       };
 }

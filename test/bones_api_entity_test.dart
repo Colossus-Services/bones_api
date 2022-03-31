@@ -2,6 +2,7 @@
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -57,6 +58,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
             'id': int,
             'type': String,
             'enabled': bool,
+            'value': Decimal,
           },
         )
       ]);
@@ -116,7 +118,7 @@ void main() {
           'smith@mail.com',
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          [Role(RoleType.guest)],
+          [Role(RoleType.guest, value: Decimal.parse('12345.678'))],
           wakeUpTime: Time(12, 13, 14, 150),
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
       var user3 = User('john@mail.com', '456',
@@ -127,7 +129,7 @@ void main() {
       var user1Json =
           '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":"2020-10-11 12:13:14.000Z"}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
       var user3Json =
           '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101},"roles":[],"wakeUpTime":"00:13:14.150","creationTime":"2021-10-12 12:13:14.000Z"}';
 
@@ -193,7 +195,7 @@ void main() {
           'smith@setl.com',
           'abc',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
-          [Role(RoleType.guest)],
+          [Role(RoleType.guest, value: Decimal.parse('1234.67'))],
           creationTime: user2Time);
       var user3 = User('john@setl.com', '456',
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101), [],
@@ -330,8 +332,8 @@ void main() {
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
 
-        var user = User(
-            'smith@memory.com', 'abc', address, [Role(RoleType.guest)],
+        var user = User('smith@memory.com', 'abc', address,
+            [Role(RoleType.guest, value: Decimal.parse('1234.6789'))],
             creationTime: user2Time);
         var id = await userSQLRepository.store(user);
         expect(id, equals(2));
@@ -352,7 +354,7 @@ void main() {
         expect(
             user.roles.map((e) => e.toJson()),
             equals([
-              {'enabled': true, 'id': 1, 'type': 'admin'}
+              {'enabled': true, 'id': 1, 'type': 'admin', 'value': null}
             ]));
         expect(user.creationTime, equals(user1Time));
       }
@@ -364,7 +366,7 @@ void main() {
         expect(
             user.roles.map((e) => e.toJson()),
             equals([
-              {'id': 2, 'type': 'guest', 'enabled': true}
+              {'id': 2, 'type': 'guest', 'enabled': true, 'value': '1234.6789'}
             ]));
         expect(user.creationTime, equals(user2Time));
       }
@@ -524,7 +526,7 @@ void main() {
           'mary@memory.com',
           'xyz',
           address,
-          [Role(RoleType.guest)],
+          [Role(RoleType.guest, value: Decimal.parse('2345.67'))],
         );
         var id = await userAPIRepository.store(user);
         expect(id, equals(3));
@@ -539,7 +541,7 @@ void main() {
         expect(
             user.roles.map((e) => e.toJson()),
             equals([
-              {'id': 3, 'type': 'guest', 'enabled': true}
+              {'id': 3, 'type': 'guest', 'enabled': true, 'value': '2345.67'}
             ]));
       }
 
@@ -577,8 +579,8 @@ void main() {
         expect(
             user2.roles.map((e) => e.toJson()),
             equals([
-              {'id': 3, 'type': 'guest', 'enabled': true},
-              {'id': 4, 'type': 'unknown', 'enabled': true}
+              {'id': 3, 'type': 'guest', 'enabled': true, 'value': '2345.67'},
+              {'id': 4, 'type': 'unknown', 'enabled': true, 'value': null}
             ]));
 
         user2.roles.removeWhere((r) => r.type == RoleType.guest);
@@ -589,7 +591,7 @@ void main() {
         expect(
             user3.roles.map((e) => e.toJson()),
             equals([
-              {'id': 4, 'type': 'unknown', 'enabled': true}
+              {'id': 4, 'type': 'unknown', 'enabled': true, 'value': null}
             ]));
       }
 

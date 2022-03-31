@@ -2,13 +2,12 @@ import 'dart:html';
 
 import 'bones_api_platform.dart';
 
-class APIPlatformGeneric extends APIPlatform {
+class APIPlatformBrowser extends APIPlatform {
   @override
   APIPlatformType get type => APIPlatformType.browser;
 
   @override
-  APIPlatformCapability get capability =>
-      APIPlatformCapability(int64: false, double64: false);
+  APIPlatformCapability get capability => APIPlatformCapability.bits53();
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) {
@@ -66,5 +65,5 @@ class APIPlatformGeneric extends APIPlatform {
 }
 
 APIPlatform createAPIPlatform() {
-  return APIPlatformGeneric();
+  return APIPlatformBrowser();
 }

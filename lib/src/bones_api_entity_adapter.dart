@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -9,6 +10,7 @@ import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('SQLRepositoryAdapter');
@@ -335,6 +337,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
       return null;
     } else if (value is Time) {
       return value.toString();
+    } else if (value is DynamicNumber) {
+      return value.toStringStandard();
     } else if (value is Enum) {
       var enumType = value.runtimeType;
       var enumReflection =

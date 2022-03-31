@@ -99,4 +99,5 @@ export 'src/bones_api_extension.dart';
 export 'src/bones_api_module.dart';
 export 'src/bones_api_repository.dart';
 export 'src/bones_api_security.dart';
+export 'src/bones_api_types.dart';
 export 'src/bones_api_utils.dart';

@@ -5,7 +5,7 @@ class APIPlatformGeneric extends APIPlatform {
   APIPlatformType get type => APIPlatformType.generic;
 
   @override
-  APIPlatformCapability get capability => APIPlatformCapability();
+  APIPlatformCapability get capability => APIPlatformCapability.bits32();
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) {

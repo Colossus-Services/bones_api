@@ -2,11 +2,13 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_error_zone.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('PostgreAdapter');
@@ -287,6 +289,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       case 'bigserial':
         return int;
       case 'decimal':
+        return Decimal;
       case 'float':
       case 'float4':
       case 'float8':

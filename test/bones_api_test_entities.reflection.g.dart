@@ -516,8 +516,9 @@ class Role$reflection extends ClassReflection<Role> {
             this,
             Role,
             '',
-            () => (RoleType type, {int? id, bool enabled = true}) =>
-                Role(type, id: id, enabled: enabled),
+            () => (RoleType type,
+                    {int? id, bool enabled = true, Decimal? value}) =>
+                Role(type, id: id, enabled: enabled, value: value),
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection(RoleType), 'type', false, true, null, null)
@@ -527,7 +528,9 @@ class Role$reflection extends ClassReflection<Role> {
               'enabled': ParameterReflection(
                   TypeReflection.tBool, 'enabled', false, false, true, null),
               'id': ParameterReflection(
-                  TypeReflection.tInt, 'id', true, false, null, null)
+                  TypeReflection.tInt, 'id', true, false, null, null),
+              'value': ParameterReflection(
+                  TypeReflection(Decimal), 'value', true, false, null, null)
             },
             null);
       case 'empty':
@@ -580,7 +583,8 @@ class Role$reflection extends ClassReflection<Role> {
         'hashCode',
         'id',
         'idFieldName',
-        'type'
+        'type',
+        'value'
       ];
 
   @override
@@ -627,6 +631,20 @@ class Role$reflection extends ClassReflection<Role> {
           false,
           (o) => () => o!.enabled as T,
           (o) => (T? v) => o!.enabled = v as bool,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'value':
+        return FieldReflection<Role, T>(
+          this,
+          Role,
+          TypeReflection(Decimal),
+          'value',
+          true,
+          (o) => () => o!.value as T,
+          (o) => (T? v) => o!.value = v as Decimal?,
           obj,
           false,
           false,

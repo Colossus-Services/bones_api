@@ -27,8 +27,7 @@ class APIPlatformVM extends APIPlatform {
   }
 
   @override
-  APIPlatformCapability get capability =>
-      APIPlatformCapability(int64: true, double64: true);
+  APIPlatformCapability get capability => APIPlatformCapability.bits64();
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) =>
