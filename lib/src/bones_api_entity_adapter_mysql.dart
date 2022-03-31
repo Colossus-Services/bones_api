@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mysql1/mysql1.dart';
+import 'package:statistics/statistics.dart' show Decimal;
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -272,6 +273,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       case 'integer':
         return int;
       case 'decimal':
+      case 'numeric':
+        return Decimal;
       case 'float':
       case 'double':
         return double;

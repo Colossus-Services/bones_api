@@ -1,3 +1,8 @@
+## 1.1.5
+
+- SQL:
+  - Added: `numeric` type mapped to `Decimal`. 
+
 ## 1.1.4
 
 - Integrate `Decimal` to entities, repositories, JSON and SQL.

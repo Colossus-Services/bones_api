@@ -289,6 +289,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       case 'bigserial':
         return int;
       case 'decimal':
+      case 'numeric':
         return Decimal;
       case 'float':
       case 'float4':
