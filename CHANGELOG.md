@@ -1,11 +1,8 @@
-## 1.1.6
-
-- Fix JSON parsing of `Decimal` types.
-
 ## 1.1.5
 
 - SQL:
   - Added: `numeric` type mapped to `Decimal`. 
+- Fix JSON parsing of `Decimal` types.
 
 ## 1.1.4
 
