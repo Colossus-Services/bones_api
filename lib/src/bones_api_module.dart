@@ -4,6 +4,8 @@ import 'package:async_extension/async_extension.dart';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart'
+    show Decimal, DynamicInt, DynamicNumber;
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
@@ -12,6 +14,7 @@ import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
+import 'bones_api_types.dart';
 
 /// A module of an API.
 abstract class APIModule {
@@ -405,6 +408,13 @@ class APIRouteBuilder<M extends APIModule> {
     }
   }
 
+  static final TypeInfo _typeInfoDecimal = TypeInfo.fromType(Decimal);
+  static final TypeInfo _typeInfoDynamicInt = TypeInfo.fromType(DynamicInt);
+  static final TypeInfo _typeInfoDynamicNumber =
+      TypeInfo.fromType(DynamicNumber);
+
+  static final TypeInfo _typeInfoTime = TypeInfo.fromType(Time);
+
   Object? _resolveRequestParameter(
       APIRequest request, ParameterReflection parameter) {
     var typeReflection = parameter.type;
@@ -433,6 +443,14 @@ class APIRouteBuilder<M extends APIModule> {
     } else if (typeInfo.isString) {
       var s = typeInfo.parse(value);
       return s;
+    } else if (typeInfo.equalsType(_typeInfoDecimal)) {
+      return Decimal.from(value);
+    } else if (typeInfo.equalsType(_typeInfoDynamicInt)) {
+      return DynamicInt.from(value);
+    } else if (typeInfo.equalsType(_typeInfoDynamicNumber)) {
+      return DynamicNumber.from(value);
+    } else if (typeInfo.equalsType(_typeInfoTime)) {
+      return Time.from(value);
     } else {
       var parsed = typeInfo.parse(value);
       return parsed ?? value;

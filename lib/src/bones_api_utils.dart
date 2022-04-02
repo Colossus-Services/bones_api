@@ -125,6 +125,8 @@ class Json {
       Object object, EntityHandlerProvider? entityHandlerProvider) {
     if (object is Time) {
       return (o, j) => object.toString();
+    } else if (object is DynamicNumber) {
+      return (o, j) => object.toStringStandard();
     }
 
     var oType = object.runtimeType;
@@ -274,6 +276,16 @@ class Json {
       return (o, t, j) {
         var time = Time.from(o);
         return time as O?;
+      };
+    } else if (type == Decimal) {
+      return (o, t, j) {
+        var d = Decimal.from(o);
+        return d as O?;
+      };
+    } else if (type == DynamicInt) {
+      return (o, t, j) {
+        var d = DynamicInt.from(o);
+        return d as O?;
       };
     }
 
