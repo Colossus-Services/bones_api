@@ -1,3 +1,11 @@
+## 1.1.6
+
+- `APIServer`:
+  - Improved CORES response (`OPTIONS` request).
+- `APISecurity`:
+  - Improved resolution of credential token and related username.
+  - Improved tests.
+
 ## 1.1.5
 
 - SQL:

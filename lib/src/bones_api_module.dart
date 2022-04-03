@@ -110,6 +110,11 @@ abstract class APIModule {
   APIModule addRoute(
       APIRequestMethod? method, String name, APIRouteFunction function,
       {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) {
+    if (method == APIRequestMethod.OPTIONS) {
+      throw ArgumentError("Can't add a route with method `OPTIONS`."
+          "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
+    }
+
     var routesHandlers = _getRoutesHandlers(method);
     routesHandlers[name] =
         APIRouteHandler(this, method, name, function, parameters, rules);
@@ -203,6 +208,18 @@ abstract class APIModule {
     } catch (e, s) {
       var error = 'ERROR: $e\n$s';
       return APIResponse.error(error: error);
+    }
+  }
+
+  /// Returns `true` if [apiRequest] is an accepted route/call for this module.
+  bool acceptsRequest(APIRequest apiRequest) {
+    var routeName = apiRequest.lastPathPart;
+
+    if (routeName == 'API-INFO') {
+      return true;
+    } else {
+      var handler = getRouteHandlerByRequest(apiRequest);
+      return handler != null;
     }
   }
 
@@ -478,6 +495,7 @@ class APIModuleProxy extends ClassProxy {
             ignoreMethods: const <String>{
               'configure',
               'ensureConfigured',
+              'acceptsRequest',
               'addRoute',
               'getRouteHandler',
               'getRouteHandlerByRequest',

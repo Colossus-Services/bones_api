@@ -440,7 +440,7 @@ class APIServer {
 
   final Completer<bool> _stopped = Completer<bool>();
 
-  /// Returns a [Future] that complets when this server stops.
+  /// Returns a [Future] that completes when this server stops.
   Future<bool> waitStopped() => _stopped.future;
 
   bool _stopping = false;
@@ -463,9 +463,12 @@ class APIServer {
     APIRequest? apiRequest;
     try {
       apiRequest = toAPIRequest(request);
-      var apiResponse = apiRoot.call(apiRequest);
-      return apiResponse.resolveMapped(
-          (res) => _processAPIResponse(request, apiRequest!, res));
+
+      if (apiRequest.method == APIRequestMethod.OPTIONS) {
+        return _processOPTIONSRequest(request, apiRequest);
+      } else {
+        return _processCall(request, apiRequest);
+      }
     } catch (e, s) {
       var requestStr = apiRequest ?? _requestToString(request);
 
@@ -504,13 +507,13 @@ class APIServer {
     return s.toString();
   }
 
-  /// Convers a [request] to an [APIRequest].
+  /// Converts a [request] to an [APIRequest].
   APIRequest toAPIRequest(Request request) {
     var method = parseAPIRequestMethod(request.method)!;
 
     var headers = Map.fromEntries(request.headersAll.entries.map((e) {
-      var vals = e.value;
-      return MapEntry(e.key, vals.length == 1 ? vals[0] : vals);
+      var values = e.value;
+      return MapEntry(e.key, values.length == 1 ? values[0] : values);
     }));
 
     var requestedUri = request.requestedUri;
@@ -518,8 +521,8 @@ class APIServer {
     var path = requestedUri.path;
     var parameters =
         Map.fromEntries(requestedUri.queryParametersAll.entries.map((e) {
-      var vals = e.value;
-      return MapEntry(e.key, vals.length == 1 ? vals[0] : vals);
+      var values = e.value;
+      return MapEntry(e.key, values.length == 1 ? values[0] : values);
     }));
 
     var scheme = request.requestedUri.scheme;
@@ -625,8 +628,29 @@ class APIServer {
     return val is HttpConnectionInfo ? val : null;
   }
 
+  FutureOr<Response> _processOPTIONSRequest(
+      Request request, APIRequest apiRequest) {
+    APIResponse apiResponse;
+
+    if (!apiRoot.acceptsRequest(apiRequest)) {
+      apiResponse = APIResponse.notFound();
+    } else {
+      apiResponse = APIResponse.ok('');
+    }
+
+    return _processAPIResponse(request, apiRequest, apiResponse);
+  }
+
+  FutureOr<Response> _processCall(Request request, APIRequest apiRequest) {
+    var apiResponse = apiRoot.call(apiRequest);
+    return apiResponse
+        .resolveMapped((res) => _processAPIResponse(request, apiRequest, res));
+  }
+
   FutureOr<Response> _processAPIResponse(
       Request request, APIRequest apiRequest, APIResponse apiResponse) {
+    setCORS(apiRequest, apiResponse);
+
     if (apiResponse is _APIResponseStaticFile) {
       return apiResponse.fileResponse;
     }
@@ -714,10 +738,63 @@ class APIServer {
     var notSentByAccessToken =
         headerAccessToken == null || !headerAccessToken.contains(tokenKey);
 
-    var needToSendHeaderXAcessToken =
+    var needToSendHeaderXAccessToken =
         notSentByAuthentication && notSentByAccessToken;
 
-    return needToSendHeaderXAcessToken;
+    return needToSendHeaderXAccessToken;
+  }
+
+  static final String headerXAccessToken = "X-Access-Token";
+  static final String headerXAccessTokenExpiration =
+      "X-Access-Token-Expiration";
+
+  static final String exposeHeaders =
+      "Content-Length, Content-Type, Last-Modified, $headerXAccessToken, $headerXAccessTokenExpiration";
+
+  void setCORS(APIRequest request, APIResponse response) {
+    var origin = getOrigin(request);
+
+    var localhost = false;
+
+    if (origin.isEmpty) {
+      response.headers["Access-Control-Allow-Origin"] = "*";
+    } else {
+      response.headers["Access-Control-Allow-Origin"] = origin;
+
+      if (origin.contains("://localhost:") ||
+          origin.contains("://127.0.0.1:") ||
+          origin.contains("://::1")) {
+        localhost = true;
+      }
+    }
+
+    response.headers["Access-Control-Allow-Methods"] =
+        "GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS";
+    response.headers["Access-Control-Allow-Credentials"] = "true";
+
+    if (localhost) {
+      response.headers["Access-Control-Allow-Headers"] =
+          "Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt";
+    } else {
+      response.headers["Access-Control-Allow-Headers"] =
+          "Content-Type, Access-Control-Allow-Headers, Authorization";
+    }
+
+    response.headers["Access-Control-Expose-Headers"] = exposeHeaders;
+  }
+
+  String getOrigin(APIRequest request) {
+    var origin = request.headers['origin'];
+    if (origin != null) return origin;
+
+    var host = request.headers['host'];
+    if (host != null) {
+      origin = "http://$host/";
+      return origin;
+    }
+
+    origin = "http://localhost/";
+    return origin;
   }
 
   FutureOr<Response> _sendResponse(Request request, APIRequest apiRequest,

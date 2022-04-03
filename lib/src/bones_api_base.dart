@@ -25,7 +25,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.5';
+  static const String VERSION = '1.1.6';
 
   static bool _boot = false;
 
@@ -283,6 +283,11 @@ abstract class APIRoot {
 
   /// Calls the API.
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
+    if (request.method == APIRequestMethod.OPTIONS) {
+      throw ArgumentError("Can't perform a call with an `OPTIONS` method. "
+          "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
+    }
+
     var preResponse = callHandlers<T>(
         preApiRequestHandlers, request, 'preApiRequestHandlers');
 
@@ -328,6 +333,21 @@ abstract class APIRoot {
     }
 
     return _callModule<T>(module, apiRequest);
+  }
+
+  /// Returns `true` if [apiRequest] is an accepted route/call.
+  bool acceptsRequest(APIRequest apiRequest) {
+    var module = getModuleByRequest(apiRequest);
+    if (module == null) {
+      var def = defaultModuleName;
+      if (def != null) {
+        module = _modules![def];
+      }
+    }
+
+    if (module == null) return false;
+
+    return module.acceptsRequest(apiRequest);
   }
 
   /// Returns a [APIRootInfo].
@@ -585,6 +605,8 @@ enum APIRequestMethod {
   DELETE,
   // ignore: constant_identifier_names
   PATCH,
+  // ignore: constant_identifier_names
+  OPTIONS,
 }
 
 /// Extension of enum [APIRequestMethod].
@@ -601,6 +623,8 @@ extension APIRequestMethodExtension on APIRequestMethod {
         return 'DELETE';
       case APIRequestMethod.PATCH:
         return 'PATCH';
+      case APIRequestMethod.OPTIONS:
+        return 'OPTIONS';
       default:
         throw ArgumentError('Unknown method: $this');
     }
@@ -628,7 +652,9 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
     case 'patch':
     case 'PATCH':
       return APIRequestMethod.PATCH;
-
+    case 'optionS':
+    case 'OPTIONS':
+      return APIRequestMethod.OPTIONS;
     default:
       return null;
   }
@@ -825,6 +851,9 @@ class APISession {
     tokens.removeWhere((t) => t.isExpired(now: now));
     return tokens;
   }
+
+  APIToken? getValidToken(String token) =>
+      validateTokens().firstWhereOrNull((t) => t.token == token);
 }
 
 /// Represents an API request.

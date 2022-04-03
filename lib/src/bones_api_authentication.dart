@@ -29,10 +29,20 @@ class APICredential {
             ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
             : null;
 
+  APICredential._(
+      this.username, this.usernameEntity, this.password, this.token);
+
+  /// Returns a copy of this [APICredential] with [username].
+  APICredential withUsername(String username) =>
+      APICredential._(username, usernameEntity, password, token);
+
+  /// Returns `true` if this [APICredential] has a [password].
   bool get hasPassword => password != null;
 
+  /// Returns `true` if this [APICredential] has a [token].
   bool get hasToken => token != null && token!.isNotEmpty;
 
+  /// Checks if the parameter [passwordOrHash] matches this [APICredential] [password].
   bool checkPassword(String? passwordOrHash) {
     if (passwordOrHash == null) return false;
     return password != null && password!.checkPassword(passwordOrHash);
@@ -67,6 +77,17 @@ class APIPassword {
   String toString() {
     return 'APIPassword{hashAlgorithm: ${hashAlgorithm.name}, passwordHash: ***}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is APIPassword &&
+          runtimeType == other.runtimeType &&
+          hashAlgorithm == other.hashAlgorithm &&
+          passwordHash == other.passwordHash;
+
+  @override
+  int get hashCode => hashAlgorithm.hashCode ^ passwordHash.hashCode;
 }
 
 /// Base class for password hashing.

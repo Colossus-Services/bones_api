@@ -126,10 +126,12 @@ abstract class APISecurity {
     return token;
   }
 
-  final Map<String, List<APIToken>> _tokens = <String, List<APIToken>>{};
+  final Map<String, List<APIToken>> _usersTokens = <String, List<APIToken>>{};
 
   APIToken? getTokenByKey(String tokenKey) {
-    for (var l in _tokens.values) {
+    if (tokenKey.isEmpty) return null;
+
+    for (var l in _usersTokens.values) {
       for (var t in l) {
         if (t.token == tokenKey) {
           return t;
@@ -141,14 +143,14 @@ abstract class APISecurity {
   }
 
   List<APIToken> getUsernameValidTokens(String username) {
-    var tokens = _tokens.putIfAbsent(username, () => <APIToken>[]);
+    var tokens = _usersTokens.putIfAbsent(username, () => <APIToken>[]);
     var now = DateTime.now();
     tokens.removeWhere((t) => t.isExpired(now: now));
     return tokens;
   }
 
   bool isValidToken(String username, String token) {
-    var tokens = _tokens[username];
+    var tokens = _usersTokens[username];
     if (tokens == null || tokens.isEmpty) {
       return false;
     }
@@ -170,7 +172,7 @@ abstract class APISecurity {
 
   void validateAllTokens([DateTime? now]) {
     now ??= DateTime.now();
-    for (var tokens in _tokens.values) {
+    for (var tokens in _usersTokens.values) {
       tokens.removeWhere((t) => t.isExpired(now: now));
     }
   }
@@ -214,7 +216,15 @@ abstract class APISecurity {
       APIRequest request) {
     var token = getSessionToken(request);
     if (token == null) {
-      return null;
+      var credential = request.credential;
+
+      if (credential != null && credential.hasToken) {
+        var tokenKey = credential.token!;
+        token = getTokenByKey(tokenKey);
+        if (token == null) return null;
+      } else {
+        return null;
+      }
     }
 
     return resumeAuthentication(token).then((authentication) {
@@ -324,7 +334,27 @@ abstract class APISecurity {
 
   APICredential? resolveRequestCredential(APIRequest request) {
     var credential = request.credential;
-    if (credential != null) return credential;
+
+    if (credential != null) {
+      if (credential.username.isEmpty && credential.hasToken) {
+        var tokenKey = credential.token!;
+        var sessionID = request.sessionID;
+
+        APIToken? validToken;
+        if (sessionID != null && sessionID.isNotEmpty) {
+          validToken = _sessionSet.get(sessionID)?.getValidToken(tokenKey);
+        }
+
+        validToken ??= getTokenByKey(tokenKey);
+
+        if (validToken != null) {
+          var username = validToken.username;
+          credential = credential.withUsername(username);
+        }
+      }
+
+      return credential;
+    }
 
     var username = getRequestParameterUsername(request).trim();
     var tokenKey = getRequestParameterToken(request).trim();

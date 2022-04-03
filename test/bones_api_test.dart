@@ -589,6 +589,11 @@ Future<String> _getURL(String url,
         future = httpClient.patchUrl(uri);
         break;
       }
+    case APIRequestMethod.OPTIONS:
+      {
+        future = httpClient.openUrl('OPTIONS', uri);
+        break;
+      }
   }
 
   response = await future.then((request) => request.close());

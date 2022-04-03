@@ -294,6 +294,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
 
   @override
   List<String> get methodsNames => const <String>[
+        'acceptsRequest',
         'addRoute',
         'apiInfo',
         'call',
@@ -505,6 +506,23 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             const <ParameterReflection>[
               ParameterReflection(TypeReflection(APIRequest), 'request', false,
                   true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'acceptsrequest':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            APIModule,
+            'acceptsRequest',
+            TypeReflection.tBool,
+            false,
+            (o) => o!.acceptsRequest,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
+                  false, true, null, null)
             ],
             null,
             null,
