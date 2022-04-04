@@ -1,7 +1,7 @@
 ## 1.1.7
 
 - `APIModuleProxy`: ignoring `APIRequest` parameters.
-- reflection_factory: ^1.0.26
+- reflection_factory: ^1.0.25
 
 ## 1.1.6
 

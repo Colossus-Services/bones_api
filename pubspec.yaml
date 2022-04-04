@@ -17,7 +17,7 @@ dependencies:
   async_extension: ^1.0.9
   dart_spawner: ^1.0.6
   args: ^2.2.0
-  reflection_factory: ^1.0.26
+  reflection_factory: ^1.0.25
   meta: ^1.7.0
   data_serializer: ^1.0.6
   statistics: ^1.0.19
