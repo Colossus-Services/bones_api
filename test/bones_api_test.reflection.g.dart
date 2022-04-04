@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.0.24
+// BUILDER: reflection_factory/1.0.25
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.0.24');
+  Version get reflectionFactoryVersion => Version.parse('1.0.25');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -577,7 +577,7 @@ extension MyInfoModule$reflectionExtension on MyInfoModule {
 }
 
 extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
-  Future<String> echo(String msg, APIRequest request) {
+  Future<String> echo(String msg) {
     var ret = onCall(
         this,
         'echo',
