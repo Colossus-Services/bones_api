@@ -146,15 +146,14 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
     var connUrl = getConnectionURL(connWrapper);
 
-    _log.log(
-        logging.Level.INFO, 'createConnection[$count]> $connUrl > $connection');
+    _log.info('createConnection[$count]> $connUrl > $connection');
 
     return connWrapper;
   }
 
   @override
   FutureOr<bool> closeConnection(MySqlConnectionWrapper connection) {
-    _log.log(logging.Level.INFO, 'closeConnection> $connection');
+    _log.info('closeConnection> $connection');
 
     connection.connection.close();
 
@@ -170,7 +169,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   Future<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.log(logging.Level.INFO, 'getTableFieldsTypesImpl> $table');
+    _log.info('getTableFieldsTypesImpl> $table');
 
     var sql = "SHOW COLUMNS FROM `$table`";
 
@@ -195,7 +194,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   Future<TableScheme?> getTableSchemeImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.log(logging.Level.INFO, 'getTableSchemeImpl> $table');
+    _log.info('getTableSchemeImpl> $table');
 
     var sql = "SHOW COLUMNS FROM `$table`";
 
@@ -228,7 +227,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     var tableScheme = TableScheme(table, idFieldName, fieldsTypes,
         fieldsReferencedTables, relationshipTables);
 
-    _log.log(logging.Level.INFO, '$tableScheme');
+    _log.info('$tableScheme');
 
     return tableScheme;
   }

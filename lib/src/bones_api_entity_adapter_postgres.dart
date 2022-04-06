@@ -139,15 +139,14 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     var connUrl = getConnectionURL(connection);
 
-    _log.log(
-        logging.Level.INFO, 'createConnection[$count]> $connUrl > $connection');
+    _log.info('createConnection[$count]> $connUrl > $connection');
 
     return connection;
   }
 
   @override
   FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
-    _log.log(logging.Level.INFO, 'closeConnection> $connection');
+    _log.info('closeConnection> $connection');
 
     if (connection is PostgreSQLConnection) {
       connection.close();
@@ -164,7 +163,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.log(logging.Level.INFO, 'getTableFieldsTypesImpl> $table');
+    _log.info('getTableFieldsTypesImpl> $table');
 
     var sql =
         "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
@@ -190,7 +189,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   Future<TableScheme?> getTableSchemeImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.log(logging.Level.INFO, 'getTableSchemeImpl> $table');
+    _log.info('getTableSchemeImpl> $table');
 
     var sql =
         "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
@@ -224,7 +223,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     var tableScheme = TableScheme(table, idFieldName, fieldsTypes,
         fieldsReferencedTables, relationshipTables);
 
-    _log.log(logging.Level.INFO, '$tableScheme');
+    _log.info('$tableScheme');
 
     return tableScheme;
   }

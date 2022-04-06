@@ -96,6 +96,14 @@ abstract class LoggerHandler {
     var logMsg = '$time $levelName $debugName $loggerName > $message\n';
 
     printMessage(msg.level, logMsg);
+
+    if (msg.error != null) {
+      printMessage(msg.level, msg.error.toString());
+    }
+
+    if (msg.stackTrace != null) {
+      printMessage(msg.level, msg.stackTrace.toString());
+    }
   }
 
   String loggerName(logging.LogRecord msg) {

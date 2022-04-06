@@ -440,8 +440,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
   FutureOr<int> countSQL(
       TransactionOperation op, String entityName, String table, SQL sql) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
-          '[transaction:${op.transactionId}] countSQL> $sql');
+      _log.info('[transaction:${op.transactionId}] countSQL> $sql');
       return doCountSQL(entityName, table, sql, connection);
     });
   }
@@ -517,8 +516,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       String table, SQL sql, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
-          '[transaction:${op.transactionId}] insertSQL> $sql');
+      _log.info('[transaction:${op.transactionId}] insertSQL> $sql');
       var retInsert = doInsertSQL(entityName, table, sql, connection);
 
       if (mapper != null) {
@@ -616,8 +614,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       String table, SQL sql, Object id, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
-          '[transaction:${op.transactionId}] updateSQL> $sql');
+      _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
       var retInsert = doUpdateSQL(entityName, table, sql, id, connection);
 
       if (mapper != null) {
@@ -773,7 +770,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       String otherTable,
       List otherIds) {
     return executeTransactionOperation(op, sqls.first, (connection) {
-      _log.log(logging.Level.INFO,
+      _log.info(
           '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
 
       var retInserts = sqls.map((sql) {
@@ -782,7 +779,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
         if (sql.hasPosSQL) {
           sql.posSQL!.map((e) {
-            _log.log(logging.Level.INFO,
+            _log.info(
                 '[transaction:${op.transactionId}] insertRelationship[POS]> $e');
             return doDeleteSQL(entityName, e.mainTable!, e, connection);
           }).resolveAllWithValue(ret);
@@ -847,7 +844,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       dynamic id,
       String otherTable) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
+      _log.info(
           '[transaction:${op.transactionId}] selectRelationshipSQL> $sql');
 
       var ret =
@@ -1053,8 +1050,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       TransactionOperation op, String entityName, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
-          '[transaction:${op.transactionId}] selectSQL> $sql');
+      _log.info('[transaction:${op.transactionId}] selectSQL> $sql');
 
       var retSel = doSelectSQL(entityName, table, sql, connection);
 
@@ -1151,8 +1147,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       TransactionOperation op, String entityName, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
     return executeTransactionOperation(op, sql, (connection) {
-      _log.log(logging.Level.INFO,
-          '[transaction:${op.transactionId}] deleteSQL> $sql');
+      _log.info('[transaction:${op.transactionId}] deleteSQL> $sql');
 
       var retSel = doDeleteSQL(entityName, table, sql, connection);
 

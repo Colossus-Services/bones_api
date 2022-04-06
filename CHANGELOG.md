@@ -1,3 +1,8 @@
+## 1.1.8
+
+- `APIServer` and `APIModule`: improved error logging.
+- statistics: ^1.0.20
+
 ## 1.1.7
 
 - `APIModuleProxy`: ignoring `APIRequest` parameters.

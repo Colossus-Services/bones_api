@@ -473,7 +473,7 @@ class APIServer {
       var requestStr = apiRequest ?? _requestToString(request);
 
       var message = 'ERROR processing request:\n\n$requestStr';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
 
       return Response.internalServerError(body: '$message\n\n$e\n$s');
     }

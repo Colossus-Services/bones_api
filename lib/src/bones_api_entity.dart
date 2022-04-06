@@ -798,7 +798,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
       return o.setField<V>(key, value);
     } catch (e, s) {
       var message = "Error setting `$type` field: $key = $value";
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       throw StateError(message);
     }
   }
@@ -894,7 +894,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     } catch (e, s) {
       var message =
           "Error setting `$type` field using reflection[$reflection]: $key = $value";
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       throw StateError(message);
     }
   }

@@ -122,7 +122,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'namedParameters: $namedParameters ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }
@@ -154,7 +154,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'namedParameters: $namedParameters ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }
@@ -386,7 +386,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'transaction: $transaction ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }
@@ -461,7 +461,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'values: $values ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }
@@ -492,7 +492,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'fieldType: $fieldType ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }
@@ -569,7 +569,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           'namedParameters: $namedParameters ; '
           'op: $op > '
           '[ERROR] $e';
-      _log.log(logging.Level.SEVERE, message, e, s);
+      _log.severe(message, e, s);
       rethrow;
     }
   }

@@ -7,6 +7,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show Decimal, DynamicInt, DynamicNumber;
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -15,6 +16,8 @@ import 'bones_api_extension.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_types.dart';
+
+final _log = logging.Logger('APIModule');
 
 /// A module of an API.
 abstract class APIModule {
@@ -206,6 +209,10 @@ abstract class APIModule {
       var response = handler.call(apiRequest);
       return response;
     } catch (e, s) {
+      _log.severe(
+          'Error calling route `$routeName` of module `$name`! APIModule: `$runtimeType` ; APIRequest: ${apiRequest.toString(withHeaders: false, withPayload: false)}',
+          e,
+          s);
       var error = 'ERROR: $e\n$s';
       return APIResponse.error(error: error);
     }

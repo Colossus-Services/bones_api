@@ -1459,15 +1459,20 @@ class APIRequest extends APIPayload {
   }
 
   @override
-  String toString() {
+  String toString({bool withHeaders = true, bool withPayload = true}) {
+    var headersStr = withHeaders ? ', headers: $headers' : '';
+    var payloadStr = withPayload && hasPayload
+        ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
+        : '';
+
     return 'APIRequest{ method: ${method.name}, '
         'path: $path, '
         'parameters: $parameters, '
         'requester: ${requesterAddress != null ? '$requesterAddress ' : ''}(${requesterSource.name}), '
         'scheme: $scheme, '
-        'origin: $origin, '
-        'headers: $headers${hasPayload ? ', '
-            'payloadLength: $payloadLength, payloadMimeType: $payloadMimeType' : ''} }';
+        'origin: $origin'
+        '$headersStr$payloadStr'
+        ' }';
   }
 }
 
