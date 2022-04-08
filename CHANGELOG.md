@@ -1,6 +1,7 @@
 ## 1.1.10
 
 - Optimize relationship requests to resolve entities.
+- `MemorySQLAdapter`: support of returned columns with alias name.
 
 ## 1.1.9
 

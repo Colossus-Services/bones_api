@@ -71,6 +71,8 @@ class SQL implements SQLWrapper {
 
   final Set<String>? returnColumns;
 
+  final Map<String, String>? returnColumnsAliases;
+
   final String? mainTable;
   final Map<String, String>? tablesAliases;
 
@@ -104,6 +106,7 @@ class SQL implements SQLWrapper {
       this.entityName,
       this.idFieldName,
       this.returnColumns,
+      this.returnColumnsAliases,
       required this.mainTable,
       this.tablesAliases,
       RegExp? placeholderRegexp})
@@ -170,6 +173,10 @@ class SQL implements SQLWrapper {
     }
     if (returnColumns != null && returnColumns!.isNotEmpty) {
       s += ' ; returnColumns: $returnColumns';
+    }
+
+    if (returnColumnsAliases != null && returnColumnsAliases!.isNotEmpty) {
+      s += ' ; returnColumnsAliases: $returnColumnsAliases';
     }
 
     if (preSQL != null) {
@@ -835,7 +842,10 @@ abstract class SQLAdapter<C> extends SchemeProvider
       return SQL(sql.toString(), parameters,
           condition: condition,
           sqlCondition: conditionSQL,
-          returnColumns: {relationship.targetRelationshipField},
+          returnColumnsAliases: {
+            relationship.sourceRelationshipField: 'source_id',
+            relationship.targetRelationshipField: 'target_id',
+          },
           mainTable: relationship.relationshipTable);
     });
   }
@@ -857,9 +867,12 @@ abstract class SQLAdapter<C> extends SchemeProvider
     });
   }
 
-
-  FutureOr<SQL> generateSelectRelationshipsSQL(Transaction transaction,
-      String entityName, String table, List<dynamic> ids, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipsSQL(
+      Transaction transaction,
+      String entityName,
+      String table,
+      List<dynamic> ids,
+      String otherTableName) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -868,7 +881,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       }
 
       var relationship =
-      tableScheme.getTableRelationshipReference(otherTableName);
+          tableScheme.getTableRelationshipReference(otherTableName);
 
       if (relationship == null) {
         throw StateError(
@@ -877,13 +890,14 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       var q = sqlElementQuote;
 
-      var conditionSQL = StringBuffer('$q${relationship.sourceRelationshipField}$q IN (');
-      
-      var parameters = <String,dynamic>{};
+      var conditionSQL =
+          StringBuffer('$q${relationship.sourceRelationshipField}$q IN (');
+
+      var parameters = <String, dynamic>{};
       for (var i = 0; i < ids.length; ++i) {
         var p = 'p$i';
         var id = ids[i];
-        parameters[p] = id ;
+        parameters[p] = id;
         if (i > 0) conditionSQL.write(', ');
         conditionSQL.write('@$p');
       }
@@ -904,12 +918,16 @@ abstract class SQLAdapter<C> extends SchemeProvider
       sql.write(conditionSQLStr);
       sql.write(' )');
 
-      var condition = KeyConditionIN([ConditionKeyField(relationship.sourceRelationshipField)], ids);
+      var condition = KeyConditionIN(
+          [ConditionKeyField(relationship.sourceRelationshipField)], ids);
 
       return SQL(sql.toString(), parameters,
           condition: condition,
           sqlCondition: conditionSQLStr,
-          returnColumns: {relationship.targetRelationshipField},
+          returnColumnsAliases: {
+            relationship.sourceRelationshipField: 'source_id',
+            relationship.targetRelationshipField: 'target_id',
+          },
           mainTable: relationship.relationshipTable);
     });
   }
@@ -926,7 +944,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
           '[transaction:${op.transactionId}] selectRelationshipsSQL> $sql');
 
       var ret =
-      doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
+          doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
       return ret;
     });
   }
@@ -1644,7 +1662,10 @@ class SQLRepositoryAdapter<O> with Initializable {
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(
-      TransactionOperation op, SQL sql, List<dynamic> ids, String otherTableName) {
+      TransactionOperation op,
+      SQL sql,
+      List<dynamic> ids,
+      String otherTableName) {
     return databaseAdapter.selectRelationshipsSQL(
         op, name, tableName, sql, ids, otherTableName);
   }

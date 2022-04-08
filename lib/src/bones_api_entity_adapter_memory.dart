@@ -185,9 +185,19 @@ class MemorySQLAdapter extends SQLAdapter<int> {
         return Map<String, dynamic>.fromEntries(
             e.entries.where((e) => returnColumns.contains(e.key)));
       }).toList();
-    } else {
-      return sel;
     }
+
+    var returnColumnsAliases = sql.returnColumnsAliases;
+
+    if (returnColumnsAliases != null && returnColumnsAliases.isNotEmpty) {
+      return sel.map((e) {
+        return Map<String, dynamic>.fromEntries(e.entries
+            .where((e) => returnColumnsAliases.containsKey(e.key))
+            .map((e) => MapEntry(returnColumnsAliases[e.key]!, e.value)));
+      }).toList();
+    }
+
+    return sel;
   }
 
   @override

@@ -2263,7 +2263,6 @@ class TransactionOperationSelectRelationship<O> extends TransactionOperation {
   }
 }
 
-
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
   final List<O> entities;
 
@@ -2276,7 +2275,6 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
     return 'TransactionOperation[#$id:selectRelationships]{entities: $entities$_commandToString}';
   }
 }
-
 
 class TransactionOperationDelete<O> extends TransactionOperation {
   final EntityMatcher matcher;
