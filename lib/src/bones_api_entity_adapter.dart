@@ -820,8 +820,10 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var sql = StringBuffer();
 
       sql.write('SELECT $q');
+      sql.write(relationship.sourceRelationshipField);
+      sql.write('$q as ${q}source_id$q , $q');
       sql.write(relationship.targetRelationshipField);
-      sql.write('$q FROM $q');
+      sql.write('$q as ${q}target_id$q FROM $q');
       sql.write(relationship.relationshipTable);
       sql.write('$q WHERE ( ');
       sql.write(conditionSQL);
@@ -851,6 +853,80 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       var ret =
           doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
+      return ret;
+    });
+  }
+
+
+  FutureOr<SQL> generateSelectRelationshipsSQL(Transaction transaction,
+      String entityName, String table, List<dynamic> ids, String otherTableName) {
+    var retTableScheme = getTableScheme(table);
+
+    return retTableScheme.resolveMapped((tableScheme) {
+      if (tableScheme == null) {
+        throw StateError("Can't find TableScheme for table: $table");
+      }
+
+      var relationship =
+      tableScheme.getTableRelationshipReference(otherTableName);
+
+      if (relationship == null) {
+        throw StateError(
+            "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+      }
+
+      var q = sqlElementQuote;
+
+      var conditionSQL = StringBuffer('$q${relationship.sourceRelationshipField}$q IN (');
+      
+      var parameters = <String,dynamic>{};
+      for (var i = 0; i < ids.length; ++i) {
+        var p = 'p$i';
+        var id = ids[i];
+        parameters[p] = id ;
+        if (i > 0) conditionSQL.write(', ');
+        conditionSQL.write('@$p');
+      }
+
+      conditionSQL.write(') ');
+
+      var conditionSQLStr = conditionSQL.toString();
+
+      var sql = StringBuffer();
+
+      sql.write('SELECT $q');
+      sql.write(relationship.sourceRelationshipField);
+      sql.write('$q as ${q}source_id$q , $q');
+      sql.write(relationship.targetRelationshipField);
+      sql.write('$q as ${q}target_id$q FROM $q');
+      sql.write(relationship.relationshipTable);
+      sql.write('$q WHERE ( ');
+      sql.write(conditionSQLStr);
+      sql.write(' )');
+
+      var condition = KeyConditionIN([ConditionKeyField(relationship.sourceRelationshipField)], ids);
+
+      return SQL(sql.toString(), parameters,
+          condition: condition,
+          sqlCondition: conditionSQLStr,
+          returnColumns: {relationship.targetRelationshipField},
+          mainTable: relationship.relationshipTable);
+    });
+  }
+
+  FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      SQL sql,
+      List<dynamic> ids,
+      String otherTable) {
+    return executeTransactionOperation(op, sql, (connection) {
+      _log.info(
+          '[transaction:${op.transactionId}] selectRelationshipsSQL> $sql');
+
+      var ret =
+      doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
       return ret;
     });
   }
@@ -1557,6 +1633,28 @@ class SQLRepositoryAdapter<O> with Initializable {
     return generateSelectRelationshipSQL(op.transaction, id, otherTableName)
         .resolveMapped((sql) {
       return selectRelationshipSQL(op, sql, id, otherTableName)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
+
+  FutureOr<SQL> generateSelectRelationshipsSQL(
+      Transaction transaction, List<dynamic> ids, String otherTableName) {
+    return databaseAdapter.generateSelectRelationshipsSQL(
+        transaction, name, tableName, ids, otherTableName);
+  }
+
+  FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(
+      TransactionOperation op, SQL sql, List<dynamic> ids, String otherTableName) {
+    return databaseAdapter.selectRelationshipsSQL(
+        op, name, tableName, sql, ids, otherTableName);
+  }
+
+  FutureOr<R> doSelectRelationships<R>(
+      TransactionOperation op, List<dynamic> ids, String otherTableName,
+      [PreFinishSQLOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
+    return generateSelectRelationshipsSQL(op.transaction, ids, otherTableName)
+        .resolveMapped((sql) {
+      return selectRelationshipsSQL(op, sql, ids, otherTableName)
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }

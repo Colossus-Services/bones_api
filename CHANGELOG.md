@@ -1,3 +1,7 @@
+## 1.1.10
+
+- Optimize relationship requests to resolve entities.
+
 ## 1.1.9
 
 - Fix update SQL when a set value is null.

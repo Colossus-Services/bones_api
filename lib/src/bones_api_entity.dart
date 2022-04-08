@@ -1179,6 +1179,10 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   FutureOr<Iterable<dynamic>> selectRelationship<E>(O? o, String field,
       {Object? oId, TypeInfo? fieldType, Transaction? transaction});
 
+  FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
+      List<O>? os, String field,
+      {List<dynamic>? oIds, TypeInfo? fieldType, Transaction? transaction});
+
   FutureOr<Iterable<O>> deleteByQuery(String query,
       {Object? parameters,
       List? positionalParameters,
@@ -2259,6 +2263,21 @@ class TransactionOperationSelectRelationship<O> extends TransactionOperation {
   }
 }
 
+
+class TransactionOperationSelectRelationships<O> extends TransactionOperation {
+  final List<O> entities;
+
+  TransactionOperationSelectRelationships(this.entities,
+      [Transaction? transaction])
+      : super(TransactionOperationType.selectRelationships, transaction);
+
+  @override
+  String toString() {
+    return 'TransactionOperation[#$id:selectRelationships]{entities: $entities$_commandToString}';
+  }
+}
+
+
 class TransactionOperationDelete<O> extends TransactionOperation {
   final EntityMatcher matcher;
 
@@ -2278,6 +2297,7 @@ enum TransactionOperationType {
   storeRelationship,
   constrainRelationship,
   selectRelationship,
+  selectRelationships,
   update,
   delete
 }
@@ -2455,6 +2475,25 @@ abstract class IterableEntityRepository<O extends Object>
     op.transaction._markOperationExecuted(op, valuesIds);
 
     return valuesIds;
+  }
+
+  @override
+  FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
+      List<O>? os, String field,
+      {List<dynamic>? oIds, TypeInfo? fieldType, Transaction? transaction}) {
+    oIds ??= os!
+        .map((o) => getID(o, entityHandler: entityHandler)! as Object)
+        .toList();
+
+    var entries = oIds.map((oId) {
+      var objs = selectRelationship(null, field,
+          oId: oId, fieldType: fieldType, transaction: transaction);
+      return MapEntry(oId, objs);
+    }).toList();
+
+    var results =
+        Map<dynamic, FutureOr<Iterable<dynamic>>>.fromEntries(entries);
+    return results.resolveAllValues();
   }
 
   List<Object> getRelationship(Object oId, Type valuesType);

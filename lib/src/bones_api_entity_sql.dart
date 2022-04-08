@@ -302,23 +302,37 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       var targetEntityRepository =
           provider.getEntityRepository(type: targetType)!;
 
-      var retRelationships = Map.fromEntries(ids.map((id) {
-        var targetIdsAsync = selectRelationship(null, fieldName,
-            oId: id, transaction: transaction, fieldType: fieldType);
+      var relationshipsAsync = selectRelationships(null, fieldName,
+          oIds: ids, fieldType: fieldType, transaction: transaction);
 
-        var targetEntities = targetIdsAsync
-            .resolveMapped((targetIds) => targetEntityRepository
-                .selectByIDs(targetIds.toList(), transaction: transaction))
-            .resolveMapped((l) =>
-                targetEntityRepository.entityHandler.castList(l, targetType)!);
+      var retRelationships = relationshipsAsync.resolveMapped((relationships) {
+        var allTargetIds =
+            relationships.values.expand((e) => e).toSet().toList();
 
-        return MapEntry(id, targetEntities);
-      })).resolveAllValues();
+        var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
+            transaction: transaction);
+
+        return targetsAsync.resolveMapped((targets) {
+          var allTargetsById = Map.fromEntries(targets
+              .whereNotNull()
+              .map((e) => MapEntry(targetEntityRepository.getEntityID(e)!, e)));
+
+          return relationships.map((id, targetIds) {
+            var targetEntities =
+                targetIds.map((id) => allTargetsById[id]).toList();
+            var targetEntitiesCast = targetEntityRepository.entityHandler
+                .castList(targetEntities, targetType)!;
+            return MapEntry(id, targetEntitiesCast);
+          }).resolveAllValues();
+        });
+      });
 
       return retRelationships.resolveMapped((relationships) {
         for (var r in results) {
           var id = r[idFieldName];
           var values = relationships[id];
+          values ??= targetEntityRepository.entityHandler
+              .castList(<dynamic>[], targetType)!;
           r[fieldName] = values;
         }
       }).resolveWithValue(true);
@@ -481,13 +495,61 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     try {
       return sqlRepositoryAdapter.doSelectRelationship(op, oId, valuesTableName,
           (sel) {
-        var valuesIds = sel.map((e) => e.values.first).cast<E>().toList();
+        var valuesIds = sel.map((e) => e['target_id']!).cast<E>().toList();
         return valuesIds;
       });
     } catch (e, s) {
       var message = 'selectRelationship> '
           'o: $o ; '
           'oId: $oId ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'op: $op > '
+          '[ERROR] $e';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  @override
+  FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
+      List<O>? os, String field,
+      {List<dynamic>? oIds, TypeInfo? fieldType, Transaction? transaction}) {
+    oIds ??= os!
+        .map((o) => getID(o, entityHandler: entityHandler)! as Object)
+        .toList();
+
+    if (oIds.isEmpty) {
+      return <dynamic, Iterable<dynamic>>{};
+    } else if (oIds.length == 1) {
+      var id = oIds.first;
+      return selectRelationship(null, field,
+              oId: id, fieldType: fieldType, transaction: transaction)
+          .resolveMapped((targetIds) {
+        return <dynamic, Iterable<dynamic>>{
+          id: targetIds is List ? targetIds : targetIds.toList()
+        };
+      });
+    }
+
+    fieldType ??= entityHandler.getFieldType(os?.first, field)!;
+
+    var op = TransactionOperationSelectRelationships(os ?? oIds, transaction);
+
+    var valuesType = fieldType.listEntityType!.type;
+    String valuesTableName = _resolveTableName(valuesType);
+
+    try {
+      return sqlRepositoryAdapter
+          .doSelectRelationships(op, oIds, valuesTableName, (sel) {
+        var relationships = sel.groupListsBy((e) => e['source_id']!).map(
+            (id, l) => MapEntry(id, l.map((m) => m['target_id']).toList()));
+        return relationships;
+      });
+    } catch (e, s) {
+      var message = 'selectRelationships> '
+          'os: $os ; '
+          'oIds: $oIds ; '
           'field: $field ; '
           'fieldType: $fieldType ; '
           'op: $op > '
