@@ -285,6 +285,23 @@ void runAdapterTests(
             wakeUpTime: user2WakeupTime, creationTime: user2CreationTime);
         var id = await userAPIRepository.store(user);
         expect(id, equals(2));
+
+        var user2 = await userAPIRepository.selectByID(id);
+        expect(user2!.wakeUpTime, equals(user2WakeupTime));
+
+        user2.wakeUpTime = null;
+        id = await userAPIRepository.store(user2);
+        expect(id, equals(2));
+
+        user2 = await userAPIRepository.selectByID(id);
+        expect(user2!.wakeUpTime, isNull);
+
+        user2.wakeUpTime = user2WakeupTime;
+        id = await userAPIRepository.store(user2);
+        expect(id, equals(2));
+
+        user2 = await userAPIRepository.selectByID(id);
+        expect(user2!.wakeUpTime, equals(user2WakeupTime));
       }
 
       var user3CreationTime = DateTime.utc(2021, 9, 22);

@@ -1,3 +1,7 @@
+## 1.1.9
+
+- Fix update SQL when a set value is null.
+
 ## 1.1.8
 
 - `APIServer` and `APIModule`: improved error logging.

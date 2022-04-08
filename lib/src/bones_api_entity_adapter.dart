@@ -357,11 +357,11 @@ abstract class SQLAdapter<C> extends SchemeProvider
       EncodingContext context,
       TableScheme tableScheme,
       String fieldName,
-      Object value,
+      Object? value,
       Map<String, Object?> fieldsValues) {
     var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
 
-    if (fieldRef == null) {
+    if (fieldRef == null || value == null) {
       fieldsValues.putIfAbsent(fieldName, () => valueToSQL(value));
       var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
       return valueSQL;
@@ -371,7 +371,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       if (refEntityRepository != null) {
         var refId = refEntityRepository.entityHandler
-            .getField(value, fieldRef.targetField);
+            .getField(refEntity, fieldRef.targetField);
 
         if (refId != null) {
           fieldsValues.putIfAbsent(fieldName, () => refId);
@@ -551,18 +551,20 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var idPlaceholder =
           _conditionSQLGenerator.parameterPlaceholder(idFieldName);
 
-      var fieldsValues = tableScheme.getFieldsValues(fields);
+      var fieldsValues =
+          tableScheme.getFieldsValues(fields, fields: fields.keys.toSet());
 
-      var fieldsNotNull = fieldsValues.entries
-          .map((e) => e.value != null && e.key != idFieldName ? e.key : null)
-          .whereNotNull()
-          .toList(growable: false);
+      if (fieldsValues.isEmpty) {
+        throw StateError("Can't get fields values!");
+      }
+
+      var fieldsKeys = fieldsValues.keys.toList();
 
       var fieldsValuesInSQL = <String, Object?>{idFieldName: id};
 
-      return fieldsNotNull
+      return fieldsKeys
           .map((f) => fieldValueToSQL(
-              context, tableScheme, f, fieldsValues[f]!, fieldsValuesInSQL))
+              context, tableScheme, f, fieldsValues[f], fieldsValuesInSQL))
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
@@ -574,7 +576,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
         sql.write('$q SET ');
 
         for (var i = 0; i < values.length; ++i) {
-          var f = fieldsNotNull[i];
+          var f = fieldsKeys[i];
           var v = values[i];
 
           if (i > 0) sql.write(' , ');

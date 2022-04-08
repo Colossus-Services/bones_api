@@ -175,7 +175,20 @@ class TableScheme with FieldsFromMap {
   /// Returns a [Map] with the table fields values populated from the provided [map].
   ///
   /// The field name resolution is case insensitive. See [getFieldValue].
-  Map<String, Object?> getFieldsValues(Map<String, Object?> map) {
+  Map<String, Object?> getFieldsValues(Map<String, Object?> map,
+      {Iterable<String>? fields}) {
+    var fieldsNames = this.fieldsNames;
+
+    if (fields != null) {
+      var fieldsSimple = fields.map((e) => fieldToSimpleKey(e)).toList();
+
+      fieldsNames = fieldsNames
+          .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
+          .where((e) => fieldsSimple.contains(e.value))
+          .map((e) => e.key)
+          .toList();
+    }
+
     return getFieldsValuesFromMap(fieldsNames, map,
         fieldsNamesIndexes: _fieldsNamesIndexes,
         fieldsNamesLC: _fieldsNamesLC,
