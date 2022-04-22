@@ -313,8 +313,6 @@ class APIToken implements Comparable<APIToken> {
 
     random.advance(maxSteps: 11, random: _advanceRandom);
 
-    var token = StringBuffer();
-
     var alphabetLength = tokenDefaultAlphabet.length;
 
     if (variableLength > 0) {
@@ -323,6 +321,8 @@ class APIToken implements Comparable<APIToken> {
     }
 
     var halfLength = length ~/ 2;
+
+    var token = StringBuffer();
 
     while (token.length < halfLength) {
       var c = tokenDefaultAlphabet[random.nextInt(alphabetLength)];
