@@ -14,6 +14,30 @@ final _log = logging.Logger('MySQLAdapter');
 
 /// A MySQL adapter.
 class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    Transaction.registerErrorFilter((e, s) => e is MySqlException);
+
+    SQLAdapter.registerAdapter(['mysql'], MySQLAdapter, (config,
+        {int? minConnections,
+        int? maxConnections,
+        EntityRepositoryProvider? parentRepositoryProvider}) {
+      try {
+        return MySQLAdapter.fromConfig(config,
+            minConnections: minConnections,
+            maxConnections: maxConnections,
+            parentRepositoryProvider: parentRepositoryProvider);
+      } catch (e, s) {
+        _log.severe("Error instantiating from config", e, s);
+        return null;
+      }
+    });
+  }
+
   final String host;
   final int port;
   final String databaseName;
@@ -44,7 +68,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
 
-    _register();
+    boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
@@ -54,8 +78,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       String? defaultUsername,
       String? defaultHost,
       int? defaultPort,
-      int minConnections = 1,
-      int maxConnections = 3,
+      int? minConnections,
+      int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider}) {
     var host = config?['host'] ?? defaultHost;
     var port = config?['port'] ?? defaultPort;
@@ -63,25 +87,19 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     var username = config?['username'] ?? config?['user'] ?? defaultUsername;
     var password = config?['password'] ?? config?['pass'];
 
+    minConnections ??= config?['minConnections'] ?? 1;
+    maxConnections ??= config?['maxConnections'] ?? 3;
+
     return MySQLAdapter(
       database,
       username,
       password: password,
       host: host,
       port: port,
-      minConnections: minConnections,
-      maxConnections: maxConnections,
+      minConnections: minConnections!,
+      maxConnections: maxConnections!,
       parentRepositoryProvider: parentRepositoryProvider,
     );
-  }
-
-  static bool _registered = false;
-
-  static void _register() {
-    if (_registered) return;
-    _registered = true;
-
-    Transaction.registerErrorFilter((e, s) => e is MySqlException);
   }
 
   FutureOr<String> _getPassword() {
@@ -191,10 +209,11 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  Future<TableScheme?> getTableSchemeImpl(String table) async {
+  Future<TableScheme?> getTableSchemeImpl(
+      String table, TableRelationshipReference? relationship) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableSchemeImpl> $table');
+    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var sql = "SHOW COLUMNS FROM `$table`";
 
@@ -224,8 +243,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
     await releaseIntoPool(connection);
 
-    var tableScheme = TableScheme(table, idFieldName, fieldsTypes,
-        fieldsReferencedTables, relationshipTables);
+    var tableScheme = TableScheme(table,
+        relationship: relationship != null,
+        idFieldName: idFieldName,
+        fieldsTypes: fieldsTypes,
+        fieldsReferencedTables: fieldsReferencedTables,
+        relationshipTables: relationshipTables);
 
     _log.info('$tableScheme');
 

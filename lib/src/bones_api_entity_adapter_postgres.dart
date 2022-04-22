@@ -15,6 +15,31 @@ final _log = logging.Logger('PostgreAdapter');
 
 /// A PostgreSQL adapter.
 class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
+
+    SQLAdapter.registerAdapter(
+        ['postgres', 'postgre', 'postgresql'], PostgreSQLAdapter, (config,
+            {int? minConnections,
+            int? maxConnections,
+            EntityRepositoryProvider? parentRepositoryProvider}) {
+      try {
+        return PostgreSQLAdapter.fromConfig(config,
+            minConnections: minConnections,
+            maxConnections: maxConnections,
+            parentRepositoryProvider: parentRepositoryProvider);
+      } catch (e, s) {
+        _log.severe("Error instantiating from config", e, s);
+        return null;
+      }
+    });
+  }
+
   final String host;
   final int port;
   final String databaseName;
@@ -41,11 +66,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
             (password is PasswordProvider ? password : null),
         super(minConnections, maxConnections, 'postgres',
             parentRepositoryProvider: parentRepositoryProvider) {
+    boot();
+
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
-
-    _register();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
@@ -55,14 +80,19 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       String? defaultUsername,
       String? defaultHost,
       int? defaultPort,
-      int minConnections = 1,
-      int maxConnections = 3,
+      int? minConnections,
+      int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider}) {
+    boot();
+
     var host = config?['host'] ?? defaultHost;
     var port = config?['port'] ?? defaultPort;
     var database = config?['database'] ?? config?['db'] ?? defaultDatabase;
     var username = config?['username'] ?? config?['user'] ?? defaultUsername;
     var password = config?['password'] ?? config?['pass'];
+
+    minConnections ??= config?['minConnections'] ?? 1;
+    maxConnections ??= config?['maxConnections'] ?? 3;
 
     return PostgreSQLAdapter(
       database,
@@ -70,19 +100,10 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       password: password,
       host: host,
       port: port,
-      minConnections: minConnections,
-      maxConnections: maxConnections,
+      minConnections: minConnections!,
+      maxConnections: maxConnections!,
       parentRepositoryProvider: parentRepositoryProvider,
     );
-  }
-
-  static bool _registered = false;
-
-  static void _register() {
-    if (_registered) return;
-    _registered = true;
-
-    Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
   }
 
   FutureOr<String> _getPassword() {
@@ -186,10 +207,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  Future<TableScheme?> getTableSchemeImpl(String table) async {
+  Future<TableScheme?> getTableSchemeImpl(
+      String table, TableRelationshipReference? relationship) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableSchemeImpl> $table');
+    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var sql =
         "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
@@ -220,8 +242,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     await releaseIntoPool(connection);
 
-    var tableScheme = TableScheme(table, idFieldName, fieldsTypes,
-        fieldsReferencedTables, relationshipTables);
+    var tableScheme = TableScheme(table,
+        relationship: relationship != null,
+        idFieldName: idFieldName,
+        fieldsTypes: fieldsTypes,
+        fieldsReferencedTables: fieldsReferencedTables,
+        relationshipTables: relationshipTables);
 
     _log.info('$tableScheme');
 

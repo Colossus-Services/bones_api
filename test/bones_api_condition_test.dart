@@ -403,20 +403,21 @@ void main() {
 
 class _TestSchemeProvider extends SchemeProvider {
   @override
-  TableScheme? getTableSchemeImpl(String table) {
+  TableScheme? getTableSchemeImpl(
+      String table, TableRelationshipReference? relationship) {
     switch (table) {
       case 'account':
         return TableScheme(
           'account',
-          'id',
-          {
+          idFieldName: 'id',
+          fieldsTypes: {
             'id': int,
             'email': String,
             'pass': String,
             'address': int,
             'admin': bool
           },
-          {
+          fieldsReferencedTables: {
             'address': TableFieldReference(
                 'account', 'address', int, 'address', 'id', int)
           },
@@ -424,8 +425,13 @@ class _TestSchemeProvider extends SchemeProvider {
       case 'address':
         return TableScheme(
           'address',
-          'id',
-          {'id': int, 'state': String, 'city': String, 'street': String},
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'state': String,
+            'city': String,
+            'street': String
+          },
         );
       default:
         return null;
@@ -434,7 +440,7 @@ class _TestSchemeProvider extends SchemeProvider {
 
   @override
   FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) {
-    return getTableSchemeImpl(table)?.fieldsTypes;
+    return getTableSchemeImpl(table, null)?.fieldsTypes;
   }
 
   @override

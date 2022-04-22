@@ -1,22 +1,70 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_utils.dart';
 
+final _log = logging.Logger('MemorySQLAdapter');
+
 /// A [SQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
 class MemorySQLAdapter extends SQLAdapter<int> {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    SQLAdapter.registerAdapter(['memory', 'mem'], MemorySQLAdapter, (config,
+        {int? minConnections,
+        int? maxConnections,
+        EntityRepositoryProvider? parentRepositoryProvider}) {
+      try {
+        return MemorySQLAdapter.fromConfig(config,
+            minConnections: minConnections,
+            maxConnections: maxConnections,
+            parentRepositoryProvider: parentRepositoryProvider);
+      } catch (e, s) {
+        _log.severe("Error instantiating from config", e, s);
+        return null;
+      }
+    });
+  }
+
   static int _idCount = 0;
 
   final int id = ++_idCount;
 
-  MemorySQLAdapter({EntityRepositoryProvider? parentRepositoryProvider})
-      : super(1, 3, 'generic',
-            parentRepositoryProvider: parentRepositoryProvider);
+  MemorySQLAdapter(
+      {int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider})
+      : super(minConnections ?? 1, maxConnections ?? 3, 'generic',
+            parentRepositoryProvider: parentRepositoryProvider) {
+    boot();
+
+    parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
+  }
+
+  factory MemorySQLAdapter.fromConfig(Map<String, dynamic>? config,
+      {int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    boot();
+
+    minConnections ??= config?['minConnections'] ?? 1;
+    maxConnections ??= config?['maxConnections'] ?? 3;
+
+    return MemorySQLAdapter(
+      minConnections: minConnections,
+      maxConnections: maxConnections,
+      parentRepositoryProvider: parentRepositoryProvider,
+    );
+  }
 
   @override
   String get sqlElementQuote => '';
@@ -149,7 +197,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       return <Map<String, dynamic>>[];
     }
 
-    var tableScheme = getTableScheme(table) as TableScheme?;
+    var tableScheme =
+        getTableScheme(table, relationship: sql.relationship) as TableScheme?;
 
     var entityHandler = getEntityRepository(name: table)?.entityHandler;
 
@@ -210,7 +259,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       return <Map<String, dynamic>>[];
     }
 
-    var tableScheme = getTableScheme(table) as TableScheme?;
+    var tableScheme =
+        getTableScheme(table, relationship: sql.relationship) as TableScheme?;
 
     var entityHandler = getEntityRepository(name: table)?.entityHandler;
 
@@ -287,8 +337,54 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<TableScheme?> getTableSchemeImpl(String table) =>
-      tablesSchemes[table];
+  FutureOr<TableScheme?> getTableSchemeImpl(
+      String table, TableRelationshipReference? relationship) {
+    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+
+    var tableScheme = tablesSchemes[table];
+    if (tableScheme != null) return tableScheme;
+
+    var entityHandler = getEntityHandler(tableName: table);
+    if (entityHandler == null) {
+      if (relationship != null) {
+        var sourceId =
+            relationship.sourceTable + '_' + relationship.sourceField;
+        var targetId =
+            relationship.targetTable + '_' + relationship.targetField;
+
+        tableScheme = TableScheme(table,
+            relationship: true,
+            idFieldName: sourceId,
+            fieldsTypes: {
+              sourceId: relationship.sourceFieldType,
+              targetId: relationship.targetFieldType,
+            });
+
+        _log.info('relationship> $tableScheme');
+
+        return tableScheme;
+      }
+
+      throw StateError(
+          "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
+    }
+
+    var idFieldName = entityHandler.idFieldsName();
+
+    var entityFieldsTypes = entityHandler.fieldsTypes();
+
+    var fieldsTypes =
+        entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
+
+    tableScheme = TableScheme(table,
+        relationship: relationship != null,
+        idFieldName: idFieldName,
+        fieldsTypes: fieldsTypes);
+
+    _log.info('$tableScheme');
+
+    return tableScheme;
+  }
 
   @override
   FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) {

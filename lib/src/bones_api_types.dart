@@ -4,6 +4,18 @@ import 'dart:typed_data';
 import 'package:data_serializer/data_serializer.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
+extension GenericObjectExtension on Object? {
+  bool get isPrimitiveValue {
+    var self = this;
+    return self is num || self is String || self is bool;
+  }
+
+  bool get isEntityIDBasicType {
+    var self = this;
+    return self is num || self is String;
+  }
+}
+
 /// A [Time] represents the time of the day,
 /// independently of the day of the year, timezone or [DateTime].
 class Time implements Comparable<Time> {

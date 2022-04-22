@@ -1,3 +1,16 @@
+## 1.1.11
+
+- `Transaction`:
+  - Queries now reuse already instantiated entities in the same transaction.
+- Added `EntityCache` for entity instantiation from `Map` or JSON.
+- `EntityRepository`:
+  - Added `storeAllFromJson` and `storeFromJson`.
+- `MemorySQLAdapter`:
+  - Fixed relationships of `TableScheme` loaded by the memory SQLAdapter.  
+- Fix update of sub-entities, that was being ignored.
+- Improve error logging.
+- reflection_factory: ^1.0.27
+
 ## 1.1.10
 
 - Optimize relationship requests to resolve entities.

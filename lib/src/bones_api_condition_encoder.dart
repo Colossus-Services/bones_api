@@ -122,6 +122,9 @@ class TableScheme with FieldsFromMap {
   /// The table name
   final String name;
 
+  /// If `true` is a relationship table.
+  final bool relationship;
+
   /// The ID field name.
   final String? idFieldName;
 
@@ -144,11 +147,15 @@ class TableScheme with FieldsFromMap {
   final Map<String, TableRelationshipReference> _tableRelationshipReference =
       <String, TableRelationshipReference>{};
 
-  TableScheme(this.name, this.idFieldName, Map<String, Type> fieldsTypes,
-      [Map<String, TableFieldReference> fieldsReferencedTables =
-          const <String, TableFieldReference>{},
-      Iterable<TableRelationshipReference>? relationshipTables])
-      : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
+  TableScheme(
+    this.name, {
+    required this.idFieldName,
+    required Map<String, Type> fieldsTypes,
+    Map<String, TableFieldReference> fieldsReferencedTables =
+        const <String, TableFieldReference>{},
+    Iterable<TableRelationshipReference>? relationshipTables,
+    this.relationship = false,
+  })  : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
         fieldsTypes = Map.unmodifiable(fieldsTypes),
         _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
             fieldsReferencedTables),
@@ -261,7 +268,8 @@ abstract class SchemeProvider {
   }
 
   /// Returns a [TableScheme] for [table].
-  FutureOr<TableScheme?> getTableScheme(String table) {
+  FutureOr<TableScheme?> getTableScheme(String table,
+      {TableRelationshipReference? relationship}) {
     var tablesScheme = _tablesSchemes[table];
     if (tablesScheme != null) return tablesScheme;
 
@@ -273,7 +281,7 @@ abstract class SchemeProvider {
     var completer = Completer<TableScheme?>();
     _tablesSchemesResolving[table] = completer;
 
-    var ret = getTableSchemeImpl(table);
+    var ret = getTableSchemeImpl(table, relationship);
 
     return ret.resolveMapped((tablesScheme) {
       if (tablesScheme == null) {
@@ -290,7 +298,8 @@ abstract class SchemeProvider {
   }
 
   /// Implementation that returns a [TableScheme] for [table].
-  FutureOr<TableScheme?> getTableSchemeImpl(String table);
+  FutureOr<TableScheme?> getTableSchemeImpl(
+      String table, TableRelationshipReference? relationship);
 
   final Map<String, Map<String, Type>> _tablesFieldsTypes =
       <String, Map<String, Type>>{};

@@ -41,9 +41,13 @@ void main() {
 
       var token = apiSecurity.createToken('foo');
 
+      print('Token: ${token.token}');
+
       expect(token.username, equals('foo'));
-      expect(token.token.length,
-          allOf(greaterThanOrEqualTo(512 - 48), lessThanOrEqualTo(512 + 48)));
+      expect(
+          token.token.length,
+          allOf(greaterThanOrEqualTo(2 + 512 - 48),
+              lessThanOrEqualTo(2 + 512 + 48)));
     });
 
     test('authenticate', () {

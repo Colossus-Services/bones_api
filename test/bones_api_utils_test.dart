@@ -1,7 +1,8 @@
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:statistics/statistics.dart' show Decimal;
+import 'package:statistics/statistics.dart'
+    show Decimal, DecimalOnDoubleExtension;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -67,7 +68,7 @@ void main() {
     });
 
     test('Json.fromJson', () async {
-      Role$reflection.staticInstance;
+      Role$reflection.boot();
 
       {
         var json = Json.toJson(Role(RoleType.guest, enabled: false));
@@ -81,6 +82,46 @@ void main() {
 
         expect(Json.fromJson<Role>(json),
             equals(Role(RoleType.admin, enabled: true)));
+      }
+    });
+
+    test('Json.fromJson + id ref', () async {
+      User$reflection.boot();
+      Address$reflection.boot();
+      Role$reflection.boot();
+
+      {
+        var creationTime = DateTime.utc(2022, 1, 2);
+        var address = Address('CA', 'LA', 'one', 101, id: 1101);
+        var role1 = Role(RoleType.guest,
+            enabled: true, value: 10.20.toDecimal(), id: 10);
+        var role2 = Role(RoleType.admin,
+            enabled: true, value: 101.10.toDecimal(), id: 101);
+        var user = User('joe@mail.com', '123', address, [role1, role2],
+            id: 1001, creationTime: creationTime);
+
+        var json = Json.toJson(user);
+
+        print(json);
+
+        var entityCache = JsonEntityCacheSimple();
+
+        var user2 = Json.fromJson<User>(json, entityCache: entityCache);
+
+        expect(user2?.toJsonEncoded(), equals(user.toJsonEncoded()));
+
+        var jsonRoles = json['roles'] as List;
+
+        expect(jsonRoles.length, equals(2));
+        expect(jsonRoles[0]['id'], equals(10));
+        expect(jsonRoles[1]['id'], equals(101));
+
+        jsonRoles.add(10);
+
+        var user3 = Json.fromJson<User>(json, entityCache: entityCache);
+
+        expect(user3, isA<User>());
+        expect(user3!.id, equals(1001));
       }
     });
 
@@ -123,7 +164,7 @@ void main() {
     });
 
     test('Json.decodeFromBytes', () async {
-      Role$reflection.staticInstance;
+      Role$reflection.boot();
 
       {
         var jsonBytes =

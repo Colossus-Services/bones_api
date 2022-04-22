@@ -93,17 +93,21 @@ abstract class LoggerHandler {
 
     var message = msg.message;
 
-    var logMsg = '$time $levelName $debugName $loggerName > $message\n';
-
-    printMessage(msg.level, logMsg);
+    var logMsg =
+        StringBuffer('$time $levelName $debugName $loggerName > $message\n');
 
     if (msg.error != null) {
-      printMessage(msg.level, msg.error.toString());
+      logMsg.write('[ERROR] ');
+      logMsg.write(msg.error.toString());
+      logMsg.write('\n');
     }
 
     if (msg.stackTrace != null) {
-      printMessage(msg.level, msg.stackTrace.toString());
+      logMsg.write(msg.stackTrace.toString());
+      logMsg.write('\n');
     }
+
+    printMessage(msg.level, logMsg.toString());
   }
 
   String loggerName(logging.LogRecord msg) {

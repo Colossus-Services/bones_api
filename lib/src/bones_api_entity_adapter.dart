@@ -8,6 +8,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_adapter_memory.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_types.dart';
@@ -74,6 +75,8 @@ class SQL implements SQLWrapper {
   final Map<String, String>? returnColumnsAliases;
 
   final String? mainTable;
+  final TableRelationshipReference? relationship;
+
   final Map<String, String>? tablesAliases;
 
   final RegExp placeholderRegexp;
@@ -108,6 +111,7 @@ class SQL implements SQLWrapper {
       this.returnColumns,
       this.returnColumnsAliases,
       required this.mainTable,
+      this.relationship,
       this.tablesAliases,
       RegExp? placeholderRegexp})
       : _sqlPositional = sqlPositional,
@@ -171,6 +175,9 @@ class SQL implements SQLWrapper {
     if (mainTable != null) {
       s += ' ; mainTable: $mainTable';
     }
+    if (relationship != null) {
+      s += ' ($relationship)';
+    }
     if (returnColumns != null && returnColumns!.isNotEmpty) {
       s += ' ; returnColumns: $returnColumns';
     }
@@ -201,6 +208,12 @@ class SQL implements SQLWrapper {
   }
 }
 
+typedef SQLAdapterInstantiator<C> = SQLAdapter<C>? Function(
+    Map<String, dynamic> config,
+    {int? minConnections,
+    int? maxConnections,
+    EntityRepositoryProvider? parentRepositoryProvider});
+
 /// Base class for SQL adapters.
 ///
 /// A [SQLAdapter] implementation is responsible to connect to the database and
@@ -210,6 +223,73 @@ class SQL implements SQLWrapper {
 abstract class SQLAdapter<C> extends SchemeProvider
     with Initializable, Pool<C>, Closable
     implements EntityRepositoryProvider {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    MemorySQLAdapter.boot();
+  }
+
+  static final Map<String, SQLAdapterInstantiator> _registeredAdaptersByName =
+      <String, SQLAdapterInstantiator>{};
+  static final Map<Type, SQLAdapterInstantiator> _registeredAdaptersByType =
+      <Type, SQLAdapterInstantiator>{};
+
+  static List<String> get registeredAdaptersNames =>
+      _registeredAdaptersByName.keys.toList();
+
+  static List<Type> get registeredAdaptersTypes =>
+      _registeredAdaptersByType.keys.toList();
+
+  static void registerAdapter<C>(List<String> names, Type type,
+      SQLAdapterInstantiator<C> adapterInstantiator) {
+    for (var name in names) {
+      _registeredAdaptersByName[name] = adapterInstantiator;
+    }
+
+    _registeredAdaptersByType[type] = adapterInstantiator;
+  }
+
+  static SQLAdapterInstantiator<C>? getAdapterInstantiator<C>(
+      {String? name, Type? type}) {
+    if (name == null && type == null) {
+      throw ArgumentError(
+          'One of the parameters `name` or `type` should NOT be null!');
+    }
+
+    SQLAdapterInstantiator<C>? adapter;
+
+    if (name != null) {
+      adapter = _registeredAdaptersByName[name] as SQLAdapterInstantiator<C>?;
+    }
+
+    if (adapter == null && type != null) {
+      adapter = _registeredAdaptersByType[type] as SQLAdapterInstantiator<C>?;
+    }
+
+    return adapter;
+  }
+
+  static List<MapEntry<SQLAdapterInstantiator, Map<String, dynamic>>>
+      getAdapterInstantiatorsFromConfig(Map<String, dynamic> config) =>
+          registeredAdaptersNames
+              .where((n) => config.containsKey(n))
+              .map((n) {
+                var instantiator = getAdapterInstantiator(name: n);
+                if (instantiator == null) return null;
+                var conf = config[n] ?? <String, dynamic>{};
+                if (conf is! Map) return null;
+                return MapEntry<SQLAdapterInstantiator, Map<String, dynamic>>(
+                    instantiator,
+                    conf.map((key, value) => MapEntry<String, dynamic>(
+                        key.toString(), value as dynamic)));
+              })
+              .whereNotNull()
+              .toList()
+            ..sort((a, b) => a.value.length.compareTo(b.value.length));
+
   /// The minimum number of connections in the pool of this adapter.
   final int minConnections;
 
@@ -225,9 +305,41 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
   SQLAdapter(this.minConnections, this.maxConnections, this.dialect,
       {this.parentRepositoryProvider}) {
+    boot();
+
     _conditionSQLGenerator =
         ConditionSQLEncoder(this, sqlElementQuote: sqlElementQuote);
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
+  }
+
+  factory SQLAdapter.fromConfig(Map<String, dynamic> config,
+      {int minConnections = 1,
+      int maxConnections = 3,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    boot();
+
+    var adaptersInstantiators = getAdapterInstantiatorsFromConfig(config);
+
+    if (adaptersInstantiators.isEmpty) {
+      throw StateError(
+          "Can't find `SQLAdapter` instantiator for `config` keys: ${config.keys.toList()}");
+    }
+
+    SQLAdapter? adapter;
+
+    for (var e in adaptersInstantiators) {
+      adapter = e.key(e.value,
+          minConnections: minConnections,
+          maxConnections: maxConnections,
+          parentRepositoryProvider: parentRepositoryProvider);
+      if (adapter != null) break;
+    }
+
+    if (adapter == null) {
+      throw StateError("Can't instantiate an `SQLAdapter` for `config`");
+    }
+
+    return adapter as SQLAdapter<C>;
   }
 
   @override
@@ -303,21 +415,28 @@ abstract class SQLAdapter<C> extends SchemeProvider
   @override
   FutureOr<Object?> getEntityID(Object entity,
       {String? entityName, String? tableName, Type? entityType}) {
+    entityType ??= entity.runtimeType;
+
+    var entityHandler = getEntityHandler(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
+    if (entityHandler == null) return null;
+
+    if (entity is Map) {
+      var idFieldsName = entityHandler.idFieldsName();
+      return entity[idFieldsName];
+    } else {
+      return entityHandler.getID(entity);
+    }
+  }
+
+  EntityHandler<T>? getEntityHandler<T>(
+      {String? entityName, String? tableName, Type? entityType}) {
     var entityRepository = _geAdapterEntityRepository(
         entityName: entityName, tableName: tableName, entityType: entityType);
 
-    if (entityRepository != null) {
-      var entityHandler = entityRepository.entityHandler;
-
-      if (entity is Map) {
-        var idFieldsName = entityHandler.idFieldsName();
-        return entity[idFieldsName];
-      } else {
-        return entityHandler.getID(entity);
-      }
-    }
-
-    return null;
+    var entityHandler = entityRepository?.entityHandler;
+    return entityHandler as EntityHandler<T>?;
   }
 
   /// The type of "quote" to use to reference elements (tables and columns).
@@ -705,7 +824,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
       sql.write(' ON CONFLICT DO NOTHING ');
     }
 
-    return SQL(sql.toString(), parameters, mainTable: relationshipTable);
+    return SQL(sql.toString(), parameters,
+        mainTable: relationshipTable, relationship: relationship);
   }
 
   SQL _generateConstrainRelationshipSQL(TableScheme tableScheme, String table,
@@ -767,7 +887,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
     return SQL(sql.toString(), parameters,
         condition: condition,
         sqlCondition: conditionSQL,
-        mainTable: relationshipTable);
+        mainTable: relationshipTable,
+        relationship: relationship);
   }
 
   FutureOr<bool> insertRelationshipSQLs(
@@ -846,7 +967,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
             relationship.sourceRelationshipField: 'source_id',
             relationship.targetRelationshipField: 'target_id',
           },
-          mainTable: relationship.relationshipTable);
+          mainTable: relationship.relationshipTable,
+          relationship: relationship);
     });
   }
 
@@ -928,7 +1050,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
             relationship.sourceRelationshipField: 'source_id',
             relationship.targetRelationshipField: 'target_id',
           },
-          mainTable: relationship.relationshipTable);
+          mainTable: relationship.relationshipTable,
+          relationship: relationship);
     });
   }
 

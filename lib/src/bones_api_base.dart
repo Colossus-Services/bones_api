@@ -25,7 +25,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.10';
+  static const String VERSION = '1.1.11';
 
   static bool _boot = false;
 
@@ -145,6 +145,9 @@ abstract class APIRoot {
       logger(this, type, message, error, stackTrace);
     }
   }
+
+  /// Ensures that this [APIRoot] and its modules are loaded.
+  void load() => _ensureModulesLoaded();
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;

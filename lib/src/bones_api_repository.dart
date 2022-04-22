@@ -9,11 +9,18 @@ abstract class APIRepository<O extends Object> {
   static EntityRepository<O>? resolveEntityRepository<O extends Object>(
       {EntityRepository<O>? entityRepository,
       EntityRepositoryProvider? provider,
-      Type? type}) {
-    return entityRepository ??
-        provider?.getEntityRepository<O>(type: type) ??
-        EntityRepositoryProvider.globalProvider
-            .getEntityRepository<O>(type: type);
+      Type? type,
+      bool required = false}) {
+    entityRepository ??= provider?.getEntityRepository<O>(type: type);
+
+    entityRepository ??= EntityRepositoryProvider.globalProvider
+        .getEntityRepository<O>(type: type);
+
+    if (entityRepository == null && required) {
+      throw StateError("Can't resolve `EntityRepository` for type: $type");
+    }
+
+    return entityRepository;
   }
 
   final EntityRepository<O> entityRepository;
@@ -25,7 +32,8 @@ abstract class APIRepository<O extends Object> {
       : entityRepository = resolveEntityRepository(
             entityRepository: entityRepository,
             provider: provider,
-            type: type)! {
+            type: type ?? O,
+            required: true)! {
     this.entityRepository.ensureInitialized();
   }
 

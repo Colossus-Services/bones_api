@@ -27,23 +27,23 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   APIEntityRepositoryProvider._() {
     sqlAdapter = MemorySQLAdapter(parentRepositoryProvider: this)
       ..addTableSchemes([
-        TableScheme('user', 'id', {
+        TableScheme('user', idFieldName: 'id', fieldsTypes: {
           'id': int,
           'email': String,
           'password': String,
           'address': int,
           'creationTime': DateTime,
-        }, {
+        }, fieldsReferencedTables: {
           'address':
               TableFieldReference('user', 'address', int, 'address', 'id', int)
-        }, [
+        }, relationshipTables: [
           TableRelationshipReference('user_role', 'user', 'id', int, 'user_id',
               'role', 'id', int, 'role_id')
         ]),
         TableScheme(
           'address',
-          'id',
-          {
+          idFieldName: 'id',
+          fieldsTypes: {
             'id': int,
             'state': String,
             'city': String,
@@ -53,8 +53,8 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
         ),
         TableScheme(
           'role',
-          'id',
-          {
+          idFieldName: 'id',
+          fieldsTypes: {
             'id': int,
             'type': String,
             'enabled': bool,

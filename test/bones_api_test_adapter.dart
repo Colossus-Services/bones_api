@@ -420,7 +420,110 @@ void runAdapterTests(
         var sel = await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
 
         expect(sel.length, equals(3));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
+        expect(sel.map((e) => e.address.state),
+            unorderedEquals(['NY', 'CA', 'CA']));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.length, equals(5));
+        expect(transaction.cachedEntitiesLength, equals(8));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          var user1 = sel.first;
+
+          user1.level = 123;
+
+          var storeId = await userAPIRepository.store(user1);
+          expect(storeId, equals(user1.id));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.length, equals(7));
+        expect(transaction.cachedEntitiesLength, equals(8));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          var user1 = sel.firstWhere((e) => e.address.state == 'NY');
+
+          user1.address.city = 'Jersey City';
+
+          var storeId = await userAPIRepository.store(user1);
+          expect(storeId, equals(user1.id));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          var user2 = sel.firstWhere((e) => e.address.state == 'NY');
+
+          expect(user2.address.city, equals('Jersey City'));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.length, equals(8));
+        expect(transaction.cachedEntitiesLength, equals(8));
       }
 
       {
@@ -428,7 +531,10 @@ void runAdapterTests(
             .selectByINAddressStates(['NY', 'CA', 'N/A']);
 
         expect(sel.length, equals(3));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
+        expect(sel.map((e) => e.address.state),
+            unorderedEquals(['NY', 'CA', 'CA']));
+        expect(sel.map((e) => e.address.city),
+            unorderedEquals(['Los Angeles', 'Los Angeles', 'Jersey City']));
       }
 
       {
@@ -443,7 +549,7 @@ void runAdapterTests(
             await userAPIRepository.selectByINAddressStatesSingleValue('CA');
 
         expect(sel.length, equals(2));
-        expect(sel.map((e) => e.address.state), equals(['CA', 'CA']));
+        expect(sel.map((e) => e.address.state), unorderedEquals(['CA', 'CA']));
       }
 
       {
@@ -451,7 +557,8 @@ void runAdapterTests(
             ['NY', 'CA', ...List.generate(10, (i) => '$i')]);
 
         expect(sel.length, equals(3));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
+        expect(sel.map((e) => e.address.state),
+            unorderedEquals(['NY', 'CA', 'CA']));
       }
 
       {
@@ -459,7 +566,8 @@ void runAdapterTests(
             ['NY', 'CA', ...List.generate(100, (i) => '$i')]);
 
         expect(sel.length, equals(3));
-        expect(sel.map((e) => e.address.state), equals(['NY', 'CA', 'CA']));
+        expect(sel.map((e) => e.address.state),
+            unorderedEquals(['NY', 'CA', 'CA']));
       }
 
       {
@@ -526,7 +634,13 @@ void runAdapterTests(
         var transaction = Transaction();
 
         var result = await transaction.execute(() async {
+          var executingTransaction = Transaction.executingTransaction;
+          expect(executingTransaction, isNotNull);
+          expect(executingTransaction!.isEmpty, isTrue);
+
           var sel = await userAPIRepository.selectByEmail('smith3@$testDomain');
+
+          expect(executingTransaction.isNotEmpty, isTrue);
 
           var user = sel.first;
           expect(user.email, equals('smith3@$testDomain'));
@@ -551,7 +665,7 @@ void runAdapterTests(
 
         expect(transaction.isAborted, isFalse);
         expect(transaction.isCommitted, isTrue);
-        expect(transaction.length, equals(9));
+        expect(transaction.length, equals(7));
         expect(transaction.abortedError, isNull);
       }
 
