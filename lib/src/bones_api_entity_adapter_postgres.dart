@@ -555,6 +555,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
         return generateInsertSQL(transaction!, entityName, table, fields)
             .resolveMapped((insertSQL) {
+          _log.info('Update not affecting any row! Auto inserting: $insertSQL');
           return doInsertSQL(entityName, table, insertSQL, connection);
         });
       }
