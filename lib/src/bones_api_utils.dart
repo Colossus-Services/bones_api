@@ -929,6 +929,53 @@ bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
   return true;
 }
 
+/// Deeply copies [o].
+T? deepCopy<T>(T? o) {
+  if (o == null) return null;
+  if (o is String) return o;
+  if (o is num) return o;
+  if (o is bool) return o;
+
+  if (o is Set) return deepCopySet(o) as T?;
+  if (o is List) return deepCopyList(o) as T?;
+  if (o is Iterable) return deepCopyList(o.toList(growable: false)) as T?;
+  if (o is Map) return deepCopyMap(o) as T?;
+
+  var entityHandler =
+      EntityHandlerProvider.globalProvider.getEntityHandler(obj: o);
+
+  if (entityHandler != null) {
+    var o2 = entityHandler.copy(o);
+    if (o2 is! Future) {
+      return o2 ?? o;
+    }
+  }
+
+  return o;
+}
+
+/// Deeply copies [list].
+List<T>? deepCopyList<T>(List<T>? list) {
+  if (list == null) return null;
+  if (list.isEmpty) return <T>[];
+  return list.map((T e) => deepCopy(e) as T).toList();
+}
+
+/// Deeply copies [list].
+Set<T>? deepCopySet<T>(Set<T>? set) {
+  if (set == null) return null;
+  if (set.isEmpty) return <T>{};
+  return set.map((T e) => deepCopy(e) as T).toSet();
+}
+
+/// Deeply copies [map].
+Map<K, V>? deepCopyMap<K, V>(Map<K, V>? map) {
+  if (map == null) return null;
+  if (map.isEmpty) return <K, V>{};
+  return map
+      .map((K k, V v) => MapEntry<K, V>(deepCopy(k) as K, deepCopy(v) as V));
+}
+
 /// Returns an [Enum] name.
 String enumToName(Enum enumValue) {
   var s = enumValue.toString();

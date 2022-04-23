@@ -64,8 +64,13 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
             : null),
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
-        super(minConnections, maxConnections, 'postgres',
-            parentRepositoryProvider: parentRepositoryProvider) {
+        super(
+          minConnections,
+          maxConnections,
+          const SQLAdapterCapability(
+              dialect: 'postgre', transactions: true, transactionAbort: true),
+          parentRepositoryProvider: parentRepositoryProvider,
+        ) {
     boot();
 
     if (_password == null && _passwordProvider == null) {
@@ -467,7 +472,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
       PostgreSQLExecutionContext connection) {
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) {
       var count = results
           .map((e) {
@@ -487,7 +493,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) {
       var entries = results
           .map((e) => e[table])
@@ -504,7 +511,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) {
       var entries = results
           .map((e) => e[table])
@@ -521,18 +529,38 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     if (sql.isDummy) return null;
 
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) => _resolveResultID(results, table, sql));
   }
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      PostgreSQLExecutionContext connection) {
+      PostgreSQLExecutionContext connection,
+      {bool allowAutoInsert = false, Transaction? transaction}) {
     if (sql.isDummy) return null;
 
     return connection
-        .mappedResultsQuery(sql.sql, substitutionValues: sql.parameters)
-        .resolveMapped((results) => _resolveResultID(results, table, sql, id));
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
+        .resolveMapped((results) {
+      if (results.isEmpty) {
+        var entry = sql.parametersByPlaceholder;
+        if (!allowAutoInsert) {
+          throw StateError(
+              "Can't update not stored entity into table `$table`: $entry");
+        }
+
+        var fields = sql.namedParameters!;
+
+        return generateInsertSQL(transaction!, entityName, table, fields)
+            .resolveMapped((insertSQL) {
+          return doInsertSQL(entityName, table, insertSQL, connection);
+        });
+      }
+
+      return _resolveResultID(results, table, sql, id);
+    });
   }
 
   _resolveResultID(
@@ -571,7 +599,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         !transaction.isExecuting &&
         sql.sqlsLength == 1 &&
         !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool((connection) => f(connection));
+      return executeWithPool(f);
     }
 
     if (!transaction.isOpen && !transaction.isOpening) {

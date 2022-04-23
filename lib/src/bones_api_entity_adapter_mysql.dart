@@ -62,8 +62,13 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
             : null),
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
-        super(minConnections, maxConnections, 'mysql',
-            parentRepositoryProvider: parentRepositoryProvider) {
+        super(
+          minConnections,
+          maxConnections,
+          const SQLAdapterCapability(
+              dialect: 'mysql', transactions: true, transactionAbort: true),
+          parentRepositoryProvider: parentRepositoryProvider,
+        ) {
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
@@ -508,12 +513,30 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      MySqlConnectionWrapper connection) {
+      MySqlConnectionWrapper connection,
+      {bool allowAutoInsert = false, Transaction? transaction}) {
     if (sql.isDummy) return null;
 
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
-        .resolveMapped((results) => _resolveResultID(results, table, sql, id));
+        .resolveMapped((results) {
+      if ((results.affectedRows ?? 0) == 0) {
+        var entry = sql.parametersByPlaceholder;
+        if (!allowAutoInsert) {
+          throw StateError(
+              "Can't update not stored entity into table `$table`: $entry");
+        }
+
+        var fields = sql.namedParameters!;
+
+        return generateInsertSQL(transaction!, entityName, table, fields)
+            .resolveMapped((insertSQL) {
+          return doInsertSQL(entityName, table, insertSQL, connection);
+        });
+      }
+
+      return _resolveResultID(results, table, sql, id);
+    });
   }
 
   _resolveResultID(Results results, String table, SQL sql, [Object? entityId]) {
@@ -560,7 +583,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
         !transaction.isExecuting &&
         sql.sqlsLength == 1 &&
         !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool((connection) => f(connection));
+      return executeWithPool(f);
     }
 
     if (!transaction.isOpen && !transaction.isOpening) {

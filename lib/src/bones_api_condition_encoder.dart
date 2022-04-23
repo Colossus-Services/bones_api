@@ -172,12 +172,22 @@ class TableScheme with FieldsFromMap {
     }
   }
 
+  bool get hasTableReferences =>
+      fieldsReferencedTablesLength > 0 || tableRelationshipReferenceLength > 0;
+
   /// Returns [_fieldsReferencedTables] length.
   int get fieldsReferencedTablesLength => _fieldsReferencedTables.length;
+
+  Map<String, TableFieldReference> get fieldsReferencedTables =>
+      UnmodifiableMapView<String, TableFieldReference>(_fieldsReferencedTables);
 
   /// Returns [_tableRelationshipReference] length.
   int get tableRelationshipReferenceLength =>
       _tableRelationshipReference.length;
+
+  Map<String, TableRelationshipReference> get tableRelationshipReference =>
+      UnmodifiableMapView<String, TableRelationshipReference>(
+          _tableRelationshipReference);
 
   /// Returns a [Map] with the table fields values populated from the provided [map].
   ///

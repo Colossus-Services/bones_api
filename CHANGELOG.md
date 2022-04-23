@@ -1,3 +1,14 @@
+## 1.1.12
+
+- `SQLAdapter` (`PostgreSQL`, `MySQL` and in-memory):
+  - Allow auto insert of new entities with explicit IDs. It was trying to update an entity that is not stored. 
+- `MemorySQLAdapter`:
+  - Fixed support for relationship tables.
+  - Fixed isolation of internal data (memory) that was leaking through queries results.
+  - Improved tests: now running same tests of `PostgreSQL` and `MySQL`.
+- Better resolution of `EntityRepository` when multiple candidates are present.
+- Added helpers: `deepCopy`, `deepCopyList`, `deepCopySet` and `deepCopyMap`.
+
 ## 1.1.11
 
 - `Transaction`:

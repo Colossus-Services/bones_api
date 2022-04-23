@@ -12,19 +12,19 @@ final dbUser = 'postgres';
 final dbPass = '123456';
 final dbName = 'postgres';
 
-class PostgresTestContainer extends DBTestContainer {
+class PostgresTestContainer extends DBTestContainerDocker {
   late final PostgreSQLContainerConfig containerConfig;
   late PostgreSQLContainer container;
 
   @override
-  Future<bool> start(DockerCommander dockerCommander, int dbPort) async {
+  Future<bool> start(int dbPort) async {
     containerConfig = PostgreSQLContainerConfig(
         pgUser: dbUser,
         pgPassword: dbPass,
         pgDatabase: dbName,
         hostPort: dbPort);
 
-    container = await containerConfig.run(dockerCommander,
+    container = await containerConfig.run(containerHandler!,
         name: 'dc_test_postgre_$dbPort', cleanContainer: true);
     return true;
   }

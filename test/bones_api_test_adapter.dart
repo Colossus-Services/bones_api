@@ -47,8 +47,31 @@ class TestEntityRepositoryProvider extends EntityRepositoryProvider {
   }
 }
 
-abstract class DBTestContainer {
-  Future<bool> start(DockerCommander dockerCommander, int dbPort);
+TestEntityRepositoryProvider createEntityRepositoryProvider(
+        bool entityByReflection,
+        SQLAdapterCreator sqlAdapterCreator,
+        int dbPort) =>
+    TestEntityRepositoryProvider(
+      entityByReflection
+          ? Address$reflection().entityHandler
+          : addressEntityHandler
+        ..inspectObject(Address.empty()),
+      entityByReflection ? Role$reflection().entityHandler : roleEntityHandler
+        ..inspectObject(Role(RoleType.unknown)),
+      entityByReflection ? User$reflection().entityHandler : userEntityHandler
+        ..inspectObject(User('', '', Address.empty(), [])),
+      sqlAdapterCreator,
+      dbPort,
+    );
+
+abstract class DBTestContainer<D> {
+  D? get containerHandler;
+
+  FutureOr<bool> setupContainerHandler();
+
+  FutureOr<bool> tearDownContainerHandler();
+
+  Future<bool> start(int dbPort);
 
   Future<bool> waitReady();
 
@@ -60,9 +83,44 @@ abstract class DBTestContainer {
 
   Future<String?> runSQL(String sqlInline);
 
+  Future<String?> createTableSQL(String sqlInline);
+
   Future<String> listTables();
 
   String get stdout;
+}
+
+abstract class DBTestContainerDocker
+    implements DBTestContainer<DockerCommander> {
+  @override
+  DockerCommander? containerHandler;
+
+  @override
+  FutureOr<bool> setupContainerHandler() async {
+    var dockerHostLocal = DockerHostLocal();
+    var dockerCommander = DockerCommander(dockerHostLocal);
+    await dockerCommander.ensureInitialized();
+
+    _log.info('DockerCommander: $dockerCommander');
+
+    var daemonOK = false;
+    try {
+      daemonOK = await dockerCommander.isDaemonRunning();
+    } catch (_) {}
+
+    containerHandler = dockerCommander;
+
+    return daemonOK;
+  }
+
+  @override
+  FutureOr<bool> tearDownContainerHandler() async {
+    await containerHandler?.close();
+    return true;
+  }
+
+  @override
+  Future<String?> createTableSQL(String sqlInline) => runSQL(sqlInline);
 }
 
 void runAdapterTests(
@@ -73,40 +131,28 @@ void runAdapterTests(
     String cmdQuote,
     String serialIntType,
     dynamic createTableMatcher,
-    {required bool entityByReflection}) {
+    {required bool entityByReflection,
+    TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) {
   _log.handler.logToConsole();
 
   var testDomain = dbName.toLowerCase() + '.com';
 
   group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
-    late final DockerHostLocal dockerHostLocal;
-    late final DockerCommander dockerCommander;
-    late bool dockerRunning;
+    late bool containerHandlerOK;
     late final TestEntityRepositoryProvider entityRepositoryProvider;
 
     setUpAll(() async {
       _log.info('[[[ setUpAll ]]]');
 
-      dockerHostLocal = DockerHostLocal();
-      dockerCommander = DockerCommander(dockerHostLocal);
-      await dockerCommander.ensureInitialized();
+      containerHandlerOK = await dbTestContainer.setupContainerHandler();
 
-      _log.info('DockerCommander: $dockerCommander');
+      _log.info('Container Daemon: $containerHandlerOK');
 
-      var daemonOK = false;
-      try {
-        daemonOK = await dockerCommander.isDaemonRunning();
-      } catch (_) {}
-
-      dockerRunning = daemonOK;
-
-      _log.info('dockerRunning: $dockerRunning');
-
-      if (dockerRunning) {
+      if (containerHandlerOK) {
         dbPort = (await getFreeListenPort(
             startPort: dbPort - 100, endPort: dbPort + 100))!;
 
-        var startOk = await dbTestContainer.start(dockerCommander, dbPort);
+        var startOk = await dbTestContainer.start(dbPort);
 
         _log.info('Container start: $startOk > $dbTestContainer');
 
@@ -114,19 +160,9 @@ void runAdapterTests(
 
         _log.info('Prepare: $prepareOutput');
 
-        entityRepositoryProvider = TestEntityRepositoryProvider(
-          entityByReflection
-              ? Address$reflection().entityHandler
-              : addressEntityHandler,
-          entityByReflection
-              ? Role$reflection().entityHandler
-              : roleEntityHandler,
-          entityByReflection
-              ? User$reflection().entityHandler
-              : userEntityHandler,
-          sqlAdapterCreator,
-          dbPort,
-        );
+        entityRepositoryProvider = defaultEntityRepositoryProvider ??
+            createEntityRepositoryProvider(
+                entityByReflection, sqlAdapterCreator, dbPort);
       } else {
         _log.warning('Docker NOT running! Skipping Docker tests!');
       }
@@ -135,19 +171,19 @@ void runAdapterTests(
     tearDownAll(() async {
       _log.info('[[[ tearDownAll ]]]');
 
-      if (dockerRunning) {
+      if (containerHandlerOK) {
         entityRepositoryProvider.close();
 
         var finalizeMsg = await dbTestContainer.finalize();
         _log.info('Finalize:\n$finalizeMsg');
 
         await dbTestContainer.stop();
-        await dockerCommander.close();
+        await dbTestContainer.tearDownContainerHandler();
       }
     });
 
     bool checkDockerRunning(String test) {
-      if (!dockerRunning) {
+      if (!containerHandlerOK) {
         _log.warning('Docker NOT running! Skip test: "$test"');
         return false;
       } else {
@@ -178,7 +214,7 @@ void runAdapterTests(
       )
       ''';
 
-      var process1 = await dbTestContainer.runSQL(sqlCreateAddress);
+      var process1 = await dbTestContainer.createTableSQL(sqlCreateAddress);
       expect(process1, createTableMatcher);
 
       var sqlCreateUser = '''
@@ -195,7 +231,7 @@ void runAdapterTests(
       );
       ''';
 
-      var process2 = await dbTestContainer.runSQL(sqlCreateUser);
+      var process2 = await dbTestContainer.createTableSQL(sqlCreateUser);
       expect(process2, createTableMatcher);
 
       var sqlCreateRole = '''
@@ -208,7 +244,7 @@ void runAdapterTests(
       );
       ''';
 
-      var process3 = await dbTestContainer.runSQL(sqlCreateRole);
+      var process3 = await dbTestContainer.createTableSQL(sqlCreateRole);
       expect(process3, createTableMatcher);
 
       var sqlCreateUserRole = '''
@@ -221,7 +257,7 @@ void runAdapterTests(
       );
       ''';
 
-      var process4 = await dbTestContainer.runSQL(sqlCreateUserRole);
+      var process4 = await dbTestContainer.createTableSQL(sqlCreateUserRole);
       expect(process4, createTableMatcher);
 
       var processList = await dbTestContainer.listTables();
@@ -663,13 +699,15 @@ void runAdapterTests(
 
         expect(result, equals('smith4@$testDomain'));
 
+        expect(transaction.isOpen, isTrue);
         expect(transaction.isAborted, isFalse);
         expect(transaction.isCommitted, isTrue);
         expect(transaction.length, equals(7));
         expect(transaction.abortedError, isNull);
       }
 
-      {
+      // If `Transaction.abort` is supported:
+      if (entityRepositoryProvider.sqlAdapter.capability.transactionAbort) {
         var transaction = Transaction();
 
         var result = await transaction.execute(() async {
@@ -695,6 +733,7 @@ void runAdapterTests(
 
         expect(result, isNull);
 
+        expect(transaction.isOpen, isTrue);
         expect(transaction.isAborted, isTrue);
         expect(transaction.isCommitted, isFalse);
         expect(transaction.length, equals(6));
@@ -779,6 +818,39 @@ void runAdapterTests(
             parameters: {'email': 'joe@$testDomain'});
         expect(del2.length, equals(1));
         expect(del2.first.email, equals('joe@$testDomain'));
+      }
+
+      {
+        var address1 = await addressAPIRepository.storeFromJson({
+          'state': 'EX',
+          'city': 'Extra',
+          'street': 'Street x',
+          'number': 888
+        });
+
+        expect(address1, isNotNull);
+        expect(address1.id, isNotNull);
+        expect(address1.number, 888);
+
+        var address2 = await addressAPIRepository.selectByID(address1.id);
+        expect(address2!.toJsonEncoded(), equals(address1.toJsonEncoded()));
+      }
+
+      {
+        var address1 = await addressAPIRepository.storeFromJson({
+          'id': 11001,
+          'state': 'EX',
+          'city': 'Extra',
+          'street': 'Street x',
+          'number': 999
+        });
+
+        expect(address1, isNotNull);
+        expect(address1.id, 11001);
+        expect(address1.number, 999);
+
+        var address2 = await addressAPIRepository.selectByID(address1.id);
+        expect(address2!.toJsonEncoded(), equals(address1.toJsonEncoded()));
       }
     });
   });

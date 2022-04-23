@@ -216,7 +216,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       Transaction transaction, Iterable<Map<String, dynamic>> results) {
     return results.map((e) {
       return entityHandler.createFromMap(e,
-          entityProvider: transaction, entityCache: transaction);
+          entityProvider: transaction,
+          entityCache: transaction,
+          entityRepositoryProvider: provider,
+          entityHandlerProvider: entityHandler.provider);
     }).toList();
   }
 
@@ -378,7 +381,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     checkNotClosed();
 
     if (isStored(o, transaction: transaction)) {
-      return _update(o, transaction);
+      return _update(o, transaction, true);
     }
 
     var op = TransactionOperationStore(name, o, transaction);
@@ -409,7 +412,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
-  FutureOr<dynamic> _update(O o, Transaction? transaction) {
+  FutureOr<dynamic> _update(
+      O o, Transaction? transaction, bool allowAutoInsert) {
     var op = TransactionOperationUpdate(name, o, transaction);
 
     return ensureReferencesStored(o, transaction: op.transaction)
@@ -431,7 +435,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       }
 
       return sqlRepositoryAdapter.doUpdate(op, o, id, fields,
-          idFieldName: idFieldsName, preFinish: (id) {
+          idFieldName: idFieldsName,
+          allowAutoInsert: allowAutoInsert, preFinish: (id) {
         return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
           trackEntity(o);
           return id;
@@ -674,7 +679,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   EntityHandler<E> _resolveEntityHandler<E>(Type type) {
-    var entityRepository = entityHandler.getEntityRepository(type: type);
+    var entityRepository = entityHandler.getEntityRepository(
+        type: type,
+        entityRepositoryProvider: provider,
+        entityHandlerProvider: entityHandler.provider);
     var entityHandler2 = entityRepository?.entityHandler;
     entityHandler2 ??= entityHandler.getEntityHandler(type: type);
     if (entityHandler2 == null) {
@@ -684,14 +692,20 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   EntityRepository<E>? _resolveEntityRepository<E extends Object>(Type type) {
-    var entityRepository = entityHandler.getEntityRepository(type: type);
+    var entityRepository = entityHandler.getEntityRepository(
+        type: type,
+        entityRepositoryProvider: provider,
+        entityHandlerProvider: entityHandler.provider);
     if (entityRepository != null) {
       return entityRepository as EntityRepository<E>;
     }
 
     var typeEntityHandler = entityHandler.getEntityHandler(type: type);
     if (typeEntityHandler != null) {
-      entityRepository = typeEntityHandler.getEntityRepository(type: type);
+      entityRepository = typeEntityHandler.getEntityRepository(
+          type: type,
+          entityRepositoryProvider: provider,
+          entityHandlerProvider: entityHandler.provider);
       if (entityRepository != null) {
         return entityRepository as EntityRepository<E>;
       }

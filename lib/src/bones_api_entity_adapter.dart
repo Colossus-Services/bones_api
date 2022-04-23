@@ -49,7 +49,9 @@ class MultipleSQL implements SQLWrapper {
 /// An encoded SQL representation.
 /// This is used by a [SQLAdapter] to execute queries.
 class SQL implements SQLWrapper {
-  static final SQL dummy = SQL('dummy', <String, dynamic>{}, mainTable: '_');
+  static final SQL dummy = SQL(
+      'dummy', <dynamic>[], <String, dynamic>{}, <String, dynamic>{},
+      mainTable: '_');
 
   @override
   int get sqlsLength => 1;
@@ -66,7 +68,9 @@ class SQL implements SQLWrapper {
   final String sql;
   final String? sqlCondition;
 
-  final Map<String, dynamic> parameters;
+  final List<dynamic>? positionalParameters;
+  final Map<String, dynamic>? namedParameters;
+  final Map<String, dynamic> parametersByPlaceholder;
 
   final String? idFieldName;
 
@@ -100,7 +104,8 @@ class SQL implements SQLWrapper {
 
   bool get hasPreOrPosSQL => hasPreSQL || hasPosSQL;
 
-  SQL(this.sql, this.parameters,
+  SQL(this.sql, this.positionalParameters, this.namedParameters,
+      this.parametersByPlaceholder,
       {this.sqlCondition,
       String? sqlPositional,
       List<String>? parametersKeysByPosition,
@@ -140,7 +145,7 @@ class SQL implements SQLWrapper {
     var keys = <String>[];
     var values = <Object?>[];
 
-    if (parameters.isEmpty) {
+    if (parametersByPlaceholder.isEmpty) {
       _sqlPositional ??= sql;
       _parametersKeysByPosition ??= keys;
       _parametersValuesByPosition ??= values;
@@ -150,7 +155,7 @@ class SQL implements SQLWrapper {
 
     var sqlPositional = sql.replaceAllMapped(placeholderRegexp, (m) {
       var k = m.group(1)!;
-      var v = parameters[k];
+      var v = parametersByPlaceholder[k];
       keys.add(k);
       values.add(v);
       return '?';
@@ -165,7 +170,7 @@ class SQL implements SQLWrapper {
   @override
   String toString() {
     var s =
-        'SQL<< $sql >>( ${Json.encode(parameters, toEncodable: _toEncodable)} )';
+        'SQL<< $sql >>( ${Json.encode(parametersByPlaceholder, toEncodable: _toEncodable)} )';
     if (condition != null) {
       s += ' ; Condition<< $condition >>';
     }
@@ -208,7 +213,21 @@ class SQL implements SQLWrapper {
   }
 }
 
-typedef SQLAdapterInstantiator<C> = SQLAdapter<C>? Function(
+class SQLAdapterCapability {
+  final String dialect;
+  final bool transactions;
+
+  final bool transactionAbort;
+
+  bool get fullTransaction => transactions && transactionAbort;
+
+  const SQLAdapterCapability(
+      {required this.dialect,
+      required this.transactions,
+      required this.transactionAbort});
+}
+
+typedef SQLAdapterInstantiator<C extends Object> = SQLAdapter<C>? Function(
     Map<String, dynamic> config,
     {int? minConnections,
     int? maxConnections,
@@ -220,7 +239,7 @@ typedef SQLAdapterInstantiator<C> = SQLAdapter<C>? Function(
 /// adjust the generated `SQL`s to the correct dialect.
 ///
 /// All [SQLAdapter]s comes with a built-in connection pool.
-abstract class SQLAdapter<C> extends SchemeProvider
+abstract class SQLAdapter<C extends Object> extends SchemeProvider
     with Initializable, Pool<C>, Closable
     implements EntityRepositoryProvider {
   static bool _boot = false;
@@ -243,7 +262,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
   static List<Type> get registeredAdaptersTypes =>
       _registeredAdaptersByType.keys.toList();
 
-  static void registerAdapter<C>(List<String> names, Type type,
+  static void registerAdapter<C extends Object>(List<String> names, Type type,
       SQLAdapterInstantiator<C> adapterInstantiator) {
     for (var name in names) {
       _registeredAdaptersByName[name] = adapterInstantiator;
@@ -252,7 +271,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
     _registeredAdaptersByType[type] = adapterInstantiator;
   }
 
-  static SQLAdapterInstantiator<C>? getAdapterInstantiator<C>(
+  static SQLAdapterInstantiator<C>? getAdapterInstantiator<C extends Object>(
       {String? name, Type? type}) {
     if (name == null && type == null) {
       throw ArgumentError(
@@ -296,14 +315,17 @@ abstract class SQLAdapter<C> extends SchemeProvider
   /// The maximum number of connections in the pool of this adapter.
   final int maxConnections;
 
+  /// The [SQLAdapter] capability.
+  final SQLAdapterCapability capability;
+
   /// The SQL dialect of this adapter.
-  final String dialect;
+  String get dialect => capability.dialect;
 
   final EntityRepositoryProvider? parentRepositoryProvider;
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  SQLAdapter(this.minConnections, this.maxConnections, this.dialect,
+  SQLAdapter(this.minConnections, this.maxConnections, this.capability,
       {this.parentRepositoryProvider}) {
     boot();
 
@@ -550,7 +572,14 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
     if (matcher == null) {
       var sqlQuery = 'SELECT count(*) as ${q}count$q FROM $q$table$q ';
-      return SQL(sqlQuery, {}, mainTable: table);
+      return SQL(
+        sqlQuery,
+        positionalParameters ?? (parameters is List ? parameters : null),
+        namedParameters ??
+            (parameters is Map<String, dynamic> ? parameters : null),
+        {},
+        mainTable: table,
+      );
     } else {
       return _generateSQLFrom(transaction, entityName, table, matcher,
           parameters: parameters,
@@ -632,7 +661,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
           sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
-        return SQL(sql.toString(), fieldsValuesInSQL,
+        return SQL(sql.toString(), null, fields, fieldsValuesInSQL,
             entityName: table, idFieldName: idFieldName, mainTable: table);
       });
     });
@@ -729,7 +758,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
           sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
-        return SQL(sql.toString(), fieldsValuesInSQL,
+        return SQL(sql.toString(), null, fields, fieldsValuesInSQL,
             sqlCondition: conditionSQL,
             entityName: table,
             idFieldName: idFieldName,
@@ -740,10 +769,11 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
   FutureOr<dynamic> updateSQL(TransactionOperation op, String entityName,
       String table, SQL sql, Object id, Map<String, Object?> fields,
-      {T Function<T>(dynamic o)? mapper}) {
+      {T Function<T>(dynamic o)? mapper, bool allowAutoInsert = false}) {
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
-      var retInsert = doUpdateSQL(entityName, table, sql, id, connection);
+      var retInsert = doUpdateSQL(entityName, table, sql, id, connection,
+          allowAutoInsert: allowAutoInsert, transaction: op.transaction);
 
       if (mapper != null) {
         return retInsert.resolveMapped((e) => mapper(e));
@@ -754,7 +784,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
   }
 
   FutureOr<dynamic> doUpdateSQL(
-      String entityName, String table, SQL sql, Object id, C connection);
+      String entityName, String table, SQL sql, Object id, C connection,
+      {bool allowAutoInsert = false, Transaction? transaction});
 
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(
       Transaction transaction,
@@ -775,7 +806,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
       if (relationship == null) {
         throw StateError(
-            "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+            "Can't find TableRelationshipReference for tables: $table -> $otherTableName\n$tableScheme");
       }
 
       var sqls = otherIds.isEmpty
@@ -824,7 +855,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       sql.write(' ON CONFLICT DO NOTHING ');
     }
 
-    return SQL(sql.toString(), parameters,
+    return SQL(sql.toString(), null, parameters, parameters,
         mainTable: relationshipTable, relationship: relationship);
   }
 
@@ -884,7 +915,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       KeyConditionNotIN([ConditionKeyField(targetIdField)], otherIds),
     ]);
 
-    return SQL(sql.toString(), parameters,
+    return SQL(sql.toString(), null, parameters, parameters,
         condition: condition,
         sqlCondition: conditionSQL,
         mainTable: relationshipTable,
@@ -960,7 +991,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var condition = KeyConditionEQ(
           [ConditionKeyField(relationship.sourceRelationshipField)], id);
 
-      return SQL(sql.toString(), parameters,
+      return SQL(sql.toString(), null, parameters, parameters,
           condition: condition,
           sqlCondition: conditionSQL,
           returnColumnsAliases: {
@@ -1043,7 +1074,7 @@ abstract class SQLAdapter<C> extends SchemeProvider
       var condition = KeyConditionIN(
           [ConditionKeyField(relationship.sourceRelationshipField)], ids);
 
-      return SQL(sql.toString(), parameters,
+      return SQL(sql.toString(), ids, {'ids': ids}, parameters,
           condition: condition,
           sqlCondition: conditionSQLStr,
           returnColumnsAliases: {
@@ -1073,8 +1104,24 @@ abstract class SQLAdapter<C> extends SchemeProvider
   }
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-          SQLWrapper sql, FutureOr<R> Function(C connection) f) =>
-      executeWithPool(f);
+      SQLWrapper sql, FutureOr<R> Function(C connection) f) {
+    var transaction = op.transaction;
+
+    if (transaction.length == 1 &&
+        !transaction.isExecuting &&
+        sql.sqlsLength == 1 &&
+        !sql.mainSQL.hasPreOrPosSQL) {
+      return executeWithPool((connection) => f(connection));
+    }
+
+    if (!transaction.isOpen && !transaction.isOpening) {
+      transaction.open(createConnection);
+    }
+
+    return transaction.onOpen<R>(() {
+      return transaction.addExecution<R, C>((c) => f(c));
+    });
+  }
 
   FutureOr<SQL> generateSelectSQL(Transaction transaction, String entityName,
       String table, EntityMatcher matcher,
@@ -1131,12 +1178,18 @@ abstract class SQLAdapter<C> extends SchemeProvider
 
         var sqlQuery = sqlBuilder(from, encodedSQL);
 
-        return SQL(sqlQuery, encodedSQL.parametersPlaceholders,
-            condition: matcher,
-            sqlCondition: conditionSQL,
-            entityName: encodedSQL.entityName,
-            mainTable: table,
-            tablesAliases: encodedSQL.tableAliases);
+        return SQL(
+          sqlQuery,
+          positionalParameters ?? (parameters is List ? parameters : null),
+          namedParameters ??
+              (parameters is Map<String, dynamic> ? parameters : null),
+          encodedSQL.parametersPlaceholders,
+          condition: matcher,
+          sqlCondition: conditionSQL,
+          entityName: encodedSQL.entityName,
+          mainTable: table,
+          tablesAliases: encodedSQL.tableAliases,
+        );
       } else {
         var innerJoin = StringBuffer();
 
@@ -1255,12 +1308,18 @@ abstract class SQLAdapter<C> extends SchemeProvider
             'FROM $q$table$q as $q$tableAlias$q $innerJoin WHERE $conditionSQL';
         var sqlQuery = sqlBuilder(from, encodedSQL);
 
-        return SQL(sqlQuery, encodedSQL.parametersPlaceholders,
-            condition: matcher,
-            sqlCondition: conditionSQL,
-            entityName: encodedSQL.entityName,
-            mainTable: table,
-            tablesAliases: encodedSQL.tableAliases);
+        return SQL(
+          sqlQuery,
+          positionalParameters ?? (parameters is List ? parameters : null),
+          namedParameters ??
+              (parameters is Map<String, dynamic> ? parameters : null),
+          encodedSQL.parametersPlaceholders,
+          condition: matcher,
+          sqlCondition: conditionSQL,
+          entityName: encodedSQL.entityName,
+          mainTable: table,
+          tablesAliases: encodedSQL.tableAliases,
+        );
       }
     });
   }
@@ -1343,13 +1402,17 @@ abstract class SQLAdapter<C> extends SchemeProvider
             'CREATE TEMPORARY TABLE IF NOT EXISTS $q$tmpTable$q AS ('
             ' SELECT $sqlSelAll FROM $q$table$q$sqlAsTableAlias WHERE $conditionSQL '
             ')',
-            deleteSQL.parameters,
+            positionalParameters ?? (parameters is List ? parameters : null),
+            namedParameters ??
+                (parameters is Map<String, dynamic> ? parameters : null),
+            deleteSQL.parametersByPlaceholder,
             mainTable: tmpTable);
 
         var posSql1 =
-            SQL('SELECT * FROM $q$tmpTable$q', {}, mainTable: tmpTable);
+            SQL('SELECT * FROM $q$tmpTable$q', [], {}, {}, mainTable: tmpTable);
 
-        var posSql2 = SQL('DROP TABLE $q$tmpTable$q', {}, mainTable: tmpTable);
+        var posSql2 =
+            SQL('DROP TABLE $q$tmpTable$q', [], {}, {}, mainTable: tmpTable);
 
         deleteSQL.preSQL = [preSql];
         deleteSQL.posSQL = [posSql1, posSql2];
@@ -1562,14 +1625,8 @@ abstract class SQLAdapter<C> extends SchemeProvider
       return entityRepository;
     }
 
-    for (var p in _knownEntityRepositoryProviders) {
-      entityRepository = p.getEntityRepository<O>(obj: obj, type: type);
-      if (entityRepository != null) {
-        return entityRepository;
-      }
-    }
-
-    return null;
+    return _knownEntityRepositoryProviders.getEntityRepository<O>(
+        obj: obj, type: type, name: name, entityRepositoryProvider: this);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -1578,6 +1635,30 @@ abstract class SQLAdapter<C> extends SchemeProvider
   @override
   void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
     _knownEntityRepositoryProviders.add(provider);
+  }
+
+  @override
+  Map<Type, EntityRepository> allRepositories(
+      {Map<Type, EntityRepository>? allRepositories,
+      Set<EntityRepositoryProvider>? traversedProviders}) {
+    allRepositories ??= <Type, EntityRepository>{};
+    traversedProviders ??= <EntityRepositoryProvider>{};
+
+    if (traversedProviders.contains(this)) {
+      return allRepositories;
+    }
+
+    traversedProviders.add(this);
+
+    for (var e in _entityRepositories.entries) {
+      allRepositories.putIfAbsent(e.key, () => e.value);
+    }
+
+    for (var e in _knownEntityRepositoryProviders) {
+      e.allRepositories(allRepositories: allRepositories);
+    }
+
+    return allRepositories;
   }
 }
 
@@ -1707,19 +1788,22 @@ class SQLRepositoryAdapter<O> with Initializable {
 
   FutureOr<dynamic> updateSQL(
       TransactionOperation op, SQL sql, Object id, Map<String, dynamic> fields,
-      {String? idFieldName}) {
+      {String? idFieldName, bool allowAutoInsert = false}) {
     return databaseAdapter
-        .updateSQL(op, name, tableName, sql, id, fields)
+        .updateSQL(op, name, tableName, sql, id, fields,
+            allowAutoInsert: allowAutoInsert)
         .resolveMapped((ret) => ret ?? {});
   }
 
   FutureOr<dynamic> doUpdate(
       TransactionOperation op, O o, Object id, Map<String, dynamic> fields,
       {String? idFieldName,
-      PreFinishSQLOperation<dynamic, dynamic>? preFinish}) {
+      PreFinishSQLOperation<dynamic, dynamic>? preFinish,
+      bool allowAutoInsert = false}) {
     return generateUpdateSQL(op.transaction, o, id, fields)
         .resolveMapped((sql) {
-      return updateSQL(op, sql, id, fields, idFieldName: idFieldName)
+      return updateSQL(op, sql, id, fields,
+              idFieldName: idFieldName, allowAutoInsert: allowAutoInsert)
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }

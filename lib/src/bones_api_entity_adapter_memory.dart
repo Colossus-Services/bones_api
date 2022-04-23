@@ -1,6 +1,6 @@
-import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -43,8 +43,13 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider})
-      : super(minConnections ?? 1, maxConnections ?? 3, 'generic',
-            parentRepositoryProvider: parentRepositoryProvider) {
+      : super(
+          minConnections ?? 1,
+          maxConnections ?? 3,
+          const SQLAdapterCapability(
+              dialect: 'generic', transactions: true, transactionAbort: false),
+          parentRepositoryProvider: parentRepositoryProvider,
+        ) {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
@@ -130,7 +135,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       String entityName, String table, SQL sql, int connection) {
     if (sql.isDummy) return null;
 
-    var entry = sql.parameters;
+    var entry = sql.namedParameters ?? sql.parametersByPlaceholder;
 
     var map = _getTableMap(table, true)!;
 
@@ -155,7 +160,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var id = nextID(table);
 
-    var entry = sql.parameters;
+    var entry = sql.parametersByPlaceholder;
 
     var tablesScheme = tablesSchemes[table];
 
@@ -169,16 +174,31 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr doUpdateSQL(
-      String entityName, String table, SQL sql, Object id, int connection) {
+      String entityName, String table, SQL sql, Object id, int connection,
+      {bool allowAutoInsert = false, Transaction? transaction}) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
 
-    var entry = sql.parameters;
-
     var prevEntry = map[id];
 
-    prevEntry!.addAll(entry);
+    var entry = sql.parametersByPlaceholder;
+
+    if (prevEntry == null) {
+      if (!allowAutoInsert) {
+        throw StateError(
+            "Can't update not stored entity into table `$table`: $entry");
+      }
+
+      var tablesScheme = tablesSchemes[table];
+      var idField = tablesScheme?.idFieldName ?? 'id';
+
+      entry[idField] ??= id;
+
+      map[id] = entry;
+    } else {
+      prevEntry.addAll(entry);
+    }
 
     return id;
   }
@@ -200,14 +220,16 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var tableScheme =
         getTableScheme(table, relationship: sql.relationship) as TableScheme?;
 
-    var entityHandler = getEntityRepository(name: table)?.entityHandler;
+    var entityHandler = getEntityHandler(tableName: table);
 
     if (tableScheme == null ||
         (tableScheme.fieldsReferencedTablesLength == 0 &&
             tableScheme.tableRelationshipReferenceLength == 0)) {
       var sel = map.values.where((e) {
         return sql.condition!.matchesEntityMap(e,
-            namedParameters: sql.parameters, entityHandler: entityHandler);
+            positionalParameters: sql.positionalParameters,
+            namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+            entityHandler: entityHandler);
       }).toList();
 
       sel = _filterReturnColumns(sql, sel);
@@ -215,10 +237,12 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     }
 
     var sel = map.values.where((obj) {
-      obj = _resolveEntityMap(obj, tableScheme);
+      obj = _resolveEntityMap(obj, entityHandler, tableScheme);
 
       return sql.condition!.matchesEntityMap(obj,
-          namedParameters: sql.parameters, entityHandler: entityHandler);
+          positionalParameters: sql.positionalParameters,
+          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+          entityHandler: entityHandler);
     }).toList();
 
     sel = _filterReturnColumns(sql, sel);
@@ -246,7 +270,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       }).toList();
     }
 
-    return sel;
+    var selIsolated = sel.map((e) => deepCopyMap(e)!).toList();
+    return selIsolated;
   }
 
   @override
@@ -262,12 +287,13 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var tableScheme =
         getTableScheme(table, relationship: sql.relationship) as TableScheme?;
 
-    var entityHandler = getEntityRepository(name: table)?.entityHandler;
+    var entityHandler = getEntityHandler(tableName: table);
 
     if (tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0) {
       var entries = map.entries.where((e) {
         return sql.condition!.matchesEntityMap(e.value,
-            namedParameters: sql.parameters, entityHandler: entityHandler);
+            namedParameters: sql.parametersByPlaceholder,
+            entityHandler: entityHandler);
       }).toList();
 
       return _removeEntries(entries, map);
@@ -275,10 +301,11 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var entries = map.entries
         .map((e) {
-          var obj = _resolveEntityMap(e.value, tableScheme);
+          var obj = _resolveEntityMap(e.value, entityHandler, tableScheme);
 
           var match = sql.condition!.matchesEntityMap(obj,
-              namedParameters: sql.parameters, entityHandler: entityHandler);
+              namedParameters: sql.parametersByPlaceholder,
+              entityHandler: entityHandler);
 
           return match ? MapEntry(e.key, obj) : null;
         })
@@ -300,9 +327,9 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     return del;
   }
 
-  Map<String, dynamic> _resolveEntityMap(
-      Map<String, dynamic> obj, TableScheme tableScheme) {
-    return obj.map((key, value) {
+  Map<String, dynamic> _resolveEntityMap(Map<String, dynamic> obj,
+      EntityHandler<dynamic>? entityHandler, TableScheme tableScheme) {
+    var obj2 = obj.map((key, value) {
       var refField = tableScheme.getFieldsReferencedTables(key);
       if (refField != null) {
         var id = obj[key];
@@ -314,9 +341,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
             var tableScheme2 =
                 getTableScheme(refField.targetTable) as TableScheme?;
 
-            if (tableScheme2 != null &&
-                tableScheme2.fieldsReferencedTablesLength > 0) {
-              obj2 = _resolveEntityMap(obj2, tableScheme2);
+            if (tableScheme2 != null && tableScheme2.hasTableReferences) {
+              var entityHandler2 =
+                  getEntityHandler(tableName: tableScheme2.name);
+              obj2 = _resolveEntityMap(obj2, entityHandler2, tableScheme2);
             }
           }
 
@@ -326,6 +354,68 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
       return MapEntry(key, value);
     });
+
+    var relationshipsTables = tableScheme.tableRelationshipReference.values
+        .where((e) => e.sourceTable == tableScheme.name)
+        .toList();
+
+    if (relationshipsTables.isNotEmpty) {
+      if (entityHandler == null) {
+        throw StateError(
+            "Can't resolve relationship fields without an `EntityHandler` for `${tableScheme.name}`");
+      }
+
+      var fieldId = entityHandler.idFieldsName();
+      var id = obj2[fieldId];
+
+      var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
+
+      for (var e in fieldsListEntity.entries) {
+        var field = e.key;
+        if (obj2.containsKey(field)) continue;
+
+        var fieldType = e.value.listEntityType!;
+
+        var targetTable = getTableForType(fieldType);
+
+        if (targetTable == null) {
+          continue;
+        } else if (targetTable is Future) {
+          throw StateError(
+              "Async response not supported when calling `getTableForType`");
+        }
+
+        var relationshipTable =
+            relationshipsTables.firstWhere((t) => t.targetTable == targetTable);
+
+        var relMap = _getTableMap(relationshipTable.relationshipTable, false);
+        if (relMap == null) continue;
+
+        var entries = relMap.values
+            .where((e) => e[relationshipTable.sourceRelationshipField] == id);
+
+        var targetIds = entries
+            .map((e) => e[relationshipTable.targetRelationshipField])
+            .toList();
+
+        var targetObjs =
+            targetIds.map((tId) => _getByID(targetTable!, tId) ?? tId).toList();
+
+        var tableScheme2 = getTableScheme(targetTable!) as TableScheme?;
+
+        if (tableScheme2 != null && tableScheme2.hasTableReferences) {
+          var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
+
+          targetObjs = targetObjs
+              .map((e) => _resolveEntityMap(e, entityHandler2, tableScheme2))
+              .toList();
+        }
+
+        obj2[field] = targetObjs;
+      }
+    }
+
+    return obj2;
   }
 
   final Map<String, TableScheme> tablesSchemes = <String, TableScheme>{};
@@ -376,14 +466,128 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var fieldsTypes =
         entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
 
+    var fieldsReferencedTables = _findFieldsReferencedTables(table,
+        entityHandler: entityHandler, entityFieldsTypes: entityFieldsTypes);
+
+    var relationshipTables = _findRelationshipTables(table);
+
     tableScheme = TableScheme(table,
         relationship: relationship != null,
         idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes);
+        fieldsTypes: fieldsTypes,
+        fieldsReferencedTables: fieldsReferencedTables,
+        relationshipTables: relationshipTables);
 
     _log.info('$tableScheme');
 
     return tableScheme;
+  }
+
+  Map<String, TableFieldReference> _findFieldsReferencedTables(String table,
+      {Type? entityType,
+      EntityHandler<dynamic>? entityHandler,
+      Map<String, TypeInfo>? entityFieldsTypes,
+      bool onlyCollectionReferences = false}) {
+    entityHandler ??=
+        getEntityHandler(tableName: table, entityType: entityType);
+
+    entityFieldsTypes ??= entityHandler!.fieldsTypes();
+
+    var relationshipFields =
+        Map<String, TypeInfo>.fromEntries(entityFieldsTypes.entries.where((e) {
+      var fieldType = e.value;
+      if (fieldType.isCollection != onlyCollectionReferences) return false;
+
+      var entityType = _resolveEntityType(fieldType);
+      if (entityType == null || entityType.isBasicType) return false;
+
+      var typeEntityHandler =
+          entityHandler!.getEntityHandler(type: entityType.type);
+      return typeEntityHandler != null;
+    }));
+
+    var fieldsReferencedTables = relationshipFields.map((field, fieldType) {
+      var targetEntityType = _resolveEntityType(fieldType)!;
+      var targetEntityHandler =
+          getEntityHandler(entityType: targetEntityType.type);
+
+      String? targetName;
+      String? targetIdField;
+      Type? targetIdType;
+      if (targetEntityHandler != null) {
+        targetName = getEntityRepository(type: targetEntityHandler.type)?.name;
+        targetIdField = targetEntityHandler.idFieldsName();
+        targetIdType =
+            targetEntityHandler.getFieldType(null, targetIdField)?.type;
+      }
+
+      targetName ??= targetEntityType.type.toString().toLowerCase();
+      targetIdField ??= 'id';
+      targetIdType ??= int;
+
+      var tableRef = TableFieldReference(
+          table, field, targetIdType, targetName, targetIdField, targetIdType);
+      return MapEntry(field, tableRef);
+    });
+    return fieldsReferencedTables;
+  }
+
+  TypeInfo? _resolveEntityType(TypeInfo fieldType) {
+    if (fieldType.isPrimitiveType) {
+      return null;
+    }
+
+    var entityType =
+        fieldType.isListEntity ? fieldType.listEntityType : fieldType;
+    return entityType;
+  }
+
+  List<TableRelationshipReference> _findRelationshipTables(String table) {
+    var allRepositories = this.allRepositories();
+
+    var allTablesReferences = Map.fromEntries(allRepositories.values.map((r) {
+      var referencedTables = _findFieldsReferencedTables(r.name,
+          entityType: r.type,
+          entityHandler: r.entityHandler,
+          onlyCollectionReferences: true);
+      return MapEntry(r, referencedTables);
+    }).where((e) => e.value.isNotEmpty));
+
+    for (var refs in allTablesReferences.values) {
+      refs.removeWhere((field, refTable) => refTable.sourceTable != table);
+    }
+
+    allTablesReferences.removeWhere((repo, refs) => refs.isEmpty);
+
+    var relationships = allTablesReferences.entries.expand((e) {
+      var repo = e.key;
+      var refs = e.value;
+
+      return refs.values.map((ref) {
+        var sourceEntityHandler = repo.entityHandler;
+        var sourceFieldId = sourceEntityHandler.idFieldsName();
+        var sourceFieldIdType =
+            sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
+
+        var relTable = ref.sourceTable + '_' + ref.targetTable + '_ref';
+        var relSourceField = ref.sourceTable + '_' + sourceFieldId;
+        var relTargetField = ref.targetTable + '_' + ref.targetField;
+
+        return TableRelationshipReference(
+          relTable,
+          ref.sourceTable,
+          sourceFieldId,
+          sourceFieldIdType,
+          relSourceField,
+          ref.targetTable,
+          ref.targetField,
+          ref.targetFieldType,
+          relTargetField,
+        );
+      });
+    }).toList();
+
+    return relationships;
   }
 
   @override

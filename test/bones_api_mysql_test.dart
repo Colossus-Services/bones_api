@@ -1,6 +1,5 @@
 @Tags(['docker', 'mysql', 'slow'])
 @Timeout(Duration(seconds: 180))
-
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_adapter_mysql.dart';
 import 'package:docker_commander/docker_commander.dart';
@@ -13,12 +12,12 @@ final dbUser = 'myuser';
 final dbPass = 'mypass';
 final dbName = 'mydb';
 
-class MySQLTestContainer extends DBTestContainer {
+class MySQLTestContainer extends DBTestContainerDocker {
   late final MySQLContainerConfig containerConfig;
   late MySQLContainer container;
 
   @override
-  Future<bool> start(DockerCommander dockerCommander, int dbPort) async {
+  Future<bool> start(int dbPort) async {
     containerConfig = MySQLContainerConfig(
       dbUser: dbUser,
       dbPassword: dbPass,
@@ -27,7 +26,7 @@ class MySQLTestContainer extends DBTestContainer {
       forceNativePasswordAuthentication: true,
     );
 
-    container = await containerConfig.run(dockerCommander,
+    container = await containerConfig.run(containerHandler!,
         name: 'dc_test_mysql_$dbPort', cleanContainer: true);
     return true;
   }
