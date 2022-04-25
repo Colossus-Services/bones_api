@@ -389,7 +389,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     try {
       return ensureReferencesStored(o, transaction: op.transaction)
           .resolveWith(() {
-        var idFieldsName = entityHandler.idFieldsName(o);
+        var idFieldsName = entityHandler.idFieldName(o);
         var fields = entityHandler.getFields(o);
 
         return sqlRepositoryAdapter.doInsert(op, o, fields,
@@ -418,7 +418,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
     return ensureReferencesStored(o, transaction: op.transaction)
         .resolveWith(() {
-      var idFieldsName = entityHandler.idFieldsName(o);
+      var idFieldsName = entityHandler.idFieldName(o);
       var id = entityHandler.getID(o);
       var fields = entityHandler.getFields(o);
 

@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -196,6 +197,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       entry[idField] ??= id;
 
       map[id] = entry;
+
+      _disposeNextIDCounter(table);
     } else {
       prevEntry.addAll(entry);
     }
@@ -204,7 +207,21 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   Object nextID(String table) {
-    return _tablesIdCount.update(table, (n) => n + 1, ifAbsent: () => 1);
+    return _tablesIdCount.update(table, (n) => n + 1,
+        ifAbsent: () => _getTableHighestID(table) + 1);
+  }
+
+  void _disposeNextIDCounter(String table) => _tablesIdCount.remove(table);
+
+  int _getTableHighestID(String table) {
+    var map = _getTableMap(table, false);
+    if (map == null || map.isEmpty) return 0;
+
+    var tablesScheme = tablesSchemes[table];
+    var idField = tablesScheme?.idFieldName ?? 'id';
+
+    var maxId = map.values.map((e) => parseInt(e[idField], 0)!).max;
+    return maxId;
   }
 
   @override
@@ -365,7 +382,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
             "Can't resolve relationship fields without an `EntityHandler` for `${tableScheme.name}`");
       }
 
-      var fieldId = entityHandler.idFieldsName();
+      var fieldId = entityHandler.idFieldName();
       var id = obj2[fieldId];
 
       var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
@@ -459,7 +476,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
           "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
     }
 
-    var idFieldName = entityHandler.idFieldsName();
+    var idFieldName = entityHandler.idFieldName();
 
     var entityFieldsTypes = entityHandler.fieldsTypes();
 
@@ -516,7 +533,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       Type? targetIdType;
       if (targetEntityHandler != null) {
         targetName = getEntityRepository(type: targetEntityHandler.type)?.name;
-        targetIdField = targetEntityHandler.idFieldsName();
+        targetIdField = targetEntityHandler.idFieldName();
         targetIdType =
             targetEntityHandler.getFieldType(null, targetIdField)?.type;
       }
@@ -565,7 +582,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
       return refs.values.map((ref) {
         var sourceEntityHandler = repo.entityHandler;
-        var sourceFieldId = sourceEntityHandler.idFieldsName();
+        var sourceFieldId = sourceEntityHandler.idFieldName();
         var sourceFieldIdType =
             sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
 

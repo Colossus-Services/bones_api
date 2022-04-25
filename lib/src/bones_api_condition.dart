@@ -553,7 +553,7 @@ class ConditionID<O> extends Condition<O> {
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var idField = entityHandler?.idFieldsName() ?? 'id';
+    var idField = entityHandler?.idFieldName() ?? 'id';
     var id = o[idField];
 
     var idValue = this.idValue;
@@ -616,7 +616,7 @@ class ConditionIdIN<O> extends Condition<O> {
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var idField = entityHandler?.idFieldsName() ?? 'id';
+    var idField = entityHandler?.idFieldName() ?? 'id';
     var id = o[idField];
     return _matchesID(
         idsValues, id, parameters, positionalParameters, namedParameters);

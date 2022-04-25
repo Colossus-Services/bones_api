@@ -445,7 +445,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     if (entityHandler == null) return null;
 
     if (entity is Map) {
-      var idFieldsName = entityHandler.idFieldsName();
+      var idFieldsName = entityHandler.idFieldName();
       return entity[idFieldsName];
     } else {
       return entityHandler.getID(entity);

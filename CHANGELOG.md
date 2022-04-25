@@ -1,3 +1,8 @@
+## 1.1.14
+
+- `MemorySQLAdapter`: fix `nextID` when entities are stored with pre-defined IDs. 
+- `EntityHandler`: Rename `idFieldsName` to `idFieldName`.
+
 ## 1.1.13
 
 - `ClassReflectionEntityHandler`:

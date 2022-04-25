@@ -155,14 +155,14 @@ abstract class EntityHandler<O> with FieldsFromMap {
     }
   }
 
-  V? getID<V>(O o) => getField(o, idFieldsName(o));
+  V? getID<V>(O o) => getField(o, idFieldName(o));
 
-  void setID<V>(O o, V id) => setField(o, idFieldsName(o), id);
+  void setID<V>(O o, V id) => setField(o, idFieldName(o), id);
 
   Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
       Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
 
-  String idFieldsName([O? o]);
+  String idFieldName([O? o]);
 
   List<String> fieldsNames([O? o]);
 
@@ -560,7 +560,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       Json.toJson(o, toEncodable: jsonToEncodable, removeNullFields: true);
 
   bool equalsFieldValues(String field, Object? value1, Object? value2, [O? o]) {
-    if (field == idFieldsName(o)) {
+    if (field == idFieldName(o)) {
       return isEqualsDeep(value1, value2);
     }
 
@@ -794,7 +794,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   String? _idFieldsName;
 
   @override
-  String idFieldsName([O? o]) {
+  String idFieldName([O? o]) {
     var idFieldsName = _idFieldsName;
 
     if (idFieldsName == null) {
@@ -1055,7 +1055,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   String? _idFieldsName;
 
   @override
-  String idFieldsName([O? o]) {
+  String idFieldName([O? o]) {
     if (_idFieldsName == null) {
       // Just to populate:
       if (_fieldsNames == null) {
