@@ -1,3 +1,10 @@
+## 1.1.13
+
+- `ClassReflectionEntityHandler`:
+  - Improve `createFromMap`.
+  - Compatibility with `JsonFieldAlias`.
+- reflection_factory: ^1.0.28
+
 ## 1.1.12
 
 - `SQLAdapter` (`PostgreSQL`, `MySQL` and in-memory):

@@ -342,9 +342,12 @@ mixin FieldsFromMap {
     List<String>? fieldsNamesLC,
     List<String>? fieldsNamesSimple,
     bool includeAbsentFields = false,
+    List<String>? returnMapUsedKeys,
   }) {
     var mapLC = <String, String>{};
     var mapSimple = <String, String>{};
+
+    var returnMapField = returnMapUsedKeys != null ? <String>[''] : null;
 
     var entries = fieldsNames.map((f) {
       String? fLC, fSimple;
@@ -354,11 +357,16 @@ mixin FieldsFromMap {
         fSimple = fieldsNamesSimple?[idx];
       }
 
-      var entry =
-          _getFieldValueFromMapImpl(f, fLC, fSimple, map, mapLC, mapSimple);
+      var entry = _getFieldValueFromMapImpl(
+          f, fLC, fSimple, map, mapLC, mapSimple, returnMapField);
 
-      if (entry == null && includeAbsentFields) {
-        entry = MapEntry(f, null);
+      if (entry == null) {
+        if (includeAbsentFields) {
+          entry = MapEntry(f, null);
+        }
+      } else if (returnMapUsedKeys != null) {
+        var mapField = returnMapField![0];
+        returnMapUsedKeys.add(mapField);
       }
 
       return entry;
@@ -377,7 +385,7 @@ mixin FieldsFromMap {
       Map<String, String>? mapLC,
       Map<String, String>? mapSimple}) {
     var entry = _getFieldValueFromMapImpl(
-        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
+        field, fieldLC, fieldSimple, map, mapLC, mapSimple, null);
     return entry?.value;
   }
 
@@ -387,12 +395,15 @@ mixin FieldsFromMap {
       String? fieldSimple,
       Map<String, Object?> map,
       Map<String, String>? mapLC,
-      Map<String, String>? mapSimple) {
+      Map<String, String>? mapSimple,
+      List<String>? returnMapField) {
     if (map.isEmpty) return null;
 
     var key = _getFieldKeyInMapImpl(
         field, fieldLC, fieldSimple, map, mapLC, mapSimple);
     if (key == null) return null;
+
+    returnMapField?[0] = key;
 
     var value = map[key];
     return MapEntry(field, value);

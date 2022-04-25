@@ -238,13 +238,15 @@ abstract class EntityHandler<O> with FieldsFromMap {
       {EntityProvider? entityProvider,
       EntityCache? entityCache,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityRepositoryProvider? entityRepositoryProvider}) {
+      EntityRepositoryProvider? entityRepositoryProvider,
+      List<String>? returnFieldsUsedKeys}) {
     var fieldsNames = this.fieldsNames();
 
     var fieldsValues = getFieldsValuesFromMap(fieldsNames, fields,
         fieldsNamesIndexes: fieldsNamesIndexes(),
         fieldsNamesLC: fieldsNamesLC(),
-        fieldsNamesSimple: fieldsNamesSimple());
+        fieldsNamesSimple: fieldsNamesSimple(),
+        returnMapUsedKeys: returnFieldsUsedKeys);
 
     return resolveFieldsValues(fieldsValues,
         entityProvider: entityProvider,
@@ -1146,15 +1148,27 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       EntityRepositoryProvider? entityRepositoryProvider}) {
     entityCache ??= JsonEntityCacheSimple();
 
+    var returnFieldsUsedKeys = <String>[];
+
     return resolveFieldsNamesAndValues(fields,
             entityProvider: entityProvider,
             entityCache: entityCache,
             entityHandlerProvider: entityHandlerProvider,
-            entityRepositoryProvider: entityRepositoryProvider)
+            entityRepositoryProvider: entityRepositoryProvider,
+            returnFieldsUsedKeys: returnFieldsUsedKeys)
         .resolveMapped((resolvedFields) {
       try {
+        var fieldsUnusedKeys = fields.keys
+            .whereNot((f) => returnFieldsUsedKeys.contains(f))
+            .toList();
+
+        // Add unresolved fields, to allow non field parameters,
+        // constructors with parameters different from class field name.
+        resolvedFields.addEntries(fieldsUnusedKeys
+            .map((f) => MapEntry<String, Object?>(f, fields[f])));
+
         var o = reflection.createInstanceFromMap(resolvedFields,
-            fieldNameResolver: (f, _) => f);
+            fieldNameResolver: (f, m) => m.containsKey(f) ? f : null);
 
         if (o != null) {
           return o;
@@ -1172,7 +1186,12 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   FutureOr<O> _createFromMapDefaultImpl(Map<String, dynamic> fields,
       EntityProvider? entityProvider, EntityCache? entityCache) {
-    var o = reflection.createInstance()!;
+    var o = reflection.createInstance();
+    if (o == null) {
+      throw StateError(
+          "Can't call `createInstance` for type `${reflection.className}`");
+    }
+
     return setFieldsFromMap(o, fields,
         entityProvider: entityProvider, entityCache: entityCache);
   }
