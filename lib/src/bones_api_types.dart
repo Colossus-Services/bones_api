@@ -1,6 +1,8 @@
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:statistics/statistics.dart';
+
 import 'package:data_serializer/data_serializer.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
@@ -261,14 +263,14 @@ class Time implements Comparable<Time> {
   /// Converts this to 64-bits bytes ([Uint8List]), encoding [totalMicrosecond].
   Uint8List toBytes64() {
     var bytes = Uint8List(8);
-    bytes.asByteData().setInt64(0, totalMicrosecond);
+    bytes.setUint64(totalMicrosecond, 0);
     return bytes;
   }
 
   /// Converts this to 32-bits bytes ([Uint8List]), encoding [totalMilliseconds].
   Uint8List toBytes32() {
     var bytes = Uint8List(4);
-    bytes.asByteData().setInt32(0, totalMilliseconds);
+    bytes.setInt32(totalMilliseconds, 0);
     return bytes;
   }
 

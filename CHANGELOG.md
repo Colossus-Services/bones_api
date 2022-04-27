@@ -1,3 +1,11 @@
+## 1.1.15
+
+- Improved GitHub CI.
+- Added browser tests.
+- mercury_client: ^2.1.5
+- swiss_knife: ^3.1.0
+- data_serializer: ^1.0.7
+
 ## 1.1.14
 
 - `MemorySQLAdapter`: fix `nextID` when entities are stored with pre-defined IDs. 

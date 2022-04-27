@@ -1,3 +1,4 @@
+@TestOn('vm')
 import 'package:test/test.dart';
 
 import 'bones_api_test_modules.dart';

@@ -1,3 +1,4 @@
+@TestOn('vm')
 @Tags(['docker', 'mysql', 'slow'])
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
