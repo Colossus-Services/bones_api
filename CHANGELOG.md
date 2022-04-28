@@ -1,3 +1,7 @@
+## 1.1.16
+
+- reflection_factory: ^1.0.29
+
 ## 1.1.15
 
 - Improved GitHub CI.

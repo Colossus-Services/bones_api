@@ -84,7 +84,7 @@ class ConditionParameter extends ConditionElement {
       if (parameters is! Map && parameters is! Iterable) {
         var obj = parameters as dynamic;
         try {
-          var json = obj.toJson();
+          var json = Json.toJson(obj);
           parameters = json;
         } catch (_) {}
       }

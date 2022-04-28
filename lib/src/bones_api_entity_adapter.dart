@@ -206,7 +206,7 @@ class SQL implements SQLWrapper {
 
   Object? _toEncodable(dynamic o) {
     try {
-      return o.toJson();
+      return Json.toJson(o);
     } catch (e) {
       return '$o';
     }
