@@ -1,3 +1,9 @@
+## 1.1.17
+
+- `APIModuleProxy`:
+  - ignoreParametersTypes: added type `APICredential` (should exist only in the implementation). 
+- reflection_factory: ^1.1.0
+
 ## 1.1.16
 
 - reflection_factory: ^1.0.29

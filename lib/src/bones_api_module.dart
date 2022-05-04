@@ -513,7 +513,10 @@ class APIModuleProxy extends ClassProxy {
             },
             alwaysReturnFuture: true,
             traverseReturnTypes: const {APIResponse},
-            ignoreParametersTypes: const {APIRequest});
+            ignoreParametersTypes: const {
+              APIRequest,
+              APICredential,
+            });
 }
 
 typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
