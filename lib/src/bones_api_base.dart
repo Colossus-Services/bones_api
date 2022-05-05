@@ -338,6 +338,14 @@ abstract class APIRoot {
     return _callModule<T>(module, apiRequest);
   }
 
+  Future<APIAuthentication> callAuthenticate(
+      String email, String password) async {
+    var auth = await call(APIRequest.get('/authenticate',
+        parameters: {'email': email, 'password': password}));
+    var authentication = APIAuthentication.fromJson(auth.payload);
+    return authentication;
+  }
+
   /// Returns `true` if [apiRequest] is an accepted route/call.
   bool acceptsRequest(APIRequest apiRequest) {
     var module = getModuleByRequest(apiRequest);
@@ -1069,55 +1077,65 @@ class APIRequest extends APIPayload {
   factory APIRequest.get(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
-      dynamic payload}) {
+      dynamic payload,
+      APICredential? credential}) {
     return APIRequest(APIRequestMethod.GET, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
-        payload: payload);
+        payload: payload,
+        credential: credential);
   }
 
   /// Creates a request of `POST` method.
   factory APIRequest.post(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
-      dynamic payload}) {
+      dynamic payload,
+      APICredential? credential}) {
     return APIRequest(APIRequestMethod.POST, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
-        payload: payload);
+        payload: payload,
+        credential: credential);
   }
 
   /// Creates a request of `PUT` method.
   factory APIRequest.put(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
-      dynamic payload}) {
+      dynamic payload,
+      APICredential? credential}) {
     return APIRequest(APIRequestMethod.PUT, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
-        payload: payload);
+        payload: payload,
+        credential: credential);
   }
 
   /// Creates a request of `DELETE` method.
   factory APIRequest.delete(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
-      dynamic payload}) {
+      dynamic payload,
+      APICredential? credential}) {
     return APIRequest(APIRequestMethod.DELETE, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
-        payload: payload);
+        payload: payload,
+        credential: credential);
   }
 
   /// Creates a request of `PATCH` method.
   factory APIRequest.patch(String path,
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
-      dynamic payload}) {
+      dynamic payload,
+      APICredential? credential}) {
     return APIRequest(APIRequestMethod.PATCH, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
-        payload: payload);
+        payload: payload,
+        credential: credential);
   }
 
   /// The elapsed time of this request.

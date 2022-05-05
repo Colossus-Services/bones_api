@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
@@ -134,7 +135,7 @@ class APIPasswordSHA256 extends APIPasswordHashAlgorithm {
   @override
   String get name => 'sha256';
 
-  static final RegExp _regExpHEX = RegExp(r'^(?:[0-9a-fA-F]{2})+$');
+  static final RegExp _regExpHEX = RegExp(r'^(?:[a-fA-F\d]{2})+$');
 
   @override
   bool isHashedPassword(String passwordOrHash) {
@@ -195,6 +196,8 @@ class APIAuthentication {
 
   String get tokenKey => token.token;
 
+  APICredential get credential => APICredential(username, token: tokenKey);
+
   bool isExpired({DateTime? now}) => token.isExpired();
 
   List<APIPermission> enabledPermissions({DateTime? now}) {
@@ -237,6 +240,12 @@ class APIAuthentication {
         if (data != null)
           'data': Json.toJson(data, maskField: Json.standardJsonMaskField),
       };
+
+  factory APIAuthentication.fromJson(Map json) {
+    var token = APIToken.fromJson(json['token']);
+    var permissions = APIPermission.listFromJson(json['permissions']);
+    return APIAuthentication(token, permissions: permissions);
+  }
 }
 
 class APIToken implements Comparable<APIToken> {
@@ -393,9 +402,28 @@ class APIToken implements Comparable<APIToken> {
         'duration': duration.inSeconds,
         'expireTime': expireTime,
       };
+
+  factory APIToken.fromJson(Map json) => APIToken(
+        json['username'],
+        token: json['token'],
+        issueTime: TypeParser.parseDateTime(json['issueTime']),
+        duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
+      );
 }
 
 class APIPermission {
+  static List<APIPermission> listFromJson(Object? json) {
+    if (json == null) return <APIPermission>[];
+
+    if (json is APIPermission) return <APIPermission>[json];
+
+    if (json is List) {
+      return json.map((e) => APIPermission.fromJson(e)).toList();
+    }
+
+    return <APIPermission>[];
+  }
+
   static String normalizeType(String type) {
     return type.toLowerCase().trim();
   }
@@ -475,4 +503,12 @@ class APIPermission {
         if (endTime != null) 'endTime': endTime,
         if (properties.isNotEmpty) 'properties': properties,
       };
+
+  factory APIPermission.fromJson(Map json) => APIPermission(
+        json['type'],
+        enabled: TypeParser.parseBool(json['enabled'], false)!,
+        initTime: TypeParser.parseDateTime(json['initTime']),
+        endTime: TypeParser.parseDateTime(json['endTime']),
+        properties: TypeParser.parseMap(json['properties']),
+      );
 }

@@ -1,3 +1,10 @@
+## 1.1.18
+
+- `APIRoot`:
+  - Added `callAuthenticate`.
+- `APIRequest`:
+  -  Added `credential` to constructors.
+
 ## 1.1.17
 
 - `APIModuleProxy`:
