@@ -206,6 +206,8 @@ abstract class APISecurity {
       return null;
     }
 
+    request.credential = credential;
+
     return authenticate(credential).then((authentication) {
       resolveRequestAuthentication(request, authentication);
       return authentication;

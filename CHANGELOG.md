@@ -1,3 +1,9 @@
+## 1.1.20
+
+- `APIServer`:
+  - Improve resolution of `APICredential` username.
+- mercury_client: ^2.1.6
+
 ## 1.1.19
 
 - `APIServer`:
