@@ -1,3 +1,9 @@
+## 1.1.19
+
+- `APIServer`:
+  - Improved resolution of request payload.
+- Added `decodeQueryStringParameters`, for full decoding of query string with single and multiple parameters. 
+
 ## 1.1.18
 
 - `APIRoot`:

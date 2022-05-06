@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
@@ -12,6 +13,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_gzip/shelf_gzip.dart';
 import 'package:shelf_letsencrypt/shelf_letsencrypt.dart';
 import 'package:shelf_static/shelf_static.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -462,21 +464,36 @@ class APIServer {
   FutureOr<Response> _process(Request request) {
     APIRequest? apiRequest;
     try {
-      apiRequest = toAPIRequest(request);
+      return toAPIRequest(request).resolveMapped((apiReq) {
+        apiRequest = apiReq;
+        return _processAPIRequest(request, apiReq);
+      });
+    } catch (e, s) {
+      return _errorProcessing(request, apiRequest, e, s);
+    }
+  }
 
+  FutureOr<Response> _processAPIRequest(
+      Request request, APIRequest apiRequest) {
+    try {
       if (apiRequest.method == APIRequestMethod.OPTIONS) {
         return _processOPTIONSRequest(request, apiRequest);
       } else {
         return _processCall(request, apiRequest);
       }
     } catch (e, s) {
-      var requestStr = apiRequest ?? _requestToString(request);
-
-      var message = 'ERROR processing request:\n\n$requestStr';
-      _log.severe(message, e, s);
-
-      return Response.internalServerError(body: '$message\n\n$e\n$s');
+      return _errorProcessing(request, apiRequest, e, s);
     }
+  }
+
+  Response _errorProcessing(
+      Request request, APIRequest? apiRequest, Object error, StackTrace stack) {
+    var requestStr = apiRequest ?? _requestToString(request);
+
+    var message = 'ERROR processing request:\n\n$requestStr';
+    _log.severe(message, error, stack);
+
+    return Response.internalServerError(body: '$message\n\n$error\n$stack');
   }
 
   String _requestToString(Request request) {
@@ -508,7 +525,7 @@ class APIServer {
   }
 
   /// Converts a [request] to an [APIRequest].
-  APIRequest toAPIRequest(Request request) {
+  FutureOr<APIRequest> toAPIRequest(Request request) {
     var method = parseAPIRequestMethod(request.method)!;
 
     var headers = Map.fromEntries(request.headersAll.entries.map((e) {
@@ -551,19 +568,39 @@ class APIServer {
 
     var credential = _resolveCredential(request);
 
-    var req = APIRequest(method, path,
-        parameters: parameters,
-        requesterSource: requesterSource,
-        requesterAddress: requesterAddress,
-        headers: headers,
-        sessionID: sessionID,
-        newSession: newSession,
-        credential: credential,
-        scheme: scheme,
-        requestedUri: request.requestedUri,
-        originalRequest: request);
+    return _resolvePayload(request).resolveMapped((payloadResolved) {
+      var mimeType = payloadResolved?.key;
+      var payload = payloadResolved?.value;
 
-    return req;
+      Map<String, dynamic> parametersResolved;
+
+      if (mimeType != null && payload != null && mimeType.isFormURLEncoded) {
+        var payloadMap = payload as Map<String, dynamic>;
+
+        parametersResolved = parameters.isEmpty
+            ? payloadMap
+            : <String, dynamic>{...parameters, ...payloadMap};
+
+        payload = null;
+      } else {
+        parametersResolved = Map<String, dynamic>.from(parameters);
+      }
+
+      var req = APIRequest(method, path,
+          parameters: parametersResolved,
+          requesterSource: requesterSource,
+          requesterAddress: requesterAddress,
+          headers: headers,
+          sessionID: sessionID,
+          newSession: newSession,
+          credential: credential,
+          scheme: scheme,
+          requestedUri: request.requestedUri,
+          originalRequest: request,
+          payload: payload);
+
+      return req;
+    });
   }
 
   Map<String, String>? _parseCookies(Request request) {
@@ -584,6 +621,37 @@ class APIServer {
     }
 
     return cookies;
+  }
+
+  FutureOr<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
+    var contentLength = request.contentLength;
+    var contentType = request.headers['content-type'];
+
+    if (contentLength == null && contentType == null) return null;
+
+    var mimeType = contentType != null ? MimeType.parse(contentType) : null;
+
+    if (mimeType == null || mimeType.isText) {
+      return request.readAsString().resolveMapped((val) =>
+          MapEntry((mimeType ?? MimeType.parse(MimeType.textPlain)!), val));
+    }
+
+    if (mimeType.isJSON) {
+      return request
+          .readAsString()
+          .resolveMapped((s) => MapEntry(mimeType, json.decode(s)));
+    }
+
+    if (mimeType.isFormURLEncoded) {
+      return request.readAsString().resolveMapped(
+          (s) => MapEntry(mimeType, decodeQueryStringParameters(s)));
+    }
+
+    return request
+        .read()
+        .expand((bs) => bs)
+        .toList()
+        .resolveMapped((bs) => MapEntry(mimeType, Uint8List.fromList(bs)));
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');
@@ -789,7 +857,9 @@ class APIServer {
 
     var host = request.headers['host'];
     if (host != null) {
-      origin = "http://$host/";
+      var scheme = request.requestedUri.scheme;
+
+      origin = "$scheme://$host/";
       return origin;
     }
 

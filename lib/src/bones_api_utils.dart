@@ -1062,3 +1062,35 @@ class InstanceTracker<O extends Object, I extends Object> {
     }
   }
 }
+
+/// Decodes [queryString], allowing single and multiple values per key.
+Map<String, dynamic> decodeQueryStringParameters(String? queryString) {
+  if (queryString == null || queryString.isEmpty) return {};
+
+  var pairs = queryString.split('&');
+
+  var parameters = <String, dynamic>{};
+
+  for (var pair in pairs) {
+    if (pair.isEmpty) continue;
+    var kv = pair.split('=');
+
+    var k = kv[0];
+    var v = kv.length > 1 ? kv[1] : '';
+
+    k = Uri.decodeQueryComponent(k);
+    v = Uri.decodeQueryComponent(v);
+
+    var prev = parameters[k];
+
+    if (prev == null) {
+      parameters[k] = v;
+    } else if (prev is List) {
+      prev.add(v);
+    } else {
+      parameters[k] = [prev, v];
+    }
+  }
+
+  return parameters;
+}
