@@ -34,14 +34,41 @@ void main() {
 
       var t3 = TypeInfo.from([]);
       expect(t3.type, equals(t1.type));
+      expect(t3.isFuture, isFalse);
+      expect(t3.isFutureOr, isFalse);
+      expect(t3.isDynamic, isFalse);
 
       var fieldRolesType = User.empty().getFieldType('roles')!;
 
       expect(fieldRolesType.type, equals(t1.type));
 
       var t4 = TypeInfo.from([Role.empty()], [Role.empty()]);
+      expect(t4.isFuture, isFalse);
+      expect(t4.isFutureOr, isFalse);
+      expect(t4.isDynamic, isFalse);
       expect(fieldRolesType.type, equals(t4.type));
       expect(fieldRolesType, equals(t4));
+
+      var t5 = TypeInfo.fromType(Future, [bool]);
+      expect(t5.isFuture, isTrue);
+      expect(t5.isFutureOr, isFalse);
+      expect(t5.isDynamic, isFalse);
+      expect(t5.arguments[0], equals(TypeInfo.tBool));
+
+      var t6 = TypeInfo.fromType(FutureOr, [bool]);
+      expect(t6.isFutureOr, isTrue);
+      expect(t6.isFuture, isFalse);
+      expect(t6.arguments[0], equals(TypeInfo.tBool));
+
+      var t7 = TypeInfo.fromType(Future, [bool]);
+      expect(t7.isFuture, isTrue);
+      expect(t7.isFutureOr, isFalse);
+      expect(t7.arguments[0], equals(TypeInfo.tBool));
+
+      var t8 = TypeInfo.fromType(Future);
+      expect(t8.isFuture, isTrue);
+      expect(t8.isFutureOr, isFalse);
+      expect(t8.hasArguments, isFalse);
     });
 
     test('Time', () async {

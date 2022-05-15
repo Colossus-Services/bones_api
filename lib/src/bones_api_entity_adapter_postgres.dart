@@ -24,20 +24,22 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
 
     SQLAdapter.registerAdapter(
-        ['postgres', 'postgre', 'postgresql'], PostgreSQLAdapter, (config,
-            {int? minConnections,
-            int? maxConnections,
-            EntityRepositoryProvider? parentRepositoryProvider}) {
-      try {
-        return PostgreSQLAdapter.fromConfig(config,
-            minConnections: minConnections,
-            maxConnections: maxConnections,
-            parentRepositoryProvider: parentRepositoryProvider);
-      } catch (e, s) {
-        _log.severe("Error instantiating from config", e, s);
-        return null;
-      }
-    });
+        ['postgres', 'postgre', 'postgresql'], PostgreSQLAdapter, _instantiate);
+  }
+
+  static FutureOr<PostgreSQLAdapter?> _instantiate(config,
+      {int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    try {
+      return PostgreSQLAdapter.fromConfig(config,
+          minConnections: minConnections,
+          maxConnections: maxConnections,
+          parentRepositoryProvider: parentRepositoryProvider);
+    } catch (e, s) {
+      _log.severe("Error instantiating from config", e, s);
+      return null;
+    }
   }
 
   final String host;

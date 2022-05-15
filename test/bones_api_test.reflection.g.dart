@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.1.0
+// BUILDER: reflection_factory/1.1.1
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.1.0');
+  Version get reflectionFactoryVersion => Version.parse('1.1.1');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -109,7 +109,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   List<Reflection> siblingsReflection() => _siblingsReflection();
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule];
+  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
 
   @override
   bool get hasMethodToJson => false;
@@ -125,6 +125,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'authenticationRoute',
         'defaultRouteName',
         'hashCode',
+        'isInitialized',
         'name',
         'routes',
         'security',
@@ -279,6 +280,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           false,
           [override],
         );
+      case 'isinitialized':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitialized',
+          false,
+          (o) => () => o!.isInitialized as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       default:
         return null;
     }
@@ -298,12 +313,18 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'addRoute',
         'apiInfo',
         'call',
+        'checkInitialized',
         'configure',
         'echo',
         'ensureConfigured',
+        'ensureInitialized',
+        'ensureInitializedAsync',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'getRoutesHandlersNames',
+        'initialize',
+        'initializeDependencies',
+        'initializeImpl',
         'resolveRoute',
         'toUpperCase'
       ];
@@ -384,6 +405,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             null);
+      case 'initializeimpl':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            APIModule,
+            'initializeImpl',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.initializeImpl,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            [override]);
       case 'getrouteshandlersnames':
         return MethodReflection<MyInfoModule, R>(
             this,
@@ -544,6 +579,78 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             ],
             null,
             null);
+      case 'ensureinitialized':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'ensureInitialized',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.ensureInitialized,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'ensureinitializedasync':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'ensureInitializedAsync',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.ensureInitializedAsync,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'initialize':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'initialize',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.initialize,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'initializedependencies':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'initializeDependencies',
+            TypeReflection(FutureOr, [
+              TypeReflection(List, [Initializable])
+            ]),
+            false,
+            (o) => o!.initializeDependencies,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'checkinitialized':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'checkInitialized',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.checkInitialized,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
       default:
         return null;
     }
@@ -610,6 +717,71 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         : (ret is Future
             ? ret.then((v) => v as String)
             : Future<String>.value(ret as dynamic));
+  }
+
+  Future<bool> initializeImpl() {
+    var ret = onCall(this, 'initializeImpl', <String, dynamic>{},
+        TypeReflection.tFutureBool);
+    return ret is Future<bool>
+        ? ret as Future<bool>
+        : (ret is Future
+            ? ret.then((v) => v as bool)
+            : Future<bool>.value(ret as dynamic));
+  }
+
+  Future<bool> ensureInitialized() {
+    var ret = onCall(this, 'ensureInitialized', <String, dynamic>{},
+        TypeReflection.tFutureBool);
+    return ret is Future<bool>
+        ? ret as Future<bool>
+        : (ret is Future
+            ? ret.then((v) => v as bool)
+            : Future<bool>.value(ret as dynamic));
+  }
+
+  Future<bool> ensureInitializedAsync() {
+    var ret = onCall(this, 'ensureInitializedAsync', <String, dynamic>{},
+        TypeReflection.tFutureBool);
+    return ret is Future<bool>
+        ? ret as Future<bool>
+        : (ret is Future
+            ? ret.then((v) => v as bool)
+            : Future<bool>.value(ret as dynamic));
+  }
+
+  Future<bool> initialize() {
+    var ret = onCall(
+        this, 'initialize', <String, dynamic>{}, TypeReflection.tFutureBool);
+    return ret is Future<bool>
+        ? ret as Future<bool>
+        : (ret is Future
+            ? ret.then((v) => v as bool)
+            : Future<bool>.value(ret as dynamic));
+  }
+
+  Future<List<Initializable>> initializeDependencies() {
+    var ret = onCall(
+        this,
+        'initializeDependencies',
+        <String, dynamic>{},
+        TypeReflection(Future, [
+          TypeReflection(List, [Initializable])
+        ]));
+    return ret is Future<List<Initializable>>
+        ? ret as Future<List<Initializable>>
+        : (ret is Future
+            ? ret.then((v) => v as List<Initializable>)
+            : Future<List<Initializable>>.value(ret as dynamic));
+  }
+
+  Future<void> checkInitialized() {
+    var ret = onCall(this, 'checkInitialized', <String, dynamic>{},
+        TypeReflection(Future, [TypeReflection.tVoid]));
+    return ret is Future<void>
+        ? ret as Future<void>
+        : (ret is Future
+            ? ret.then((v) => v as dynamic)
+            : Future<void>.value(ret as dynamic));
   }
 }
 

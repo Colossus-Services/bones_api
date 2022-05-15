@@ -22,20 +22,22 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
     Transaction.registerErrorFilter((e, s) => e is MySqlException);
 
-    SQLAdapter.registerAdapter(['mysql'], MySQLAdapter, (config,
-        {int? minConnections,
-        int? maxConnections,
-        EntityRepositoryProvider? parentRepositoryProvider}) {
-      try {
-        return MySQLAdapter.fromConfig(config,
-            minConnections: minConnections,
-            maxConnections: maxConnections,
-            parentRepositoryProvider: parentRepositoryProvider);
-      } catch (e, s) {
-        _log.severe("Error instantiating from config", e, s);
-        return null;
-      }
-    });
+    SQLAdapter.registerAdapter(['mysql'], MySQLAdapter, _instantiate);
+  }
+
+  static FutureOr<MySQLAdapter?> _instantiate(config,
+      {int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    try {
+      return MySQLAdapter.fromConfig(config,
+          minConnections: minConnections,
+          maxConnections: maxConnections,
+          parentRepositoryProvider: parentRepositoryProvider);
+    } catch (e, s) {
+      _log.severe("Error instantiating from config", e, s);
+      return null;
+    }
   }
 
   final String host;

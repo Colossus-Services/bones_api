@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.1.0
+// BUILDER: reflection_factory/1.1.1
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.1.0');
+  Version get reflectionFactoryVersion => Version.parse('1.1.1');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -109,7 +109,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   List<Reflection> siblingsReflection() => _siblingsReflection();
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule];
+  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
 
   @override
   bool get hasMethodToJson => false;
@@ -125,6 +125,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'authenticationRoute',
         'defaultRouteName',
         'hashCode',
+        'isInitialized',
         'name',
         'routes',
         'security',
@@ -279,6 +280,20 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           false,
           [override],
         );
+      case 'isinitialized':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitialized',
+          false,
+          (o) => () => o!.isInitialized as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       default:
         return null;
     }
@@ -298,8 +313,11 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'addRoute',
         'apiInfo',
         'call',
+        'checkInitialized',
         'configure',
         'ensureConfigured',
+        'ensureInitialized',
+        'ensureInitializedAsync',
         'geDynamicAsync',
         'geDynamicAsync2',
         'getDynamic',
@@ -308,6 +326,9 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'getRoutesHandlersNames',
         'getUser',
         'getUserAsync',
+        'initialize',
+        'initializeDependencies',
+        'initializeImpl',
         'notARoute',
         'notARouteAsync',
         'resolveRoute'
@@ -472,6 +493,20 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             null);
+      case 'initializeimpl':
+        return MethodReflection<UserModule, R>(
+            this,
+            APIModule,
+            'initializeImpl',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.initializeImpl,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            [override]);
       case 'getrouteshandlersnames':
         return MethodReflection<UserModule, R>(
             this,
@@ -630,6 +665,78 @@ class UserModule$reflection extends ClassReflection<UserModule> {
               ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
                   true, false, null, null)
             ],
+            null,
+            null);
+      case 'ensureinitialized':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'ensureInitialized',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.ensureInitialized,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'ensureinitializedasync':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'ensureInitializedAsync',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.ensureInitializedAsync,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'initialize':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'initialize',
+            TypeReflection.tFutureOrBool,
+            false,
+            (o) => o!.initialize,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'initializedependencies':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'initializeDependencies',
+            TypeReflection(FutureOr, [
+              TypeReflection(List, [Initializable])
+            ]),
+            false,
+            (o) => o!.initializeDependencies,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'checkinitialized':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'checkInitialized',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.checkInitialized,
+            obj,
+            false,
+            null,
+            null,
             null,
             null);
       default:
