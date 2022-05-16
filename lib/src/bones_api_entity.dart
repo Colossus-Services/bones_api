@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
+import 'package:swiss_knife/swiss_knife.dart' show EventStream;
 
 import 'bones_api_condition.dart';
 import 'bones_api_error_zone.dart';
@@ -1335,12 +1336,30 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       Transaction? transaction,
       int? limit});
 
+  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit});
+
   FutureOr<Iterable<dynamic>> selectRelationship<E>(O? o, String field,
       {Object? oId, TypeInfo? fieldType, Transaction? transaction});
 
   FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
       List<O>? os, String field,
       {List<dynamic>? oIds, TypeInfo? fieldType, Transaction? transaction});
+}
+
+abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
+  EntityStorage(String name) : super(name);
+
+  bool isStored(O o, {Transaction? transaction});
+
+  FutureOr<dynamic> store(O o, {Transaction? transaction});
+
+  FutureOr<Iterable> storeAll(Iterable<O> o, {Transaction? transaction});
+
+  FutureOr<bool> setRelationship<E extends Object>(
+      O o, String field, List<E> values,
+      {TypeInfo? fieldType, Transaction? transaction});
+
+  final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
   FutureOr<Iterable<O>> deleteByQuery(String query,
       {Object? parameters,
@@ -1363,23 +1382,11 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       Transaction? transaction});
 }
 
-abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
-  EntityStorage(String name) : super(name);
-
-  bool isStored(O o, {Transaction? transaction});
-
-  FutureOr<dynamic> store(O o, {Transaction? transaction});
-
-  FutureOr<Iterable> storeAll(Iterable<O> o, {Transaction? transaction});
-
-  FutureOr<bool> setRelationship<E extends Object>(
-      O o, String field, List<E> values,
-      {TypeInfo? fieldType, Transaction? transaction});
-}
-
-class EntityRepositoryProvider with Closable implements EntityProvider {
+class EntityRepositoryProvider
+    with Closable, Initializable
+    implements EntityProvider {
   static final EntityRepositoryProvider _globalProvider =
-      EntityRepositoryProvider._global();
+      EntityRepositoryProvider._global()..doInitialization();
 
   static EntityRepositoryProvider get globalProvider => _globalProvider;
 
@@ -1391,6 +1398,9 @@ class EntityRepositoryProvider with Closable implements EntityProvider {
   }
 
   EntityRepositoryProvider._global();
+
+  @override
+  FutureOr<bool> initialize() => true;
 
   void registerEntityRepository<O extends Object>(
       EntityRepository<O> entityRepository) {
@@ -1410,6 +1420,8 @@ class EntityRepositoryProvider with Closable implements EntityProvider {
 
     if (_callingGetEntityRepository) return null;
     _callingGetEntityRepository = true;
+
+    checkInitialized();
 
     try {
       var entityRepository =
@@ -1568,6 +1580,24 @@ extension IterableEntityRepositoryProviderExtension
 }
 
 extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
+  FutureOr<Map<String, List<Object>>> storeAllFromJsonEncoded(
+      String jsonEncoded,
+      {Transaction? transaction}) {
+    var json = Json.decode(jsonEncoded);
+    if (json == null) return <String, List<Object>>{};
+
+    var map = (json as Map).map((key, value) {
+      return MapEntry(
+          key.toString(),
+          (value as Iterable)
+              .map((e) => (e as Map).map((key, value) =>
+                  MapEntry<String, dynamic>(key.toString(), value as dynamic)))
+              .toList());
+    });
+
+    return storeAllFromJson(map, transaction: transaction);
+  }
+
   FutureOr<Map<String, List<Object>>> storeAllFromJson(
       Map<String, Iterable<Map<String, dynamic>>> entries,
       {Transaction? transaction}) {
@@ -1741,8 +1771,13 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 
   FutureOr<List<O>> storeAllFromJson(
-      Iterable<Map<String, dynamic>> entitiesJson,
-      {Transaction? transaction}) {
+          Iterable<Map<String, dynamic>> entitiesJson,
+          {Transaction? transaction}) =>
+      executeInitialized(
+          () => _storeAllFromJsonImpl(entitiesJson, transaction));
+
+  FutureOr<List<O>> _storeAllFromJsonImpl(
+      Iterable<Map<String, dynamic>> entitiesJson, Transaction? transaction) {
     transaction ??= Transaction.autoCommit();
 
     var osAsync = entitiesJson
@@ -1755,7 +1790,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 
   FutureOr<O> storeFromJson(Map<String, dynamic> json,
-      {Transaction? transaction}) {
+          {Transaction? transaction}) =>
+      executeInitialized(() => _storeFromJsonImpl(json, transaction));
+
+  FutureOr<O> _storeFromJsonImpl(
+      Map<String, dynamic> json, Transaction? transaction) {
     transaction ??= Transaction.autoCommit();
 
     var oAsync = createFromMap(json, entityCache: transaction);
@@ -1779,19 +1818,76 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       entityHandler.createFromMap(fields,
           entityProvider: entityProvider, entityCache: entityCache);
 
-  O trackEntity(O o) => _entitiesTracker.trackInstance(o);
+  O trackEntity(O o, {bool stored = false}) {
+    var entity = _entitiesTracker.trackInstance(o);
 
-  void untrackEntity(O? o) => _entitiesTracker.untrackInstance(o);
+    if (stored) {
+      notifyStoredEntities([entity]);
+    }
 
-  O? trackEntityNullable(O? o) => _entitiesTracker.trackInstanceNullable(o);
+    return entity;
+  }
 
-  List<O> trackEntities(Iterable<O> os) => _entitiesTracker.trackInstances(os);
+  void untrackEntity(O? o, {bool deleted = false}) {
+    _entitiesTracker.untrackInstance(o);
 
-  List<O?> trackEntitiesNullable(Iterable<O?> os) =>
-      _entitiesTracker.trackInstancesNullable(os);
+    if (deleted && o != null) {
+      notifyDeletedEntities([o]);
+    }
+  }
 
-  void untrackEntities(Iterable<O?> os) =>
-      _entitiesTracker.untrackInstances(os);
+  O? trackEntityNullable(O? o) {
+    if (o == null) return null;
+    return trackEntity(o);
+  }
+
+  List<O> trackEntities(Iterable<O> os, {bool stored = false}) {
+    var entities = _entitiesTracker.trackInstances(os);
+
+    if (stored) {
+      notifyStoredEntities(entities);
+    }
+
+    return entities;
+  }
+
+  List<O?> trackEntitiesNullable(Iterable<O?> os, {bool stored = false}) {
+    var entities = _entitiesTracker.trackInstancesNullable(os);
+
+    if (stored) {
+      notifyStoredEntities(entities.whereNotNull());
+    }
+
+    return entities;
+  }
+
+  void untrackEntities(Iterable<O?> os, {bool deleted = false}) {
+    _entitiesTracker.untrackInstances(os);
+
+    if (deleted) {
+      notifyDeletedEntities(os.whereNotNull());
+    }
+  }
+
+  final EventStream<O> onStore = EventStream<O>();
+
+  void notifyStoredEntities(Iterable<O> entities) {
+    if (onStore.isUsed) {
+      for (var e in entities) {
+        onStore.add(e);
+      }
+    }
+  }
+
+  final EventStream<O> onDelete = EventStream<O>();
+
+  void notifyDeletedEntities(Iterable<O> entities) {
+    if (onDelete.isUsed) {
+      for (var e in entities) {
+        onDelete.add(e);
+      }
+    }
+  }
 
   List<String>? getEntityChangedFields(O o) {
     var prevFields = _entitiesTracker.getTrackedInstanceInfo(o);
@@ -2615,6 +2711,15 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
+  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit}) {
+    checkNotClosed();
+
+    var os = all(limit: limit);
+
+    return trackEntities(os);
+  }
+
+  @override
   O? selectByID(id, {Transaction? transaction}) {
     checkNotClosed();
 
@@ -2650,6 +2755,8 @@ abstract class IterableEntityRepository<O extends Object>
 
       op.transaction._markOperationExecuted(op, oId);
 
+      trackEntity(o, stored: true);
+
       return oId;
     });
   }
@@ -2659,7 +2766,10 @@ abstract class IterableEntityRepository<O extends Object>
     checkNotClosed();
 
     transaction ??= Transaction.autoCommit();
-    return os.map((o) => store(o, transaction: transaction)).toList();
+
+    var result = os.map((o) => store(o, transaction: transaction)).toList();
+
+    return result;
   }
 
   @override
@@ -2810,7 +2920,7 @@ abstract class IterableEntityRepository<O extends Object>
       remove(o);
     }
 
-    untrackEntities(del);
+    untrackEntities(del, deleted: true);
 
     return del;
   }
@@ -2829,6 +2939,16 @@ abstract class IterableEntityRepository<O extends Object>
         namedParameters: namedParameters,
       );
     });
+
+    if (limit != null && limit > 0) {
+      itr = itr.take(limit);
+    }
+
+    return itr.toList();
+  }
+
+  List<O> all({int? limit}) {
+    var itr = iterable();
 
     if (limit != null && limit > 0) {
       itr = itr.take(limit);

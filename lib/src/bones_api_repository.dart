@@ -1,10 +1,12 @@
-import 'dart:async';
+import 'package:async_extension/async_extension.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_mixin.dart';
 
 /// A entity repository API.
-abstract class APIRepository<O extends Object> {
+abstract class APIRepository<O extends Object> with Initializable {
   /// Resolves a [EntityRepository].
   static EntityRepository<O>? resolveEntityRepository<O extends Object>(
       {EntityRepository<O>? entityRepository,
@@ -47,7 +49,20 @@ abstract class APIRepository<O extends Object> {
     configure();
   }
 
+  @override
+  FutureOr<bool> initialize() => entityRepository.executeInitialized(() {
+        ensureConfigured();
+        return true;
+      });
+
+  EventStream<O> get onStore => entityRepository.onStore;
+
+  EventStream<O> get onDelete => entityRepository.onDelete;
+
   FutureOr<O?> selectByID(dynamic id) => entityRepository.selectByID(id);
+
+  FutureOr<Iterable<O>> selectAll({int? limit}) =>
+      entityRepository.selectAll(limit: limit);
 
   FutureOr<int> length() => entityRepository.length();
 

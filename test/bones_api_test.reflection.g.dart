@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.1.1
+// BUILDER: reflection_factory/1.1.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.1.1');
+  Version get reflectionFactoryVersion => Version.parse('1.1.2');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -315,16 +315,17 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'call',
         'checkInitialized',
         'configure',
+        'doInitialization',
         'echo',
         'ensureConfigured',
         'ensureInitialized',
         'ensureInitializedAsync',
+        'executeInitialized',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'getRoutesHandlersNames',
         'initialize',
         'initializeDependencies',
-        'initializeImpl',
         'resolveRoute',
         'toUpperCase'
       ];
@@ -405,14 +406,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             null);
-      case 'initializeimpl':
+      case 'initialize':
         return MethodReflection<MyInfoModule, R>(
             this,
             APIModule,
-            'initializeImpl',
+            'initialize',
             TypeReflection.tFutureOrBool,
             false,
-            (o) => o!.initializeImpl,
+            (o) => o!.initialize,
             obj,
             false,
             null,
@@ -607,14 +608,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             null);
-      case 'initialize':
+      case 'doinitialization':
         return MethodReflection<MyInfoModule, R>(
             this,
             Initializable,
-            'initialize',
+            'doInitialization',
             TypeReflection.tFutureOrBool,
             false,
-            (o) => o!.initialize,
+            (o) => o!.doInitialization,
             obj,
             false,
             null,
@@ -648,6 +649,28 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             obj,
             false,
             null,
+            null,
+            null,
+            null);
+      case 'executeinitialized':
+        return MethodReflection<MyInfoModule, R>(
+            this,
+            Initializable,
+            'executeInitialized',
+            TypeReflection.tFutureOrDynamic,
+            false,
+            (o) => o!.executeInitialized,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection(ExecuteInitializedCallback, [dynamic]),
+                  'callback',
+                  false,
+                  true,
+                  null,
+                  null)
+            ],
             null,
             null,
             null);
@@ -719,9 +742,9 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
             : Future<String>.value(ret as dynamic));
   }
 
-  Future<bool> initializeImpl() {
-    var ret = onCall(this, 'initializeImpl', <String, dynamic>{},
-        TypeReflection.tFutureBool);
+  Future<bool> initialize() {
+    var ret = onCall(
+        this, 'initialize', <String, dynamic>{}, TypeReflection.tFutureBool);
     return ret is Future<bool>
         ? ret as Future<bool>
         : (ret is Future
@@ -749,9 +772,9 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
             : Future<bool>.value(ret as dynamic));
   }
 
-  Future<bool> initialize() {
-    var ret = onCall(
-        this, 'initialize', <String, dynamic>{}, TypeReflection.tFutureBool);
+  Future<bool> doInitialization() {
+    var ret = onCall(this, 'doInitialization', <String, dynamic>{},
+        TypeReflection.tFutureBool);
     return ret is Future<bool>
         ? ret as Future<bool>
         : (ret is Future
@@ -782,6 +805,21 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         : (ret is Future
             ? ret.then((v) => v as dynamic)
             : Future<void>.value(ret as dynamic));
+  }
+
+  Future<R> executeInitialized<R>(FutureOr<R> Function() callback) {
+    var ret = onCall(
+        this,
+        'executeInitialized',
+        <String, dynamic>{
+          'callback': callback,
+        },
+        TypeReflection.tFutureDynamic);
+    return ret is Future<R>
+        ? ret as Future<R>
+        : (ret is Future
+            ? ret.then((v) => v as dynamic)
+            : Future<R>.value(ret as dynamic));
   }
 }
 

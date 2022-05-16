@@ -9,6 +9,8 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
+import 'bones_api_entity.dart';
+import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
@@ -25,7 +27,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.20';
+  static const String VERSION = '1.1.21';
 
   static bool _boot = false;
 
@@ -38,7 +40,7 @@ class BonesAPI {
 }
 
 /// Root class of an API.
-abstract class APIRoot {
+abstract class APIRoot with Initializable {
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
   /// Returns the last [APIRoot] if instantiated.
@@ -146,14 +148,31 @@ abstract class APIRoot {
     }
   }
 
-  /// Ensures that this [APIRoot] and its modules are loaded.
-  void load() => _ensureModulesLoaded();
+  @override
+  FutureOr<List<Initializable>> initializeDependencies() {
+    var lAsync1 = loadEntityProviders();
+    var lAsync2 = loadEntityRepositoryProviders();
+
+    var inits = lAsync1.resolveBoth(lAsync2,
+        (l1, l2) => [...l1, ...l2].whereType<Initializable>().toList());
+    return inits;
+  }
+
+  @override
+  FutureOr<bool> initialize() => _ensureModulesLoaded();
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
 
+  /// Gracefully loads the [EntityProvider] needed for this [APIRoot].
+  FutureOr<List<EntityProvider>> loadEntityProviders() => <EntityProvider>[];
+
+  /// Gracefully loads the [EntityRepositoryProvider] needed for this [APIRoot].
+  FutureOr<List<EntityRepositoryProvider>> loadEntityRepositoryProviders() =>
+      <EntityRepositoryProvider>[];
+
   /// Loads the modules of this API.
-  Set<APIModule> loadModules();
+  FutureOr<Set<APIModule>> loadModules();
 
   Map<String, APIModule>? _modules;
 
@@ -169,8 +188,27 @@ abstract class APIRoot {
     return _modules!.values.toSet();
   }
 
-  void _ensureModulesLoaded() {
-    _modules ??= Map.fromEntries(loadModules().map((e) => MapEntry(e.name, e)));
+  Future<bool>? _modulesLoading;
+
+  FutureOr<bool> _ensureModulesLoaded() {
+    if (_modules != null) return true;
+
+    var modulesLoading = _modulesLoading;
+    if (modulesLoading != null) {
+      return modulesLoading;
+    }
+
+    var ret = loadModules().resolveMapped((modules) {
+      _modules ??= Map.fromEntries(modules.map((e) => MapEntry(e.name, e)));
+      _modulesLoading = null;
+      return true;
+    });
+
+    if (ret is Future<bool>) {
+      _modulesLoading = ret;
+    }
+
+    return ret;
   }
 
   /// Returns a module with [name].
@@ -291,20 +329,28 @@ abstract class APIRoot {
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
     }
 
+    var ret = _ensureModulesLoaded();
+
+    if (ret is Future<bool>) {
+      return ret.then((_) => _preCall(request));
+    } else {
+      return _preCall(request);
+    }
+  }
+
+  FutureOr<APIResponse<T>> _preCall<T>(APIRequest request) {
     var preResponse = callHandlers<T>(
         preApiRequestHandlers, request, 'preApiRequestHandlers');
 
     if (preResponse != null) {
       return preResponse
           .resolveMapped((response) => response ?? _callAPI(request));
+    } else {
+      return _callAPI(request);
     }
-
-    return _callAPI(request);
   }
 
   FutureOr<APIResponse<T>> _callAPI<T>(APIRequest request) {
-    _ensureModulesLoaded();
-
     var apiSecurity = security;
 
     if (apiSecurity != null &&

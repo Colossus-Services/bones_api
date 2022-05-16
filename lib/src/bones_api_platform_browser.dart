@@ -1,4 +1,9 @@
+import 'dart:async';
 import 'dart:html';
+import 'dart:typed_data';
+
+import 'package:mercury_client/mercury_client.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_platform.dart';
 
@@ -7,7 +12,8 @@ class APIPlatformBrowser extends APIPlatform {
   APIPlatformType get type => APIPlatformType.browser;
 
   @override
-  APIPlatformCapability get capability => APIPlatformCapability.bits53();
+  APIPlatformCapability get capability =>
+      APIPlatformCapability.bits53(canReadFile: true);
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) {
@@ -62,6 +68,37 @@ class APIPlatformBrowser extends APIPlatform {
 
   @override
   void stderrLn(Object? o) => window.console.error(o);
+
+  @override
+  String? resolveFilePath(String filePath) {
+    var url = resolveURL(filePath, baseUri: getUriBase());
+    return url;
+  }
+
+  Future<HttpResponse> _readFile(String filePath) async {
+    var baseUrl = getUriBase();
+    var client = HttpClient(baseUrl.toString());
+    var response = await client.get(filePath);
+    return response;
+  }
+
+  @override
+  FutureOr<String?> readFileAsString(String filePath) async {
+    HttpResponse response = await _readFile(filePath);
+    if (response.isNotOK) return null;
+
+    return response.bodyAsString;
+  }
+
+  @override
+  FutureOr<Uint8List?> readFileAsBytes(String filePath) async {
+    HttpResponse response = await _readFile(filePath);
+    if (response.isNotOK) return null;
+
+    var data = response.body?.asByteArray;
+    if (data == null) return null;
+    return data is Uint8List ? data : Uint8List.fromList(data);
+  }
 }
 
 APIPlatform createAPIPlatform() {

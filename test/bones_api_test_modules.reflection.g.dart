@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.1.1
+// BUILDER: reflection_factory/1.1.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.14.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.1.1');
+  Version get reflectionFactoryVersion => Version.parse('1.1.2');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -315,9 +315,11 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'call',
         'checkInitialized',
         'configure',
+        'doInitialization',
         'ensureConfigured',
         'ensureInitialized',
         'ensureInitializedAsync',
+        'executeInitialized',
         'geDynamicAsync',
         'geDynamicAsync2',
         'getDynamic',
@@ -328,7 +330,6 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'getUserAsync',
         'initialize',
         'initializeDependencies',
-        'initializeImpl',
         'notARoute',
         'notARouteAsync',
         'resolveRoute'
@@ -493,14 +494,14 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             null);
-      case 'initializeimpl':
+      case 'initialize':
         return MethodReflection<UserModule, R>(
             this,
             APIModule,
-            'initializeImpl',
+            'initialize',
             TypeReflection.tFutureOrBool,
             false,
-            (o) => o!.initializeImpl,
+            (o) => o!.initialize,
             obj,
             false,
             null,
@@ -695,14 +696,14 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             null);
-      case 'initialize':
+      case 'doinitialization':
         return MethodReflection<UserModule, R>(
             this,
             Initializable,
-            'initialize',
+            'doInitialization',
             TypeReflection.tFutureOrBool,
             false,
-            (o) => o!.initialize,
+            (o) => o!.doInitialization,
             obj,
             false,
             null,
@@ -736,6 +737,28 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             obj,
             false,
             null,
+            null,
+            null,
+            null);
+      case 'executeinitialized':
+        return MethodReflection<UserModule, R>(
+            this,
+            Initializable,
+            'executeInitialized',
+            TypeReflection.tFutureOrDynamic,
+            false,
+            (o) => o!.executeInitialized,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection(ExecuteInitializedCallback, [dynamic]),
+                  'callback',
+                  false,
+                  true,
+                  null,
+                  null)
+            ],
             null,
             null,
             null);

@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:bones_api/bones_api.dart';
+
 import 'bones_api_platform_generic.dart'
     if (dart.library.html) 'bones_api_platform_browser.dart'
     if (dart.library.io) 'bones_api_platform_io.dart';
@@ -48,10 +52,13 @@ abstract class APIPlatform {
   /// Returns the static [APIPlatform] instance for the current platform.
   static APIPlatform get() => _instance;
 
+  /// The platform type.
   APIPlatformType get type;
 
+  /// The name of the platform.
   String get name => type.name;
 
+  /// The capabilities of this platforms.
   APIPlatformCapability get capability;
 
   void log(Object? message, [Object? error, StackTrace? stackTrace]);
@@ -69,6 +76,15 @@ abstract class APIPlatform {
   void stderr(Object? o);
 
   void stderrLn(Object? o);
+
+  /// Resolves [filePath] to the platform actual file path.
+  String? resolveFilePath(String filePath);
+
+  /// Reads a [filePath] data as [String].
+  FutureOr<String?> readFileAsString(String filePath);
+
+  /// Reads a [filePath] data as [Uint8List].
+  FutureOr<Uint8List?> readFileAsBytes(String filePath);
 }
 
 class APIPlatformCapability {
@@ -84,6 +100,7 @@ class APIPlatformCapability {
 
   static final BigInt int32Min = BigInt.parse('-2147483648');
 
+  final bool canReadFile;
   final bool int64;
   final bool double64;
   final bool int53;
@@ -94,7 +111,8 @@ class APIPlatformCapability {
   final int minSafeInteger;
 
   APIPlatformCapability(
-      {this.int64 = false,
+      {required this.canReadFile,
+      this.int64 = false,
       this.double64 = false,
       this.int53 = false,
       this.double53 = false,
@@ -121,7 +139,12 @@ class APIPlatformCapability {
                         : throw StateError(
                             'minSafeInteger error: Platform `int` not defined!'))));
 
-  APIPlatformCapability.bits64() : this(int64: true, double64: true);
-  APIPlatformCapability.bits53() : this(int53: true, double53: true);
-  APIPlatformCapability.bits32() : this(int32: true, double32: true);
+  APIPlatformCapability.bits64({required bool canReadFile})
+      : this(canReadFile: canReadFile, int64: true, double64: true);
+
+  APIPlatformCapability.bits53({required bool canReadFile})
+      : this(canReadFile: canReadFile, int53: true, double53: true);
+
+  APIPlatformCapability.bits32({required bool canReadFile})
+      : this(canReadFile: canReadFile, int32: true, double32: true);
 }

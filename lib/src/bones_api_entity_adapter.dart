@@ -227,11 +227,11 @@ class SQLAdapterCapability {
       required this.transactionAbort});
 }
 
-typedef SQLAdapterInstantiator<C extends Object> = SQLAdapter<C>? Function(
-    Map<String, dynamic> config,
-    {int? minConnections,
-    int? maxConnections,
-    EntityRepositoryProvider? parentRepositoryProvider});
+typedef SQLAdapterInstantiator<C extends Object>
+    = FutureOr<SQLAdapter<C>?> Function(Map<String, dynamic> config,
+        {int? minConnections,
+        int? maxConnections,
+        EntityRepositoryProvider? parentRepositoryProvider});
 
 /// Base class for SQL adapters.
 ///
@@ -334,7 +334,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory SQLAdapter.fromConfig(Map<String, dynamic> config,
+  static FutureOr<SQLAdapter> fromConfig<C extends Object>(
+      Map<String, dynamic> config,
       {int minConnections = 1,
       int maxConnections = 3,
       EntityRepositoryProvider? parentRepositoryProvider}) {
@@ -347,25 +348,42 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
           "Can't find `SQLAdapter` instantiator for `config` keys: ${config.keys.toList()}");
     }
 
-    SQLAdapter? adapter;
+    var asyncInstantiators = <Future<SQLAdapter>>[];
 
     for (var e in adaptersInstantiators) {
-      adapter = e.key(e.value,
+      var f = e.key;
+      var conf = e.value;
+
+      var ret = f(conf,
           minConnections: minConnections,
           maxConnections: maxConnections,
           parentRepositoryProvider: parentRepositoryProvider);
-      if (adapter != null) break;
+      if (ret == null) {
+        continue;
+      } else if (ret is SQLAdapter) {
+        var adapter = ret as SQLAdapter<C>;
+        return adapter;
+      } else if (ret is Future<SQLAdapter>) {
+        asyncInstantiators.add(ret);
+      }
     }
 
-    if (adapter == null) {
-      throw StateError("Can't instantiate an `SQLAdapter` for `config`");
+    if (asyncInstantiators.isNotEmpty) {
+      return asyncInstantiators.resolveAll().then((l) {
+        for (var e in l) {
+          return e as SQLAdapter<C>;
+        }
+
+        throw StateError(
+            "Can't async instantiate an `SQLAdapter` for `config`: $config");
+      });
     }
 
-    return adapter as SQLAdapter<C>;
+    throw StateError("Can't instantiate an `SQLAdapter` for `config`: $config");
   }
 
   @override
-  void initialize();
+  FutureOr<bool> initialize();
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
@@ -1679,9 +1697,7 @@ class SQLRepositoryAdapter<O> with Initializable {
         type = type ?? O;
 
   @override
-  void initialize() {
-    databaseAdapter.ensureInitialized();
-  }
+  FutureOr<bool> initialize() => databaseAdapter.ensureInitialized();
 
   String get dialect => databaseAdapter.dialect;
 

@@ -1,3 +1,18 @@
+## 1.1.21
+
+- `Initializable`:
+  - Now allows async initializations.
+- `MethodReflectionExtension`:
+  - `isAPIMethod` now accepts `FutureOr<APIResponse>`.
+- `EntityRepository`:
+  - Added `selectAll`.
+- reflection_factory: ^1.1.2
+- crypto: ^3.0.2
+- shelf: ^1.3.0
+- hotreloader: ^3.0.4
+- args: ^2.3.1
+- yaml: ^3.1.1
+
 ## 1.1.20
 
 - `APIServer`:

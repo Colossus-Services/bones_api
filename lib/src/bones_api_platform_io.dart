@@ -1,4 +1,5 @@
 import 'dart:io' as io;
+import 'dart:typed_data';
 
 import 'package:logging/logging.dart' as logging;
 
@@ -27,7 +28,8 @@ class APIPlatformVM extends APIPlatform {
   }
 
   @override
-  APIPlatformCapability get capability => APIPlatformCapability.bits64();
+  APIPlatformCapability get capability =>
+      APIPlatformCapability.bits64(canReadFile: true);
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) =>
@@ -56,6 +58,24 @@ class APIPlatformVM extends APIPlatform {
 
   @override
   void stderrLn(Object? o) => io.stderr.writeln(o);
+
+  @override
+  String? resolveFilePath(String filePath) {
+    var file = io.File(filePath).absolute;
+    return file.path;
+  }
+
+  @override
+  String? readFileAsString(String filePath) {
+    var file = io.File(filePath);
+    return file.readAsStringSync();
+  }
+
+  @override
+  Uint8List? readFileAsBytes(String filePath) {
+    var file = io.File(filePath);
+    return file.readAsBytesSync();
+  }
 }
 
 APIPlatform createAPIPlatform() {

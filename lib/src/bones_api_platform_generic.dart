@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'bones_api_platform.dart';
 
 class APIPlatformGeneric extends APIPlatform {
@@ -5,7 +7,8 @@ class APIPlatformGeneric extends APIPlatform {
   APIPlatformType get type => APIPlatformType.generic;
 
   @override
-  APIPlatformCapability get capability => APIPlatformCapability.bits32();
+  APIPlatformCapability get capability =>
+      APIPlatformCapability.bits32(canReadFile: false);
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) {
@@ -51,6 +54,15 @@ class APIPlatformGeneric extends APIPlatform {
 
   @override
   void stderrLn(Object? o) => stdout(o);
+
+  @override
+  String? resolveFilePath(String filePath) => null;
+
+  @override
+  String? readFileAsString(String filePath) => null;
+
+  @override
+  Uint8List? readFileAsBytes(String filePath) => null;
 }
 
 APIPlatform createAPIPlatform() {

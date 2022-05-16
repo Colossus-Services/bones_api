@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/src/bones_api_mixin.dart';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -20,7 +21,7 @@ import 'bones_api_types.dart';
 final _log = logging.Logger('APIModule');
 
 /// A module of an API.
-abstract class APIModule {
+abstract class APIModule with Initializable {
   /// The API root, that is loading this module.
   final APIRoot apiRoot;
 
@@ -53,6 +54,12 @@ abstract class APIModule {
     if (_configured) return;
     _configured = true;
     configure();
+  }
+
+  @override
+  FutureOr<bool> initialize() {
+    ensureConfigured();
+    return true;
   }
 
   final Map<String, APIRouteHandler> _routesHandlers =

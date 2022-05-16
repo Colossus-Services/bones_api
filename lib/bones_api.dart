@@ -96,6 +96,8 @@ export 'src/bones_api_entity_adapter.dart';
 export 'src/bones_api_entity_adapter_memory.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_extension.dart';
+export 'src/bones_api_mixin.dart'
+    show Initializable, ExecuteInitializedCallback;
 export 'src/bones_api_module.dart';
 export 'src/bones_api_repository.dart';
 export 'src/bones_api_security.dart';

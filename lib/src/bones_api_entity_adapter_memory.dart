@@ -2,8 +2,11 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
+import 'package:async_extension/async_extension.dart';
 
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_mixin.dart';
+import 'bones_api_platform.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_utils.dart';
@@ -20,20 +23,23 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     if (_boot) return;
     _boot = true;
 
-    SQLAdapter.registerAdapter(['memory', 'mem'], MemorySQLAdapter, (config,
-        {int? minConnections,
-        int? maxConnections,
-        EntityRepositoryProvider? parentRepositoryProvider}) {
-      try {
-        return MemorySQLAdapter.fromConfig(config,
-            minConnections: minConnections,
-            maxConnections: maxConnections,
-            parentRepositoryProvider: parentRepositoryProvider);
-      } catch (e, s) {
-        _log.severe("Error instantiating from config", e, s);
-        return null;
-      }
-    });
+    SQLAdapter.registerAdapter(
+        ['memory', 'mem'], MemorySQLAdapter, _instantiate);
+  }
+
+  static FutureOr<MemorySQLAdapter?> _instantiate(config,
+      {int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    try {
+      return MemorySQLAdapter.fromConfig(config,
+          minConnections: minConnections,
+          maxConnections: maxConnections,
+          parentRepositoryProvider: parentRepositoryProvider);
+    } catch (e, s) {
+      _log.severe("Error instantiating from config", e, s);
+      return null;
+    }
   }
 
   static int _idCount = 0;
@@ -56,7 +62,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory MemorySQLAdapter.fromConfig(Map<String, dynamic>? config,
+  static FutureOr<MemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider}) {
@@ -65,11 +71,96 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
 
-    return MemorySQLAdapter(
+    var adapter = MemorySQLAdapter(
       minConnections: minConnections,
       maxConnections: maxConnections,
       parentRepositoryProvider: parentRepositoryProvider,
     );
+
+    var populate = config?['populate'];
+
+    if (populate != null) {
+      adapter._populateSource = populate['source'];
+    }
+
+    return adapter;
+  }
+
+  @override
+  List<Initializable> initializeDependencies() {
+    var parentRepositoryProvider = this.parentRepositoryProvider;
+    return <Initializable>[
+      if (parentRepositoryProvider != null) parentRepositoryProvider
+    ];
+  }
+
+  @override
+  FutureOr<bool> initialize() => _populateImpl();
+
+  Object? _populateSource;
+
+  FutureOr<bool> _populateImpl() {
+    var populateSource = _populateSource;
+    if (populateSource != null) {
+      _populateSource = null;
+      return populateFromSource(populateSource).resolveWithValue(true);
+    } else {
+      return true;
+    }
+  }
+
+  static const _logSectionOpen =
+      '\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+  static const _logSectionClose =
+      '\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>';
+
+  FutureOr<MemorySQLAdapter> populateFromSource(Object? source) {
+    if (source == null) {
+      return this;
+    } else if (source is Map<String, Iterable<Map<String, dynamic>>>) {
+      _log.info(
+          'Populating adapter ($this) [Map entries: ${source.length}]...$_logSectionOpen');
+
+      return storeAllFromJson(source).resolveMapped((_) {
+        _log.info('Populate finished. $_logSectionClose');
+        return this;
+      });
+    } else if (source is String) {
+      if (RegExp(r'^\S+\.json$').hasMatch(source)) {
+        var apiPlatform = APIPlatform.get();
+
+        _log.info(
+            'Reading $this populate source file: ${apiPlatform.resolveFilePath(source)}');
+
+        var fileData = apiPlatform.readFileAsString(source);
+
+        if (fileData != null) {
+          return fileData.resolveMapped((data) {
+            if (data != null) {
+              _log.info(
+                  'Populating $this [encoded JSON length: ${data.length}]...$_logSectionOpen');
+
+              return storeAllFromJsonEncoded(data).resolveMapped((_) {
+                _log.info('Populate finished. $_logSectionClose');
+                return this;
+              });
+            } else {
+              return this;
+            }
+          });
+        }
+      } else {
+        _log.info(
+            'Populating $this [encoded JSON length: ${source.length}]...$_logSectionOpen');
+
+        return storeAllFromJsonEncoded(source).resolveMapped((_) {
+          _log.info('Populate finished. $_logSectionClose');
+          return this;
+        });
+      }
+    }
+
+    return this;
   }
 
   @override
@@ -618,6 +709,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   String toString() {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
-    return 'MemorySQLAdapter{id: $id, tables: $tablesSizes}';
+    var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
+    return 'MemorySQLAdapter{id: $id$tablesStr}';
   }
 }

@@ -532,9 +532,23 @@ abstract class ConditionEncoder {
         transaction: transaction,
         tableName: tableName);
 
-    var rootIsGroup = condition is GroupCondition;
+    if (condition is ConditionANY) {
+      return context;
+    }
 
-    if (!rootIsGroup) {
+    bool rootIsGroup;
+
+    if (condition is GroupCondition) {
+      rootIsGroup = true;
+
+      if (condition.conditions.isEmpty) {
+        return context;
+      } else if (condition.conditions.length == 1 &&
+          condition.conditions.first is ConditionANY) {
+        return context;
+      }
+    } else {
+      rootIsGroup = false;
       context.write(groupOpener);
     }
 
@@ -559,6 +573,8 @@ abstract class ConditionEncoder {
       return encodeIDCondition(c, context);
     } else if (c is ConditionIdIN) {
       return encodeIDConditionIN(c, context);
+    } else if (c is ConditionANY) {
+      return context;
     } else {
       throw ConditionEncodingError("$c");
     }

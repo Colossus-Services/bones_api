@@ -361,7 +361,18 @@ class APIServer {
 
     _log.info('Started HTTP server: $address:$port');
 
-    return true;
+    _log.info('Initializing ${apiRoot.name}...');
+
+    return apiRoot.ensureInitialized().then((ok) {
+      var modules = apiRoot.modules;
+      _log.info('Loaded modules: ${modules.map((e) => e.name).toList()}');
+
+      if (!ok) {
+        _log.severe('Error loading APIRoot: ${apiRoot.name}');
+      }
+
+      return ok;
+    });
   }
 
   Future<void> _startNormal() async {

@@ -3,20 +3,143 @@ import 'dart:collection';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
+typedef ExecuteInitializedCallback<R> = FutureOr<R> Function();
+
 mixin Initializable {
-  bool _initialized = false;
+  /// Ensures that this instance is initialized.
+  FutureOr<bool> ensureInitialized() => _doInitializationImpl();
 
-  void ensureInitialized() {
-    if (_initialized) {
-      return;
-    }
-
-    _initialized = true;
-
-    initialize();
+  /// Ensures that this instance is initialized. If is not
+  /// initialized yet it will force an asynchronous initialization
+  /// and return a [Future].
+  FutureOr<bool> ensureInitializedAsync() {
+    if (_initialized) return true;
+    return Future<bool>.microtask(_doInitializationImpl);
   }
 
-  void initialize() {}
+  /// Initialize this instance if is not initialized yet.
+  FutureOr<bool> doInitialization() => _doInitializationImpl();
+
+  FutureOr<bool> _initializeIfNotInitializing() {
+    if (_initializing) return true;
+    return _doInitializationImpl();
+  }
+
+  bool _initializing = false;
+  bool _initialized = false;
+
+  /// Returns `true` if this instance is already initialized.
+  bool get isInitialized => _initialized;
+
+  Future<bool>? _initializeAsync;
+
+  FutureOr<bool> _doInitializationImpl() {
+    if (_initialized) return true;
+
+    var initializeAsync = _initializeAsync;
+    if (initializeAsync != null) {
+      return initializeAsync;
+    }
+
+    // Avoid recursive call to this initialization:
+    if (_initializing) return true;
+    _initializing = true;
+
+    var retDep = initializeDependencies();
+
+    var dependencies = retDep.resolveMapped(
+        (l) => l.map((e) => e._initializeIfNotInitializing()).resolveAll());
+
+    if (dependencies is Future<List<bool>>) {
+      return _initializeAsync = dependencies.then((okDeps) {
+        if (okDeps.any((ok) => !ok)) {
+          throw StateError("Error initializing dependencies (async): $this");
+        }
+
+        return _callInitialize();
+      });
+    } else {
+      if (dependencies.any((ok) => !ok)) {
+        throw StateError("Error initializing dependencies: $this");
+      }
+
+      return _callInitialize();
+    }
+  }
+
+  FutureOr<bool> _callInitialize() {
+    var ret = initialize();
+
+    if (ret is Future<bool>) {
+      return _initializeAsync = ret.then((ok) {
+        _initialized = true;
+        _initializing = false;
+        _initializeAsync = null;
+        if (!ok) {
+          throw StateError("Error initializing (async): $this");
+        }
+        return true;
+      });
+    } else {
+      _initialized = true;
+      _initializing = false;
+      _initializeAsync = null;
+      if (!ret) {
+        throw StateError("Error initializing: $this");
+      }
+      return true;
+    }
+  }
+
+  /// Return a [List] of [Initializable] instances that need to be initialized
+  /// before initialize this instance.
+  FutureOr<List<Initializable>> initializeDependencies() => <Initializable>[];
+
+  /// Initialization implementation. Do not call it directly, use [doInitialization].
+  ///
+  /// It can be a synchronous (returning a [bool]) or an asynchronous
+  /// implementation (returning a [Future]<[bool]>).
+  FutureOr<bool> initialize() => true;
+
+  /// Checks if this instance is initialized.
+  ///
+  /// Throws a [StateError] if is not initialized and
+  /// can't initialize it synchronously.
+  void checkInitialized() {
+    if (!isInitialized) {
+      if (_initializing) return;
+
+      var ret = _doInitializationImpl();
+      if (ret is Future<bool>) {
+        throw StateError(
+            "Not initialized yet! Async initialization for: $this");
+      }
+    }
+  }
+
+  /// Executes the [callback] ensuring that this instances was fully initialized.
+  FutureOr<R> executeInitialized<R>(ExecuteInitializedCallback<R> callback) {
+    if (isInitialized) {
+      return callback();
+    }
+
+    var ret = ensureInitialized();
+
+    if (ret is Future<bool>) {
+      return ret.then((ok) {
+        if (!ok) {
+          throw StateError("Error initializing (async): $this");
+        }
+        return callback();
+      });
+    } else {
+      if (!ret) {
+        throw StateError("Error initializing: $this");
+      }
+
+      return callback();
+    }
+  }
 }
 
 mixin Closable {
@@ -488,7 +611,7 @@ mixin FieldsFromMap {
 
   String fieldToSimpleKey(String key) => defaultFieldToSimpleKey(key);
 
-  static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z0-9]');
+  static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z\d]');
 
   static String defaultFieldToSimpleKey(String key) =>
       key.toLowerCase().replaceAll(_regexpLettersAndDigits, '');

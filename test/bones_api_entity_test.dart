@@ -201,8 +201,14 @@ void main() {
           Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101), [],
           creationTime: user3Time);
 
+      expect(await userRepository.selectAll(), isEmpty);
+
       userRepository.store(user1);
+      expect((await userRepository.selectAll()).length, equals(1));
+
       userRepository.store(user2);
+      expect((await userRepository.selectAll()).length, equals(2));
+
       userRepository.store(user3);
 
       var user1Json = user1.toJsonEncoded();

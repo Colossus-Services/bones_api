@@ -503,6 +503,42 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   String encode() => '( ${conditions.join(' || ')} )';
 }
 
+class ConditionANY<O> extends Condition<O> {
+  ConditionANY() : super._();
+
+  @override
+  ConditionANY<T> cast<T>() =>
+      this is ConditionANY<T> ? this as ConditionANY<T> : ConditionANY<T>()
+        .._markResolved(resolved);
+
+  @override
+  void resolve(
+      {Condition? parent, required List<ConditionParameter> parameters}) {
+    _markResolved();
+  }
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    return true;
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    return true;
+  }
+
+  @override
+  String encode() => 'true';
+}
+
 class ConditionID<O> extends Condition<O> {
   dynamic idValue;
 

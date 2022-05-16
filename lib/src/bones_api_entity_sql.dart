@@ -22,9 +22,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
         super(adapter, name, entityHandler, type: type);
 
   @override
-  void initialize() {
-    sqlRepositoryAdapter.ensureInitialized();
-  }
+  FutureOr<bool> initialize() => provider
+      .executeInitialized(() => sqlRepositoryAdapter.ensureInitialized());
 
   String get dialect => sqlRepositoryAdapter.dialect;
 
@@ -156,6 +155,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       rethrow;
     }
   }
+
+  @override
+  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit}) =>
+      select(ConditionANY(), limit: limit);
 
   FutureOr<List<O>> _resolveEntities(
       Transaction transaction, Iterable<Map<String, dynamic>> results) {
@@ -398,7 +401,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
           return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
             trackEntity(o);
-            return id;
+            return id; // pre-finish
           });
         });
       });
@@ -439,7 +442,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           allowAutoInsert: allowAutoInsert, preFinish: (id) {
         return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
           trackEntity(o);
-          return id;
+          return id; // pre-finish
         });
       });
     });
@@ -714,12 +717,13 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  Iterable<dynamic> storeAll(Iterable<O> os, {Transaction? transaction}) {
+  FutureOr<Iterable<dynamic>> storeAll(Iterable<O> os,
+      {Transaction? transaction}) {
     checkNotClosed();
 
     transaction ??= Transaction.executingOrNew();
 
-    var result = os.map((o) => store(o, transaction: transaction)).toList();
+    var result = os.map((o) => store(o, transaction: transaction)).resolveAll();
 
     return result;
   }
@@ -739,7 +743,11 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters, preFinish: (results) {
-        return _resolveEntities(op.transaction, results);
+        return _resolveEntities(op.transaction, results)
+            .resolveMapped((entities) {
+          untrackEntities(entities, deleted: true);
+          return entities;
+        });
       });
     } catch (e, s) {
       var message = 'delete> '

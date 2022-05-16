@@ -4,6 +4,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_module.dart';
+import 'bones_api_mixin.dart';
 
 /// [ReflectionFactory] extension.
 extension ReflectionFactoryExtension on ReflectionFactory {
@@ -74,7 +75,8 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
 extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
   /// Returns `true` if this reflected method is an API method ([returnsAPIResponse] OR [receivesAPIRequest]).
   bool get isAPIMethod =>
-      declaringType != APIModule && (returnsAPIResponse || receivesAPIRequest);
+      (declaringType != APIModule && declaringType != Initializable) &&
+      (returnsAPIResponse || receivesAPIRequest);
 
   /// Returns `true` if this reflected method is [returnsAPIResponse] AND [receivesAPIRequest].
   bool get isFullAPIMethod => returnsAPIResponse && receivesAPIRequest;
@@ -92,7 +94,7 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
 
     if (typeInfo.isOf(APIResponse) || typeInfo.isDynamic) return true;
 
-    if (typeInfo.isFuture) {
+    if (typeInfo.isFuture || typeInfo.isFutureOr) {
       var arg = typeInfo.argumentType(0);
       if (arg == null) return false;
 
