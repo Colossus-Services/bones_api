@@ -53,7 +53,11 @@ class UserAPIRepository extends APIRepository<User> {
   }
 
   FutureOr<Iterable<User>> selectByRole(Role role) {
-    return selectByQuery(' roles == ? ', parameters: [role]);
+    return selectByQuery(' roles =~ ? ', parameters: [role]);
+  }
+
+  FutureOr<Iterable<User>> selectByRoleId(int roleId) {
+    return selectByQuery(' roles =~ ? ', parameters: [roleId]);
   }
 }
 

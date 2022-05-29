@@ -642,6 +642,44 @@ abstract class EntityHandler<O> with FieldsFromMap {
     equals = equalsValuesCollection(value1, value2);
     if (equals != null) return equals;
 
+    equals = equalsValuesEntity(value1, value2);
+    if (equals != null) return equals;
+
+    return false;
+  }
+
+  static bool? equalsValuesEntity(Object value1, Object value2) {
+    var reflectionFactory = ReflectionFactory();
+
+    EntityHandler? entityHandler1 = value1.isPrimitiveValue
+        ? null
+        : reflectionFactory
+                .getRegisterClassReflection(value1.runtimeType)
+                ?.entityHandler ??
+            EntityHandlerProvider.globalProvider.getEntityHandler(obj: value1);
+
+    EntityHandler? entityHandler2 = value2.isPrimitiveValue
+        ? null
+        : reflectionFactory
+                .getRegisterClassReflection(value2.runtimeType)
+                ?.entityHandler ??
+            EntityHandlerProvider.globalProvider.getEntityHandler(obj: value2);
+
+    if (entityHandler1 != null) {
+      var id1 = entityHandler1.getID(value1);
+
+      if (entityHandler2 != null) {
+        if (entityHandler1 != entityHandler2) return false;
+        var id2 = entityHandler2.getID(value2);
+        return id1 == id2;
+      } else {
+        return id1 == value2;
+      }
+    } else if (entityHandler2 != null) {
+      var id2 = entityHandler2.getID(value2);
+      return value1 == id2;
+    }
+
     return false;
   }
 

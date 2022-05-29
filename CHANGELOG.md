@@ -1,3 +1,8 @@
+## 1.1.22
+
+- `MemorySQLAdapter`:
+  - Fixed when comparing entities and IDs. 
+
 ## 1.1.21
 
 - `Initializable`:

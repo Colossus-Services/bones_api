@@ -344,6 +344,13 @@ void runAdapterTests(
 
         user2 = await userAPIRepository.selectByID(id);
         expect(user2!.wakeUpTime, equals(user2WakeupTime));
+
+        var user2Role = user2.roles.first;
+
+        expect((await userAPIRepository.selectByRole(user2Role)).first,
+            equals(user2));
+        expect((await userAPIRepository.selectByRoleId(user2Role.id!)).first,
+            equals(user2));
       }
 
       var user3CreationTime = DateTime.utc(2021, 9, 22);
