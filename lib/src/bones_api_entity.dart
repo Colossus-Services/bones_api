@@ -642,7 +642,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
     equals = equalsValuesCollection(value1, value2);
     if (equals != null) return equals;
 
-    equals = equalsValuesEntity(value1, value2);
+     equals = equalsValuesEntity(value1, value2);
     if (equals != null) return equals;
 
     return false;

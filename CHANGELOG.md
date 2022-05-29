@@ -1,3 +1,7 @@
+## 1.1.23
+
+- Small path for the last version.
+
 ## 1.1.22
 
 - `MemorySQLAdapter`:
