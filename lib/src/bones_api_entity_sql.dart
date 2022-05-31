@@ -34,6 +34,15 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       {'queryType': 'SQL', 'dialect': dialect};
 
   @override
+  FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
+    var cachedEntityByID = transaction?.getCachedEntityByID(id, type: type);
+    if (cachedEntityByID != null) return false;
+
+    return count(matcher: ConditionID(id), transaction: transaction)
+        .resolveMapped((count) => count > 0);
+  }
+
+  @override
   FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
     checkNotClosed();
 
@@ -42,8 +51,19 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     if (id == null || entityHasChangedFields(o)) {
       return store(o, transaction: transaction);
     } else {
-      return ensureReferencesStored(o, transaction: transaction)
-          .resolveWithValue(id);
+      if (isTrackingEntity(o)) {
+        return ensureReferencesStored(o, transaction: transaction)
+            .resolveWithValue(id);
+      }
+
+      return existsID(id, transaction: transaction).resolveMapped((exists) {
+        if (!exists) {
+          return store(o, transaction: transaction);
+        } else {
+          return ensureReferencesStored(o, transaction: transaction)
+              .resolveWithValue(id);
+        }
+      });
     }
   }
 
@@ -101,8 +121,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
-      Transaction? transaction,
-      TransactionOperation? op}) {
+      Transaction? transaction}) {
     checkNotClosed();
 
     var op = TransactionOperationCount(name, null, transaction);

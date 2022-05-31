@@ -27,7 +27,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.23';
+  static const String VERSION = '1.1.24';
 
   static bool _boot = false;
 

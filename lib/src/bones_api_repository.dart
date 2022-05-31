@@ -59,6 +59,8 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   EventStream<O> get onDelete => entityRepository.onDelete;
 
+  FutureOr<bool> existsID(dynamic id) => entityRepository.existsID(id);
+
   FutureOr<O?> selectByID(dynamic id) => entityRepository.selectByID(id);
 
   FutureOr<Iterable<O>> selectAll({int? limit}) =>

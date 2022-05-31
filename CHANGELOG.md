@@ -1,3 +1,14 @@
+## 1.1.24
+
+- Improve populate of entities using ID as reference to sub entities fields.
+- `EntitySource`:
+  - Added `existsID`. 
+- `SQLAdapter`:
+  - Fixed storage (and update fallback) of entities with pre-defined IDs. 
+- `MemorySQLAdapter`:
+  - Fixed `count` with a condition.s 
+- petitparser: ^4.4.0
+
 ## 1.1.23
 
 - Small path for the last version.

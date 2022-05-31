@@ -34,6 +34,14 @@ class UserAPIRepository extends APIRepository<User> {
     return selectByQuery(' email == ? ', parameters: {'email': email});
   }
 
+  FutureOr<Iterable<User>> selectByAddress(Address address) {
+    return selectByQuery(' address == ? ', parameters: [address]);
+  }
+
+  FutureOr<Iterable<User>> selectByAddressID(int addressId) {
+    return selectByQuery(' address == ? ', parameters: [addressId]);
+  }
+
   FutureOr<Iterable<User>> selectByAddressState(String state) {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }

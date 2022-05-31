@@ -1,4 +1,6 @@
+import 'package:bones_api/src/bones_api_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
@@ -136,7 +138,8 @@ class ConditionParameter extends ConditionElement {
   bool matches(Object? value,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
     var myValue = getValue(
         parameters: parameters,
         positionalParameters: positionalParameters,
@@ -152,22 +155,26 @@ class ConditionParameter extends ConditionElement {
     if (myValue is Iterable) {
       if (otherValue is Iterable) {
         var equals = isEqualsIterableDeep(myValue, otherValue,
-            valueEquality: EntityHandler.equalsValuesBasic);
+            valueEquality: (a, b) => EntityHandler.equalsValuesBasic(a, b,
+                entityHandler: entityHandler));
         return equals;
       } else {
         var contains = myValue
-            .where((v) => EntityHandler.equalsValuesBasic(v, otherValue))
+            .where((v) => EntityHandler.equalsValuesBasic(v, otherValue,
+                entityHandler: entityHandler))
             .isNotEmpty;
         return contains;
       }
     } else if (otherValue is Iterable) {
       var contains = otherValue
-          .where((v) => EntityHandler.equalsValuesBasic(v, myValue))
+          .where((v) => EntityHandler.equalsValuesBasic(v, myValue,
+              entityHandler: entityHandler))
           .isNotEmpty;
       return contains;
     }
 
-    return EntityHandler.equalsValuesBasic(myValue, otherValue);
+    return EntityHandler.equalsValuesBasic(myValue, otherValue,
+        entityHandler: entityHandler);
   }
 
   bool matchesIn(List values,
@@ -306,17 +313,21 @@ abstract class Condition<O> extends ConditionElement
   bool equalsConditionValue(Object? value1, Object? value2,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      TypeInfo? keyType,
+      EntityHandler? keyEntityHandler}) {
     if (value1 is ConditionParameter) {
       return value1.matches(value2,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
     } else if (value2 is ConditionParameter) {
       return value2.matches(value1,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
     } else {
       return value1 == value2;
     }
@@ -600,7 +611,8 @@ class ConditionID<O> extends Condition<O> {
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
     } else {
-      return EntityHandler.equalsValuesBasic(id, idValue);
+      return EntityHandler.equalsValuesBasic(id, idValue,
+          entityHandler: entityHandler);
     }
   }
 
@@ -830,26 +842,33 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     return obj;
   }
 
-  Object? getEntityMapKeyValue(Map<String, dynamic>? o,
+  KeyConditionValue? getEntityMapKeyValue(Map<String, dynamic>? entityMap,
       [EntityHandler<O>? entityHandler]) {
-    if (o == null || o.isEmpty) return null;
+    if (entityMap == null || entityMap.isEmpty) return null;
 
-    dynamic obj = o;
+    dynamic value = entityMap;
+    TypeInfo? valueType =
+        TypeInfo.from(entityHandler?.type ?? entityMap.runtimeType);
+    EntityHandler? valueEntityHandler = entityHandler;
 
     for (var key in keys) {
-      Object? value;
+      Object? keyValue;
+      TypeInfo? keyType;
+      EntityHandler? keyEntityHandler;
 
       if (key is ConditionKeyField) {
-        if (obj is Map) {
-          value = obj[key.name];
-        } else if (obj is Iterable) {
-          return obj.map((e) {
+        var keyName = key.name;
+
+        if (value is Map) {
+          keyValue = value[keyName];
+        } else if (value is Iterable) {
+          keyValue = value.map((e) {
             if (e is Map) {
-              return e[key.name];
+              return e[keyName];
             } else {
               var handler = entityHandler?.getEntityHandler(obj: e);
               if (handler != null) {
-                var v = handler.getField(e, key.name);
+                var v = handler.getField(e, keyName);
                 return v;
               } else {
                 return e;
@@ -858,28 +877,88 @@ abstract class KeyCondition<O, V> extends Condition<O> {
           }).toList();
         } else {
           throw StateError(
-              "Can't access key[${key.name}] for type: ${obj.runtimeType}");
+              "Can't access key[$keyName] for type: ${value.runtimeType}");
         }
+
+        keyType =
+            _resolveValueType(keyName, valueType, valueEntityHandler, keyValue);
+        keyEntityHandler =
+            _resolveValueEntityHandler(keyType, valueEntityHandler);
       } else if (key is ConditionKeyIndex) {
         var index = key.index;
 
-        if (obj is Iterable) {
-          value = obj.elementAt(index);
+        if (value is Iterable) {
+          keyValue = value.elementAt(index);
+          keyType =
+              _resolveValueType(null, valueType, valueEntityHandler, keyValue);
+          keyEntityHandler =
+              _resolveValueEntityHandler(keyType, valueEntityHandler);
         } else {
           throw StateError(
-              "Can't access index[$index] for type: ${obj.runtimeType}");
+              "Can't access index[$index] for type: ${value.runtimeType}");
         }
       }
 
-      if (value == null) {
+      if (keyValue == null) {
         return null;
       } else {
-        obj = value;
+        value = keyValue;
+        valueType = keyType;
+        valueEntityHandler = keyEntityHandler;
       }
     }
 
-    return obj;
+    return KeyConditionValue(value, valueType, valueEntityHandler);
   }
+
+  EntityHandler? _resolveValueEntityHandler(
+      TypeInfo? objType, EntityHandler? objEntityHandler) {
+    if (objType == null) return null;
+
+    if (objEntityHandler != null) {
+      return objEntityHandler.getEntityHandler(type: objType.type);
+    }
+
+    var classReflection =
+        ReflectionFactory().getRegisterClassReflection(objType.type);
+
+    return classReflection?.entityHandler ??
+        EntityHandlerProvider.globalProvider
+            .getEntityHandler(type: objType.type);
+  }
+
+  TypeInfo? _resolveValueType(String? keyName, TypeInfo? objType,
+      EntityHandler? objEntityHandler, Object? value) {
+    if (keyName != null) {
+      var type = objEntityHandler?.getFieldType(null, keyName);
+      if (type != null) return type;
+    }
+
+    if (value == null) {
+      return null;
+    } else if (value is List) {
+      if (value.isNotEmpty) {
+        return _resolveValueType(
+            keyName, objType, objEntityHandler, value.first);
+      } else {
+        return TypeInfo.from(value);
+      }
+    } else if (value is Map) {
+      return objType ?? TypeInfo.from(value);
+    }
+
+    var t = objEntityHandler?.getEntityHandler(obj: value)?.type;
+    return t != null ? TypeInfo.fromType(t) : null;
+  }
+}
+
+class KeyConditionValue {
+  final Object value;
+
+  final TypeInfo? type;
+  final EntityHandler? entityHandler;
+
+  KeyConditionValue(this.value, this.type, this.entityHandler);
 }
 
 class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
@@ -913,10 +992,12 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return equalsConditionValue(value, keyValue,
+    return equalsConditionValue(value, keyValue?.value,
         parameters: parameters,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -957,10 +1038,12 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(value, keyValue,
+    return !equalsConditionValue(value, keyValue?.value,
         parameters: parameters,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1015,7 +1098,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    var inValues = inConditionValues(keyValue, value,
+    var inValues = inConditionValues(keyValue?.value, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);

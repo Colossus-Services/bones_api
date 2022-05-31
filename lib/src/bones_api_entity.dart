@@ -144,7 +144,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
   static bool isPrimitiveType<T>([Type? type]) =>
       TypeParser.isPrimitiveType<T>(type);
 
-  EntityHandler<T>? getEntityHandler<T>({T? obj, Type? type}) {
+  EntityHandler<T>? getEntityHandler<T>(
+      {T? obj, Type? type, EntityHandler? knownEntityHandler}) {
     if (T == O && isValidType<T>()) {
       return this as EntityHandler<T>;
     } else if (obj != null && obj.runtimeType == O && isValidType<O>()) {
@@ -152,8 +153,51 @@ abstract class EntityHandler<O> with FieldsFromMap {
     } else if (type != null && type == O && isValidType<O>()) {
       return this as EntityHandler<T>;
     } else {
-      return provider.getEntityHandler<T>(obj: obj, type: type);
+      return knownEntityHandler?.getEntityHandler<T>(obj: obj, type: type) ??
+          provider.getEntityHandler<T>(obj: obj, type: type);
     }
+  }
+
+  V? resolveID<V>(Object? value) {
+    if (value == null) return null;
+
+    if (value is O) {
+      return getID(value as O);
+    } else if (value is Map) {
+      return resolveIDFromMap(value);
+    } else {
+      var idType = this.idType();
+
+      if (value.runtimeType == idType) {
+        return value as V;
+      }
+
+      var idTypeInfo = TypeInfo.fromType(idType);
+      return idTypeInfo.parse(value) as V?;
+    }
+  }
+
+  V? resolveIDFromMap<V>(Map map) {
+    var idField = idFieldName();
+
+    var id = map[idField];
+    if (id != null) return id;
+
+    var idFieldSimple = FieldsFromMap.defaultFieldToSimpleKey(idField);
+
+    for (var k in map.keys) {
+      if (k == idFieldSimple) {
+        return map[k];
+      }
+
+      var kSimple = FieldsFromMap.defaultFieldToSimpleKey(k);
+
+      if (kSimple == idFieldSimple) {
+        return map[k];
+      }
+    }
+
+    return null;
   }
 
   V? getID<V>(O o) => getField(o, idFieldName(o));
@@ -162,6 +206,10 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
       Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
+
+  Type? _idType;
+
+  Type idType([O? o]) => _idType ??= getFieldType(o, idFieldName(o))!.type;
 
   String idFieldName([O? o]);
 
@@ -401,6 +449,15 @@ abstract class EntityHandler<O> with FieldsFromMap {
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider) {
     var valEntityHandler = _resolveEntityHandler(type);
+
+    if (entityRepositoryProvider == null) {
+      if (this is EntityRepositoryProvider) {
+        entityRepositoryProvider = this as EntityRepositoryProvider;
+      } else if (entityProvider is EntityRepositoryProvider) {
+        entityRepositoryProvider = entityProvider;
+      }
+    }
+
     var entityRepository = valEntityHandler?.getEntityRepository(
         type: type.type,
         entityRepositoryProvider: entityRepositoryProvider,
@@ -622,7 +679,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return false;
   }
 
-  static bool equalsValuesBasic(Object? value1, Object? value2) {
+  static bool equalsValuesBasic(Object? value1, Object? value2,
+      {EntityHandler? entityHandler}) {
     if (value1 == null) return value2 == null;
     if (value2 == null) return false;
     if (identical(value1, value2) || value1 == value2) return true;
@@ -639,16 +697,18 @@ abstract class EntityHandler<O> with FieldsFromMap {
     equals = equalsValuesEnum(value1, value2);
     if (equals != null) return equals;
 
-    equals = equalsValuesCollection(value1, value2);
+    equals =
+        equalsValuesCollection(value1, value2, entityHandler: entityHandler);
     if (equals != null) return equals;
 
-    equals = equalsValuesEntity(value1, value2);
+    equals = equalsValuesEntity(value1, value2, entityHandler: entityHandler);
     if (equals != null) return equals;
 
     return false;
   }
 
-  static bool? equalsValuesEntity(Object value1, Object value2) {
+  static bool? equalsValuesEntity(Object value1, Object value2,
+      {EntityHandler? entityHandler}) {
     var reflectionFactory = ReflectionFactory();
 
     EntityHandler? entityHandler1 = value1.isPrimitiveValue
@@ -673,11 +733,17 @@ abstract class EntityHandler<O> with FieldsFromMap {
         var id2 = entityHandler2.getID(value2);
         return id1 == id2;
       } else {
-        return id1 == value2;
+        var id2 = entityHandler1.resolveID(value2);
+        return id1 == id2;
       }
     } else if (entityHandler2 != null) {
+      var id1 = entityHandler2.resolveID(value1);
       var id2 = entityHandler2.getID(value2);
-      return value1 == id2;
+      return id1 == id2;
+    } else if (entityHandler != null) {
+      var id1 = entityHandler.resolveID(value1);
+      var id2 = entityHandler.resolveID(value2);
+      return id1 == id2;
     }
 
     return false;
@@ -734,12 +800,15 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return null;
   }
 
-  static bool? equalsValuesCollection(Object value1, Object value2) {
+  static bool? equalsValuesCollection(Object value1, Object value2,
+      {EntityHandler? entityHandler}) {
     var collection1 = TypeParser.isCollectionValue(value1);
     var collection2 = TypeParser.isCollectionValue(value2);
 
     if (collection1 && collection2) {
-      return isEqualsDeep(value1, value2, valueEquality: equalsValuesBasic);
+      return isEqualsDeep(value1, value2,
+          valueEquality: (a, b) =>
+              equalsValuesBasic(a, b, entityHandler: entityHandler));
     }
 
     return null;
@@ -1020,8 +1089,10 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
               reflection.siblingsClassReflection().map((c) => c.entityHandler));
 
   @override
-  EntityHandler<T>? getEntityHandler<T>({T? obj, Type? type}) {
-    var entityHandler = super.getEntityHandler(obj: obj, type: type);
+  EntityHandler<T>? getEntityHandler<T>(
+      {T? obj, Type? type, EntityHandler? knownEntityHandler}) {
+    var entityHandler = super.getEntityHandler(
+        obj: obj, type: type, knownEntityHandler: knownEntityHandler);
     if (entityHandler != null) {
       return entityHandler;
     }
@@ -1311,6 +1382,8 @@ abstract class EntityAccessor<O extends Object> {
 
 abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   EntitySource(String name) : super(name);
+
+  FutureOr<bool> existsID(dynamic id, {Transaction? transaction});
 
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
     return select(ConditionID(id)).resolveMapped((sel) {
@@ -1819,7 +1892,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     transaction ??= Transaction.autoCommit();
 
     var osAsync = entitiesJson
-        .map((e) => createFromMap(e, entityCache: transaction))
+        .map((e) => createFromMap(e,
+            entityCache: transaction, entityProvider: provider))
         .resolveAll();
 
     return osAsync.resolveMapped((os) {
@@ -1855,6 +1929,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           {EntityProvider? entityProvider, EntityCache? entityCache}) =>
       entityHandler.createFromMap(fields,
           entityProvider: entityProvider, entityCache: entityCache);
+
+  bool isTrackingEntity(O o) => _entitiesTracker.isTrackedInstance(o);
 
   O trackEntity(O o, {bool stored = false}) {
     var entity = _entitiesTracker.trackInstance(o);
@@ -2728,6 +2804,18 @@ abstract class IterableEntityRepository<O extends Object>
         namedParameters: namedParameters,
       );
     }).length;
+  }
+
+  @override
+  FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
+    checkNotClosed();
+
+    var o = iterable().firstWhereOrNull((o) {
+      var oId = getID(o, entityHandler: entityHandler);
+      return oId == id;
+    });
+
+    return o != null;
   }
 
   @override

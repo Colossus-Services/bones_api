@@ -14,6 +14,9 @@ final dbPass = 'mypass';
 final dbName = 'mydb';
 
 class MySQLTestContainer extends DBTestContainerDocker {
+  @override
+  String get name => 'mysql';
+
   late final MySQLContainerConfig containerConfig;
   late MySQLContainer container;
 

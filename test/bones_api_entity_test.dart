@@ -351,7 +351,7 @@ void main() {
       expect(
           await userSQLRepository
               .countByQuery(' email == ? ', parameters: ['smith@memory.com']),
-          equals(2));
+          equals(1));
 
       {
         var user = await userSQLRepository.selectByID(1);

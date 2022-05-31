@@ -219,7 +219,16 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   FutureOr<int> doCountSQL(
       String entityName, String table, SQL sql, int connection) {
     var map = _getTableMap(table, false);
-    return map == null ? 0 : map.length;
+    if (map == null) return 0;
+
+    var condition = sql.condition;
+
+    if (condition != null) {
+      var sel = _selectEntries(table, sql);
+      return sel.length;
+    } else {
+      return map.length;
+    }
   }
 
   @override
@@ -320,6 +329,13 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       String entityName, String table, SQL sql, int connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
+    var sel = _selectEntries(table, sql);
+    sel = _filterReturnColumns(sql, sel);
+
+    return sel;
+  }
+
+  List<Map<String, dynamic>> _selectEntries(String table, SQL sql) {
     var map = _getTableMap(table, false);
     if (map == null) {
       return <Map<String, dynamic>>[];
@@ -330,30 +346,27 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var entityHandler = getEntityHandler(tableName: table);
 
+    List<Map<String, dynamic>> sel;
+
     if (tableScheme == null ||
         (tableScheme.fieldsReferencedTablesLength == 0 &&
             tableScheme.tableRelationshipReferenceLength == 0)) {
-      var sel = map.values.where((e) {
+      sel = map.values.where((e) {
         return sql.condition!.matchesEntityMap(e,
             positionalParameters: sql.positionalParameters,
             namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
             entityHandler: entityHandler);
       }).toList();
+    } else {
+      sel = map.values.where((obj) {
+        obj = _resolveEntityMap(obj, entityHandler, tableScheme);
 
-      sel = _filterReturnColumns(sql, sel);
-      return sel;
+        return sql.condition!.matchesEntityMap(obj,
+            positionalParameters: sql.positionalParameters,
+            namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+            entityHandler: entityHandler);
+      }).toList();
     }
-
-    var sel = map.values.where((obj) {
-      obj = _resolveEntityMap(obj, entityHandler, tableScheme);
-
-      return sql.condition!.matchesEntityMap(obj,
-          positionalParameters: sql.positionalParameters,
-          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
-          entityHandler: entityHandler);
-    }).toList();
-
-    sel = _filterReturnColumns(sql, sel);
     return sel;
   }
 

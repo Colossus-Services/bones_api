@@ -455,6 +455,10 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   @override
   FutureOr<Object?> getEntityID(Object entity,
       {String? entityName, String? tableName, Type? entityType}) {
+    if (entity is num) {
+      return entity;
+    }
+
     entityType ??= entity.runtimeType;
 
     var entityHandler = getEntityHandler(
@@ -503,6 +507,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       return null;
     } else if (value is Time) {
       return value.toString();
+    } else if (value is DateTime) {
+      return value.toUtc();
     } else if (value is DynamicNumber) {
       return value.toStringStandard();
     } else if (value is Enum) {
@@ -604,8 +610,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
           sqlBuilder: (String from, EncodingContext context) {
-        var tableAlias = context.resolveEntityAlias(table);
-        return 'SELECT count($q$tableAlias$q.*) as ${q}count$q $from';
+        return 'SELECT count(*) as ${q}count$q $from';
       });
     }
   }

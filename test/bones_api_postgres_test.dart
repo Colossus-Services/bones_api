@@ -14,6 +14,9 @@ final dbPass = '123456';
 final dbName = 'postgres';
 
 class PostgresTestContainer extends DBTestContainerDocker {
+  @override
+  String get name => 'postgres';
+
   late final PostgreSQLContainerConfig containerConfig;
   late PostgreSQLContainer container;
 

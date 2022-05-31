@@ -17,6 +17,9 @@ class DBMemoryFakeTestContainer implements DBTestContainer<Object> {
       0);
 
   @override
+  String get name => 'memory';
+
+  @override
   Object? containerHandler;
 
   @override
