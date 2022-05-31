@@ -1,3 +1,8 @@
+## 1.1.25
+
+- `EntityRepositoryProvider`:
+  - `storeAllFromJson`: ensure that operations are executed sequentially. 
+
 ## 1.1.24
 
 - Improve populate of entities using ID as reference to sub entities fields.

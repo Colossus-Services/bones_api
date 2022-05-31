@@ -1711,8 +1711,8 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
 
   FutureOr<Map<String, List<Object>>> storeAllFromJson(
       Map<String, Iterable<Map<String, dynamic>>> entries,
-      {Transaction? transaction}) {
-    var results = <String, FutureOr<List<Object>>>{};
+      {Transaction? transaction}) async {
+    var results = <String, List<Object>>{};
 
     for (var e in entries.entries) {
       var typeName = e.key;
@@ -1723,11 +1723,11 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
             "Can't find `EntityRepository` for type name: $typeName");
       }
 
-      var os = entityRepository.storeAllFromJson(typeEntries);
+      var os = await entityRepository.storeAllFromJson(typeEntries);
       results[typeName] = os;
     }
 
-    return results.resolveAllValues();
+    return results;
   }
 }
 
