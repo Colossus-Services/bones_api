@@ -20,11 +20,6 @@ mixin Initializable {
   /// Initialize this instance if is not initialized yet.
   FutureOr<bool> doInitialization() => _doInitializationImpl();
 
-  FutureOr<bool> _initializeIfNotInitializing() {
-    if (_initializing) return true;
-    return _doInitializationImpl();
-  }
-
   bool _initializing = false;
   bool _initialized = false;
 
@@ -47,8 +42,8 @@ mixin Initializable {
 
     var retDep = initializeDependencies();
 
-    var dependencies = retDep.resolveMapped(
-        (l) => l.map((e) => e._initializeIfNotInitializing()).resolveAll());
+    var dependencies = retDep
+        .resolveMapped((l) => l.map((e) => e.doInitialization()).resolveAll());
 
     if (dependencies is Future<List<bool>>) {
       return _initializeAsync = dependencies.then((okDeps) {

@@ -1,3 +1,8 @@
+## 1.1.26
+
+- `Initializable`:
+  - Fix initialization of dependencies.
+
 ## 1.1.25
 
 - `EntityRepositoryProvider`:
