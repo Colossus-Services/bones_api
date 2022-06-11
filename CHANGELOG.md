@@ -1,7 +1,9 @@
 ## 1.1.26
 
 - `Initializable`:
-  - Fix initialization of dependencies.
+  - Initialization of circular dependencies:
+    - Automatically identify initialization of circular dependencies.
+    - "Fix" the asynchronous deadlock caused by wait of circular dependencies.
 
 ## 1.1.25
 
