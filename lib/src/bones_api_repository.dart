@@ -3,7 +3,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_mixin.dart';
+import 'bones_api_initializable.dart';
 
 /// A entity repository API.
 abstract class APIRepository<O extends Object> with Initializable {

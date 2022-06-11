@@ -1,27 +1,41 @@
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/src/bones_api_mixin.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show Decimal, DynamicInt, DynamicNumber;
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
-import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_initializable.dart';
 import 'bones_api_security.dart';
-import 'bones_api_utils.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('APIModule');
 
 /// A module of an API.
 abstract class APIModule with Initializable {
+  static const Set<String> interfaceMethodsNames = <String>{
+    'acceptsRequest',
+    'addRoute',
+    'apiInfo',
+    'call',
+    'configure',
+    'ensureConfigured',
+    'getRouteHandler',
+    'getRouteHandlerByRequest',
+    'getRoutesHandlersNames',
+    'resolveRoute',
+    ...Initializable.interfaceMethodsNames,
+  };
+
   /// The API root, that is loading this module.
   final APIRoot apiRoot;
 
@@ -506,20 +520,11 @@ class APIModuleProxy extends ClassProxy {
   }) : super(moduleClassName,
             libraryName: libraryName,
             libraryPath: libraryPath,
-            ignoreMethods: const <String>{
-              'configure',
-              'ensureConfigured',
-              'acceptsRequest',
-              'addRoute',
-              'getRouteHandler',
-              'getRouteHandlerByRequest',
-              'getRoutesHandlersNames',
-              'resolveRoute',
-              'call',
-              'apiInfo',
-            },
+            ignoreMethods: APIModule.interfaceMethodsNames,
             alwaysReturnFuture: true,
-            traverseReturnTypes: const {APIResponse},
+            traverseReturnTypes: const {
+              APIResponse
+            },
             ignoreParametersTypes: const {
               APIRequest,
               APICredential,

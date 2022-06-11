@@ -125,7 +125,14 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'authenticationRoute',
         'defaultRouteName',
         'hashCode',
+        'initializationStatus',
+        'initializedDependencies',
+        'initializedDependenciesDeeply',
+        'initializedDependenciesDeeplyLength',
+        'initializedDependenciesLength',
+        'isAsyncInitialization',
         'isInitialized',
+        'isInitializing',
         'name',
         'routes',
         'security',
@@ -280,6 +287,20 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           false,
           [override],
         );
+      case 'isinitializing':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitializing',
+          false,
+          (o) => () => o!.isInitializing as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       case 'isinitialized':
         return FieldReflection<UserModule, T>(
           this,
@@ -288,6 +309,90 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           'isInitialized',
           false,
           (o) => () => o!.isInitialized as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'isasyncinitialization':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isAsyncInitialization',
+          false,
+          (o) => () => o!.isAsyncInitialization as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependencies':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection(List, [Initializable]),
+          'initializedDependencies',
+          false,
+          (o) => () => o!.initializedDependencies as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependencieslength':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tInt,
+          'initializedDependenciesLength',
+          false,
+          (o) => () => o!.initializedDependenciesLength as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependenciesdeeply':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection(List, [Initializable]),
+          'initializedDependenciesDeeply',
+          false,
+          (o) => () => o!.initializedDependenciesDeeply as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependenciesdeeplylength':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tInt,
+          'initializedDependenciesDeeplyLength',
+          false,
+          (o) => () => o!.initializedDependenciesDeeplyLength as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializationstatus':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tString,
+          'initializationStatus',
+          false,
+          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,

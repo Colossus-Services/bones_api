@@ -11,6 +11,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter_memory.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 

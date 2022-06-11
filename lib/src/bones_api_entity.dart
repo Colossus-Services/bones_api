@@ -11,6 +11,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 

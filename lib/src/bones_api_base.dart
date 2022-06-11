@@ -10,7 +10,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_mixin.dart';
+import 'bones_api_initializable.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils.dart';

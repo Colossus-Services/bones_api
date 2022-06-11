@@ -125,7 +125,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'authenticationRoute',
         'defaultRouteName',
         'hashCode',
+        'initializationStatus',
+        'initializedDependencies',
+        'initializedDependenciesDeeply',
+        'initializedDependenciesDeeplyLength',
+        'initializedDependenciesLength',
+        'isAsyncInitialization',
         'isInitialized',
+        'isInitializing',
         'name',
         'routes',
         'security',
@@ -280,6 +287,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           false,
           [override],
         );
+      case 'isinitializing':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitializing',
+          false,
+          (o) => () => o!.isInitializing as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       case 'isinitialized':
         return FieldReflection<MyInfoModule, T>(
           this,
@@ -288,6 +309,90 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           'isInitialized',
           false,
           (o) => () => o!.isInitialized as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'isasyncinitialization':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isAsyncInitialization',
+          false,
+          (o) => () => o!.isAsyncInitialization as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependencies':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection(List, [Initializable]),
+          'initializedDependencies',
+          false,
+          (o) => () => o!.initializedDependencies as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependencieslength':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tInt,
+          'initializedDependenciesLength',
+          false,
+          (o) => () => o!.initializedDependenciesLength as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependenciesdeeply':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection(List, [Initializable]),
+          'initializedDependenciesDeeply',
+          false,
+          (o) => () => o!.initializedDependenciesDeeply as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializeddependenciesdeeplylength':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tInt,
+          'initializedDependenciesDeeplyLength',
+          false,
+          (o) => () => o!.initializedDependenciesDeeplyLength as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'initializationstatus':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tString,
+          'initializationStatus',
+          false,
+          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,
@@ -740,86 +845,6 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         : (ret is Future
             ? ret.then((v) => v as String)
             : Future<String>.value(ret as dynamic));
-  }
-
-  Future<bool> initialize() {
-    var ret = onCall(
-        this, 'initialize', <String, dynamic>{}, TypeReflection.tFutureBool);
-    return ret is Future<bool>
-        ? ret as Future<bool>
-        : (ret is Future
-            ? ret.then((v) => v as bool)
-            : Future<bool>.value(ret as dynamic));
-  }
-
-  Future<bool> ensureInitialized() {
-    var ret = onCall(this, 'ensureInitialized', <String, dynamic>{},
-        TypeReflection.tFutureBool);
-    return ret is Future<bool>
-        ? ret as Future<bool>
-        : (ret is Future
-            ? ret.then((v) => v as bool)
-            : Future<bool>.value(ret as dynamic));
-  }
-
-  Future<bool> ensureInitializedAsync() {
-    var ret = onCall(this, 'ensureInitializedAsync', <String, dynamic>{},
-        TypeReflection.tFutureBool);
-    return ret is Future<bool>
-        ? ret as Future<bool>
-        : (ret is Future
-            ? ret.then((v) => v as bool)
-            : Future<bool>.value(ret as dynamic));
-  }
-
-  Future<bool> doInitialization() {
-    var ret = onCall(this, 'doInitialization', <String, dynamic>{},
-        TypeReflection.tFutureBool);
-    return ret is Future<bool>
-        ? ret as Future<bool>
-        : (ret is Future
-            ? ret.then((v) => v as bool)
-            : Future<bool>.value(ret as dynamic));
-  }
-
-  Future<List<Initializable>> initializeDependencies() {
-    var ret = onCall(
-        this,
-        'initializeDependencies',
-        <String, dynamic>{},
-        TypeReflection(Future, [
-          TypeReflection(List, [Initializable])
-        ]));
-    return ret is Future<List<Initializable>>
-        ? ret as Future<List<Initializable>>
-        : (ret is Future
-            ? ret.then((v) => v as List<Initializable>)
-            : Future<List<Initializable>>.value(ret as dynamic));
-  }
-
-  Future<void> checkInitialized() {
-    var ret = onCall(this, 'checkInitialized', <String, dynamic>{},
-        TypeReflection(Future, [TypeReflection.tVoid]));
-    return ret is Future<void>
-        ? ret as Future<void>
-        : (ret is Future
-            ? ret.then((v) => v as dynamic)
-            : Future<void>.value(ret as dynamic));
-  }
-
-  Future<R> executeInitialized<R>(FutureOr<R> Function() callback) {
-    var ret = onCall(
-        this,
-        'executeInitialized',
-        <String, dynamic>{
-          'callback': callback,
-        },
-        TypeReflection.tFutureDynamic);
-    return ret is Future<R>
-        ? ret as Future<R>
-        : (ret is Future
-            ? ret.then((v) => v as dynamic)
-            : Future<R>.value(ret as dynamic));
   }
 }
 
