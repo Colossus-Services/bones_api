@@ -34,12 +34,6 @@ class InitializationStatus {
   void _setInitializing() {
     _initializing = true;
     _id = ++_idCount;
-
-    Future.delayed(Duration(seconds: 3), () {
-      if (!initialized) {
-        print('!!! INIT NOT FINISHED> $this');
-      }
-    });
   }
 
   /// Returns `true` if [initializable] is initializing.
