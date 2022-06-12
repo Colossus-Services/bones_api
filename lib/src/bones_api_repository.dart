@@ -36,7 +36,7 @@ abstract class APIRepository<O extends Object> with Initializable {
             provider: provider,
             type: type ?? O,
             required: true)! {
-    this.entityRepository.ensureInitialized();
+    this.entityRepository.ensureInitialized(parent: this);
   }
 
   void configure() {}
@@ -50,10 +50,11 @@ abstract class APIRepository<O extends Object> with Initializable {
   }
 
   @override
-  FutureOr<bool> initialize() => entityRepository.executeInitialized(() {
+  FutureOr<InitializationResult> initialize() =>
+      entityRepository.executeInitialized(() {
         ensureConfigured();
-        return true;
-      });
+        return InitializationResult.ok(this, dependencies: [entityRepository]);
+      }, parent: this);
 
   EventStream<O> get onStore => entityRepository.onStore;
 

@@ -126,10 +126,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         'defaultRouteName',
         'hashCode',
         'initializationStatus',
-        'initializedDependencies',
-        'initializedDependenciesDeeply',
-        'initializedDependenciesDeeplyLength',
-        'initializedDependenciesLength',
         'isAsyncInitialization',
         'isInitialized',
         'isInitializing',
@@ -287,14 +283,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           false,
           [override],
         );
-      case 'isinitializing':
+      case 'initializationstatus':
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection.tBool,
-          'isInitializing',
+          TypeReflection(InitializationStatus),
+          'initializationStatus',
           false,
-          (o) => () => o!.isInitializing as T,
+          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,
@@ -315,6 +311,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           false,
           null,
         );
+      case 'isinitializing':
+        return FieldReflection<MyInfoModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitializing',
+          false,
+          (o) => () => o!.isInitializing as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       case 'isasyncinitialization':
         return FieldReflection<MyInfoModule, T>(
           this,
@@ -323,76 +333,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           'isAsyncInitialization',
           false,
           (o) => () => o!.isAsyncInitialization as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependencies':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          TypeReflection(List, [Initializable]),
-          'initializedDependencies',
-          false,
-          (o) => () => o!.initializedDependencies as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependencieslength':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tInt,
-          'initializedDependenciesLength',
-          false,
-          (o) => () => o!.initializedDependenciesLength as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependenciesdeeply':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          TypeReflection(List, [Initializable]),
-          'initializedDependenciesDeeply',
-          false,
-          (o) => () => o!.initializedDependenciesDeeply as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependenciesdeeplylength':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tInt,
-          'initializedDependenciesDeeplyLength',
-          false,
-          (o) => () => o!.initializedDependenciesDeeplyLength as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializationstatus':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tString,
-          'initializationStatus',
-          false,
-          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,
@@ -516,7 +456,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'initialize',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.initialize,
             obj,
@@ -690,42 +630,51 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'ensureInitialized',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.ensureInitialized,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'ensureinitializedasync':
         return MethodReflection<MyInfoModule, R>(
             this,
             Initializable,
             'ensureInitializedAsync',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'doinitialization':
         return MethodReflection<MyInfoModule, R>(
             this,
             Initializable,
             'doInitialization',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.doInitialization,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'initializedependencies':
         return MethodReflection<MyInfoModule, R>(
@@ -777,7 +726,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
                   null)
             ],
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       default:
         return null;

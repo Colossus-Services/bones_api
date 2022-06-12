@@ -1512,7 +1512,7 @@ class EntityRepositoryProvider
   EntityRepositoryProvider._global();
 
   @override
-  FutureOr<bool> initialize() => true;
+  FutureOr<InitializationResult> initialize() => InitializationResult.ok(this);
 
   void registerEntityRepository<O extends Object>(
       EntityRepository<O> entityRepository) {
@@ -1636,6 +1636,11 @@ class EntityRepositoryProvider
 
     return allRepositories;
   }
+
+  @override
+  String toString() {
+    return '$runtimeType${_entityRepositories.keys.toList()}';
+  }
 }
 
 extension IterableEntityRepositoryProviderExtension
@@ -1718,6 +1723,9 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     for (var e in entries.entries) {
       var typeName = e.key;
       var typeEntries = e.value;
+
+      _log.info('Populating `$typeName`: ${typeEntries.length} entries...');
+
       var entityRepository = getEntityRepository(name: typeName);
       if (entityRepository == null) {
         throw StateError(
@@ -1885,8 +1893,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   FutureOr<List<O>> storeAllFromJson(
           Iterable<Map<String, dynamic>> entitiesJson,
           {Transaction? transaction}) =>
-      executeInitialized(
-          () => _storeAllFromJsonImpl(entitiesJson, transaction));
+      executeInitialized(() => _storeAllFromJsonImpl(entitiesJson, transaction),
+          parent: provider);
 
   FutureOr<List<O>> _storeAllFromJsonImpl(
       Iterable<Map<String, dynamic>> entitiesJson, Transaction? transaction) {
@@ -1904,7 +1912,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
   FutureOr<O> storeFromJson(Map<String, dynamic> json,
           {Transaction? transaction}) =>
-      executeInitialized(() => _storeFromJsonImpl(json, transaction));
+      executeInitialized(() => _storeFromJsonImpl(json, transaction),
+          parent: provider);
 
   FutureOr<O> _storeFromJsonImpl(
       Map<String, dynamic> json, Transaction? transaction) {
@@ -2171,7 +2180,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   @override
   String toString() {
     var info = information();
-    return 'EntityRepository{ name: $name, provider: $provider, type: $type, information: $info }';
+    return '$runtimeType[$type:$name]@${provider.runtimeType}$info';
   }
 }
 

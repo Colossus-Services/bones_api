@@ -384,7 +384,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<bool> initialize();
+  FutureOr<InitializationResult> initialize();
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
@@ -1556,6 +1556,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   final Map<Type, EntityRepository> _entityRepositories =
       <Type, EntityRepository>{};
 
+  List<EntityRepository> get entityRepositories =>
+      _entityRepositories.values.toList();
+
   @override
   void registerEntityRepository<O extends Object>(
       EntityRepository<O> entityRepository) {
@@ -1703,7 +1706,8 @@ class SQLRepositoryAdapter<O> with Initializable {
         type = type ?? O;
 
   @override
-  FutureOr<bool> initialize() => databaseAdapter.ensureInitialized();
+  FutureOr<InitializationResult> initialize() =>
+      databaseAdapter.ensureInitialized(parent: this);
 
   String get dialect => databaseAdapter.dialect;
 
@@ -1938,4 +1942,8 @@ class SQLRepositoryAdapter<O> with Initializable {
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }
+
+  @override
+  String toString() =>
+      'SQLRepositoryAdapter{name: $name, tableName: $tableName, type: $type}';
 }

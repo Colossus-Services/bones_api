@@ -1,3 +1,11 @@
+## 1.1.27 
+
+- `Initializable`:
+  - `Initializable.initialize`:
+    Now returns a `InitializationResult`, allow improved results and dependencies in the result.
+  - Improve automatic detection of circular dependencies and avoid deadlocks.
+  - Refactor of dependency chain analysis code.
+
 ## 1.1.26
 
 - `Initializable`:

@@ -7,6 +7,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_initializable.dart';
 
 final _log = logging.Logger('SQLEntityRepository');
 
@@ -22,8 +23,17 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
         super(adapter, name, entityHandler, type: type);
 
   @override
-  FutureOr<bool> initialize() => provider
-      .executeInitialized(() => sqlRepositoryAdapter.ensureInitialized());
+  FutureOr<InitializationResult> initialize() => provider
+          .executeInitialized(
+              () => sqlRepositoryAdapter.ensureInitialized(parent: this),
+              parent: this)
+          .resolveMapped((result) {
+        return InitializationResult.ok(this, dependencies: [
+          provider,
+          sqlRepositoryAdapter,
+          ...result.dependencies
+        ]);
+      });
 
   String get dialect => sqlRepositoryAdapter.dialect;
 
@@ -778,5 +788,11 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       _log.severe(message, e, s);
       rethrow;
     }
+  }
+
+  @override
+  String toString() {
+    var info = information();
+    return '$runtimeType[$name]@${provider.runtimeType}$info';
   }
 }

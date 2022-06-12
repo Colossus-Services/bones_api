@@ -126,10 +126,6 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'defaultRouteName',
         'hashCode',
         'initializationStatus',
-        'initializedDependencies',
-        'initializedDependenciesDeeply',
-        'initializedDependenciesDeeplyLength',
-        'initializedDependenciesLength',
         'isAsyncInitialization',
         'isInitialized',
         'isInitializing',
@@ -287,14 +283,14 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           false,
           [override],
         );
-      case 'isinitializing':
+      case 'initializationstatus':
         return FieldReflection<UserModule, T>(
           this,
           Initializable,
-          TypeReflection.tBool,
-          'isInitializing',
+          TypeReflection(InitializationStatus),
+          'initializationStatus',
           false,
-          (o) => () => o!.isInitializing as T,
+          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,
@@ -315,6 +311,20 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           false,
           null,
         );
+      case 'isinitializing':
+        return FieldReflection<UserModule, T>(
+          this,
+          Initializable,
+          TypeReflection.tBool,
+          'isInitializing',
+          false,
+          (o) => () => o!.isInitializing as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
       case 'isasyncinitialization':
         return FieldReflection<UserModule, T>(
           this,
@@ -323,76 +333,6 @@ class UserModule$reflection extends ClassReflection<UserModule> {
           'isAsyncInitialization',
           false,
           (o) => () => o!.isAsyncInitialization as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependencies':
-        return FieldReflection<UserModule, T>(
-          this,
-          Initializable,
-          TypeReflection(List, [Initializable]),
-          'initializedDependencies',
-          false,
-          (o) => () => o!.initializedDependencies as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependencieslength':
-        return FieldReflection<UserModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tInt,
-          'initializedDependenciesLength',
-          false,
-          (o) => () => o!.initializedDependenciesLength as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependenciesdeeply':
-        return FieldReflection<UserModule, T>(
-          this,
-          Initializable,
-          TypeReflection(List, [Initializable]),
-          'initializedDependenciesDeeply',
-          false,
-          (o) => () => o!.initializedDependenciesDeeply as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializeddependenciesdeeplylength':
-        return FieldReflection<UserModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tInt,
-          'initializedDependenciesDeeplyLength',
-          false,
-          (o) => () => o!.initializedDependenciesDeeplyLength as T,
-          null,
-          obj,
-          false,
-          false,
-          null,
-        );
-      case 'initializationstatus':
-        return FieldReflection<UserModule, T>(
-          this,
-          Initializable,
-          TypeReflection.tString,
-          'initializationStatus',
-          false,
-          (o) => () => o!.initializationStatus as T,
           null,
           obj,
           false,
@@ -604,7 +544,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'initialize',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.initialize,
             obj,
@@ -778,42 +718,51 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             Initializable,
             'ensureInitialized',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.ensureInitialized,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'ensureinitializedasync':
         return MethodReflection<UserModule, R>(
             this,
             Initializable,
             'ensureInitializedAsync',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'doinitialization':
         return MethodReflection<UserModule, R>(
             this,
             Initializable,
             'doInitialization',
-            TypeReflection.tFutureOrBool,
+            TypeReflection(FutureOr, [InitializationResult]),
             false,
             (o) => o!.doInitialization,
             obj,
             false,
             null,
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       case 'initializedependencies':
         return MethodReflection<UserModule, R>(
@@ -865,7 +814,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
                   null)
             ],
             null,
-            null,
+            const <String, ParameterReflection>{
+              'parent': ParameterReflection(TypeReflection(Initializable),
+                  'parent', true, false, null, null)
+            },
             null);
       default:
         return null;

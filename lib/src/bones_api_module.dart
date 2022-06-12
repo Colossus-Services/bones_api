@@ -71,9 +71,9 @@ abstract class APIModule with Initializable {
   }
 
   @override
-  FutureOr<bool> initialize() {
+  FutureOr<InitializationResult> initialize() {
     ensureConfigured();
-    return true;
+    return InitializationResult.ok(this);
   }
 
   final Map<String, APIRouteHandler> _routesHandlers =

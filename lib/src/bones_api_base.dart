@@ -27,7 +27,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.26';
+  static const String VERSION = '1.1.27';
 
   static bool _boot = false;
 
@@ -159,7 +159,7 @@ abstract class APIRoot with Initializable {
   }
 
   @override
-  FutureOr<bool> initialize() => _ensureModulesLoaded();
+  FutureOr<InitializationResult> initialize() => _ensureModulesLoaded();
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
@@ -188,10 +188,12 @@ abstract class APIRoot with Initializable {
     return _modules!.values.toSet();
   }
 
-  Future<bool>? _modulesLoading;
+  Future<InitializationResult>? _modulesLoading;
 
-  FutureOr<bool> _ensureModulesLoaded() {
-    if (_modules != null) return true;
+  FutureOr<InitializationResult> _ensureModulesLoaded() {
+    if (_modules != null) {
+      return InitializationResult.ok(this, dependencies: _modules!.values);
+    }
 
     var modulesLoading = _modulesLoading;
     if (modulesLoading != null) {
@@ -201,10 +203,10 @@ abstract class APIRoot with Initializable {
     var ret = loadModules().resolveMapped((modules) {
       _modules ??= Map.fromEntries(modules.map((e) => MapEntry(e.name, e)));
       _modulesLoading = null;
-      return true;
+      return InitializationResult.ok(this, dependencies: modules);
     });
 
-    if (ret is Future<bool>) {
+    if (ret is Future<InitializationResult>) {
       _modulesLoading = ret;
     }
 

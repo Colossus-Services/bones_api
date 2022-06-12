@@ -363,15 +363,15 @@ class APIServer {
 
     _log.info('Initializing ${apiRoot.name}...');
 
-    return apiRoot.ensureInitialized().then((ok) {
+    return apiRoot.ensureInitialized().then((result) {
       var modules = apiRoot.modules;
       _log.info('Loaded modules: ${modules.map((e) => e.name).toList()}');
 
-      if (!ok) {
+      if (!result.ok) {
         _log.severe('Error loading APIRoot: ${apiRoot.name}');
       }
 
-      return ok;
+      return result.ok;
     });
   }
 

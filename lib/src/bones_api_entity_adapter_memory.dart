@@ -95,17 +95,28 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<bool> initialize() => _populateImpl();
+  FutureOr<InitializationResult> initialize() => _populateImpl();
 
   Object? _populateSource;
 
-  FutureOr<bool> _populateImpl() {
+  FutureOr<InitializationResult> _populateImpl() {
     var populateSource = _populateSource;
+
     if (populateSource != null) {
       _populateSource = null;
-      return populateFromSource(populateSource).resolveWithValue(true);
+
+      return populateFromSource(populateSource).resolveMapped((val) {
+        var result = InitializationResult.ok(this, dependencies: [
+          if (parentRepositoryProvider != null) parentRepositoryProvider!,
+          ...entityRepositories,
+        ]);
+
+        return result;
+      });
     } else {
-      return true;
+      return InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!
+      ]);
     }
   }
 
