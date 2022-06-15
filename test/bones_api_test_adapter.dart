@@ -310,15 +310,16 @@ void runAdapterTests(
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
+        var role = Role(RoleType.admin);
 
-        var user = User(
-            'joe@$testDomain', '123', address, [Role(RoleType.admin)],
+        var user = User('joe@$testDomain', '123', address, [role],
             level: 100, creationTime: user1CreationTime);
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
 
         expect(user.id, equals(1));
         expect(address.id, equals(1));
+        expect(role.id, equals(1));
 
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
@@ -337,6 +338,12 @@ void runAdapterTests(
             (await userAPIRepository.selectByAddressID(address.id!))
                 .single
                 .email,
+            equals('joe@$testDomain'));
+
+        expect((await userAPIRepository.selectByRole(role)).single.email,
+            equals('joe@$testDomain'));
+
+        expect((await userAPIRepository.selectByRoleId(role.id!)).single.email,
             equals('joe@$testDomain'));
       }
 
@@ -408,9 +415,8 @@ void runAdapterTests(
         expect(user.wakeUpTime, isNull);
         expect(user.creationTime, equals(user1CreationTime));
 
-        var user2 =
-            (await userAPIRepository.selectByEmail('joe@$testDomain')).first;
-        expect(user2.toJsonEncoded(), equals(user.toJsonEncoded()));
+        var user2 = await userAPIRepository.selectByEmail('joe@$testDomain');
+        expect(user2!.toJsonEncoded(), equals(user.toJsonEncoded()));
 
         var user3 = (await userAPIRepository.select(
                 Condition.parse('email == ?'),
@@ -470,16 +476,14 @@ void runAdapterTests(
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('joe@$testDomain');
-        var user = sel.first;
-        expect(user.email, equals('joe@$testDomain'));
+        var user = await userAPIRepository.selectByEmail('joe@$testDomain');
+        expect(user!.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('smith@$testDomain');
-        var user = sel.first;
-        expect(user.email, equals('smith@$testDomain'));
+        var user = await userAPIRepository.selectByEmail('smith@$testDomain');
+        expect(user!.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
       }
 
@@ -687,10 +691,9 @@ void runAdapterTests(
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('smith2@$testDomain');
+        var user = await userAPIRepository.selectByEmail('smith2@$testDomain');
 
-        var user = sel.first;
-        expect(user.email, equals('smith2@$testDomain'));
+        expect(user!.email, equals('smith2@$testDomain'));
         expect(user.address.state, equals('CA'));
 
         user.email = 'smith3@$testDomain';
@@ -698,10 +701,9 @@ void runAdapterTests(
         var ok = await userAPIRepository.store(user);
         expect(ok, equals(user.id));
 
-        var sel2 = await userAPIRepository.selectByEmail('smith3@$testDomain');
-        var user2 = sel2.first;
+        var user2 = await userAPIRepository.selectByEmail('smith3@$testDomain');
 
-        expect(user2.id, equals(user.id));
+        expect(user2!.id, equals(user.id));
         expect(user2.email, equals('smith3@$testDomain'));
       }
 
@@ -713,23 +715,22 @@ void runAdapterTests(
           expect(executingTransaction, isNotNull);
           expect(executingTransaction!.isEmpty, isTrue);
 
-          var sel = await userAPIRepository.selectByEmail('smith3@$testDomain');
+          var user =
+              await userAPIRepository.selectByEmail('smith3@$testDomain');
 
           expect(executingTransaction.isNotEmpty, isTrue);
 
-          var user = sel.first;
-          expect(user.email, equals('smith3@$testDomain'));
+          expect(user!.email, equals('smith3@$testDomain'));
           expect(user.address.state, equals('CA'));
 
           user.email = 'smith4@$testDomain';
           var ok = await userAPIRepository.store(user);
           expect(ok, equals(user.id));
 
-          var sel2 =
+          var user2 =
               await userAPIRepository.selectByEmail('smith4@$testDomain');
-          var user2 = sel2.first;
 
-          expect(user2.email, equals('smith4@$testDomain'));
+          expect(user2!.email, equals('smith4@$testDomain'));
 
           return user2.email;
         });
@@ -751,11 +752,10 @@ void runAdapterTests(
 
         var result = await transaction.execute(() async {
           try {
-            var sel =
+            var user =
                 await userAPIRepository.selectByEmail('smith4@$testDomain');
 
-            var user = sel.first;
-            expect(user.email, equals('smith4@$testDomain'));
+            expect(user!.email, equals('smith4@$testDomain'));
 
             user.email = 'smith5@$testDomain';
             var ok = await userAPIRepository.store(user);

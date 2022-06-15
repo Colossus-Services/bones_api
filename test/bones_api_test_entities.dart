@@ -30,8 +30,8 @@ class UserAPIRepository extends APIRepository<User> {
   UserAPIRepository(EntityRepositoryProvider provider)
       : super(provider: provider);
 
-  FutureOr<Iterable<User>> selectByEmail(String email) {
-    return selectByQuery(' email == ? ', parameters: {'email': email});
+  FutureOr<User?> selectByEmail(String email) {
+    return selectFirstByQuery(' email == ? ', parameters: {'email': email});
   }
 
   FutureOr<Iterable<User>> selectByAddress(Address address) {

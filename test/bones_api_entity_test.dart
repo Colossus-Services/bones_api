@@ -457,9 +457,8 @@ void main() {
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('joe@memory.com');
-        var user = sel.first;
-        expect(user.email, equals('joe@memory.com'));
+        var user = await userAPIRepository.selectByEmail('joe@memory.com');
+        expect(user!.email, equals('joe@memory.com'));
         expect(user.address.state, equals('NY'));
       }
 
@@ -471,8 +470,8 @@ void main() {
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('XX');
-        expect(sel, isEmpty);
+        var user = await userAPIRepository.selectByEmail('XX');
+        expect(user, isNull);
       }
 
       {
@@ -552,28 +551,25 @@ void main() {
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('mary@memory.com');
-        var user = sel.first;
+        var user = await userAPIRepository.selectByEmail('mary@memory.com');
 
-        expect(user.email, equals('mary@memory.com'));
+        expect(user!.email, equals('mary@memory.com'));
         expect(user.address.state, equals('FL'));
 
         user.email = 'mary2@memory.com';
 
         expect(await userAPIRepository.store(user), equals(user.id));
 
-        var sel2 = await userAPIRepository.selectByEmail('mary2@memory.com');
-        var user2 = sel2.first;
+        var user2 = await userAPIRepository.selectByEmail('mary2@memory.com');
 
-        expect(user2.email, equals('mary2@memory.com'));
+        expect(user2!.email, equals('mary2@memory.com'));
         expect(user2.address.state, equals('FL'));
       }
 
       {
-        var sel = await userAPIRepository.selectByEmail('mary2@memory.com');
-        var user = sel.first;
+        var user = await userAPIRepository.selectByEmail('mary2@memory.com');
 
-        expect(user.email, equals('mary2@memory.com'));
+        expect(user!.email, equals('mary2@memory.com'));
         expect(user.address.state, equals('FL'));
 
         user.roles.add(Role(RoleType.unknown));

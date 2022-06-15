@@ -1425,6 +1425,18 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
 
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
+  FutureOr<O?> selectFirstByQuery(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
+      selectByQuery(query,
+              parameters: parameters,
+              namedParameters: namedParameters,
+              transaction: transaction,
+              limit: 1)
+          .resolveMapped((result) => result.firstOrNull);
+
   FutureOr<Iterable<O>> selectByQuery(String query,
       {Object? parameters,
       List? positionalParameters,
@@ -2138,6 +2150,19 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         namedParameters: namedParameters,
         transaction: transaction);
   }
+
+  @override
+  FutureOr<O?> selectFirstByQuery(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
+      selectByQuery(query,
+              parameters: parameters,
+              namedParameters: namedParameters,
+              transaction: transaction,
+              limit: 1)
+          .resolveMapped((result) => result.firstOrNull);
 
   @override
   FutureOr<Iterable<O>> selectByQuery(String query,

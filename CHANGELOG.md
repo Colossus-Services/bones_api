@@ -1,5 +1,7 @@
 ## 1.1.28
 
+- `EntitySource`:
+  - Added `selectFirstByQuery`.
 - Clean code.
 
 ## 1.1.27 

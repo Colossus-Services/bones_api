@@ -69,6 +69,17 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   FutureOr<int> length() => entityRepository.length();
 
+  FutureOr<O?> selectFirstByQuery(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters}) =>
+      entityRepository.selectFirstByQuery(
+        query,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
+
   FutureOr<Iterable<O>> selectByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
