@@ -618,6 +618,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<int> countSQL(
       TransactionOperation op, String entityName, String table, SQL sql) {
+    if (sql.isDummy) return 0;
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] countSQL> $sql');
       return doCountSQL(entityName, table, sql, connection);
@@ -694,6 +696,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   FutureOr<dynamic> insertSQL(TransactionOperation op, String entityName,
       String table, SQL sql, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper}) {
+    if (sql.isDummy) return null;
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] insertSQL> $sql');
       var retInsert = doInsertSQL(entityName, table, sql, connection);
@@ -716,6 +720,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<SQL> generateUpdateSQL(Transaction transaction, String entityName,
       String table, Object id, Map<String, Object?> fields) {
+    if (fields.isEmpty) return SQL.dummy;
+
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -733,8 +739,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       var fieldsValues =
           tableScheme.getFieldsValues(fields, fields: fields.keys.toSet());
 
+      // No value to update:
       if (fieldsValues.isEmpty) {
-        throw StateError("Can't get fields values!");
+        return SQL.dummy;
       }
 
       var fieldsKeys = fieldsValues.keys.toList();
@@ -794,6 +801,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   FutureOr<dynamic> updateSQL(TransactionOperation op, String entityName,
       String table, SQL sql, Object id, Map<String, Object?> fields,
       {T Function<T>(dynamic o)? mapper, bool allowAutoInsert = false}) {
+    if (sql.isDummy) return null;
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
       var retInsert = doUpdateSQL(entityName, table, sql, id, connection,
@@ -1034,6 +1043,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       SQL sql,
       dynamic id,
       String otherTable) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info(
           '[transaction:${op.transactionId}] selectRelationshipSQL> $sql');
@@ -1117,6 +1128,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       SQL sql,
       List<dynamic> ids,
       String otherTable) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info(
           '[transaction:${op.transactionId}] selectRelationshipsSQL> $sql');
@@ -1351,6 +1364,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
       TransactionOperation op, String entityName, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] selectSQL> $sql');
 
@@ -1452,6 +1467,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
       TransactionOperation op, String entityName, String table, SQL sql,
       {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
+    if (sql.isDummy) return <Map<String, dynamic>>[];
+
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] deleteSQL> $sql');
 

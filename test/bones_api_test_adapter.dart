@@ -864,6 +864,28 @@ void runAdapterTests(
           'state': 'EX',
           'city': 'Extra',
           'street': 'Street x',
+          'number': 777
+        });
+
+        expect(address1, isNotNull);
+        expect(address1.id, isNotNull);
+        expect(address1.number, 777);
+
+        var address2 = await addressAPIRepository.selectByID(address1.id);
+        expect(address2!.toJsonEncoded(), equals(address1.toJsonEncoded()));
+
+        var del1 = await addressAPIRepository.deleteByID(address1.id);
+
+        expect(del1, isNotNull);
+        expect(del1!.id, address1.id);
+        expect(del1.number, address1.number);
+      }
+
+      {
+        var address1 = await addressAPIRepository.storeFromJson({
+          'state': 'EX',
+          'city': 'Extra2',
+          'street': 'Street z',
           'number': 888
         });
 
@@ -873,6 +895,12 @@ void runAdapterTests(
 
         var address2 = await addressAPIRepository.selectByID(address1.id);
         expect(address2!.toJsonEncoded(), equals(address1.toJsonEncoded()));
+
+        var del1 = await addressAPIRepository.deleteEntity(address1);
+
+        expect(del1, isNotNull);
+        expect(del1!.id, address1.id);
+        expect(del1.number, address1.number);
       }
 
       {
@@ -905,7 +933,9 @@ void runAdapterTests(
             'id': 1001,
             'email': 'extra@mail.com',
             'password': 'abc789',
-            'roles': [],
+            'roles': [
+              {'type': 'guest', 'enabled': true, 'value': 3.33}
+            ],
             'wakeUpTime': Time(10, 0),
             'creationTime': DateTime(2022, 10, 1),
             'address': 11001,
@@ -934,11 +964,48 @@ void runAdapterTests(
 
       expect(usersResult.length, equals(2));
 
-      expect(usersResult[0].address.id, equals(11001));
-      expect(usersResult[0].address.state, equals('EX'));
+      var usersResult0 = usersResult[0];
+      expect(usersResult0.address.id, equals(11001));
+      expect(usersResult0.address.state, equals('EX'));
+      expect(usersResult0.roles.length, equals(1));
+      expect(usersResult0.roles[0].enabled, isTrue);
+      expect(usersResult0.roles[0].type, equals(RoleType.guest));
+      expect(usersResult0.roles[0].value, equals(Decimal.from(3.33)));
 
-      expect(usersResult[1].address.id, equals(11111));
-      expect(usersResult[1].address.state, equals('EX2'));
+      var usersResult1 = usersResult[1];
+      expect(usersResult1.address.id, equals(11111));
+      expect(usersResult1.address.state, equals('EX2'));
+      expect(usersResult1.roles, isEmpty);
+
+      var userAPIRepository = entityRepositoryProvider.userAPIRepository;
+
+      print('DELETE CASCADE:');
+      print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+
+      var deleted = await userAPIRepository.deleteEntityCascade(usersResult0);
+
+      print(deleted);
+
+      expect(deleted, isNotEmpty);
+
+      expect(deleted.length, 3);
+
+      var delUser = deleted.whereType<User>().firstOrNull;
+      expect(delUser, isNotNull);
+      expect(delUser!.email, 'extra@mail.com');
+      expect(delUser.roles, isEmpty);
+      expect(delUser.address, isNotNull);
+
+      var delRole = deleted.whereType<Role>().firstOrNull;
+      expect(delRole, isNotNull);
+      expect(delRole!.enabled, isTrue);
+      expect(delRole.type, equals(RoleType.guest));
+
+      var delAddress = deleted.whereType<Address>().firstOrNull;
+      expect(delAddress, isNotNull);
+      expect(delAddress!.state, equals('EX'));
+
+      print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
     });
   });
 }

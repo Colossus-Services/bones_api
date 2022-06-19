@@ -92,12 +92,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
           var fieldType = entityHandler.getFieldType(o, fieldName)!;
 
-          if (!EntityHandler.isValidType(fieldType.type)) {
-            return null;
-          }
-
           if (value is List && fieldType.isList && fieldType.hasArguments) {
             var elementType = fieldType.arguments.first;
+            if (!EntityHandler.isValidEntityType(elementType.type)) return null;
+
             var elementRepository =
                 provider.getEntityRepository(type: elementType.type);
             if (elementRepository == null) return null;
@@ -108,6 +106,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
             }).toList();
             return futures.resolveAll();
           } else {
+            if (!EntityHandler.isValidEntityType(fieldType.type)) return null;
+
             var repository =
                 provider.getEntityRepository(type: fieldType.type, obj: value);
             if (repository == null) return null;

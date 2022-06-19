@@ -111,6 +111,10 @@ abstract class APIRepository<O extends Object> with Initializable {
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
 
+  FutureOr<O?> deleteEntity(O o) => entityRepository.deleteEntity(o);
+
+  FutureOr<O?> deleteByID(dynamic id) => entityRepository.deleteByID(id);
+
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,
@@ -119,6 +123,9 @@ abstract class APIRepository<O extends Object> with Initializable {
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
+
+  FutureOr<Iterable> deleteEntityCascade(O o) =>
+      entityRepository.deleteEntityCascade(o);
 
   FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
       entityRepository.store(o, transaction: transaction);

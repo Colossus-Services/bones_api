@@ -10,8 +10,8 @@ import 'package:swiss_knife/swiss_knife.dart' show EventStream;
 import 'bones_api_condition.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
-import 'bones_api_mixin.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_mixin.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
@@ -119,7 +119,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
   EntityHandler(EntityHandlerProvider? provider, {Type? type})
       : provider = provider ?? EntityHandlerProvider.globalProvider,
         type = type ?? O {
-    if (!isValidType(this.type)) {
+    if (!isValidEntityType(this.type)) {
       throw StateError('Invalid EntityHandler type: $type (O: $O)');
     }
 
@@ -137,9 +137,71 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   void ensureRegistered() => provider._register(this);
 
-  static bool isValidType<T>([Type? type]) {
+  static Type? resolveEntityType<O>({O? obj, Type? type}) {
+    if (type != null && isValidEntityType(type)) return type;
+
+    if (obj != null) {
+      type = obj.runtimeType;
+      if (isValidEntityType(type)) return type;
+    }
+
+    type = O;
+    if (isValidEntityType(type)) return type;
+
+    return null;
+  }
+
+  static bool isValidEntityType<T>([Type? type]) {
     type ??= T;
-    return type != Object && type != dynamic && !isPrimitiveType(type);
+    return type != Object &&
+        type != dynamic &&
+        !isBasicType(type) &&
+        !_isReflectedEnumTypeImpl(type);
+  }
+
+  static bool isBasicType<T>([Type? type]) {
+    type ??= T;
+
+    if (isPrimitiveType<T>(type) || TypeParser.isCollectionType<T>(type)) {
+      return true;
+    }
+
+    if (type == DateTime || type == Time || type == Decimal) return true;
+
+    return false;
+  }
+
+  static bool isReflectedEnumType<T>([Type? type]) {
+    type ??= T;
+
+    if (isBasicType<T>(type)) return false;
+
+    return _isReflectedEnumTypeImpl(type);
+  }
+
+  static final Map<Type, bool> _reflectedEnumTypes = <Type, bool>{};
+
+  static bool _isReflectedEnumTypeImpl(Type type) {
+    var val = _reflectedEnumTypes[type];
+
+    if (val == null) {
+      var reflectionFactory = ReflectionFactory();
+
+      var enumReflection = reflectionFactory.getRegisterEnumReflection(type);
+      if (enumReflection != null) {
+        _reflectedEnumTypes[type] = true;
+        return true;
+      }
+
+      var classReflection = reflectionFactory.getRegisterClassReflection(type);
+      if (classReflection != null) {
+        _reflectedEnumTypes[type] = false;
+      }
+
+      return false;
+    } else {
+      return val;
+    }
   }
 
   static bool isPrimitiveType<T>([Type? type]) =>
@@ -147,11 +209,11 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   EntityHandler<T>? getEntityHandler<T>(
       {T? obj, Type? type, EntityHandler? knownEntityHandler}) {
-    if (T == O && isValidType<T>()) {
+    if (T == O && isValidEntityType<T>()) {
       return this as EntityHandler<T>;
-    } else if (obj != null && obj.runtimeType == O && isValidType<O>()) {
+    } else if (obj != null && obj.runtimeType == O && isValidEntityType<O>()) {
       return this as EntityHandler<T>;
-    } else if (type != null && type == O && isValidType<O>()) {
+    } else if (type != null && type == O && isValidEntityType<O>()) {
       return this as EntityHandler<T>;
     } else {
       return knownEntityHandler?.getEntityHandler<T>(obj: obj, type: type) ??
@@ -540,6 +602,11 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   TypeInfo? getFieldType(O? o, String key);
+
+  Map<String, TypeInfo> getFieldsTypes(O o) {
+    return Map<String, TypeInfo>.fromEntries(fieldsNames(o)
+        .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
+  }
 
   V? getField<V>(O o, String key);
 
@@ -1379,6 +1446,8 @@ abstract class EntityAccessor<O extends Object> {
   final String name;
 
   EntityAccessor(this.name);
+
+  Object? getEntityID(O o);
 }
 
 abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
@@ -1499,11 +1568,210 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         transaction: transaction);
   }
 
+  FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
+      deleteByID(getEntityID(o), transaction: transaction);
+
+  FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) {
+    if (id == null) return null;
+    return delete(ConditionID(id), transaction: transaction)
+        .resolveMapped((del) => del.firstOrNull);
+  }
+
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
       Transaction? transaction});
+
+  FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) {
+    transaction ??= Transaction.autoCommit();
+    return deleteCascadeGeneric(o, transaction,
+        entityHandler: EntityHandlerProvider.globalProvider
+            .getEntityHandler(obj: o, type: O),
+        entityRepository: EntityRepositoryProvider.globalProvider
+            .getEntityRepository(obj: o, type: O),
+        repositoryProvider: EntityRepositoryProvider.globalProvider);
+  }
+
+  static EntityRepository<O>? _resolveRepositoryProvider<O extends Object>(
+          EntityHandler? entityHandler,
+          EntityRepository<O>? entityRepository,
+          EntityRepositoryProvider? repositoryProvider,
+          {O? obj,
+          Type? type}) =>
+      entityRepository?.provider.getEntityRepository<O>(obj: obj, type: type) ??
+      repositoryProvider?.getEntityRepository<O>(obj: obj, type: type) ??
+      entityHandler?.getEntityRepository<O>(obj: obj, type: type);
+
+  static Future<Iterable> deleteCascadeGeneric<O extends Object>(
+      O o, Transaction transaction,
+      {EntityHandler<O>? entityHandler,
+      EntityRepository<O>? entityRepository,
+      EntityRepositoryProvider? repositoryProvider}) async {
+    entityRepository ??= _resolveRepositoryProvider<O>(
+        entityHandler, entityRepository, repositoryProvider,
+        obj: o);
+    entityHandler ??= _resolveEntityHandler<O>(
+        entityHandler, entityRepository, repositoryProvider,
+        obj: o);
+
+    if (entityHandler == null) {
+      throw ArgumentError(
+          "EntityHandler not provided for type: ${o.runtimeType}");
+    }
+
+    var deleted = <Object>[];
+
+    await _deleteCascadeGenericImpl(o, transaction, entityHandler,
+        entityRepository, repositoryProvider, deleted);
+
+    return deleted;
+  }
+
+  static EntityHandler<O>? _resolveEntityHandler<O extends Object>(
+      EntityHandler? entityHandler,
+      EntityRepository<O>? entityRepository,
+      EntityRepositoryProvider? repositoryProvider,
+      {O? obj,
+      Type? type}) {
+    var t = EntityHandler.resolveEntityType<O>(obj: obj, type: type);
+
+    var eh = (t != null && entityRepository?.entityHandler.type == t
+            ? entityRepository?.entityHandler
+            : null) ??
+        entityHandler?.getEntityHandler<O>(obj: obj, type: type);
+    if (eh != null && eh.type == obj.type) return eh;
+
+    var er = _resolveRepositoryProvider<O>(
+        entityHandler, entityRepository, repositoryProvider,
+        obj: obj, type: type);
+    return er?.entityHandler;
+  }
+
+  static Future<bool> _deleteCascadeGenericImpl<O extends Object>(
+      O o,
+      Transaction transaction,
+      EntityHandler<O>? entityHandler,
+      EntityRepository<O>? entityRepository,
+      EntityRepositoryProvider? repositoryProvider,
+      List<Object> deleted) async {
+    if (entityHandler == null) {
+      throw ArgumentError(
+          "EntityHandler not provided for type: ${o.runtimeType}");
+    }
+
+    if (entityRepository == null) {
+      throw ArgumentError(
+          "EntityRepository not provided for type: ${o.runtimeType}");
+    }
+
+    var id = entityRepository.getEntityID(o);
+    if (id == null) return false;
+
+    var fieldsTypes = entityHandler
+        .getFieldsTypes(o)
+        .entries
+        .where((e) => !e.value.isPrimitiveType);
+
+    var preDeleteCalls = <Future<bool> Function()>[];
+    var posDeleteCalls = <Future<bool> Function()>[];
+    var changed = false;
+
+    for (var e in fieldsTypes) {
+      var t = e.value;
+      EntityRepository<Object>? tEntityRepository;
+      EntityHandler<Object>? tEntityHandler;
+
+      if (t.isIterable) {
+        var tTypeInfo = t.arguments.firstOrNull;
+        if (tTypeInfo == null || tTypeInfo.isPrimitiveType) continue;
+
+        var tType = tTypeInfo.type;
+        if (!EntityHandler.isValidEntityType(tType)) continue;
+
+        var fieldValues = entityHandler.getField(o, e.key);
+        if (fieldValues == null ||
+            fieldValues is! Iterable ||
+            fieldValues.whereNotNull().isEmpty) continue;
+
+        for (var e in fieldValues.whereNotNull()) {
+          tEntityRepository ??= _resolveRepositoryProvider(
+              entityHandler, entityRepository, repositoryProvider,
+              obj: e, type: tType);
+
+          tEntityHandler ??= _resolveEntityHandler(
+              entityHandler, tEntityRepository, repositoryProvider,
+              obj: e, type: tType);
+
+          preDeleteCalls.add(() => _deleteCascadeGenericImpl<Object>(
+              e,
+              transaction,
+              tEntityHandler,
+              tEntityRepository,
+              repositoryProvider,
+              deleted));
+        }
+
+        var fieldValuesEmpty = fieldValues.toList()..clear();
+        entityHandler.setField(o, e.key, fieldValuesEmpty);
+        changed = true;
+      } else if (t.isCollection || EntityHandler.isReflectedEnumType(t.type)) {
+        continue;
+      } else {
+        var tType = t.type;
+        if (!EntityHandler.isValidEntityType(tType)) continue;
+
+        var fieldValue = entityHandler.getField(o, e.key);
+        if (fieldValue == null) continue;
+
+        tEntityRepository = _resolveRepositoryProvider(
+            entityHandler, entityRepository, repositoryProvider,
+            obj: fieldValue, type: tType);
+
+        tEntityHandler = _resolveEntityHandler(
+            entityHandler, tEntityRepository, repositoryProvider,
+            obj: fieldValue, type: tType);
+
+        // ignore: prefer_function_declarations_over_variables
+        var call = () => _deleteCascadeGenericImpl<Object>(
+            fieldValue,
+            transaction,
+            tEntityHandler,
+            tEntityRepository,
+            repositoryProvider,
+            deleted);
+
+        if (entityHandler.trySetField(o, e.key, null)) {
+          preDeleteCalls.add(call);
+          changed = true;
+        } else {
+          posDeleteCalls.add(call);
+        }
+      }
+    }
+
+    if (changed) {
+      await entityRepository.store(o, transaction: transaction);
+    }
+
+    for (var d in preDeleteCalls) {
+      await d();
+    }
+
+    var del = await entityRepository.deleteByID(id);
+
+    for (var d in posDeleteCalls) {
+      await d();
+    }
+
+    var delOk = del != null;
+
+    if (delOk) {
+      deleted.add(o);
+    }
+
+    return delOk;
+  }
 }
 
 class EntityRepositoryProvider
@@ -1890,7 +2158,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       : provider = provider ?? EntityRepositoryProvider.globalProvider,
         type = type ?? O,
         super(name) {
-    if (!EntityHandler.isValidType(this.type)) {
+    if (!EntityHandler.isValidEntityType(this.type)) {
       throw StateError('Invalid EntityRepository type: $type ?? $O');
     }
 
@@ -1943,6 +2211,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       entityHandler.createFromMap(fields,
           entityProvider: entityProvider, entityCache: entityCache);
 
+  @override
   Object? getEntityID(O o) => entityHandler.getID(o);
 
   Map<String, Object?> getEntityFields(O o) => entityHandler.getFields(o);
@@ -2184,6 +2453,17 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 
   @override
+  FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
+      deleteByID(getEntityID(o), transaction: transaction);
+
+  @override
+  FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) {
+    if (id == null) return null;
+    return delete(ConditionID(id), transaction: transaction)
+        .resolveMapped((del) => del.firstOrNull);
+  }
+
+  @override
   FutureOr<Iterable<O>> deleteByQuery(String query,
       {Object? parameters,
       List? positionalParameters,
@@ -2198,6 +2478,18 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         transaction: transaction);
+  }
+
+  @override
+  FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) {
+    checkNotClosed();
+
+    transaction ??= Transaction.autoCommit();
+
+    return EntityStorage.deleteCascadeGeneric(o, transaction,
+        entityHandler: entityHandler,
+        entityRepository: this,
+        repositoryProvider: provider);
   }
 
   Map<String, dynamic> information();
@@ -2842,6 +3134,9 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
+  Object? getEntityID(O o) => getID(o, entityHandler: entityHandler);
+
+  @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
     checkNotClosed();
 
@@ -3036,7 +3331,7 @@ abstract class IterableEntityRepository<O extends Object>
 
       var fieldType = entityHandler.getFieldType(o, fieldName)!;
 
-      if (!EntityHandler.isValidType(fieldType.type)) {
+      if (!EntityHandler.isValidEntityType(fieldType.type)) {
         return null;
       }
 
@@ -3063,6 +3358,23 @@ abstract class IterableEntityRepository<O extends Object>
 
     return futures.resolveAllWithValue(true);
   }
+
+  @override
+  FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) {
+    if (id == null) return null;
+
+    checkNotClosed();
+
+    var o = selectByID(id, transaction: transaction);
+    if (o == null) return null;
+
+    remove(o);
+    return o;
+  }
+
+  @override
+  FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
+      deleteByID(getEntityID(o));
 
   @override
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,

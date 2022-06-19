@@ -1,3 +1,14 @@
+## 1.1.29
+
+- `EntityRepository`:
+  - Added `deleteEntity`, `deleteByID` and `deleteEntityCascade`.
+- `EntityHandler`:
+  - Renamed `isValidType` to `isValidEntityType`.
+- shelf: ^1.3.1
+- shelf_static: ^1.1.1
+- reflection_factory: ^1.2.0
+- postgres: ^2.4.4
+
 ## 1.1.28
 
 - `EntitySource`:
