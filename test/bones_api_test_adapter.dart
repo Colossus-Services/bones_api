@@ -165,6 +165,8 @@ void runAdapterTests(
         entityRepositoryProvider = defaultEntityRepositoryProvider ??
             createEntityRepositoryProvider(
                 entityByReflection, sqlAdapterCreator, dbPort);
+
+        await entityRepositoryProvider.ensureInitialized();
       } else {
         _log.warning('Docker NOT running! Skipping Docker tests!');
       }

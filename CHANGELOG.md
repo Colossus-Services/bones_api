@@ -1,3 +1,10 @@
+## 1.1.30
+
+- `MemorySQLAdapter`:
+  - Ensure that the stored data has only valid JSON values for the whole entity tree.
+- `EntityRepository`:
+  - Added `isOfEntityType`.
+
 ## 1.1.29
 
 - `EntityRepository`:

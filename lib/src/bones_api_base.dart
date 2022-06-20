@@ -27,7 +27,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.29';
+  static const String VERSION = '1.1.30';
 
   static bool _boot = false;
 
@@ -333,7 +333,7 @@ abstract class APIRoot with Initializable {
 
     var ret = _ensureModulesLoaded();
 
-    if (ret is Future<bool>) {
+    if (ret is Future<InitializationResult>) {
       return ret.then((_) => _preCall(request));
     } else {
       return _preCall(request);
@@ -386,10 +386,12 @@ abstract class APIRoot with Initializable {
     return _callModule<T>(module, apiRequest);
   }
 
-  Future<APIAuthentication> callAuthenticate(
+  Future<APIAuthentication?> callAuthenticate(
       String email, String password) async {
     var auth = await call(APIRequest.get('/authenticate',
         parameters: {'email': email, 'password': password}));
+    if (auth.isNotOK) return null;
+
     var authentication = APIAuthentication.fromJson(auth.payload);
     return authentication;
   }
@@ -1846,6 +1848,31 @@ class APIResponse<T> extends APIPayload {
     _authenticationType = type;
     _authenticationRealm = realm;
   }
+
+  /// Returns `true` if [status] is a [APIResponseStatus.OK] or a [APIResponseStatus.NOT_FOUND].
+  bool get isValid =>
+      status == APIResponseStatus.OK || status == APIResponseStatus.NOT_FOUND;
+
+  /// Alias to ![isValid].
+  bool get isNotValid => !isValid;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.OK].
+  bool get isOK => status == APIResponseStatus.OK;
+
+  /// Alias to ![isNotOK].
+  bool get isNotOK => !isOK;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.NOT_FOUND].
+  bool get isNotFound => status == APIResponseStatus.NOT_FOUND;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.UNAUTHORIZED].
+  bool get isUnauthorized => status == APIResponseStatus.UNAUTHORIZED;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.ERROR].
+  bool get isError => status == APIResponseStatus.ERROR;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.BAD_REQUEST].
+  bool get isBadRequest => status == APIResponseStatus.BAD_REQUEST;
 
   Map<String, Duration>? _metrics;
 

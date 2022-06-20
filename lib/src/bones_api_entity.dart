@@ -2170,6 +2170,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     entityHandler.notifyKnownEntityRepositoryProvider(this.provider);
   }
 
+  bool isOfEntityType(Object? o) {
+    if (o == null) return false;
+    return o is O || o.runtimeType == type;
+  }
+
   FutureOr<List<O>> storeAllFromJson(
           Iterable<Map<String, dynamic>> entitiesJson,
           {Transaction? transaction}) =>

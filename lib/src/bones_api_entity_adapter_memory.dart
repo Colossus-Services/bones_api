@@ -1,4 +1,5 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/src/bones_api_types.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
@@ -247,7 +248,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       String entityName, String table, SQL sql, int connection) {
     if (sql.isDummy) return null;
 
-    var entry = sql.namedParameters ?? sql.parametersByPlaceholder;
+    var entry = _normalizeEntityJSON(
+        sql.namedParameters ?? sql.parametersByPlaceholder,
+        entityName: entityName,
+        table: table);
 
     var map = _getTableMap(table, true)!;
 
@@ -272,7 +276,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var id = nextID(table);
 
-    var entry = sql.parametersByPlaceholder;
+    var entry = _normalizeEntityJSON(sql.parametersByPlaceholder,
+        entityName: entityName, table: table);
 
     var tablesScheme = tablesSchemes[table];
 
@@ -282,6 +287,61 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     map[id] = entry;
 
     return id;
+  }
+
+  Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
+      {String? entityName, String? table, EntityRepository? entityRepository}) {
+    entityRepository ??=
+        getEntityRepository(name: entityName, tableName: table);
+
+    if (entityRepository == null) {
+      throw StateError(
+          "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table");
+    }
+
+    var entityHandler = entityRepository.entityHandler;
+
+    entityJson.map((key, value) {
+      if (value == null || (value as Object).isPrimitiveValue) {
+        return MapEntry(key, value);
+      }
+
+      var fieldType = entityHandler.getFieldType(null, key);
+
+      if (fieldType != null) {
+        if (fieldType.isIterable && fieldType.isListEntity) {
+          var listEntityType = fieldType.listEntityType!;
+
+          var fieldListEntityRepository =
+              getEntityRepository(type: listEntityType.type);
+          if (fieldListEntityRepository == null) {
+            throw StateError(
+                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+          }
+
+          var valIter = value is Iterable ? value : [value];
+
+          value = valIter
+              .map((v) => fieldListEntityRepository.isOfEntityType(v)
+                  ? fieldListEntityRepository.getEntityID(v)
+                  : v)
+              .toList();
+        } else if (!fieldType.isPrimitiveType &&
+            EntityHandler.isValidEntityType(fieldType.type)) {
+          var fieldEntityRepository = getEntityRepository(type: fieldType.type);
+          if (fieldEntityRepository == null) {
+            throw StateError(
+                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+          }
+
+          value = fieldEntityRepository.getEntityID(value);
+        }
+      }
+
+      return MapEntry(key, value);
+    });
+
+    return entityJson;
   }
 
   @override
@@ -294,7 +354,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var prevEntry = map[id];
 
-    var entry = sql.parametersByPlaceholder;
+    var entry = _normalizeEntityJSON(sql.parametersByPlaceholder,
+        entityName: entityName, table: table);
 
     if (prevEntry == null) {
       if (!allowAutoInsert) {
