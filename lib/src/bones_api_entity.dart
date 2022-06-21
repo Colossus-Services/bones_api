@@ -551,7 +551,18 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   List? castList(List list, Type type) {
     if (type == this.type) {
+      if (list.any((e) => e == null)) {
+        throw ArgumentError(
+            "Can't cast to List<$type> due to null elements in it.");
+      }
       return List<O>.from(list);
+    }
+    return null;
+  }
+
+  List? castListNullable(List list, Type type) {
+    if (type == this.type) {
+      return List<O?>.from(list);
     }
     return null;
   }
@@ -559,6 +570,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
   Iterable? castIterable(Iterable itr, Type type) {
     if (type == this.type) {
       return itr.cast<O>();
+    }
+    return null;
+  }
+
+  Iterable? castIterableNullable(Iterable itr, Type type) {
+    if (type == this.type) {
+      return itr.cast<O?>();
     }
     return null;
   }

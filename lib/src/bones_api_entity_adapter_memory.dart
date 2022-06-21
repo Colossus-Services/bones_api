@@ -301,7 +301,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
     var entityHandler = entityRepository.entityHandler;
 
-    entityJson.map((key, value) {
+    var entityJsonNormalized = entityJson.map((key, value) {
       if (value == null || (value as Object).isPrimitiveValue) {
         return MapEntry(key, value);
       }
@@ -341,7 +341,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       return MapEntry(key, value);
     });
 
-    return entityJson;
+    return entityJsonNormalized;
   }
 
   @override
@@ -525,26 +525,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     var obj2 = obj.map((key, value) {
       var refField = tableScheme.getFieldsReferencedTables(key);
       if (refField != null) {
-        var id = obj[key];
-
-        if (id != null) {
-          var obj2 = _getByID(refField.targetTable, id);
-
-          if (obj2 != null) {
-            var tableScheme2 =
-                getTableScheme(refField.targetTable) as TableScheme?;
-
-            if (tableScheme2 != null && tableScheme2.hasTableReferences) {
-              var entityHandler2 =
-                  getEntityHandler(tableName: tableScheme2.name);
-              obj2 = _resolveEntityMap(obj2, entityHandler2, tableScheme2);
-            }
-          }
-
-          value = obj2;
-        }
+        value = _resolveEntityFieldReferencedTable(obj, key, refField);
       }
-
       return MapEntry(key, value);
     });
 
@@ -564,51 +546,81 @@ class MemorySQLAdapter extends SQLAdapter<int> {
       var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
 
       for (var e in fieldsListEntity.entries) {
-        var field = e.key;
-        if (obj2.containsKey(field)) continue;
-
+        var fieldKey = e.key;
         var fieldType = e.value.listEntityType!;
 
-        var targetTable = getTableForType(fieldType);
-
-        if (targetTable == null) {
-          continue;
-        } else if (targetTable is Future) {
-          throw StateError(
-              "Async response not supported when calling `getTableForType`");
+        var targetObjs = _resolveEntityFieldRelationshipTables(
+            relationshipsTables, id, fieldType);
+        if (targetObjs != null) {
+          obj2[fieldKey] = targetObjs;
         }
-
-        var relationshipTable =
-            relationshipsTables.firstWhere((t) => t.targetTable == targetTable);
-
-        var relMap = _getTableMap(relationshipTable.relationshipTable, false);
-        if (relMap == null) continue;
-
-        var entries = relMap.values
-            .where((e) => e[relationshipTable.sourceRelationshipField] == id);
-
-        var targetIds = entries
-            .map((e) => e[relationshipTable.targetRelationshipField])
-            .toList();
-
-        var targetObjs =
-            targetIds.map((tId) => _getByID(targetTable!, tId) ?? tId).toList();
-
-        var tableScheme2 = getTableScheme(targetTable!) as TableScheme?;
-
-        if (tableScheme2 != null && tableScheme2.hasTableReferences) {
-          var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
-
-          targetObjs = targetObjs
-              .map((e) => _resolveEntityMap(e, entityHandler2, tableScheme2))
-              .toList();
-        }
-
-        obj2[field] = targetObjs;
       }
     }
 
     return obj2;
+  }
+
+  Object? _resolveEntityFieldReferencedTable(
+      Map<String, dynamic> obj, String key, TableFieldReference refField) {
+    var id = obj[key];
+    if (id == null) return null;
+
+    var fieldObj = _getByID(refField.targetTable, id);
+
+    if (fieldObj != null) {
+      var tableScheme2 = getTableScheme(refField.targetTable) as TableScheme?;
+
+      if (tableScheme2 != null && tableScheme2.hasTableReferences) {
+        var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
+        fieldObj = _resolveEntityMap(fieldObj, entityHandler2, tableScheme2);
+      }
+    }
+
+    return fieldObj;
+  }
+
+  List? _resolveEntityFieldRelationshipTables(
+      List<TableRelationshipReference> relationshipsTables,
+      Object id,
+      TypeInfo fieldType) {
+    var targetTable = getTableForType(fieldType);
+
+    if (targetTable == null) {
+      return null;
+    } else if (targetTable is Future) {
+      throw StateError(
+          "Async response not supported when calling `getTableForType`");
+    }
+
+    var relationshipTable =
+        relationshipsTables.firstWhere((t) => t.targetTable == targetTable);
+
+    var relMap = _getTableMap(relationshipTable.relationshipTable, false);
+    if (relMap == null) {
+      return null;
+    }
+
+    var entries = relMap.values
+        .where((e) => e[relationshipTable.sourceRelationshipField] == id);
+
+    var targetIds = entries
+        .map((e) => e[relationshipTable.targetRelationshipField])
+        .toList();
+
+    var targetObjs =
+        targetIds.map((tId) => _getByID(targetTable!, tId) ?? tId).toList();
+
+    var tableScheme2 = getTableScheme(targetTable!) as TableScheme?;
+
+    if (tableScheme2 != null && tableScheme2.hasTableReferences) {
+      var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
+
+      targetObjs = targetObjs
+          .map((e) => _resolveEntityMap(e, entityHandler2, tableScheme2))
+          .toList();
+    }
+
+    return targetObjs;
   }
 
   final Map<String, TableScheme> tablesSchemes = <String, TableScheme>{};

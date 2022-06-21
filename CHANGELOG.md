@@ -1,3 +1,16 @@
+## 1.1.31
+
+- `EntityHandler`:
+  - `castListNullable` and `castIterableNullable`. 
+  - `castList`:
+    better exception message when an element is null.
+- `Condition`:
+  Better resolution and matching of JSON collections and entities.
+- `KeyCondition`:
+   - Fix `_resolveValueEntityHandler` for `List` entities types.
+- `MemorySQLAdapter`:
+  - Fix `_normalizeEntityJSON`.
+
 ## 1.1.30
 
 - `MemorySQLAdapter`:

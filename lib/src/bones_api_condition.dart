@@ -180,7 +180,8 @@ class ConditionParameter extends ConditionElement {
   bool matchesIn(List values,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
     var myValue = getValue(
         parameters: parameters,
         positionalParameters: positionalParameters,
@@ -336,12 +337,14 @@ abstract class Condition<O> extends ConditionElement
   bool inConditionValues(Object? value1, List value2,
       {Object? parameters,
       List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
     if (value1 is ConditionParameter) {
       return value1.matchesIn(value2,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          entityHandler: entityHandler);
     }
 
     for (var v2 in value2) {
@@ -349,7 +352,8 @@ abstract class Condition<O> extends ConditionElement
         var match = v2.matches(value1,
             parameters: parameters,
             positionalParameters: positionalParameters,
-            namedParameters: namedParameters);
+            namedParameters: namedParameters,
+            entityHandler: entityHandler);
         if (match) return true;
       } else {
         if (value1 == v2) return true;
@@ -908,12 +912,26 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       }
     }
 
+    if (valueEntityHandler != null) {
+      var idFieldName = valueEntityHandler.idFieldName();
+
+      if (value is Map) {
+        value = value[idFieldName];
+      } else if (value is Iterable) {
+        value = value.map((v) => v is Map ? v[idFieldName] : v).toList();
+      }
+    }
+
     return KeyConditionValue(value, valueType, valueEntityHandler);
   }
 
   EntityHandler? _resolveValueEntityHandler(
       TypeInfo? objType, EntityHandler? objEntityHandler) {
     if (objType == null) return null;
+
+    if (objType.isListEntity) {
+      objType = objType.listEntityType!;
+    }
 
     if (objEntityHandler != null) {
       return objEntityHandler.getEntityHandler(type: objType.type);
@@ -1101,7 +1119,8 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     var inValues = inConditionValues(keyValue?.value, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+        namedParameters: namedParameters,
+        entityHandler: entityHandler);
 
     return inValues != not;
   }
