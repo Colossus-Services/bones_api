@@ -23,6 +23,10 @@ abstract class LoggerHandler {
   static LoggerHandler create(logging.Logger logger) =>
       createLoggerHandler(logger);
 
+  static int _idCount = 0;
+
+  final int id = ++_idCount;
+
   final logging.Logger logger;
 
   LoggerHandler(this.logger);

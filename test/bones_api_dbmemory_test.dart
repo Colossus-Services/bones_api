@@ -92,22 +92,20 @@ class DBMemoryFakeTestContainer implements DBTestContainer<Object> {
   String get stdout => '';
 }
 
-void main() {
-  _runTest(true);
-  _runTest(false);
+Future<void> main() async {
+  await _runTest(true);
+  await _runTest(false);
 }
 
-void _runTest(bool useReflection) {
-  runAdapterTests(
-    'DBMemory',
-    DBMemoryFakeTestContainer(),
-    0,
-    (provider, dbPort) => MemorySQLAdapter(
-      parentRepositoryProvider: provider,
-    ),
-    '"',
-    'int',
-    contains('ok'),
-    entityByReflection: useReflection,
-  );
-}
+Future<bool> _runTest(bool useReflection) => runAdapterTests(
+      'DBMemory',
+      DBMemoryFakeTestContainer(),
+      0,
+      (provider, dbPort) => MemorySQLAdapter(
+        parentRepositoryProvider: provider,
+      ),
+      '"',
+      'int',
+      contains('ok'),
+      entityByReflection: useReflection,
+    );

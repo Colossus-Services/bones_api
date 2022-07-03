@@ -72,27 +72,25 @@ class MySQLTestContainer extends DBTestContainerDocker {
   String get stdout => container.stdout?.asString ?? '';
 }
 
-void main() {
-  _runTest(false);
-  _runTest(true);
+Future<void> main() async {
+  await _runTest(false);
+  await _runTest(true);
 }
 
-void _runTest(bool useReflection) {
-  runAdapterTests(
-    'MySQL',
-    MySQLTestContainer(),
-    3306,
-    (provider, dbPort) => MySQLAdapter(
-      dbName,
-      dbUser,
-      password: dbPass,
-      host: '127.0.0.1',
-      port: dbPort,
-      parentRepositoryProvider: provider,
-    ),
-    '`',
-    'bigint unsigned',
-    anyOf(isNull, isEmpty),
-    entityByReflection: useReflection,
-  );
-}
+Future<bool> _runTest(bool useReflection) => runAdapterTests(
+      'MySQL',
+      MySQLTestContainer(),
+      3306,
+      (provider, dbPort) => MySQLAdapter(
+        dbName,
+        dbUser,
+        password: dbPass,
+        host: '127.0.0.1',
+        port: dbPort,
+        parentRepositoryProvider: provider,
+      ),
+      '`',
+      'bigint unsigned',
+      anyOf(isNull, isEmpty),
+      entityByReflection: useReflection,
+    );

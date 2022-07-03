@@ -67,26 +67,24 @@ class PostgresTestContainer extends DBTestContainerDocker {
   String get stdout => container.stdout?.asString ?? '';
 }
 
-void main() {
-  _runTest(true);
-  _runTest(false);
+Future<void> main() async {
+  await _runTest(true);
+  await _runTest(false);
 }
 
-void _runTest(bool useReflection) {
-  runAdapterTests(
-    'PostgreSQL',
-    PostgresTestContainer(),
-    5432,
-    (provider, dbPort) => PostgreSQLAdapter(
-      dbName,
-      dbUser,
-      password: dbPass,
-      port: dbPort,
-      parentRepositoryProvider: provider,
-    ),
-    '"',
-    'bigint',
-    contains('CREATE TABLE'),
-    entityByReflection: useReflection,
-  );
-}
+Future<bool> _runTest(bool useReflection) => runAdapterTests(
+      'PostgreSQL',
+      PostgresTestContainer(),
+      5432,
+      (provider, dbPort) => PostgreSQLAdapter(
+        dbName,
+        dbUser,
+        password: dbPass,
+        port: dbPort,
+        parentRepositoryProvider: provider,
+      ),
+      '"',
+      'bigint',
+      contains('CREATE TABLE'),
+      entityByReflection: useReflection,
+    );

@@ -97,10 +97,36 @@ abstract class DBTestContainerDocker
   @override
   DockerCommander? containerHandler;
 
+  static bool? _dockerOK;
+  static Future<bool>? _dockerOKFuture;
+
+  static FutureOr<bool> isDockerOK(DockerCommander dockerCommander) {
+    var ok = _dockerOK;
+    if (ok != null) return ok;
+
+    var future = _dockerOKFuture;
+    if (future != null) {
+      return future;
+    }
+
+    return _dockerOKFuture = _isDockerOKImpl(dockerCommander);
+  }
+
+  static Future<bool> _isDockerOKImpl(DockerCommander dockerCommander) async {
+    await dockerCommander.ensureInitialized();
+
+    var daemonOk = await dockerCommander.isDaemonRunning();
+    return _dockerOK = daemonOk;
+  }
+
   @override
   FutureOr<bool> setupContainerHandler() async {
     var dockerHostLocal = DockerHostLocal();
     var dockerCommander = DockerCommander(dockerHostLocal);
+
+    var daemonOk = await isDockerOK(dockerCommander);
+    if (!daemonOk) return false;
+
     await dockerCommander.ensureInitialized();
 
     _log.info('DockerCommander: $dockerCommander');
@@ -125,7 +151,7 @@ abstract class DBTestContainerDocker
   Future<String?> createTableSQL(String sqlInline) => runSQL(sqlInline);
 }
 
-void runAdapterTests(
+Future<bool> runAdapterTests(
     String dbName,
     DBTestContainer dbTestContainer,
     int dbPort,
@@ -134,61 +160,67 @@ void runAdapterTests(
     String serialIntType,
     dynamic createTableMatcher,
     {required bool entityByReflection,
-    TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) {
+    TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) async {
   _log.handler.logToConsole();
+
+  final _testLog = logging.Logger(
+      'TEST:SQLAdapter:$dbName${entityByReflection ? '+reflection' : ''}');
+
+  _testLog.info('[[[ Setup Container Handler ]]]');
+
+  var containerHandlerOK = await dbTestContainer.setupContainerHandler();
+
+  _testLog.info('Container Handler: $containerHandlerOK');
+
+  if (!containerHandlerOK) {
+    _testLog.warning('Docker NOT running! Skipping Docker tests!');
+  }
 
   var testDomain = dbName.toLowerCase() + '.com';
 
   group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
-    late bool containerHandlerOK;
     late final TestEntityRepositoryProvider entityRepositoryProvider;
 
     setUpAll(() async {
-      _log.info('[[[ setUpAll ]]]');
+      _testLog.info('[[[ setUpAll ]]]');
 
-      containerHandlerOK = await dbTestContainer.setupContainerHandler();
+      expect(containerHandlerOK, isTrue);
 
-      _log.info('Container Daemon: $containerHandlerOK');
+      dbPort = (await getFreeListenPort(
+          startPort: dbPort - 100, endPort: dbPort + 100))!;
 
-      if (containerHandlerOK) {
-        dbPort = (await getFreeListenPort(
-            startPort: dbPort - 100, endPort: dbPort + 100))!;
+      var startOk = await dbTestContainer.start(dbPort);
 
-        var startOk = await dbTestContainer.start(dbPort);
+      _testLog.info('Container start: $startOk > $dbTestContainer');
 
-        _log.info('Container start: $startOk > $dbTestContainer');
+      var prepareOutput = await dbTestContainer.prepare();
 
-        var prepareOutput = await dbTestContainer.prepare();
+      _testLog.info('Prepare: $prepareOutput');
 
-        _log.info('Prepare: $prepareOutput');
+      entityRepositoryProvider = defaultEntityRepositoryProvider ??
+          createEntityRepositoryProvider(
+              entityByReflection, sqlAdapterCreator, dbPort);
 
-        entityRepositoryProvider = defaultEntityRepositoryProvider ??
-            createEntityRepositoryProvider(
-                entityByReflection, sqlAdapterCreator, dbPort);
-
-        await entityRepositoryProvider.ensureInitialized();
-      } else {
-        _log.warning('Docker NOT running! Skipping Docker tests!');
-      }
+      await entityRepositoryProvider.ensureInitialized();
     });
 
     tearDownAll(() async {
-      _log.info('[[[ tearDownAll ]]]');
+      _testLog.info('[[[ tearDownAll ]]]');
 
-      if (containerHandlerOK) {
-        entityRepositoryProvider.close();
+      expect(containerHandlerOK, isTrue);
 
-        var finalizeMsg = await dbTestContainer.finalize();
-        _log.info('Finalize:\n$finalizeMsg');
+      entityRepositoryProvider.close();
 
-        await dbTestContainer.stop();
-        await dbTestContainer.tearDownContainerHandler();
-      }
+      var finalizeMsg = await dbTestContainer.finalize();
+      _testLog.info('Finalize:\n$finalizeMsg');
+
+      await dbTestContainer.stop();
+      await dbTestContainer.tearDownContainerHandler();
     });
 
     bool checkDockerRunning(String test) {
       if (!containerHandlerOK) {
-        _log.warning('Docker NOT running! Skip test: "$test"');
+        _testLog.warning('Docker NOT running! Skip test: "$test"');
         return false;
       } else {
         return true;
@@ -925,7 +957,8 @@ void runAdapterTests(
 
     test('populate', () async {
       if (dbTestContainer.name == 'mysql') {
-        _log.warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
+        _testLog
+            .warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
         return;
       }
 
@@ -1009,5 +1042,7 @@ void runAdapterTests(
 
       print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
     });
-  });
+  }, skip: !containerHandlerOK);
+
+  return containerHandlerOK;
 }

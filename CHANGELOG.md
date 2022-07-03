@@ -2,6 +2,8 @@
 
 - `MemorySQLAdapter`:
   - Using `MapHistory` for internal representation, to allow rollback of transactions. 
+- Tests for `SQLAdapter`:
+  - Improve detection of `Docker` daemon and skipping of tests group when `Docker` is not running.
 - map_history: ^1.0.1
 
 ## 1.1.31
