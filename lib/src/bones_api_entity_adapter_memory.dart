@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/src/bones_api_types.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:map_history/map_history.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
@@ -204,8 +205,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   FutureOr<bool> closeConnection(int connection) => true;
 
-  final Map<String, Map<Object, Map<String, dynamic>>> _tables =
-      <String, Map<Object, Map<String, dynamic>>>{};
+  final Map<String, MapHistory<Object, Map<String, dynamic>>> _tables =
+      <String, MapHistory<Object, Map<String, dynamic>>>{};
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
@@ -215,7 +216,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
     if (map != null) {
       return map;
     } else if (autoCreate) {
-      _tables[table] = map = <int, Map<String, dynamic>>{};
+      _tables[table] = map = MapHistory<Object, Map<String, dynamic>>();
       return map;
     } else {
       return null;
@@ -228,8 +229,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<int> doCountSQL(
-      String entityName, String table, SQL sql, int connection) {
+  FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
+      Transaction transaction, int connection) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -244,8 +245,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doInsertRelationshipSQL(
-      String entityName, String table, SQL sql, int connection) {
+  FutureOr doInsertRelationshipSQL(String entityName, String table, SQL sql,
+      Transaction transaction, int connection) {
     if (sql.isDummy) return null;
 
     var entry = _normalizeEntityJSON(
@@ -268,8 +269,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doInsertSQL(
-      String entityName, String table, SQL sql, int connection) {
+  FutureOr doInsertSQL(String entityName, String table, SQL sql,
+      Transaction transaction, int connection) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
@@ -345,9 +346,9 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr doUpdateSQL(
-      String entityName, String table, SQL sql, Object id, int connection,
-      {bool allowAutoInsert = false, Transaction? transaction}) {
+  FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
+      Transaction transaction, int connection,
+      {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
@@ -397,8 +398,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
-      String entityName, String table, SQL sql, int connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
+      String table, SQL sql, Transaction transaction, int connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var sel = _selectEntries(table, sql);
@@ -468,8 +469,8 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
-      String entityName, String table, SQL sql, int connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
+      String table, SQL sql, Transaction transaction, int connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var map = _getTableMap(table, false);

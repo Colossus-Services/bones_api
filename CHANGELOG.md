@@ -1,3 +1,9 @@
+## 1.1.32
+
+- `MemorySQLAdapter`:
+  - Using `MapHistory` for internal representation, to allow rollback of transactions. 
+- map_history: ^1.0.1
+
 ## 1.1.31
 
 - `EntityHandler`:

@@ -622,7 +622,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] countSQL> $sql');
-      return doCountSQL(entityName, table, sql, connection);
+      return doCountSQL(entityName, table, sql, op.transaction, connection);
     });
   }
 
@@ -630,6 +630,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     String entityName,
     String table,
     SQL sql,
+    Transaction transaction,
     C connection,
   );
 
@@ -700,7 +701,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] insertSQL> $sql');
-      var retInsert = doInsertSQL(entityName, table, sql, connection);
+      var retInsert =
+          doInsertSQL(entityName, table, sql, op.transaction, connection);
 
       if (mapper != null) {
         return retInsert.resolveMapped((e) => mapper(e));
@@ -710,13 +712,13 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     });
   }
 
-  FutureOr<dynamic> doInsertRelationshipSQL(
-      String entityName, String table, SQL sql, C connection) {
-    return doInsertSQL(entityName, table, sql, connection);
+  FutureOr<dynamic> doInsertRelationshipSQL(String entityName, String table,
+      SQL sql, Transaction transaction, C connection) {
+    return doInsertSQL(entityName, table, sql, transaction, connection);
   }
 
-  FutureOr<dynamic> doInsertSQL(
-      String entityName, String table, SQL sql, C connection);
+  FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
+      Transaction transaction, C connection);
 
   FutureOr<SQL> generateUpdateSQL(Transaction transaction, String entityName,
       String table, Object id, Map<String, Object?> fields) {
@@ -805,8 +807,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
-      var retInsert = doUpdateSQL(entityName, table, sql, id, connection,
-          allowAutoInsert: allowAutoInsert, transaction: op.transaction);
+      var retInsert = doUpdateSQL(
+          entityName, table, sql, id, op.transaction, connection,
+          allowAutoInsert: allowAutoInsert);
 
       if (mapper != null) {
         return retInsert.resolveMapped((e) => mapper(e));
@@ -816,9 +819,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     });
   }
 
-  FutureOr<dynamic> doUpdateSQL(
-      String entityName, String table, SQL sql, Object id, C connection,
-      {bool allowAutoInsert = false, Transaction? transaction});
+  FutureOr<dynamic> doUpdateSQL(String entityName, String table, SQL sql,
+      Object id, Transaction transaction, C connection,
+      {bool allowAutoInsert = false});
 
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(
       Transaction transaction,
@@ -968,14 +971,15 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
           '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
 
       var retInserts = sqls.map((sql) {
-        var ret = doInsertRelationshipSQL(
-            entityName, sql.mainTable ?? table, sql, connection);
+        var ret = doInsertRelationshipSQL(entityName, sql.mainTable ?? table,
+            sql, op.transaction, connection);
 
         if (sql.hasPosSQL) {
           sql.posSQL!.map((e) {
             _log.info(
                 '[transaction:${op.transactionId}] insertRelationship[POS]> $e');
-            return doDeleteSQL(entityName, e.mainTable!, e, connection);
+            return doDeleteSQL(
+                entityName, e.mainTable!, e, op.transaction, connection);
           }).resolveAllWithValue(ret);
         } else {
           return ret;
@@ -1049,8 +1053,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       _log.info(
           '[transaction:${op.transactionId}] selectRelationshipSQL> $sql');
 
-      var ret =
-          doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
+      var ret = doSelectSQL(
+          entityName, sql.mainTable ?? table, sql, op.transaction, connection);
       return ret;
     });
   }
@@ -1134,8 +1138,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       _log.info(
           '[transaction:${op.transactionId}] selectRelationshipsSQL> $sql');
 
-      var ret =
-          doSelectSQL(entityName, sql.mainTable ?? table, sql, connection);
+      var ret = doSelectSQL(
+          entityName, sql.mainTable ?? table, sql, op.transaction, connection);
       return ret;
     });
   }
@@ -1369,7 +1373,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] selectSQL> $sql');
 
-      var retSel = doSelectSQL(entityName, table, sql, connection);
+      var retSel =
+          doSelectSQL(entityName, table, sql, op.transaction, connection);
 
       if (mapper != null) {
         return retSel.resolveMapped((e) => e.map(mapper));
@@ -1391,6 +1396,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     String entityName,
     String table,
     SQL sql,
+    Transaction transaction,
     C connection,
   );
 
@@ -1472,7 +1478,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] deleteSQL> $sql');
 
-      var retSel = doDeleteSQL(entityName, table, sql, connection);
+      var retSel =
+          doDeleteSQL(entityName, table, sql, op.transaction, connection);
 
       if (mapper != null) {
         return retSel.resolveMapped((e) => e.map(mapper));
@@ -1486,6 +1493,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     String entityName,
     String table,
     SQL sql,
+    Transaction transaction,
     C connection,
   );
 

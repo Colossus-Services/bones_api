@@ -296,7 +296,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   static final RegExp _regExpSpaces = RegExp(r'\s+');
   static final RegExp _regExpIgnoreWords =
-      RegExp(r'(?:unsigned|signed|varying|precision|\(.*?\))');
+      RegExp(r'unsigned|signed|varying|precision|\(.*?\)');
 
   Type _toFieldType(String dataType) {
     dataType = dataType.toLowerCase();
@@ -472,7 +472,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      PostgreSQLExecutionContext connection) {
+      Transaction transaction, PostgreSQLExecutionContext connection) {
     return connection
         .mappedResultsQuery(sql.sql,
             substitutionValues: sql.parametersByPlaceholder)
@@ -490,8 +490,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      PostgreSQLExecutionContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -508,8 +512,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
-      String table, SQL sql, PostgreSQLExecutionContext connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      PostgreSQLExecutionContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -527,7 +535,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
-      PostgreSQLExecutionContext connection) {
+      Transaction transaction, PostgreSQLExecutionContext connection) {
     if (sql.isDummy) return null;
 
     return connection
@@ -538,8 +546,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      PostgreSQLExecutionContext connection,
-      {bool allowAutoInsert = false, Transaction? transaction}) {
+      Transaction transaction, PostgreSQLExecutionContext connection,
+      {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
     return connection
@@ -555,10 +563,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
         var fields = sql.namedParameters!;
 
-        return generateInsertSQL(transaction!, entityName, table, fields)
+        return generateInsertSQL(transaction, entityName, table, fields)
             .resolveMapped((insertSQL) {
           _log.info('Update not affecting any row! Auto inserting: $insertSQL');
-          return doInsertSQL(entityName, table, insertSQL, connection);
+          return doInsertSQL(
+              entityName, table, insertSQL, transaction, connection);
         });
       }
 

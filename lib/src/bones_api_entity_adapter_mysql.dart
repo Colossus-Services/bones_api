@@ -272,7 +272,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   static final RegExp _regExpSpaces = RegExp(r'\s+');
   static final RegExp _regExpIgnoreWords =
-      RegExp(r'(?:unsigned|signed|varying|precision|\(.*?\))');
+      RegExp(r'unsigned|signed|varying|precision|\(.*?\)');
 
   Type _toFieldType(String dataType) {
     dataType = dataType.toLowerCase();
@@ -439,7 +439,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      MySqlConnectionWrapper connection) {
+      Transaction transaction, MySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
@@ -449,8 +449,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
-      String table, SQL sql, MySqlConnectionWrapper connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      MySqlConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -462,8 +466,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       results.map((e) => e.fields).whereType<Map<String, dynamic>>().toList();
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
-      String table, SQL sql, MySqlConnectionWrapper connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      MySqlConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var preSQLs = sql.preSQL;
@@ -505,7 +513,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
-      MySqlConnectionWrapper connection) {
+      Transaction transaction, MySqlConnectionWrapper connection) {
     if (sql.isDummy) return null;
 
     return connection
@@ -515,8 +523,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      MySqlConnectionWrapper connection,
-      {bool allowAutoInsert = false, Transaction? transaction}) {
+      Transaction transaction, MySqlConnectionWrapper connection,
+      {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
     return connection
@@ -531,10 +539,11 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
         var fields = sql.namedParameters!;
 
-        return generateInsertSQL(transaction!, entityName, table, fields)
+        return generateInsertSQL(transaction, entityName, table, fields)
             .resolveMapped((insertSQL) {
           _log.info('Update not affecting any row! Auto inserting: $insertSQL');
-          return doInsertSQL(entityName, table, insertSQL, connection);
+          return doInsertSQL(
+              entityName, table, insertSQL, transaction, connection);
         });
       }
 
