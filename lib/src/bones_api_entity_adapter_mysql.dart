@@ -587,47 +587,37 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      SQLWrapper sql, TransactionExecution<R, MySqlConnectionWrapper> f) {
-    var transaction = op.transaction;
+  FutureOr<MySqlConnectionWrapper> openTransaction(Transaction transaction) {
+    var contextCompleter = Completer<MySqlConnectionWrapper>();
 
-    if (transaction.length == 1 &&
-        !transaction.isExecuting &&
-        sql.sqlsLength == 1 &&
-        !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool(f);
-    }
+    var result = executeWithPool(
+      (connection) {
+        return connection.connection.transaction((t) {
+          var transactionWrap =
+              _MySqlConnectionTransaction(connection.connection, t);
+          contextCompleter.complete(transactionWrap);
 
-    if (!transaction.isOpen && !transaction.isOpening) {
-      _openTransaction(transaction);
-    }
+          return transaction.transactionFuture.catchError((e, s) {
+            cancelTransaction(transaction, connection, e, s);
+            throw e;
+          });
+        });
+      },
+      validator: (c) => !transaction.isAborted,
+    );
 
-    return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, MySqlConnectionWrapper>((c) => f(c));
-    });
+    transaction.transactionResult = result;
+
+    return contextCompleter.future;
   }
 
-  void _openTransaction(Transaction transaction) {
-    transaction.open(() {
-      var contextCompleter = Completer<MySqlConnectionWrapper>();
-
-      var ret = executeWithPool(
-        (connection) {
-          return connection.connection.transaction((t) {
-            var transactionWrap =
-                _MySqlConnectionTransaction(connection.connection, t);
-            contextCompleter.complete(transactionWrap);
-
-            return transaction.transactionFuture;
-          });
-        },
-        validator: (c) => !transaction.isAborted,
-      );
-
-      transaction.transactionResult = ret;
-
-      return contextCompleter.future;
-    });
+  @override
+  bool cancelTransaction(
+      Transaction transaction,
+      MySqlConnectionWrapper connection,
+      Object? error,
+      StackTrace? stackTrace) {
+    return true;
   }
 }
 

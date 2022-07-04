@@ -1152,17 +1152,23 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
         !transaction.isExecuting &&
         sql.sqlsLength == 1 &&
         !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool((connection) => f(connection));
+      return executeWithPool(f);
     }
 
     if (!transaction.isOpen && !transaction.isOpening) {
-      transaction.open(createConnection);
+      transaction.open(() => openTransaction(transaction));
     }
 
     return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, C>((c) => f(c));
+      return transaction.addExecution<R, C>((c) => f(c),
+          debugInfo: () => sql.mainSQL.toString());
     });
   }
+
+  FutureOr<C> openTransaction(Transaction transaction);
+
+  FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
+      Object? error, StackTrace? stackTrace);
 
   FutureOr<SQL> generateSelectSQL(Transaction transaction, String entityName,
       String table, EntityMatcher matcher,

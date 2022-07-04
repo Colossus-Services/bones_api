@@ -15,10 +15,26 @@ import 'bones_api_utils.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
 
+class MemorySQLAdapterContext {
+  final int id;
+
+  final Map<String, int> tablesVersions;
+
+  MemorySQLAdapterContext(this.id, this.tablesVersions);
+
+  bool _closed = false;
+
+  bool get isClosed => _closed;
+
+  void close() {
+    _closed = true;
+  }
+}
+
 /// A [SQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class MemorySQLAdapter extends SQLAdapter<int> {
+class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
@@ -56,7 +72,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
           minConnections ?? 1,
           maxConnections ?? 3,
           const SQLAdapterCapability(
-              dialect: 'generic', transactions: true, transactionAbort: false),
+              dialect: 'generic', transactions: true, transactionAbort: true),
           parentRepositoryProvider: parentRepositoryProvider,
         ) {
     boot();
@@ -194,19 +210,31 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   @override
   bool get sqlAcceptsInsertOnConflict => false;
 
+  @override
+  String getConnectionURL(MemorySQLAdapterContext connection) =>
+      'memory://${connection.id}';
+
   int _connectionCount = 0;
 
   @override
-  String getConnectionURL(int connection) => 'memory://$connection';
+  MemorySQLAdapterContext createConnection() {
+    var id = ++_connectionCount;
+    var tablesVersions = this.tablesVersions;
+
+    return MemorySQLAdapterContext(id, tablesVersions);
+  }
 
   @override
-  int createConnection() => ++_connectionCount;
-
-  @override
-  FutureOr<bool> closeConnection(int connection) => true;
+  FutureOr<bool> closeConnection(MemorySQLAdapterContext connection) {
+    connection.close();
+    return true;
+  }
 
   final Map<String, MapHistory<Object, Map<String, dynamic>>> _tables =
       <String, MapHistory<Object, Map<String, dynamic>>>{};
+
+  Map<String, int> get tablesVersions =>
+      _tables.map((key, value) => MapEntry(key, value.version));
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
@@ -230,7 +258,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, int connection) {
+      Transaction transaction, MemorySQLAdapterContext connection) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -246,7 +274,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr doInsertRelationshipSQL(String entityName, String table, SQL sql,
-      Transaction transaction, int connection) {
+      Transaction transaction, MemorySQLAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var entry = _normalizeEntityJSON(
@@ -270,7 +298,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, int connection) {
+      Transaction transaction, MemorySQLAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
@@ -347,7 +375,7 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, int connection,
+      Transaction transaction, MemorySQLAdapterContext connection,
       {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
@@ -373,7 +401,10 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
       _disposeNextIDCounter(table);
     } else {
-      prevEntry.addAll(entry);
+      var updated = deepCopyMap(prevEntry)!;
+      updated.addAll(entry);
+
+      map[id] = updated;
     }
 
     return id;
@@ -398,8 +429,12 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(String entityName,
-      String table, SQL sql, Transaction transaction, int connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      MemorySQLAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var sel = _selectEntries(table, sql);
@@ -469,8 +504,12 @@ class MemorySQLAdapter extends SQLAdapter<int> {
   }
 
   @override
-  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(String entityName,
-      String table, SQL sql, Transaction transaction, int connection) {
+  FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      MemorySQLAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var map = _getTableMap(table, false);
@@ -803,6 +842,40 @@ class MemorySQLAdapter extends SQLAdapter<int> {
 
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
+
+  @override
+  FutureOr<MemorySQLAdapterContext> openTransaction(Transaction transaction) {
+    return createConnection().resolveMapped((conn) {
+      transaction.transactionFuture.catchError((e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      });
+      return conn;
+    });
+  }
+
+  @override
+  bool cancelTransaction(
+      Transaction transaction,
+      MemorySQLAdapterContext connection,
+      Object? error,
+      StackTrace? stackTrace) {
+    _rollbackTables(connection.tablesVersions);
+    return true;
+  }
+
+  void _rollbackTables(Map<String, int> tablesVersions) {
+    for (var e in tablesVersions.entries) {
+      var table = e.key;
+      var version = e.value;
+      _rollbackTable(table, version);
+    }
+  }
+
+  void _rollbackTable(String table, int targetVersion) {
+    var tableMap = _tables[table];
+    tableMap?.rollback(targetVersion);
+  }
 
   @override
   String toString() {

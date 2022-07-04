@@ -633,11 +633,11 @@ abstract class EntityHandler<O> with FieldsFromMap {
         .map((key) => MapEntry<String, dynamic>(key, getField(o, key))));
   }
 
-  void setField<V>(O o, String key, V? value);
+  void setField<V>(O o, String key, V? value, {bool log = true});
 
   bool trySetField<V>(O o, String key, V? value) {
     try {
-      setField(o, key, value);
+      setField(o, key, value, log: false);
       return true;
     } catch (e) {
       return false;
@@ -1104,13 +1104,15 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
-  void setField<V>(O o, String key, V? value) {
+  void setField<V>(O o, String key, V? value, {bool log = true}) {
     inspectObject(o);
     try {
       return o.setField<V>(key, value);
     } catch (e, s) {
       var message = "Error setting `$type` field: $key = $value";
-      _log.severe(message, e, s);
+      if (log) {
+        _log.severe(message, e, s);
+      }
       throw StateError(message);
     }
   }
@@ -1208,13 +1210,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }
 
   @override
-  void setField<V>(O o, String key, V? value) {
+  void setField<V>(O o, String key, V? value, {bool log = true}) {
     try {
       reflection.setField(key, value, o);
     } catch (e, s) {
       var message =
           "Error setting `$type` field using reflection[$reflection]: $key = $value";
-      _log.severe(message, e, s);
+      if (log) {
+        _log.severe(message, e, s);
+      }
       throw StateError(message);
     }
   }
@@ -2529,7 +2533,24 @@ class TransactionAbortedError extends Error {
   String? reason;
   Object? payload;
 
-  TransactionAbortedError({this.reason, this.payload});
+  Object? abortError;
+  StackTrace? abortStackTrace;
+
+  TransactionAbortedError(
+      {this.reason, this.payload, this.abortError, this.abortStackTrace});
+
+  TransactionAbortedError withAbortStackTrace(StackTrace? abortStackTrace) {
+    if (abortStackTrace == null ||
+        identical(this.abortStackTrace, abortStackTrace)) {
+      return this;
+    }
+
+    return TransactionAbortedError(
+        reason: reason,
+        payload: payload,
+        abortError: abortError,
+        abortStackTrace: abortStackTrace);
+  }
 
   @override
   String toString() {
@@ -2808,7 +2829,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   TransactionAbortedError? get abortedError => _abortedError;
 
   /// Abort this transaction.
-  FutureOr<TransactionAbortedError?> abort({String? reason, Object? payload}) {
+  FutureOr<TransactionAbortedError?> abort(
+      {String? reason,
+      Object? payload,
+      Object? error,
+      StackTrace? stackTrace}) {
     if (_commitCalled) {
       return null;
     }
@@ -2818,7 +2843,25 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     payload ??= _lastResult;
-    var abortError = TransactionAbortedError(reason: reason, payload: payload);
+
+    TransactionAbortedError abortError;
+    if (error is TransactionAbortedError) {
+      stackTrace ??=
+          error.abortStackTrace ?? error.stackTrace ?? StackTrace.current;
+      abortError = error.withAbortStackTrace(stackTrace);
+    } else {
+      if (error is Error) {
+        stackTrace ??= error.stackTrace ?? StackTrace.current;
+      } else {
+        stackTrace ??= StackTrace.current;
+      }
+
+      abortError = TransactionAbortedError(
+          reason: reason,
+          payload: payload,
+          abortError: error,
+          abortStackTrace: stackTrace);
+    }
 
     _abortedError = abortError;
     _aborted = true;
@@ -2829,7 +2872,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<TransactionAbortedError> _abortImpl() {
     var abortError = _abortedError!;
 
-    _transactionCompleter.completeError(abortError);
+    _transactionCompleter.completeError(
+        abortError.abortError ?? abortError, abortError.abortStackTrace);
 
     if (transactionResult != null) {
       if (transactionResult is Future) {
@@ -2878,21 +2922,52 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
-  FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec) {
+  FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
+      {String? Function()? debugInfo}) {
     if (_executionsFutures.isEmpty) {
-      var ret = exec(context! as C);
+      var ret = _executeSafe(exec, debugInfo);
       _executionsFutures.add(ret);
       return ret;
     } else {
       var last = _executionsFutures.last;
 
       var ret = last.resolveWith(() {
-        return exec(context! as C);
+        return _executeSafe(exec, debugInfo);
       });
 
       _executionsFutures.add(ret);
       return ret;
     }
+  }
+
+  FutureOr<R> _executeSafe<R, C>(
+      TransactionExecution<R, C> exec, String? Function()? debugInfo) {
+    try {
+      var ret = exec(context! as C);
+      if (ret is Future<R>) {
+        var future = ret;
+        return future
+            .catchError((e, s) => _onExecutionError<R>(e, s, debugInfo));
+      } else {
+        return ret;
+      }
+    } catch (e, s) {
+      return _onExecutionError<R>(e, s, debugInfo);
+    }
+  }
+
+  FutureOr<R> _onExecutionError<R>(
+      Object error, StackTrace stackTrace, String? Function()? debugInfo) {
+    var info = debugInfo != null ? debugInfo() : null;
+
+    if (info != null && info.isNotEmpty) {
+      _log.severe(
+          "Error executing transaction operation: $info", error, stackTrace);
+    } else {
+      _log.severe("Error executing transaction operation!", error, stackTrace);
+    }
+
+    throw error;
   }
 
   @override

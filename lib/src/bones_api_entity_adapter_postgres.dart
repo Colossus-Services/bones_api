@@ -603,50 +603,38 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      SQLWrapper sql, TransactionExecution<R, PostgreSQLExecutionContext> f) {
-    var transaction = op.transaction;
+  FutureOr<PostgreSQLExecutionContext> openTransaction(
+      Transaction transaction) {
+    var contextCompleter = Completer<PostgreSQLExecutionContext>();
 
-    if (transaction.length == 1 &&
-        !transaction.isExecuting &&
-        sql.sqlsLength == 1 &&
-        !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool(f);
-    }
+    var result = executeWithPool(
+      (connection) {
+        var theConnection = connection as PostgreSQLConnection;
 
-    if (!transaction.isOpen && !transaction.isOpening) {
-      _openTransaction(transaction);
-    }
+        return theConnection.transaction((c) {
+          contextCompleter.complete(c);
 
-    return transaction.onOpen<R>(() {
-      return transaction
-          .addExecution<R, PostgreSQLExecutionContext>((c) => f(c));
-    });
+          return transaction.transactionFuture.catchError((e, s) {
+            cancelTransaction(transaction, c, e, s);
+            throw e;
+          });
+        });
+      },
+      validator: (c) => !transaction.isAborted,
+    );
+
+    transaction.transactionResult = result;
+
+    return contextCompleter.future;
   }
 
-  void _openTransaction(Transaction transaction) {
-    transaction.open(() {
-      var contextCompleter = Completer<PostgreSQLExecutionContext>();
-
-      var ret = executeWithPool(
-        (connection) {
-          var theConnection = connection as PostgreSQLConnection;
-
-          return theConnection.transaction((c) {
-            contextCompleter.complete(c);
-
-            return transaction.transactionFuture.catchError((e) {
-              c.cancelTransaction();
-              return null;
-            });
-          });
-        },
-        validator: (c) => !transaction.isAborted,
-      );
-
-      transaction.transactionResult = ret;
-
-      return contextCompleter.future;
-    });
+  @override
+  bool cancelTransaction(
+      Transaction transaction,
+      PostgreSQLExecutionContext connection,
+      Object? error,
+      StackTrace? stackTrace) {
+    connection.cancelTransaction();
+    return true;
   }
 }
