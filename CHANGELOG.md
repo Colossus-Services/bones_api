@@ -1,3 +1,10 @@
+## 1.1.33
+
+- mysql1: ^0.20.0
+- postgres: ^2.4.5
+- lints: ^2.0.0
+- coverage: ^1.3.2
+
 ## 1.1.32
 
 - `MemorySQLAdapter`:

@@ -124,7 +124,7 @@ abstract class LoggerHandler {
 
   static String truncateString(String s, int limit) {
     if (s.length > limit) {
-      s = s.substring(0, limit - 4) + '..' + s.substring(s.length - 2);
+      s = '${s.substring(0, limit - 4)}..${s.substring(s.length - 2)}';
     }
     return s;
   }

@@ -505,7 +505,7 @@ class MyCommandServe extends CommandSourceFileBase {
   String _filterOutput(String o, List<int> count) {
     var c = ++count[0];
     var o2 =
-        o.replaceAllMapped(RegExp(r'(\r?\n)'), (m) => m.group(1)! + ' >> ');
+        o.replaceAllMapped(RegExp(r'(\r?\n)'), (m) => '${m.group(1)!} >> ');
     if (c == 1) {
       o2 = ' >> $o2';
     }

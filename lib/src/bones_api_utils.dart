@@ -534,7 +534,7 @@ class TimedMap<K, V> implements Map<K, V> {
   /// See [checkAllEntries].
   List<MapEntry<K, V>> entriesChecked({DateTime? now, Duration? keyTimeout}) =>
       keysChecked(now: now, keyTimeout: keyTimeout)
-          .map((k) => MapEntry(k, _entries[k]!))
+          .map((k) => MapEntry(k, _entries[k] as V))
           .toList();
 
   /// Checks all the entries of this instance.
@@ -612,7 +612,7 @@ class TimedMap<K, V> implements Map<K, V> {
       var t = _entriesPutTime[k];
 
       if (t != null) {
-        var v = _entries[k]!;
+        var v = _entries[k] as V;
 
         if (test(k, v, t)) {
           _entries.remove(k);
@@ -732,7 +732,7 @@ class TimedMap<K, V> implements Map<K, V> {
       var t = _entriesPutTime[k];
 
       if (t != null) {
-        var v = _entries[k]!;
+        var v = _entries[k] as V;
         var v2 = update(k, v, t);
 
         _entries[k] = v2;

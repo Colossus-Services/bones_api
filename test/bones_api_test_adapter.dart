@@ -163,26 +163,26 @@ Future<bool> runAdapterTests(
     TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) async {
   _log.handler.logToConsole();
 
-  final _testLog = logging.Logger(
+  final testLog = logging.Logger(
       'TEST:SQLAdapter:$dbName${entityByReflection ? '+reflection' : ''}');
 
-  _testLog.info('[[[ Setup Container Handler ]]]');
+  testLog.info('[[[ Setup Container Handler ]]]');
 
   var containerHandlerOK = await dbTestContainer.setupContainerHandler();
 
-  _testLog.info('Container Handler: $containerHandlerOK');
+  testLog.info('Container Handler: $containerHandlerOK');
 
   if (!containerHandlerOK) {
-    _testLog.warning('Docker NOT running! Skipping Docker tests!');
+    testLog.warning('Docker NOT running! Skipping Docker tests!');
   }
 
-  var testDomain = dbName.toLowerCase() + '.com';
+  var testDomain = '${dbName.toLowerCase()}.com';
 
   group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
     late final TestEntityRepositoryProvider entityRepositoryProvider;
 
     setUpAll(() async {
-      _testLog.info('[[[ setUpAll ]]]');
+      testLog.info('[[[ setUpAll ]]]');
 
       expect(containerHandlerOK, isTrue);
 
@@ -191,11 +191,11 @@ Future<bool> runAdapterTests(
 
       var startOk = await dbTestContainer.start(dbPort);
 
-      _testLog.info('Container start: $startOk > $dbTestContainer');
+      testLog.info('Container start: $startOk > $dbTestContainer');
 
       var prepareOutput = await dbTestContainer.prepare();
 
-      _testLog.info('Prepare: $prepareOutput');
+      testLog.info('Prepare: $prepareOutput');
 
       entityRepositoryProvider = defaultEntityRepositoryProvider ??
           createEntityRepositoryProvider(
@@ -205,14 +205,14 @@ Future<bool> runAdapterTests(
     });
 
     tearDownAll(() async {
-      _testLog.info('[[[ tearDownAll ]]]');
+      testLog.info('[[[ tearDownAll ]]]');
 
       expect(containerHandlerOK, isTrue);
 
       entityRepositoryProvider.close();
 
       var finalizeMsg = await dbTestContainer.finalize();
-      _testLog.info('Finalize:\n$finalizeMsg');
+      testLog.info('Finalize:\n$finalizeMsg');
 
       await dbTestContainer.stop();
       await dbTestContainer.tearDownContainerHandler();
@@ -220,7 +220,7 @@ Future<bool> runAdapterTests(
 
     bool checkDockerRunning(String test) {
       if (!containerHandlerOK) {
-        _testLog.warning('Docker NOT running! Skip test: "$test"');
+        testLog.warning('Docker NOT running! Skip test: "$test"');
         return false;
       } else {
         return true;
@@ -957,8 +957,7 @@ Future<bool> runAdapterTests(
 
     test('populate', () async {
       if (dbTestContainer.name == 'mysql') {
-        _testLog
-            .warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
+        testLog.warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
         return;
       }
 

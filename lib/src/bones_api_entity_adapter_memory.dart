@@ -683,9 +683,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     if (entityHandler == null) {
       if (relationship != null) {
         var sourceId =
-            relationship.sourceTable + '_' + relationship.sourceField;
+            '${relationship.sourceTable}_${relationship.sourceField}';
         var targetId =
-            relationship.targetTable + '_' + relationship.targetField;
+            '${relationship.targetTable}_${relationship.targetField}';
 
         tableScheme = TableScheme(table,
             relationship: true,
@@ -814,9 +814,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         var sourceFieldIdType =
             sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
 
-        var relTable = ref.sourceTable + '_' + ref.targetTable + '_ref';
-        var relSourceField = ref.sourceTable + '_' + sourceFieldId;
-        var relTargetField = ref.targetTable + '_' + ref.targetField;
+        var relTable = '${ref.sourceTable}_${ref.targetTable}_ref';
+        var relSourceField = '${ref.sourceTable}_$sourceFieldId';
+        var relTargetField = '${ref.targetTable}_${ref.targetField}';
 
         return TableRelationshipReference(
           relTable,

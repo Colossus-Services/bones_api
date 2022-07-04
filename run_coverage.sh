@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dart run test --coverage=./coverage
+dart run test --coverage=./coverage -x build
 
 dart pub global run coverage:format_coverage --packages=.dart_tool/package_config.json --report-on=lib --lcov -o ./coverage/lcov.info -i ./coverage
 

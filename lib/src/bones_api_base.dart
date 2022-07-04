@@ -27,7 +27,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.1.32';
+  static const String VERSION = '1.1.33';
 
   static bool _boot = false;
 
@@ -602,7 +602,7 @@ class APIRouteInfo {
         ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
         : Uri.base;
     var module = routeHandler.module;
-    var path = module.name + '/' + name;
+    var path = '${module.name}/$name';
 
     var parameters = hasParameters ? parametersAsJson : null;
 
@@ -650,7 +650,7 @@ class APIRouteInfo {
 }
 
 APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {
-  var payload = 'NOT FOUND: No route for path "' + request.path + '"';
+  var payload = 'NOT FOUND: No route for path "${request.path}"';
   return APIResponse.notFound(payloadDynamic: payload);
 }
 
