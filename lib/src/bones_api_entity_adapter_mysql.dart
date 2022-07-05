@@ -619,6 +619,13 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       StackTrace? stackTrace) {
     return true;
   }
+
+  @override
+  bool get callCloseTransactionRequired => false;
+
+  @override
+  FutureOr<void> closeTransaction(
+      Transaction transaction, MySqlConnectionWrapper? connection) {}
 }
 
 abstract class MySqlConnectionWrapper {

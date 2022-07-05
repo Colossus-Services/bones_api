@@ -2672,8 +2672,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   bool get isOpening => _opening;
 
-  void open(FutureOr<Object> Function() opener) {
+  FutureOr<void> Function()? _transactionCloser;
+
+  void open(
+      FutureOr<Object> Function() opener, FutureOr<void> Function()? closer) {
+    if (_opening) {
+      throw StateError("Transaction already opening.");
+    } else if (_open) {
+      throw StateError("Transaction already open.");
+    }
+
     _opening = true;
+    _transactionCloser = closer;
 
     asyncTry(opener, then: (c) {
       _setContext(c!);
@@ -2695,6 +2705,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   void _setContext(Object context) {
     _context = context;
     _open = true;
+    _opening = false;
     _openCompleter.complete(true);
   }
 
@@ -2801,20 +2812,38 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var result = _lastResult;
     _result = result;
 
-    _transactionCompleter.complete(result);
+    FutureOr<void>? closerResult;
 
+    var closer = _transactionCloser;
+    if (closer != null) {
+      closerResult = closer();
+
+      if (closerResult != null) {
+        closerResult.resolveWith(() => _commitComplete<R>(result));
+      }
+    }
+
+    return _commitComplete<R>(result);
+  }
+
+  FutureOr<R?> _commitComplete<R>(Object? result) {
     if (transactionResult != null) {
+      _transactionCompleter.complete(result);
+
       return transactionResult!.resolveMapped((r) {
         _committed = true;
         _resultCompleter.complete(r);
         return r as R?;
       });
     } else {
-      return _transactionCompleter.future.then((r) {
+      var ret = _transactionCompleter.future.then((r) {
         _committed = true;
         _resultCompleter.complete(r);
         return r as R?;
       });
+
+      _transactionCompleter.complete(result);
+      return ret;
     }
   }
 

@@ -637,4 +637,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     connection.cancelTransaction();
     return true;
   }
+
+  @override
+  bool get callCloseTransactionRequired => false;
+
+  @override
+  FutureOr<void> closeTransaction(
+      Transaction transaction, PostgreSQLExecutionContext? connection) {}
 }

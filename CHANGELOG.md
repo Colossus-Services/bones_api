@@ -1,3 +1,9 @@
+## 1.1.34
+
+- `MemorySQLAdapter`:
+  - Consolidating tables after a transaction is finished, removing unnecessary history data. 
+- map_history: ^1.0.2
+
 ## 1.1.33
 
 - mysql1: ^0.20.0

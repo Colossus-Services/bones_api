@@ -1156,7 +1156,12 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     }
 
     if (!transaction.isOpen && !transaction.isOpening) {
-      transaction.open(() => openTransaction(transaction));
+      transaction.open(
+        () => openTransaction(transaction),
+        callCloseTransactionRequired
+            ? () => closeTransaction(transaction, transaction.context as C?)
+            : null,
+      );
     }
 
     return transaction.onOpen<R>(() {
@@ -1169,6 +1174,10 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
       Object? error, StackTrace? stackTrace);
+
+  bool get callCloseTransactionRequired;
+
+  FutureOr<void> closeTransaction(Transaction transaction, C? connection);
 
   FutureOr<SQL> generateSelectSQL(Transaction transaction, String entityName,
       String table, EntityMatcher matcher,

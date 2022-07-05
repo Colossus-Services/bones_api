@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/src/bones_api_types.dart';
 import 'package:collection/collection.dart';
@@ -15,7 +17,7 @@ import 'bones_api_utils.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
 
-class MemorySQLAdapterContext {
+class MemorySQLAdapterContext implements Comparable<MemorySQLAdapterContext> {
   final int id;
 
   final Map<String, int> tablesVersions;
@@ -29,6 +31,9 @@ class MemorySQLAdapterContext {
   void close() {
     _closed = true;
   }
+
+  @override
+  int compareTo(MemorySQLAdapterContext other) => id.compareTo(other.id);
 }
 
 /// A [SQLAdapter] that stores tables data in memory.
@@ -843,9 +848,14 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
+  final Map<MemorySQLAdapterContext, DateTime> _openTransactionsContexts =
+      <MemorySQLAdapterContext, DateTime>{};
+
   @override
   FutureOr<MemorySQLAdapterContext> openTransaction(Transaction transaction) {
     return createConnection().resolveMapped((conn) {
+      _openTransactionsContexts[conn] = DateTime.now();
+
       transaction.transactionFuture.catchError((e, s) {
         cancelTransaction(transaction, conn, e, s);
         throw e;
@@ -860,8 +870,56 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       MemorySQLAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
+    _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
     return true;
+  }
+
+  @override
+  bool get callCloseTransactionRequired => true;
+
+  @override
+  FutureOr<void> closeTransaction(
+      Transaction transaction, MemorySQLAdapterContext? connection) {
+    if (connection != null) {
+      _consolidateTransactionContext(connection);
+    }
+  }
+
+  final ListQueue<MemorySQLAdapterContext> _consolidateContextQueue =
+      ListQueue<MemorySQLAdapterContext>();
+
+  void _consolidateTransactionContext(MemorySQLAdapterContext context) {
+    _openTransactionsContexts.remove(context);
+
+    if (_openTransactionsContexts.isNotEmpty) {
+      _consolidateContextQueue.add(context);
+      return;
+    }
+
+    if (_consolidateContextQueue.isEmpty) {
+      _consolidateTables(context.tablesVersions);
+    } else {
+      var list = [..._consolidateContextQueue, context];
+      list.sort();
+
+      for (var c in list) {
+        _consolidateTables(c.tablesVersions);
+      }
+    }
+  }
+
+  void _consolidateTables(Map<String, int> tablesVersions) {
+    for (var e in tablesVersions.entries) {
+      var table = e.key;
+      var version = e.value;
+      _consolidateTable(table, version);
+    }
+  }
+
+  void _consolidateTable(String table, int targetVersion) {
+    var tableMap = _tables[table];
+    tableMap?.consolidate(targetVersion);
   }
 
   void _rollbackTables(Map<String, int> tablesVersions) {
