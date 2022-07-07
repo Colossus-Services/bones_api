@@ -4,6 +4,7 @@
 - `LoggerHandler`:
   - `logToConsole`: avoid multiple listeners to the root logger.
 - `APITestConfigDocker`: remove unnecessary call to `logToConsole()`.
+- Fix imports at `bones_api_root_starter.dart`.
 
 ## 1.2.0
 

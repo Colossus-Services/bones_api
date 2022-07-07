@@ -1,5 +1,7 @@
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api_server.dart';
+
+import 'bones_api_base.dart';
+import 'bones_api_config.dart';
 
 /// Helper to gracefully start/stop an [APIRoot].
 class APIRootStarter<A extends APIRoot> {
