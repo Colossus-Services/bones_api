@@ -36,7 +36,7 @@ abstract class LoggerHandler {
     logger.level = logging.Level.ALL;
   }
 
-  StreamSubscription<logging.LogRecord>? _loggingListenSubscription;
+  static StreamSubscription<logging.LogRecord>? _loggingListenSubscription;
 
   void logToConsole() {
     if (_loggingListenSubscription != null) {

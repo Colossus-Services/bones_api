@@ -111,8 +111,6 @@ abstract class APITestConfigDocker extends APITestConfigBase {
 
   @override
   Future<bool> startImpl() async {
-    _log.handler.logToConsole();
-
     _started = false;
 
     var dockerCommander = DockerCommander(dockerHost);

@@ -1,6 +1,9 @@
 ## 1.2.1
 
 - `EntityAccessor`: added `nameSimplified`.
+- `LoggerHandler`:
+  - `logToConsole`: avoid multiple listeners to the root logger.
+- `APITestConfigDocker`: remove unnecessary call to `logToConsole()`.
 
 ## 1.2.0
 
