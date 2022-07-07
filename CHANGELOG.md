@@ -1,5 +1,10 @@
 ## 1.2.0
 
+- Added `APIRootStarter` helper.
+- Added `APITestConfig`: an `APIRoot` test helper.
+- Added `APITestConfigDocker`, a base class for `Docker` database containers:
+  - `APITestConfigDockerMySQL` (MySQL container)
+  - `APITestConfigDockerPostgreSQL` (PostgreSQL container)
 - `APIConfig`: now supports variables (%VAR_NAME%).
 - `SQLAdapterCapability`: added capability `tableSQL`.
 - `SQLAdapter`:
@@ -12,6 +17,7 @@
   - `populateFromSource` moved to `EntityRepositoryProvider` extension.
 - `APIPlatform`:
   - `getProperty`: read a property from an "environment variable" (VM) or `window.location.href` (Browser).
+- `APISession` and `APISessionSet`: moved to `bones_api_session.dart`.
 - Change named parameter `caseInsensitive` to `caseSensitive` to follow `RegExp` parameters naming style.
 - Split `bones_api_utils.dart` in multiple utils files:
   - `bones_api_utils_collections.dart`

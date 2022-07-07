@@ -5,6 +5,7 @@ import 'package:async_extension/async_extension.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
+import 'bones_api_session.dart';
 
 abstract class APISecurity {
   final Duration tokenDuration;

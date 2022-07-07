@@ -1,164 +1,257 @@
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api_server.dart';
+import 'package:docker_commander/docker_commander.dart';
+import 'package:logging/logging.dart' as logging;
 
-class APIRootStarter<A extends APIRoot> {
-  A? _apiRoot;
+import 'bones_api_base.dart';
+import 'bones_api_config.dart';
+import 'bones_api_logging.dart';
+import 'bones_api_root_starter.dart';
+import 'bones_api_utils_collections.dart';
 
-  final FutureOr<A> Function(APIConfig? apiConfig)? _apiRootInstantiator;
-  final FutureOr<APIConfig?> Function()? _apiConfigProvider;
+final _log = logging.Logger('APITestConfig');
 
-  final FutureOr<bool> Function()? _preInitializer;
+/// An [APIRoot] test configuration.
+class APITestConfig {
+  final Map<String, dynamic> apiConfigMap;
 
-  final FutureOr<bool> Function()? _stopper;
+  APITestConfig(Map<String, dynamic> apiConfig)
+      : apiConfigMap = deepCopyMap<String, dynamic>(apiConfig)!;
 
-  APIRootStarter.fromInstance(A apiRoot,
-      {FutureOr<bool> Function()? preInitializer,
-      FutureOr<bool> Function()? stopper})
-      : _apiRoot = apiRoot,
-        _preInitializer = preInitializer,
-        _stopper = stopper,
-        _apiRootInstantiator = null,
-        _apiConfigProvider = null;
+  /// Returns `true` if already started.
+  bool get isStarted => true;
 
-  APIRootStarter.fromInstantiator(
-      A Function(APIConfig? apiConfig) apiRootInstantiator,
-      {FutureOr<APIConfig?> Function()? apiConfig,
-      FutureOr<bool> Function()? preInitializer,
-      FutureOr<bool> Function()? stopper})
-      : _apiRootInstantiator = apiRootInstantiator,
-        _apiConfigProvider = apiConfig,
-        _preInitializer = preInitializer,
-        _stopper = stopper;
+  /// Returns `true` if starting.
+  bool get isStarting => false;
 
-  A? get apiRoot => _apiRoot;
+  /// The start operation.
+  FutureOr<bool> start() => true;
 
-  FutureOr<A> getAPIRoot() {
-    var apiRoot = _apiRoot;
-    if (apiRoot != null) {
-      return apiRoot;
-    }
+  /// Returns `true` if stopped.
+  bool get isStopped => false;
 
-    var fConfig = _apiConfigProvider;
-    var retConfig = fConfig == null ? null : fConfig();
+  /// The stop operation.
+  FutureOr<bool> stop() => true;
 
-    return retConfig.resolveMapped((config) {
-      var f = _apiRootInstantiator!;
-      var ret = f(config);
+  @override
+  String toString() => '$runtimeType$apiConfigMap';
 
-      return ret.resolveMapped((a) {
-        _apiRoot = a;
-        return a;
-      });
-    });
+  /// Creates an [APIRootStarter] using this [APITestConfig] as pre-initialization and stopper.
+  APIRootStarter<A> createAPIRootStarter<A extends APIRoot>(
+      A Function(APIConfig? apiConfig) apiRootInstantiator) {
+    return APIRootStarter.fromInstantiator(
+      apiRootInstantiator,
+      apiConfig: () => APIConfig(apiConfigMap),
+      preInitializer: () => start(),
+      stopper: () => stop(),
+    );
   }
+}
 
-  FutureOr<A> getAPIRootStarted() {
-    if (isStarted) {
-      return getAPIRoot();
-    }
+/// A base implementation of an [APITestConfig]. See [startImpl] and [stopImpl].
+abstract class APITestConfigBase extends APITestConfig {
+  APITestConfigBase(Map<String, dynamic> apiConfigMap) : super(apiConfigMap);
 
-    return start().resolveMapped((ok) {
-      if (!ok) {
-        throw StateError("Error starting.");
-      }
-      return getAPIRoot();
-    });
-  }
-
-  bool? _preInitialized;
-
-  FutureOr<bool> _preInitialize() {
-    var preInitialized = _preInitialized;
-    if (preInitialized != null) {
-      if (!preInitialized) {
-        throw StateError("Already pre-initializing!");
-      }
-      return true;
-    }
-
-    var f = _preInitializer;
-    if (f == null) {
-      _preInitialized = true;
-      return true;
-    }
-
-    _preInitialized = false;
-
-    var ret = f();
-
-    return ret.resolveMapped((ok) {
-      if (!ok) {
-        throw StateError("Pre-initialization error.");
-      }
-
-      _preInitialized = true;
-      return true;
-    });
-  }
-
+  @override
   bool get isStarted => _started ?? false;
 
-  bool? _started;
-  FutureOr<bool>? _starting;
-
-  FutureOr<bool> start() {
+  @override
+  bool get isStarting {
     var started = _started;
-    if (started != null) {
-      if (started) return true;
+    return started != null && !started;
+  }
 
-      var starting = _starting;
-      if (starting != null) {
-        return starting;
-      }
+  bool? _started;
+
+  @override
+  FutureOr<bool> start() {
+    if (isStarted) {
+      throw StateError("Already started!");
+    } else if (isStarting) {
+      throw StateError("Already starting!");
     }
+
+    return startImpl();
+  }
+
+  /// The start implementation.
+  FutureOr<bool> startImpl();
+
+  @override
+  bool get isStopped => _stopped;
+
+  bool _stopped = false;
+
+  @override
+  FutureOr<bool> stop() async {
+    if (_started == null) return false;
+    if (_stopped) return true;
+
+    bool ok = await stopImpl();
+
+    _stopped = true;
+
+    _log.info('** STOPPED[$ok]> $this');
+    return ok;
+  }
+
+  /// The stop implementation.
+  FutureOr<bool> stopImpl();
+}
+
+/// An [APITestConfig] for `Docker` containers.
+abstract class APITestConfigDocker extends APITestConfigBase {
+  /// The [DockerHost] for [DockerCommander].
+  DockerHost dockerHost;
+
+  APITestConfigDocker(this.dockerHost, Map<String, dynamic> apiConfigMap)
+      : super(apiConfigMap);
+
+  /// The [DockerContainer] that was started.
+  DockerContainer? container;
+
+  @override
+  Future<bool> startImpl() async {
+    _log.handler.logToConsole();
 
     _started = false;
-    _stopped = null;
 
-    var retApiRoot = getAPIRoot();
+    var dockerCommander = DockerCommander(dockerHost);
 
-    return _starting = retApiRoot.resolveMapped((apiRoot) {
-      return _preInitialize().resolveMapped((preInitOk) {
-        if (!preInitOk) {
-          throw StateError("Pre-initialization error.");
-        }
+    await dockerCommander.ensureInitialized();
 
-        return apiRoot.ensureInitialized().resolveMapped((initResult) {
-          _started = true;
-          _starting = null;
-          return initResult.ok;
-        });
+    var daemonOk = await dockerCommander.isDaemonRunning();
+    if (!daemonOk) {
+      throw StateError("Docker Daemon not running!");
+    }
+
+    _log.info('** Creating container... >> $this');
+
+    var container = this.container = await createContainer(dockerCommander);
+
+    var ready = await container.waitReady();
+    if (!ready) {
+      throw StateError("Container not ready!");
+    }
+
+    _started = true;
+
+    var logsStdout = await container.catLogs(stderr: false);
+    var logsStderr = await container.catLogs(stderr: true);
+
+    _log.info('Container $container LOGS:\n'
+        '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< [LOGS STDOUT]\n'
+        '$logsStdout\n'
+        '======================================================== [LOGS STDERR]\n'
+        '$logsStderr\n'
+        '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> [LOGS END]');
+
+    _log.info('** STARTED> $this');
+
+    return true;
+  }
+
+  /// [DockerContainer] creation implementation.
+  Future<DockerContainer> createContainer(DockerCommander dockerCommander);
+
+  @override
+  FutureOr<bool> stopImpl() => stopContainer();
+
+  /// The timeout to stop the [container].
+  Duration get stopContainerTimeout => Duration(seconds: 60);
+
+  /// Stops the [container]. Called by [stopImpl].
+  FutureOr<bool> stopContainer() {
+    var container = this.container;
+    if (container == null) return false;
+    return container.stop(timeout: stopContainerTimeout);
+  }
+}
+
+/// A base class for [APITestConfig] `Docker` database containers.
+abstract class APITestConfigDockerDB extends APITestConfigDocker {
+  /// The DB type/name.
+  final String dbType;
+
+  /// The container name prefix.
+  final String containerNamePrefix;
+
+  APITestConfigDockerDB(
+      DockerHost dockerHost, this.dbType, Map<String, dynamic> apiConfig,
+      {String? containerNamePrefix})
+      : containerNamePrefix =
+            containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
+        super(dockerHost, apiConfig);
+
+  /// The database configuration [Map].
+  Map<String, dynamic> get dbConfig;
+
+  /// The [dbConfig] `username`.
+  String get dbUser => dbConfig['username'];
+
+  /// The [dbConfig] `password`.
+  String get dbPass => dbConfig['password'];
+
+  /// The [dbConfig] `database` name.
+  String get dbName => dbConfig['database'];
+
+  /// The [dbConfig] `port` (database exposed port for connections).
+  FutureOr<int> get dbPort {
+    var port = dbConfig['port'];
+
+    if (port is String) {
+      port = int.tryParse(port.trim()) ?? 0;
+    }
+
+    if (port is int) {
+      if (port > 0) return port;
+
+      if (port > -1000) {
+        port = 5000;
+      } else {
+        port = -port;
+      }
+
+      return resolveFreePort(port).then((p) {
+        dbConfig['port'] = p;
+        return p;
       });
-    });
-  }
-
-  bool? _stopped;
-
-  FutureOr<bool> stop() {
-    if (!isStarted) return false;
-
-    var stopped = _stopped;
-    if (stopped != null) {
-      if (stopped) return true;
-      throw StateError("Already stopping");
+    } else if (port == '?' || port == '*') {
+      return resolveFreePort(5000).then((p) {
+        dbConfig['port'] = p;
+        return p;
+      });
     }
 
-    _stopped = false;
-
-    var stopper = _stopper;
-    if (stopper == null) {
-      _stopped = true;
-      _started = null;
-      return true;
-    }
-
-    var ret = stopper();
-
-    return ret.resolveMapped((ok) {
-      if (!ok) throw StateError("Error stopping.");
-      _stopped = true;
-      _started = null;
-      return true;
-    });
+    throw StateError("Can't resolve `dbPort`: $port");
   }
+
+  /// Resolves the database port.
+  FutureOr<int> resolveDbPort(int port) =>
+      resolveFreePort(port).resolveMapped((p) {
+        dbConfig['port'] = p;
+        return p;
+      });
+
+  /// Resolves a free-port to use for the database.
+  FutureOr<int> resolveFreePort(int port);
+
+  @override
+  Future<DockerContainer> createContainer(
+      DockerCommander dockerCommander) async {
+    var dbPort = await this.dbPort;
+
+    _log.info('Initializing $dbType container at port: $dbPort');
+
+    var containerConfig = createDBContainerConfig(dbPort);
+
+    var container = await containerConfig.run(dockerCommander,
+        name: '${containerNamePrefix}_$dbPort', cleanContainer: true);
+
+    _log.info('Container initialized: $container');
+
+    return container;
+  }
+
+  /// The [DockerContainerConfig] instantiator.
+  DockerContainerConfig createDBContainerConfig(int dbPort);
 }
