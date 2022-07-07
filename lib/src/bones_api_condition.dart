@@ -1,10 +1,11 @@
-import 'package:bones_api/src/bones_api_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_extension.dart';
+import 'bones_api_utils_collections.dart';
+import 'bones_api_utils_json.dart';
 
 abstract class ConditionElement {
   bool _resolved = false;

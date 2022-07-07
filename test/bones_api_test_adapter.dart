@@ -1,7 +1,7 @@
 @Timeout(Duration(seconds: 180))
 import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/bones_api_logging.dart';
 import 'package:collection/collection.dart';
-import 'package:bones_api/src/bones_api_logging.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart';
@@ -166,14 +166,12 @@ Future<bool> runAdapterTests(
   final testLog = logging.Logger(
       'TEST:SQLAdapter:$dbName${entityByReflection ? '+reflection' : ''}');
 
-  testLog.info('[[[ Setup Container Handler ]]]');
+  testLog.info('[[[ Checking Container Handler ]]]');
 
   var containerHandlerOK = await dbTestContainer.setupContainerHandler();
 
-  testLog.info('Container Handler: $containerHandlerOK');
-
   if (!containerHandlerOK) {
-    testLog.warning('Docker NOT running! Skipping Docker tests!');
+    testLog.warning('[[[ Docker NOT running! SKIPPING Docker tests! ]]]');
   }
 
   var testDomain = '${dbName.toLowerCase()}.com';

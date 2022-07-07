@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_security.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_json.dart';
 
 /// Represents a authentication credential.
 class APICredential {

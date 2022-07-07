@@ -5,15 +5,18 @@ import 'dart:typed_data';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'bones_api_extension.dart';
 import 'bones_api_platform.dart';
 
 class APIPlatformBrowser extends APIPlatform {
   @override
   APIPlatformType get type => APIPlatformType.browser;
 
+  APIPlatformCapability? _capability;
+
   @override
   APIPlatformCapability get capability =>
-      APIPlatformCapability.bits53(canReadFile: true);
+      _capability ??= APIPlatformCapability.bits53(canReadFile: true);
 
   @override
   void log(Object? message, [Object? error, StackTrace? stackTrace]) {
@@ -98,6 +101,18 @@ class APIPlatformBrowser extends APIPlatform {
     var data = response.body?.asByteArray;
     if (data == null) return null;
     return data is Uint8List ? data : Uint8List.fromList(data);
+  }
+
+  @override
+  String? getProperty(String? key,
+      {String? defaultValue, bool caseSensitive = false}) {
+    if (key == null) return defaultValue;
+
+    var location = window.location.href.trim();
+    if (location.isEmpty) return defaultValue;
+
+    var uri = Uri.parse(location);
+    return uri.queryParameters.getIgnoreCase(key, defaultValue: defaultValue);
   }
 }
 

@@ -1,7 +1,10 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
+
+final _log = logging.Logger('ConditionSQLEncoder');
 
 /// A [Condition] encoder for SQL.
 class ConditionSQLEncoder extends ConditionEncoder {
@@ -45,7 +48,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       return tableSchemeRet.resolveMapped((tableScheme) {
         if (tableScheme == null) {
-          throw StateError("Can't find TableScheme for entity: $tableName");
+          var errorMsg =
+              "Can't find `TableScheme` for entity/table: $tableName";
+          _log.severe(errorMsg);
+          throw StateError(errorMsg);
         }
 
         var idFieldName = tableScheme.idFieldName ?? 'id';
@@ -80,7 +86,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       return tableSchemeRet.resolveMapped((tableScheme) {
         if (tableScheme == null) {
-          throw StateError("Can't find TableScheme for entity: $tableName");
+          var errorMsg =
+              "Can't find `TableScheme` for entity/table: $tableName";
+          _log.severe(errorMsg);
+          throw StateError(errorMsg);
         }
 
         var idFieldName = tableScheme.idFieldName ?? 'id';
@@ -190,7 +199,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     return tableSchemeRet.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for: $tableName");
+        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var q = sqlElementQuote;
@@ -270,7 +281,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     return tableSchemeRet.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for: $tableName");
+        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var fieldRef = tableScheme.getFieldsReferencedTables(key0.name);
@@ -287,9 +300,12 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
           return targetTableSchemeRet.resolveMapped((targetTableScheme) {
             if (targetTableScheme == null) {
-              throw StateError(
-                  "Can't find TableScheme for target table: $fieldRef");
+              var errorMsg =
+                  "Can't find `TableScheme` for target table: $fieldRef";
+              _log.severe(errorMsg);
+              throw StateError(errorMsg);
             }
+
             var q = sqlElementQuote;
             var targetFieldName =
                 targetTableScheme.resolveTableFiledName(key1.name);
@@ -341,9 +357,12 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
             return targetTableSchemeRet.resolveMapped((targetTableScheme) {
               if (targetTableScheme == null) {
-                throw StateError(
-                    "Can't find TableScheme for target table: $relationship");
+                var errorMsg =
+                    "Can't find `TableScheme` for target table: $fieldRef";
+                _log.severe(errorMsg);
+                throw StateError(errorMsg);
               }
+
               var q = sqlElementQuote;
               var targetFieldName =
                   targetTableScheme.resolveTableFiledName(key1.name);

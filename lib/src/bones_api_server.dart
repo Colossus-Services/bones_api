@@ -22,7 +22,8 @@ import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_httpclient.dart';
+import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIServer');
 

@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:convert' as dart_convert;
 
+import 'package:collection/collection.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_config_generic.dart'
     if (dart.library.io) 'bones_api_config_io.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_platform.dart';
+import 'bones_api_utils_json.dart';
 
 typedef APIConfigProvider = FutureOr<APIConfig?> Function();
 
@@ -36,34 +38,83 @@ class APIConfig {
 
   /// Returns a unmodifiable [Map] of the configuration properties.
   Map<String, dynamic> get properties =>
-      Map<String, dynamic>.unmodifiable(_properties);
+      Map<String, dynamic>.unmodifiable(Map.fromEntries(entries));
 
   /// The [properties] keys.
   Iterable<String> get keys => _properties.keys;
 
   /// The [properties] entries.
-  Iterable<MapEntry<String, dynamic>> get entries => _properties.entries;
+  Iterable<MapEntry<String, dynamic>> get entries => _properties.entries
+      .map((e) => MapEntry(e.key, _resolveValue(e.key, e.value, null)));
 
   /// The [properties] values.
-  Iterable<dynamic> get values => _properties.values;
+  Iterable<dynamic> get values => entries.map((e) => e.value);
 
   /// [properties] key getter.
-  dynamic operator [](String key) => _properties[key];
+  dynamic operator [](String key) => _getImpl(key, null);
 
   /// [properties] key setter.
   operator []=(String key, dynamic value) => _properties[key] = value;
 
+  dynamic get(String key, {Object? defaultValue, bool caseSensitive = false}) {
+    return caseSensitive
+        ? _getImpl(key, defaultValue)
+        : getIgnoreCase(key, defaultValue: defaultValue);
+  }
+
+  dynamic _getImpl(String key, Object? defaultValue) =>
+      _resolveValue(key, _properties[key], defaultValue);
+
+  static final RegExp _regexpValueVariable = RegExp(r'%\w+%');
+
+  dynamic _resolveValue(String key, Object? value, Object? defaultValue) {
+    if (value == null) return defaultValue;
+
+    if (value is String) {
+      if (!value.contains('%')) {
+        return value;
+      }
+
+      var valueResolved = value.replaceAllMapped(_regexpValueVariable, (m) {
+        var k = m[1];
+        var v =
+            k != null ? _getVariable(k, !equalsIgnoreAsciiCase(k, key)) : m[0];
+        return v ?? '';
+      });
+
+      return valueResolved;
+    }
+
+    return value;
+  }
+
+  String? _getVariable(String key, bool allowProperties) {
+    if (allowProperties) {
+      var val = _properties[key];
+      if (val != null) {
+        return _resolveValue(key, val, null);
+      }
+    }
+
+    var val = APIPlatform.get().getProperty(key);
+    if (val != null) {
+      return _resolveValue(key, val, null);
+    }
+
+    return null;
+  }
+
   /// [properties] case insensitive key getter.
-  dynamic getCaseInsensitive(String key) {
+  dynamic getIgnoreCase(String key, {Object? defaultValue}) {
     if (_properties.containsKey(key)) {
-      return _properties[key];
+      return _getImpl(key, defaultValue);
     }
 
     var keyLC = key.toLowerCase();
 
     for (var k in _properties.keys) {
       if (k.toLowerCase() == keyLC) {
-        return _properties[k];
+        return _getImpl(k, defaultValue);
       }
     }
 
@@ -294,10 +345,8 @@ class APIConfig {
       : this(dart_convert.json.decode(jsonEncoded));
 
   /// Constructs an [APIConfig] from [properties].
-  factory APIConfig.fromPropertiesEncoded(String properties) {
-    var map = parsePropertiesEncoded(properties);
-    return APIConfig(map);
-  }
+  APIConfig.fromPropertiesEncoded(String properties)
+      : this(parsePropertiesEncoded(properties));
 
   static Map<String, dynamic> parsePropertiesEncoded(String properties) {
     var entries = parsePropertiesEncodedEntries(properties);

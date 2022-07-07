@@ -167,7 +167,16 @@ class TableScheme with FieldsFromMap {
 
     for (var t in _relationshipTables) {
       if (t.sourceTable == name) {
-        _tableRelationshipReference[t.targetTable] = t;
+        var prev = _tableRelationshipReference[t.targetTable];
+        if (prev != null) {
+          var cmp = t.relationshipTable.length
+              .compareTo(prev.relationshipTable.length);
+          if (cmp > 0) {
+            _tableRelationshipReference[t.targetTable] = t;
+          }
+        } else {
+          _tableRelationshipReference[t.targetTable] = t;
+        }
       }
     }
   }

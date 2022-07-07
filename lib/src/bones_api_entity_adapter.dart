@@ -10,10 +10,12 @@ import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter_memory.dart';
 import 'bones_api_entity_sql.dart';
-import 'bones_api_mixin.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_mixin.dart';
+import 'bones_api_platform.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_collections.dart';
+import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('SQLRepositoryAdapter');
 
@@ -217,15 +219,16 @@ class SQL implements SQLWrapper {
 class SQLAdapterCapability {
   final String dialect;
   final bool transactions;
-
   final bool transactionAbort;
+  final bool tableSQL;
 
   bool get fullTransaction => transactions && transactionAbort;
 
   const SQLAdapterCapability(
       {required this.dialect,
       required this.transactions,
-      required this.transactionAbort});
+      required this.transactionAbort,
+      required this.tableSQL});
 }
 
 typedef SQLAdapterInstantiator<C extends Object>
@@ -327,7 +330,11 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
   SQLAdapter(this.minConnections, this.maxConnections, this.capability,
-      {this.parentRepositoryProvider}) {
+      {this.parentRepositoryProvider,
+      Object? populateTables,
+      Object? populateSource})
+      : _populateTables = populateTables,
+        _populateSource = populateSource {
     boot();
 
     _conditionSQLGenerator =
@@ -384,7 +391,108 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<InitializationResult> initialize();
+  FutureOr<InitializationResult> initialize() => _populateImpl();
+
+  Object? _populateTables;
+  Object? _populateSource;
+
+  FutureOr<InitializationResult> _populateImpl() {
+    var tables = _populateTables;
+
+    if (tables != null) {
+      _populateTables = null;
+
+      return populateTables(tables)
+          .resolveMapped((_) => _populateSourceImpl(_populateSource));
+    } else {
+      return _populateSourceImpl(_populateSource);
+    }
+  }
+
+  FutureOr<InitializationResult> _populateSourceImpl(Object? populateSource) {
+    _populateSource = null;
+
+    if (populateSource == null) {
+      return InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!
+      ]);
+    }
+
+    return populateFromSource(populateSource).resolveMapped((val) {
+      var result = InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!,
+        ...entityRepositories,
+      ]);
+
+      return result;
+    });
+  }
+
+  FutureOr<List<String>> populateTables(Object? tables) {
+    if (tables == null) {
+      return <String>[];
+    } else if (tables is String) {
+      if (RegExp(r'^\S+\.sql$').hasMatch(tables)) {
+        var apiPlatform = APIPlatform.get();
+
+        _log.info(
+            'Reading $this populate tables file: ${apiPlatform.resolveFilePath(tables)}');
+
+        var fileData = apiPlatform.readFileAsString(tables);
+
+        if (fileData != null) {
+          return fileData.resolveMapped((data) {
+            if (data != null) {
+              _log.info(
+                  'Populating $this tables [encoded JSON length: ${data.length}]...');
+
+              return populateTablesFromSQLs(data).resolveMapped((res) {
+                _log.info('Populate tables finished.');
+                return <String>[];
+              });
+            } else {
+              return <String>[];
+            }
+          });
+        }
+      }
+    }
+
+    return <String>[];
+  }
+
+  FutureOr<bool> populateTablesFromSQLs(String sqls) {
+    sqls =
+        sqls.replaceAllMapped(RegExp(r'(?:\n|^)--.*?([\r\n]+)'), (m) => m[1]!);
+    sqls = sqls.replaceAllMapped(RegExp(r'/\*.*?\*/'), (m) => m[1]!);
+    sqls = '\n$sqls\n;';
+
+    var list = <String>[];
+
+    var regexpCreateTableSQL = RegExp(r'\s(?:CREATE|ALTER)\s+TABLE\s.*?;',
+        caseSensitive: false, dotAll: true);
+
+    sqls.replaceAllMapped(regexpCreateTableSQL, (m) {
+      var sql = m[0]!;
+      list.add(sql);
+      return '';
+    });
+
+    if (list.isEmpty) return true;
+
+    return _populateTablesFromSQLsImpl(list);
+  }
+
+  Future<bool> _populateTablesFromSQLsImpl(List<String> list) async {
+    for (var sql in list) {
+      var ok = await executeTableSQL(sql);
+      if (!ok) {
+        throw StateError("Error creating table SQL: $sql");
+      }
+    }
+
+    return true;
+  }
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
@@ -587,6 +695,8 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     }
   }
 
+  FutureOr<bool> executeTableSQL(String createTableSQL);
+
   FutureOr<SQL> generateCountSQL(
       Transaction transaction, String entityName, String table,
       {EntityMatcher? matcher,
@@ -640,7 +750,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return retTableScheme.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
+        var errorMsg = "Can't find `TableScheme` for table: $table";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var context = EncodingContext(entityName,
@@ -661,7 +773,10 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
+        assert(fieldsNotNull.length == values.length);
+
         var idFieldName = tableScheme.idFieldName;
+        assert(idFieldName != null && idFieldName.isNotEmpty);
 
         var q = sqlElementQuote;
 
@@ -669,9 +784,13 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
         sql.write('INSERT INTO $q');
         sql.write(table);
-        sql.write('$q ($q');
-        sql.write(fieldsNotNull.join('$q,$q'));
-        sql.write('$q)');
+        sql.write(q);
+
+        if (fieldsNotNull.isNotEmpty) {
+          sql.write('(');
+          sql.write(fieldsNotNull.map((f) => '$q$f$q').join(','));
+          sql.write(')');
+        }
 
         if (sqlAcceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
@@ -680,9 +799,13 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
           sql.write(q);
         }
 
-        sql.write(' VALUES (');
-        sql.write(values.join(' , '));
-        sql.write(')');
+        if (values.isNotEmpty) {
+          sql.write(' VALUES (');
+          sql.write(values.join(' , '));
+          sql.write(')');
+        } else {
+          sql.write(' DEFAULT VALUES ');
+        }
 
         if (sqlAcceptsReturningSyntax) {
           sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
@@ -728,7 +851,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return retTableScheme.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
+        var errorMsg = "Can't find `TableScheme` for table: $table";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var context = EncodingContext(entityName,
@@ -834,7 +959,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return retTableScheme.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
+        var errorMsg = "Can't find `TableScheme` for table: $table";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var relationship =
@@ -995,7 +1122,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return retTableScheme.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
+        var errorMsg = "Can't find `TableScheme` for table: $table";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var relationship =
@@ -1069,7 +1198,9 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     return retTableScheme.resolveMapped((tableScheme) {
       if (tableScheme == null) {
-        throw StateError("Can't find TableScheme for table: $table");
+        var errorMsg = "Can't find `TableScheme` for table: $table";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
       }
 
       var relationship =

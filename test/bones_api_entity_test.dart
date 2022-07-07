@@ -1,6 +1,6 @@
 @Tags(['entities'])
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/src/bones_api_logging.dart';
+import 'package:bones_api/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';

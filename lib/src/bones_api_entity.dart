@@ -12,8 +12,11 @@ import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_platform.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_collections.dart';
+import 'bones_api_utils_instance_tracker.dart';
+import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('Entity');
 
@@ -2039,6 +2042,60 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     }
 
     return results;
+  }
+
+  static const _logSectionOpen =
+      '\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+  static const _logSectionClose =
+      '\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>';
+
+  FutureOr<Map<String, List<Object>>> populateFromSource(Object? source) {
+    if (source == null) {
+      return <String, List<Object>>{};
+    } else if (source is Map<String, Iterable<Map<String, dynamic>>>) {
+      _log.info(
+          'Populating adapter ($this) [Map entries: ${source.length}]...$_logSectionOpen');
+
+      return storeAllFromJson(source).resolveMapped((res) {
+        _log.info('Populate source finished. $_logSectionClose');
+        return res;
+      });
+    } else if (source is String) {
+      if (RegExp(r'^\S+\.json$').hasMatch(source)) {
+        var apiPlatform = APIPlatform.get();
+
+        _log.info(
+            'Reading $this populate source file: ${apiPlatform.resolveFilePath(source)}');
+
+        var fileData = apiPlatform.readFileAsString(source);
+
+        if (fileData != null) {
+          return fileData.resolveMapped((data) {
+            if (data != null) {
+              _log.info(
+                  'Populating $this source [encoded JSON length: ${data.length}]...$_logSectionOpen');
+
+              return storeAllFromJsonEncoded(data).resolveMapped((res) {
+                _log.info('Populate source finished. $_logSectionClose');
+                return res;
+              });
+            } else {
+              return <String, List<Object>>{};
+            }
+          });
+        }
+      } else {
+        _log.info(
+            'Populating $this source [encoded JSON length: ${source.length}]...$_logSectionOpen');
+
+        return storeAllFromJsonEncoded(source).resolveMapped((res) {
+          _log.info('Populate source finished. $_logSectionClose');
+          return res;
+        });
+      }
+    }
+
+    return <String, List<Object>>{};
   }
 }
 

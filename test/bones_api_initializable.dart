@@ -1,4 +1,5 @@
 @Timeout(Duration(seconds: 180))
+import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:test/test.dart';
 

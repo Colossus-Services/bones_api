@@ -8,8 +8,9 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_error_zone.dart';
+import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('PostgreAdapter');
 
@@ -58,6 +59,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
+      Object? populateTables,
+      Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider})
       : host = host ?? 'localhost',
         port = port ?? 5432,
@@ -70,7 +73,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
           minConnections,
           maxConnections,
           const SQLAdapterCapability(
-              dialect: 'postgre', transactions: true, transactionAbort: true),
+              dialect: 'postgre',
+              transactions: true,
+              transactionAbort: true,
+              tableSQL: false),
+          populateTables: populateTables,
+          populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
         ) {
     boot();
@@ -101,6 +109,15 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
 
+    var populate = config?['populate'];
+    Object? populateTables;
+    Object? populateSource;
+
+    if (populate != null) {
+      populateTables = populate['tables'];
+      populateSource = populate['source'];
+    }
+
     return PostgreSQLAdapter(
       database,
       username,
@@ -109,6 +126,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       port: port,
       minConnections: minConnections!,
       maxConnections: maxConnections!,
+      populateTables: populateTables,
+      populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
     );
   }
@@ -119,6 +138,14 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     } else {
       return _passwordProvider!(username);
     }
+  }
+
+  @override
+  List<Initializable> initializeDependencies() {
+    var parentRepositoryProvider = this.parentRepositoryProvider;
+    return <Initializable>[
+      if (parentRepositoryProvider != null) parentRepositoryProvider
+    ];
   }
 
   @override
@@ -160,12 +187,30 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     var count = ++_connectionCount;
 
-    var connection = PostgreSQLConnection(host, port, databaseName,
-        username: username, password: password);
+    PostgreSQLConnection? connection;
+    Object? error;
 
-    await _errorZone.runGuardedAsync(() => connection.open());
+    for (var i = 0; i < 3; ++i) {
+      var timeout = i == 0 ? 3 : (i == 1 ? 10 : 30);
 
-    var connUrl = getConnectionURL(connection);
+      connection = PostgreSQLConnection(host, port, databaseName,
+          username: username, password: password, timeoutInSeconds: timeout);
+
+      try {
+        await _errorZone.runGuardedAsync(() => connection!.open());
+        error = null;
+        break;
+      } catch (e) {
+        error = e;
+        connection = null;
+      }
+    }
+
+    if (error != null) {
+      throw error;
+    }
+
+    var connUrl = getConnectionURL(connection!);
 
     _log.info('createConnection[$count]> $connUrl > $connection');
 
@@ -366,21 +411,36 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
           m.values.where((r) => r.targetTable != table).isNotEmpty;
     }).toList();
 
-    var relationships = tablesReferences.map((e) {
-      var refToTable = e.values.where((r) => r.targetTable == table).first;
-      var otherRef = e.values.where((r) => r.targetTable != table).first;
-      return TableRelationshipReference(
-        refToTable.sourceTable,
-        refToTable.targetTable,
-        refToTable.targetField,
-        refToTable.targetFieldType,
-        refToTable.sourceField,
-        otherRef.targetTable,
-        otherRef.targetField,
-        otherRef.targetFieldType,
-        otherRef.sourceField,
-      );
-    }).toList();
+    var relationships = tablesReferences
+        .map((e) {
+          var refToTables = e.values
+              .where((r) => r.targetTable == table)
+              .toList(growable: false);
+          var otherRefs = e.values
+              .where((r) => r.targetTable != table)
+              .toList(growable: false);
+
+          if (refToTables.length != 1 || otherRefs.length != 1) {
+            return null;
+          }
+
+          var refToTable = refToTables.single;
+          var otherRef = otherRefs.single;
+
+          return TableRelationshipReference(
+            refToTable.sourceTable,
+            refToTable.targetTable,
+            refToTable.targetField,
+            refToTable.targetFieldType,
+            refToTable.sourceField,
+            otherRef.targetTable,
+            otherRef.targetField,
+            otherRef.targetFieldType,
+            otherRef.sourceField,
+          );
+        })
+        .whereNotNull()
+        .toList();
 
     return relationships;
   }
@@ -468,6 +528,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     }).whereNotNull());
 
     return map;
+  }
+
+  @override
+  FutureOr<bool> executeTableSQL(String createTableSQL) {
+    return executeWithPool(
+        (c) => c.execute(createTableSQL).resolveMapped((_) => true));
   }
 
   @override

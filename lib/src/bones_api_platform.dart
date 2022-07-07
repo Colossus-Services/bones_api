@@ -1,6 +1,5 @@
+import 'dart:async';
 import 'dart:typed_data';
-
-import 'package:bones_api/bones_api.dart';
 
 import 'bones_api_platform_generic.dart'
     if (dart.library.html) 'bones_api_platform_browser.dart'
@@ -85,6 +84,9 @@ abstract class APIPlatform {
 
   /// Reads a [filePath] data as [Uint8List].
   FutureOr<Uint8List?> readFileAsBytes(String filePath);
+
+  String? getProperty(String? key,
+      {String? defaultValue, bool caseSensitive = false});
 }
 
 class APIPlatformCapability {

@@ -1,3 +1,25 @@
+## 1.2.0
+
+- `APIConfig`: now supports variables (%VAR_NAME%).
+- `SQLAdapterCapability`: added capability `tableSQL`.
+- `SQLAdapter`:
+  - Added parameters `populateTables` and `populateSource` (previously present only for `MemorySQLAdapter`).
+  - Added `populateTables` and `executeTableSQL` methods.
+  - `generateInsertSQL`: fix issue when all values are null. 
+- `MySQLAdapter` and `PostgreSQLAdapter`:
+  - Improved automatic resolution of relationship tables.
+- `MemorySQLAdapter`:
+  - `populateFromSource` moved to `EntityRepositoryProvider` extension.
+- `APIPlatform`:
+  - `getProperty`: read a property from an "environment variable" (VM) or `window.location.href` (Browser).
+- Change named parameter `caseInsensitive` to `caseSensitive` to follow `RegExp` parameters naming style.
+- Split `bones_api_utils.dart` in multiple utils files:
+  - `bones_api_utils_collections.dart`
+  - `bones_api_utils_httpclient.dart`
+  - `bones_api_utils_json.dart`
+  - `bones_api_utils_timedmap.dart`
+- docker_commander: ^2.0.14
+
 ## 1.1.34
 
 - `MemorySQLAdapter`:

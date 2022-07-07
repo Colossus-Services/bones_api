@@ -510,7 +510,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       return sqlRepositoryAdapter.doInsertRelationship(
           op, oId, valuesTableName, othersIds);
     } catch (e, s) {
-      var message = 'setRelationship> '
+      var message = 'setRelationship[$valuesTableName]> '
           'o: $o ; '
           'field: $field ; '
           'fieldType: $fieldType ; '
@@ -547,7 +547,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
         return valuesIds;
       });
     } catch (e, s) {
-      var message = 'selectRelationship> '
+      var message = 'selectRelationship[valuesTableName]> '
           'o: $o ; '
           'oId: $oId ; '
           'field: $field ; '

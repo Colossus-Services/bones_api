@@ -114,8 +114,8 @@ y=zzz
       expect(apiConfig['password'], equals(123456));
       expect(apiConfig['BaR'], isNull);
 
-      expect(apiConfig.getCaseInsensitive('FoO'), equals(123));
-      expect(apiConfig.getCaseInsensitive('Baz'), isNull);
+      expect(apiConfig.getIgnoreCase('FoO'), equals(123));
+      expect(apiConfig.getIgnoreCase('Baz'), isNull);
 
       expect(
           apiConfig.toJsonEncoded(),

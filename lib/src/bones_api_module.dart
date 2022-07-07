@@ -16,7 +16,7 @@ import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_security.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils.dart';
+import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIModule');
 
