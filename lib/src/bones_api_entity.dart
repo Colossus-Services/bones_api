@@ -1468,9 +1468,17 @@ mixin EntityFieldAccessor<O> {
 class EntityFieldAccessorGeneric<O> with EntityFieldAccessor<O> {}
 
 abstract class EntityAccessor<O extends Object> {
+  static String simplifiedName(String name) {
+    name = name.trim().toLowerCase().replaceAll(RegExp(r'[\W_]+'), '').trim();
+    return name;
+  }
+
   final String name;
 
   EntityAccessor(this.name);
+
+  String? _nameSimplified;
+  String get nameSimplified => _nameSimplified ??= simplifiedName(name);
 
   Object? getEntityID(O o);
 }
@@ -1887,8 +1895,11 @@ class EntityRepositoryProvider
       if (entityRepository != null) {
         return entityRepository as EntityRepository<O>;
       } else if (name != null) {
-        entityRepository =
-            _entityRepositories.values.where((e) => e.name == name).firstOrNull;
+        var nameSimplified = EntityAccessor.simplifiedName(name);
+
+        entityRepository = _entityRepositories.values
+            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
+            .firstOrNull;
         if (entityRepository != null && entityRepository.isClosed) {
           entityRepository = null;
         }

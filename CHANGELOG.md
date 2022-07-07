@@ -1,3 +1,7 @@
+## 1.2.1
+
+- `EntityAccessor`: added `nameSimplified`.
+
 ## 1.2.0
 
 - Added `APIRootStarter` helper.

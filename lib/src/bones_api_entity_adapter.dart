@@ -1791,8 +1791,11 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       if (entityRepository != null) {
         return entityRepository as EntityRepository<O>;
       } else if (name != null) {
-        entityRepository =
-            _entityRepositories.values.where((e) => e.name == name).firstOrNull;
+        var nameSimplified = EntityAccessor.simplifiedName(name);
+
+        entityRepository = _entityRepositories.values
+            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
+            .firstOrNull;
         if (entityRepository != null && entityRepository.isClosed) {
           entityRepository = null;
         }
