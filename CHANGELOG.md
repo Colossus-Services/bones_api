@@ -1,3 +1,10 @@
+## 1.2.3
+
+- `APIRootStarter`:
+  - Added `isStopped`.
+  - Improved documentation.
+  - Improved tests.
+
 ## 1.2.2
 
 - Fix library names:

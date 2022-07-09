@@ -151,6 +151,67 @@ void main() {
     });
   });
 
+  group('APIRootStarter', () {
+    test('fromInstance', () async {
+      var starter = APIRootStarter<MyAPI>.fromInstance(MyAPI());
+
+      expect(starter.isStarted, isFalse);
+      expect(starter.isStopped, isFalse);
+
+      expect(await starter.start(), isTrue);
+      expect(starter.isStarted, isTrue);
+      expect(starter.isStopped, isFalse);
+
+      var api = starter.apiRoot;
+      expect(api, isNotNull);
+
+      var apiRequest = APIRequest.get('/service/base/foo');
+
+      var res = await api!.call(apiRequest);
+      expect(res.payload, equals('Hi[GET]!'));
+
+      expect(starter.stop(), isTrue);
+      expect(starter.isStopped, isTrue);
+    });
+
+    test('fromInstantiator', () async {
+      var starterStatus = 0;
+
+      var starter = APIRootStarter<MyAPI>.fromInstantiator(
+          (apiConfig) => MyAPI.withConfig(apiConfig),
+          apiConfig: () => APIConfig({'test': 'fromStarter'}),
+          preInitializer: () {
+            starterStatus = 1;
+            return true;
+          },
+          stopper: () {
+            starterStatus = -1;
+            return true;
+          });
+
+      expect(starter.isStarted, isFalse);
+      expect(starter.isStopped, isFalse);
+      expect(starterStatus, equals(0));
+
+      expect(await starter.start(), isTrue);
+      expect(starter.isStarted, isTrue);
+      expect(starter.isStopped, isFalse);
+      expect(starterStatus, equals(1));
+
+      var api = starter.apiRoot;
+      expect(api, isNotNull);
+
+      var apiRequest = APIRequest.get('/service/base/foo');
+
+      var res = await api!.call(apiRequest);
+      expect(res.payload, equals('Hi[GET]!'));
+
+      expect(starter.stop(), isTrue);
+      expect(starter.isStopped, isTrue);
+      expect(starterStatus, equals(-1));
+    });
+  });
+
   group('APIServer', () {
     final api = MyAPI();
 
@@ -454,10 +515,11 @@ void main() {
 class MyAPI extends APIRoot {
   static MyAPI? _instance;
 
-  factory MyAPI() => _instance ??= MyAPI._();
+  factory MyAPI() => _instance ??= MyAPI.withConfig();
 
-  MyAPI._()
+  MyAPI.withConfig([dynamic apiConfig])
       : super('example', '1.0',
+            apiConfig: apiConfig,
             preApiRequestHandlers: [_preRequest],
             posApiRequestHandlers: [_posRequest]);
 

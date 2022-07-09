@@ -108,6 +108,8 @@ class APIRootStarter<A extends APIRoot> {
     });
   }
 
+  /// Returns `true` if is already started.
+  /// See [start].
   bool get isStarted => _started ?? false;
 
   bool? _started;
@@ -147,7 +149,12 @@ class APIRootStarter<A extends APIRoot> {
 
   bool? _stopped;
 
+  /// Returns `true` if is already stopped.
+  /// See [stop].
+  bool get isStopped => _stopped ?? false;
+
   /// Stops the [APIRoot] instance. Calls [_stopper] if needed.
+  /// Will return `false` if is not already started (see [isStarted] and [start]).
   FutureOr<bool> stop() {
     if (!isStarted) return false;
 
