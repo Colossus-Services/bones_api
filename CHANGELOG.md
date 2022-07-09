@@ -1,3 +1,10 @@
+## 1.2.2
+
+- Fix library names:
+  - `bones_api_test`
+  - `bones_api_test.mysql`.
+  - `bones_api_test.postgres`.
+
 ## 1.2.1
 
 - `EntityAccessor`: added `nameSimplified`.

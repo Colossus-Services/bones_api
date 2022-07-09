@@ -1,5 +1,5 @@
 /// Bones_API Test PostgresSQL Library.
-library bones_api_console;
+library bones_api_test.postgres;
 
 export 'bones_api_test.dart';
 

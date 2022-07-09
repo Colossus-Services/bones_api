@@ -1,5 +1,5 @@
 /// Bones_API Test Library.
-library bones_api_console;
+library bones_api_test;
 
 export 'bones_api.dart';
 

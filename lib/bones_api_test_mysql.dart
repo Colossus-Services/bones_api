@@ -1,5 +1,5 @@
 /// Bones_API Test MySQL Library.
-library bones_api_console;
+library bones_api_test.mysql;
 
 export 'bones_api_test.dart';
 
