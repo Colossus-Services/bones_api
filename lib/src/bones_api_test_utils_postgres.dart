@@ -3,6 +3,7 @@ import 'package:docker_commander/docker_commander_vm.dart';
 
 import 'bones_api_entity_adapter_postgres.dart';
 import 'bones_api_test_utils.dart';
+import 'bones_api_test_utils_freeport.dart' as freeport;
 
 /// A [APITestConfigDockerDB] for `PostgreSQL`.
 class APITestConfigDockerPostgreSQL
@@ -27,9 +28,7 @@ class APITestConfigDockerPostgreSQL
       );
 
   @override
-  Future<int> resolveFreePort(int port) =>
-      getFreeListenPort(startPort: port - 100, endPort: port + 100)
-          .then((freePort) => freePort ?? port);
+  Future<int> resolveFreePort(int port) => freeport.resolveFreePort(port);
 
   @override
   Future<String?> runSQL(String sqlInline) => container!.runSQL(sqlInline);

@@ -462,6 +462,15 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   }
 
   FutureOr<bool> populateTablesFromSQLs(String sqls) {
+    var list = extractTableSQLs(sqls);
+    if (list.isEmpty) return true;
+    return _populateTablesFromSQLsImpl(list);
+  }
+
+  static List<String> extractTableSQLs(String sqls) => extractSQLs(sqls,
+      RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true));
+
+  static List<String> extractSQLs(String sqls, RegExp commandPrefixPattern) {
     sqls =
         sqls.replaceAllMapped(RegExp(r'(?:\n|^)--.*?([\r\n]+)'), (m) => m[1]!);
     sqls = sqls.replaceAllMapped(RegExp(r'/\*.*?\*/'), (m) => m[1]!);
@@ -469,8 +478,10 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
 
     var list = <String>[];
 
-    var regexpCreateTableSQL = RegExp(r'\s(?:CREATE|ALTER)\s+TABLE\s.*?;',
-        caseSensitive: false, dotAll: true);
+    var regexpCreateTableSQL = RegExp(
+        r'\s' + commandPrefixPattern.pattern + r'\s+TABLE\s.*?;',
+        caseSensitive: false,
+        dotAll: true);
 
     sqls.replaceAllMapped(regexpCreateTableSQL, (m) {
       var sql = m[0]!;
@@ -478,9 +489,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
       return '';
     });
 
-    if (list.isEmpty) return true;
-
-    return _populateTablesFromSQLsImpl(list);
+    return list;
   }
 
   Future<bool> _populateTablesFromSQLsImpl(List<String> list) async {

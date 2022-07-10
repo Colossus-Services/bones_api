@@ -3,6 +3,7 @@ import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_base.dart';
+import 'bones_api_entity_adapter.dart';
 import 'bones_api_config.dart';
 import 'bones_api_root_starter.dart';
 import 'bones_api_utils_collections.dart';
@@ -100,6 +101,36 @@ abstract class APITestConfigBase extends APITestConfig {
 /// An [APITestConfig] for `Docker` containers.
 abstract class APITestConfigDocker<C extends DockerContainer>
     extends APITestConfigBase {
+  static final Map<DockerHost, bool> _daemonRunning = <DockerHost, bool>{};
+
+  /// Resets the cache for [isDaemonRunning].
+  /// - [dockerHost] if provided will reset only the cached result for [dockerHost].
+  static void resetIsDaemonRunningCache([DockerHost? dockerHost]) async {
+    if (dockerHost != null) {
+      _daemonRunning.remove(dockerHost);
+    } else {
+      _daemonRunning.clear();
+    }
+  }
+
+  /// Returns `true` if the Docker Daemon is running.
+  /// The result is cached. See [resetIsDaemonRunningCache].
+  static FutureOr<bool> isDaemonRunning(DockerHost dockerHost) {
+    var cached = _daemonRunning[dockerHost];
+    if (cached != null) return cached;
+
+    return _isDaemonRunningImpl(dockerHost).resolveMapped((running) {
+      _daemonRunning[dockerHost] = running;
+      return running;
+    });
+  }
+
+  static Future<bool> _isDaemonRunningImpl(DockerHost dockerHost) async {
+    var dockerCommander = DockerCommander(dockerHost);
+    await dockerCommander.ensureInitialized();
+    return await dockerCommander.isDaemonRunning();
+  }
+
   /// The [DockerHost] for [DockerCommander].
   DockerHost dockerHost;
 
@@ -163,23 +194,24 @@ abstract class APITestConfigDocker<C extends DockerContainer>
     if (container == null) return false;
     return container.stop(timeout: stopContainerTimeout);
   }
+
+  /// The STDOUT [Output] of the [container].
+  Output? get stdout => container?.stdout;
+
+  /// The [stdout] as [String].
+  String get stdoutAsString => stdout?.asString ?? '';
+
+  /// The STDERR [Output] of the [container].
+  Output? get stderr => container?.stderr;
+
+  /// The [stderr] as [String].
+  String get stderrAsString => stderr?.asString ?? '';
 }
 
-/// A base class for [APITestConfig] `Docker` database containers.
-abstract class APITestConfigDockerDB<C extends DockerContainer>
-    extends APITestConfigDocker<C> {
+/// Mixin for [APITestConfig] with DB configuration.
+mixin APITestConfigDBMixin {
   /// The DB type/name.
-  final String dbType;
-
-  /// The container name prefix.
-  final String containerNamePrefix;
-
-  APITestConfigDockerDB(
-      DockerHost dockerHost, this.dbType, Map<String, dynamic> apiConfig,
-      {String? containerNamePrefix})
-      : containerNamePrefix =
-            containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
-        super(dockerHost, apiConfig);
+  String get dbType;
 
   /// The database configuration [Map].
   Map<String, dynamic> get dbConfig;
@@ -234,6 +266,84 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
   /// Resolves a free-port to use for the database.
   FutureOr<int> resolveFreePort(int port);
 
+  /// List the database tables names.
+  FutureOr<List<String>> listTables() =>
+      throw UnsupportedError("`listTables` not implemented");
+}
+
+/// A base class for [APITestConfig] with database.
+abstract class APITestConfigDB extends APITestConfig with APITestConfigDBMixin {
+  @override
+  final String dbType;
+
+  APITestConfigDB(this.dbType, Map<String, dynamic> apiConfig)
+      : super(apiConfig);
+}
+
+/// A [APITestConfig] with in-memory database.
+class APITestConfigDBMemory extends APITestConfigDB {
+  APITestConfigDBMemory(Map<String, dynamic> apiConfig)
+      : super('memory', apiConfig);
+
+  @override
+  Map<String, dynamic> get dbConfig => apiConfigMap['db']['memory'];
+
+  @override
+  FutureOr<int> resolveFreePort(int port) => 5000;
+}
+
+/// Mixin for [APITestConfig] with DB configuration + SQL.
+mixin APITestConfigDBSQLMixin on APITestConfigDBMixin {
+  /// Runs a SQL in the DB. The SQL shouldn't have multiple lines.
+  Future<String?> runSQL(String sqlInline);
+
+  /// Perform a create table SQL.
+  Future<List<String?>> createTableSQL(String sqls) async {
+    var list = SQLAdapter.extractTableSQLs(sqls);
+    if (list.isEmpty) return <String>[];
+
+    var results = Future.wait(list.map(runSQL));
+    return results;
+  }
+}
+
+/// A base class for [APITestConfig] with database with SQL.
+abstract class APITestConfigDBSQL extends APITestConfigDB {
+  APITestConfigDBSQL(String dbType, Map<String, dynamic> apiConfig)
+      : super(dbType, apiConfig);
+
+  /// Runs a SQL in the DB. The SQL shouldn't have multiple lines.
+  Future<String?> runSQL(String sqlInline);
+
+  /// Perform a create table SQL.
+  Future<List<String?>> createTableSQL(String sqls) async {
+    var list = SQLAdapter.extractTableSQLs(sqls);
+    if (list.isEmpty) return <String>[];
+
+    var results = Future.wait(list.map(runSQL));
+    return results;
+  }
+}
+
+/// A base class for [APITestConfig] `Docker` database containers.
+abstract class APITestConfigDockerDB<C extends DockerContainer>
+    extends APITestConfigDocker<C>
+    with APITestConfigDBMixin
+    implements APITestConfigDB {
+  /// The DB type/name.
+  @override
+  final String dbType;
+
+  /// The container name prefix.
+  final String containerNamePrefix;
+
+  APITestConfigDockerDB(
+      DockerHost dockerHost, this.dbType, Map<String, dynamic> apiConfig,
+      {String? containerNamePrefix})
+      : containerNamePrefix =
+            containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
+        super(dockerHost, apiConfig);
+
   @override
   Future<C> createContainer(DockerCommander dockerCommander) async {
     var dbPort = await this.dbPort;
@@ -252,21 +362,14 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
 
   /// The [DockerContainerConfig] instantiator.
   DockerContainerConfig<C> createDBContainerConfig(int dbPort);
-
-  /// List the database tables names.
-  FutureOr<List<String>> listTables() =>
-      throw UnsupportedError("`listTables` not implemented");
 }
 
 /// A base class for [APITestConfigDockerDB] with SQL support.
 abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
-    extends APITestConfigDockerDB<C> {
+    extends APITestConfigDockerDB<C> with APITestConfigDBSQLMixin {
   APITestConfigDockerDBSQL(
       DockerHost dockerHost, String dbType, Map<String, dynamic> apiConfig,
       {String? containerNamePrefix})
       : super(dockerHost, dbType, apiConfig,
             containerNamePrefix: containerNamePrefix);
-
-  /// Runs a SQL in the DB. The SQL shouldn't have multiple lines.
-  Future<String?> runSQL(String sqlInline);
 }

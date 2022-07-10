@@ -1,7 +1,9 @@
 @TestOn('vm')
-import 'package:bones_api/bones_api_test_mysql.dart';
+@Timeout(Duration(minutes: 2))
 import 'package:bones_api/bones_api_logging.dart';
+import 'package:bones_api/bones_api_test_mysql.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
+import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
@@ -46,23 +48,32 @@ const Map<String, dynamic> apiConfigMysql = <String, dynamic>{
   'dialect': 'mysql',
 };
 
-void main() {
+final dockerHostLocal = DockerHostLocal();
+
+APITestConfigDB _getAPITestConfig(String dbType) {
+  _log.info('** DB TYPE: $dbType');
+
+  var containerPrefix = 'bones_api_test_$dbType';
+
+  if (dbType == 'postgres') {
+    return APITestConfigDockerPostgreSQL(apiConfigPostgres,
+        dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
+  } else if (dbType == 'mysql') {
+    return APITestConfigDockerMySQL(apiConfigMysql,
+        dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
+  } else {
+    return APITestConfigDBMemory(apiConfigMemory);
+  }
+}
+
+void main() async {
   logToConsole();
 
-  APITestConfig _getAPITestConfig(String dbType) {
-    _log.info('** DB TYPE: $dbType');
+  var dockerRunning =
+      await APITestConfigDocker.isDaemonRunning(dockerHostLocal);
 
-    var containerPrefix = 'bones_api_test_$dbType';
-
-    if (dbType == 'postgres') {
-      return APITestConfigDockerPostgreSQL(apiConfigPostgres,
-          containerNamePrefix: containerPrefix);
-    } else if (dbType == 'mysql') {
-      return APITestConfigDockerMySQL(apiConfigMysql,
-          containerNamePrefix: containerPrefix);
-    } else {
-      return APITestConfig(apiConfigMemory);
-    }
+  if (!dockerRunning) {
+    _log.warning('Docker Daemon NOT running! Skipping tests with Docker.');
   }
 
   group('APITestConfig (basic start/stop)', () {
@@ -100,15 +111,19 @@ void main() {
         expect(connection, isNotNull);
 
         expect(adapter.disposePoolElement(connection!), isTrue);
+
+        //apiTestConfig.list
       } finally {
         expect(await apiRootStarter.stop(), isTrue);
       }
     }
 
     test('memory', () => _testDB('memory'));
-    test('postgres', () => _testDB('postgres'));
-    test('mysql', () => _testDB('mysql'));
-  });
+
+    test('postgres', () => _testDB('postgres'), tags: ['docker']);
+
+    test('mysql', () => _testDB('mysql'), tags: ['docker']);
+  }, skip: !dockerRunning);
 }
 
 class MyAPI extends APIRoot {

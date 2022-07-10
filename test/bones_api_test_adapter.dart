@@ -1,6 +1,6 @@
 @Timeout(Duration(seconds: 180))
-import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_logging.dart';
+import 'package:bones_api/bones_api_test_vm.dart';
 import 'package:collection/collection.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
@@ -184,8 +184,7 @@ Future<bool> runAdapterTests(
 
       expect(containerHandlerOK, isTrue);
 
-      dbPort = (await getFreeListenPort(
-          startPort: dbPort - 100, endPort: dbPort + 100))!;
+      dbPort = await resolveFreePort(dbPort);
 
       var startOk = await dbTestContainer.start(dbPort);
 
