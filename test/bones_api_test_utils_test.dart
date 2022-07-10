@@ -66,7 +66,7 @@ APITestConfigDB _getAPITestConfig(String dbType) {
   }
 }
 
-void main() async {
+Future<void> main() async {
   logToConsole();
 
   var apiTestConfigMemory = _getAPITestConfig('memory');
