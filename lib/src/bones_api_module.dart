@@ -6,7 +6,7 @@ import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
-    show Decimal, DynamicInt, DynamicNumber;
+    show Decimal, DynamicInt, DynamicNumber, ListExtension;
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
@@ -298,8 +298,11 @@ class APIModuleInfo {
   /// Returns the routes of the [module].
   List<APIRouteInfo> get routes => module.routes.apiInfo(apiRequest);
 
-  Map<String, dynamic> toJson() =>
-      {'name': name, if (version != null) 'version': version, 'routes': routes};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (version != null) 'version': version,
+        'routes': routes.map((e) => e.toJson()).toList()
+      };
 }
 
 /// A route builder.
@@ -503,9 +506,16 @@ class APIRouteBuilder<M extends APIModule> {
   }
 
   List<APIRouteInfo> apiInfo([APIRequest? apiRequest]) {
-    var info = module._routesHandlers.values
-        .map((e) => e.apiInfo(apiRequest))
-        .toList();
+    var routesHandlers = <APIRouteHandler>[
+      ...module._routesHandlers.values,
+      ...module._routesHandlersGET.values,
+      ...module._routesHandlersPOST.values,
+      ...module._routesHandlersPATH.values,
+      ...module._routesHandlersPUT.values,
+      ...module._routesHandlersDELETE.values,
+    ].toDistinctList();
+
+    var info = routesHandlers.map((e) => e.apiInfo(apiRequest)).toList();
     return info;
   }
 }

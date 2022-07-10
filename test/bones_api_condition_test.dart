@@ -1,13 +1,7 @@
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/bones_api_logging.dart';
-import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
-final _log = logging.Logger('bones_api_test');
-
 void main() {
-  _log.handler.logToConsole();
-
   group('Condition', () {
     setUp(() {});
 

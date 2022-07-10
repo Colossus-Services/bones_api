@@ -4,18 +4,12 @@ import 'dart:io';
 
 import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
-import 'package:bones_api/bones_api_logging.dart';
-import 'package:logging/logging.dart' as logging;
 import 'package:mercury_client/mercury_client.dart' as mercury_client;
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';
 
-final _log = logging.Logger('bones_api_test');
-
 void main() {
-  _log.handler.logToConsole();
-
   group('APIRoot', () {
     final api = MyAPI();
 
@@ -345,13 +339,19 @@ void main() {
 
       var expectedInfo = '{"name":"example","version":"1.0","modules":['
           '{"name":"base","routes":['
-          '{"name":"time","uri":"http://localhost:0/base/time"},{"name":"auth","uri":"http://localhost:0/base/auth"},'
+          '{"name":"time","uri":"http://localhost:0/base/time"},'
+          '{"name":"auth","uri":"http://localhost:0/base/auth"},'
           '{"name":"404","uri":"http://localhost:0/base/404"},'
-          '{"name":"err","uri":"http://localhost:0/base/err"}'
+          '{"name":"err","uri":"http://localhost:0/base/err"},'
+          '{"name":"foo","method":"GET","uri":"http://localhost:0/base/foo"},'
+          '{"name":"foo","method":"POST","uri":"http://localhost:0/base/foo"},'
+          '{"name":"patch","method":"PATCH","uri":"http://localhost:0/base/patch"},'
+          '{"name":"put","method":"PUT","uri":"http://localhost:0/base/put"},'
+          '{"name":"delete","method":"DELETE","uri":"http://localhost:0/base/delete"}'
           ']},'
           '{"name":"info","routes":['
           '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"},'
-          '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:5544/info/toUpperCase?msg=String"}'
+          '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:0/info/toUpperCase?msg=String"}'
           ']}'
           ']}';
 

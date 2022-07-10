@@ -98,7 +98,8 @@ abstract class APITestConfigBase extends APITestConfig {
 }
 
 /// An [APITestConfig] for `Docker` containers.
-abstract class APITestConfigDocker extends APITestConfigBase {
+abstract class APITestConfigDocker<C extends DockerContainer>
+    extends APITestConfigBase {
   /// The [DockerHost] for [DockerCommander].
   DockerHost dockerHost;
 
@@ -106,7 +107,7 @@ abstract class APITestConfigDocker extends APITestConfigBase {
       : super(apiConfigMap);
 
   /// The [DockerContainer] that was started.
-  DockerContainer? container;
+  C? container;
 
   @override
   Future<bool> startImpl() async {
@@ -148,7 +149,7 @@ abstract class APITestConfigDocker extends APITestConfigBase {
   }
 
   /// [DockerContainer] creation implementation.
-  Future<DockerContainer> createContainer(DockerCommander dockerCommander);
+  Future<C> createContainer(DockerCommander dockerCommander);
 
   @override
   FutureOr<bool> stopImpl() => stopContainer();
@@ -165,7 +166,8 @@ abstract class APITestConfigDocker extends APITestConfigBase {
 }
 
 /// A base class for [APITestConfig] `Docker` database containers.
-abstract class APITestConfigDockerDB extends APITestConfigDocker {
+abstract class APITestConfigDockerDB<C extends DockerContainer>
+    extends APITestConfigDocker<C> {
   /// The DB type/name.
   final String dbType;
 
@@ -233,8 +235,7 @@ abstract class APITestConfigDockerDB extends APITestConfigDocker {
   FutureOr<int> resolveFreePort(int port);
 
   @override
-  Future<DockerContainer> createContainer(
-      DockerCommander dockerCommander) async {
+  Future<C> createContainer(DockerCommander dockerCommander) async {
     var dbPort = await this.dbPort;
 
     _log.info('Initializing $dbType container at port: $dbPort');
@@ -250,5 +251,22 @@ abstract class APITestConfigDockerDB extends APITestConfigDocker {
   }
 
   /// The [DockerContainerConfig] instantiator.
-  DockerContainerConfig createDBContainerConfig(int dbPort);
+  DockerContainerConfig<C> createDBContainerConfig(int dbPort);
+
+  /// List the database tables names.
+  FutureOr<List<String>> listTables() =>
+      throw UnsupportedError("`listTables` not implemented");
+}
+
+/// A base class for [APITestConfigDockerDB] with SQL support.
+abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
+    extends APITestConfigDockerDB<C> {
+  APITestConfigDockerDBSQL(
+      DockerHost dockerHost, String dbType, Map<String, dynamic> apiConfig,
+      {String? containerNamePrefix})
+      : super(dockerHost, dbType, apiConfig,
+            containerNamePrefix: containerNamePrefix);
+
+  /// Runs a SQL in the DB. The SQL shouldn't have multiple lines.
+  Future<String?> runSQL(String sqlInline);
 }

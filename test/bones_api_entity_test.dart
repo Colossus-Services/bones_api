@@ -1,13 +1,9 @@
 @Tags(['entities'])
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/bones_api_logging.dart';
-import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
-
-final _log = logging.Logger('bones_api_entity_test');
 
 class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   static final APIEntityRepositoryProvider _instance =
@@ -82,8 +78,6 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 }
 
 void main() {
-  _log.handler.logToConsole();
-
   group('Entity', () {
     late final SetEntityRepository<Address> addressRepository;
     late final SetEntityRepository<Role> roleRepository;

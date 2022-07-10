@@ -6,6 +6,8 @@ import 'package:logging/logging.dart' as logging;
 import 'bones_api_logging_generic.dart'
     if (dart.library.io) 'bones_api_logging_io.dart';
 
+final _log = logging.Logger('LoggerHandler');
+
 final Expando<LoggerHandler> _loggerHandlers = Expando<LoggerHandler>();
 
 extension LoggerExntesion on logging.Logger {
@@ -16,6 +18,31 @@ extension LoggerExntesion on logging.Logger {
       _loggerHandlers[this] = handler;
     }
     return handler;
+  }
+}
+
+StreamSubscription<logging.LogRecord>? _loggingListenSubscription;
+
+void logToConsole() => _logToConsole(null);
+
+void _logToConsole(LoggerHandler? loggerHandler) {
+  if (_loggingListenSubscription != null) {
+    return;
+  }
+
+  loggerHandler ??= _log.handler;
+
+  var listen = logging.Logger.root.onRecord.listen(loggerHandler._log);
+  _loggingListenSubscription = listen;
+}
+
+void cancelLogToConsole() => _cancelLogToConsole();
+
+void _cancelLogToConsole() {
+  var listen = _loggingListenSubscription;
+  if (listen != null) {
+    listen.cancel();
+    _loggingListenSubscription = null;
   }
 }
 
@@ -36,15 +63,9 @@ abstract class LoggerHandler {
     logger.level = logging.Level.ALL;
   }
 
-  static StreamSubscription<logging.LogRecord>? _loggingListenSubscription;
+  void logToConsole() => _logToConsole(this);
 
-  void logToConsole() {
-    if (_loggingListenSubscription != null) {
-      return;
-    }
-    var listen = logging.Logger.root.onRecord.listen(_log);
-    _loggingListenSubscription = listen;
-  }
+  void cancelLogToConsole() => _cancelLogToConsole();
 
   static final Map<String, QueueList<int>> _maxKeys =
       <String, QueueList<int>>{};

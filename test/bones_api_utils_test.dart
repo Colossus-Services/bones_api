@@ -1,13 +1,10 @@
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_logging.dart';
-import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart'
     show Decimal, DecimalOnDoubleExtension;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
-
-final _log = logging.Logger('bones_api_test');
 
 class Foo {
   int id;
@@ -23,7 +20,7 @@ class Foo {
 }
 
 void main() {
-  _log.handler.logToConsole();
+  logToConsole();
 
   group('Utils', () {
     setUp(() {});

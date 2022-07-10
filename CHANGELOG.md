@@ -4,6 +4,12 @@
   - Added `isStopped`.
   - Improved documentation.
   - Improved tests.
+- `APIRouteBuilder`:
+  - `apiInfo` now also returns `APIRouteInfo` for method specific routes.
+- New `APITestConfigDockerDBSQL`: adding SQL methods for DB containers with SQL support.
+- `LoggerHandler`:
+  - Exposed global function `logToConsole`.
+  - Added `cancelLogToConsole`.
 
 ## 1.2.2
 
