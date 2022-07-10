@@ -6,13 +6,16 @@
   - Improved tests.
 - `APIRouteBuilder`:
   - `apiInfo` now also returns `APIRouteInfo` for method specific routes.
-- New `APITestConfigDockerDBSQL`: adding SQL methods for DB containers with SQL support.
+- `APITestConfig`:
+  - Added `resolveSupported`, `isSupported`, `isUnsupported` and `unsupportedReason`. 
+  - New `APITestConfigDockerDBSQL`: adding SQL methods for DB containers with SQL support.
 - Better hierarchy of  `APITestConfig` implementations.
 - `LoggerHandler`:
   - Exposed global function `logToConsole`.
   - Added `cancelLogToConsole`.
 - Added library `bones_api_test_vm.dart`.
   - Exposes `resolveFreePort` (now uses a random approach to avoid collision between parallel tests).
+- docker_commander: ^2.0.15
 
 ## 1.2.2
 

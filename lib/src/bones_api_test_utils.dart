@@ -17,6 +17,21 @@ class APITestConfig {
   APITestConfig(Map<String, dynamic> apiConfig)
       : apiConfigMap = deepCopyMap<String, dynamic>(apiConfig)!;
 
+  /// Resolves if this configuration test is supported.
+  /// See [isSupported].
+  FutureOr<bool> resolveSupported() => true;
+
+  /// Returns `true` if this test configuration is supported.
+  /// See [isUnsupported].
+  bool get isSupported => true;
+
+  /// Alias to ![isSupported];
+  bool get isUnsupported => !isSupported;
+
+  /// If [isUnsupported] is `true` should return a reason message.
+  /// This can be used in tests to show the `skip` reason.
+  String? get unsupportedReason => isUnsupported ? 'Unsupported: $this' : null;
+
   /// Returns `true` if already started.
   bool get isStarted => true;
 
@@ -47,9 +62,35 @@ class APITestConfig {
   }
 }
 
+extension APITestConfigExtension on Iterable<APITestConfig> {
+  FutureOr<List<bool>> resolveSupported() =>
+      map((e) => e.resolveSupported()).resolveAll();
+}
+
 /// A base implementation of an [APITestConfig]. See [startImpl] and [stopImpl].
 abstract class APITestConfigBase extends APITestConfig {
   APITestConfigBase(Map<String, dynamic> apiConfigMap) : super(apiConfigMap);
+
+  bool? _supported;
+
+  /// Resolves if this configuration test is supported.
+  /// See [isSupported].
+  @override
+  FutureOr<bool> resolveSupported() {
+    var supported = _supported;
+    if (supported != null) return supported;
+
+    return resolveSupportedImpl().resolveMapped((ok) {
+      _supported = ok;
+      return ok;
+    });
+  }
+
+  /// The [resolveSupported] implementation.
+  FutureOr<bool> resolveSupportedImpl() => true;
+
+  @override
+  bool get isSupported => _supported ?? false;
 
   @override
   bool get isStarted => _started ?? false;
@@ -73,7 +114,7 @@ abstract class APITestConfigBase extends APITestConfig {
     return startImpl();
   }
 
-  /// The start implementation.
+  /// The [start] implementation.
   FutureOr<bool> startImpl();
 
   @override
@@ -94,43 +135,13 @@ abstract class APITestConfigBase extends APITestConfig {
     return ok;
   }
 
-  /// The stop implementation.
+  /// The [stop] implementation.
   FutureOr<bool> stopImpl();
 }
 
 /// An [APITestConfig] for `Docker` containers.
 abstract class APITestConfigDocker<C extends DockerContainer>
     extends APITestConfigBase {
-  static final Map<DockerHost, bool> _daemonRunning = <DockerHost, bool>{};
-
-  /// Resets the cache for [isDaemonRunning].
-  /// - [dockerHost] if provided will reset only the cached result for [dockerHost].
-  static void resetIsDaemonRunningCache([DockerHost? dockerHost]) async {
-    if (dockerHost != null) {
-      _daemonRunning.remove(dockerHost);
-    } else {
-      _daemonRunning.clear();
-    }
-  }
-
-  /// Returns `true` if the Docker Daemon is running.
-  /// The result is cached. See [resetIsDaemonRunningCache].
-  static FutureOr<bool> isDaemonRunning(DockerHost dockerHost) {
-    var cached = _daemonRunning[dockerHost];
-    if (cached != null) return cached;
-
-    return _isDaemonRunningImpl(dockerHost).resolveMapped((running) {
-      _daemonRunning[dockerHost] = running;
-      return running;
-    });
-  }
-
-  static Future<bool> _isDaemonRunningImpl(DockerHost dockerHost) async {
-    var dockerCommander = DockerCommander(dockerHost);
-    await dockerCommander.ensureInitialized();
-    return await dockerCommander.isDaemonRunning();
-  }
-
   /// The [DockerHost] for [DockerCommander].
   DockerHost dockerHost;
 
@@ -139,6 +150,14 @@ abstract class APITestConfigDocker<C extends DockerContainer>
 
   /// The [DockerContainer] that was started.
   C? container;
+
+  @override
+  FutureOr<bool> resolveSupportedImpl() =>
+      DockerHost.isDaemonRunning(dockerHost);
+
+  @override
+  String? get unsupportedReason =>
+      isUnsupported ? 'Docker Daemon NOT running!' : null;
 
   @override
   Future<bool> startImpl() async {

@@ -69,16 +69,17 @@ APITestConfigDB _getAPITestConfig(String dbType) {
 void main() async {
   logToConsole();
 
-  var dockerRunning =
-      await APITestConfigDocker.isDaemonRunning(dockerHostLocal);
+  var apiTestConfigMemory = _getAPITestConfig('memory');
+  var apiTestConfigPostgres = _getAPITestConfig('postgres');
+  var apiTestConfigMySQL = _getAPITestConfig('mysql');
 
-  if (!dockerRunning) {
-    _log.warning('Docker Daemon NOT running! Skipping tests with Docker.');
-  }
+  await [apiTestConfigMemory, apiTestConfigPostgres, apiTestConfigMySQL]
+      .resolveSupported();
 
   group('APITestConfig (basic start/stop)', () {
-    Future<void> _testDB(String dbType) async {
-      var apiTestConfig = _getAPITestConfig(dbType);
+    Future<void> _testDB(APITestConfigDB apiTestConfig) async {
+      expect(apiTestConfig.isSupported, isTrue);
+
       var apiRootStarter = apiTestConfig
           .createAPIRootStarter((apiConfig) => MyAPI.withConfig(apiConfig));
 
@@ -118,12 +119,15 @@ void main() async {
       }
     }
 
-    test('memory', () => _testDB('memory'));
+    test('memory', () => _testDB(apiTestConfigMemory),
+        skip: apiTestConfigMemory.unsupportedReason);
 
-    test('postgres', () => _testDB('postgres'), tags: ['docker']);
+    test('postgres', () => _testDB(apiTestConfigPostgres),
+        skip: apiTestConfigPostgres.unsupportedReason, tags: ['docker']);
 
-    test('mysql', () => _testDB('mysql'), tags: ['docker']);
-  }, skip: !dockerRunning);
+    test('mysql', () => _testDB(apiTestConfigMySQL),
+        skip: apiTestConfigMySQL.unsupportedReason, tags: ['docker']);
+  });
 }
 
 class MyAPI extends APIRoot {
