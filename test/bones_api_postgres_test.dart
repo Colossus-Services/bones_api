@@ -1,6 +1,6 @@
 @TestOn('vm')
 @Tags(['docker', 'postgres', 'entities', 'slow'])
-@Timeout(Duration(seconds: 180))
+@Timeout(Duration(minutes: 4))
 import 'package:bones_api/bones_api_adapter_postgre.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
 import 'package:test/test.dart';
