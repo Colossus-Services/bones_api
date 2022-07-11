@@ -31,7 +31,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.14.0');
+  Version get languageVersion => Version.parse('2.15.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.0');
