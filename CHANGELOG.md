@@ -1,3 +1,9 @@
+## 1.2.5
+
+- sdk: '>=2.15.0 <3.0.0'
+- petitparser: ^5.0.0
+- hotreloader: ^3.0.5
+
 ## 1.2.4
 
 - `SQLAdapter`:
