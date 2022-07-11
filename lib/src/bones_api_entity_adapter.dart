@@ -479,7 +479,7 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     var list = <String>[];
 
     var regexpCreateTableSQL = RegExp(
-        r'\s' + commandPrefixPattern.pattern + r'\s+TABLE\s.*?;',
+        r'\s' + commandPrefixPattern.pattern + r'\s.*?;',
         caseSensitive: false,
         dotAll: true);
 

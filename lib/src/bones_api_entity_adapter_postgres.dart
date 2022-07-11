@@ -207,6 +207,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     }
 
     if (error != null) {
+      _log.severe("Can't connect to PostgreSQL: $databaseName@$host:$port");
       throw error;
     }
 

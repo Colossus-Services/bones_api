@@ -87,6 +87,7 @@ Future<void> main() async {
 
       try {
         expect(apiRootStarter.isStarted, isTrue);
+        expect(apiTestConfig.isStarted, isTrue);
 
         var api = apiRootStarter.apiRoot!;
         expect(api.apiConfig['dialect'], isNotEmpty);

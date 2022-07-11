@@ -8,8 +8,12 @@ import 'bones_api_test_utils_freeport.dart' as freeport;
 /// A [APITestConfigDockerDB] for `MySQL`.
 class APITestConfigDockerMySQL
     extends APITestConfigDockerDBSQL<MySQLContainer> {
+  final bool forceNativePasswordAuthentication;
+
   APITestConfigDockerMySQL(Map<String, dynamic> apiConfig,
-      {DockerHost? dockerHost, String? containerNamePrefix})
+      {DockerHost? dockerHost,
+      String? containerNamePrefix,
+      this.forceNativePasswordAuthentication = false})
       : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
     MySQLAdapter.boot();
@@ -25,6 +29,7 @@ class APITestConfigDockerMySQL
         dbPassword: dbPass,
         dbName: dbName,
         hostPort: dbPort,
+        forceNativePasswordAuthentication: forceNativePasswordAuthentication,
       );
 
   @override
@@ -39,6 +44,14 @@ class APITestConfigDockerMySQL
     if (res == null || res.isEmpty) return <String>[];
 
     var parts = res.split(RegExp(r'[\r\n]'));
+
+    if (parts.isNotEmpty) {
+      if (parts[0].contains('Tables_in_mydb')) {
+        parts.removeAt(0);
+      }
+
+      parts = parts.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
 
     return parts;
   }

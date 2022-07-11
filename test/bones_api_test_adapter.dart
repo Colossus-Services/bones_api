@@ -2,7 +2,6 @@
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:bones_api/bones_api_test_vm.dart';
 import 'package:collection/collection.dart';
-import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
@@ -64,97 +63,9 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
       dbPort,
     );
 
-abstract class DBTestContainer<D> {
-  String get name;
-
-  D? get containerHandler;
-
-  FutureOr<bool> setupContainerHandler();
-
-  FutureOr<bool> tearDownContainerHandler();
-
-  Future<bool> start(int dbPort);
-
-  Future<bool> waitReady();
-
-  Future<String?> prepare() async => null;
-
-  Future<String?> finalize() async => null;
-
-  Future<bool> stop();
-
-  Future<String?> runSQL(String sqlInline);
-
-  Future<String?> createTableSQL(String sqlInline);
-
-  Future<String> listTables();
-
-  String get stdout;
-}
-
-abstract class DBTestContainerDocker
-    implements DBTestContainer<DockerCommander> {
-  @override
-  DockerCommander? containerHandler;
-
-  static bool? _dockerOK;
-  static Future<bool>? _dockerOKFuture;
-
-  static FutureOr<bool> isDockerOK(DockerCommander dockerCommander) {
-    var ok = _dockerOK;
-    if (ok != null) return ok;
-
-    var future = _dockerOKFuture;
-    if (future != null) {
-      return future;
-    }
-
-    return _dockerOKFuture = _isDockerOKImpl(dockerCommander);
-  }
-
-  static Future<bool> _isDockerOKImpl(DockerCommander dockerCommander) async {
-    await dockerCommander.ensureInitialized();
-
-    var daemonOk = await dockerCommander.isDaemonRunning();
-    return _dockerOK = daemonOk;
-  }
-
-  @override
-  FutureOr<bool> setupContainerHandler() async {
-    var dockerHostLocal = DockerHostLocal();
-    var dockerCommander = DockerCommander(dockerHostLocal);
-
-    var daemonOk = await isDockerOK(dockerCommander);
-    if (!daemonOk) return false;
-
-    await dockerCommander.ensureInitialized();
-
-    _log.info('DockerCommander: $dockerCommander');
-
-    var daemonOK = false;
-    try {
-      daemonOK = await dockerCommander.isDaemonRunning();
-    } catch (_) {}
-
-    containerHandler = dockerCommander;
-
-    return daemonOK;
-  }
-
-  @override
-  FutureOr<bool> tearDownContainerHandler() async {
-    await containerHandler?.close();
-    return true;
-  }
-
-  @override
-  Future<String?> createTableSQL(String sqlInline) => runSQL(sqlInline);
-}
-
 Future<bool> runAdapterTests(
     String dbName,
-    DBTestContainer dbTestContainer,
-    int dbPort,
+    APITestConfigDB testConfigDB,
     SQLAdapterCreator sqlAdapterCreator,
     String cmdQuote,
     String serialIntType,
@@ -166,12 +77,13 @@ Future<bool> runAdapterTests(
   final testLog = logging.Logger(
       'TEST:SQLAdapter:$dbName${entityByReflection ? '+reflection' : ''}');
 
-  testLog.info('[[[ Checking Container Handler ]]]');
+  testLog.info('[[[ Checking $testConfigDB ]]]');
 
-  var containerHandlerOK = await dbTestContainer.setupContainerHandler();
+  var configSupported = await testConfigDB.resolveSupported();
 
-  if (!containerHandlerOK) {
-    testLog.warning('[[[ Docker NOT running! SKIPPING Docker tests! ]]]');
+  if (!configSupported) {
+    testLog
+        .warning('[[[ ${testConfigDB.unsupportedReason} -> Skipping tests ]]]');
   }
 
   var testDomain = '${dbName.toLowerCase()}.com';
@@ -182,17 +94,14 @@ Future<bool> runAdapterTests(
     setUpAll(() async {
       testLog.info('[[[ setUpAll ]]]');
 
-      expect(containerHandlerOK, isTrue);
+      expect(configSupported, isTrue);
 
-      dbPort = await resolveFreePort(dbPort);
+      var startOk = await testConfigDB.start();
 
-      var startOk = await dbTestContainer.start(dbPort);
+      var dbPort = await testConfigDB.dbPort;
 
-      testLog.info('Container start: $startOk > $dbTestContainer');
-
-      var prepareOutput = await dbTestContainer.prepare();
-
-      testLog.info('Prepare: $prepareOutput');
+      testLog
+          .info('Container start: $startOk > dbPort: $dbPort > $testConfigDB');
 
       entityRepositoryProvider = defaultEntityRepositoryProvider ??
           createEntityRepositoryProvider(
@@ -204,35 +113,27 @@ Future<bool> runAdapterTests(
     tearDownAll(() async {
       testLog.info('[[[ tearDownAll ]]]');
 
-      expect(containerHandlerOK, isTrue);
+      expect(configSupported, isTrue);
 
       entityRepositoryProvider.close();
 
-      var finalizeMsg = await dbTestContainer.finalize();
-      testLog.info('Finalize:\n$finalizeMsg');
-
-      await dbTestContainer.stop();
-      await dbTestContainer.tearDownContainerHandler();
+      await testConfigDB.stop();
     });
 
-    bool checkDockerRunning(String test) {
-      if (!containerHandlerOK) {
-        testLog.warning('Docker NOT running! Skip test: "$test"');
-        return false;
-      } else {
-        return true;
-      }
-    }
-
     test('create table', () async {
-      if (!checkDockerRunning('[$dbName] create table')) return;
+      if (testConfigDB is! APITestConfigDBSQL) {
+        _log.info("Not a `APITestConfigDBSQL`: skipping table creation SQLs.");
+        return;
+      }
 
-      var ready = await dbTestContainer.waitReady();
-      expect(ready, isTrue);
+      expect(testConfigDB.isStarted, isTrue);
 
-      print('----------------------------------------------');
-      print(dbTestContainer.stdout);
-      print('----------------------------------------------');
+      if (testConfigDB is APITestConfigDocker) {
+        var testConfigDocker = testConfigDB as APITestConfigDocker;
+        print('----------------------------------------------');
+        print(testConfigDocker.stdout);
+        print('----------------------------------------------');
+      }
 
       var q = cmdQuote;
 
@@ -247,8 +148,8 @@ Future<bool> runAdapterTests(
       )
       ''';
 
-      var process1 = await dbTestContainer.createTableSQL(sqlCreateAddress);
-      expect(process1, createTableMatcher);
+      var process1 = await testConfigDB.createTableSQL(sqlCreateAddress);
+      expect(process1.join(), createTableMatcher);
 
       var sqlCreateUser = '''
       CREATE TABLE IF NOT EXISTS ${q}user$q (
@@ -264,8 +165,8 @@ Future<bool> runAdapterTests(
       );
       ''';
 
-      var process2 = await dbTestContainer.createTableSQL(sqlCreateUser);
-      expect(process2, createTableMatcher);
+      var process2 = await testConfigDB.createTableSQL(sqlCreateUser);
+      expect(process2.join(), createTableMatcher);
 
       var sqlCreateRole = '''
       CREATE TABLE IF NOT EXISTS ${q}role$q (
@@ -277,8 +178,8 @@ Future<bool> runAdapterTests(
       );
       ''';
 
-      var process3 = await dbTestContainer.createTableSQL(sqlCreateRole);
-      expect(process3, createTableMatcher);
+      var process3 = await testConfigDB.createTableSQL(sqlCreateRole);
+      expect(process3.join(), createTableMatcher);
 
       var sqlCreateUserRole = '''
       CREATE TABLE IF NOT EXISTS ${q}user_role_ref$q (
@@ -290,26 +191,24 @@ Future<bool> runAdapterTests(
       );
       ''';
 
-      var process4 = await dbTestContainer.createTableSQL(sqlCreateUserRole);
-      expect(process4, createTableMatcher);
+      var process4 = await testConfigDB.createTableSQL(sqlCreateUserRole);
+      expect(process4.join(), createTableMatcher);
 
-      var processList = await dbTestContainer.listTables();
+      var tablesNames = await testConfigDB.listTables();
 
-      print(processList);
+      _log.info("Created tables: $tablesNames");
 
       expect(
-          processList,
+          tablesNames,
           allOf(
-            contains(RegExp(r'\Waddress\W')),
-            contains(RegExp(r'\Wuser\W')),
-            contains(RegExp(r'\Wrole\W')),
-            contains(RegExp(r'\Wuser_role_ref\W')),
+            contains('address'),
+            contains('user'),
+            contains('role'),
+            contains('user_role_ref'),
           ));
     });
 
     test('TestEntityRepositoryProvider', () async {
-      if (!checkDockerRunning('[$dbName] TestEntityRepositoryProvider')) return;
-
       var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
       var roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
@@ -953,7 +852,7 @@ Future<bool> runAdapterTests(
     });
 
     test('populate', () async {
-      if (dbTestContainer.name == 'mysql') {
+      if (testConfigDB.dbType.toLowerCase() == 'mysql') {
         testLog.warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
         return;
       }
@@ -1038,7 +937,7 @@ Future<bool> runAdapterTests(
 
       print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
     });
-  }, skip: !containerHandlerOK);
+  }, skip: testConfigDB.unsupportedReason);
 
-  return containerHandlerOK;
+  return configSupported;
 }

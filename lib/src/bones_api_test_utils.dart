@@ -1,10 +1,13 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_base.dart';
-import 'bones_api_entity_adapter.dart';
 import 'bones_api_config.dart';
+import 'bones_api_entity.dart';
+import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_memory.dart';
 import 'bones_api_root_starter.dart';
 import 'bones_api_utils_collections.dart';
 
@@ -68,9 +71,7 @@ extension APITestConfigExtension on Iterable<APITestConfig> {
 }
 
 /// A base implementation of an [APITestConfig]. See [startImpl] and [stopImpl].
-abstract class APITestConfigBase extends APITestConfig {
-  APITestConfigBase(Map<String, dynamic> apiConfigMap) : super(apiConfigMap);
-
+mixin APITestConfigBase on APITestConfig {
   bool? _supported;
 
   /// Resolves if this configuration test is supported.
@@ -141,7 +142,7 @@ abstract class APITestConfigBase extends APITestConfig {
 
 /// An [APITestConfig] for `Docker` containers.
 abstract class APITestConfigDocker<C extends DockerContainer>
-    extends APITestConfigBase {
+    extends APITestConfig with APITestConfigBase {
   /// The [DockerHost] for [DockerCommander].
   DockerHost dockerHost;
 
@@ -183,8 +184,8 @@ abstract class APITestConfigDocker<C extends DockerContainer>
 
     _started = true;
 
-    var logsStdout = await container.catLogs(stderr: false);
-    var logsStderr = await container.catLogs(stderr: true);
+    var logsStdout = container.stdout?.asString;
+    var logsStderr = container.stderr?.asString;
 
     _log.info('Container $container LOGS:\n'
         '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< [LOGS STDOUT]\n'
@@ -236,13 +237,13 @@ mixin APITestConfigDBMixin {
   Map<String, dynamic> get dbConfig;
 
   /// The [dbConfig] `username`.
-  String get dbUser => dbConfig['username'];
+  String get dbUser => dbConfig['username'] ?? dbConfig['user'];
 
   /// The [dbConfig] `password`.
-  String get dbPass => dbConfig['password'];
+  String get dbPass => dbConfig['password'] ?? dbConfig['pass'];
 
   /// The [dbConfig] `database` name.
-  String get dbName => dbConfig['database'];
+  String get dbName => dbConfig['database'] ?? dbConfig['db'];
 
   /// The [dbConfig] `port` (database exposed port for connections).
   FutureOr<int> get dbPort {
@@ -265,7 +266,7 @@ mixin APITestConfigDBMixin {
         dbConfig['port'] = p;
         return p;
       });
-    } else if (port == '?' || port == '*') {
+    } else if (port == null || port == '?' || port == '*') {
       return resolveFreePort(5000).then((p) {
         dbConfig['port'] = p;
         return p;
@@ -300,8 +301,11 @@ abstract class APITestConfigDB extends APITestConfig with APITestConfigDBMixin {
 }
 
 /// A [APITestConfig] with in-memory database.
-class APITestConfigDBMemory extends APITestConfigDB {
-  APITestConfigDBMemory(Map<String, dynamic> apiConfig)
+class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
+  final EntityRepositoryProvider? parentRepositoryProvider;
+
+  APITestConfigDBMemory(Map<String, dynamic> apiConfig,
+      {this.parentRepositoryProvider})
       : super('memory', apiConfig);
 
   @override
@@ -309,6 +313,57 @@ class APITestConfigDBMemory extends APITestConfigDB {
 
   @override
   FutureOr<int> resolveFreePort(int port) => 5000;
+
+  MemorySQLAdapter? sqlAdapter;
+
+  @override
+  FutureOr<bool> startImpl() {
+    _started = false;
+
+    sqlAdapter =
+        MemorySQLAdapter(parentRepositoryProvider: parentRepositoryProvider);
+
+    _log.info('** STARTED> $this');
+
+    _started = true;
+
+    return true;
+  }
+
+  @override
+  FutureOr<bool> stopImpl() {
+    var sqlAdapter = this.sqlAdapter;
+    if (sqlAdapter == null) return true;
+
+    sqlAdapter.close();
+    this.sqlAdapter = null;
+    return true;
+  }
+
+  @override
+  Future<List<String>> listTables() async {
+    var sqlAdapter = this.sqlAdapter!;
+
+    var allRepositories = sqlAdapter.allRepositories().values.toList();
+
+    var tables = allRepositories.map((e) => e.name).toList();
+
+    var tablesSchemes = await tables
+        .map((t) => sqlAdapter.getTableScheme(t))
+        .toList()
+        .resolveAll();
+
+    var relationshipTables = tablesSchemes
+        .whereNotNull()
+        .expand((e) => e.tableRelationshipReference.values);
+
+    var allTables = [
+      ...tables,
+      ...relationshipTables.map((e) => e.relationshipTable)
+    ];
+
+    return allTables;
+  }
 }
 
 /// Mixin for [APITestConfig] with DB configuration + SQL.
@@ -385,7 +440,9 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
 
 /// A base class for [APITestConfigDockerDB] with SQL support.
 abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
-    extends APITestConfigDockerDB<C> with APITestConfigDBSQLMixin {
+    extends APITestConfigDockerDB<C>
+    with APITestConfigDBSQLMixin
+    implements APITestConfigDBSQL {
   APITestConfigDockerDBSQL(
       DockerHost dockerHost, String dbType, Map<String, dynamic> apiConfig,
       {String? containerNamePrefix})

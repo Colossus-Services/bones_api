@@ -38,8 +38,14 @@ class APITestConfigDockerPostgreSQL
     var res = await container!.runSQL(r'\d');
     if (res == null || res.isEmpty) return <String>[];
 
-    var parts = res.split(RegExp(r'[\r\n]'));
+    var body = res.split(RegExp(r'--+\+--+\+--+\+'))[1];
+    var parts = body.split(RegExp(r'[\r\n]'));
 
-    return parts;
+    var names = parts
+        .where((p) => p.contains(RegExp(r'\s+\|\s+\w+\s+\|')))
+        .map((p) => p.split(RegExp(r'\s+\|\s+'))[1].trim())
+        .toList();
+
+    return names;
   }
 }

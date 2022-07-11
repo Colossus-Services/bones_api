@@ -1,3 +1,14 @@
+## 1.2.4
+
+- `SQLAdapter`:
+  - Fix `extractSQLs`.
+- `APITestConfigDBMemory`:
+  - Now starts creating a `MemorySQLAdapter`.
+- `APITestConfigDockerPostgreSQL`:
+  - Fix `listTables` implementation.
+- `APITestConfigDockerMySQL`:
+  - Fix `listTables` implementation.
+
 ## 1.2.3
 
 - `APIRootStarter`:
