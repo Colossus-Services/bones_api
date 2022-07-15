@@ -749,7 +749,8 @@ abstract class SQLGenerator {
     return null;
   }
 
-  FutureOr<List<SQLBuilder>> generateCreateTableSQLs();
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
+      {bool ifNotExists = true, bool sortColumns = true});
 
   FutureOr<CreateTableSQL> generateCreateTableSQL(
       {EntityRepository? entityRepository,
@@ -758,7 +759,7 @@ abstract class SQLGenerator {
       String? name,
       String? tableName,
       bool ifNotExists = true,
-      bool multiline = true}) async {
+      bool sortColumns = true}) async {
     entityRepository ??=
         getEntityRepository(type: type, obj: obj, name: name, tableName: name);
     if (entityRepository == null) {
@@ -787,6 +788,10 @@ abstract class SQLGenerator {
         .entries
         .where((e) => !e.value.isListEntity)
         .toList();
+
+    if (sortColumns) {
+      fieldsEntries.sort((a, b) => a.key.compareTo(b.key));
+    }
 
     var referenceFields =
         <String, MapEntry<String, MapEntry<String, String>>>{};
@@ -924,8 +929,13 @@ abstract class SQLGenerator {
 
   /// Generate a full text with all the SQLs to create the tables.
   Future<String> generateFullCreateTableSQLs(
-      {String? title, bool withDate = true}) async {
-    return generateCreateTableSQLs().resolveMapped((allSQLs) {
+      {String? title,
+      bool withDate = true,
+      bool ifNotExists = true,
+      bool sortColumns = true}) async {
+    return generateCreateTableSQLs(
+            ifNotExists: ifNotExists, sortColumns: sortColumns)
+        .resolveMapped((allSQLs) {
       if (allSQLs.isEmpty) return '';
 
       var dialect = allSQLs.first.dialect;

@@ -413,16 +413,25 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   /// Generates the [CreateTableSQL] for each [EntityRepository].
   /// See [entityRepositories].
   FutureOr<Map<EntityRepository, CreateTableSQL>>
-      generateEntityRepositoresCreateTableSQLs() => entityRepositories
-          .map((r) => MapEntry<EntityRepository, FutureOr<CreateTableSQL>>(
-              r, generateCreateTableSQL(entityRepository: r)))
-          .toMapFromEntries()
-          .resolveAllValues();
+      generateEntityRepositoresCreateTableSQLs(
+              {bool ifNotExists = true, bool sortColumns = true}) =>
+          entityRepositories
+              .map((r) => MapEntry<EntityRepository, FutureOr<CreateTableSQL>>(
+                  r,
+                  generateCreateTableSQL(
+                      entityRepository: r,
+                      ifNotExists: ifNotExists,
+                      sortColumns: sortColumns)))
+              .toMapFromEntries()
+              .resolveAllValues();
 
   /// Generate all the SQLs to create the tables.
   @override
-  FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
-      generateEntityRepositoresCreateTableSQLs().resolveMapped((sqls) {
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
+          {bool ifNotExists = true, bool sortColumns = true}) =>
+      generateEntityRepositoresCreateTableSQLs(
+              ifNotExists: ifNotExists, sortColumns: sortColumns)
+          .resolveMapped((sqls) {
         List<SQLBuilder> allSQLs =
             sqls.values.expand((e) => e.allSQLBuilders).toList();
 

@@ -785,7 +785,14 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
 
   A? _adapter;
 
-  FutureOr<A> get adapter async => _adapter ??= await buildAdapter();
+  FutureOr<A> get adapter {
+    var adapter = _adapter;
+    if (adapter != null) return adapter;
+    return buildAdapter().resolveMapped((adapter) {
+      _adapter = adapter;
+      return adapter;
+    });
+  }
 
   FutureOr<A> buildAdapter() => DBAdapter.fromConfig(
         adapterConfig,

@@ -13,37 +13,55 @@ final _log = logging.Logger('bones_api_test_adapter');
 typedef SQLAdapterCreator = SQLAdapter Function(
     EntityRepositoryProvider? parentRepositoryProvider, int dbPort);
 
-class TestEntityRepositoryProvider extends EntityRepositoryProvider {
+class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
+  final SQLAdapterCreator sqlAdapterCreator;
+  final int dbPort;
+
   final EntityHandler<Address> addressEntityHandler;
   final EntityHandler<Role> roleEntityHandler;
   final EntityHandler<User> userEntityHandler;
+
+  late final SQLAdapter sqlAdapter;
 
   late final AddressAPIRepository addressAPIRepository;
   late final RoleAPIRepository roleAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
-  late final SQLAdapter sqlAdapter;
-
   TestEntityRepositoryProvider(
       this.addressEntityHandler,
       this.roleEntityHandler,
       this.userEntityHandler,
-      SQLAdapterCreator sqlAdapterCreator,
-      int dbPort) {
-    sqlAdapter = sqlAdapterCreator(this, dbPort);
-
-    SQLEntityRepository<Address>(sqlAdapter, 'address', addressEntityHandler);
-
-    SQLEntityRepository<Role>(sqlAdapter, 'role', roleEntityHandler);
-
-    SQLEntityRepository<User>(sqlAdapter, 'user', userEntityHandler);
-
-    addressAPIRepository = AddressAPIRepository(this)..ensureConfigured();
-
-    roleAPIRepository = RoleAPIRepository(this)..ensureConfigured();
-
-    userAPIRepository = UserAPIRepository(this)..ensureConfigured();
+      this.sqlAdapterCreator,
+      this.dbPort) {
+    sqlAdapter = adapter as SQLAdapter;
+    buildRepositories(sqlAdapter);
   }
+
+  @override
+  Map<String, dynamic> get adapterConfig => {};
+
+  List<SQLEntityRepository<Object>>? _repositories;
+
+  @override
+  List<SQLEntityRepository<Object>> buildRepositories(
+      SQLAdapter<Object> adapter) {
+    return _repositories ??= [
+      SQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
+      SQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
+      SQLEntityRepository<User>(adapter, 'user', userEntityHandler)
+    ].asUnmodifiableView;
+  }
+
+  @override
+  FutureOr<SQLAdapter<Object>> buildAdapter() =>
+      sqlAdapterCreator(this, dbPort);
+
+  @override
+  FutureOr<List<Initializable>> initializeDependencies() => [
+        addressAPIRepository = AddressAPIRepository(this),
+        roleAPIRepository = RoleAPIRepository(this),
+        userAPIRepository = UserAPIRepository(this),
+      ];
 }
 
 TestEntityRepositoryProvider createEntityRepositoryProvider(
@@ -118,6 +136,41 @@ Future<bool> runAdapterTests(
       entityRepositoryProvider.close();
 
       await testConfigDB.stop();
+    });
+
+    test('generateFullCreateTableSQLs', () async {
+      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      expect(sqlAdapter, isNotNull);
+
+      var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
+          title: 'Test Generated SQL', withDate: false);
+
+      print(fullCreateTableSQLs);
+
+      expect(fullCreateTableSQLs, contains('-- Test Generated SQL'));
+      expect(fullCreateTableSQLs,
+          contains('-- SQLAdapter: ${sqlAdapter.runtimeType}'));
+      expect(
+          fullCreateTableSQLs, contains('-- Dialect: ${sqlAdapter.dialect}'));
+      expect(fullCreateTableSQLs,
+          contains('-- Generator: BonesAPI/${BonesAPI.VERSION}'));
+
+      expect(fullCreateTableSQLs, contains('-- Entity: Address @ address'));
+
+      var q = sqlAdapter.sqlElementQuote;
+      var reS = r'(?:\s+|--[^\n]+)+';
+      var reAnyType = r'\w+[^\n]*?';
+
+      var tableAddressRegexp =
+          RegExp('CREATE TABLE IF NOT EXISTS ${q}address$q \\($reS'
+              '${q}id$q $reAnyType PRIMARY KEY,$reS'
+              '${q}city$q VARCHAR,$reS'
+              '${q}number$q INT,$reS'
+              '${q}state$q VARCHAR,$reS'
+              '${q}street$q VARCHAR$reS'
+              '\\)$reS;');
+
+      expect(fullCreateTableSQLs, contains(tableAddressRegexp));
     });
 
     test('create table', () async {

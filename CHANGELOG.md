@@ -6,8 +6,10 @@
 - `MySQLAdapter`:
   - dialect: "MySQL"
 - `SQLGenerator`:
-  - `generateCreateTableSQL`: fix column generation for enum fields.
-  - `generateFullCreateTableSQLs`: added parameter `withDate`.
+  - `generateCreateTableSQL`:
+    - Added parameters `ifNotExists` and `sortColumns`. 
+    - fix column generation for enum fields.
+  - `generateFullCreateTableSQLs`: added parameters `withDate`, `ifNotExists` and `sortColumns`.
 
 ## 1.2.6
 

@@ -114,7 +114,11 @@ Future<void> main() async {
 
         expect(adapter.disposePoolElement(connection!), isTrue);
 
-        //apiTestConfig.list
+        var fullCreateTableSQLs =
+            await adapter.generateFullCreateTableSQLs(title: 'Test');
+
+        // No repositories:
+        expect(fullCreateTableSQLs, equals(''));
       } finally {
         expect(await apiRootStarter.stop(), isTrue);
       }
