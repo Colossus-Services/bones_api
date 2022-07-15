@@ -7,6 +7,7 @@ import 'package:statistics/statistics.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
@@ -73,7 +74,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
           minConnections,
           maxConnections,
           const SQLAdapterCapability(
-              dialect: 'postgre',
+              dialect: 'PostgreSQL',
               transactions: true,
               transactionAbort: true,
               tableSQL: false),

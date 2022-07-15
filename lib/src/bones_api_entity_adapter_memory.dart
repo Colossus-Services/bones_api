@@ -9,7 +9,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';

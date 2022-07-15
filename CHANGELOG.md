@@ -1,3 +1,14 @@
+## 1.2.7
+
+- Split `bones_api_entity_adapter.dart` into `bones_api_entity_adapter_sql.dart`.
+- `PostgreSQLAdapter`:
+  - dialect: "PostgreSQL"
+- `MySQLAdapter`:
+  - dialect: "MySQL"
+- `SQLGenerator`:
+  - `generateCreateTableSQL`: fix column generation for enum fields.
+  - `generateFullCreateTableSQLs`: added parameter `withDate`.
+
 ## 1.2.6
 
 - Added `SQLBuilder` that is used to generate the entities `CREATE TABLE` SQLs.

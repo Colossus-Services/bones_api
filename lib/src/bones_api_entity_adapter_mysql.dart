@@ -7,6 +7,7 @@ import 'package:statistics/statistics.dart' show Decimal;
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_utils_timedmap.dart';
@@ -71,7 +72,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
           minConnections,
           maxConnections,
           const SQLAdapterCapability(
-              dialect: 'mysql',
+              dialect: 'MySQL',
               transactions: true,
               transactionAbort: true,
               tableSQL: false),

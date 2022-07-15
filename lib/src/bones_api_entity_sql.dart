@@ -7,6 +7,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
 
@@ -813,7 +814,8 @@ abstract class SQLEntityRepositoryProvider<A extends SQLAdapter>
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
       adapter.resolveMapped((adapter) => adapter.generateCreateTableSQLs());
 
-  FutureOr<String> generateFullCreateTableSQLs({String? title}) =>
-      adapter.resolveMapped(
-          (adapter) => adapter.generateFullCreateTableSQLs(title: title));
+  FutureOr<String> generateFullCreateTableSQLs(
+          {String? title, bool withDate = true}) =>
+      adapter.resolveMapped((adapter) => adapter.generateFullCreateTableSQLs(
+          title: title, withDate: withDate));
 }

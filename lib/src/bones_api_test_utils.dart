@@ -6,8 +6,8 @@ import 'package:logging/logging.dart' as logging;
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity_adapter_memory.dart';
+import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_root_starter.dart';
 import 'bones_api_utils_collections.dart';
 

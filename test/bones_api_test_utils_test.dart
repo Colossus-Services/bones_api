@@ -30,7 +30,7 @@ const Map<String, dynamic> apiConfigPostgres = <String, dynamic>{
       }
     },
   },
-  'dialect': 'postgre',
+  'dialect': 'PostgreSQL',
 };
 
 const Map<String, dynamic> apiConfigMysql = <String, dynamic>{
@@ -45,7 +45,7 @@ const Map<String, dynamic> apiConfigMysql = <String, dynamic>{
       }
     },
   },
-  'dialect': 'mysql',
+  'dialect': 'MySQL',
 };
 
 final dockerHostLocal = DockerHostLocal();

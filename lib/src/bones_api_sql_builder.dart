@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
-import 'package:statistics/statistics.dart';
-import 'package:reflection_factory/reflection_factory.dart';
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
+import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
+
+import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_types.dart';
 
@@ -747,6 +749,8 @@ abstract class SQLGenerator {
     return null;
   }
 
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs();
+
   FutureOr<CreateTableSQL> generateCreateTableSQL(
       {EntityRepository? entityRepository,
       Object? obj,
@@ -807,10 +811,12 @@ abstract class SQLGenerator {
           refColumn = entityType.value.key;
 
           comment += ' @ $refTable.$refColumn';
-        } else {
-          continue;
         }
       }
+
+      fieldSQLType ??= await enumTypeToSQLType(fieldType.type);
+
+      if (fieldSQLType == null) continue;
 
       sqlEntries.add(SQLEntry('COLUMN', ' $q$fieldName$q $fieldSQLType',
           comment: comment,
@@ -914,5 +920,43 @@ abstract class SQLGenerator {
     createSQL.relationships = relationshipSQLs;
 
     return createSQL;
+  }
+
+  /// Generate a full text with all the SQLs to create the tables.
+  Future<String> generateFullCreateTableSQLs(
+      {String? title, bool withDate = true}) async {
+    return generateCreateTableSQLs().resolveMapped((allSQLs) {
+      if (allSQLs.isEmpty) return '';
+
+      var dialect = allSQLs.first.dialect;
+
+      var fullSQL = StringBuffer();
+
+      if (title != null && title.isNotEmpty) {
+        var parts = title.split(RegExp(r'\r?\n'));
+        for (var l in parts) {
+          fullSQL.write('-- $l\n');
+        }
+      }
+
+      fullSQL.write('-- SQLAdapter: $runtimeType\n');
+      fullSQL.write('-- Dialect: $dialect\n');
+      fullSQL.write('-- Generator: BonesAPI/${BonesAPI.VERSION}\n');
+      if (withDate) fullSQL.write('-- Date: ${DateTime.now()}\n');
+      fullSQL.write('\n');
+
+      for (var s in allSQLs) {
+        if (s is CreateTableSQL && s.entityRepository != null) {
+          var sqlEntityRepository = s.entityRepository!;
+          fullSQL.write(
+              '-- Entity: ${sqlEntityRepository.type} @ ${sqlEntityRepository.name}\n\n');
+        }
+
+        var sql = s.buildSQL(multiline: s is! AlterTableSQL);
+        fullSQL.write('$sql\n\n');
+      }
+
+      return fullSQL.toString();
+    });
   }
 }
