@@ -2,8 +2,9 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
-import 'package:statistics/statistics.dart';
+import 'package:statistics/statistics.dart' hide IterableIntExtension;
 
+import 'bones_api_base.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
@@ -13,6 +14,7 @@ import 'bones_api_entity_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_platform.dart';
+import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
@@ -216,36 +218,797 @@ class SQL implements SQLWrapper {
   }
 }
 
-class SQLAdapterCapability {
+/// [DBAdapter] capabilities.
+class DBAdapterCapability {
+  /// The dialect of the DB.
   final String dialect;
-  final bool transactions;
-  final bool transactionAbort;
-  final bool tableSQL;
 
+  /// `true` if the DB supports transactions.
+  final bool transactions;
+
+  /// `true` if the DB supports abortion of transactions.
+  final bool transactionAbort;
+
+  /// `true` if the DB fully supports [transactions] and [transactionAbort].
   bool get fullTransaction => transactions && transactionAbort;
 
-  const SQLAdapterCapability(
-      {required this.dialect,
-      required this.transactions,
-      required this.transactionAbort,
-      required this.tableSQL});
+  const DBAdapterCapability({
+    required this.dialect,
+    required this.transactions,
+    required this.transactionAbort,
+  });
 }
 
-typedef SQLAdapterInstantiator<C extends Object>
-    = FutureOr<SQLAdapter<C>?> Function(Map<String, dynamic> config,
+typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>>
+    = FutureOr<A?> Function(Map<String, dynamic> config,
         {int? minConnections,
         int? maxConnections,
         EntityRepositoryProvider? parentRepositoryProvider});
 
-/// Base class for SQL adapters.
+typedef PreFinishDBOperation<T, R> = FutureOr<R> Function(T result);
+
+/// Base class for DB adapters.
+///
+/// A [DBAdapter] implementation is responsible to connect to the database and
+/// perform operations.
+///
+/// All [DBAdapter]s comes with a built-in connection pool.
+abstract class DBAdapter<C extends Object> extends SchemeProvider
+    with Initializable, Pool<C>, Closable
+    implements EntityRepositoryProvider {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    SQLAdapter.boot();
+  }
+
+  static final Map<String, DBAdapterInstantiator> _registeredAdaptersByName =
+      <String, DBAdapterInstantiator>{};
+  static final Map<Type, DBAdapterInstantiator> _registeredAdaptersByType =
+      <Type, DBAdapterInstantiator>{};
+
+  static List<String> get registeredAdaptersNames =>
+      _registeredAdaptersByName.keys.toList();
+
+  static List<Type> get registeredAdaptersTypes =>
+      _registeredAdaptersByType.keys.toList();
+
+  static void registerAdapter<C extends Object, A extends DBAdapter<C>>(
+      List<String> names,
+      Type type,
+      DBAdapterInstantiator<C, A> adapterInstantiator) {
+    for (var name in names) {
+      _registeredAdaptersByName[name] = adapterInstantiator;
+    }
+
+    _registeredAdaptersByType[type] = adapterInstantiator;
+  }
+
+  static DBAdapterInstantiator<C, A>?
+      getAdapterInstantiator<C extends Object, A extends DBAdapter<C>>(
+          {String? name, Type? type}) {
+    if (name == null && type == null) {
+      throw ArgumentError(
+          'One of the parameters `name` or `type` should NOT be null!');
+    }
+
+    if (name != null) {
+      var adapter = _registeredAdaptersByName[name];
+      if (adapter is DBAdapterInstantiator<C, A>) {
+        return adapter;
+      }
+    }
+
+    if (type != null) {
+      var adapter = _registeredAdaptersByType[type];
+      if (adapter is DBAdapterInstantiator<C, A>) {
+        return adapter;
+      }
+    }
+
+    return null;
+  }
+
+  static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
+      getAdapterInstantiatorsFromConfig<C extends Object,
+              A extends SQLAdapter<C>>(Map<String, dynamic> config) =>
+          _getAdapterInstantiatorsFromConfigImpl<C, A>(
+              config, registeredAdaptersNames, getAdapterInstantiator);
+
+  static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
+      _getAdapterInstantiatorsFromConfigImpl<C extends Object,
+                  A extends DBAdapter<C>>(
+              Map<String, dynamic> config,
+              List<String> registeredAdaptersNames,
+              DBAdapterInstantiator<C, A>? Function({String? name, Type? type})
+                  getAdapterInstantiator) =>
+          registeredAdaptersNames
+              .where((n) => config.containsKey(n))
+              .map((n) {
+                var instantiator = getAdapterInstantiator(name: n);
+                if (instantiator == null) return null;
+                var conf = config[n] ?? <String, dynamic>{};
+                if (conf is! Map) return null;
+                return MapEntry<DBAdapterInstantiator<C, A>,
+                        Map<String, dynamic>>(
+                    instantiator,
+                    conf.map((key, value) => MapEntry<String, dynamic>(
+                        key.toString(), value as dynamic)));
+              })
+              .whereNotNull()
+              .toList()
+            ..sort((a, b) => a.value.length.compareTo(b.value.length));
+
+  /// The minimum number of connections in the pool of this adapter.
+  final int minConnections;
+
+  /// The maximum number of connections in the pool of this adapter.
+  final int maxConnections;
+
+  /// The [DBAdapter] capability.
+  final DBAdapterCapability capability;
+
+  /// The DB dialect of this adapter.
+  String get dialect => capability.dialect;
+
+  final EntityRepositoryProvider? parentRepositoryProvider;
+
+  DBAdapter(this.minConnections, this.maxConnections, this.capability,
+      {this.parentRepositoryProvider, Object? populateSource})
+      : _populateSource = populateSource {
+    boot();
+
+    parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
+  }
+
+  static FutureOr<A> fromConfig<C extends Object, A extends DBAdapter<C>>(
+      Map<String, dynamic> config,
+      {int minConnections = 1,
+      int maxConnections = 3,
+      EntityRepositoryProvider? parentRepositoryProvider}) {
+    boot();
+
+    var instantiators = getAdapterInstantiatorsFromConfig(config);
+
+    if (instantiators.isEmpty) {
+      throw StateError(
+          "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}");
+    }
+
+    return instantiateAdaptor<Object, DBAdapter<Object>>(instantiators, config,
+            minConnections: minConnections,
+            maxConnections: maxConnections,
+            parentRepositoryProvider: parentRepositoryProvider)
+        .resolveMapped((adapter) => adapter as A);
+  }
+
+  static FutureOr<A>
+      instantiateAdaptor<C extends Object, A extends DBAdapter<C>>(
+          List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
+              instantiators,
+          Map<String, dynamic> config,
+          {int minConnections = 1,
+          int maxConnections = 3,
+          EntityRepositoryProvider? parentRepositoryProvider}) {
+    if (instantiators.isEmpty) {
+      throw StateError(
+          "No `$A` instantiator for `config` keys: ${config.keys.toList()}");
+    }
+
+    var asyncInstantiators = <Future<A>>[];
+
+    for (var e in instantiators) {
+      var f = e.key;
+      var conf = e.value;
+
+      var ret = f(conf,
+          minConnections: minConnections,
+          maxConnections: maxConnections,
+          parentRepositoryProvider: parentRepositoryProvider);
+      if (ret == null) {
+        continue;
+      } else if (ret is A) {
+        return ret;
+      } else if (ret is Future<A>) {
+        asyncInstantiators.add(ret);
+      }
+    }
+
+    if (asyncInstantiators.isNotEmpty) {
+      return asyncInstantiators.resolveAll().then((l) {
+        for (var e in l) {
+          return e;
+        }
+
+        throw StateError(
+            "Can't async instantiate an `$A` for `config`: $config");
+      });
+    }
+
+    throw StateError("Can't instantiate an `$A` for `config`: $config");
+  }
+
+  @override
+  FutureOr<InitializationResult> initialize() => _populateImpl();
+
+  Object? _populateSource;
+
+  FutureOr<InitializationResult> _populateImpl() =>
+      _populateSourceImpl(_populateSource);
+
+  FutureOr<InitializationResult> _populateSourceImpl(Object? populateSource) {
+    _populateSource = null;
+
+    if (populateSource == null) {
+      return InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!
+      ]);
+    }
+
+    return populateFromSource(populateSource).resolveMapped((val) {
+      var result = InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!,
+        ...entityRepositories,
+      ]);
+
+      return result;
+    });
+  }
+
+  @override
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
+    if (id == null) return null;
+    var entityRepository = getEntityRepository(type: type);
+    return entityRepository?.selectByID(id).resolveMapped((o) => o as O?);
+  }
+
+  FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>
+      entityRepositories
+          .map((r) => MapEntry<EntityRepository, FutureOr<String>>(
+              r, getTableForEntityRepository(r)))
+          .toMapFromEntries()
+          .resolveAllValues();
+
+  @override
+  FutureOr<String?> getTableForType(TypeInfo type) {
+    if (type.hasArguments) {
+      if (type.isMap) {
+        type = type.arguments[1];
+      } else if (type.isIterable || type.isList || type.isSet) {
+        type = type.arguments[0];
+      }
+    }
+
+    var entityType = type.type;
+
+    var entityRepository = getEntityRepository(type: entityType);
+
+    if (entityRepository != null) {
+      return getTableForEntityRepository(entityRepository);
+    } else {
+      return null;
+    }
+  }
+
+  EntityRepository? _geAdapterEntityRepository(
+      {String? entityName, String? tableName, Type? entityType}) {
+    EntityRepository? entityRepository;
+
+    if (entityName != null) {
+      entityRepository = getEntityRepository(name: entityName);
+    }
+
+    if (entityRepository == null &&
+        tableName != null &&
+        tableName != entityName) {
+      entityRepository = getEntityRepository(tableName: tableName);
+    }
+
+    if (entityRepository == null && entityType != null) {
+      entityRepository = getEntityRepository(type: entityType);
+    }
+
+    return entityRepository;
+  }
+
+  @override
+  FutureOr<TypeInfo?> getFieldType(String field,
+      {String? entityName, String? tableName, Type? entityType}) {
+    var entityRepository = _geAdapterEntityRepository(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
+    if (entityRepository != null) {
+      var type = entityRepository.entityHandler.getFieldType(null, field);
+      return type;
+    }
+
+    return null;
+  }
+
+  @override
+  FutureOr<Object?> getEntityID(Object entity,
+      {String? entityName, String? tableName, Type? entityType}) {
+    if (entity is num) {
+      return entity;
+    }
+
+    entityType ??= entity.runtimeType;
+
+    var entityHandler = getEntityHandler(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
+    if (entityHandler == null) return null;
+
+    if (entity is Map) {
+      var idFieldsName = entityHandler.idFieldName();
+      return entity[idFieldsName];
+    } else {
+      return entityHandler.getID(entity);
+    }
+  }
+
+  EntityHandler<T>? getEntityHandler<T>(
+      {String? entityName, String? tableName, Type? entityType}) {
+    var entityRepository = _geAdapterEntityRepository(
+        entityName: entityName, tableName: tableName, entityType: entityType);
+
+    var entityHandler = entityRepository?.entityHandler;
+    return entityHandler as EntityHandler<T>?;
+  }
+
+  FutureOr<int> doCount(
+      TransactionOperation op, String entityName, String table,
+      {EntityMatcher? matcher,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      PreFinishDBOperation<int, int>? preFinish});
+
+  FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
+      String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      int? limit,
+      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
+
+  FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
+      String table, O o, Map<String, dynamic> fields,
+      {String? idFieldName, PreFinishDBOperation<dynamic, dynamic>? preFinish});
+
+  FutureOr<dynamic> doUpdate<O>(TransactionOperation op, String entityName,
+      String table, O o, Object id, Map<String, dynamic> fields,
+      {String? idFieldName,
+      PreFinishDBOperation<dynamic, dynamic>? preFinish,
+      bool allowAutoInsert = false});
+
+  FutureOr<bool> doInsertRelationship(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      dynamic id,
+      String otherTableName,
+      List otherIds,
+      [PreFinishDBOperation<bool, bool>? preFinish]);
+
+  FutureOr<R> doSelectRelationship<R>(TransactionOperation op,
+      String entityName, String table, dynamic id, String otherTableName,
+      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
+
+  FutureOr<R> doSelectRelationships<R>(TransactionOperation op,
+      String entityName, String table, List<dynamic> ids, String otherTableName,
+      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
+
+  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
+      String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
+
+  FutureOr<C> openTransaction(Transaction transaction);
+
+  FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
+      Object? error, StackTrace? stackTrace);
+
+  bool get callCloseTransactionRequired;
+
+  FutureOr<void> closeTransaction(Transaction transaction, C? connection);
+
+  static int temporaryTableIdCount = 0;
+
+  static String createTemporaryTableName(String prefix) {
+    var id = ++temporaryTableIdCount;
+    var seed = DateTime.now().microsecondsSinceEpoch;
+    return '${prefix}_${seed}_$id';
+  }
+
+  /// Returns the URL of the [connection].
+  String getConnectionURL(C connection);
+
+  /// Creates a connection [C] for this adapte
+  FutureOr<C> createConnection();
+
+  /// Returns `true` if [connection] is valid for usage.
+  FutureOr<bool> isConnectionValid(C connection);
+
+  FutureOr<bool> closeConnection(C connection);
+
+  /// Checks the connections of the pool. Defaults: calls [removeInvalidElementsFromPool].
+  FutureOr<bool> checkConnections() => removeInvalidElementsFromPool();
+
+  /// Defaults: calls [isConnectionValid].
+  @override
+  FutureOr<bool> isPoolElementValid(C o) => isConnectionValid(o);
+
+  /// Checks the pool connections and limits.
+  @override
+  FutureOr<bool> checkPool() =>
+      checkPoolSize(minConnections, maxConnections, 30000);
+
+  @override
+  int get poolSizeDesiredLimit => maxConnections;
+
+  /// Defaults: calls [createConnection].
+  @override
+  FutureOr<C?> createPoolElement() {
+    super.createPoolElement();
+
+    if (poolSize < maxConnections) {
+      return createConnection();
+    } else {
+      return null;
+    }
+  }
+
+  /// Defaults: calls [closeConnection].
+  @override
+  FutureOr<bool> closePoolElement(C o) {
+    super.closePoolElement(o);
+    return closeConnection(o);
+  }
+
+  final Map<String, DBRepositoryAdapter> _repositoriesAdapters =
+      <String, DBRepositoryAdapter>{};
+
+  DBRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
+      {String? tableName, Type? type}) {
+    if (isClosed) {
+      return null;
+    }
+
+    return _repositoriesAdapters.putIfAbsent(
+            name, () => instantiateRepositoryAdapter<O>(name, tableName, type))
+        as DBRepositoryAdapter<O>;
+  }
+
+  DBRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
+      String name, String? tableName, Type? type) {
+    return DBRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
+  }
+
+  DBRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
+    String name,
+  ) {
+    if (isClosed) return null;
+    return _repositoriesAdapters[name] as DBRepositoryAdapter<O>?;
+  }
+
+  DBRepositoryAdapter<O>? getRepositoryAdapterByType<O>(Type type) {
+    if (isClosed) return null;
+    return _repositoriesAdapters.values.firstWhereOrNull((e) => e.type == type)
+        as DBRepositoryAdapter<O>?;
+  }
+
+  DBRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(String tableName) {
+    if (isClosed) return null;
+    return _repositoriesAdapters.values
+            .firstWhereOrNull((e) => e.tableName == tableName)
+        as DBRepositoryAdapter<O>?;
+  }
+
+  final Map<Type, EntityRepository> _entityRepositories =
+      <Type, EntityRepository>{};
+
+  List<EntityRepository> get entityRepositories =>
+      _entityRepositories.values.toList();
+
+  @override
+  void registerEntityRepository<O extends Object>(
+      EntityRepository<O> entityRepository) {
+    checkNotClosed();
+
+    _entityRepositories[entityRepository.type] = entityRepository;
+  }
+
+  @override
+  List<EntityRepository> get registeredEntityRepositories =>
+      _entityRepositories.values.toList();
+
+  bool _callingGetEntityRepository = false;
+
+  @override
+  EntityRepository<O>? getEntityRepository<O extends Object>(
+      {O? obj, Type? type, String? name, String? tableName}) {
+    if (isClosed) return null;
+
+    if (_callingGetEntityRepository) return null;
+    _callingGetEntityRepository = true;
+
+    try {
+      return _getEntityRepositoryImpl<O>(
+              obj: obj, type: type, name: name, tableName: tableName) ??
+          EntityRepositoryProvider.globalProvider
+              .getEntityRepository<O>(obj: obj, type: type, name: name);
+    } finally {
+      _callingGetEntityRepository = false;
+    }
+  }
+
+  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>(
+      {O? obj, Type? type, String? name, String? tableName}) {
+    if (!isClosed) {
+      var entityRepository = _entityRepositories[O];
+      if (entityRepository != null && entityRepository.isClosed) {
+        entityRepository = null;
+      }
+
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      } else if (obj != null) {
+        entityRepository = _entityRepositories[obj.runtimeType];
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+      }
+
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      } else if (type != null) {
+        entityRepository = _entityRepositories[type];
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+      }
+
+      if (entityRepository != null) {
+        return entityRepository as EntityRepository<O>;
+      } else if (name != null) {
+        var nameSimplified = EntityAccessor.simplifiedName(name);
+
+        entityRepository = _entityRepositories.values
+            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
+            .firstOrNull;
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+
+        if (entityRepository != null) {
+          return entityRepository as EntityRepository<O>;
+        }
+      }
+
+      if (tableName != null) {
+        entityRepository = _entityRepositories.values
+            .where((e) => e is SQLEntityRepository && e.tableName == tableName)
+            .firstOrNull;
+        if (entityRepository != null && entityRepository.isClosed) {
+          entityRepository = null;
+        }
+
+        if (entityRepository != null) {
+          return entityRepository as EntityRepository<O>;
+        }
+      }
+    }
+
+    var entityRepository =
+        parentRepositoryProvider?.getEntityRepository<O>(obj: obj, type: type);
+
+    if (entityRepository != null) {
+      return entityRepository;
+    }
+
+    return _knownEntityRepositoryProviders.getEntityRepository<O>(
+        obj: obj, type: type, name: name, entityRepositoryProvider: this);
+  }
+
+  final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
+      <EntityRepositoryProvider>{};
+
+  @override
+  void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
+    _knownEntityRepositoryProviders.add(provider);
+  }
+
+  @override
+  Map<Type, EntityRepository> allRepositories(
+      {Map<Type, EntityRepository>? allRepositories,
+      Set<EntityRepositoryProvider>? traversedProviders}) {
+    allRepositories ??= <Type, EntityRepository>{};
+    traversedProviders ??= <EntityRepositoryProvider>{};
+
+    if (traversedProviders.contains(this)) {
+      return allRepositories;
+    }
+
+    traversedProviders.add(this);
+
+    for (var e in _entityRepositories.entries) {
+      allRepositories.putIfAbsent(e.key, () => e.value);
+    }
+
+    for (var e in _knownEntityRepositoryProviders) {
+      e.allRepositories(allRepositories: allRepositories);
+    }
+
+    return allRepositories;
+  }
+}
+
+class DBRepositoryAdapter<O> with Initializable {
+  final DBAdapter databaseAdapter;
+
+  final String name;
+
+  final String tableName;
+
+  final Type type;
+
+  DBRepositoryAdapter(this.databaseAdapter, this.name,
+      {String? tableName, Type? type})
+      : tableName = tableName ?? name,
+        type = type ?? O;
+
+  @override
+  FutureOr<InitializationResult> initialize() =>
+      databaseAdapter.ensureInitialized(parent: this);
+
+  String get dialect => databaseAdapter.dialect;
+
+  SchemeProvider get schemeProvider => databaseAdapter;
+
+  FutureOr<TableScheme> getTableScheme() =>
+      databaseAdapter.getTableScheme(tableName).resolveMapped((t) => t!);
+
+  FutureOr<int> doCount(TransactionOperation op,
+          {EntityMatcher? matcher,
+          Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          PreFinishDBOperation<int, int>? preFinish}) =>
+      databaseAdapter.doCount(op, name, tableName,
+          matcher: matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          preFinish: preFinish);
+
+  FutureOr<R> doSelect<R>(TransactionOperation op, EntityMatcher matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          int? limit,
+          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
+              preFinish}) =>
+      databaseAdapter.doSelect<R>(op, name, tableName, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit,
+          preFinish: preFinish);
+
+  FutureOr<dynamic> doInsert(
+          TransactionOperation op, O o, Map<String, dynamic> fields,
+          {String? idFieldName,
+          PreFinishDBOperation<dynamic, dynamic>? preFinish}) =>
+      databaseAdapter.doInsert(op, name, tableName, o, fields,
+          idFieldName: idFieldName, preFinish: preFinish);
+
+  FutureOr<dynamic> doUpdate(
+          TransactionOperation op, O o, Object id, Map<String, dynamic> fields,
+          {String? idFieldName,
+          PreFinishDBOperation<dynamic, dynamic>? preFinish,
+          bool allowAutoInsert = false}) =>
+      databaseAdapter.doUpdate(op, name, tableName, o, id, fields,
+          idFieldName: idFieldName,
+          preFinish: preFinish,
+          allowAutoInsert: allowAutoInsert);
+
+  FutureOr<bool> doInsertRelationship(TransactionOperation op, dynamic id,
+          String otherTableName, List otherIds,
+          [PreFinishDBOperation<bool, bool>? preFinish]) =>
+      databaseAdapter.doInsertRelationship(
+          op, name, tableName, id, otherTableName, otherIds, preFinish);
+
+  FutureOr<R> doSelectRelationship<R>(
+          TransactionOperation op, dynamic id, String otherTableName,
+          [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
+              preFinish]) =>
+      databaseAdapter.doSelectRelationship<R>(
+          op, name, tableName, id, otherTableName, preFinish);
+
+  FutureOr<R> doSelectRelationships<R>(
+          TransactionOperation op, List<dynamic> ids, String otherTableName,
+          [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
+              preFinish]) =>
+      databaseAdapter.doSelectRelationships<R>(
+          op, name, tableName, ids, otherTableName, preFinish);
+
+  FutureOr<R> doDelete<R>(TransactionOperation op, EntityMatcher matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
+              preFinish}) =>
+      databaseAdapter.doDelete<R>(op, name, tableName, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          preFinish: preFinish);
+
+  @override
+  String toString() =>
+      'DBRepositoryAdapter{name: $name, tableName: $tableName, type: $type}';
+}
+
+/// Base class for [EntityRepositoryProvider] with [DBAdapter]s.
+abstract class DBEntityRepositoryProvider<A extends DBAdapter>
+    extends EntityRepositoryProvider {
+  Map<String, dynamic> get adapterConfig;
+
+  A? _adapter;
+
+  FutureOr<A> get adapter async => _adapter ??= await buildAdapter();
+
+  FutureOr<A> buildAdapter() => DBAdapter.fromConfig(
+        adapterConfig,
+        parentRepositoryProvider: this,
+      );
+
+  @override
+  Future<InitializationResult> initialize() async {
+    var adapter = await this.adapter;
+    var repositories = buildRepositories(adapter);
+
+    return InitializationResult.ok(this,
+        dependencies: [adapter, ...repositories]);
+  }
+
+  List<EntityRepository> buildRepositories(A adapter);
+}
+
+/// [SQLAdapter] capabilities.
+class SQLAdapterCapability extends DBAdapterCapability {
+  /// `true` if the adapter supports table SQLs.
+  /// See [SQLAdapter.populateTables].
+  final bool tableSQL;
+
+  const SQLAdapterCapability(
+      {required String dialect,
+      required bool transactions,
+      required bool transactionAbort,
+      required this.tableSQL})
+      : super(
+            dialect: dialect,
+            transactions: transactions,
+            transactionAbort: transactionAbort);
+}
+
+typedef SQLAdapterInstantiator<C extends Object, A extends SQLAdapter<C>>
+    = DBAdapterInstantiator<C, A>;
+
+/// Base class for SQL DB adapters.
 ///
 /// A [SQLAdapter] implementation is responsible to connect to the database and
 /// adjust the generated `SQL`s to the correct dialect.
 ///
 /// All [SQLAdapter]s comes with a built-in connection pool.
-abstract class SQLAdapter<C extends Object> extends SchemeProvider
-    with Initializable, Pool<C>, Closable
-    implements EntityRepositoryProvider {
+abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
+    with SQLGenerator {
   static bool _boot = false;
 
   static void boot() {
@@ -266,166 +1029,105 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
   static List<Type> get registeredAdaptersTypes =>
       _registeredAdaptersByType.keys.toList();
 
-  static void registerAdapter<C extends Object>(List<String> names, Type type,
-      SQLAdapterInstantiator<C> adapterInstantiator) {
+  static void registerAdapter<C extends Object, A extends SQLAdapter<C>>(
+      List<String> names,
+      Type type,
+      SQLAdapterInstantiator<C, A> adapterInstantiator) {
     for (var name in names) {
       _registeredAdaptersByName[name] = adapterInstantiator;
     }
 
     _registeredAdaptersByType[type] = adapterInstantiator;
+
+    DBAdapter.registerAdapter(names, type, adapterInstantiator);
   }
 
-  static SQLAdapterInstantiator<C>? getAdapterInstantiator<C extends Object>(
-      {String? name, Type? type}) {
+  static SQLAdapterInstantiator<C, A>?
+      getAdapterInstantiator<C extends Object, A extends SQLAdapter<C>>(
+          {String? name, Type? type}) {
     if (name == null && type == null) {
       throw ArgumentError(
           'One of the parameters `name` or `type` should NOT be null!');
     }
 
-    SQLAdapterInstantiator<C>? adapter;
-
     if (name != null) {
-      adapter = _registeredAdaptersByName[name] as SQLAdapterInstantiator<C>?;
+      var adapter = _registeredAdaptersByName[name];
+      if (adapter is SQLAdapterInstantiator<C, A>) {
+        return adapter;
+      }
     }
 
-    if (adapter == null && type != null) {
-      adapter = _registeredAdaptersByType[type] as SQLAdapterInstantiator<C>?;
+    if (type != null) {
+      var adapter = _registeredAdaptersByType[type];
+      if (adapter is SQLAdapterInstantiator<C, A>) {
+        return adapter;
+      }
     }
 
-    return adapter;
+    return null;
   }
 
-  static List<MapEntry<SQLAdapterInstantiator, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfig(Map<String, dynamic> config) =>
-          registeredAdaptersNames
-              .where((n) => config.containsKey(n))
-              .map((n) {
-                var instantiator = getAdapterInstantiator(name: n);
-                if (instantiator == null) return null;
-                var conf = config[n] ?? <String, dynamic>{};
-                if (conf is! Map) return null;
-                return MapEntry<SQLAdapterInstantiator, Map<String, dynamic>>(
-                    instantiator,
-                    conf.map((key, value) => MapEntry<String, dynamic>(
-                        key.toString(), value as dynamic)));
-              })
-              .whereNotNull()
-              .toList()
-            ..sort((a, b) => a.value.length.compareTo(b.value.length));
-
-  /// The minimum number of connections in the pool of this adapter.
-  final int minConnections;
-
-  /// The maximum number of connections in the pool of this adapter.
-  final int maxConnections;
+  static List<MapEntry<SQLAdapterInstantiator<C, A>, Map<String, dynamic>>>
+      getAdapterInstantiatorsFromConfig<C extends Object,
+              A extends SQLAdapter<C>>(Map<String, dynamic> config) =>
+          DBAdapter._getAdapterInstantiatorsFromConfigImpl<C, A>(
+              config, registeredAdaptersNames, getAdapterInstantiator);
 
   /// The [SQLAdapter] capability.
-  final SQLAdapterCapability capability;
-
-  /// The SQL dialect of this adapter.
-  String get dialect => capability.dialect;
-
-  final EntityRepositoryProvider? parentRepositoryProvider;
+  @override
+  SQLAdapterCapability get capability =>
+      super.capability as SQLAdapterCapability;
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  SQLAdapter(this.minConnections, this.maxConnections, this.capability,
-      {this.parentRepositoryProvider,
+  SQLAdapter(
+      int minConnections, int maxConnections, SQLAdapterCapability capability,
+      {EntityRepositoryProvider? parentRepositoryProvider,
       Object? populateTables,
       Object? populateSource})
       : _populateTables = populateTables,
-        _populateSource = populateSource {
+        super(minConnections, maxConnections, capability,
+            parentRepositoryProvider: parentRepositoryProvider,
+            populateSource: populateSource) {
     boot();
 
     _conditionSQLGenerator =
         ConditionSQLEncoder(this, sqlElementQuote: sqlElementQuote);
-    parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<SQLAdapter> fromConfig<C extends Object>(
+  static FutureOr<A> fromConfig<C extends Object, A extends SQLAdapter<C>>(
       Map<String, dynamic> config,
       {int minConnections = 1,
       int maxConnections = 3,
       EntityRepositoryProvider? parentRepositoryProvider}) {
     boot();
 
-    var adaptersInstantiators = getAdapterInstantiatorsFromConfig(config);
+    var instantiators = getAdapterInstantiatorsFromConfig<C, A>(config);
 
-    if (adaptersInstantiators.isEmpty) {
+    if (instantiators.isEmpty) {
       throw StateError(
-          "Can't find `SQLAdapter` instantiator for `config` keys: ${config.keys.toList()}");
+          "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}");
     }
 
-    var asyncInstantiators = <Future<SQLAdapter>>[];
-
-    for (var e in adaptersInstantiators) {
-      var f = e.key;
-      var conf = e.value;
-
-      var ret = f(conf,
-          minConnections: minConnections,
-          maxConnections: maxConnections,
-          parentRepositoryProvider: parentRepositoryProvider);
-      if (ret == null) {
-        continue;
-      } else if (ret is SQLAdapter) {
-        var adapter = ret as SQLAdapter<C>;
-        return adapter;
-      } else if (ret is Future<SQLAdapter>) {
-        asyncInstantiators.add(ret);
-      }
-    }
-
-    if (asyncInstantiators.isNotEmpty) {
-      return asyncInstantiators.resolveAll().then((l) {
-        for (var e in l) {
-          return e as SQLAdapter<C>;
-        }
-
-        throw StateError(
-            "Can't async instantiate an `SQLAdapter` for `config`: $config");
-      });
-    }
-
-    throw StateError("Can't instantiate an `SQLAdapter` for `config`: $config");
+    return DBAdapter.instantiateAdaptor<C, A>(instantiators, config,
+        minConnections: minConnections,
+        maxConnections: maxConnections,
+        parentRepositoryProvider: parentRepositoryProvider);
   }
 
-  @override
-  FutureOr<InitializationResult> initialize() => _populateImpl();
-
   Object? _populateTables;
-  Object? _populateSource;
 
+  @override
   FutureOr<InitializationResult> _populateImpl() {
     var tables = _populateTables;
 
     if (tables != null) {
       _populateTables = null;
 
-      return populateTables(tables)
-          .resolveMapped((_) => _populateSourceImpl(_populateSource));
+      return populateTables(tables).resolveMapped((_) => super._populateImpl());
     } else {
-      return _populateSourceImpl(_populateSource);
+      return super._populateImpl();
     }
-  }
-
-  FutureOr<InitializationResult> _populateSourceImpl(Object? populateSource) {
-    _populateSource = null;
-
-    if (populateSource == null) {
-      return InitializationResult.ok(this, dependencies: [
-        if (parentRepositoryProvider != null) parentRepositoryProvider!
-      ]);
-    }
-
-    return populateFromSource(populateSource).resolveMapped((val) {
-      var result = InitializationResult.ok(this, dependencies: [
-        if (parentRepositoryProvider != null) parentRepositoryProvider!,
-        ...entityRepositories,
-      ]);
-
-      return result;
-    });
   }
 
   FutureOr<List<String>> populateTables(Object? tables) {
@@ -503,106 +1205,61 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     return true;
   }
 
-  @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
-    if (id == null) return null;
-    var entityRepository = getEntityRepository(type: type);
-    return entityRepository?.selectByID(id).resolveMapped((o) => o as O?);
-  }
+  /// Generates the [CreateTableSQL] for each [EntityRepository].
+  /// See [entityRepositories].
+  FutureOr<Map<EntityRepository, CreateTableSQL>>
+      generateEntityRepositoresCreateTableSQLs() => entityRepositories
+          .map((r) => MapEntry<EntityRepository, FutureOr<CreateTableSQL>>(
+              r, generateCreateTableSQL(entityRepository: r)))
+          .toMapFromEntries()
+          .resolveAllValues();
 
-  @override
-  FutureOr<String?> getTableForType(TypeInfo type) {
-    if (type.hasArguments) {
-      if (type.isMap) {
-        type = type.arguments[1];
-      } else if (type.isIterable || type.isList || type.isSet) {
-        type = type.arguments[0];
+  /// Generate all the SQLs to create the tables.
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
+      generateEntityRepositoresCreateTableSQLs().resolveMapped((sqls) {
+        List<SQLBuilder> allSQLs =
+            sqls.values.expand((e) => e.allSQLBuilders).toList();
+
+        allSQLs.bestOrder();
+        return allSQLs;
+      });
+
+  /// Generate a full text with all the SQLs to create the tables.
+  Future<String> generateFullCreateTableSQLs({String? title}) async {
+    return generateCreateTableSQLs().resolveMapped((allSQLs) {
+      if (allSQLs.isEmpty) return '';
+
+      var dialect = allSQLs.first.dialect;
+
+      var fullSQL = StringBuffer();
+
+      if (title != null && title.isNotEmpty) {
+        var parts = title.split(RegExp(r'\r?\n'));
+        for (var l in parts) {
+          fullSQL.write('-- $l\n');
+        }
       }
-    }
 
-    var entityType = type.type;
+      fullSQL.write('-- SQLAdapter: $runtimeType\n');
+      fullSQL.write('-- Dialect: $dialect\n');
+      fullSQL.write('-- Generator: BonesAPI/${BonesAPI.VERSION}\n');
+      fullSQL.write('-- Date: ${DateTime.now()}\n');
+      fullSQL.write('\n');
 
-    var entityRepository = getEntityRepository(type: entityType);
+      for (var s in allSQLs) {
+        if (s is CreateTableSQL && s.entityRepository != null) {
+          var sqlEntityRepository = s.entityRepository!;
+          fullSQL.write(
+              '-- Entity: ${sqlEntityRepository.type} @ ${sqlEntityRepository.name}\n\n');
+        }
 
-    if (entityRepository != null) {
-      if (entityRepository is SQLEntityRepository) {
-        return entityRepository.tableName;
-      } else {
-        return entityRepository.name;
+        var sql = s.buildSQL(multiline: s is! AlterTableSQL);
+        fullSQL.write('$sql\n\n');
       }
-    }
 
-    return null;
+      return fullSQL.toString();
+    });
   }
-
-  EntityRepository? _geAdapterEntityRepository(
-      {String? entityName, String? tableName, Type? entityType}) {
-    EntityRepository? entityRepository;
-
-    if (entityName != null) {
-      entityRepository = getEntityRepository(name: entityName);
-    }
-
-    if (entityRepository == null &&
-        tableName != null &&
-        tableName != entityName) {
-      entityRepository = getEntityRepository(tableName: tableName);
-    }
-
-    if (entityRepository == null && entityType != null) {
-      entityRepository = getEntityRepository(type: entityType);
-    }
-
-    return entityRepository;
-  }
-
-  @override
-  FutureOr<TypeInfo?> getFieldType(String field,
-      {String? entityName, String? tableName, Type? entityType}) {
-    var entityRepository = _geAdapterEntityRepository(
-        entityName: entityName, tableName: tableName, entityType: entityType);
-
-    if (entityRepository != null) {
-      var type = entityRepository.entityHandler.getFieldType(null, field);
-      return type;
-    }
-
-    return null;
-  }
-
-  @override
-  FutureOr<Object?> getEntityID(Object entity,
-      {String? entityName, String? tableName, Type? entityType}) {
-    if (entity is num) {
-      return entity;
-    }
-
-    entityType ??= entity.runtimeType;
-
-    var entityHandler = getEntityHandler(
-        entityName: entityName, tableName: tableName, entityType: entityType);
-
-    if (entityHandler == null) return null;
-
-    if (entity is Map) {
-      var idFieldsName = entityHandler.idFieldName();
-      return entity[idFieldsName];
-    } else {
-      return entityHandler.getID(entity);
-    }
-  }
-
-  EntityHandler<T>? getEntityHandler<T>(
-      {String? entityName, String? tableName, Type? entityType}) {
-    var entityRepository = _geAdapterEntityRepository(
-        entityName: entityName, tableName: tableName, entityType: entityType);
-
-    var entityHandler = entityRepository?.entityHandler;
-    return entityHandler as EntityHandler<T>?;
-  }
-
-  /// The type of "quote" to use to reference elements (tables and columns).
-  String get sqlElementQuote;
 
   /// If `true` indicates that this adapter SQL uses the `OUTPUT` syntax for inserts/deletes.
   bool get sqlAcceptsOutputSyntax;
@@ -752,6 +1409,25 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     Transaction transaction,
     C connection,
   );
+
+  @override
+  FutureOr<int> doCount(
+      TransactionOperation op, String entityName, String table,
+      {EntityMatcher? matcher,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      PreFinishDBOperation<int, int>? preFinish}) {
+    return generateCountSQL(op.transaction, entityName, table,
+            matcher: matcher,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        .resolveMapped((sql) {
+      return countSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
   FutureOr<SQL> generateInsertSQL(Transaction transaction, String entityName,
       String table, Map<String, Object?> fields) {
@@ -1310,15 +1986,6 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     });
   }
 
-  FutureOr<C> openTransaction(Transaction transaction);
-
-  FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
-      Object? error, StackTrace? stackTrace);
-
-  bool get callCloseTransactionRequired;
-
-  FutureOr<void> closeTransaction(Transaction transaction, C? connection);
-
   FutureOr<SQL> generateSelectSQL(Transaction transaction, String entityName,
       String table, EntityMatcher matcher,
       {Object? parameters,
@@ -1652,252 +2319,154 @@ abstract class SQLAdapter<C extends Object> extends SchemeProvider
     C connection,
   );
 
-  /// Returns the URL of the [connection].
-  String getConnectionURL(C connection);
-
-  /// Creates a connection [C] for this adapte
-  FutureOr<C> createConnection();
-
-  /// Returns `true` if [connection] is valid for usage.
-  FutureOr<bool> isConnectionValid(C connection);
-
-  FutureOr<bool> closeConnection(C connection);
-
-  /// Checks the connections of the pool. Defaults: calls [removeInvalidElementsFromPool].
-  FutureOr<bool> checkConnections() => removeInvalidElementsFromPool();
-
-  /// Defaults: calls [isConnectionValid].
   @override
-  FutureOr<bool> isPoolElementValid(C o) => isConnectionValid(o);
-
-  /// Checks the pool connections and limits.
-  @override
-  FutureOr<bool> checkPool() =>
-      checkPoolSize(minConnections, maxConnections, 30000);
-
-  @override
-  int get poolSizeDesiredLimit => maxConnections;
-
-  /// Defaults: calls [createConnection].
-  @override
-  FutureOr<C?> createPoolElement() {
-    super.createPoolElement();
-
-    if (poolSize < maxConnections) {
-      return createConnection();
-    } else {
-      return null;
-    }
-  }
-
-  /// Defaults: calls [closeConnection].
-  @override
-  FutureOr<bool> closePoolElement(C o) {
-    super.closePoolElement(o);
-    return closeConnection(o);
-  }
-
-  final Map<String, SQLRepositoryAdapter> _repositoriesAdapters =
-      <String, SQLRepositoryAdapter>{};
-
   SQLRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
-      {String? tableName, Type? type}) {
-    if (isClosed) {
-      return null;
-    }
+          {String? tableName, Type? type}) =>
+      super.createRepositoryAdapter<O>(name, tableName: tableName, type: type)
+          as SQLRepositoryAdapter<O>?;
 
-    return _repositoriesAdapters.putIfAbsent(
-        name,
-        () => SQLRepositoryAdapter<O>(this, name,
-            tableName: tableName, type: type)) as SQLRepositoryAdapter<O>;
-  }
+  @override
+  SQLRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
+          String name, String? tableName, Type? type) =>
+      SQLRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
 
+  @override
   SQLRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
     String name,
-  ) {
-    if (isClosed) return null;
-    return _repositoriesAdapters[name] as SQLRepositoryAdapter<O>?;
-  }
+  ) =>
+      super.getRepositoryAdapterByName<O>(name) as SQLRepositoryAdapter<O>?;
 
-  SQLRepositoryAdapter<O>? getRepositoryAdapterByType<O>(Type type) {
-    if (isClosed) return null;
-    return _repositoriesAdapters.values.firstWhereOrNull((e) => e.type == type)
-        as SQLRepositoryAdapter<O>?;
-  }
+  @override
+  SQLRepositoryAdapter<O>? getRepositoryAdapterByType<O>(Type type) =>
+      super.getRepositoryAdapterByType<O>(type) as SQLRepositoryAdapter<O>?;
 
+  @override
   SQLRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(
-      String tableName) {
-    if (isClosed) return null;
-    return _repositoriesAdapters.values
-            .firstWhereOrNull((e) => e.tableName == tableName)
-        as SQLRepositoryAdapter<O>?;
-  }
+          String tableName) =>
+      super.getRepositoryAdapterByTableName(tableName)
+          as SQLRepositoryAdapter<O>?;
 
-  final Map<Type, EntityRepository> _entityRepositories =
-      <Type, EntityRepository>{};
-
-  List<EntityRepository> get entityRepositories =>
-      _entityRepositories.values.toList();
-
-  @override
-  void registerEntityRepository<O extends Object>(
-      EntityRepository<O> entityRepository) {
-    checkNotClosed();
-
-    _entityRepositories[entityRepository.type] = entityRepository;
-  }
-
-  @override
-  List<EntityRepository> get registeredEntityRepositories =>
-      _entityRepositories.values.toList();
-
-  bool _callingGetEntityRepository = false;
-
-  @override
-  EntityRepository<O>? getEntityRepository<O extends Object>(
-      {O? obj, Type? type, String? name, String? tableName}) {
-    if (isClosed) return null;
-
-    if (_callingGetEntityRepository) return null;
-    _callingGetEntityRepository = true;
-
-    try {
-      return _getEntityRepositoryImpl<O>(
-              obj: obj, type: type, name: name, tableName: tableName) ??
-          EntityRepositoryProvider.globalProvider
-              .getEntityRepository<O>(obj: obj, type: type, name: name);
-    } finally {
-      _callingGetEntityRepository = false;
+  FutureOr<R> _finishOperation<T, R>(
+      TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
+    if (preFinish != null) {
+      return preFinish(res).resolveMapped((res2) => op.finish(res2));
+    } else {
+      return op.finish<R>(res as R);
     }
   }
 
-  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>(
-      {O? obj, Type? type, String? name, String? tableName}) {
-    if (!isClosed) {
-      var entityRepository = _entityRepositories[O];
-      if (entityRepository != null && entityRepository.isClosed) {
-        entityRepository = null;
-      }
-
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (obj != null) {
-        entityRepository = _entityRepositories[obj.runtimeType];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-      }
-
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (type != null) {
-        entityRepository = _entityRepositories[type];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-      }
-
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (name != null) {
-        var nameSimplified = EntityAccessor.simplifiedName(name);
-
-        entityRepository = _entityRepositories.values
-            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
-            .firstOrNull;
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-
-        if (entityRepository != null) {
-          return entityRepository as EntityRepository<O>;
-        }
-      }
-
-      if (tableName != null) {
-        entityRepository = _entityRepositories.values
-            .where((e) => e is SQLEntityRepository && e.tableName == tableName)
-            .firstOrNull;
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-
-        if (entityRepository != null) {
-          return entityRepository as EntityRepository<O>;
-        }
-      }
-    }
-
-    var entityRepository =
-        parentRepositoryProvider?.getEntityRepository<O>(obj: obj, type: type);
-
-    if (entityRepository != null) {
-      return entityRepository;
-    }
-
-    return _knownEntityRepositoryProviders.getEntityRepository<O>(
-        obj: obj, type: type, name: name, entityRepositoryProvider: this);
-  }
-
-  final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
-      <EntityRepositoryProvider>{};
-
   @override
-  void notifyKnownEntityRepositoryProvider(EntityRepositoryProvider provider) {
-    _knownEntityRepositoryProviders.add(provider);
+  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
+      String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
+    return generateDeleteSQL(op.transaction, entityName, table, matcher,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        .resolveMapped((sql) {
+      return deleteSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
   }
 
   @override
-  Map<Type, EntityRepository> allRepositories(
-      {Map<Type, EntityRepository>? allRepositories,
-      Set<EntityRepositoryProvider>? traversedProviders}) {
-    allRepositories ??= <Type, EntityRepository>{};
-    traversedProviders ??= <EntityRepositoryProvider>{};
+  FutureOr doInsert<O>(TransactionOperation op, String entityName, String table,
+      O o, Map<String, dynamic> fields,
+      {String? idFieldName, PreFinishDBOperation? preFinish}) {
+    return generateInsertSQL(op.transaction, entityName, table, fields)
+        .resolveMapped((sql) {
+      return insertSQL(op, entityName, table, sql, fields)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
-    if (traversedProviders.contains(this)) {
-      return allRepositories;
-    }
+  @override
+  FutureOr<bool> doInsertRelationship(TransactionOperation op,
+      String entityName, String table, id, String otherTableName, List otherIds,
+      [PreFinishDBOperation<bool, bool>? preFinish]) {
+    return generateInsertRelationshipSQLs(
+            op.transaction, entityName, table, id, otherTableName, otherIds)
+        .resolveMapped((sqls) {
+      return insertRelationshipSQLs(
+              op, entityName, table, sqls, id, otherTableName, otherIds)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
-    traversedProviders.add(this);
+  @override
+  FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
+      String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      int? limit,
+      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
+    return generateSelectSQL(op.transaction, entityName, table, matcher,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+            limit: limit)
+        .resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
-    for (var e in _entityRepositories.entries) {
-      allRepositories.putIfAbsent(e.key, () => e.value);
-    }
+  @override
+  FutureOr<R> doSelectRelationship<R>(TransactionOperation op,
+      String entityName, String table, dynamic id, String otherTableName,
+      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
+    return generateSelectRelationshipSQL(
+            op.transaction, entityName, table, id, otherTableName)
+        .resolveMapped((sql) {
+      return selectRelationshipSQL(
+              op, entityName, table, sql, id, otherTableName)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
-    for (var e in _knownEntityRepositoryProviders) {
-      e.allRepositories(allRepositories: allRepositories);
-    }
+  @override
+  FutureOr<R> doSelectRelationships<R>(TransactionOperation op,
+      String entityName, String table, List ids, String otherTableName,
+      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
+    return generateSelectRelationshipsSQL(
+            op.transaction, entityName, table, ids, otherTableName)
+        .resolveMapped((sql) {
+      return selectRelationshipsSQL(
+              op, entityName, table, sql, ids, otherTableName)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
 
-    return allRepositories;
+  @override
+  FutureOr doUpdate<O>(TransactionOperation op, String entityName, String table,
+      O o, Object id, Map<String, dynamic> fields,
+      {String? idFieldName,
+      PreFinishDBOperation? preFinish,
+      bool allowAutoInsert = false}) {
+    return generateUpdateSQL(op.transaction, entityName, table, id, fields)
+        .resolveMapped((sql) {
+      return updateSQL(op, entityName, table, sql, id, fields,
+              allowAutoInsert: allowAutoInsert)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
   }
 }
 
-typedef PreFinishSQLOperation<T, R> = FutureOr<R> Function(T result);
+class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
+  @override
+  SQLAdapter get databaseAdapter => super.databaseAdapter as SQLAdapter;
 
-class SQLRepositoryAdapter<O> with Initializable {
-  final SQLAdapter databaseAdapter;
-
-  final String name;
-
-  final String tableName;
-
-  final Type type;
-
-  SQLRepositoryAdapter(this.databaseAdapter, this.name,
+  SQLRepositoryAdapter(SQLAdapter databaseAdapter, String name,
       {String? tableName, Type? type})
-      : tableName = tableName ?? name,
-        type = type ?? O;
+      : super(databaseAdapter, name, tableName: tableName, type: type);
 
   @override
   FutureOr<InitializationResult> initialize() =>
       databaseAdapter.ensureInitialized(parent: this);
-
-  String get dialect => databaseAdapter.dialect;
-
-  SchemeProvider get schemeProvider => databaseAdapter;
-
-  FutureOr<TableScheme> getTableScheme() =>
-      databaseAdapter.getTableScheme(tableName).resolveMapped((t) => t!);
 
   FutureOr<SQL> generateCountSQL(Transaction transaction,
           {EntityMatcher? matcher,
@@ -1912,23 +2481,6 @@ class SQLRepositoryAdapter<O> with Initializable {
 
   FutureOr<int> countSQL(TransactionOperation op, SQL sql) {
     return databaseAdapter.countSQL(op, name, tableName, sql);
-  }
-
-  FutureOr<int> doCount(TransactionOperation op,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishSQLOperation<int, int>? preFinish}) {
-    return generateCountSQL(op.transaction,
-            matcher: matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        .resolveMapped((sql) {
-      return countSQL(op, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
   }
 
   FutureOr<SQL> generateSelectSQL(
@@ -1948,23 +2500,6 @@ class SQLRepositoryAdapter<O> with Initializable {
     return databaseAdapter.selectSQL(op, name, tableName, sql);
   }
 
-  FutureOr<R> doSelect<R>(TransactionOperation op, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit,
-      PreFinishSQLOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
-    return generateSelectSQL(op.transaction, matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-            limit: limit)
-        .resolveMapped((sql) {
-      return selectSQL(op, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
-  }
-
   FutureOr<SQL> generateInsertSQL(
       Transaction transaction, O o, Map<String, dynamic> fields) {
     return databaseAdapter.generateInsertSQL(
@@ -1977,16 +2512,6 @@ class SQLRepositoryAdapter<O> with Initializable {
     return databaseAdapter
         .insertSQL(op, name, tableName, sql, fields)
         .resolveMapped((ret) => ret ?? {});
-  }
-
-  FutureOr<dynamic> doInsert(
-      TransactionOperation op, O o, Map<String, dynamic> fields,
-      {String? idFieldName,
-      PreFinishSQLOperation<dynamic, dynamic>? preFinish}) {
-    return generateInsertSQL(op.transaction, o, fields).resolveMapped((sql) {
-      return insertSQL(op, sql, fields, idFieldName: idFieldName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
   }
 
   FutureOr<SQL> generateUpdateSQL(
@@ -2004,19 +2529,6 @@ class SQLRepositoryAdapter<O> with Initializable {
         .resolveMapped((ret) => ret ?? {});
   }
 
-  FutureOr<dynamic> doUpdate(
-      TransactionOperation op, O o, Object id, Map<String, dynamic> fields,
-      {String? idFieldName,
-      PreFinishSQLOperation<dynamic, dynamic>? preFinish,
-      bool allowAutoInsert = false}) {
-    return generateUpdateSQL(op.transaction, o, id, fields)
-        .resolveMapped((sql) {
-      return updateSQL(op, sql, id, fields,
-              idFieldName: idFieldName, allowAutoInsert: allowAutoInsert)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
-  }
-
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(Transaction transaction,
       dynamic id, String otherTableName, List otherIds) {
     return databaseAdapter.generateInsertRelationshipSQLs(
@@ -2029,26 +2541,6 @@ class SQLRepositoryAdapter<O> with Initializable {
         op, name, tableName, sqls, id, otherTableName, otherIds);
   }
 
-  FutureOr<bool> doInsertRelationship(
-      TransactionOperation op, dynamic id, String otherTableName, List otherIds,
-      [PreFinishSQLOperation<bool, bool>? preFinish]) {
-    return generateInsertRelationshipSQLs(
-            op.transaction, id, otherTableName, otherIds)
-        .resolveMapped((sqls) {
-      return insertRelationshipSQLs(op, sqls, id, otherTableName, otherIds)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
-  }
-
-  FutureOr<R> _finishOperation<T, R>(
-      TransactionOperation op, T res, PreFinishSQLOperation<T, R>? preFinish) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
-
   FutureOr<SQL> generateSelectRelationshipSQL(
       Transaction transaction, dynamic id, String otherTableName) {
     return databaseAdapter.generateSelectRelationshipSQL(
@@ -2059,16 +2551,6 @@ class SQLRepositoryAdapter<O> with Initializable {
       TransactionOperation op, SQL sql, dynamic id, String otherTableName) {
     return databaseAdapter.selectRelationshipSQL(
         op, name, tableName, sql, id, otherTableName);
-  }
-
-  FutureOr<R> doSelectRelationship<R>(
-      TransactionOperation op, dynamic id, String otherTableName,
-      [PreFinishSQLOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
-    return generateSelectRelationshipSQL(op.transaction, id, otherTableName)
-        .resolveMapped((sql) {
-      return selectRelationshipSQL(op, sql, id, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
   }
 
   FutureOr<SQL> generateSelectRelationshipsSQL(
@@ -2086,16 +2568,6 @@ class SQLRepositoryAdapter<O> with Initializable {
         op, name, tableName, sql, ids, otherTableName);
   }
 
-  FutureOr<R> doSelectRelationships<R>(
-      TransactionOperation op, List<dynamic> ids, String otherTableName,
-      [PreFinishSQLOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
-    return generateSelectRelationshipsSQL(op.transaction, ids, otherTableName)
-        .resolveMapped((sql) {
-      return selectRelationshipsSQL(op, sql, ids, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
-  }
-
   FutureOr<SQL> generateDeleteSQL(
           Transaction transaction, EntityMatcher matcher,
           {Object? parameters,
@@ -2109,21 +2581,6 @@ class SQLRepositoryAdapter<O> with Initializable {
   FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
       TransactionOperation op, SQL sql) {
     return databaseAdapter.deleteSQL(op, name, tableName, sql);
-  }
-
-  FutureOr<R> doDelete<R>(TransactionOperation op, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishSQLOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
-    return generateDeleteSQL(op.transaction, matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        .resolveMapped((sql) {
-      return deleteSQL(op, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
-    });
   }
 
   @override

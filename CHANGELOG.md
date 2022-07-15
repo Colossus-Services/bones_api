@@ -1,3 +1,15 @@
+## 1.2.6
+
+- Added `SQLBuilder` that is used to generate the entities `CREATE TABLE` SQLs.
+- Added `SQLGenerator` that is capable to generate entities tables and relationships SQLs.
+- Split `SQLAdapter` and `SQLAdapterCapability` into `DBAdapterCapability` and `DBAdapter`.
+- `SQLAdapter`:
+  - Added `generateCreateTableSQLs`, `generateFullCreateTableSQLs`, `generateEntityRepositoresCreateTableSQLs`.
+- Added `DBEntityRepositoryProvider` and `SQLEntityRepositoryProvider`.
+- statistics: ^1.0.21
+- test: ^1.21.4
+- dependency_validator: ^3.2.2
+
 ## 1.2.5
 
 - sdk: '>=2.15.0 <3.0.0'

@@ -8,6 +8,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_sql_builder.dart';
 
 final _log = logging.Logger('SQLEntityRepository');
 
@@ -795,4 +796,24 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     var info = information();
     return '$runtimeType[$name]@${provider.runtimeType}$info';
   }
+}
+
+/// Base class for [EntityRepositoryProvider] with [SQLAdapter]s.
+abstract class SQLEntityRepositoryProvider<A extends SQLAdapter>
+    extends DBEntityRepositoryProvider<A> {
+  @override
+  FutureOr<A> buildAdapter() => SQLAdapter.fromConfig(
+        adapterConfig,
+        parentRepositoryProvider: this,
+      );
+
+  @override
+  List<SQLEntityRepository> buildRepositories(SQLAdapter adapter);
+
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
+      adapter.resolveMapped((adapter) => adapter.generateCreateTableSQLs());
+
+  FutureOr<String> generateFullCreateTableSQLs({String? title}) =>
+      adapter.resolveMapped(
+          (adapter) => adapter.generateFullCreateTableSQLs(title: title));
 }

@@ -5,6 +5,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_entity_sql.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -354,6 +355,22 @@ abstract class SchemeProvider {
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
   TableScheme? disposeTableSchemeCache(String table) =>
       _tablesSchemes.remove(table);
+
+  /// Returns the table name for [entityRepository].
+  FutureOr<String> getTableForEntityRepository(
+      EntityRepository entityRepository) {
+    if (entityRepository is SQLEntityRepository) {
+      return entityRepository.tableName;
+    } else {
+      return entityRepository.name;
+    }
+  }
+
+  /// Returns a [TableScheme] for [entityRepository].
+  FutureOr<TableScheme?> getTableSchemeForEntityRepository(
+          EntityRepository entityRepository) =>
+      getTableForEntityRepository(entityRepository)
+          .resolveMapped((table) => getTableScheme(table));
 
   /// Returns the table name for [type].
   FutureOr<String?> getTableForType(TypeInfo type);
