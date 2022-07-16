@@ -559,10 +559,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<bool> executeTableSQL(String createTableSQL) {
-    return executeWithPool(
-        (c) => c.execute(createTableSQL).resolveMapped((_) => true));
-  }
+  FutureOr<bool> executeTableSQL(String createTableSQL) => executeWithPool(
+      (c) => c.execute(createTableSQL).resolveMapped((_) => true));
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,

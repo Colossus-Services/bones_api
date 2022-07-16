@@ -510,12 +510,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<bool> executeTableSQL(String createTableSQL) {
-    createTableSQL = createTableSQL.replaceFirst(RegExp(r'\s+;\s*$'), '');
-
-    return executeWithPool(
-        (c) => c.query(createTableSQL).resolveMapped((_) => true));
-  }
+  FutureOr<bool> executeTableSQL(String createTableSQL) => executeWithPool(
+      (c) => c.query(createTableSQL).resolveMapped((_) => true));
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
