@@ -351,36 +351,44 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           return fileData.resolveMapped((data) {
             if (data != null) {
               _log.info(
-                  'Populating $this tables [encoded JSON length: ${data.length}]...');
+                  'Populating $this tables [SQL length: ${data.length}]...');
 
-              return populateTablesFromSQLs(data).resolveMapped((res) {
-                _log.info('Populate tables finished.');
-                return <String>[];
+              return populateTablesFromSQLs(data).resolveMapped((tables) {
+                _log.info('Populate tables finished: $tables');
+                return tables;
               });
             } else {
               return <String>[];
             }
           });
         }
+      } else if (RegExp(r'(?:^|\s+)(?:CREATE|ALTER)\s+TABLE\s')
+          .hasMatch(tables)) {
+        _log.info('Populating $this tables [SQL length: ${tables.length}]...');
+
+        return populateTablesFromSQLs(tables).resolveMapped((tables) {
+          _log.info('Populate tables finished: $tables');
+          return tables;
+        });
       }
     }
 
     return <String>[];
   }
 
-  FutureOr<bool> populateTablesFromSQLs(String sqls) {
-    var list = extractTableSQLs(sqls);
-    if (list.isEmpty) return true;
-    return _populateTablesFromSQLsImpl(list);
+  static String? extractTableNameInSQL(String tableSQL) {
+    var match = RegExp(
+            r'''(?:^|\s)(?:CREATE|ALTER)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?['"`]?(\w+)['"`]?''')
+        .firstMatch(tableSQL);
+
+    return match?.group(1);
   }
 
   static List<String> extractTableSQLs(String sqls) => extractSQLs(sqls,
       RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true));
 
   static List<String> extractSQLs(String sqls, RegExp commandPrefixPattern) {
-    sqls =
-        sqls.replaceAllMapped(RegExp(r'(?:\n|^)--.*?([\r\n]+)'), (m) => m[1]!);
-    sqls = sqls.replaceAllMapped(RegExp(r'/\*.*?\*/'), (m) => m[1]!);
+    sqls = removeSQLsComments(sqls);
     sqls = '\n$sqls\n;';
 
     var list = <String>[];
@@ -399,15 +407,47 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     return list;
   }
 
-  Future<bool> _populateTablesFromSQLsImpl(List<String> list) async {
+  static String removeSQLsComments(String sqls) {
+    sqls =
+        sqls.replaceAllMapped(RegExp(r'/\*.*?\*/', dotAll: true), (m) => m[1]!);
+
+    while (true) {
+      var prev = sqls;
+      sqls = sqls.replaceAllMapped(
+          RegExp(r'(?:^|\n)--[^\n]*?([\r\n]+)', dotAll: true), (m) => m[1]!);
+      if (prev == sqls) break;
+    }
+
+    sqls = sqls.replaceAllMapped(
+        RegExp(r'[ \t]--[ \t][^\n]*?(\n|$)', dotAll: true), (m) => m[1]!);
+
+    return sqls;
+  }
+
+  FutureOr<List<String>> populateTablesFromSQLs(String sqls) {
+    var list = extractTableSQLs(sqls);
+    if (list.isEmpty) return <String>[];
+    return _populateTablesFromSQLsImpl(list);
+  }
+
+  Future<List<String>> _populateTablesFromSQLsImpl(List<String> list) async {
+    var tables = <String>[];
+
     for (var sql in list) {
+      _log.info("Populating table:\n<<<\n${sql.trim()}\n>>>");
+
       var ok = await executeTableSQL(sql);
       if (!ok) {
         throw StateError("Error creating table SQL: $sql");
       }
+
+      var name = extractTableNameInSQL(sql);
+      if (name != null) {
+        tables.add(name);
+      }
     }
 
-    return true;
+    return tables;
   }
 
   /// Generates the [CreateTableSQL] for each [EntityRepository].

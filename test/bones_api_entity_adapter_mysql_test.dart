@@ -45,6 +45,5 @@ Future<bool> _runTest(bool useReflection) => runAdapterTests(
       ),
       '`',
       'bigint unsigned',
-      anyOf(isNull, isEmpty),
       entityByReflection: useReflection,
     );

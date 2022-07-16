@@ -80,6 +80,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
         ) {
+    boot();
+
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
@@ -97,6 +99,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider}) {
+    boot();
+
     var host = config?['host'] ?? defaultHost;
     var port = config?['port'] ?? defaultPort;
     var database = config?['database'] ?? config?['db'] ?? defaultDatabase;
@@ -481,7 +485,34 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
+  String? typeToSQLType(Type type, String column) {
+    var sqlType = super.typeToSQLType(type, column);
+
+    if (sqlType == 'VARCHAR') {
+      var sz = getVarcharPreferredSize(column);
+      return 'VARCHAR($sz)';
+    } else if (sqlType == 'DECIMAL') {
+      return 'DECIMAL(27,12)';
+    }
+
+    return sqlType;
+  }
+
+  @override
+  String? foreignKeyTypeToSQLType(Type idType, String idName) {
+    var sqlType = super.foreignKeyTypeToSQLType(idType, idName);
+
+    if (sqlType == 'BIGINT') {
+      return '$sqlType UNSIGNED';
+    }
+
+    return sqlType;
+  }
+
+  @override
   FutureOr<bool> executeTableSQL(String createTableSQL) {
+    createTableSQL = createTableSQL.replaceFirst(RegExp(r'\s+;\s*$'), '');
+
     return executeWithPool(
         (c) => c.query(createTableSQL).resolveMapped((_) => true));
   }

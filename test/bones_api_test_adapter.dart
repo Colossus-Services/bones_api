@@ -81,16 +81,13 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
       dbPort,
     );
 
-Future<bool> runAdapterTests(
-    String dbName,
-    APITestConfigDB testConfigDB,
-    SQLAdapterCreator sqlAdapterCreator,
-    String cmdQuote,
-    String serialIntType,
-    dynamic createTableMatcher,
+Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
+    SQLAdapterCreator sqlAdapterCreator, String cmdQuote, String serialIntType,
     {required bool entityByReflection,
     TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) async {
   _log.handler.logToConsole();
+
+  User$reflection.boot();
 
   final testLog = logging.Logger(
       'TEST:SQLAdapter:$dbName${entityByReflection ? '+reflection' : ''}');
@@ -160,17 +157,41 @@ Future<bool> runAdapterTests(
       var q = sqlAdapter.sqlElementQuote;
       var reS = r'(?:\s+|--[^\n]+)+';
       var reAnyType = r'\w+[^\n]*?';
+      var reArg = r'(?:\([^ \t\(\)]+\))';
 
       var tableAddressRegexp =
           RegExp('CREATE TABLE IF NOT EXISTS ${q}address$q \\($reS'
               '${q}id$q $reAnyType PRIMARY KEY,$reS'
-              '${q}city$q VARCHAR,$reS'
+              '${q}city$q VARCHAR$reArg?,$reS'
               '${q}number$q INT,$reS'
-              '${q}state$q VARCHAR,$reS'
-              '${q}street$q VARCHAR$reS'
+              '${q}state$q VARCHAR$reArg?,$reS'
+              '${q}street$q VARCHAR$reArg?$reS'
               '\\)$reS;');
 
       expect(fullCreateTableSQLs, contains(tableAddressRegexp));
+
+      var tableRoleRegexp =
+          RegExp('CREATE TABLE IF NOT EXISTS ${q}role$q \\($reS'
+              '${q}id$q $reAnyType PRIMARY KEY,$reS'
+              '${q}enabled$q BOOLEAN,$reS'
+              '${q}type$q $reAnyType,$reS'
+              '${q}value$q DECIMAL$reArg?$reS'
+              '\\)$reS;');
+
+      expect(fullCreateTableSQLs, contains(tableRoleRegexp));
+
+      var tableUserRegexp =
+          RegExp('CREATE TABLE IF NOT EXISTS ${q}user$q \\($reS'
+              '${q}id$q $reAnyType PRIMARY KEY,$reS'
+              '${q}address$q BIGINT.*?,$reS'
+              '${q}creationtime$q TIMESTAMP,$reS'
+              '${q}email$q VARCHAR$reArg?,$reS'
+              '${q}level$q INT,$reS'
+              '${q}password$q VARCHAR$reArg?,$reS'
+              '${q}wakeuptime$q TIME.*?,$reS'
+              'CONSTRAINT');
+
+      expect(fullCreateTableSQLs, contains(tableUserRegexp));
     });
 
     test('create table', () async {
@@ -188,64 +209,22 @@ Future<bool> runAdapterTests(
         print('----------------------------------------------');
       }
 
-      var q = cmdQuote;
+      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      expect(sqlAdapter, isNotNull);
 
-      var sqlCreateAddress = '''
-      CREATE TABLE IF NOT EXISTS ${q}address$q (
-        ${q}id$q serial,
-        ${q}state$q text,
-        ${q}city$q text,
-        ${q}street$q text,
-        ${q}number$q integer,
-        PRIMARY KEY( ${q}id$q )
-      )
-      ''';
+      var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
+          title: 'Test Generated SQL', withDate: false);
 
-      var process1 = await testConfigDB.createTableSQL(sqlCreateAddress);
-      expect(process1.join(), createTableMatcher);
+      var tables = await sqlAdapter.populateTables(fullCreateTableSQLs);
 
-      var sqlCreateUser = '''
-      CREATE TABLE IF NOT EXISTS ${q}user$q (
-        ${q}id$q serial,
-        ${q}email$q text NOT NULL,
-        ${q}password$q text NOT NULL,
-        ${q}address$q $serialIntType NOT NULL,
-        ${q}level$q integer,
-        ${q}wake_up_time$q time,
-        ${q}creation_time$q timestamp NOT NULL,
-        PRIMARY KEY( ${q}id$q ),
-        CONSTRAINT user_ref_address_fk FOREIGN KEY (${q}address$q) REFERENCES ${q}address$q(${q}id$q)
-      );
-      ''';
-
-      var process2 = await testConfigDB.createTableSQL(sqlCreateUser);
-      expect(process2.join(), createTableMatcher);
-
-      var sqlCreateRole = '''
-      CREATE TABLE IF NOT EXISTS ${q}role$q (
-        ${q}id$q serial,
-        ${q}type$q text NOT NULL,
-        ${q}enabled$q boolean NOT NULL,
-        ${q}value$q decimal(10,4) NULL,
-        PRIMARY KEY( ${q}id$q )
-      );
-      ''';
-
-      var process3 = await testConfigDB.createTableSQL(sqlCreateRole);
-      expect(process3.join(), createTableMatcher);
-
-      var sqlCreateUserRole = '''
-      CREATE TABLE IF NOT EXISTS ${q}user_role_ref$q (
-        ${q}user_id$q $serialIntType NOT NULL,
-        ${q}role_id$q $serialIntType NOT NULL,
-        CONSTRAINT user_role_ref_pkey PRIMARY KEY (${q}user_id$q, ${q}role_id$q),
-        CONSTRAINT user_role_ref_fk1 FOREIGN KEY (${q}user_id$q) REFERENCES ${q}user$q(${q}id$q) ON DELETE CASCADE,
-        CONSTRAINT user_role_ref_fk2 FOREIGN KEY (${q}role_id$q) REFERENCES ${q}role$q(${q}id$q) ON DELETE CASCADE
-      );
-      ''';
-
-      var process4 = await testConfigDB.createTableSQL(sqlCreateUserRole);
-      expect(process4.join(), createTableMatcher);
+      expect(
+          tables,
+          allOf(
+            contains('address'),
+            contains('user'),
+            contains('role'),
+            contains('user__roles__rel'),
+          ));
 
       var tablesNames = await testConfigDB.listTables();
 
@@ -257,7 +236,7 @@ Future<bool> runAdapterTests(
             contains('address'),
             contains('user'),
             contains('role'),
-            contains('user_role_ref'),
+            contains('user__roles__rel'),
           ));
     });
 

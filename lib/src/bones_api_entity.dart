@@ -20,6 +20,8 @@ import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('Entity');
 
+final _logTransaction = logging.Logger('Transaction');
+
 typedef JsonToEncodable = Object? Function(dynamic object);
 
 typedef JsonReviver = Object? Function(Object? key, Object? value);
@@ -1380,8 +1382,10 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
               resolvedFields, entityProvider, entityCache);
         }
       } catch (e, s) {
-        print(e);
-        print(s);
+        _log.warning(
+            "Error creating from `Map` using `reflection.createInstanceFromMap`. Using `_createFromMapDefaultImpl`",
+            e,
+            s);
         return _createFromMapDefaultImpl(fields, entityProvider, entityCache);
       }
     });
@@ -1478,6 +1482,7 @@ abstract class EntityAccessor<O extends Object> {
   EntityAccessor(this.name);
 
   String? _nameSimplified;
+
   String get nameSimplified => _nameSimplified ??= simplifiedName(name);
 
   Object? getEntityID(O o);
@@ -2757,8 +2762,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       _setContext(c!);
       return c;
     }, onError: (e, s) {
-      print(e);
-      print(s);
+      _logTransaction.severe("Error opening transaction: $this", e, s);
     });
   }
 

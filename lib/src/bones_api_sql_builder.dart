@@ -7,6 +7,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_mixin.dart';
 import 'bones_api_types.dart';
 
 /// A column information of a [SQLEntry].
@@ -690,18 +691,18 @@ abstract class SQLGenerator {
   FutureOr<String> getTableForEntityRepository(
       EntityRepository entityRepository);
 
-  String? typeToSQLType(Type type) {
+  String? typeToSQLType(Type type, String column) {
     if (type == String) {
       return 'VARCHAR';
     } else if (type == bool) {
-      return 'BIT';
+      return 'BOOLEAN';
     } else if (type == DateTime) {
       return 'TIMESTAMP';
     } else if (type == Time) {
-      return 'TIME WITHOUT TIME ZONE';
+      return 'TIME';
     } else if (type == double || type == Decimal) {
       return 'DECIMAL';
-    } else if (type == int || type == BigInt || type == DynamicInt) {
+    } else if (type == int) {
       return 'INT';
     } else if (type == BigInt || type == DynamicInt) {
       return 'BIGINT';
@@ -712,12 +713,61 @@ abstract class SQLGenerator {
     return null;
   }
 
+  /// Returns the preferred `VARCHAR` size for a [column] name.
+  int getVarcharPreferredSize(String? column) {
+    if (column == null) return 1024;
+
+    column = column.trim();
+    if (column.isEmpty) return 1024;
+
+    column = FieldsFromMap.defaultFieldToSimpleKey(column);
+    if (column.isEmpty) return 1024;
+
+    switch (column) {
+      case 'zip':
+      case 'zipcode':
+      case 'postalcode':
+        return 32;
+
+      case 'name':
+      case 'firstname':
+      case 'middlename':
+      case 'lastname':
+      case 'city':
+        return 128;
+
+      case 'address':
+      case 'email':
+        return 254;
+
+      case 'http':
+      case 'https':
+      case 'url':
+        return 2048;
+
+      case 'text':
+      case 'html':
+      case 'xml':
+      case 'json':
+      case 'yaml':
+      case 'yml':
+      case 'data':
+      case 'content':
+      case 'base64':
+        return 65535;
+
+      default:
+        return 1024;
+    }
+  }
+
   String? primaryKeyTypeToSQLType(Type type) {
     return 'SERIAL PRIMARY KEY';
   }
 
+  /// Returns: table -> idName: sqlType
   FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
-      Type type) {
+      Type type, String? column) {
     var typeEntityRepository = getEntityRepository(type: type);
 
     if (typeEntityRepository != null) {
@@ -725,7 +775,9 @@ abstract class SQLGenerator {
 
       var idName = entityHandler.idFieldName();
       var idType = entityHandler.idType();
-      var sqlType = typeToSQLType(idType);
+
+      var sqlType = foreignKeyTypeToSQLType(idType, idName);
+
       if (sqlType != null) {
         return getTableForEntityRepository(typeEntityRepository)
             .resolveMapped((table) {
@@ -737,13 +789,24 @@ abstract class SQLGenerator {
     return null;
   }
 
-  FutureOr<String?> enumTypeToSQLType(Type type) {
+  String? foreignKeyTypeToSQLType(Type idType, String idName) {
+    if (idType == int) {
+      idType = BigInt;
+    }
+
+    var sqlType = typeToSQLType(idType, idName);
+    return sqlType;
+  }
+
+  /// Returns: ENUM: valuesNames
+  FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
+      Type type, String column) {
     var reflectionFactory = ReflectionFactory();
     var enumReflection = reflectionFactory.getRegisterEnumReflection(type);
 
     if (enumReflection != null) {
-      var enumType = typeToSQLType(String);
-      return enumType;
+      var valuesNames = enumReflection.valuesByName.keys.toList()..sort();
+      return MapEntry('ENUM', valuesNames);
     }
 
     return null;
@@ -805,9 +868,9 @@ abstract class SQLGenerator {
       String? refTable;
       String? refColumn;
 
-      var fieldSQLType = typeToSQLType(fieldType.type);
+      var fieldSQLType = typeToSQLType(fieldType.type, fieldName);
       if (fieldSQLType == null) {
-        var entityType = await entityTypeToSQLType(fieldType.type);
+        var entityType = await entityTypeToSQLType(fieldType.type, fieldName);
         if (entityType != null) {
           referenceFields[fieldName] = entityType;
           fieldSQLType = entityType.value.value;
@@ -819,7 +882,26 @@ abstract class SQLGenerator {
         }
       }
 
-      fieldSQLType ??= await enumTypeToSQLType(fieldType.type);
+      if (fieldSQLType == null) {
+        var enumType = await enumTypeToSQLType(fieldType.type, fieldName);
+        if (enumType != null) {
+          var type = enumType.key;
+          var values = enumType.value;
+
+          if (type == 'ENUM') {
+            fieldSQLType = type;
+            fieldSQLType += '(${values.map((e) => "'$e'").join(',')})';
+          } else if (type.endsWith(' CHECK')) {
+            fieldSQLType = type;
+            fieldSQLType +=
+                '( $q$fieldName$q IN (${values.map((e) => "'$e'").join(',')}) )';
+          } else {
+            fieldSQLType = type;
+          }
+
+          comment += ' enum(${values.join(', ')})';
+        }
+      }
 
       if (fieldSQLType == null) continue;
 
@@ -841,7 +923,7 @@ abstract class SQLGenerator {
       var constrainName = '${table}__${fieldName}__fkey';
 
       sqlEntries.add(SQLEntry('CONSTRAINT',
-          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$fieldName$q) REFERENCES $q$refTableName$q($q$refField$q) ON UPDATE CASCADE ON DELETE CASCADE NOT DEFERRABLE',
+          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$fieldName$q) REFERENCES $refTableName($q$refField$q) ON UPDATE CASCADE',
           comment: '${e.key} @ $refTableName.$refField',
           columns: [
             SQLColumn(table, fieldName,
@@ -864,16 +946,16 @@ abstract class SQLGenerator {
       var fieldName = e.key;
       var fieldType = e.value.listEntityType!;
 
-      var relSrcType = typeToSQLType(idType);
+      var srcFieldName = table.toLowerCase();
+      var relSrcType = foreignKeyTypeToSQLType(idType, srcFieldName);
 
-      var relDstType = await entityTypeToSQLType(fieldType.type);
+      var relDstType = await entityTypeToSQLType(fieldType.type, null);
       if (relDstType == null) continue;
 
       var relDstTable = relDstType.key;
       var relDstTableId = relDstType.value.key;
       var relDstTypeSQL = relDstType.value.value;
 
-      var srcFieldName = table.toLowerCase();
       var dstFieldName = relDstTable.toLowerCase();
 
       var relName = '${table}__${fieldName}__rel';
@@ -902,14 +984,14 @@ abstract class SQLGenerator {
               SQLColumn(relName, dstFieldName)
             ]),
         SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idFieldName$q) ON UPDATE CASCADE ON DELETE CASCADE NOT DEFERRABLE',
+            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idFieldName$q) ON UPDATE CASCADE ON DELETE CASCADE',
             comment: ' $srcFieldName @ $table.$idFieldName',
             columns: [
               SQLColumn(relName, srcFieldName,
                   referenceTable: table, referenceColumn: idFieldName)
             ]),
         SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON UPDATE CASCADE ON DELETE CASCADE NOT DEFERRABLE',
+            ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON UPDATE CASCADE ON DELETE CASCADE',
             comment: ' $dstFieldName @ $relDstTable.$relDstTableId',
             columns: [
               SQLColumn(relName, dstFieldName,

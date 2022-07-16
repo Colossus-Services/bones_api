@@ -10,6 +10,8 @@
     - Added parameters `ifNotExists` and `sortColumns`. 
     - fix column generation for enum fields.
   - `generateFullCreateTableSQLs`: added parameters `withDate`, `ifNotExists` and `sortColumns`.
+- `SQLAdapter` tests:
+  - Now is creating tables using `generateFullCreateTableSQLs` (`MySQL` and `PostgreSQL`).
 
 ## 1.2.6
 

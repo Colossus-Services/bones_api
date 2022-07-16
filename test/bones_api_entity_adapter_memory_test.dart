@@ -29,6 +29,5 @@ Future<bool> _runTest(bool useReflection) => runAdapterTests(
       ),
       '"',
       'int',
-      contains('ok'),
       entityByReflection: useReflection,
     );

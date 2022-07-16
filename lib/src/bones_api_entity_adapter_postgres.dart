@@ -533,6 +533,32 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
+  String? typeToSQLType(Type type, String column) {
+    var sqlType = super.typeToSQLType(type, column);
+
+    if (sqlType == 'TIME') {
+      return 'TIME WITHOUT TIME ZONE';
+    }
+
+    return sqlType;
+  }
+
+  @override
+  FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
+      Type type, String column) {
+    return super.enumTypeToSQLType(type, column).resolveMapped((enumType) {
+      if (enumType == null) return null;
+
+      var values = enumType.value;
+      if (values.isEmpty) {
+        return MapEntry('VARCHAR', values);
+      }
+
+      return MapEntry('VARCHAR CHECK', values);
+    });
+  }
+
+  @override
   FutureOr<bool> executeTableSQL(String createTableSQL) {
     return executeWithPool(
         (c) => c.execute(createTableSQL).resolveMapped((_) => true));

@@ -42,6 +42,5 @@ Future<bool> _runTest(bool useReflection) => runAdapterTests(
       ),
       '"',
       'bigint',
-      contains('CREATE TABLE'),
       entityByReflection: useReflection,
     );
