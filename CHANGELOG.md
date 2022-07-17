@@ -1,3 +1,7 @@
+## 1.2.11
+
+- `EntityHandler`: Fix `validateFieldValue` for sub-entities.
+
 ## 1.2.10
 
 - Generate `CREATE TABLE` SQL with unique constraint (from `EntityField`). 

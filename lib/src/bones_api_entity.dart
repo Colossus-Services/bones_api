@@ -657,22 +657,24 @@ abstract class EntityHandler<O> with FieldsFromMap {
       }
     }
 
-    var fieldType = getFieldType(o, key);
+    if (value != null) {
+      var fieldType = getFieldType(o, key);
 
-    if (fieldType != null &&
-        (!fieldType.isBasicType || fieldType.isListEntity)) {
-      var fieldEntityHandler =
-          getEntityHandler(obj: value, type: fieldType.type);
-      if (fieldEntityHandler != null) {
-        var invalids = fieldEntityHandler.validateAllFields(value as dynamic);
-        if (invalids != null && invalids.isNotEmpty) {
-          return EntityFieldInvalid(
-            'entity($fieldType) field${invalids.length > 1 ? 's' : ''}(${invalids.keys.join(',')})',
-            value,
-            entityType: type,
-            fieldName: key,
-            fieldEntityErrors: invalids,
-          );
+      if (fieldType != null &&
+          (!fieldType.isBasicType || fieldType.isListEntity)) {
+        var fieldEntityHandler =
+            getEntityHandler(obj: value, type: fieldType.type);
+        if (fieldEntityHandler != null) {
+          var invalids = fieldEntityHandler.validateAllFields(value as dynamic);
+          if (invalids != null && invalids.isNotEmpty) {
+            return EntityFieldInvalid(
+              'entity($fieldType) field${invalids.length > 1 ? 's' : ''}(${invalids.keys.join(',')})',
+              value,
+              entityType: type,
+              fieldName: key,
+              fieldEntityErrors: invalids,
+            );
+          }
         }
       }
     }
