@@ -191,7 +191,10 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
               '${q}wakeuptime$q TIME.*?,$reS'
               'CONSTRAINT');
 
-      expect(fullCreateTableSQLs, contains(tableUserRegexp));
+      var tableUserUniqueRegexp = RegExp('UNIQUE\\s\\(${q}email$q\\)');
+
+      expect(fullCreateTableSQLs,
+          allOf(contains(tableUserRegexp), contains(tableUserUniqueRegexp)));
     });
 
     test('create table', () async {

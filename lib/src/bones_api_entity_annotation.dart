@@ -156,6 +156,8 @@ extension EntityFieldExtension on Iterable<EntityField> {
 
   List<String> get regexp => map((e) => e.regexp).whereNotNull().toList();
 
+  List<EntityField> get isUnique => where((e) => e.isUnique).toList();
+
   List<EntityField> get isHidden => where((e) => e.isHidden).toList();
 
   List<EntityField> get isVisible => where((e) => e.isVisible).toList();

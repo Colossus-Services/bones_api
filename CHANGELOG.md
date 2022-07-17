@@ -1,3 +1,7 @@
+## 1.2.10
+
+- Generate `CREATE TABLE` SQL with unique constraint (from `EntityField`). 
+
 ## 1.2.9
 
 - Generate `CREATE TABLE` SQL using `EntityField` information.

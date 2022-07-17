@@ -955,6 +955,18 @@ abstract class SQLGenerator {
             SQLColumn(table, columnName,
                 referenceTable: refTable, referenceColumn: refColumn)
           ]));
+
+      if (entityFieldAnnotations != null &&
+          entityFieldAnnotations.isUnique.isNotEmpty) {
+        var constrainUniqueName = '${table}__${columnName}__unique';
+
+        sqlEntries.add(SQLEntry('CONSTRAINT',
+            ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+            columns: [
+              SQLColumn(table, columnName,
+                  referenceTable: refTable, referenceColumn: refColumn)
+            ]));
+      }
     }
 
     for (var e in referenceFields.entries) {
@@ -976,6 +988,17 @@ abstract class SQLGenerator {
                 referenceTable: refTableName, referenceColumn: refField)
           ]));
     }
+
+    sqlEntries.sort((a, b) {
+      var c1 = a.type == 'CONSTRAINT';
+      var c2 = b.type == 'CONSTRAINT';
+
+      if (c1) {
+        return c2 ? 0 : 1;
+      } else {
+        return c2 ? -1 : 0;
+      }
+    });
 
     var createSQL = CreateTableSQL(dialect, table, sqlEntries,
         q: q, entityRepository: entityRepository);
