@@ -724,6 +724,12 @@ abstract class SQLGenerator {
     if (column.isEmpty) return 1024;
 
     switch (column) {
+      case 'tel':
+      case 'cel':
+      case 'cell':
+      case 'phone':
+      case 'celphone':
+      case 'cellphone':
       case 'zip':
       case 'zipcode':
       case 'postalcode':
@@ -739,6 +745,19 @@ abstract class SQLGenerator {
       case 'address':
       case 'email':
         return 254;
+
+      case 'hash':
+      case 'pass':
+      case 'passhash':
+      case 'password':
+      case 'passwordhash':
+      case 'passphrase':
+      case 'passphrasehash':
+        return 512;
+
+      case 'title':
+      case 'description':
+        return 1024;
 
       case 'http':
       case 'https':

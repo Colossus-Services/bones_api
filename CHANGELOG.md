@@ -1,3 +1,8 @@
+## 1.2.8
+
+- Add `EntityField`: annotation to inform if a field is `hidden`, `unique` and its limits (`minimum`,`maximum`).
+- `EntityStorage`: now checks entity fields validity (`EntityField`).
+
 ## 1.2.7
 
 - Split `bones_api_entity_adapter.dart` into `bones_api_entity_adapter_sql.dart`.

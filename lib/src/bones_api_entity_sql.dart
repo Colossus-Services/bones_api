@@ -414,6 +414,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<dynamic> store(O o, {Transaction? transaction}) {
     checkNotClosed();
 
+    entityHandler.checkAllFieldsValues(o);
+
     if (isStored(o, transaction: transaction)) {
       return _update(o, transaction, true);
     }

@@ -274,8 +274,52 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var address = Address('NY', 'New York', 'street A', 101);
         var role = Role(RoleType.admin);
 
+        {
+          var invalidUser = User('joe at $testDomain', '123', address, [role],
+              level: 100, creationTime: user1CreationTime);
+
+          expect(invalidUser.reflection.allFieldsValids(), isFalse);
+
+          EntityFieldInvalid? error;
+          try {
+            await userAPIRepository.store(invalidUser);
+          } on EntityFieldInvalid catch (e) {
+            error = e;
+          }
+
+          expect(error, isNotNull);
+          expect(error.toString(),
+              contains('Invalid entity(User) field(email)> reason: regexp'));
+        }
+
+        {
+          var invalidAddress = Address('NYXZ', 'New York', 'street A', 101);
+          var role = Role(RoleType.admin);
+
+          var user = User('joe@$testDomain', '123', invalidAddress, [role],
+              level: 100, creationTime: user1CreationTime);
+
+          expect(user.reflection.allFieldsValids(), isFalse);
+
+          EntityFieldInvalid? error;
+          try {
+            await userAPIRepository.store(user);
+          } on EntityFieldInvalid catch (e) {
+            error = e;
+          }
+
+          expect(error, isNotNull);
+          expect(
+              error.toString(),
+              contains(
+                  'Invalid entity(Address) field(state)> reason: maximum(3)'));
+        }
+
         var user = User('joe@$testDomain', '123', address, [role],
             level: 100, creationTime: user1CreationTime);
+
+        expect(user.reflection.allFieldsValids(), isTrue);
+
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
 

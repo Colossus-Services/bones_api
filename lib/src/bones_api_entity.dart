@@ -8,6 +8,7 @@ import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
 import 'package:swiss_knife/swiss_knife.dart' show EventStream;
 
 import 'bones_api_condition.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
@@ -38,6 +39,8 @@ abstract class Entity {
   V? getField<V>(String key);
 
   TypeInfo? getFieldType(String key);
+
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) => null;
 
   void setField<V>(String key, V? value);
 
@@ -631,6 +634,96 @@ abstract class EntityHandler<O> with FieldsFromMap {
         .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
   }
 
+  List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
+
+  EntityFieldInvalid? validateFieldValue<V>(O o, String key,
+      {V? value, bool nullValue = false}) {
+    if (value == null) {
+      if (nullValue) {
+        value = null;
+      } else {
+        value = getField<V>(o, key);
+      }
+    }
+
+    var annotations = getFieldEntityAnnotations(o, key);
+    if (annotations != null && annotations.isNotEmpty) {
+      for (var a in annotations) {
+        if (a is EntityField) {
+          var invalid =
+              a.validateValue(value, entityType: type, fieldName: key);
+          if (invalid != null) return invalid;
+        }
+      }
+    }
+
+    var fieldType = getFieldType(o, key);
+
+    if (fieldType != null &&
+        (!fieldType.isBasicType || fieldType.isListEntity)) {
+      var fieldEntityHandler =
+          getEntityHandler(obj: value, type: fieldType.type);
+      if (fieldEntityHandler != null) {
+        var invalids = fieldEntityHandler.validateAllFields(value as dynamic);
+        if (invalids != null && invalids.isNotEmpty) {
+          return EntityFieldInvalid(
+            'entity($fieldType) field${invalids.length > 1 ? 's' : ''}(${invalids.keys.join(',')})',
+            value,
+            entityType: type,
+            fieldName: key,
+            fieldEntityErrors: invalids,
+          );
+        }
+      }
+    }
+
+    return null;
+  }
+
+  bool isValidFieldValue<V>(O o, String key,
+          {V? value, bool nullValue = false}) =>
+      validateFieldValue(o, key, value: value, nullValue: nullValue) == null;
+
+  void checkFieldValue<V>(O o, String key, {V? value, bool nullValue = false}) {
+    var invalid =
+        validateFieldValue(o, key, value: value, nullValue: nullValue);
+    if (invalid == null) return;
+
+    throw invalid;
+  }
+
+  bool allFieldsValids<V>(O o) {
+    var fieldsNames = this.fieldsNames(o);
+    for (var f in fieldsNames) {
+      if (!isValidFieldValue(o, f)) return false;
+    }
+    return true;
+  }
+
+  Map<String, EntityFieldInvalid>? validateAllFields<V>(O o) {
+    var fieldsNames = this.fieldsNames(o);
+
+    Map<String, EntityFieldInvalid>? errors;
+
+    for (var f in fieldsNames) {
+      var invalid = validateFieldValue(o, f);
+      if (invalid != null) {
+        errors ??= <String, EntityFieldInvalid>{};
+        errors[f] = invalid;
+      }
+    }
+
+    return errors;
+  }
+
+  void checkAllFieldsValues<V>(O o) {
+    var fieldsNames = this.fieldsNames(o);
+
+    for (var f in fieldsNames) {
+      checkFieldValue(o, f);
+    }
+  }
+
   V? getField<V>(O o, String key);
 
   Map<String, dynamic> getFields(O o) {
@@ -1049,14 +1142,26 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     return fieldsTypes;
   }
 
+  Map<String, List<EntityAnnotation>?>? _fieldsEntityAnnotations;
+
   @override
   void inspectObject(O? o) {
     if (o != null && _idFieldsName == null) {
       _idFieldsName = o.idFieldName;
+
       _fieldsNames ??= List<String>.unmodifiable(o.fieldsNames);
+
       _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
           Map<String, TypeInfo>.fromEntries(
               _fieldsNames!.map((f) => MapEntry(f, o.getFieldType(f)!))));
+
+      _fieldsEntityAnnotations ??=
+          Map<String, List<EntityAnnotation>?>.unmodifiable(
+              Map<String, List<EntityAnnotation>?>.fromEntries(
+                  _fieldsNames!.map((f) {
+        var list = o.getFieldEntityAnnotations(f);
+        return MapEntry(f, list == null ? null : UnmodifiableListView(list));
+      })));
     }
   }
 
@@ -1119,6 +1224,16 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
         _log.severe(message, e, s);
       }
       throw StateError(message);
+    }
+  }
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key) {
+    inspectObject(o);
+    if (o != null) {
+      return o.getFieldEntityAnnotations(key);
+    } else {
+      return _fieldsEntityAnnotations?[key];
     }
   }
 
@@ -1213,6 +1328,17 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     var field = reflection.field(key, o);
     return field != null ? TypeInfo.from(field) : null;
   }
+
+  List<Object>? getFieldAnnotations(O? o, String key) {
+    var field = reflection.field(key, o);
+    if (field == null) return null;
+
+    return field.annotations;
+  }
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key) =>
+      getFieldAnnotations(o, key)?.whereType<EntityAnnotation>().toList();
 
   @override
   void setField<V>(O o, String key, V? value, {bool log = true}) {
@@ -3395,6 +3521,8 @@ abstract class IterableEntityRepository<O extends Object>
   @override
   dynamic store(O o, {Transaction? transaction}) {
     checkNotClosed();
+
+    entityHandler.checkAllFieldsValues(o);
 
     var op = TransactionOperationStore(name, o, transaction);
 

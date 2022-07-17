@@ -73,6 +73,9 @@ class UserAPIRepository extends APIRepository<User> {
 class User extends Entity {
   int? id;
 
+  @EntityField.unique()
+  @EntityField.maximum(100)
+  @EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*')
   String email;
 
   String password;
@@ -176,6 +179,20 @@ class User extends Entity {
   }
 
   @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
+    switch (key) {
+      case 'email':
+        return [
+          EntityField.unique(),
+          EntityField.maximum(100),
+          EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*'),
+        ];
+      default:
+        return null;
+    }
+  }
+
+  @override
   void setField<V>(String key, V? value) {
     switch (key) {
       case 'id':
@@ -240,10 +257,13 @@ class User extends Entity {
 class Address extends Entity {
   int? id;
 
+  @EntityField.maximum(3)
   String state;
 
+  @EntityField.maximum(100)
   String city;
 
+  @EntityField.maximum(200)
   String street;
 
   int number;
@@ -321,6 +341,21 @@ class Address extends Entity {
         return TypeInfo.tString;
       case 'number':
         return TypeInfo.tInt;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
+    switch (key) {
+      case 'state':
+        return [EntityField.maximum(3)];
+      case 'city':
+        return [EntityField.maximum(100)];
+      case 'street':
+        return [EntityField.maximum(100)];
+
       default:
         return null;
     }

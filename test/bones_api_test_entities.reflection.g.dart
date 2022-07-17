@@ -206,7 +206,7 @@ class Address$reflection extends ClassReflection<Address> {
           obj,
           false,
           false,
-          null,
+          [EntityField.maximum(3)],
         );
       case 'city':
         return FieldReflection<Address, T>(
@@ -220,7 +220,7 @@ class Address$reflection extends ClassReflection<Address> {
           obj,
           false,
           false,
-          null,
+          [EntityField.maximum(100)],
         );
       case 'street':
         return FieldReflection<Address, T>(
@@ -234,7 +234,7 @@ class Address$reflection extends ClassReflection<Address> {
           obj,
           false,
           false,
-          null,
+          [EntityField.maximum(200)],
         );
       case 'number':
         return FieldReflection<Address, T>(
@@ -308,6 +308,7 @@ class Address$reflection extends ClassReflection<Address> {
   @override
   List<String> get methodsNames => const <String>[
         'getField',
+        'getFieldEntityAnnotations',
         'getFieldType',
         'getID',
         'setField',
@@ -348,6 +349,23 @@ class Address$reflection extends ClassReflection<Address> {
             TypeReflection(TypeInfo),
             true,
             (o) => o!.getFieldType,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'getfieldentityannotations':
+        return MethodReflection<Address, R>(
+            this,
+            Address,
+            'getFieldEntityAnnotations',
+            TypeReflection(List, [EntityAnnotation]),
+            true,
+            (o) => o!.getFieldEntityAnnotations,
             obj,
             false,
             const <ParameterReflection>[
@@ -708,6 +726,7 @@ class Role$reflection extends ClassReflection<Role> {
   @override
   List<String> get methodsNames => const <String>[
         'getField',
+        'getFieldEntityAnnotations',
         'getFieldType',
         'getID',
         'setField',
@@ -817,6 +836,23 @@ class Role$reflection extends ClassReflection<Role> {
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tDynamic, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'getfieldentityannotations':
+        return MethodReflection<Role, R>(
+            this,
+            Entity,
+            'getFieldEntityAnnotations',
+            TypeReflection(List, [EntityAnnotation]),
+            true,
+            (o) => o!.getFieldEntityAnnotations,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
             ],
             null,
             null,
@@ -1091,7 +1127,11 @@ class User$reflection extends ClassReflection<User> {
           obj,
           false,
           false,
-          null,
+          [
+            EntityField.unique(),
+            EntityField.maximum(100),
+            EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*')
+          ],
         );
       case 'password':
         return FieldReflection<User, T>(
@@ -1235,6 +1275,7 @@ class User$reflection extends ClassReflection<User> {
   @override
   List<String> get methodsNames => const <String>[
         'getField',
+        'getFieldEntityAnnotations',
         'getFieldType',
         'getID',
         'setField',
@@ -1275,6 +1316,23 @@ class User$reflection extends ClassReflection<User> {
             TypeReflection(TypeInfo),
             true,
             (o) => o!.getFieldType,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'getfieldentityannotations':
+        return MethodReflection<User, R>(
+            this,
+            User,
+            'getFieldEntityAnnotations',
+            TypeReflection(List, [EntityAnnotation]),
+            true,
+            (o) => o!.getFieldEntityAnnotations,
             obj,
             false,
             const <ParameterReflection>[

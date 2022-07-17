@@ -3,6 +3,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_module.dart';
 
@@ -57,6 +58,30 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
           as ClassReflectionEntityHandler<O>;
     });
   }
+
+  bool isValidFieldValue<V>(String key,
+          {O? obj, V? value, bool nullValue = false}) =>
+      entityHandler.isValidFieldValue(obj ?? object!, key,
+          value: value, nullValue: nullValue);
+
+  EntityFieldInvalid? validateFieldValue<V>(String key,
+          {O? obj, V? value, bool nullValue = false}) =>
+      entityHandler.validateFieldValue(obj ?? object!, key,
+          value: value, nullValue: nullValue);
+
+  void checkFieldValue<V>(String key,
+          {O? obj, V? value, bool nullValue = false}) =>
+      entityHandler.checkFieldValue(obj ?? object!, key,
+          value: value, nullValue: nullValue);
+
+  bool allFieldsValids<V>({O? obj}) =>
+      entityHandler.allFieldsValids(obj ?? object!);
+
+  Map<String, EntityFieldInvalid>? validateAllFields<V>({O? obj}) =>
+      entityHandler.validateAllFields(obj ?? object!);
+
+  void checkAllFieldsValues<V>({O? obj}) =>
+      entityHandler.checkAllFieldsValues(obj ?? object!);
 
   /// Creates an instance [O] from [map].
   FutureOr<O> createFromMap(Map<String, dynamic> map,

@@ -231,6 +231,7 @@ export 'src/bones_api_entity.dart';
 export 'src/bones_api_entity_adapter.dart';
 export 'src/bones_api_entity_adapter_memory.dart';
 export 'src/bones_api_entity_adapter_sql.dart';
+export 'src/bones_api_entity_annotation.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_initializable.dart';
