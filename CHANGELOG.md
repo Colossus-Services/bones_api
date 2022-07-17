@@ -1,3 +1,7 @@
+## 1.2.9
+
+- Generate `CREATE TABLE` SQL using `EntityField` information.
+
 ## 1.2.8
 
 - Add `EntityField`: annotation to inform if a field is `hidden`, `unique` and its limits (`minimum`,`maximum`).

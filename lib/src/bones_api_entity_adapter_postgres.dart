@@ -12,6 +12,7 @@ import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_timedmap.dart';
+import 'bones_api_entity_annotation.dart';
 
 final _log = logging.Logger('PostgreAdapter');
 
@@ -533,8 +534,10 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  String? typeToSQLType(Type type, String column) {
-    var sqlType = super.typeToSQLType(type, column);
+  String? typeToSQLType(Type type, String column,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var sqlType = super.typeToSQLType(type, column,
+        entityFieldAnnotations: entityFieldAnnotations);
 
     if (sqlType == 'TIME') {
       return 'TIME WITHOUT TIME ZONE';
@@ -545,8 +548,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
-      Type type, String column) {
-    return super.enumTypeToSQLType(type, column).resolveMapped((enumType) {
+      Type type, String column,
+      {List<EntityField>? entityFieldAnnotations}) {
+    return super
+        .enumTypeToSQLType(type, column,
+            entityFieldAnnotations: entityFieldAnnotations)
+        .resolveMapped((enumType) {
       if (enumType == null) return null;
 
       var values = enumType.value;

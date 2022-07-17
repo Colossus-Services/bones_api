@@ -11,6 +11,7 @@ import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_utils_timedmap.dart';
+import 'bones_api_entity_annotation.dart';
 
 final _log = logging.Logger('MySQLAdapter');
 
@@ -485,8 +486,10 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  String? typeToSQLType(Type type, String column) {
-    var sqlType = super.typeToSQLType(type, column);
+  String? typeToSQLType(Type type, String column,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var sqlType = super.typeToSQLType(type, column,
+        entityFieldAnnotations: entityFieldAnnotations);
 
     if (sqlType == 'VARCHAR') {
       var sz = getVarcharPreferredSize(column);
@@ -499,8 +502,10 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  String? foreignKeyTypeToSQLType(Type idType, String idName) {
-    var sqlType = super.foreignKeyTypeToSQLType(idType, idName);
+  String? foreignKeyTypeToSQLType(Type idType, String idName,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var sqlType = super.foreignKeyTypeToSQLType(idType, idName,
+        entityFieldAnnotations: entityFieldAnnotations);
 
     if (sqlType == 'BIGINT') {
       return '$sqlType UNSIGNED';

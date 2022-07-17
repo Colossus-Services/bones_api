@@ -1,4 +1,5 @@
 import 'package:bones_api/bones_api.dart';
+import 'package:collection/collection.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:statistics/statistics.dart';
 
@@ -146,6 +147,18 @@ class EntityField extends EntityAnnotation {
 
     return null;
   }
+}
+
+extension EntityFieldExtension on Iterable<EntityField> {
+  List<num> get maximum => map((e) => e.maximum).whereNotNull().toList();
+
+  List<num> get minimum => map((e) => e.minimum).whereNotNull().toList();
+
+  List<String> get regexp => map((e) => e.regexp).whereNotNull().toList();
+
+  List<EntityField> get isHidden => where((e) => e.isHidden).toList();
+
+  List<EntityField> get isVisible => where((e) => e.isVisible).toList();
 }
 
 /// An entity field validation error.

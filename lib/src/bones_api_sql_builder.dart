@@ -9,6 +9,7 @@ import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_types.dart';
+import 'bones_api_entity_annotation.dart';
 
 /// A column information of a [SQLEntry].
 class SQLColumn implements Comparable<SQLColumn> {
@@ -691,9 +692,11 @@ abstract class SQLGenerator {
   FutureOr<String> getTableForEntityRepository(
       EntityRepository entityRepository);
 
-  String? typeToSQLType(Type type, String column) {
+  String? typeToSQLType(Type type, String column,
+      {List<EntityField>? entityFieldAnnotations}) {
     if (type == String) {
-      return 'VARCHAR';
+      var maximum = entityFieldAnnotations?.maximum.firstOrNull;
+      return maximum != null && maximum > 0 ? 'VARCHAR($maximum)' : 'VARCHAR';
     } else if (type == bool) {
       return 'BOOLEAN';
     } else if (type == DateTime) {
@@ -786,7 +789,8 @@ abstract class SQLGenerator {
 
   /// Returns: table -> idName: sqlType
   FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
-      Type type, String? column) {
+      Type type, String? column,
+      {List<EntityField>? entityFieldAnnotations}) {
     var typeEntityRepository = getEntityRepository(type: type);
 
     if (typeEntityRepository != null) {
@@ -794,8 +798,13 @@ abstract class SQLGenerator {
 
       var idName = entityHandler.idFieldName();
       var idType = entityHandler.idType();
+      var idEntityAnnotations = entityHandler
+          .getFieldEntityAnnotations(null, idName)
+          ?.whereType<EntityField>()
+          .toList();
 
-      var sqlType = foreignKeyTypeToSQLType(idType, idName);
+      var sqlType = foreignKeyTypeToSQLType(idType, idName,
+          entityFieldAnnotations: idEntityAnnotations);
 
       if (sqlType != null) {
         return getTableForEntityRepository(typeEntityRepository)
@@ -808,18 +817,21 @@ abstract class SQLGenerator {
     return null;
   }
 
-  String? foreignKeyTypeToSQLType(Type idType, String idName) {
+  String? foreignKeyTypeToSQLType(Type idType, String idName,
+      {List<EntityField>? entityFieldAnnotations}) {
     if (idType == int) {
       idType = BigInt;
     }
 
-    var sqlType = typeToSQLType(idType, idName);
+    var sqlType = typeToSQLType(idType, idName,
+        entityFieldAnnotations: entityFieldAnnotations);
     return sqlType;
   }
 
   /// Returns: ENUM: valuesNames
   FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
-      Type type, String column) {
+      Type type, String column,
+      {List<EntityField>? entityFieldAnnotations}) {
     var reflectionFactory = ReflectionFactory();
     var enumReflection = reflectionFactory.getRegisterEnumReflection(type);
 
@@ -852,17 +864,20 @@ abstract class SQLGenerator {
     var q = sqlElementQuote;
 
     var entityType = entityRepository.type;
-    var table = await getTableForEntityRepository(entityRepository);
     var entityHandler = entityRepository.entityHandler;
 
-    var idFieldName = entityHandler.idFieldName().toLowerCase();
+    var table = await getTableForEntityRepository(entityRepository);
+
+    var idFieldName = entityHandler.idFieldName();
     var idType = entityHandler.idType();
+
+    var idColumnName = idFieldName.toLowerCase();
     var idTypeSQL = primaryKeyTypeToSQLType(idType);
 
     var sqlEntries = <SQLEntry>[
-      SQLEntry('COLUMN', ' $q$idFieldName$q $idTypeSQL',
+      SQLEntry('COLUMN', ' $q$idColumnName$q $idTypeSQL',
           comment: '$idType $idFieldName',
-          columns: [SQLColumn(table, idFieldName)]),
+          columns: [SQLColumn(table, idColumnName)]),
     ];
 
     var fieldsEntries = entityHandler
@@ -879,19 +894,28 @@ abstract class SQLGenerator {
         <String, MapEntry<String, MapEntry<String, String>>>{};
 
     for (var e in fieldsEntries) {
-      var fieldName = e.key.toLowerCase();
+      var fieldName = e.key;
       var fieldType = e.value;
       if (fieldName == idFieldName) continue;
 
-      var comment = '${e.value} ${e.key}';
+      var entityFieldAnnotations = entityHandler
+          .getFieldEntityAnnotations(null, fieldName)
+          ?.whereType<EntityField>()
+          .toList();
+
+      var columnName = fieldName.toLowerCase();
+      var comment = '$fieldType $fieldName';
+
       String? refTable;
       String? refColumn;
 
-      var fieldSQLType = typeToSQLType(fieldType.type, fieldName);
+      var fieldSQLType = typeToSQLType(fieldType.type, columnName,
+          entityFieldAnnotations: entityFieldAnnotations);
       if (fieldSQLType == null) {
-        var entityType = await entityTypeToSQLType(fieldType.type, fieldName);
+        var entityType = await entityTypeToSQLType(fieldType.type, columnName,
+            entityFieldAnnotations: entityFieldAnnotations);
         if (entityType != null) {
-          referenceFields[fieldName] = entityType;
+          referenceFields[columnName] = entityType;
           fieldSQLType = entityType.value.value;
 
           refTable = entityType.key;
@@ -902,7 +926,8 @@ abstract class SQLGenerator {
       }
 
       if (fieldSQLType == null) {
-        var enumType = await enumTypeToSQLType(fieldType.type, fieldName);
+        var enumType = await enumTypeToSQLType(fieldType.type, columnName,
+            entityFieldAnnotations: entityFieldAnnotations);
         if (enumType != null) {
           var type = enumType.key;
           var values = enumType.value;
@@ -913,7 +938,7 @@ abstract class SQLGenerator {
           } else if (type.endsWith(' CHECK')) {
             fieldSQLType = type;
             fieldSQLType +=
-                '( $q$fieldName$q IN (${values.map((e) => "'$e'").join(',')}) )';
+                '( $q$columnName$q IN (${values.map((e) => "'$e'").join(',')}) )';
           } else {
             fieldSQLType = type;
           }
@@ -924,28 +949,30 @@ abstract class SQLGenerator {
 
       if (fieldSQLType == null) continue;
 
-      sqlEntries.add(SQLEntry('COLUMN', ' $q$fieldName$q $fieldSQLType',
+      sqlEntries.add(SQLEntry('COLUMN', ' $q$columnName$q $fieldSQLType',
           comment: comment,
           columns: [
-            SQLColumn(table, fieldName,
+            SQLColumn(table, columnName,
                 referenceTable: refTable, referenceColumn: refColumn)
           ]));
     }
 
     for (var e in referenceFields.entries) {
-      var fieldName = e.key.toLowerCase();
+      var fieldName = e.key;
       var ref = e.value;
+
+      var columnName = fieldName.toLowerCase();
 
       var refTableName = ref.key;
       var refField = ref.value.key.toLowerCase();
 
-      var constrainName = '${table}__${fieldName}__fkey';
+      var constrainName = '${table}__${columnName}__fkey';
 
       sqlEntries.add(SQLEntry('CONSTRAINT',
-          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$fieldName$q) REFERENCES $refTableName($q$refField$q) ON UPDATE CASCADE',
-          comment: '${e.key} @ $refTableName.$refField',
+          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $refTableName($q$refField$q) ON UPDATE CASCADE',
+          comment: '$fieldName @ $refTableName.$refField',
           columns: [
-            SQLColumn(table, fieldName,
+            SQLColumn(table, columnName,
                 referenceTable: refTableName, referenceColumn: refField)
           ]));
     }
@@ -965,8 +992,16 @@ abstract class SQLGenerator {
       var fieldName = e.key;
       var fieldType = e.value.listEntityType!;
 
+      var entityFieldAnnotations = entityHandler
+          .getFieldEntityAnnotations(null, fieldName)
+          ?.whereType<EntityField>()
+          .toList();
+
+      var columnName = fieldName.toLowerCase();
+
       var srcFieldName = table.toLowerCase();
-      var relSrcType = foreignKeyTypeToSQLType(idType, srcFieldName);
+      var relSrcType = foreignKeyTypeToSQLType(idType, srcFieldName,
+          entityFieldAnnotations: entityFieldAnnotations);
 
       var relDstType = await entityTypeToSQLType(fieldType.type, null);
       if (relDstType == null) continue;
@@ -977,7 +1012,7 @@ abstract class SQLGenerator {
 
       var dstFieldName = relDstTable.toLowerCase();
 
-      var relName = '${table}__${fieldName}__rel';
+      var relName = '${table}__${columnName}__rel';
 
       var constrainUniqueName = '${relName}__unique';
       var constrainSrcName = '${relName}__${srcFieldName}__fkey';
@@ -988,7 +1023,7 @@ abstract class SQLGenerator {
             comment: '$entityType.${e.key}',
             columns: [
               SQLColumn(relName, srcFieldName,
-                  referenceTable: table, referenceColumn: idFieldName)
+                  referenceTable: table, referenceColumn: idColumnName)
             ]),
         SQLEntry('COLUMN', ' $q$dstFieldName$q $relDstTypeSQL NOT NULL',
             comment: '${e.value} @ $relDstTable.$relDstTableId',
@@ -1003,11 +1038,11 @@ abstract class SQLGenerator {
               SQLColumn(relName, dstFieldName)
             ]),
         SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idFieldName$q) ON UPDATE CASCADE ON DELETE CASCADE',
-            comment: ' $srcFieldName @ $table.$idFieldName',
+            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON UPDATE CASCADE ON DELETE CASCADE',
+            comment: ' $srcFieldName @ $table.$idColumnName',
             columns: [
               SQLColumn(relName, srcFieldName,
-                  referenceTable: table, referenceColumn: idFieldName)
+                  referenceTable: table, referenceColumn: idColumnName)
             ]),
         SQLEntry('CONSTRAINT',
             ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON UPDATE CASCADE ON DELETE CASCADE',
