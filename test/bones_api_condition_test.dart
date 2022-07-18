@@ -466,12 +466,18 @@ class _TestSchemeProvider extends SchemeProvider {
 
   @override
   FutureOr<Object?> getEntityID(Object entity,
-      {String? entityName, String? tableName, Type? entityType}) {
+      {String? entityName,
+      String? tableName,
+      Type? entityType,
+      EntityHandler? entityHandler}) {
     if (entity is Entity) {
       return entity.getID();
     } else if (entity is Map) {
       return entity['id'];
+    } else if (entityHandler != null) {
+      return entityHandler.getID(entity);
     }
+
     throw StateError("Unknown entity type: $entity");
   }
 }

@@ -668,6 +668,35 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
+  Object? errorResolver(Object? error, StackTrace? stackTrace) {
+    if (error is MySqlException) {
+      if (error.errorNumber == 1062) {
+        var keyMatch = RegExp(r"for key '(?:(\w+)\.(.*?)|(.*?))'")
+            .firstMatch(error.message);
+
+        String? tableName;
+        String? fieldName;
+
+        if (keyMatch != null) {
+          var mTable = keyMatch[1];
+          var mField = keyMatch[2];
+          var mKey = keyMatch[3];
+
+          if (mTable != null) {
+            tableName = mTable;
+          }
+
+          fieldName = mField ?? mKey;
+        }
+
+        throw EntityFieldInvalid("unique", error.message,
+            tableName: tableName, fieldName: fieldName, parentError: error);
+      }
+    }
+    return error;
+  }
+
+  @override
   FutureOr<MySqlConnectionWrapper> openTransaction(Transaction transaction) {
     var contextCompleter = Completer<MySqlConnectionWrapper>();
 

@@ -12,6 +12,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
@@ -196,6 +197,61 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   FutureOr<bool> executeTableSQL(String createTableSQL) {
     throw UnsupportedError("Can't execute create table SQL");
   }
+
+  @override
+  void checkEntityFields<O>(O o, String entityName, String table,
+      {EntityHandler<O>? entityHandler}) {
+    Map<Object, Map<String, dynamic>>? map = _getTableMap(table, false);
+    if (map == null) return;
+
+    entityHandler ??=
+        getEntityHandler<O>(entityName: entityName, tableName: table);
+    if (entityHandler == null) {
+      throw StateError(
+          "Can't define `EntityHandler`> entityName: $entityName ; table: $table ; entityType: $O");
+    }
+
+    var entityId = getEntityID(o!,
+        entityHandler: entityHandler, entityName: entityName, tableName: table);
+
+    var fieldsEntityAnnotations =
+        entityHandler.getAllFieldsEntityAnnotations(o);
+
+    var uniques = fieldsEntityAnnotations?.entries
+        .where((e) => e.value.hasUnique)
+        .toList();
+    if (uniques == null || uniques.isEmpty) return;
+
+    for (var e in uniques) {
+      var field = e.key;
+      var value = entityHandler.getField(o, field);
+      if (value == null) continue;
+
+      if (_containsEntryWithConflictFieldValue(
+          map, entityHandler, entityId, field, value)) {
+        throw EntityFieldInvalid('unique', value,
+            fieldName: field, entityType: entityHandler.type, tableName: table);
+      }
+    }
+  }
+
+  bool _containsEntryWithConflictFieldValue<O>(
+          Map<Object, Map<String, dynamic>> map,
+          EntityHandler<O> entityHandler,
+          Object? entityId,
+          String field,
+          value) =>
+      map.entries.any((e) {
+        if (entityId != null) {
+          var id = e.key;
+          if (entityId == id) return false;
+        }
+
+        var elem = e.value;
+        var elemValue = elem[field];
+        var conflict = elemValue == value;
+        return conflict;
+      });
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,

@@ -956,8 +956,7 @@ abstract class SQLGenerator {
                 referenceTable: refTable, referenceColumn: refColumn)
           ]));
 
-      if (entityFieldAnnotations != null &&
-          entityFieldAnnotations.isUnique.isNotEmpty) {
+      if (entityFieldAnnotations != null && entityFieldAnnotations.hasUnique) {
         var constrainUniqueName = '${table}__${columnName}__unique';
 
         sqlEntries.add(SQLEntry('CONSTRAINT',

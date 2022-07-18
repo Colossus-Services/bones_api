@@ -169,6 +169,22 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   bool get sqlAcceptsInsertOnConflict => true;
 
   @override
+  Object? errorResolver(Object? error, StackTrace? stackTrace) {
+    if (error is PostgreSQLException) {
+      if (error.severity == PostgreSQLSeverity.error) {
+        if (error.code == '23505') {
+          throw EntityFieldInvalid("unique", error.detail,
+              fieldName: error.columnName,
+              tableName: error.tableName,
+              parentError: error);
+        }
+      }
+    }
+
+    return error;
+  }
+
+  @override
   String getConnectionURL(PostgreSQLExecutionContext connection) {
     var c = connection as PostgreSQLConnection;
     return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';

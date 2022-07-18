@@ -353,14 +353,17 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   @override
   FutureOr<Object?> getEntityID(Object entity,
-      {String? entityName, String? tableName, Type? entityType}) {
+      {String? entityName,
+      String? tableName,
+      Type? entityType,
+      EntityHandler? entityHandler}) {
     if (entity is num) {
       return entity;
     }
 
     entityType ??= entity.runtimeType;
 
-    var entityHandler = getEntityHandler(
+    entityHandler ??= getEntityHandler(
         entityName: entityName, tableName: tableName, entityType: entityType);
 
     if (entityHandler == null) return null;

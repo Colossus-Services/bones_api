@@ -271,9 +271,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
     return null;
   }
 
-  V? getID<V>(O o) => getField(o, idFieldName(o));
+  V? getID<V>(O o) => getField<V?>(o, idFieldName(o));
 
-  void setID<V>(O o, V id) => setField(o, idFieldName(o), id);
+  void setID<V>(O o, V id) => setField<V>(o, idFieldName(o), id);
 
   Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
       Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
@@ -636,6 +636,19 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
 
+  Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations(O? o) {
+    var fieldsNames = this.fieldsNames(o);
+
+    var entries = fieldsNames.map((f) {
+      var annotations = getFieldEntityAnnotations(o, f);
+      return annotations == null ? null : MapEntry(f, annotations);
+    }).whereNotNull();
+
+    var map = Map<String, List<EntityAnnotation>>.fromEntries(entries);
+
+    return map.isEmpty ? null : map;
+  }
+
   EntityFieldInvalid? validateFieldValue<V>(O o, String key,
       {V? value, bool nullValue = false}) {
     if (value == null) {
@@ -672,7 +685,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
               value,
               entityType: type,
               fieldName: key,
-              fieldEntityErrors: invalids,
+              subEntityErrors: invalids,
             );
           }
         }
@@ -737,7 +750,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   bool trySetField<V>(O o, String key, V? value) {
     try {
-      setField(o, key, value, log: false);
+      setField<V>(o, key, value, log: false);
       return true;
     } catch (e) {
       return false;
@@ -1031,7 +1044,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
     var retValue2 = resolveEntityFieldValue(o, key, value,
         entityProvider: entityProvider, entityCache: entityCache);
     return retValue2.resolveMapped((value2) {
-      setField(o, key, value2);
+      setField<dynamic>(o, key, value2);
       return value2;
     });
   }
@@ -1323,7 +1336,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   void inspectObject(O? o) {}
 
   @override
-  V? getField<V>(O o, String key) => reflection.getField(key, o);
+  V? getField<V>(O o, String key) => reflection.getField<V?>(key, o);
 
   @override
   TypeInfo? getFieldType(O? o, String key) {
@@ -1345,7 +1358,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   @override
   void setField<V>(O o, String key, V? value, {bool log = true}) {
     try {
-      reflection.setField(key, value, o);
+      reflection.setField<V?>(key, value, o);
     } catch (e, s) {
       var message =
           "Error setting `$type` field using reflection[$reflection]: $key = $value";
@@ -1710,6 +1723,8 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
   bool isStored(O o, {Transaction? transaction});
 
+  void checkEntityFields(O o);
+
   FutureOr<dynamic> store(O o, {Transaction? transaction});
 
   FutureOr<Iterable> storeAll(Iterable<O> o, {Transaction? transaction});
@@ -1879,7 +1894,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         }
 
         var fieldValuesEmpty = fieldValues.toList()..clear();
-        entityHandler.setField(o, e.key, fieldValuesEmpty);
+        entityHandler.setField<dynamic>(o, e.key, fieldValuesEmpty);
         changed = true;
       } else if (t.isCollection || EntityHandler.isReflectedEnumType(t.type)) {
         continue;
@@ -1907,7 +1922,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
             repositoryProvider,
             deleted);
 
-        if (entityHandler.trySetField(o, e.key, null)) {
+        if (entityHandler.trySetField<dynamic>(o, e.key, null)) {
           preDeleteCalls.add(call);
           changed = true;
         } else {
@@ -3152,16 +3167,17 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
   FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
-      {String? Function()? debugInfo}) {
+      {Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      String? Function()? debugInfo}) {
     if (_executionsFutures.isEmpty) {
-      var ret = _executeSafe(exec, debugInfo);
+      var ret = _executeSafe(exec, errorResolver, debugInfo);
       _executionsFutures.add(ret);
       return ret;
     } else {
       var last = _executionsFutures.last;
 
       var ret = last.resolveWith(() {
-        return _executeSafe(exec, debugInfo);
+        return _executeSafe(exec, errorResolver, debugInfo);
       });
 
       _executionsFutures.add(ret);
@@ -3170,24 +3186,39 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   FutureOr<R> _executeSafe<R, C>(
-      TransactionExecution<R, C> exec, String? Function()? debugInfo) {
+      TransactionExecution<R, C> exec,
+      Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      String? Function()? debugInfo) {
     try {
       var ret = exec(context! as C);
       if (ret is Future<R>) {
         var future = ret;
-        return future
-            .catchError((e, s) => _onExecutionError<R>(e, s, debugInfo));
+        return future.catchError(
+            (e, s) => _onExecutionError<R>(e, s, errorResolver, debugInfo));
       } else {
         return ret;
       }
     } catch (e, s) {
-      return _onExecutionError<R>(e, s, debugInfo);
+      return _onExecutionError<R>(e, s, errorResolver, debugInfo);
     }
   }
 
+  FutureOr<R> notifyExecutionError<R>(Object error, StackTrace stackTrace,
+      {Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      String? Function()? debugInfo}) {
+    return _onExecutionError<R>(error, stackTrace, errorResolver, debugInfo);
+  }
+
   FutureOr<R> _onExecutionError<R>(
-      Object error, StackTrace stackTrace, String? Function()? debugInfo) {
+      Object error,
+      StackTrace stackTrace,
+      Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      String? Function()? debugInfo) {
     var info = debugInfo != null ? debugInfo() : null;
+
+    if (errorResolver != null) {
+      error = errorResolver(error, stackTrace) ?? error;
+    }
 
     if (info != null && info.isNotEmpty) {
       _log.severe(
@@ -3524,7 +3555,7 @@ abstract class IterableEntityRepository<O extends Object>
   dynamic store(O o, {Transaction? transaction}) {
     checkNotClosed();
 
-    entityHandler.checkAllFieldsValues(o);
+    checkEntityFields(o);
 
     var op = TransactionOperationStore(name, o, transaction);
 
@@ -3545,6 +3576,36 @@ abstract class IterableEntityRepository<O extends Object>
       return oId;
     });
   }
+
+  @override
+  void checkEntityFields(O o) {
+    entityHandler.checkAllFieldsValues(o);
+
+    var fieldsEntityAnnotations =
+        entityHandler.getAllFieldsEntityAnnotations(o);
+
+    var uniques = fieldsEntityAnnotations?.entries
+        .where((e) => e.value.hasUnique)
+        .toList();
+    if (uniques == null || uniques.isEmpty) return;
+
+    for (var e in uniques) {
+      var field = e.key;
+      var value = getField(o, field);
+      if (value == null) continue;
+
+      if (_containsEntryWithFieldValue(field, value)) {
+        throw EntityFieldInvalid("unique", value,
+            fieldName: field, entityType: type, tableName: name);
+      }
+    }
+  }
+
+  bool _containsEntryWithFieldValue(String field, value) =>
+      iterable().any((elem) {
+        var elemValue = getField(elem, field);
+        return elemValue == value;
+      });
 
   @override
   Iterable<dynamic> storeAll(Iterable<O> os, {Transaction? transaction}) {

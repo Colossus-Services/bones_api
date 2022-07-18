@@ -282,17 +282,27 @@ mixin Pool<O> {
   }
 
   FutureOr<R> executeWithPool<R>(FutureOr<R> Function(O o) f,
-      {Duration? timeout, bool Function(O o)? validator}) {
+      {Duration? timeout,
+      bool Function(O o)? validator,
+      Function(Object error, StackTrace stackTrace)? onError}) {
     return catchFromPool(timeout: timeout).then((o) {
       try {
         var ret = f(o);
-        return ret.resolveMapped((val) {
+
+        return ret.then((val) {
           if (validator == null || validator(o)) {
             releaseIntoPool(o);
           } else {
             disposePoolElement(o);
           }
           return val;
+        }, onError: (e, s) {
+          disposePoolElement(o);
+          if (onError != null) {
+            return onError(e, s);
+          } else {
+            throw e;
+          }
         });
       } catch (_) {
         disposePoolElement(o);

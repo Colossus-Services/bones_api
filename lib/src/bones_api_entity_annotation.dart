@@ -149,18 +149,48 @@ class EntityField extends EntityAnnotation {
   }
 }
 
-extension EntityFieldExtension on Iterable<EntityField> {
+extension IterableEntityAnnotationExtension on Iterable<EntityAnnotation> {
+  Iterable<EntityField> get entityFieldsIterable => whereType<EntityField>();
+
+  List<EntityField> get entityFields => entityFieldsIterable.toList();
+
+  List<num> get maximum => entityFieldsIterable.maximum;
+
+  List<num> get minimum => entityFieldsIterable.minimum;
+
+  List<String> get regexp => entityFieldsIterable.regexp;
+
+  List<EntityField> get unique => entityFieldsIterable.unique;
+
+  List<EntityField> get hidden => entityFieldsIterable.hidden;
+
+  List<EntityField> get visible => entityFieldsIterable.visible;
+
+  bool get hasUnique => entityFieldsIterable.hasUnique;
+
+  bool get hasHidden => entityFieldsIterable.hasHidden;
+
+  bool get hasVisible => entityFieldsIterable.hasVisible;
+}
+
+extension IterableEntityFieldExtension on Iterable<EntityField> {
   List<num> get maximum => map((e) => e.maximum).whereNotNull().toList();
 
   List<num> get minimum => map((e) => e.minimum).whereNotNull().toList();
 
   List<String> get regexp => map((e) => e.regexp).whereNotNull().toList();
 
-  List<EntityField> get isUnique => where((e) => e.isUnique).toList();
+  List<EntityField> get unique => where((e) => e.isUnique).toList();
 
-  List<EntityField> get isHidden => where((e) => e.isHidden).toList();
+  List<EntityField> get hidden => where((e) => e.isHidden).toList();
 
-  List<EntityField> get isVisible => where((e) => e.isVisible).toList();
+  List<EntityField> get visible => where((e) => e.isVisible).toList();
+
+  bool get hasUnique => any((e) => e.isUnique);
+
+  bool get hasHidden => any((e) => e.isHidden);
+
+  bool get hasVisible => any((e) => e.isVisible);
 }
 
 /// An entity field validation error.
@@ -174,20 +204,49 @@ class EntityFieldInvalid extends Error {
   /// The entity [Type].
   final Type? entityType;
 
+  /// The table of the [entityType].
+  final String? tableName;
+
   /// The field name of the [value].
   final String? fieldName;
 
-  Map<String, EntityFieldInvalid>? fieldEntityErrors;
+  /// The errors of the sub-entity ([value]) in the [fieldName].
+  final Map<String, EntityFieldInvalid>? subEntityErrors;
+
+  /// The parent/original error.
+  final Object? parentError;
 
   EntityFieldInvalid(this.reason, this.value,
-      {this.entityType, this.fieldName, this.fieldEntityErrors});
+      {this.entityType,
+      this.tableName,
+      this.fieldName,
+      this.subEntityErrors,
+      this.parentError});
+
+  EntityFieldInvalid copyWith(
+          {String? reason,
+          Object? value,
+          Type? entityType,
+          String? tableName,
+          String? fieldName,
+          Map<String, EntityFieldInvalid>? subEntityErrors,
+          Object? parentError}) =>
+      EntityFieldInvalid(
+        reason ?? this.reason,
+        value ?? this.value,
+        entityType: entityType ?? this.entityType,
+        tableName: tableName ?? this.tableName,
+        fieldName: fieldName ?? this.fieldName,
+        subEntityErrors: subEntityErrors ?? this.subEntityErrors,
+        parentError: parentError ?? this.parentError,
+      );
 
   String get message {
-    var msg = 'reason: $reason ; value: <${value?.toString().truncate(20)}>';
+    var msg = 'reason: $reason ; value: <${value?.toString().truncate(100)}>';
 
-    var fieldEntityErrors = this.fieldEntityErrors;
-    if (fieldEntityErrors != null && fieldEntityErrors.isNotEmpty) {
-      for (var e in fieldEntityErrors.values) {
+    var subEntityErrors = this.subEntityErrors;
+    if (subEntityErrors != null && subEntityErrors.isNotEmpty) {
+      for (var e in subEntityErrors.values) {
         msg += '\n- $e';
       }
     }
@@ -197,10 +256,23 @@ class EntityFieldInvalid extends Error {
 
   @override
   String toString() {
-    var typeStr = entityType != null ? '($entityType)' : '';
+    var entityStr = entityType != null ? '$entityType' : '';
+
+    var tableName = this.tableName;
+    if (tableName != null && tableName.isNotEmpty) {
+      entityStr += '@table:$tableName';
+    }
+
+    if (entityStr.isNotEmpty) {
+      entityStr = '($entityStr)';
+    }
+
     var fieldStr =
         fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
 
-    return 'Invalid entity$typeStr field$fieldStr> $message';
+    var parentStr =
+        parentError != null ? '\n  -- Parent ERROR>> $parentError' : '';
+
+    return 'Invalid entity$entityStr field$fieldStr> $message$parentStr';
   }
 }

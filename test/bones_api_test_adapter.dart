@@ -272,6 +272,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       }
 
       var user1CreationTime = DateTime.utc(2021, 9, 20, 10, 11, 12, 0, 0);
+      int user1Id;
 
       {
         var address = Address('NY', 'New York', 'street A', 101);
@@ -326,6 +327,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
 
+        user1Id = id;
+
         expect(user.id, equals(1));
         expect(address.id, equals(1));
         expect(role.id, equals(1));
@@ -354,10 +357,30 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect((await userAPIRepository.selectByRoleId(role.id!)).single.email,
             equals('joe@$testDomain'));
+
+        var userDuplicated = User('joe@$testDomain', '456', address, [role],
+            level: 100, creationTime: user1CreationTime);
+
+        EntityFieldInvalid? error;
+        try {
+          await userAPIRepository.store(userDuplicated);
+        } on EntityFieldInvalid catch (e) {
+          error = e;
+        }
+
+        expect(error, isA<EntityFieldInvalid>());
+        expect(
+          error.toString(),
+          matches(RegExp(
+              r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@\w+\.com.*?>.*',
+              dotAll: true)),
+        );
       }
 
       var user2CreationTime = DateTime.utc(2021, 9, 21, 22, 11, 12, 0, 0);
       var user2WakeupTime = Time(9, 10, 11);
+
+      int user2Id;
 
       {
         var address = Address('CA', 'Los Angeles', 'street B', 201);
@@ -365,8 +388,10 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var user = User('smith@$testDomain', 'abc', address,
             [Role(RoleType.guest, value: Decimal.parse('123.45'))],
             wakeUpTime: user2WakeupTime, creationTime: user2CreationTime);
-        var id = await userAPIRepository.store(user);
-        expect(id, equals(2));
+        final id = await userAPIRepository.store(user);
+        expect(id, greaterThanOrEqualTo(2));
+
+        user2Id = id;
 
         expect((await userAPIRepository.selectAll()).length, equals(2));
 
@@ -374,15 +399,15 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(user2!.wakeUpTime, equals(user2WakeupTime));
 
         user2.wakeUpTime = null;
-        id = await userAPIRepository.store(user2);
-        expect(id, equals(2));
+        var id2 = await userAPIRepository.store(user2);
+        expect(id2, equals(id));
 
         user2 = await userAPIRepository.selectByID(id);
         expect(user2!.wakeUpTime, isNull);
 
         user2.wakeUpTime = user2WakeupTime;
-        id = await userAPIRepository.store(user2);
-        expect(id, equals(2));
+        id2 = await userAPIRepository.store(user2);
+        expect(id2, equals(id));
 
         user2 = await userAPIRepository.selectByID(id);
         expect(user2!.wakeUpTime, equals(user2WakeupTime));
@@ -398,20 +423,24 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       var user3CreationTime = DateTime.utc(2021, 9, 22);
       var user3WakeupTime = Time(12, 10, 11);
 
+      int user3Id;
+
       {
         var address = Address('CA', 'Los Angeles', 'street B', 101);
 
         var user = User('john@$testDomain', '456', address, [],
             wakeUpTime: user3WakeupTime, creationTime: user3CreationTime);
         var id = await userAPIRepository.store(user);
-        expect(id, equals(3));
+        expect(id, greaterThanOrEqualTo(3));
+
+        user3Id = id;
       }
 
       expect(await addressAPIRepository.length(), equals(3));
       expect(await userAPIRepository.length(), equals(3));
 
       {
-        var user = await userAPIRepository.selectByID(1);
+        var user = await userAPIRepository.selectByID(user1Id);
         expect(user!.email, equals('joe@$testDomain'));
         expect(user.address.state, equals('NY'));
         expect(
@@ -441,7 +470,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       }
 
       {
-        var user = await userAPIRepository.selectByID(2);
+        var user = await userAPIRepository.selectByID(user2Id);
         expect(user!.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
         expect(
@@ -470,7 +499,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       }
 
       {
-        var user = await userAPIRepository.selectByID(3);
+        var user = await userAPIRepository.selectByID(user3Id);
         expect(user!.email, equals('john@$testDomain'));
         expect(user.address.state, equals('CA'));
         expect(user.roles, isEmpty);
@@ -790,7 +819,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       }
 
       {
-        var user = await userAPIRepository.selectByID(2);
+        var user = await userAPIRepository.selectByID(user2Id);
 
         expect(user!.email, equals('smith4@$testDomain'));
 
@@ -840,7 +869,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
       {
         var del = await userAPIRepository
-            .deleteByQuery(' #ID == ? ', parameters: [2]);
+            .deleteByQuery(' #ID == ? ', parameters: [user2Id]);
         var user = del.first;
         expect(user.email, equals('smith4@$testDomain'));
         expect(user.address.state, equals('CA'));

@@ -389,7 +389,10 @@ abstract class SchemeProvider {
 
   /// Returns the [entity] ID for [entityName], [tableName] or [entityType].
   FutureOr<Object?> getEntityID(Object entity,
-      {String? entityName, String? tableName, Type? entityType});
+      {String? entityName,
+      String? tableName,
+      Type? entityType,
+      EntityHandler? entityHandler});
 }
 
 /// An encoding context for [ConditionEncoder].

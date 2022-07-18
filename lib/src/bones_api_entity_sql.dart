@@ -411,10 +411,17 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
+  void checkEntityFields(O o) {
+    entityHandler.checkAllFieldsValues(o);
+
+    sqlRepositoryAdapter.checkEntityFields(o, entityHandler);
+  }
+
+  @override
   FutureOr<dynamic> store(O o, {Transaction? transaction}) {
     checkNotClosed();
 
-    entityHandler.checkAllFieldsValues(o);
+    checkEntityFields(o);
 
     if (isStored(o, transaction: transaction)) {
       return _update(o, transaction, true);

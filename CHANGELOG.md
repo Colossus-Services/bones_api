@@ -1,3 +1,9 @@
+## 1.2.12
+
+- `MemorySQLAdapter`: check for unique fields.
+- `PostgreSQLAdapter` and `MySQLAdapter`: handles unique field errors as `EntityFieldInvalid`.
+- `EntityFieldInvalid`: improved error information (added `tableName` and `parentError`).
+
 ## 1.2.11
 
 - `EntityHandler`: Fix `validateFieldValue` for sub-entities.

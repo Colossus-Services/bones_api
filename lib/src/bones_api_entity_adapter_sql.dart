@@ -581,6 +581,9 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
   FutureOr<bool> executeTableSQL(String createTableSQL);
 
+  void checkEntityFields<O>(O o, String entityName, String table,
+      {EntityHandler<O>? entityHandler}) {}
+
   FutureOr<SQL> generateCountSQL(
       Transaction transaction, String entityName, String table,
       {EntityMatcher? matcher,
@@ -1178,6 +1181,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     });
   }
 
+  Object? errorResolver(Object? error, StackTrace? stackTrace) => error;
+
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
       SQLWrapper sql, FutureOr<R> Function(C connection) f) {
     var transaction = op.transaction;
@@ -1186,7 +1191,13 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         !transaction.isExecuting &&
         sql.sqlsLength == 1 &&
         !sql.mainSQL.hasPreOrPosSQL) {
-      return executeWithPool(f);
+      return executeWithPool(f,
+          onError: (e, s) => transaction.notifyExecutionError(
+                e,
+                s,
+                errorResolver: errorResolver,
+                debugInfo: () => sql.mainSQL.toString(),
+              ));
     }
 
     if (!transaction.isOpen && !transaction.isOpening) {
@@ -1199,8 +1210,11 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     }
 
     return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, C>((c) => f(c),
-          debugInfo: () => sql.mainSQL.toString());
+      return transaction.addExecution<R, C>(
+        (c) => f(c),
+        errorResolver: errorResolver,
+        debugInfo: () => sql.mainSQL.toString(),
+      );
     });
   }
 
@@ -1685,6 +1699,9 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
   @override
   FutureOr<InitializationResult> initialize() =>
       databaseAdapter.ensureInitialized(parent: this);
+
+  void checkEntityFields(O o, EntityHandler<O> entityHandler) => databaseAdapter
+      .checkEntityFields<O>(o, name, tableName, entityHandler: entityHandler);
 
   FutureOr<SQL> generateCountSQL(Transaction transaction,
           {EntityMatcher? matcher,
