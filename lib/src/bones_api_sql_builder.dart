@@ -7,9 +7,9 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_mixin.dart';
-import 'bones_api_types.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 
 /// A column information of a [SQLEntry].
 class SQLColumn implements Comparable<SQLColumn> {
@@ -723,7 +723,7 @@ abstract class SQLGenerator {
     column = column.trim();
     if (column.isEmpty) return 1024;
 
-    column = FieldsFromMap.defaultFieldToSimpleKey(column);
+    column = normalizeColumnName(column);
     if (column.isEmpty) return 1024;
 
     switch (column) {
@@ -871,7 +871,7 @@ abstract class SQLGenerator {
     var idFieldName = entityHandler.idFieldName();
     var idType = entityHandler.idType();
 
-    var idColumnName = idFieldName.toLowerCase();
+    var idColumnName = normalizeColumnName(idFieldName);
     var idTypeSQL = primaryKeyTypeToSQLType(idType);
 
     var sqlEntries = <SQLEntry>[
@@ -903,7 +903,7 @@ abstract class SQLGenerator {
           ?.whereType<EntityField>()
           .toList();
 
-      var columnName = fieldName.toLowerCase();
+      var columnName = normalizeColumnName(fieldName);
       var comment = '$fieldType $fieldName';
 
       String? refTable;
@@ -972,7 +972,7 @@ abstract class SQLGenerator {
       var fieldName = e.key;
       var ref = e.value;
 
-      var columnName = fieldName.toLowerCase();
+      var columnName = normalizeColumnName(fieldName);
 
       var refTableName = ref.key;
       var refField = ref.value.key.toLowerCase();
@@ -1019,9 +1019,9 @@ abstract class SQLGenerator {
           ?.whereType<EntityField>()
           .toList();
 
-      var columnName = fieldName.toLowerCase();
+      var columnName = normalizeColumnName(fieldName);
 
-      var srcFieldName = table.toLowerCase();
+      var srcFieldName = normalizeColumnName(table);
       var relSrcType = foreignKeyTypeToSQLType(idType, srcFieldName,
           entityFieldAnnotations: entityFieldAnnotations);
 
@@ -1032,7 +1032,7 @@ abstract class SQLGenerator {
       var relDstTableId = relDstType.value.key;
       var relDstTypeSQL = relDstType.value.value;
 
-      var dstFieldName = relDstTable.toLowerCase();
+      var dstFieldName = normalizeColumnName(relDstTable);
 
       var relName = '${table}__${columnName}__rel';
 
@@ -1084,6 +1084,9 @@ abstract class SQLGenerator {
 
     return createSQL;
   }
+
+  String normalizeColumnName(String fieldName) =>
+      StringUtils.toLowerCaseUnderscore(fieldName, simple: true);
 
   /// Generate a full text with all the SQLs to create the tables.
   Future<String> generateFullCreateTableSQLs(

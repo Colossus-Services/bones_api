@@ -6,8 +6,8 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_entity.dart';
-import 'bones_api_mixin.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 
 typedef ToEncodable = Object? Function(Object? object);
 
@@ -395,7 +395,7 @@ class Json {
       return fieldLC;
     }
 
-    var fieldSimple = FieldsFromMap.defaultFieldToSimpleKey(field);
+    var fieldSimple = StringUtils.toLowerCaseSimple(field);
     if (map.containsKey(fieldSimple)) {
       return fieldSimple;
     }

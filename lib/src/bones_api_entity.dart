@@ -15,6 +15,7 @@ import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_instance_tracker.dart';
 import 'bones_api_utils_json.dart';
@@ -254,14 +255,14 @@ abstract class EntityHandler<O> with FieldsFromMap {
     var id = map[idField];
     if (id != null) return id;
 
-    var idFieldSimple = FieldsFromMap.defaultFieldToSimpleKey(idField);
+    var idFieldSimple = StringUtils.toLowerCaseSimple(idField);
 
     for (var k in map.keys) {
       if (k == idFieldSimple) {
         return map[k];
       }
 
-      var kSimple = FieldsFromMap.defaultFieldToSimpleKey(k);
+      var kSimple = StringUtils.toLowerCaseSimple(k);
 
       if (kSimple == idFieldSimple) {
         return map[k];

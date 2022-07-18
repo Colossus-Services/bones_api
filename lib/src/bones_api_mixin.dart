@@ -3,6 +3,8 @@ import 'dart:collection';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
+import 'bones_api_utils.dart';
+
 mixin Closable {
   bool _closed = false;
 
@@ -478,12 +480,7 @@ mixin FieldsFromMap {
     return null;
   }
 
-  String fieldToLCKey(String key) => key.toLowerCase();
+  String fieldToLCKey(String key) => StringUtils.toLowerCase(key);
 
-  String fieldToSimpleKey(String key) => defaultFieldToSimpleKey(key);
-
-  static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z\d]');
-
-  static String defaultFieldToSimpleKey(String key) =>
-      key.toLowerCase().replaceAll(_regexpLettersAndDigits, '');
+  String fieldToSimpleKey(String key) => StringUtils.toLowerCaseSimple(key);
 }

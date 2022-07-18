@@ -1,3 +1,10 @@
+## 1.2.13
+
+- `SQLGenerator`:
+  - Added `normalizeColumnName`: now generates column names using underscore (from camel-case fields).
+- `StringUtils`:
+  - Added `toLowerCaseSimple` and `toLowerCaseUnderscore`.
+
 ## 1.2.12
 
 - `MemorySQLAdapter`: check for unique fields.

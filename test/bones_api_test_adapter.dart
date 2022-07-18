@@ -184,11 +184,11 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           RegExp('CREATE TABLE IF NOT EXISTS ${q}user$q \\($reS'
               '${q}id$q $reAnyType PRIMARY KEY,$reS'
               '${q}address$q BIGINT.*?,$reS'
-              '${q}creationtime$q TIMESTAMP,$reS'
+              '${q}creation_time$q TIMESTAMP,$reS'
               '${q}email$q VARCHAR$reArg?,$reS'
               '${q}level$q INT,$reS'
               '${q}password$q VARCHAR$reArg?,$reS'
-              '${q}wakeuptime$q TIME.*?,$reS'
+              '${q}wake_up_time$q TIME.*?,$reS'
               'CONSTRAINT');
 
       var tableUserUniqueRegexp = RegExp('UNIQUE\\s\\(${q}email$q\\)');

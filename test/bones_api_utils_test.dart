@@ -25,6 +25,31 @@ void main() {
   group('Utils', () {
     setUp(() {});
 
+    test('StringUtils', () async {
+      expect(StringUtils.toLowerCase('someCamel-Case+Name'),
+          equals('somecamel-case+name'));
+
+      expect(StringUtils.toLowerCaseSimple('someCamel-Case+Name'),
+          equals('somecamelcasename'));
+
+      expect(StringUtils.toLowerCaseUnderscore('someCamelCaseName'),
+          equals('some_camel_case_name'));
+
+      expect(StringUtils.toLowerCaseUnderscore('someCamel-caseName'),
+          equals('some_camel-case_name'));
+      expect(
+          StringUtils.toLowerCaseUnderscore('someCamel-caseName', simple: true),
+          equals('some_camel_case_name'));
+
+      expect(StringUtils.toLowerCaseUnderscore('_someCamelCaseName'),
+          equals('_some_camel_case_name'));
+
+      expect(StringUtils.toLowerCaseUnderscore('someCamel_CaseName'),
+          equals('some_camel_case_name'));
+      expect(StringUtils.toLowerCaseUnderscore('_someCamel_CaseName'),
+          equals('_some_camel_case_name'));
+    });
+
     test('Json.toJson', () async {
       expect(Json.toJson(123), equals(123));
       expect(Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),
