@@ -8,11 +8,12 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_error_zone.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_timedmap.dart';
-import 'bones_api_entity_annotation.dart';
 
 final _log = logging.Logger('PostgreAdapter');
 
@@ -61,6 +62,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
+      bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider})
@@ -79,6 +81,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
               transactions: true,
               transactionAbort: true,
               tableSQL: false),
+          generateTables: generateTables,
           populateTables: populateTables,
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
@@ -112,10 +115,17 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     maxConnections ??= config?['maxConnections'] ?? 3;
 
     var populate = config?['populate'];
+
+    var generateTables = false;
     Object? populateTables;
     Object? populateSource;
 
-    if (populate != null) {
+    if (populate is Map) {
+      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+          populate.getAsBool('generate-tables', ignoreCase: true) ??
+          populate.getAsBool('generate_tables', ignoreCase: true) ??
+          false;
+
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -128,6 +138,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       port: port,
       minConnections: minConnections!,
       maxConnections: maxConnections!,
+      generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
@@ -161,6 +172,9 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   bool get sqlAcceptsTemporaryTableForReturning => false;
+
+  @override
+  bool get sqlAcceptsInsertDefaultValues => true;
 
   @override
   bool get sqlAcceptsInsertIgnore => false;
@@ -582,8 +596,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<bool> executeTableSQL(String createTableSQL) => executeWithPool(
-      (c) => c.execute(createTableSQL).resolveMapped((_) => true));
+  FutureOr<bool> executeTableSQL(String createTableSQL) => executeWithPool((c) {
+        return c.execute(createTableSQL).then((_) => true, onError: (e, s) {
+          _log.severe("Error executing table SQL:\n$createTableSQL", e, s);
+          return false;
+        });
+      });
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
@@ -677,20 +695,61 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         }
 
         var fields = sql.namedParameters!;
-
-        return generateInsertSQL(transaction, entityName, table, fields)
-            .resolveMapped((insertSQL) {
-          _log.info('Update not affecting any row! Auto inserting: $insertSQL');
-          return doInsertSQL(
-              entityName, table, insertSQL, transaction, connection);
-        });
+        return _updateAutoInsert(
+            transaction, entityName, table, fields, connection);
       }
 
       return _resolveResultID(results, table, sql, id);
     });
   }
 
-  _resolveResultID(
+  FutureOr<dynamic> _updateAutoInsert(
+      Transaction transaction,
+      String entityName,
+      String table,
+      Map<String, dynamic> fields,
+      PostgreSQLExecutionContext connection) {
+    return getTableScheme(table).resolveMapped((tableScheme) {
+      if (tableScheme == null) {
+        throw StateError("Can't find `TableScheme` for table `$table`");
+      }
+
+      var idFieldName = tableScheme.idFieldName ?? 'id';
+      var id = fields[idFieldName];
+
+      if (id == null) {
+        throw StateError(
+            "Can't auto-insert entry without ID> table: `$table`; idFieldName: $idFieldName");
+      }
+
+      return generateInsertSQL(transaction, entityName, table, fields)
+          .resolveMapped((insertSQL) {
+        _log.info('Update not affecting any row! Auto inserting: $insertSQL');
+
+        return doInsertSQL(
+                entityName, table, insertSQL, transaction, connection)
+            .resolveMapped((res) => _fixeTableSequence(
+                transaction, entityName, table, idFieldName, connection, res));
+      });
+    });
+  }
+
+  FutureOr<dynamic> _fixeTableSequence(
+      Transaction transaction,
+      String entityName,
+      String table,
+      String idFieldName,
+      PostgreSQLExecutionContext connection,
+      Object? lastInsertResult) {
+    var fixSql =
+        "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), coalesce(max(id),0) + 1, false) FROM \"$table\"";
+
+    _log.info("Fixing table PRIMARY KEY sequence: <$fixSql>");
+
+    return connection.query(fixSql).then((r) => lastInsertResult);
+  }
+
+  dynamic _resolveResultID(
       List<Map<String, Map<String, dynamic>>> results, String table, SQL sql,
       [Object? entityId]) {
     if (results.isEmpty) {

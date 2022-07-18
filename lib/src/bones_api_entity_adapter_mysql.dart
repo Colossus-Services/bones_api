@@ -8,10 +8,11 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_error_zone.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_utils_timedmap.dart';
-import 'bones_api_entity_annotation.dart';
 
 final _log = logging.Logger('MySQLAdapter');
 
@@ -59,6 +60,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       int? port = 3306,
       int minConnections = 1,
       int maxConnections = 3,
+      bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider})
@@ -77,6 +79,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
               transactions: true,
               transactionAbort: true,
               tableSQL: false),
+          generateTables: generateTables,
           populateTables: populateTables,
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
@@ -112,10 +115,17 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     maxConnections ??= config?['maxConnections'] ?? 3;
 
     var populate = config?['populate'];
+
+    var generateTables = false;
     Object? populateTables;
     Object? populateSource;
 
-    if (populate != null) {
+    if (populate is Map) {
+      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+          populate.getAsBool('generate-tables', ignoreCase: true) ??
+          populate.getAsBool('generate_tables', ignoreCase: true) ??
+          false;
+
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -128,6 +138,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       port: port,
       minConnections: minConnections!,
       maxConnections: maxConnections!,
+      generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
@@ -161,6 +172,9 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   bool get sqlAcceptsTemporaryTableForReturning => true;
+
+  @override
+  bool get sqlAcceptsInsertDefaultValues => false;
 
   @override
   bool get sqlAcceptsInsertIgnore => true;
@@ -516,7 +530,10 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<bool> executeTableSQL(String createTableSQL) => executeWithPool(
-      (c) => c.query(createTableSQL).resolveMapped((_) => true));
+      (c) => c.query(createTableSQL).then((_) => true, onError: (e, s) {
+            _log.severe("Error executing table SQL:\n$createTableSQL", e, s);
+            return false;
+          }));
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
@@ -754,28 +771,28 @@ class _MySqlConnectionWrapped implements MySqlConnectionWrapper {
 
   @override
   Future<Results> query(String sql, [List<Object?>? values]) =>
-      connection.query(sql, values);
+      connection.query(sql, values?.cast<Object?>());
 
   @override
   Future<List<Results>> queryMulti(
           String sql, Iterable<List<Object?>> values) =>
-      connection.queryMulti(sql, values);
+      connection.queryMulti(sql, values.map((e) => e.cast<Object?>()));
 }
 
 class _MySqlConnectionTransaction implements MySqlConnectionWrapper {
   @override
   final MySqlConnection connection;
 
-  final dynamic transaction;
+  final TransactionContext transaction;
 
   _MySqlConnectionTransaction(this.connection, this.transaction);
 
   @override
   Future<Results> query(String sql, [List<Object?>? values]) =>
-      transaction.query(sql, values?.cast<Object>());
+      transaction.query(sql, values?.cast<Object?>());
 
   @override
   Future<List<Results>> queryMulti(
           String sql, Iterable<List<Object?>> values) =>
-      transaction.queryMulti(sql, values.map((e) => e.cast<Object>()));
+      transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
 }

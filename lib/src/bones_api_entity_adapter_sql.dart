@@ -288,9 +288,11 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   SQLAdapter(
       int minConnections, int maxConnections, SQLAdapterCapability capability,
       {EntityRepositoryProvider? parentRepositoryProvider,
+      bool generateTables = false,
       Object? populateTables,
       Object? populateSource})
-      : _populateTables = populateTables,
+      : _generateTables = generateTables,
+        _populateTables = populateTables,
         super(minConnections, maxConnections, capability,
             parentRepositoryProvider: parentRepositoryProvider,
             populateSource: populateSource) {
@@ -320,20 +322,38 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         parentRepositoryProvider: parentRepositoryProvider);
   }
 
+  bool _generateTables = false;
   Object? _populateTables;
 
   @override
   FutureOr<InitializationResult> populateImpl() {
-    var tables = _populateTables;
+    if (_generateTables) {
+      _generateTables = false;
+      return generateTables().resolveMapped((tables) {
+        tables.sort();
+        _log.info("Generated tables: $tables");
+        return _populateImpl2();
+      });
+    }
 
+    return _populateImpl2();
+  }
+
+  FutureOr<InitializationResult> _populateImpl2() {
+    var tables = _populateTables;
     if (tables != null) {
       _populateTables = null;
-
-      return populateTables(tables).resolveMapped((_) => super.populateImpl());
-    } else {
-      return super.populateImpl();
+      return populateTables(tables).resolveWith(super.populateImpl);
     }
+
+    return super.populateImpl();
   }
+
+  FutureOr<List<String>> generateTables() =>
+      generateFullCreateTableSQLs(withDate: false)
+          .resolveMapped((fullCreateTableSQLs) {
+        return populateTables(fullCreateTableSQLs);
+      });
 
   FutureOr<List<String>> populateTables(Object? tables) {
     if (tables == null) {
@@ -479,19 +499,22 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         return allSQLs;
       });
 
-  /// If `true` indicates that this adapter SQL uses the `OUTPUT` syntax for inserts/deletes.
+  /// If `true` indicates that this adapter's SQL uses the `OUTPUT` syntax for inserts/deletes.
   bool get sqlAcceptsOutputSyntax;
 
-  /// If `true` indicates that this adapter SQL uses the `RETURNING` syntax for inserts/deletes.
+  /// If `true` indicates that this adapter's SQL uses the `RETURNING` syntax for inserts/deletes.
   bool get sqlAcceptsReturningSyntax;
 
-  /// If `true` indicates that this adapter SQL needs a temporary table to return rows for inserts/deletes.
+  /// If `true` indicates that this adapter's SQL needs a temporary table to return rows for inserts/deletes.
   bool get sqlAcceptsTemporaryTableForReturning;
 
-  /// If `true` indicates that this adapter SQL uses the `IGNORE` syntax for inserts.
+  /// If `true` indicates that this adapter's SQL can use the `DEFAULT VALUES` directive for inserts.
+  bool get sqlAcceptsInsertDefaultValues;
+
+  /// If `true` indicates that this adapter's SQL uses the `IGNORE` syntax for inserts.
   bool get sqlAcceptsInsertIgnore;
 
-  /// If `true` indicates that this adapter SQL uses the `ON CONFLICT` syntax for inserts.
+  /// If `true` indicates that this adapter's SQL uses the `ON CONFLICT` syntax for inserts.
   bool get sqlAcceptsInsertOnConflict;
 
   /// Converts [value] to an acceptable SQL value for the adapter.
@@ -710,7 +733,11 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           sql.write(values.join(' , '));
           sql.write(')');
         } else {
-          sql.write(' DEFAULT VALUES ');
+          if (sqlAcceptsInsertDefaultValues) {
+            sql.write(' DEFAULT VALUES ');
+          } else {
+            sql.write(' VALUES () ');
+          }
         }
 
         if (sqlAcceptsReturningSyntax) {

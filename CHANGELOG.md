@@ -1,3 +1,10 @@
+## 1.2.14
+
+- `SQLAdapter`:
+  - Added option `generateTables`: will automatically generate the tables when initialized.
+- `PostgreSQLAdapter`:
+  - When update auto inserts (new entity with pre-defined ID), a fix of the primary key sequence is performed.
+
 ## 1.2.13
 
 - `SQLGenerator`:

@@ -10,9 +10,10 @@ import 'package:statistics/statistics.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_annotation.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
-import 'bones_api_entity_annotation.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
@@ -72,6 +73,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   MemorySQLAdapter(
       {int? minConnections,
       int? maxConnections,
+      bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider})
@@ -83,6 +85,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
               transactions: true,
               transactionAbort: true,
               tableSQL: false),
+          generateTables: generateTables,
           populateTables: populateTables,
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
@@ -102,10 +105,17 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     maxConnections ??= config?['maxConnections'] ?? 3;
 
     var populate = config?['populate'];
+
+    var generateTables = false;
     Object? populateTables;
     Object? populateSource;
 
-    if (populate != null) {
+    if (populate is Map) {
+      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+          populate.getAsBool('generate-tables', ignoreCase: true) ??
+          populate.getAsBool('generate_tables', ignoreCase: true) ??
+          false;
+
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -114,6 +124,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       minConnections: minConnections,
       maxConnections: maxConnections,
       parentRepositoryProvider: parentRepositoryProvider,
+      generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
     );
@@ -140,6 +151,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   bool get sqlAcceptsTemporaryTableForReturning => false;
+
+  @override
+  bool get sqlAcceptsInsertDefaultValues => false;
 
   @override
   bool get sqlAcceptsInsertIgnore => true;

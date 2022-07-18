@@ -980,7 +980,7 @@ abstract class SQLGenerator {
       var constrainName = '${table}__${columnName}__fkey';
 
       sqlEntries.add(SQLEntry('CONSTRAINT',
-          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $refTableName($q$refField$q) ON UPDATE CASCADE',
+          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q) ON UPDATE CASCADE',
           comment: '$fieldName @ $refTableName.$refField',
           columns: [
             SQLColumn(table, columnName,
