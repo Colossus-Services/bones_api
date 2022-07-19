@@ -685,7 +685,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  Object? errorResolver(Object? error, StackTrace? stackTrace) {
+  Object? resolveError(Object? error, StackTrace? stackTrace) {
     if (error is MySqlException) {
       if (error.errorNumber == 1062) {
         var keyMatch = RegExp(r"for key '(?:(\w+)\.(.*?)|(.*?))'")
@@ -706,7 +706,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
           fieldName = mField ?? mKey;
         }
 
-        throw EntityFieldInvalid("unique", error.message,
+        return EntityFieldInvalid("unique", error.message,
             tableName: tableName, fieldName: fieldName, parentError: error);
       }
     }

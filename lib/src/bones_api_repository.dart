@@ -113,7 +113,11 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   FutureOr<O?> deleteEntity(O o) => entityRepository.deleteEntity(o);
 
+  FutureOr<O?> tryDeleteEntity(O o) => entityRepository.tryDeleteEntity(o);
+
   FutureOr<O?> deleteByID(dynamic id) => entityRepository.deleteByID(id);
+
+  FutureOr<O?> tryDeleteByID(dynamic id) => entityRepository.tryDeleteByID(id);
 
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
           {Object? parameters,

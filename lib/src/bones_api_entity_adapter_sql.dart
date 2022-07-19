@@ -1208,7 +1208,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     });
   }
 
-  Object? errorResolver(Object? error, StackTrace? stackTrace) => error;
+  Object? resolveError(Object? error, StackTrace? stackTrace) => error;
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
       SQLWrapper sql, FutureOr<R> Function(C connection) f) {
@@ -1222,7 +1222,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
                 s,
-                errorResolver: errorResolver,
+                errorResolver: resolveError,
                 debugInfo: () => sql.mainSQL.toString(),
               ));
     }
@@ -1239,7 +1239,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     return transaction.onOpen<R>(() {
       return transaction.addExecution<R, C>(
         (c) => f(c),
-        errorResolver: errorResolver,
+        errorResolver: resolveError,
         debugInfo: () => sql.mainSQL.toString(),
       );
     });

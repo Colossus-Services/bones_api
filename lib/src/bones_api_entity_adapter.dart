@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' hide IterableIntExtension;
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -10,6 +11,8 @@ import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
+
+final _log = logging.Logger('DBAdapter');
 
 typedef PasswordProvider = FutureOr<String> Function(String user);
 
@@ -283,9 +286,22 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
-    if (id == null) return null;
+    if (id == null || type == null) return null;
+
     var entityRepository = getEntityRepository(type: type);
-    return entityRepository?.selectByID(id).resolveMapped((o) => o as O?);
+    if (entityRepository != null) {
+      return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
+    }
+
+    var enumReflection = ReflectionFactory().getRegisterEnumReflection(type);
+    if (enumReflection != null) {
+      return null;
+    }
+
+    _log.warning(
+        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type");
+
+    return null;
   }
 
   FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>

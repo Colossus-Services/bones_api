@@ -825,6 +825,9 @@ abstract class ConditionEncoder {
   String escapeStringQuotes(String valueStr, String quote) =>
       valueStr.replaceAll(quote, "\\$quote");
 
+  FutureOr<String> resolveFieldName(String tableName, String fieldName) =>
+      fieldName;
+
   String resolveEntityAlias(EncodingContext context, String entityName) =>
       context.resolveEntityAlias(entityName);
 

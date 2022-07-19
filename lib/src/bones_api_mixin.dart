@@ -118,6 +118,14 @@ mixin Pool<O> {
     }
   }
 
+  FutureOr<O?> peekFromPool() {
+    if (_pool.isEmpty) {
+      return null;
+    } else {
+      return _catchFromPopulatedPool();
+    }
+  }
+
   int get poolSizeDesiredLimit;
 
   static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 100);
@@ -306,9 +314,13 @@ mixin Pool<O> {
             throw e;
           }
         });
-      } catch (_) {
+      } catch (e, s) {
         disposePoolElement(o);
-        rethrow;
+        if (onError != null) {
+          return onError(e, s);
+        } else {
+          rethrow;
+        }
       }
     });
   }

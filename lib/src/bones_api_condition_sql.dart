@@ -137,6 +137,19 @@ class ConditionSQLEncoder extends ConditionEncoder {
     });
   }
 
+  @override
+  FutureOr<String> resolveFieldName(String tableName, String fieldName) {
+    var schemeProvider = this.schemeProvider;
+    if (schemeProvider == null) return fieldName;
+
+    return schemeProvider
+        .getTableScheme(tableName)
+        .resolveMapped((tableScheme) {
+      if (tableScheme == null) return fieldName;
+      return tableScheme.resolveTableFiledName(fieldName) ?? fieldName;
+    });
+  }
+
   FutureOr<EncodingContext> encodeConditionValuesWithOperator(
       EncodingContext context,
       Type keyType,
@@ -212,7 +225,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
           : null;
 
       if (tableFieldType != null) {
-        return MapEntry(tableFieldType, '$q$tableAlias$q.$q${key0.name}$q');
+        return MapEntry(tableFieldType, '$q$tableAlias$q.$q$tableFieldName$q');
       }
 
       var retFieldType = schemeProvider.getFieldType(key0.name,

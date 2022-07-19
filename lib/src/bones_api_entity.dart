@@ -539,7 +539,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
       var transaction = entityProvider is Transaction ? entityProvider : null;
       var retEntity =
           entityRepository.selectByID(value, transaction: transaction);
-      return retEntity.resolveMapped((val) => val as T?);
+      return retEntity.resolveMapped((val) {
+        return val as T?;
+      });
     }
 
     try {
@@ -1753,11 +1755,17 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
   FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
       deleteByID(getEntityID(o), transaction: transaction);
 
+  FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteEntity(o, transaction: transaction));
+
   FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) {
     if (id == null) return null;
     return delete(ConditionID(id), transaction: transaction)
         .resolveMapped((del) => del.firstOrNull);
   }
+
+  FutureOr<O?> tryDeleteByID(dynamic id, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteByID(id, transaction: transaction));
 
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
       {Object? parameters,
@@ -2074,9 +2082,21 @@ class EntityRepositoryProvider
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
-    if (id == null) return null;
+    if (id == null || type == null) return null;
     var entityRepository = getEntityRepository(type: type);
-    return entityRepository?.selectByID(id).resolveMapped((o) => o as O?);
+    if (entityRepository != null) {
+      return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
+    }
+
+    var enumReflection = ReflectionFactory().getRegisterEnumReflection(type);
+    if (enumReflection != null) {
+      return null;
+    }
+
+    _log.warning(
+        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type");
+
+    return null;
   }
 
   Map<Type, EntityRepository> allRepositories(
@@ -2189,7 +2209,8 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       var typeName = e.key;
       var typeEntries = e.value;
 
-      _log.info('Populating `$typeName`: ${typeEntries.length} entries...');
+      _log.info(
+          'Populating `$typeName`: ${typeEntries.length} JSON entries...$_logSectionOpen');
 
       var entityRepository = getEntityRepository(name: typeName);
       if (entityRepository == null) {
@@ -2199,6 +2220,8 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
 
       var os = await entityRepository.storeAllFromJson(typeEntries);
       results[typeName] = os;
+
+      _log.info('Populated `$typeName` entries: ${os.length}$_logSectionClose');
     }
 
     return results;
@@ -2451,9 +2474,27 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 
   FutureOr<O> createFromMap(Map<String, dynamic> fields,
-          {EntityProvider? entityProvider, EntityCache? entityCache}) =>
-      entityHandler.createFromMap(fields,
+      {EntityProvider? entityProvider, EntityCache? entityCache}) {
+    try {
+      var ret = entityHandler.createFromMap(fields,
           entityProvider: entityProvider, entityCache: entityCache);
+
+      return ret.then((o) => o, onError: (e, s) {
+        _log.severe(
+            "Error creating `${entityHandler.type}` from fields Map: $fields",
+            e,
+            s);
+
+        throw e;
+      });
+    } catch (e, s) {
+      _log.severe(
+          "Error creating `${entityHandler.type}` from fields Map: $fields",
+          e,
+          s);
+      rethrow;
+    }
+  }
 
   @override
   Object? getEntityID(O o) => entityHandler.getID(o);
@@ -2701,11 +2742,19 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       deleteByID(getEntityID(o), transaction: transaction);
 
   @override
+  FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteEntity(o, transaction: transaction));
+
+  @override
   FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) {
     if (id == null) return null;
     return delete(ConditionID(id), transaction: transaction)
         .resolveMapped((del) => del.firstOrNull);
   }
+
+  @override
+  FutureOr<O?> tryDeleteByID(dynamic id, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteByID(id, transaction: transaction));
 
   @override
   FutureOr<Iterable<O>> deleteByQuery(String query,
@@ -3035,7 +3084,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       closerResult = closer();
 
       if (closerResult != null) {
-        closerResult.resolveWith(() => _commitComplete<R>(result));
+        return closerResult.resolveWith(() => _commitComplete<R>(result));
       }
     }
 
@@ -3764,8 +3813,16 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
+  FutureOr<O?> tryDeleteByID(dynamic id, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteByID(id, transaction: transaction));
+
+  @override
   FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
       deleteByID(getEntityID(o));
+
+  @override
+  FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>
+      tryCall<O>(() => deleteEntity(o, transaction: transaction));
 
   @override
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,

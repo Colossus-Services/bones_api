@@ -9,10 +9,10 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
-import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('PostgreAdapter');
@@ -183,11 +183,11 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   bool get sqlAcceptsInsertOnConflict => true;
 
   @override
-  Object? errorResolver(Object? error, StackTrace? stackTrace) {
+  Object? resolveError(Object? error, StackTrace? stackTrace) {
     if (error is PostgreSQLException) {
       if (error.severity == PostgreSQLSeverity.error) {
         if (error.code == '23505') {
-          throw EntityFieldInvalid("unique", error.detail,
+          return EntityFieldInvalid("unique", error.detail,
               fieldName: error.columnName,
               tableName: error.tableName,
               parentError: error);
@@ -204,13 +204,6 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
   }
 
-  Zone? _errorZoneInstance;
-
-  Zone get _errorZone {
-    return _errorZoneInstance ??=
-        createErrorZone(uncaughtErrorTitle: 'PostgreSQLAdapter ERROR:');
-  }
-
   int _connectionCount = 0;
 
   @override
@@ -219,40 +212,66 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     var count = ++_connectionCount;
 
-    PostgreSQLConnection? connection;
-    Object? error;
-
     for (var i = 0; i < 3; ++i) {
       var timeout = i == 0 ? 3 : (i == 1 ? 10 : 30);
 
-      connection = PostgreSQLConnection(host, port, databaseName,
-          username: username, password: password, timeoutInSeconds: timeout);
+      var connection = await _createConnectionImpl(password, timeout);
 
-      try {
-        await _errorZone.runGuardedAsync(() => connection!.open());
-        error = null;
-        break;
-      } catch (e) {
-        error = e;
-        connection = null;
+      if (connection != null) {
+        var connUrl = getConnectionURL(connection);
+        _log.info('createConnection[$count]> $connUrl > $connection');
+
+        return connection;
+      }
+
+      if (poolSize > 0) {
+        var poolConn = peekFromPool();
+        if (poolConn != null) {
+          return poolConn.resolveMapped((conn) {
+            if (conn is PostgreSQLConnection) {
+              var connUrl = getConnectionURL(conn);
+              _log.severe(
+                  "Skipping connection retry. Returning connection from pool: $connUrl");
+              return conn;
+            }
+
+            return _createConnectionImpl(password, timeout).then((conn) {
+              if (conn == null) {
+                var error = PostgreSQLException(
+                    "Error connecting to: $databaseName@$host:$port");
+
+                _log.severe(
+                    "Can't connect to PostgreSQL: $databaseName@$host:$port");
+
+                throw error;
+              }
+              return conn;
+            });
+          });
+        }
       }
     }
 
-    if (error != null) {
-      _log.severe("Can't connect to PostgreSQL: $databaseName@$host:$port");
-      throw error;
-    }
+    var error =
+        PostgreSQLException("Error connecting to: $databaseName@$host:$port");
 
-    var connUrl = getConnectionURL(connection!);
+    _log.severe("Can't connect to PostgreSQL: $databaseName@$host:$port");
 
-    _log.info('createConnection[$count]> $connUrl > $connection');
+    throw error;
+  }
 
-    return connection;
+  Future<PostgreSQLConnection?> _createConnectionImpl(
+      String password, int timeout) async {
+    var connection = PostgreSQLConnection(host, port, databaseName,
+        username: username, password: password, timeoutInSeconds: timeout);
+    var ok = await tryCallMapped(() => connection.open(),
+        onSuccessValue: true, onErrorValue: false);
+    return ok != null && ok ? connection : null;
   }
 
   @override
   FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
-    _log.info('closeConnection> $connection');
+    _log.info('closeConnection> $connection > poolSize: $poolSize');
 
     if (connection is PostgreSQLConnection) {
       connection.close();

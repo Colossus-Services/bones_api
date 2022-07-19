@@ -189,12 +189,16 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
-  Map<Object, Map<String, dynamic>>? _getTableMap(
-      String table, bool autoCreate) {
+  Map<Object, Map<String, dynamic>>? _getTableMap(String table, bool autoCreate,
+      {bool relationship = false}) {
     var map = _tables[table];
     if (map != null) {
       return map;
     } else if (autoCreate) {
+      if (!relationship && !_tableExists(table)) {
+        throw StateError("Table doesn't exists: $table");
+      }
+
       _tables[table] = map = MapHistory<Object, Map<String, dynamic>>();
       return map;
     } else {
@@ -202,9 +206,55 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
   }
 
+  bool _tableExists(String table) =>
+      _hasTableScheme(table) || getEntityHandler(tableName: table) != null;
+
   Map<String, dynamic>? _getByID(String table, Object id) {
     var map = _getTableMap(table, false);
     return map?[id];
+  }
+
+  MapEntry<String, MapEntry<Object, MapEntry<String, Object>>>?
+      _findAnyReference(String referencedTable, Object? id) {
+    if (id == null) return null;
+
+    for (var e in _tables.entries) {
+      var table = e.key;
+      var ref = _findReferenceInTable(table, referencedTable, id);
+      if (ref != null) return MapEntry(table, ref);
+    }
+
+    return null;
+  }
+
+  MapEntry<Object, MapEntry<String, Object>>? _findReferenceInTable(
+      String table, String referencedTable, Object? id) {
+    if (id == null) return null;
+
+    var tableScheme = getTableScheme(table) as TableScheme;
+
+    var fieldsReferencedTables = tableScheme.fieldsReferencedTables;
+    if (fieldsReferencedTables.isEmpty) return null;
+
+    for (var e in fieldsReferencedTables.entries) {
+      var ref = e.value;
+      if (ref.targetTable == referencedTable) {
+        var sourceField = ref.sourceField;
+
+        var tableMap = _getTableMap(ref.sourceTable, false);
+
+        var reference = tableMap?.entries
+            .where((e) => e.value[sourceField] == id)
+            .firstOrNull;
+
+        if (reference != null) {
+          var value = reference.value[sourceField];
+          return MapEntry(reference.key, MapEntry(sourceField, value));
+        }
+      }
+    }
+
+    return null;
   }
 
   @override
@@ -293,7 +343,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         entityName: entityName,
         table: table);
 
-    var map = _getTableMap(table, true)!;
+    var map = _getTableMap(table, true, relationship: true)!;
 
     var prevEntry =
         map.entries.firstWhereOrNull((e) => isEqualsDeep(e.value, entry));
@@ -556,6 +606,20 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         .whereNotNull()
         .toList(growable: false);
 
+    for (var e in entries) {
+      var id = e.key;
+
+      var ref = _findAnyReference(table, id);
+      if (ref != null) {
+        var refTable = ref.key;
+        var refId = ref.value.key;
+        var refFieldName = ref.value.value.key;
+        var refFieldValue = ref.value.value.value;
+        throw MemorySQLAdapterError("delete.constraint",
+            "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
+      }
+    }
+
     return _removeEntries(entries, map);
   }
 
@@ -646,7 +710,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     var relationshipTable =
         relationshipsTables.firstWhere((t) => t.targetTable == targetTable);
 
-    var relMap = _getTableMap(relationshipTable.relationshipTable, false);
+    var relMap = _getTableMap(relationshipTable.relationshipTable, false,
+        relationship: true);
     if (relMap == null) {
       return null;
     }
@@ -682,8 +747,10 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
   }
 
+  bool _hasTableScheme(String table) => tablesSchemes.containsKey(table);
+
   @override
-  FutureOr<TableScheme?> getTableSchemeImpl(
+  TableScheme? getTableSchemeImpl(
       String table, TableRelationshipReference? relationship) {
     _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
@@ -825,9 +892,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         var sourceFieldIdType =
             sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
 
-        var relTable = '${ref.sourceTable}_${ref.targetTable}_ref';
-        var relSourceField = '${ref.sourceTable}_$sourceFieldId';
-        var relTargetField = '${ref.targetTable}_${ref.targetField}';
+        var relTable = '${ref.sourceTable}__${ref.targetTable}__rel';
+        var relSourceField = '${ref.sourceTable}__$sourceFieldId';
+        var relTargetField = '${ref.targetTable}__${ref.targetField}';
 
         return TableRelationshipReference(
           relTable,
@@ -947,4 +1014,15 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     return 'MemorySQLAdapter{id: $id$tablesStr}';
   }
+}
+
+/// Error thrown by [MemorySQLAdapter] operations.
+class MemorySQLAdapterError extends Error {
+  final String type;
+  final String message;
+
+  MemorySQLAdapterError(this.type, this.message) : super();
+
+  @override
+  String toString() => message;
 }
