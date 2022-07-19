@@ -1,3 +1,14 @@
+## 1.2.15
+
+- `ConditionSQLEncoder`:
+  - `keyFieldToSQL`: fix resolution of class field to table column name.
+  - Added `resolveFieldName`.
+- `EntityStorage`:
+  - Added `tryDeleteEntity` and `tryDeleteByID`.
+- `MemorySQLAdapter` now check references constraint before delete.
+- `PostgreSQLAdapter`: improved connection retry.
+- Added `tryCallMapped` and `tryCall` utils.
+
 ## 1.2.14
 
 - `SQLAdapter`:

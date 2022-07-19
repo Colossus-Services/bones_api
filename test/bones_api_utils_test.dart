@@ -553,7 +553,67 @@ void main() {
       expect(tracker.isTrackedInstance(m2), isFalse);
     });
   });
+
+  group('tryCall', () {
+    test('basic', () {
+      expect(tryCall(() => 123), equals(123));
+
+      expect(tryCall(() => null, defaultValue: 123), equals(123));
+
+      expect(tryCall(() => 123, onSuccessValue: 456, onErrorValue: -456),
+          equals(456));
+
+      expect(
+          tryCall(() => throw StateError('test'),
+              onSuccessValue: 456, onErrorValue: -456),
+          equals(-456));
+    });
+  });
+
+  group('tryCallMapped', () {
+    test('sync', () {
+      expect(tryCallMapped(() => 123), equals(123));
+
+      expect(tryCallMapped(() => null, defaultValue: 123), equals(123));
+
+      expect(tryCallMapped(() => 123, onSuccessValue: 456, onErrorValue: -456),
+          equals(456));
+
+      expect(
+          tryCallMapped(() => throw StateError('test error'),
+              onSuccessValue: 456, onErrorValue: -456),
+          equals(-456));
+    });
+
+    test('async', () async {
+      expect(await tryCallMapped(() => _asyncValue(123)), equals(123));
+
+      expect(await tryCallMapped(() => _asyncValue(null), defaultValue: 123),
+          equals(123));
+
+      expect(
+          await tryCallMapped(() => _asyncValue(123),
+              onSuccessValue: 456, onErrorValue: -456),
+          equals(456));
+
+      expect(
+          await tryCallMapped(() => _asyncValue(123),
+              onSuccess: (v) => 456 * 2, onError: (e, s) => -456 * 2),
+          equals(456 * 2));
+
+      expect(
+          await tryCallMapped(
+              () => Future.delayed(Duration(milliseconds: 1),
+                  () => throw StateError('test async error')),
+              onSuccess: (v) => 456 * 2,
+              onError: (e, s) => e.toString()),
+          contains('test async error'));
+    });
+  });
 }
+
+Future<T> _asyncValue<T>(T value) =>
+    Future.delayed(Duration(milliseconds: 1), () => value);
 
 class AB {
   final int a;
