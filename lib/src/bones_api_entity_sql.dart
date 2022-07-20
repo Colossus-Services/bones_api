@@ -99,7 +99,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
             if (!EntityHandler.isValidEntityType(elementType.type)) return null;
 
             var elementRepository =
-                provider.getEntityRepository(type: elementType.type);
+                provider.getEntityRepositoryByType(elementType.type);
             if (elementRepository == null) return null;
 
             var futures = value.map((e) {
@@ -342,7 +342,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
           databaseAdapter.getRepositoryAdapterByTableName(targetTable)!;
       var targetType = targetRepositoryAdapter.type;
       var targetEntityRepository =
-          provider.getEntityRepository(type: targetType)!;
+          provider.getEntityRepositoryByType(targetType)!;
 
       var relationshipsAsync = selectRelationships(null, fieldName,
           oIds: ids, fieldType: fieldType, transaction: transaction);

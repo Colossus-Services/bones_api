@@ -13,7 +13,7 @@ abstract class APIRepository<O extends Object> with Initializable {
       EntityRepositoryProvider? provider,
       Type? type,
       bool required = false}) {
-    entityRepository ??= provider?.getEntityRepository<O>(type: type);
+    entityRepository ??= provider?.getEntityRepositoryByType<O>(type ?? O);
 
     entityRepository ??= EntityRepositoryProvider.globalProvider
         .getEntityRepository<O>(type: type);

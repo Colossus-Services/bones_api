@@ -291,7 +291,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
     if (id == null || type == null) return null;
 
-    var entityRepository = getEntityRepository(type: type);
+    var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
       return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
     }
@@ -326,7 +326,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     var entityType = type.type;
 
-    var entityRepository = getEntityRepository(type: entityType);
+    var entityRepository = getEntityRepositoryByType(entityType);
 
     if (entityRepository != null) {
       return getTableForEntityRepository(entityRepository);
@@ -350,7 +350,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     if (entityRepository == null && entityType != null) {
-      entityRepository = getEntityRepository(type: entityType);
+      entityRepository = getEntityRepositoryByType(entityType);
     }
 
     return entityRepository;
@@ -597,41 +597,31 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       {O? obj, Type? type, String? name, String? tableName}) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[O];
-      if (entityRepository != null && entityRepository.isClosed) {
-        entityRepository = null;
+      if (entityRepository != null && !entityRepository.isClosed) {
+        return entityRepository as EntityRepository<O>;
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (obj != null) {
+      if (obj != null) {
         entityRepository = _entityRepositories[obj.runtimeType];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
+        if (entityRepository != null && !entityRepository.isClosed) {
+          return entityRepository as EntityRepository<O>;
         }
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (type != null) {
+      if (type != null) {
         entityRepository = _entityRepositories[type];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
+        if (entityRepository != null && !entityRepository.isClosed) {
+          return entityRepository as EntityRepository<O>;
         }
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (name != null) {
+      if (name != null) {
         var nameSimplified = EntityAccessor.simplifiedName(name);
 
         entityRepository = _entityRepositories.values
             .where((e) => e.name == name || e.nameSimplified == nameSimplified)
             .firstOrNull;
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-
-        if (entityRepository != null) {
+        if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
         }
       }
@@ -640,11 +630,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         entityRepository = _entityRepositories.values
             .where((e) => e is SQLEntityRepository && e.tableName == tableName)
             .firstOrNull;
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
-
-        if (entityRepository != null) {
+        if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
         }
       }
@@ -659,6 +645,42 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     return _knownEntityRepositoryProviders.getEntityRepository<O>(
         obj: obj, type: type, name: name, entityRepositoryProvider: this);
+  }
+
+  @override
+  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
+    if (isClosed) return null;
+
+    if (_callingGetEntityRepository) return null;
+    _callingGetEntityRepository = true;
+
+    try {
+      return _getEntityRepositoryByTypeImpl<O>(type) ??
+          EntityRepositoryProvider.globalProvider
+              .getEntityRepositoryByType<O>(type);
+    } finally {
+      _callingGetEntityRepository = false;
+    }
+  }
+
+  EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
+      Type type) {
+    if (!isClosed) {
+      var entityRepository = _entityRepositories[type];
+      if (entityRepository != null && !entityRepository.isClosed) {
+        return entityRepository as EntityRepository<O>;
+      }
+    }
+
+    var entityRepository =
+        parentRepositoryProvider?.getEntityRepositoryByType<O>(type);
+
+    if (entityRepository != null) {
+      return entityRepository;
+    }
+
+    return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(type,
+        entityRepositoryProvider: this);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =

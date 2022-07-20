@@ -8,6 +8,9 @@
   - `stop` now also closes the `APIRoot`.
 - `APIServer`:
   - `stop` now also closes the `APIRoot`.
+- `EntityRepositoryProvider`:
+  - Optimize `getEntityRepository`
+  - Added `getEntityRepositoryByType`.
 
 ## 1.2.15
 

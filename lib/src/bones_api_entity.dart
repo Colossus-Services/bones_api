@@ -2030,41 +2030,32 @@ class EntityRepositoryProvider
       {O? obj, Type? type, String? name}) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[O];
-      if (entityRepository != null && entityRepository.isClosed) {
-        entityRepository = null;
+      if (entityRepository != null && !entityRepository.isClosed) {
+        return entityRepository as EntityRepository<O>;
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (obj != null) {
+      if (obj != null) {
         entityRepository = _entityRepositories[obj.runtimeType];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
+        if (entityRepository != null && !entityRepository.isClosed) {
+          return entityRepository as EntityRepository<O>;
         }
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (type != null) {
+      if (type != null) {
         entityRepository = _entityRepositories[type];
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
+        if (entityRepository != null && !entityRepository.isClosed) {
+          return entityRepository as EntityRepository<O>;
         }
       }
 
-      if (entityRepository != null) {
-        return entityRepository as EntityRepository<O>;
-      } else if (name != null) {
+      if (name != null) {
         var nameSimplified = EntityAccessor.simplifiedName(name);
 
         entityRepository = _entityRepositories.values
             .where((e) => e.name == name || e.nameSimplified == nameSimplified)
             .firstOrNull;
-        if (entityRepository != null && entityRepository.isClosed) {
-          entityRepository = null;
-        }
 
-        if (entityRepository != null) {
+        if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
         }
       }
@@ -2072,6 +2063,43 @@ class EntityRepositoryProvider
 
     return _knownEntityRepositoryProviders.getEntityRepository<O>(
         obj: obj, type: type, name: name, entityRepositoryProvider: this);
+  }
+
+  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
+    if (isClosed) return null;
+
+    if (_callingGetEntityRepository) return null;
+    _callingGetEntityRepository = true;
+
+    checkInitialized();
+
+    try {
+      var entityRepository = _getEntityRepositoryByTypeImpl<O>(type);
+      if (entityRepository != null) {
+        return entityRepository;
+      }
+
+      if (!identical(this, _globalProvider)) {
+        return _globalProvider._getEntityRepositoryByTypeImpl<O>(type);
+      }
+
+      return null;
+    } finally {
+      _callingGetEntityRepository = false;
+    }
+  }
+
+  EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
+      Type type) {
+    if (!isClosed) {
+      var entityRepository = _entityRepositories[type];
+      if (entityRepository != null && !entityRepository.isClosed) {
+        return entityRepository as EntityRepository<O>;
+      }
+    }
+
+    return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(type,
+        entityRepositoryProvider: this);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -2086,7 +2114,7 @@ class EntityRepositoryProvider
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
     if (id == null || type == null) return null;
-    var entityRepository = getEntityRepository(type: type);
+    var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
       return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
     }
@@ -2144,6 +2172,26 @@ extension IterableEntityRepositoryProviderExtension
             .whereNotNull()
             .toList();
 
+    return _resolveEntityRepository<T>(entityRepositories, type,
+        entityRepositoryProvider, entityHandlerProvider);
+  }
+
+  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+      {EntityRepositoryProvider? entityRepositoryProvider,
+      EntityHandlerProvider? entityHandlerProvider}) {
+    var entityRepositories = map((e) => e.getEntityRepositoryByType<T>(type))
+        .whereNotNull()
+        .toList();
+
+    return _resolveEntityRepository<T>(entityRepositories, type,
+        entityRepositoryProvider, entityHandlerProvider);
+  }
+
+  EntityRepository<T>? _resolveEntityRepository<T extends Object>(
+      List<EntityRepository<T>> entityRepositories,
+      Type? type,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      EntityHandlerProvider? entityHandlerProvider) {
     var entityRepositoriesLength = entityRepositories.length;
 
     if (entityRepositoriesLength > 1) {
@@ -3785,7 +3833,7 @@ abstract class IterableEntityRepository<O extends Object>
         var elementType = fieldType.arguments.first;
 
         var elementRepository =
-            provider.getEntityRepository(type: elementType.type);
+            provider.getEntityRepositoryByType(elementType.type);
         if (elementRepository == null) return null;
 
         var futures = value.map((e) {

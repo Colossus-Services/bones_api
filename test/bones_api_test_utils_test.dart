@@ -128,10 +128,11 @@ Future<void> main() async {
         skip: apiTestConfigMemory.unsupportedReason);
 
     test('postgres', () => _testDB(apiTestConfigPostgres),
-        skip: apiTestConfigPostgres.unsupportedReason, tags: ['docker']);
+        skip: apiTestConfigPostgres.unsupportedReason,
+        tags: ['docker', 'slow']);
 
     test('mysql', () => _testDB(apiTestConfigMySQL),
-        skip: apiTestConfigMySQL.unsupportedReason, tags: ['docker']);
+        skip: apiTestConfigMySQL.unsupportedReason, tags: ['docker', 'slow']);
   });
 }
 

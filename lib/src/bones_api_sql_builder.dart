@@ -689,6 +689,8 @@ abstract class SQLGenerator {
   EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj, Type? type, String? name, String? tableName});
 
+  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type);
+
   FutureOr<String> getTableForEntityRepository(
       EntityRepository entityRepository);
 
@@ -791,7 +793,7 @@ abstract class SQLGenerator {
   FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
       Type type, String? column,
       {List<EntityField>? entityFieldAnnotations}) {
-    var typeEntityRepository = getEntityRepository(type: type);
+    var typeEntityRepository = getEntityRepositoryByType(type);
 
     if (typeEntityRepository != null) {
       var entityHandler = typeEntityRepository.entityHandler;

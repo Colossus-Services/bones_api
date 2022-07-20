@@ -403,7 +403,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =
-              getEntityRepository(type: listEntityType.type);
+              getEntityRepositoryByType(listEntityType.type);
           if (fieldListEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
@@ -418,7 +418,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
               .toList();
         } else if (!fieldType.isPrimitiveType &&
             EntityHandler.isValidEntityType(fieldType.type)) {
-          var fieldEntityRepository = getEntityRepository(type: fieldType.type);
+          var fieldEntityRepository = getEntityRepositoryByType(fieldType.type);
           if (fieldEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
@@ -845,7 +845,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       String? targetIdField;
       Type? targetIdType;
       if (targetEntityHandler != null) {
-        targetName = getEntityRepository(type: targetEntityHandler.type)?.name;
+        targetName = getEntityRepositoryByType(targetEntityHandler.type)?.name;
         targetIdField = targetEntityHandler.idFieldName();
         targetIdType =
             targetEntityHandler.getFieldType(null, targetIdField)?.type;
