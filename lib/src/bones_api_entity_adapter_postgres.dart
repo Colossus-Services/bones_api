@@ -841,6 +841,6 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   String toString() {
     var closedStr = isClosed ? ', closed' : '';
-    return 'MySQLAdapter{$databaseName@$host:$port$closedStr}';
+    return 'PostgreSQLAdapter{$databaseName@$host:$port$closedStr}';
   }
 }

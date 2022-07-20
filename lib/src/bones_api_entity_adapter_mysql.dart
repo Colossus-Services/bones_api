@@ -757,7 +757,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   String toString() {
     var closedStr = isClosed ? ', closed' : '';
-    return 'PostgreSQLAdapter{$databaseName@$host:$port$closedStr}';
+    return 'MySQLAdapter{$databaseName@$host:$port$closedStr}';
   }
 }
 
