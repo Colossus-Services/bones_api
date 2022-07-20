@@ -79,6 +79,15 @@ class EntityHandlerProvider {
     return entityHandler as EntityHandler<O>?;
   }
 
+  EntityHandler<O>? getEntityHandlerByType<O>(Type type) =>
+      _getEntityHandlerByTypeImpl<O>(type) ??
+      _globalProvider._getEntityHandlerByTypeImpl<O>(type);
+
+  EntityHandler<O>? _getEntityHandlerByTypeImpl<O>(Type type) {
+    var entityHandler = _entityHandlers[type];
+    return entityHandler as EntityHandler<O>?;
+  }
+
   EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj,
       Type? type,
@@ -227,6 +236,16 @@ abstract class EntityHandler<O> with FieldsFromMap {
     } else {
       return knownEntityHandler?.getEntityHandler<T>(obj: obj, type: type) ??
           provider.getEntityHandler<T>(obj: obj, type: type);
+    }
+  }
+
+  EntityHandler<T>? getEntityHandlerByType<T>(Type type,
+      {EntityHandler? knownEntityHandler}) {
+    if (type == O && isValidEntityType<O>()) {
+      return this as EntityHandler<T>;
+    } else {
+      return knownEntityHandler?.getEntityHandlerByType<T>(type) ??
+          provider.getEntityHandlerByType<T>(type);
     }
   }
 
@@ -530,8 +549,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
       }
     }
 
-    var entityRepository = valEntityHandler?.getEntityRepository(
-        type: type.type,
+    var entityRepository = valEntityHandler?.getEntityRepositoryByType(
+        type.type,
         entityRepositoryProvider: entityRepositoryProvider,
         entityHandlerProvider: entityHandlerProvider ?? provider);
 
@@ -594,8 +613,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
   EntityHandler? _resolveEntityHandler(TypeInfo fieldType) {
     var valEntityHandler = getEntityHandler(type: fieldType.type);
-    valEntityHandler ??= getEntityRepository(
-            type: fieldType.type, entityHandlerProvider: provider)
+    valEntityHandler ??= getEntityRepositoryByType(fieldType.type,
+            entityHandlerProvider: provider)
         ?.entityHandler;
     return valEntityHandler;
   }
@@ -1071,6 +1090,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
           obj: obj,
           type: type,
           name: name,
+          entityHandlerProvider: entityHandlerProvider ?? provider,
+          entityRepositoryProvider: entityRepositoryProvider);
+
+  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+          {EntityHandlerProvider? entityHandlerProvider,
+          EntityRepositoryProvider? entityRepositoryProvider}) =>
+      _knownEntityRepositoryProviders.getEntityRepositoryByType<T>(type,
           entityHandlerProvider: entityHandlerProvider ?? provider,
           entityRepositoryProvider: entityRepositoryProvider);
 }
@@ -2167,6 +2193,13 @@ extension IterableEntityRepositoryProviderExtension
       String? name,
       EntityRepositoryProvider? entityRepositoryProvider,
       EntityHandlerProvider? entityHandlerProvider}) {
+    var length = this.length;
+    if (length == 0) {
+      return null;
+    } else if (length == 1) {
+      return first.getEntityRepository<T>(obj: obj, type: type, name: name);
+    }
+
     var entityRepositories =
         map((e) => e.getEntityRepository<T>(obj: obj, type: type, name: name))
             .whereNotNull()
@@ -2179,6 +2212,13 @@ extension IterableEntityRepositoryProviderExtension
   EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
       {EntityRepositoryProvider? entityRepositoryProvider,
       EntityHandlerProvider? entityHandlerProvider}) {
+    var length = this.length;
+    if (length == 0) {
+      return null;
+    } else if (length == 1) {
+      return first.getEntityRepositoryByType<T>(type);
+    }
+
     var entityRepositories = map((e) => e.getEntityRepositoryByType<T>(type))
         .whereNotNull()
         .toList();
@@ -2193,6 +2233,7 @@ extension IterableEntityRepositoryProviderExtension
       EntityRepositoryProvider? entityRepositoryProvider,
       EntityHandlerProvider? entityHandlerProvider) {
     var entityRepositoriesLength = entityRepositories.length;
+    if (entityRepositoriesLength == 0) return null;
 
     if (entityRepositoriesLength > 1) {
       entityRepositories = entityRepositories.toSet().toList();

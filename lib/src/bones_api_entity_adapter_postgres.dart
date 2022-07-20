@@ -837,4 +837,10 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   @override
   FutureOr<void> closeTransaction(
       Transaction transaction, PostgreSQLExecutionContext? connection) {}
+
+  @override
+  String toString() {
+    var closedStr = isClosed ? ', closed' : '';
+    return 'MySQLAdapter{$databaseName@$host:$port$closedStr}';
+  }
 }

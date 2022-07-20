@@ -13,6 +13,7 @@ import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_arguments.dart';
 import 'bones_api_utils_json.dart';
 
@@ -199,9 +200,10 @@ abstract class APIRoot with Initializable, Closable {
   bool close() {
     if (!(super.close() as bool)) return false;
 
+    tryCallMapped(() => onClose());
+
     _instances.remove(this);
 
-    onClose();
     return true;
   }
 

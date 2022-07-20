@@ -141,6 +141,14 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 
   @override
+  bool close() {
+    if (!super.close()) return false;
+
+    _tables.clear();
+    return true;
+  }
+
+  @override
   String get sqlElementQuote => '';
 
   @override
@@ -1019,7 +1027,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   String toString() {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
-    return 'MemorySQLAdapter{id: $id$tablesStr}';
+    var closedStr = isClosed ? ', closed' : '';
+    return 'MemorySQLAdapter{id: $id$tablesStr$closedStr}';
   }
 }
 

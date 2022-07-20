@@ -11,6 +11,12 @@
 - `EntityRepositoryProvider`:
   - Optimize `getEntityRepository`
   - Added `getEntityRepositoryByType`.
+- `EntityHandler`:
+  - Added `getEntityHandlerByType` and `getEntityRepositoryByType`.
+- `EntityHandlerProvider`:
+  - Added `getEntityHandlerByType` and `getEntityRepositoryByType`.
+- `clearPool`:
+  - `clearPool` now also closes/disposes all elements in the pool.
 
 ## 1.2.15
 

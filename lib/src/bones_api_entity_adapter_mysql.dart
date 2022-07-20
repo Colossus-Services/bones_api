@@ -753,6 +753,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   FutureOr<void> closeTransaction(
       Transaction transaction, MySqlConnectionWrapper? connection) {}
+
+  @override
+  String toString() {
+    var closedStr = isClosed ? ', closed' : '';
+    return 'PostgreSQLAdapter{$databaseName@$host:$port$closedStr}';
+  }
 }
 
 abstract class MySqlConnectionWrapper {

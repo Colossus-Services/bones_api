@@ -261,7 +261,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   FutureOr<InitializationResult> initialize() => populateImpl();
 
   @override
-  bool close() => super.close() as bool;
+  bool close() {
+    if (!(super.close() as bool)) return false;
+
+    clearPool();
+    return true;
+  }
 
   Object? _populateSource;
 
@@ -853,4 +858,14 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
   }
 
   List<EntityRepository> buildRepositories(A adapter);
+
+  @override
+  bool close() {
+    if (!super.close()) return false;
+
+    _adapter?.close();
+    _adapter = null;
+
+    return true;
+  }
 }

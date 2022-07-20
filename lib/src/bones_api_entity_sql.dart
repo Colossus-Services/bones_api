@@ -722,21 +722,22 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   EntityHandler<E> _resolveEntityHandler<E>(Type type) {
-    var entityRepository = entityHandler.getEntityRepository(
-        type: type,
+    var entityRepository = entityHandler.getEntityRepositoryByType(type,
         entityRepositoryProvider: provider,
         entityHandlerProvider: entityHandler.provider);
+
     var entityHandler2 = entityRepository?.entityHandler;
     entityHandler2 ??= entityHandler.getEntityHandler(type: type);
+
     if (entityHandler2 == null) {
       throw StateError("Can't resolve EntityHandler for type: $type");
     }
+
     return entityHandler2 as EntityHandler<E>;
   }
 
   EntityRepository<E>? _resolveEntityRepository<E extends Object>(Type type) {
-    var entityRepository = entityHandler.getEntityRepository(
-        type: type,
+    var entityRepository = entityHandler.getEntityRepositoryByType(type,
         entityRepositoryProvider: provider,
         entityHandlerProvider: entityHandler.provider);
     if (entityRepository != null) {
@@ -744,15 +745,16 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     var typeEntityHandler = entityHandler.getEntityHandler(type: type);
+
     if (typeEntityHandler != null) {
-      entityRepository = typeEntityHandler.getEntityRepository(
-          type: type,
+      entityRepository = typeEntityHandler.getEntityRepositoryByType(type,
           entityRepositoryProvider: provider,
           entityHandlerProvider: entityHandler.provider);
       if (entityRepository != null) {
         return entityRepository as EntityRepository<E>;
       }
     }
+
     return null;
   }
 

@@ -84,6 +84,12 @@ mixin Pool<O> {
   FutureOr<bool> isPoolElementValid(O o);
 
   FutureOr<bool> clearPool() {
+    var pool = _pool.toList();
+
+    for (var e in pool) {
+      disposePoolElement(e);
+    }
+
     _pool.clear();
     return true;
   }
