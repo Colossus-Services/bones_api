@@ -1,3 +1,8 @@
+## 1.2.16
+
+- `MemorySQLAdapter`:
+  - Fix delete constraint for tables without referenced fields. 
+
 ## 1.2.15
 
 - `ConditionSQLEncoder`:

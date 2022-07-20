@@ -590,6 +590,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
             entityHandler: entityHandler);
       }).toList();
 
+      _checkNotReferencedEntities(entries, table);
+
       return _removeEntries(entries, map);
     }
 
@@ -606,6 +608,12 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         .whereNotNull()
         .toList(growable: false);
 
+    _checkNotReferencedEntities(entries, table);
+
+    return _removeEntries(entries, map);
+  }
+
+  void _checkNotReferencedEntities(List<MapEntry<Object, Map<String, dynamic>>> entries, String table) {
     for (var e in entries) {
       var id = e.key;
 
@@ -619,8 +627,6 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
             "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
       }
     }
-
-    return _removeEntries(entries, map);
   }
 
   List<Map<String, dynamic>> _removeEntries(
