@@ -10,9 +10,10 @@ mixin Closable {
 
   bool get isClosed => _closed;
 
-  void close() {
-    if (_closed) return;
+  FutureOr<bool> close() {
+    if (_closed) return false;
     _closed = true;
+    return true;
   }
 
   void checkNotClosed() {

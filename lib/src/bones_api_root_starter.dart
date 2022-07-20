@@ -1,7 +1,10 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
+
+final _log = logging.Logger('APIRootStarter');
 
 /// Helper to gracefully start/stop an [APIRoot].
 class APIRootStarter<A extends APIRoot> {
@@ -133,6 +136,9 @@ class APIRootStarter<A extends APIRoot> {
     var retApiRoot = getAPIRoot();
 
     return _starting = retApiRoot.resolveMapped((apiRoot) {
+      _log.info(
+          "** Starting APIRoot: ${apiRoot.toString(withModulesNames: false)}");
+
       return _preInitialize().resolveMapped((preInitOk) {
         if (!preInitOk) {
           throw StateError("Pre-initialization error.");
@@ -166,6 +172,17 @@ class APIRootStarter<A extends APIRoot> {
 
     _stopped = false;
 
+    var apiRoot = _apiRoot;
+    if (apiRoot != null) {
+      return apiRoot.close().resolveMapped((val) {
+        return _stopImpl();
+      });
+    }
+
+    return _stopImpl();
+  }
+
+  FutureOr<bool> _stopImpl() {
     var stopper = _stopper;
     if (stopper == null) {
       _stopped = true;

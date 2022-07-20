@@ -10,6 +10,7 @@ import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils_arguments.dart';
@@ -40,7 +41,7 @@ class BonesAPI {
 }
 
 /// Root class of an API.
-abstract class APIRoot with Initializable {
+abstract class APIRoot with Initializable, Closable {
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
   /// Returns the last [APIRoot] if instantiated.
@@ -82,6 +83,21 @@ abstract class APIRoot with Initializable {
     return lastAsDefault ? get(singleton: false) : null;
   }
 
+  /// Returns an [APIRoot] instance by [type].
+  static A? getByType<A extends APIRoot>(
+      {Type? type, bool lastAsDefault = false}) {
+    type ??= A;
+
+    var apiRoot =
+        _instances.values.firstWhereOrNull((e) => e.runtimeType == type);
+    if (apiRoot != null) return apiRoot as A;
+
+    apiRoot = _instances.values.firstWhereOrNull((e) => e is A);
+    if (apiRoot != null) return apiRoot as A;
+
+    return lastAsDefault ? get(singleton: false) as A? : null;
+  }
+
   /// Returns the first [APIRoot] matched by [matcher].
   static APIRoot? getWhere(bool Function(APIRoot apiRoot) matcher,
           {bool lastAsDefault = false}) =>
@@ -99,6 +115,11 @@ abstract class APIRoot with Initializable {
       return n.contains(part);
     }, lastAsDefault: lastAsDefault);
   }
+
+  static int _instanceIdCount = 0;
+
+  /// An instance ID to help with debug.
+  final int _instanceId = ++_instanceIdCount;
 
   /// API name.
   final String name;
@@ -173,6 +194,19 @@ abstract class APIRoot with Initializable {
 
   /// Loads the modules of this API.
   FutureOr<Set<APIModule>> loadModules();
+
+  @override
+  bool close() {
+    if (!(super.close() as bool)) return false;
+
+    _instances.remove(this);
+
+    onClose();
+    return true;
+  }
+
+  /// Called when this instance is closed.
+  void onClose() {}
 
   Map<String, APIModule>? _modules;
 
@@ -489,8 +523,13 @@ abstract class APIRoot with Initializable {
   int get hashCode => name.hashCode ^ version.hashCode;
 
   @override
-  String toString() {
-    return '$name[$version]$modulesNames';
+  String toString({bool withModulesNames = true}) {
+    var modulesNames = '';
+    if (withModulesNames) {
+      modulesNames = _modules?.keys.toSet().toString() ?? '{loading...}';
+    }
+
+    return '$name[$version]$modulesNames#$_instanceId';
   }
 }
 

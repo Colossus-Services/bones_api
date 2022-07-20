@@ -2,6 +2,12 @@
 
 - `MemorySQLAdapter`:
   - Fix delete constraint for tables without referenced fields. 
+- `APIRoot`:
+  - Added `getByType`.
+  - Added `close` (removes from available `APIRoot` instances).
+  - `stop` now also closes the `APIRoot`.
+- `APIServer`:
+  - `stop` now also closes the `APIRoot`.
 
 ## 1.2.15
 

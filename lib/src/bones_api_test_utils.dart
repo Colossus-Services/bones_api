@@ -335,9 +335,9 @@ class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
     var sqlAdapter = this.sqlAdapter;
     if (sqlAdapter == null) return true;
 
-    sqlAdapter.close();
     this.sqlAdapter = null;
-    return true;
+
+    return sqlAdapter.close().resolveWithValue(true);
   }
 
   @override

@@ -260,6 +260,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   FutureOr<InitializationResult> initialize() => populateImpl();
 
+  @override
+  bool close() => super.close() as bool;
+
   Object? _populateSource;
 
   FutureOr<InitializationResult> populateImpl() =>

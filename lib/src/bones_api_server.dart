@@ -465,6 +465,8 @@ class APIServer {
     if (!_started || _stopping || isStopped) return;
     _stopping = true;
 
+    apiRoot.close();
+
     await _httpServer.close();
 
     if (_httpSecureServer != null) {

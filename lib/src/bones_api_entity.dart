@@ -1984,6 +1984,9 @@ class EntityRepositoryProvider
   @override
   FutureOr<InitializationResult> initialize() => InitializationResult.ok(this);
 
+  @override
+  bool close() => super.close() as bool;
+
   void registerEntityRepository<O extends Object>(
       EntityRepository<O> entityRepository) {
     checkNotClosed();
@@ -2431,6 +2434,9 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
     entityHandler.notifyKnownEntityRepositoryProvider(this.provider);
   }
+
+  @override
+  bool close() => super.close() as bool;
 
   bool isOfEntityType(Object? o) {
     if (o == null) return false;
