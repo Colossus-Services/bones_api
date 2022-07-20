@@ -33,8 +33,8 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
           'address':
               TableFieldReference('user', 'address', int, 'address', 'id', int)
         }, relationshipTables: [
-          TableRelationshipReference('user__role__rel', 'user', 'id', int, 'user_id',
-              'role', 'id', int, 'role_id')
+          TableRelationshipReference('user__role__rel', 'user', 'id', int,
+              'user_id', 'role', 'id', int, 'role_id')
         ]),
         TableScheme(
           'address',
