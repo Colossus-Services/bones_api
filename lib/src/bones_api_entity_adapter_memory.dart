@@ -613,7 +613,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     return _removeEntries(entries, map);
   }
 
-  void _checkNotReferencedEntities(List<MapEntry<Object, Map<String, dynamic>>> entries, String table) {
+  void _checkNotReferencedEntities(
+      List<MapEntry<Object, Map<String, dynamic>>> entries, String table) {
     for (var e in entries) {
       var id = e.key;
 
