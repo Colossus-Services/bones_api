@@ -1,3 +1,7 @@
+## 1.2.17
+
+- Fix resolution of table columns to entity fields when resolving sub-entities.
+
 ## 1.2.16
 
 - `MemorySQLAdapter`:

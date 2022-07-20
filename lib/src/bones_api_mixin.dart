@@ -347,6 +347,38 @@ mixin FieldsFromMap {
         fieldsNames.map((f) => fieldToSimpleKey(f)));
   }
 
+  /// Resolves [fieldName] to one that matches a [fieldsNames] element.
+  String? resolveFiledName(
+    List<String> fieldsNames,
+    final String fieldName, {
+    Map<String, int>? fieldsNamesIndexes,
+    List<String>? fieldsNamesLC,
+    List<String>? fieldsNamesSimple,
+    bool includeAbsentFields = false,
+    List<String>? returnMapUsedKeys,
+  }) {
+    var f = fieldsNames.firstWhereOrNull((f) => f == fieldName);
+
+    f ??= fieldsNames.firstWhereOrNull((f) {
+      String? fLC, fSimple;
+      if (fieldsNamesIndexes != null) {
+        var idx = fieldsNamesIndexes[f]!;
+        fLC = fieldsNamesLC?[idx];
+        fSimple = fieldsNamesSimple?[idx];
+      }
+
+      fLC ??= fieldToLCKey(f);
+      if (fieldName == fLC) return true;
+
+      fSimple ??= fieldToSimpleKey(f);
+      if (fieldName == fSimple) return true;
+
+      return false;
+    });
+
+    return f;
+  }
+
   /// Returns a [Map] with the fields values populated from the provided [map].
   ///
   /// The field name resolution is case insensitive. See [getFieldValueFromMap].

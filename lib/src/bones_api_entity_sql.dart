@@ -282,21 +282,18 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (fieldsEntityRepositories.isNotEmpty) {
       var fieldsEntitiesAsync = fieldsEntityRepositories.map((field, repo) {
-        var fieldValues = resultsList.map((e) => e[field]).toList();
+        var tableColumn = _resolveEntityFieldToTableColumn(field);
+
+        var fieldValues = resultsList.map((e) => e[tableColumn]).toList();
         var fieldValuesUniques = fieldValues.toSet().toList();
 
-        var entitiesAsync =
-            repo.selectByIDs(fieldValuesUniques, transaction: transaction);
+        var entities = repo
+            .selectByIDs(fieldValuesUniques, transaction: transaction)
+            .resolveMapped((entities) => fieldValuesUniques
+                .mapIndexed((i, val) => MapEntry(val, entities[i]))
+                .toList());
 
-        var entities = entitiesAsync.resolveMapped((entities) {
-          var entries = List<MapEntry<dynamic, Object?>>.generate(
-              fieldValuesUniques.length,
-              (i) => MapEntry(fieldValuesUniques[i], entities[i]));
-
-          return entries;
-        });
-
-        return MapEntry(field, entities);
+        return MapEntry(tableColumn, entities);
       }).resolveAllValues();
 
       return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
@@ -379,6 +376,30 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
         }
       }).resolveWithValue(true);
     });
+  }
+
+  // ignore: unused_element
+  String _resolveTableColumnToEntityField(String tableField, [O? o]) {
+    var fieldsNames = entityHandler.fieldsNames(o);
+    var entityFieldName =
+        entityHandler.resolveFiledName(fieldsNames, tableField);
+    if (entityFieldName == null) {
+      throw StateError(
+          "Can't resolve the table column `$tableField` to one of the entity `${entityHandler.type}` fields: $fieldsNames");
+    }
+    return entityFieldName;
+  }
+
+  String _resolveEntityFieldToTableColumn(String entityField) {
+    var tableScheme = sqlRepositoryAdapter.getTableScheme() as TableScheme;
+
+    var tableField = tableScheme.resolveTableFiledName(entityField);
+    if (tableField == null) {
+      throw StateError(
+          "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");
+    }
+
+    return tableField;
   }
 
   FutureOr<Map<String, TableRelationshipReference>> _getRelationshipFields(
