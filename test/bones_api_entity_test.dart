@@ -28,12 +28,12 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
           'email': String,
           'password': String,
           'address': int,
-          'creationTime': DateTime,
+          'creation_time': DateTime,
         }, fieldsReferencedTables: {
           'address':
               TableFieldReference('user', 'address', int, 'address', 'id', int)
         }, relationshipTables: [
-          TableRelationshipReference('user_role', 'user', 'id', int, 'user_id',
+          TableRelationshipReference('user__role__rel', 'user', 'id', int, 'user_id',
               'role', 'id', int, 'role_id')
         ]),
         TableScheme(
