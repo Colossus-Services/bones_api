@@ -268,6 +268,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     return true;
   }
 
+  Map<String, dynamic> information({bool extended = false, String? table}) =>
+      <String, dynamic>{};
+
   Object? _populateSource;
 
   FutureOr<InitializationResult> populateImpl() =>
@@ -311,6 +314,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     return null;
   }
+
+  @override
+  Map<EntityRepository, Object> get registeredEntityRepositoriesInformation =>
+      _entityRepositories.values
+          .map((e) => MapEntry(e, e.information(extended: true)))
+          .toMapFromEntries();
 
   FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>
       entityRepositories
@@ -746,6 +755,9 @@ class DBRepositoryAdapter<O> with Initializable {
   FutureOr<TableScheme> getTableScheme() =>
       databaseAdapter.getTableScheme(tableName).resolveMapped((t) => t!);
 
+  Map<String, dynamic> information({bool extended = false}) =>
+      databaseAdapter.information(extended: extended, table: tableName);
+
   FutureOr<int> doCount(TransactionOperation op,
           {EntityMatcher? matcher,
           Object? parameters,
@@ -867,5 +879,32 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
     _adapter = null;
 
     return true;
+  }
+}
+
+/// A [DBAdapter] [Exception].
+class DBAdapterException implements Exception {
+  /// The type of the exception.
+  final String type;
+
+  /// The exception message.
+  final String message;
+
+  /// The parent error/exception.
+  /// Usually the native [Exception] or [Error] of the database.
+  Object? parentError;
+  StackTrace? parentStackTrace;
+
+  DBAdapterException(this.type, this.message,
+      {this.parentError, this.parentStackTrace})
+      : super();
+
+  @override
+  String toString() {
+    var s = '$runtimeType[$type]: $message';
+    if (parentError != null) {
+      s += '\n  -- Parent ERROR>> [${parentError.runtimeType}] $parentError';
+    }
+    return s;
   }
 }

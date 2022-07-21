@@ -1,3 +1,13 @@
+## 1.2.18
+
+- `Transaction`:
+  - Fix synchronization of final return for long transactions. 
+- Added `SQLAdapterException` and `DBAdapterException` for better exception/error handling:
+  - `MemorySQLAdapterException`.
+  - `PostgreSQLAdapterException`.
+  - `MySQLAdapterException`.
+- Added `FieldNameMapper`.
+
 ## 1.2.17
 
 - Fix resolution of table columns to entity fields when resolving sub-entities.

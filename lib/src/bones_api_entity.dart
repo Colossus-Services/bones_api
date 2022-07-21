@@ -4,7 +4,8 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
-import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
+import 'package:statistics/statistics.dart'
+    show Decimal, DynamicInt, IterableMapEntryExtension;
 import 'package:swiss_knife/swiss_knife.dart' show EventStream;
 
 import 'bones_api_condition.dart';
@@ -2023,6 +2024,11 @@ class EntityRepositoryProvider
   List<EntityRepository> get registeredEntityRepositories =>
       _entityRepositories.values.toList();
 
+  Map<EntityRepository, Object> get registeredEntityRepositoriesInformation =>
+      _entityRepositories.values
+          .map((e) => MapEntry(e, e.information(extended: true)))
+          .toMapFromEntries();
+
   bool _callingGetEntityRepository = false;
 
   EntityRepository<O>? getEntityRepository<O extends Object>(
@@ -2880,7 +2886,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         repositoryProvider: provider);
   }
 
-  Map<String, dynamic> information();
+  Map<String, dynamic> information({bool extended = false});
 
   @override
   String toString() {
@@ -3098,6 +3104,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     if (op.transactionRoot && !op.externalTransaction && length > 1) {
       return resultFuture.then((_) => result);
+    } else if (_commitCalled) {
+      return resultFuture.then((_) => result);
     } else {
       return result;
     }
@@ -3187,24 +3195,31 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   FutureOr<R?> _commitComplete<R>(Object? result) {
+    var transactionResult = this.transactionResult;
     if (transactionResult != null) {
-      _transactionCompleter.complete(result);
-
-      return transactionResult!.resolveMapped((r) {
-        _committed = true;
-        _resultCompleter.complete(r);
-        return r as R?;
-      });
+      if (transactionResult is Future) {
+        var ret = transactionResult.then((r) => _commitCompleteFinish<R>(r));
+        _transactionCompleter.complete(result);
+        return ret;
+      } else {
+        _transactionCompleter.complete(result);
+        return _commitCompleteFinish<R>(result);
+      }
     } else {
-      var ret = _transactionCompleter.future.then((r) {
-        _committed = true;
-        _resultCompleter.complete(r);
-        return r as R?;
-      });
+      var ret =
+          _transactionCompleter.future.then((r) => _commitCompleteFinish<R>(r));
 
       _transactionCompleter.complete(result);
       return ret;
     }
+  }
+
+  R? _commitCompleteFinish<R>(Object? result) {
+    _committed = true;
+    _logTransaction.info(
+        '[transaction:$id] Committed> ops: ${_operations.length} ; root: ${_operations.first} > result: $result');
+    _resultCompleter.complete(result);
+    return result as R?;
   }
 
   bool _aborted = false;
@@ -3974,7 +3989,8 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
-  Map<String, dynamic> information() => {
+  Map<String, dynamic> information({bool extended = false}) => {
+        'name': name,
         'length': length(),
         'nextID': nextID(),
       };

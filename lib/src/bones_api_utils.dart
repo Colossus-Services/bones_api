@@ -1,4 +1,5 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:statistics/statistics.dart';
 
 /// Basic [String] functions.
 class StringUtils {
@@ -57,6 +58,99 @@ class StringUtils {
 
   /// Returns `true` if [s] is a letter or digit.
   static bool isLetterOrDigit(String s) => _regexpIsLetterOrDigit.hasMatch(s);
+}
+
+/// Base class for key normalization mapping.
+abstract class KeyMapper<K> {
+  List<K> expandedKeys(K key);
+
+  List<K> normalizedKeys(K key);
+
+  final Map<K, K> _keysMapping = <K, K>{};
+  final Map<K, K> _keysUnmapping = <K, K>{};
+
+  void setupKeys(Iterable<K> keys) {
+    for (var k in keys) {
+      setupKey(k);
+    }
+  }
+
+  List<K> setupKey(K key) {
+    var expandKeys =
+        expandedKeys(key).expand((k) => normalizedKeys(k)).toList();
+
+    var keysNorm = [...normalizedKeys(key), ...expandKeys].toDistinctList();
+
+    if (keysNorm.isEmpty) return keysNorm;
+
+    _keysMapping[key] = key;
+    _keysUnmapping[key] = keysNorm.first;
+
+    for (var kNorm in keysNorm) {
+      _keysMapping[kNorm] = key;
+    }
+
+    return keysNorm;
+  }
+
+  K? map(K key) {
+    var k = _keysMapping[key];
+    if (k != null) return k;
+
+    var keysNorm = normalizedKeys(key);
+
+    for (var kNorm in keysNorm) {
+      var k = _keysMapping[kNorm];
+      if (k != null) return k;
+    }
+
+    return null;
+  }
+
+  K? unmap(K keyMapped) {
+    var key = _keysUnmapping[keyMapped];
+    if (key != null) return key;
+
+    var keysNorm = normalizedKeys(keyMapped);
+
+    for (var e in _keysMapping.entries) {
+      var k = e.value;
+      if (k == keyMapped || keysNorm.contains(k)) {
+        return e.key;
+      }
+    }
+
+    return key;
+  }
+}
+
+/// A [KeyMapper] for class fields or table columns.
+class FieldNameMapper extends KeyMapper<String> {
+  @override
+  List<String> expandedKeys(String key) {
+    var exp = <String>[
+      key,
+      if (key.contains('-')) key.replaceAll('-', '_'),
+      if (key.contains('_')) key.replaceAll('_', '-'),
+    ];
+
+    exp.addAll(exp.map((k) => k.toUpperCase()).toList());
+    exp.addAll(exp.map((k) => k.toLowerCase()).toList());
+
+    var norm = exp.expand((k) => normalizedKeys(k)).toList();
+
+    var allExp = <String>[...exp, ...norm];
+
+    return allExp;
+  }
+
+  @override
+  List<String> normalizedKeys(String key) {
+    var lc = StringUtils.toLowerCase(key);
+    var lcSimple = StringUtils.toLowerCaseSimple(key);
+
+    return lc != lcSimple ? <String>[lcSimple, lc] : <String>[lc];
+  }
 }
 
 /// Tries to performa a [call].

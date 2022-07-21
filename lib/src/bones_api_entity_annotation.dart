@@ -215,12 +215,16 @@ class EntityFieldInvalid extends Error {
   /// The parent/original error.
   final Object? parentError;
 
+  /// The [parentError] [StackTrace].
+  final StackTrace? parentStackTrace;
+
   EntityFieldInvalid(this.reason, this.value,
       {this.entityType,
       this.tableName,
       this.fieldName,
       this.subEntityErrors,
-      this.parentError});
+      this.parentError,
+      this.parentStackTrace});
 
   EntityFieldInvalid copyWith(
           {String? reason,
@@ -229,7 +233,8 @@ class EntityFieldInvalid extends Error {
           String? tableName,
           String? fieldName,
           Map<String, EntityFieldInvalid>? subEntityErrors,
-          Object? parentError}) =>
+          Object? parentError,
+          StackTrace? parentStackTrace}) =>
       EntityFieldInvalid(
         reason ?? this.reason,
         value ?? this.value,
@@ -238,6 +243,7 @@ class EntityFieldInvalid extends Error {
         fieldName: fieldName ?? this.fieldName,
         subEntityErrors: subEntityErrors ?? this.subEntityErrors,
         parentError: parentError ?? this.parentError,
+        parentStackTrace: parentStackTrace ?? this.parentStackTrace,
       );
 
   String get message {
@@ -269,8 +275,9 @@ class EntityFieldInvalid extends Error {
     var fieldStr =
         fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
 
-    var parentStr =
-        parentError != null ? '\n  -- Parent ERROR>> $parentError' : '';
+    var parentStr = parentError != null
+        ? '\n  -- Parent ERROR>> [${parentError.runtimeType}] $parentError'
+        : '';
 
     return 'Invalid entity$entityStr field$fieldStr> $message$parentStr';
   }

@@ -154,6 +154,20 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
+  Map<String, dynamic> information({bool extended = false, String? table}) {
+    var info = <String, dynamic>{};
+
+    if (table != null) {
+      var executingTransaction = Transaction.executingTransaction;
+      if (executingTransaction != null) {
+        info['executingTransaction'] = executingTransaction;
+      }
+    }
+
+    return info;
+  }
+
+  @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
     return <Initializable>[
@@ -183,19 +197,26 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   bool get sqlAcceptsInsertOnConflict => true;
 
   @override
-  Object? resolveError(Object? error, StackTrace? stackTrace) {
-    if (error is PostgreSQLException) {
+  Object resolveError(Object error, StackTrace stackTrace) {
+    if (error is PostgreSQLAdapterException) {
+      return error;
+    } else if (error is PostgreSQLException) {
       if (error.severity == PostgreSQLSeverity.error) {
         if (error.code == '23505') {
           return EntityFieldInvalid("unique", error.detail,
               fieldName: error.columnName,
               tableName: error.tableName,
               parentError: error);
+        } else if (error.code == '23503') {
+          return PostgreSQLAdapterException("delete.constraint",
+              '${error.message} ; Detail: ${error.detail} ; Table: ${error.tableName} ; Constraint: ${error.constraintName}',
+              parentError: error, parentStackTrace: stackTrace);
         }
       }
     }
 
-    return error;
+    return PostgreSQLAdapterException('error', '$error',
+        parentError: error, parentStackTrace: stackTrace);
   }
 
   @override
@@ -843,4 +864,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     var closedStr = isClosed ? ', closed' : '';
     return 'PostgreSQLAdapter{$databaseName@$host:$port$closedStr}';
   }
+}
+
+/// Exception thrown by [PostgreSQLAdapter] operations.
+class PostgreSQLAdapterException extends SQLAdapterException {
+  PostgreSQLAdapterException(String type, String message,
+      {Object? parentError, StackTrace? parentStackTrace})
+      : super(type, message,
+            parentError: parentError, parentStackTrace: parentStackTrace);
 }

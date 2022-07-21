@@ -570,6 +570,42 @@ void main() {
     });
   });
 
+  group('FieldNameMapper', () {
+    test('map', () {
+      var fm = FieldNameMapper();
+
+      fm.setupKeys(['user', 'e-mail', 'business_account']);
+
+      expect(fm.map('user'), equals('user'));
+      expect(fm.map('User'), equals('user'));
+      expect(fm.map('_user'), equals('user'));
+
+      expect(fm.map('email'), equals('e-mail'));
+      expect(fm.map('e-mail'), equals('e-mail'));
+      expect(fm.map('EMail'), equals('e-mail'));
+      expect(fm.map('E-Mail'), equals('e-mail'));
+
+      expect(fm.map('business_account'), equals('business_account'));
+      expect(fm.map('businessAccount'), equals('business_account'));
+      expect(fm.map('business-account'), equals('business_account'));
+    });
+
+    test('unmap', () {
+      var fm = FieldNameMapper();
+
+      fm.setupKeys(['user', 'e-mail', 'business_account']);
+
+      expect(fm.unmap('user'), equals('user'));
+      expect(fm.unmap('User'), equals('user'));
+
+      expect(fm.unmap('e-mail'), equals('email'));
+      expect(fm.unmap('email'), isNull);
+
+      expect(fm.unmap('business_account'), equals('businessaccount'));
+      expect(fm.unmap('businessAccount'), isNull);
+    });
+  });
+
   group('tryCallMapped', () {
     test('sync', () {
       expect(tryCallMapped(() => 123), equals(123));

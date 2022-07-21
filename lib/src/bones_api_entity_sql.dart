@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -42,8 +43,13 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
   String get tableName => sqlRepositoryAdapter.tableName;
 
   @override
-  Map<String, dynamic> information() =>
-      {'queryType': 'SQL', 'dialect': dialect};
+  Map<String, dynamic> information({bool extended = false}) => {
+        'queryType': 'SQL',
+        'dialect': dialect,
+        'table': name,
+        if (extended)
+          'sqlAdapter': sqlRepositoryAdapter.information(extended: true),
+      };
 
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
@@ -272,13 +278,15 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       return _resolveEntitiesSimple(transaction, resultsList);
     }
 
-    var fieldsEntityRepositories =
-        Map.fromEntries(fieldsEntity.entries.map((e) {
-      var fieldEntityRepository = _resolveEntityRepository(e.value.type);
-      return fieldEntityRepository != null
-          ? MapEntry(e.key, fieldEntityRepository)
-          : null;
-    }).whereNotNull());
+    var fieldsEntityRepositories = fieldsEntity.entries
+        .map((e) {
+          var fieldEntityRepository = _resolveEntityRepository(e.value.type);
+          return fieldEntityRepository != null
+              ? MapEntry(e.key, fieldEntityRepository)
+              : null;
+        })
+        .whereNotNull()
+        .toMapFromEntries();
 
     if (fieldsEntityRepositories.isNotEmpty) {
       var fieldsEntitiesAsync = fieldsEntityRepositories.map((field, repo) {

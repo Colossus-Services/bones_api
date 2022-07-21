@@ -133,6 +133,16 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 
   @override
+  Object resolveError(Object error, StackTrace stackTrace) {
+    if (error is MemorySQLAdapterException) {
+      return error;
+    }
+
+    return MemorySQLAdapterException('error', '$error',
+        parentError: error, parentStackTrace: stackTrace);
+  }
+
+  @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
     return <Initializable>[
@@ -263,6 +273,21 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
 
     return null;
+  }
+
+  @override
+  Map<String, dynamic> information({bool extended = false, String? table}) {
+    var info = <String, dynamic>{};
+
+    if (table != null) {
+      var tableMap = _getTableMap(table, false);
+
+      if (tableMap != null) {
+        info[table] = {'ids': tableMap.keys.toList()};
+      }
+    }
+
+    return info;
   }
 
   @override
@@ -632,7 +657,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         var refId = ref.value.key;
         var refFieldName = ref.value.value.key;
         var refFieldValue = ref.value.value.value;
-        throw MemorySQLAdapterError("delete.constraint",
+        throw MemorySQLAdapterException("delete.constraint",
             "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
       }
     }
@@ -1033,12 +1058,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 }
 
 /// Error thrown by [MemorySQLAdapter] operations.
-class MemorySQLAdapterError extends Error {
-  final String type;
-  final String message;
-
-  MemorySQLAdapterError(this.type, this.message) : super();
-
-  @override
-  String toString() => message;
+class MemorySQLAdapterException extends SQLAdapterException {
+  MemorySQLAdapterException(String type, String message,
+      {Object? parentError, StackTrace? parentStackTrace})
+      : super(type, message,
+            parentError: parentError, parentStackTrace: parentStackTrace);
 }

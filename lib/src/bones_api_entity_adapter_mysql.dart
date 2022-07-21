@@ -685,8 +685,10 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  Object? resolveError(Object? error, StackTrace? stackTrace) {
-    if (error is MySqlException) {
+  Object resolveError(Object error, StackTrace stackTrace) {
+    if (error is MySQLAdapterException) {
+      return error;
+    } else if (error is MySqlException) {
       if (error.errorNumber == 1062) {
         var keyMatch = RegExp(r"for key '(?:(\w+)\.(.*?)|(.*?))'")
             .firstMatch(error.message);
@@ -707,10 +709,15 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
         }
 
         return EntityFieldInvalid("unique", error.message,
-            tableName: tableName, fieldName: fieldName, parentError: error);
+            tableName: tableName,
+            fieldName: fieldName,
+            parentError: error,
+            parentStackTrace: stackTrace);
       }
     }
-    return error;
+
+    return MySQLAdapterException('error', '$error',
+        parentError: error, parentStackTrace: stackTrace);
   }
 
   @override
@@ -801,4 +808,12 @@ class _MySqlConnectionTransaction implements MySqlConnectionWrapper {
   Future<List<Results>> queryMulti(
           String sql, Iterable<List<Object?>> values) =>
       transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
+}
+
+/// Exception thrown by [MySQLAdapter] operations.
+class MySQLAdapterException extends SQLAdapterException {
+  MySQLAdapterException(String type, String message,
+      {Object? parentError, StackTrace? parentStackTrace})
+      : super(type, message,
+            parentError: parentError, parentStackTrace: parentStackTrace);
 }

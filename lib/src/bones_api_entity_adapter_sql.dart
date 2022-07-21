@@ -750,21 +750,18 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     });
   }
 
-  FutureOr<dynamic> insertSQL(TransactionOperation op, String entityName,
-      String table, SQL sql, Map<String, Object?> fields,
-      {T Function<T>(dynamic o)? mapper}) {
+  FutureOr<dynamic> insertSQL(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+    Map<String, Object?> fields,
+  ) {
     if (sql.isDummy) return null;
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] insertSQL> $sql');
-      var retInsert =
-          doInsertSQL(entityName, table, sql, op.transaction, connection);
-
-      if (mapper != null) {
-        return retInsert.resolveMapped((e) => mapper(e));
-      } else {
-        return retInsert;
-      }
+      return doInsertSQL(entityName, table, sql, op.transaction, connection);
     });
   }
 
@@ -860,20 +857,13 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
   FutureOr<dynamic> updateSQL(TransactionOperation op, String entityName,
       String table, SQL sql, Object id, Map<String, Object?> fields,
-      {T Function<T>(dynamic o)? mapper, bool allowAutoInsert = false}) {
+      {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
-      var retInsert = doUpdateSQL(
-          entityName, table, sql, id, op.transaction, connection,
+      return doUpdateSQL(entityName, table, sql, id, op.transaction, connection,
           allowAutoInsert: allowAutoInsert);
-
-      if (mapper != null) {
-        return retInsert.resolveMapped((e) => mapper(e));
-      } else {
-        return retInsert;
-      }
     });
   }
 
@@ -1208,7 +1198,9 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     });
   }
 
-  Object? resolveError(Object? error, StackTrace? stackTrace) => error;
+  Object resolveError(Object error, StackTrace stackTrace) =>
+      SQLAdapterException('error', '$error',
+          parentError: error, parentStackTrace: stackTrace);
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
       SQLWrapper sql, FutureOr<R> Function(C connection) f) {
@@ -1447,21 +1439,16 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
-      TransactionOperation op, String entityName, String table, SQL sql,
-      {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] selectSQL> $sql');
-
-      var retSel =
-          doSelectSQL(entityName, table, sql, op.transaction, connection);
-
-      if (mapper != null) {
-        return retSel.resolveMapped((e) => e.map(mapper));
-      } else {
-        return retSel;
-      }
+      return doSelectSQL(entityName, table, sql, op.transaction, connection);
     });
   }
 
@@ -1552,21 +1539,16 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
-      TransactionOperation op, String entityName, String table, SQL sql,
-      {Map<String, dynamic> Function(Map<String, dynamic> r)? mapper}) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] deleteSQL> $sql');
-
-      var retSel =
-          doDeleteSQL(entityName, table, sql, op.transaction, connection);
-
-      if (mapper != null) {
-        return retSel.resolveMapped((e) => e.map(mapper));
-      } else {
-        return retSel;
-      }
+      return doDeleteSQL(entityName, table, sql, op.transaction, connection);
     });
   }
 
@@ -1848,4 +1830,12 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
   @override
   String toString() =>
       'SQLRepositoryAdapter{name: $name, tableName: $tableName, type: $type}';
+}
+
+/// A [SQLAdapter] [Exception].
+class SQLAdapterException extends DBAdapterException {
+  SQLAdapterException(String type, String message,
+      {Object? parentError, StackTrace? parentStackTrace})
+      : super(type, message,
+            parentError: parentError, parentStackTrace: parentStackTrace);
 }
