@@ -787,7 +787,12 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
 
       targetObjs = targetObjs
-          .map((e) => _resolveEntityMap(e, entityHandler2, tableScheme2))
+          .map((e) {
+            return e is! Map<String, Object?>
+                ? null
+                : _resolveEntityMap(e, entityHandler2, tableScheme2);
+          })
+          .whereNotNull()
           .toList();
     }
 

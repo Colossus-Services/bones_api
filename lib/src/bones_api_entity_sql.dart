@@ -365,8 +365,10 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
               .map((e) => MapEntry(targetEntityRepository.getEntityID(e)!, e)));
 
           return relationships.map((id, targetIds) {
-            var targetEntities =
-                targetIds.map((id) => allTargetsById[id]).toList();
+            var targetEntities = targetIds
+                .map((id) => allTargetsById[id])
+                .whereNotNull()
+                .toList();
             var targetEntitiesCast = targetEntityRepository.entityHandler
                 .castList(targetEntities, targetType)!;
             return MapEntry(id, targetEntitiesCast);
