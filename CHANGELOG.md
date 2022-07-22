@@ -1,3 +1,9 @@
+## 1.2.19
+
+- `TableScheme`:
+  - `getTableRelationshipReference`:
+    better resolution when an entity has multiple `List` fields referencing the same entity/table.
+
 ## 1.2.18
 
 - `Transaction`:

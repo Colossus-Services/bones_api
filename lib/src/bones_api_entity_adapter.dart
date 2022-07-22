@@ -448,17 +448,28 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       TransactionOperation op,
       String entityName,
       String table,
+      String field,
       dynamic id,
       String otherTableName,
       List otherIds,
       [PreFinishDBOperation<bool, bool>? preFinish]);
 
-  FutureOr<R> doSelectRelationship<R>(TransactionOperation op,
-      String entityName, String table, dynamic id, String otherTableName,
+  FutureOr<R> doSelectRelationship<R>(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      String field,
+      dynamic id,
+      String otherTableName,
       [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
 
-  FutureOr<R> doSelectRelationships<R>(TransactionOperation op,
-      String entityName, String table, List<dynamic> ids, String otherTableName,
+  FutureOr<R> doSelectRelationships<R>(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      String field,
+      List<dynamic> ids,
+      String otherTableName,
       [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
 
   FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
@@ -802,25 +813,25 @@ class DBRepositoryAdapter<O> with Initializable {
           preFinish: preFinish,
           allowAutoInsert: allowAutoInsert);
 
-  FutureOr<bool> doInsertRelationship(TransactionOperation op, dynamic id,
-          String otherTableName, List otherIds,
+  FutureOr<bool> doInsertRelationship(TransactionOperation op, String field,
+          dynamic id, String otherTableName, List otherIds,
           [PreFinishDBOperation<bool, bool>? preFinish]) =>
       databaseAdapter.doInsertRelationship(
-          op, name, tableName, id, otherTableName, otherIds, preFinish);
+          op, name, tableName, field, id, otherTableName, otherIds, preFinish);
 
-  FutureOr<R> doSelectRelationship<R>(
-          TransactionOperation op, dynamic id, String otherTableName,
+  FutureOr<R> doSelectRelationship<R>(TransactionOperation op, String field,
+          dynamic id, String otherTableName,
           [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
               preFinish]) =>
       databaseAdapter.doSelectRelationship<R>(
-          op, name, tableName, id, otherTableName, preFinish);
+          op, name, tableName, field, id, otherTableName, preFinish);
 
-  FutureOr<R> doSelectRelationships<R>(
-          TransactionOperation op, List<dynamic> ids, String otherTableName,
+  FutureOr<R> doSelectRelationships<R>(TransactionOperation op, String field,
+          List<dynamic> ids, String otherTableName,
           [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
               preFinish]) =>
       databaseAdapter.doSelectRelationships<R>(
-          op, name, tableName, ids, otherTableName, preFinish);
+          op, name, tableName, field, ids, otherTableName, preFinish);
 
   FutureOr<R> doDelete<R>(TransactionOperation op, EntityMatcher matcher,
           {Object? parameters,

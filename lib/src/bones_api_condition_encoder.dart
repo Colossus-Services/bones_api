@@ -4,8 +4,9 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_mixin.dart';
 import 'bones_api_entity_sql.dart';
+import 'bones_api_mixin.dart';
+import 'bones_api_utils.dart';
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -118,6 +119,28 @@ class TableRelationshipReference {
   }
 }
 
+class _TableRelationshipKey {
+  final String? sourceTable;
+  final String? sourceField;
+  final String? targetTable;
+
+  _TableRelationshipKey(this.sourceTable, this.sourceField, this.targetTable);
+
+  bool get isValid => sourceTable != null || targetTable != null;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _TableRelationshipKey &&
+          sourceTable == other.sourceTable &&
+          sourceField == other.sourceField &&
+          targetTable == other.targetTable;
+
+  @override
+  int get hashCode =>
+      sourceTable.hashCode ^ sourceField.hashCode ^ targetTable.hashCode;
+}
+
 /// A generic table scheme.
 class TableScheme with FieldsFromMap {
   /// The table name
@@ -145,8 +168,9 @@ class TableScheme with FieldsFromMap {
   late final List<String> _fieldsNamesLC;
   late final List<String> _fieldsNamesSimple;
 
-  final Map<String, TableRelationshipReference> _tableRelationshipReference =
-      <String, TableRelationshipReference>{};
+  final Map<String, List<TableRelationshipReference>>
+      _tableRelationshipReference =
+      <String, List<TableRelationshipReference>>{};
 
   TableScheme(
     this.name, {
@@ -168,18 +192,14 @@ class TableScheme with FieldsFromMap {
 
     for (var t in _relationshipTables) {
       if (t.sourceTable == name) {
-        var prev = _tableRelationshipReference[t.targetTable];
-        if (prev != null) {
-          var cmp = t.relationshipTable.length
-              .compareTo(prev.relationshipTable.length);
-          if (cmp > 0) {
-            _tableRelationshipReference[t.targetTable] = t;
-          }
-        } else {
-          _tableRelationshipReference[t.targetTable] = t;
-        }
+        var l = _tableRelationshipReference.putIfAbsent(
+            t.targetTable, () => <TableRelationshipReference>[]);
+        l.add(t);
       }
     }
+
+    _tableRelationshipReference.updateAll((key, value) =>
+        UnmodifiableListView<TableRelationshipReference>(value));
   }
 
   bool get hasTableReferences =>
@@ -195,9 +215,10 @@ class TableScheme with FieldsFromMap {
   int get tableRelationshipReferenceLength =>
       _tableRelationshipReference.length;
 
-  Map<String, TableRelationshipReference> get tableRelationshipReference =>
-      UnmodifiableMapView<String, TableRelationshipReference>(
-          _tableRelationshipReference);
+  Map<String, List<TableRelationshipReference>>
+      get tableRelationshipReference =>
+          UnmodifiableMapView<String, List<TableRelationshipReference>>(
+              _tableRelationshipReference);
 
   /// Returns a [Map] with the table fields values populated from the provided [map].
   ///
@@ -223,11 +244,134 @@ class TableScheme with FieldsFromMap {
         includeAbsentFields: true);
   }
 
+  final Map<_TableRelationshipKey, TableRelationshipReference?>
+      _tableRelationshipReferenceResolved =
+      <_TableRelationshipKey, TableRelationshipReference?>{};
+
   /// Returns the [TableRelationshipReference] with the [targetTable].
-  TableRelationshipReference? getTableRelationshipReference(String targetTable,
-          [String? sourceTable]) =>
-      _tableRelationshipReference[targetTable] ??
-      _tableRelationshipReference[sourceTable];
+  TableRelationshipReference? getTableRelationshipReference(
+      {String? sourceTable, String? sourceField, String? targetTable}) {
+    var key = _TableRelationshipKey(sourceTable, sourceField, targetTable);
+    if (!key.isValid) {
+      throw ArgumentError(
+          "Parameter `sourceTable` or `targetTable` should be provided.");
+    }
+
+    return _tableRelationshipReferenceResolved.putIfAbsent(
+        key,
+        () => _getTableRelationshipReferenceImpl(
+            sourceTable, sourceField, targetTable));
+  }
+
+  TableRelationshipReference? _getTableRelationshipReferenceImpl(
+      String? sourceTable, String? sourceField, String? targetTable) {
+    var byTarget = _tableRelationshipReference[targetTable];
+
+    var rel = _resolveTableRelationshipReference(
+        byTarget, sourceTable, sourceField, targetTable);
+    if (rel != null) return rel;
+
+    var bySource = _tableRelationshipReference[sourceTable];
+
+    rel = _resolveTableRelationshipReference(
+        bySource, sourceTable, sourceField, targetTable);
+    if (rel != null) return rel;
+
+    return null;
+  }
+
+  TableRelationshipReference? _resolveTableRelationshipReference(
+      List<TableRelationshipReference>? l,
+      String? sourceTable,
+      String? sourceField,
+      String? targetTable) {
+    if (l == null || l.isEmpty) return null;
+    if (l.isEmpty) return null;
+    if (l.length == 1) return l.first;
+
+    var rels = l;
+
+    if (sourceTable != null) {
+      rels = l.where((rel) => rel.sourceTable == sourceTable).toList();
+      if (rels.length == 1) return rels.first;
+
+      if (rels.isEmpty) {
+        var sourceTableSimple = StringUtils.toLowerCaseSimple(sourceTable);
+
+        rels = l
+            .where((rel) =>
+                StringUtils.toLowerCaseSimple(rel.sourceTable) ==
+                sourceTableSimple)
+            .toList();
+
+        if (rels.length == 1) return rels.first;
+      }
+    }
+
+    // Expects to have the field in the relationship table name:
+    if (sourceField != null) {
+      var sourceFieldSimpleUnderscored =
+          StringUtils.toLowerCaseSimpleUnderscored(sourceField);
+
+      var rels1 = rels
+          .where((rel) =>
+              StringUtils.toLowerCaseSimpleUnderscored(rel.relationshipTable)
+                  .contains(sourceFieldSimpleUnderscored))
+          .toList();
+
+      if (rels1.length == 1) return rels1.first;
+
+      var sourceFieldSimple =
+          StringUtils.toLowerCaseSimpleUnderscored(sourceField);
+
+      if (rels1.isEmpty) {
+        rels1 = rels
+            .where((rel) => StringUtils.toLowerCaseSimple(rel.relationshipTable)
+                .contains(sourceFieldSimple))
+            .toList();
+      }
+
+      var relsNames = StringUtils.trimEqualitiesMap(
+        rels1.map((e) => e.relationshipTable).toList(),
+        delimiter: '_',
+        normalizer: (s) => StringUtils.toLowerCaseSimpleUnderscored(s),
+        validator: (s) =>
+            !StringUtils.toLowerCaseSimple(s).contains(sourceFieldSimple),
+      );
+
+      var relsNamesSimple = relsNames.map(
+          (key, value) => MapEntry(key, StringUtils.toLowerCaseSimple(value)));
+
+      var rels2 = rels1.where((rel) {
+        var f = relsNamesSimple[rel.relationshipTable]!;
+        return f.contains(sourceFieldSimple);
+      }).toList();
+
+      if (rels2.length == 1) return rels2.first;
+
+      var rels3 = rels1.where((rel) {
+        var f = relsNamesSimple[rel.relationshipTable]!;
+        return f == sourceFieldSimple;
+      }).toList();
+
+      if (rels3.length == 1) return rels3.first;
+
+      if (rels1.length > 1) {
+        rels1.sort((a, b) =>
+            a.relationshipTable.length.compareTo(b.relationshipTable.length));
+        var short = rels.first;
+        return short;
+      }
+    }
+
+    if (rels.isEmpty) {
+      rels = l;
+    }
+
+    throw StateError(
+        "Ambiguous relationship tables for ${sourceTable ?? '?'}.${sourceField ?? '?'} -> ${targetTable ?? '?'}:\n"
+        "${rels.map((r) => ' -- $r\n').join('\n')}\n");
+  }
 
   /// Returns a [TableFieldReference] from [_fieldsReferencedTables] with a resolved [fieldKey].
   /// See [resolveTableFiledName].

@@ -17,17 +17,20 @@ class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
   final SQLAdapterCreator sqlAdapterCreator;
   final int dbPort;
 
+  final EntityHandler<Store> storeEntityHandler;
   final EntityHandler<Address> addressEntityHandler;
   final EntityHandler<Role> roleEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
   late final SQLAdapter sqlAdapter;
 
+  late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
   late final RoleAPIRepository roleAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
   TestEntityRepositoryProvider(
+      this.storeEntityHandler,
       this.addressEntityHandler,
       this.roleEntityHandler,
       this.userEntityHandler,
@@ -46,6 +49,7 @@ class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
   List<SQLEntityRepository<Object>> buildRepositories(
       SQLAdapter<Object> adapter) {
     return _repositories ??= [
+      SQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
       SQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
       SQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
       SQLEntityRepository<User>(adapter, 'user', userEntityHandler)
@@ -58,6 +62,7 @@ class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() => [
+        storeAPIRepository = StoreAPIRepository(this),
         addressAPIRepository = AddressAPIRepository(this),
         roleAPIRepository = RoleAPIRepository(this),
         userAPIRepository = UserAPIRepository(this),
@@ -69,6 +74,8 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
         SQLAdapterCreator sqlAdapterCreator,
         int dbPort) =>
     TestEntityRepositoryProvider(
+      entityByReflection ? Store$reflection().entityHandler : storeEntityHandler
+        ..inspectObject(Store.empty()),
       entityByReflection
           ? Address$reflection().entityHandler
           : addressEntityHandler
@@ -220,12 +227,16 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
       var tables = await sqlAdapter.populateTables(fullCreateTableSQLs);
 
+      _log.info("Populated tables: $tables");
+
       expect(
           tables,
           allOf(
             contains('address'),
             contains('user'),
             contains('role'),
+            contains('address__stores__rel'),
+            contains('address__closed_stores__rel'),
             contains('user__roles__rel'),
           ));
 
@@ -239,11 +250,14 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
             contains('address'),
             contains('user'),
             contains('role'),
+            contains('address__stores__rel'),
+            contains('address__closed_stores__rel'),
             contains('user__roles__rel'),
           ));
     });
 
     test('TestEntityRepositoryProvider', () async {
+      var storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
       var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
       var roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
@@ -275,7 +289,12 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       int user1Id;
 
       {
-        var address = Address('NY', 'New York', 'street A', 101);
+        var store1 = Store('s11', 11);
+        var store2 = Store('s12', 12);
+        var storeClosed = Store('s9', 9);
+
+        var address = Address('NY', 'New York', 'street A', 101,
+            stores: [store1, store2], closedStores: [storeClosed]);
         var role = Role(RoleType.admin);
 
         {
@@ -319,6 +338,10 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
                   'Invalid entity(Address) field(state)> reason: maximum(3)'));
         }
 
+        expect((await storeAPIRepository.selectAll()).length, equals(0));
+        expect((await addressAPIRepository.selectAll()).length, equals(0));
+        expect((await userAPIRepository.selectAll()).length, equals(0));
+
         var user = User('joe@$testDomain', '123', address, [role],
             level: 100, creationTime: user1CreationTime);
 
@@ -335,6 +358,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
+        expect((await storeAPIRepository.selectAll()).length, equals(3));
 
         expect((await userAPIRepository.existsID(1)), isTrue);
         expect((await addressAPIRepository.existsID(1)), isTrue);
@@ -343,6 +367,18 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
             equals('joe@$testDomain'));
         expect((await addressAPIRepository.selectByID(1))?.city,
             equals('New York'));
+
+        expect(
+            (await addressAPIRepository.selectByID(1))
+                ?.stores
+                .map((e) => e.name),
+            equals(['s11', 's12']));
+
+        expect(
+            (await addressAPIRepository.selectByID(1))
+                ?.closedStores
+                .map((e) => e.name),
+            equals(['s9']));
 
         expect((await userAPIRepository.selectByAddress(address)).single.email,
             equals('joe@$testDomain'));
@@ -542,6 +578,40 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       }
 
       {
+        var user = await userAPIRepository.selectByEmail('joe@$testDomain');
+        expect(user!.email, equals('joe@$testDomain'));
+
+        expect(user.id, greaterThanOrEqualTo(1));
+        expect(user.roles.length, equals(1));
+
+        user.roles.add(Role(RoleType.unknown));
+
+        expect(await userAPIRepository.store(user), equals(user.id));
+        expect(user.roles.length, equals(2));
+
+        var user2 = await userAPIRepository.selectByID(user.id);
+        expect(user2!.roles.length, equals(2));
+        expect(user2.roles.map((e) => e.id), unorderedEquals([1, 3]));
+        expect(user2.roles.map((e) => e.type),
+            unorderedEquals([RoleType.admin, RoleType.unknown]));
+
+        expect(user2.password, equals('123'));
+        user2.password = '321';
+
+        expect(await userAPIRepository.store(user2), equals(user.id));
+        expect(user2.roles.length, equals(2));
+
+        var user3 = await userAPIRepository.selectByID(user.id);
+
+        expect(user3!.password, equals('321'));
+
+        expect(user3.roles.length, equals(2));
+        expect(user3.roles.map((e) => e.id), unorderedEquals([1, 3]));
+        expect(user3.roles.map((e) => e.type),
+            unorderedEquals([RoleType.admin, RoleType.unknown]));
+      }
+
+      {
         var transaction = Transaction();
 
         var result = await transaction.execute(() async {
@@ -565,8 +635,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         print(transaction);
 
         expect(result!.length, equals(3));
-        expect(transaction.length, equals(5));
-        expect(transaction.cachedEntitiesLength, equals(8));
+        expect(transaction.length, equals(9));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -601,7 +671,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(8));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -640,7 +710,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(8));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -718,7 +788,14 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       {
         var sel = await userAPIRepository.selectByAddressState('CA');
 
-        var user = sel.first;
+        expect(sel.length, equals(2));
+
+        expect(sel.map((e) => e.email),
+            unorderedEquals(['smith@$testDomain', 'john@$testDomain']));
+
+        expect(sel.map((e) => e.address.state), equals(['CA', 'CA']));
+
+        var user = sel.firstWhere((e) => e.email.startsWith('smith'));
         expect(user.email, equals('smith@$testDomain'));
         expect(user.address.state, equals('CA'));
 
@@ -830,12 +907,12 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         var rolesJson2a = [
           {'id': 2, 'type': 'guest', 'enabled': true, 'value': '123.4500'},
-          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
+          {'id': 4, 'type': 'unknown', 'enabled': true, 'value': null}
         ];
 
         var rolesJson2b = [
           {'id': 2, 'type': 'guest', 'enabled': true, 'value': '123.45'},
-          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
+          {'id': 4, 'type': 'unknown', 'enabled': true, 'value': null}
         ];
 
         expect(
@@ -859,7 +936,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(user3!.email, equals(user.email));
 
         var rolesJson3 = [
-          {'id': 3, 'type': 'unknown', 'enabled': true, 'value': null}
+          {'id': 4, 'type': 'unknown', 'enabled': true, 'value': null}
         ];
         expect(
             user3.roles.map(
@@ -960,7 +1037,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
     });
 
     test('populate', () async {
-      if (testConfigDB.dbType.toLowerCase() == 'mysql') {
+      if (testConfigDB.dbType.toLowerCase() == 'mysqlx') {
         testLog.warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
         return;
       }
@@ -995,6 +1072,15 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           },
         ]
       });
+
+      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+
+      var information = sqlAdapter.information(extended: true);
+
+      _log.info('${sqlAdapter.runtimeType} INFORMATION:');
+      _log.info(Json.encode(information, pretty: true).replaceAllMapped(
+          RegExp(r'\[\s*(?:\d+,\s*|\d+\s*)+\]'),
+          (m) => m[0]!.replaceAll(RegExp(r'\s+'), ' ')));
 
       expect(result.length, equals(1));
 

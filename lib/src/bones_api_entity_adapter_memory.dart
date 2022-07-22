@@ -279,11 +279,24 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   Map<String, dynamic> information({bool extended = false, String? table}) {
     var info = <String, dynamic>{};
 
+    var tables = <String>{};
     if (table != null) {
-      var tableMap = _getTableMap(table, false);
+      tables.add(table);
+    }
+
+    if (extended && tables.isEmpty) {
+      tables = _tables.keys.toSet();
+    }
+
+    if (tables.isNotEmpty) {
+      info['tables'] = <String, dynamic>{};
+    }
+
+    for (var t in tables) {
+      var tableMap = _getTableMap(t, false);
 
       if (tableMap != null) {
-        info[table] = {'ids': tableMap.keys.toList()};
+        info['tables'][t] = {'ids': tableMap.keys.toList()};
       }
     }
 
@@ -539,6 +552,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   List<Map<String, dynamic>> _selectEntries(String table, SQL sql) {
     var map = _getTableMap(table, false);
+
     if (map == null) {
       return <Map<String, dynamic>>[];
     }
@@ -686,6 +700,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     });
 
     var relationshipsTables = tableScheme.tableRelationshipReference.values
+        .expand((e) => e)
         .where((e) => e.sourceTable == tableScheme.name)
         .toList();
 
@@ -927,22 +942,28 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       var refs = e.value;
 
       return refs.values.map((ref) {
+        var sourceTable = ref.sourceTable;
+        var sourceField = ref.sourceField;
+
+        var targetTable = ref.targetTable;
+        var targetField = ref.targetField;
+
         var sourceEntityHandler = repo.entityHandler;
         var sourceFieldId = sourceEntityHandler.idFieldName();
         var sourceFieldIdType =
             sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
 
-        var relTable = '${ref.sourceTable}__${ref.targetTable}__rel';
-        var relSourceField = '${ref.sourceTable}__$sourceFieldId';
-        var relTargetField = '${ref.targetTable}__${ref.targetField}';
+        var relTable = '${sourceTable}__${sourceField}__rel';
+        var relSourceField = '${sourceTable}__$sourceFieldId';
+        var relTargetField = '${targetTable}__$targetField';
 
         return TableRelationshipReference(
           relTable,
-          ref.sourceTable,
+          sourceTable,
           sourceFieldId,
           sourceFieldIdType,
           relSourceField,
-          ref.targetTable,
+          targetTable,
           ref.targetField,
           ref.targetFieldType,
           relTargetField,

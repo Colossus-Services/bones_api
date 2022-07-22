@@ -355,7 +355,7 @@ class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
 
     var relationshipTables = tablesSchemes
         .whereNotNull()
-        .expand((e) => e.tableRelationshipReference.values);
+        .expand((e) => e.tableRelationshipReference.values.expand((e) => e));
 
     var allTables = [
       ...tables,

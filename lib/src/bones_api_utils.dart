@@ -1,4 +1,5 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 import 'package:statistics/statistics.dart';
 
 /// Basic [String] functions.
@@ -6,18 +7,28 @@ class StringUtils {
   /// Transforms [s] to lower-case.
   static String toLowerCase(String s) => s.toLowerCase();
 
-  static final RegExp _regexpLettersAndDigits = RegExp(r'[^a-zA-Z\d]+');
+  static final RegExp _regexpNotLettersAndDigits = RegExp(r'[^a-zA-Z\d]+');
 
   /// Transforms [s] to lower-case and removes non-letters and non-digits.
   static String toLowerCaseSimple(String s) =>
-      s.toLowerCase().replaceAll(_regexpLettersAndDigits, '');
+      s.toLowerCase().replaceAll(_regexpNotLettersAndDigits, '');
+
+  static final RegExp _regexpNotLettersDigitsAndUnderscore = RegExp(r'\W+');
+
+  /// Transforms [s] to lower-case and removes non-letters, non-digits and non-underscore (`_`), also repeating underscores are replaced to a single one `_`.
+  static String toLowerCaseSimpleUnderscored(String s) {
+    return s
+        .toLowerCase()
+        .replaceAll(_regexpNotLettersDigitsAndUnderscore, '')
+        .replaceAll(RegExp(r'_+'), '_');
+  }
 
   /// Transforms [s] to lower-case using underscore (`_`)
   /// before the upper-case letters.
   /// - If [simple] is `true` removes non-letters and non-digits.
   static String toLowerCaseUnderscore(String s, {bool simple = false}) {
     if (simple) {
-      s = s.replaceAll(_regexpLettersAndDigits, '_');
+      s = s.replaceAll(_regexpNotLettersAndDigits, '_');
     }
 
     var str = StringBuffer();
@@ -58,6 +69,144 @@ class StringUtils {
 
   /// Returns `true` if [s] is a letter or digit.
   static bool isLetterOrDigit(String s) => _regexpIsLetterOrDigit.hasMatch(s);
+
+  /// Ensures that this [regexp] matches an ending of a [String].
+  static RegExp asEndingPattern(RegExp regexp) {
+    if (regexp.pattern.contains('\$')) {
+      return regexp;
+    } else {
+      return RegExp('${regexp.pattern}\$');
+    }
+  }
+
+  /// Returns `true` if [s] ends with [pattern] (accepts [RegExp]).
+  static bool endsWithPattern(String s, Pattern pattern,
+      {bool isEndingPattern = false}) {
+    if (pattern is RegExp) {
+      var p = isEndingPattern ? pattern : asEndingPattern(pattern);
+      return p.hasMatch(s);
+    } else {
+      return s.endsWith(pattern.toString());
+    }
+  }
+
+  /// Returns the equals head part of [l] elements.
+  static String getHeadEquality(List<String> l,
+      {Pattern? delimiter,
+      int? minLength,
+      bool Function(String s)? validator}) {
+    if (l.length <= 1) return '';
+
+    var min = l.map((e) => e.length).min;
+    if (minLength != null && min > minLength) min = minLength;
+
+    var longest = '';
+    String? longestWithDelimiter;
+
+    if (delimiter is RegExp) {
+      delimiter = asEndingPattern(delimiter);
+    }
+
+    for (var sz = 1; sz < min; ++sz) {
+      var head = l[0].substring(0, sz);
+
+      var matches = true;
+      for (var i = 1; i < l.length; ++i) {
+        var e = l[i];
+        if (!e.startsWith(head)) {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches && (validator == null || validator(head))) {
+        longest = head;
+        if (delimiter != null &&
+            endsWithPattern(head, delimiter, isEndingPattern: true)) {
+          longestWithDelimiter = head;
+        }
+      }
+    }
+
+    return longestWithDelimiter ?? longest;
+  }
+
+  /// Returns the equals tail part of [l] elements.
+  static String getTailEquality(List<String> l,
+      {Pattern? delimiter,
+      int? minLength,
+      bool Function(String s)? validator}) {
+    if (l.length <= 1) return '';
+
+    var min = l.map((e) => e.length).min;
+    if (minLength != null && min > minLength) min = minLength;
+
+    var longest = '';
+    String? longestWithDelimiter;
+
+    for (var sz = 1; sz < min; ++sz) {
+      var s = l[0];
+      var tail = s.substring(s.length - sz);
+
+      var matches = true;
+      for (var i = 1; i < l.length; ++i) {
+        var e = l[i];
+        if (!e.endsWith(tail)) {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches && (validator == null || validator(tail))) {
+        longest = tail;
+        if (delimiter != null && tail.startsWith(delimiter)) {
+          longestWithDelimiter = tail;
+        }
+      }
+    }
+
+    return longestWithDelimiter ?? longest;
+  }
+
+  static List<String> trimEqualities(List<String> l,
+      {Pattern? delimiter,
+      int? minLength,
+      bool Function(String s)? validator}) {
+    if (l.length <= 1) return l.toList();
+
+    var head = getHeadEquality(l,
+        delimiter: delimiter, minLength: minLength, validator: validator);
+    var headSz = head.length;
+
+    var min = l.map((e) => e.length).min;
+    var tailMinLength = min - headSz;
+    if (minLength != null && tailMinLength > minLength) {
+      tailMinLength = minLength;
+    }
+
+    var tail = getTailEquality(l,
+        delimiter: delimiter, minLength: tailMinLength, validator: validator);
+    var tailSz = tail.length;
+
+    var l2 = l.map((e) => e.substring(headSz, e.length - tailSz)).toList();
+    return l2;
+  }
+
+  static Map<String, String> trimEqualitiesMap(List<String> l,
+      {String? delimiter,
+      String Function(String s)? normalizer,
+      bool Function(String s)? validator}) {
+    var l1 = normalizer != null ? normalizeAll(l, normalizer) : l;
+    var l2 = trimEqualities(l1, delimiter: delimiter, validator: validator);
+    return Map<String, String>.fromIterables(l, l2);
+  }
+
+  static List<String> normalizeAll(
+      List<String> l, String Function(String s)? normalizer) {
+    if (normalizer == null) return l;
+    l = l.map(normalizer).toList();
+    return l;
+  }
 }
 
 /// Base class for key normalization mapping.

@@ -22,10 +22,8 @@ class Foo {
 void main() {
   logToConsole();
 
-  group('Utils', () {
-    setUp(() {});
-
-    test('StringUtils', () async {
+  group('StringUtils', () {
+    test('toLowerCaseSimple, toLowerCaseUnderscore', () async {
       expect(StringUtils.toLowerCase('someCamel-Case+Name'),
           equals('somecamel-case+name'));
 
@@ -50,7 +48,116 @@ void main() {
           equals('_some_camel_case_name'));
     });
 
-    test('Json.toJson', () async {
+    test('getHeadEquality', () async {
+      expect(StringUtils.endsWithPattern('abx_xyz', 'z'), isTrue);
+      expect(StringUtils.endsWithPattern('abx_xyz', 'a'), isFalse);
+
+      var re = RegExp(r'[yz]');
+      expect(StringUtils.endsWithPattern('abx_xz', re), isTrue);
+      expect(StringUtils.endsWithPattern('abx_xy', re), isTrue);
+      expect(StringUtils.endsWithPattern('abx_xa', re), isFalse);
+      expect(StringUtils.endsWithPattern('abz_', re), isFalse);
+    });
+
+    test('getHeadEquality', () async {
+      expect(
+          StringUtils.getHeadEquality(['abc_xyz', 'abc_123']), equals('abc_'));
+      expect(StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_123']),
+          equals('abc_'));
+
+      expect(StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3']),
+          equals('abc_xyz'));
+      expect(
+          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
+              delimiter: '_'),
+          equals('abc_'));
+
+      expect(
+          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
+              validator: (s) => !s.contains('y')),
+          equals('abc_x'));
+      expect(
+          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
+              validator: (s) => !s.contains('y'), delimiter: '_'),
+          equals('abc_'));
+    });
+
+    test('getTailEquality', () async {
+      expect(
+          StringUtils.getTailEquality(['abc_xyz', '123_xyz']), equals('_xyz'));
+      expect(StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '123_xyz']),
+          equals('_xyz'));
+
+      expect(StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz']),
+          equals('abc_xyz'));
+      expect(
+          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
+              delimiter: '_'),
+          equals('_xyz'));
+
+      expect(
+          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
+              validator: (s) => !s.contains('b')),
+          equals('c_xyz'));
+      expect(
+          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
+              validator: (s) => !s.contains('b'), delimiter: '_'),
+          equals('_xyz'));
+    });
+
+    test('trimEqualitiesMap', () async {
+      expect(
+          StringUtils.trimEqualitiesMap(['item_abc', 'item_klm', 'item_xyz']),
+          equals({'item_abc': 'abc', 'item_klm': 'klm', 'item_xyz': 'xyz'}));
+
+      expect(
+          StringUtils.trimEqualitiesMap(
+              ['item_abc_id', 'item_klm_id', 'item_xyz_id']),
+          equals({
+            'item_abc_id': 'abc',
+            'item_klm_id': 'klm',
+            'item_xyz_id': 'xyz'
+          }));
+
+      expect(
+          StringUtils.trimEqualitiesMap(
+              ['item_abc_1k_id', 'item_klm_2k_id', 'item_xyz_3k_id']),
+          equals({
+            'item_abc_1k_id': 'abc_1',
+            'item_klm_2k_id': 'klm_2',
+            'item_xyz_3k_id': 'xyz_3'
+          }));
+
+      expect(
+          StringUtils.trimEqualitiesMap(
+              ['item_abc_1k_id', 'item_klm_2k_id', 'item_xyz_3k_id'],
+              delimiter: '_'),
+          equals({
+            'item_abc_1k_id': 'abc_1k',
+            'item_klm_2k_id': 'klm_2k',
+            'item_xyz_3k_id': 'xyz_3k'
+          }));
+
+      expect(StringUtils.trimEqualitiesMap(['item_abc_id', 'item_abc_xyz_id']),
+          equals({'item_abc_id': 'i', 'item_abc_xyz_id': 'xyz_i'}));
+
+      expect(
+          StringUtils.trimEqualitiesMap(['item_abc_id', 'item_abc_xyz_id'],
+              validator: (s) => !s.contains('abc')),
+          equals({'item_abc_id': 'c', 'item_abc_xyz_id': 'c_xyz'}));
+
+      expect(StringUtils.trimEqualitiesMap(['item_xyz_id', 'item_abc_xyz_id']),
+          equals({'item_xyz_id': 'x', 'item_abc_xyz_id': 'abc_x'}));
+
+      expect(
+          StringUtils.trimEqualitiesMap(['item_xyz_id', 'item_abc_xyz_id'],
+              delimiter: '_', validator: (s) => !s.contains('xyz')),
+          equals({'item_xyz_id': 'xyz', 'item_abc_xyz_id': 'abc_xyz'}));
+    });
+  });
+
+  group('Json', () {
+    test('toJson', () async {
       expect(Json.toJson(123), equals(123));
       expect(Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),
           equals('2021-01-02 03:04:05.000Z'));
@@ -89,7 +196,7 @@ void main() {
           equals({'type': 'guest', 'enabled': false, 'value': '456.789'}));
     });
 
-    test('Json.fromJson', () async {
+    test('fromJson', () async {
       Role$reflection.boot();
 
       {
@@ -107,7 +214,7 @@ void main() {
       }
     });
 
-    test('Json.fromJson + id ref', () async {
+    test('fromJson + id ref', () async {
       User$reflection.boot();
       Address$reflection.boot();
       Role$reflection.boot();
@@ -147,7 +254,7 @@ void main() {
       }
     });
 
-    test('Json.encode', () async {
+    test('encode', () async {
       expect(Json.encode({'a': 1, 'b': 2}), equals('{"a":1,"b":2}'));
 
       expect(
@@ -168,7 +275,7 @@ void main() {
           equals('{"a":1,"pass":"x"}'));
     });
 
-    test('Json.decode', () async {
+    test('decode', () async {
       expect(Json.decode('{"a":1,"b":2}'), equals({'a': 1, 'b': 2}));
 
       expect(
@@ -185,7 +292,7 @@ void main() {
           equals({'ab': AB(1, 2)}));
     });
 
-    test('Json.decodeFromBytes', () async {
+    test('decodeFromBytes', () async {
       Role$reflection.boot();
 
       {
@@ -203,8 +310,10 @@ void main() {
             equals(Role(RoleType.admin, enabled: true)));
       }
     });
+  });
 
-    test('TypeParser.parseInt', () async {
+  group('TypeParser', () {
+    test('parseInt', () async {
       expect(TypeParser.parseInt(10), equals(10));
       expect(TypeParser.parseInt('11'), equals(11));
       expect(TypeParser.parseInt(' 12 '), equals(12));
@@ -225,7 +334,7 @@ void main() {
       expect(TypeParser.parseInt(null), isNull);
     });
 
-    test('TypeParser.parseDouble', () async {
+    test('parseDouble', () async {
       expect(TypeParser.parseDouble(10), equals(10));
       expect(TypeParser.parseDouble(10.11), equals(10.11));
       expect(TypeParser.parseDouble('11'), equals(11.0));
@@ -251,7 +360,7 @@ void main() {
       expect(TypeParser.parseDouble(null), isNull);
     });
 
-    test('TypeParser.parseNum', () async {
+    test('parseNum', () async {
       expect(TypeParser.parseNum(10), equals(10));
       expect(TypeParser.parseNum(10.11), equals(10.11));
       expect(TypeParser.parseNum('11'), equals(11.0));
@@ -277,7 +386,7 @@ void main() {
       expect(TypeParser.parseNum(null), isNull);
     });
 
-    test('TypeParser.parseBool', () async {
+    test('parseBool', () async {
       expect(TypeParser.parseBool(true), isTrue);
       expect(TypeParser.parseBool(false), isFalse);
 
@@ -307,7 +416,7 @@ void main() {
       expect(TypeParser.parseBool('error'), isFalse);
     });
 
-    test('TypeParser.parserFor', () async {
+    test('parserFor', () async {
       expect(TypeParser.parserFor<int>()!('123'), isA<int>());
       expect(TypeParser.parserFor<double>()!('123,4'), isA<double>());
       expect(TypeParser.parserFor<num>()!('123,4'), isA<num>());
@@ -340,7 +449,7 @@ void main() {
           isA<Iterable>());
     });
 
-    test('TypeParser.parseList', () async {
+    test('parseList', () async {
       expect(TypeParser.parseList([1, 2, 3]), equals([1, 2, 3]));
       expect(TypeParser.parseList('1,2,3'), equals(['1', '2', '3']));
       expect(TypeParser.parseList('1,2,3', elementParser: TypeParser.parseInt),
@@ -348,7 +457,7 @@ void main() {
       expect(TypeParser.parseList<int>('1,2,3'), equals([1, 2, 3]));
     });
 
-    test('TypeParser.parseSet', () async {
+    test('parseSet', () async {
       expect(TypeParser.parseSet([1, 2, 3]), equals({1, 2, 3}));
       expect(TypeParser.parseSet('1,2,3'), equals({'1', '2', '3'}));
       expect(TypeParser.parseSet('1,2,3', elementParser: TypeParser.parseInt),
@@ -356,7 +465,7 @@ void main() {
       expect(TypeParser.parseSet<int>('1,2,3'), equals({1, 2, 3}));
     });
 
-    test('TypeParser.parseMap', () async {
+    test('parseMap', () async {
       expect(TypeParser.parseMap({'a': 1, 'b': 2}), equals({'a': 1, 'b': 2}));
       expect(TypeParser.parseMap('a:1&b:2'), equals({'a': '1', 'b': '2'}));
       expect(

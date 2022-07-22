@@ -13,6 +13,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 
   late final MemorySQLAdapter sqlAdapter;
 
+  late final SQLEntityRepository<Store> storeSQLRepository;
   late final SQLEntityRepository<Address> addressSQLRepository;
   late final SQLEntityRepository<Role> roleSQLRepository;
   late final SQLEntityRepository<User> userSQLRepository;
@@ -33,7 +34,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
           'address':
               TableFieldReference('user', 'address', int, 'address', 'id', int)
         }, relationshipTables: [
-          TableRelationshipReference('user__role__rel', 'user', 'id', int,
+          TableRelationshipReference('user__roles__rel', 'user', 'id', int,
               'user_id', 'role', 'id', int, 'role_id')
         ]),
         TableScheme(
@@ -44,7 +45,22 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
             'state': String,
             'city': String,
             'street': String,
-            'number': int
+            'number': int,
+          },
+          relationshipTables: [
+            TableRelationshipReference('address__stores__rel', 'address', 'id',
+                int, 'address_id', 'store', 'id', int, 'store_id'),
+            TableRelationshipReference('address__closed_stores__rel', 'address',
+                'id', int, 'address_id', 'store', 'id', int, 'store_id')
+          ],
+        ),
+        TableScheme(
+          'store',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'name': String,
+            'number': int,
           },
         ),
         TableScheme(
@@ -58,6 +74,10 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
           },
         )
       ]);
+
+    storeSQLRepository =
+        SQLEntityRepository<Store>(sqlAdapter, 'store', storeEntityHandler)
+          ..ensureInitialized();
 
     addressSQLRepository = SQLEntityRepository<Address>(
         sqlAdapter, 'address', addressEntityHandler)
@@ -79,11 +99,15 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 
 void main() {
   group('Entity', () {
+    late final SetEntityRepository<Store> storeRepository;
     late final SetEntityRepository<Address> addressRepository;
     late final SetEntityRepository<Role> roleRepository;
     late final SetEntityRepository<User> userRepository;
 
     setUpAll(() {
+      storeRepository = SetEntityRepository<Store>('store', storeEntityHandler);
+      storeRepository.ensureInitialized();
+
       addressRepository =
           SetEntityRepository<Address>('address', addressEntityHandler);
       addressRepository.ensureInitialized();
@@ -98,6 +122,8 @@ void main() {
     tearDownAll(() {
       addressRepository.close();
       userRepository.close();
+      storeRepository.close();
+      roleRepository.close();
     });
 
     test('basic', () async {
@@ -111,21 +137,26 @@ void main() {
       var user2 = User(
           'smith@mail.com',
           'abc',
-          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404),
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 404,
+              stores: [Store('s1', 1)], closedStores: [Store('s2', 2)]),
           [Role(RoleType.guest, value: Decimal.parse('12345.678'))],
           wakeUpTime: Time(12, 13, 14, 150),
           creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14, 0, 0));
-      var user3 = User('john@mail.com', '456',
-          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101), [],
+      var user3 = User(
+          'john@mail.com',
+          '456',
+          Address('CA', 'Los Angeles', 'Hollywood Boulevard', 101,
+              stores: [Store('s1', 1)]),
+          [],
           wakeUpTime: Time(0, 13, 14, 150),
           creationTime: DateTime.utc(2021, 10, 12, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":"2020-10-11 12:13:14.000Z"}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101,"stores":[],"closedStores":[]},"roles":[{"enabled":true,"type":"admin"}],"level":10,"creationTime":"2020-10-11 12:13:14.000Z"}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404,"stores":[{"name":"s1","number":1}],"closedStores":[{"name":"s2","number":2}]},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","creationTime":"2021-10-11 12:13:14.000Z"}';
       var user3Json =
-          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101},"roles":[],"wakeUpTime":"00:13:14.150","creationTime":"2021-10-12 12:13:14.000Z"}';
+          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101,"stores":[{"name":"s1","number":1}],"closedStores":[]},"roles":[],"wakeUpTime":"00:13:14.150","creationTime":"2021-10-12 12:13:14.000Z"}';
 
       addressEntityHandler.inspectObject(user1.address);
       roleEntityHandler.inspectObject(user1.roles.first);
@@ -658,7 +689,7 @@ void main() {
         });
 
         expect(t.isCommitted, isTrue);
-        expect(t.length, equals(8));
+        expect(t.length, equals(10));
         expect(t.isExecuting, isFalse);
         expect((t.result as List).first, isA<User>());
       }

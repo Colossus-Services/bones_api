@@ -219,7 +219,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       var q = sqlElementQuote;
 
-      var tableFieldName = tableScheme.resolveTableFiledName(key0.name);
+      var fieldName = key0.name;
+      var tableFieldName = tableScheme.resolveTableFiledName(fieldName);
       var tableFieldType = tableFieldName != null
           ? tableScheme.fieldsTypes[tableFieldName]
           : null;
@@ -228,29 +229,31 @@ class ConditionSQLEncoder extends ConditionEncoder {
         return MapEntry(tableFieldType, '$q$tableAlias$q.$q$tableFieldName$q');
       }
 
-      var retFieldType = schemeProvider.getFieldType(key0.name,
+      var retFieldType = schemeProvider.getFieldType(fieldName,
           entityName: context.entityName, tableName: context.tableName);
 
-      return retFieldType.resolveMapped((fieldType) {
-        if (fieldType == null) {
+      return retFieldType.resolveMapped((refFieldType) {
+        if (refFieldType == null) {
           throw ConditionEncodingError(
               'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme');
         }
 
-        var retTableNameRef = schemeProvider.getTableForType(fieldType);
+        var retTableNameRef = schemeProvider.getTableForType(refFieldType);
 
         return retTableNameRef.resolveMapped((tableNameRef) {
           if (tableNameRef == null) {
             throw ConditionEncodingError(
-                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
           var relationship = tableScheme.getTableRelationshipReference(
-              tableNameRef, tableNameRef);
+              sourceTable: tableName,
+              sourceField: fieldName,
+              targetTable: tableNameRef);
 
           if (relationship == null) {
             throw ConditionEncodingError(
-                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
           context.relationshipTables[tableNameRef] ??= relationship;
@@ -299,7 +302,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
         throw StateError(errorMsg);
       }
 
-      var fieldRef = tableScheme.getFieldsReferencedTables(key0.name);
+      var fieldName = key0.name;
+      var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
 
       if (fieldRef != null) {
         context.fieldsReferencedTables.add(fieldRef);
@@ -332,29 +336,31 @@ class ConditionSQLEncoder extends ConditionEncoder {
         }
       }
 
-      var retFieldType = schemeProvider.getFieldType(key0.name,
+      var retFieldType = schemeProvider.getFieldType(fieldName,
           entityName: context.entityName, tableName: context.tableName);
 
-      return retFieldType.resolveMapped((fieldType) {
-        if (fieldType == null) {
+      return retFieldType.resolveMapped((refFieldType) {
+        if (refFieldType == null) {
           throw ConditionEncodingError(
               'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme');
         }
 
-        var retTableNameRef = schemeProvider.getTableForType(fieldType);
+        var retTableNameRef = schemeProvider.getTableForType(refFieldType);
 
         return retTableNameRef.resolveMapped((tableNameRef) {
           if (tableNameRef == null) {
             throw ConditionEncodingError(
-                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
           var relationship = tableScheme.getTableRelationshipReference(
-              tableNameRef, tableNameRef);
+              sourceTable: tableName,
+              sourceField: fieldName,
+              targetTable: tableNameRef);
 
           if (relationship == null) {
             throw ConditionEncodingError(
-                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $fieldType> $this ; tableScheme: $tableScheme');
+                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
           context.relationshipTables[tableNameRef] ??= relationship;

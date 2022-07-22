@@ -419,12 +419,15 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
       var databaseAdapter = sqlRepositoryAdapter.databaseAdapter;
 
       var entries = fieldsListEntity.entries.map((e) {
+        var fieldName = e.key;
         var targetType = e.value.listEntityType!.type;
         var targetRepositoryAdapter =
             databaseAdapter.getRepositoryAdapterByType(targetType);
         if (targetRepositoryAdapter == null) return null;
-        var relationship = tableScheme
-            .getTableRelationshipReference(targetRepositoryAdapter.name);
+        var relationship = tableScheme.getTableRelationshipReference(
+            sourceTable: tableName,
+            sourceField: fieldName,
+            targetTable: targetRepositoryAdapter.name);
         if (relationship == null) return null;
         return MapEntry(e.key, relationship);
       }).whereNotNull();
@@ -522,9 +525,11 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     if (fieldsListEntity.isEmpty) return false;
 
     var ret = fieldsListEntity.entries.map((e) {
-      var values = entityHandler.getField(o, e.key);
-      return setRelationship(o, e.key, values,
-          fieldType: e.value, transaction: transaction);
+      var field = e.key;
+      var fieldType = e.value;
+      var values = entityHandler.getField(o, field);
+      return setRelationship(o, field, values,
+          fieldType: fieldType, transaction: transaction);
     }).resolveAll();
 
     return ret.resolveWithValue(true);
@@ -548,7 +553,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
     try {
       return sqlRepositoryAdapter.doInsertRelationship(
-          op, oId, valuesTableName, othersIds);
+          op, field, oId, valuesTableName, othersIds);
     } catch (e, s) {
       var message = 'setRelationship[$valuesTableName]> '
           'o: $o ; '
@@ -581,8 +586,8 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
     String valuesTableName = _resolveTableName(valuesType);
 
     try {
-      return sqlRepositoryAdapter.doSelectRelationship(op, oId, valuesTableName,
-          (sel) {
+      return sqlRepositoryAdapter
+          .doSelectRelationship(op, field, oId, valuesTableName, (sel) {
         var valuesIds = sel.map((e) => e['target_id']!).cast<E>().toList();
         return valuesIds;
       });
@@ -714,7 +719,7 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
 
     try {
       return sqlRepositoryAdapter
-          .doSelectRelationships(op, oIds, valuesTableName, (sel) {
+          .doSelectRelationships(op, field, oIds, valuesTableName, (sel) {
         var relationships = sel.groupListsBy((e) => e['source_id']!).map(
             (id, l) => MapEntry(id, l.map((m) => m['target_id']).toList()));
 

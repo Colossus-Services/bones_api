@@ -875,6 +875,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       Transaction transaction,
       String entityName,
       String table,
+      String field,
       dynamic id,
       String otherTableName,
       List otherIds) {
@@ -887,8 +888,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         throw StateError(errorMsg);
       }
 
-      var relationship =
-          tableScheme.getTableRelationshipReference(otherTableName);
+      var relationship = tableScheme.getTableRelationshipReference(
+          sourceTable: table, sourceField: field, targetTable: otherTableName);
 
       if (relationship == null) {
         throw StateError(
@@ -903,7 +904,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
               .toList();
 
       var constrainSQL = _generateConstrainRelationshipSQL(
-          tableScheme, table, id, otherTableName, otherIds);
+          tableScheme, table, field, id, otherTableName, otherIds);
 
       sqls.last.posSQL = [constrainSQL];
 
@@ -946,9 +947,9 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   SQL _generateConstrainRelationshipSQL(TableScheme tableScheme, String table,
-      dynamic id, String otherTableName, List otherIds) {
-    var relationship =
-        tableScheme.getTableRelationshipReference(otherTableName);
+      String field, dynamic id, String otherTableName, List otherIds) {
+    var relationship = tableScheme.getTableRelationshipReference(
+        sourceTable: table, sourceField: field, targetTable: otherTableName);
 
     if (relationship == null) {
       throw StateError(
@@ -1039,8 +1040,13 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     });
   }
 
-  FutureOr<SQL> generateSelectRelationshipSQL(Transaction transaction,
-      String entityName, String table, dynamic id, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipSQL(
+      Transaction transaction,
+      String entityName,
+      String table,
+      String field,
+      dynamic id,
+      String otherTableName) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1050,8 +1056,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         throw StateError(errorMsg);
       }
 
-      var relationship =
-          tableScheme.getTableRelationshipReference(otherTableName);
+      var relationship = tableScheme.getTableRelationshipReference(
+          sourceTable: table, sourceField: field, targetTable: otherTableName);
 
       if (relationship == null) {
         throw StateError(
@@ -1115,6 +1121,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       Transaction transaction,
       String entityName,
       String table,
+      String field,
       List<dynamic> ids,
       String otherTableName) {
     var retTableScheme = getTableScheme(table);
@@ -1126,8 +1133,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         throw StateError(errorMsg);
       }
 
-      var relationship =
-          tableScheme.getTableRelationshipReference(otherTableName);
+      var relationship = tableScheme.getTableRelationshipReference(
+          sourceTable: table, sourceField: field, targetTable: otherTableName);
 
       if (relationship == null) {
         throw StateError(
@@ -1625,11 +1632,17 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   @override
-  FutureOr<bool> doInsertRelationship(TransactionOperation op,
-      String entityName, String table, id, String otherTableName, List otherIds,
+  FutureOr<bool> doInsertRelationship(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      String field,
+      dynamic id,
+      String otherTableName,
+      List otherIds,
       [PreFinishDBOperation<bool, bool>? preFinish]) {
-    return generateInsertRelationshipSQLs(
-            op.transaction, entityName, table, id, otherTableName, otherIds)
+    return generateInsertRelationshipSQLs(op.transaction, entityName, table,
+            field, id, otherTableName, otherIds)
         .resolveMapped((sqls) {
       return insertRelationshipSQLs(
               op, entityName, table, sqls, id, otherTableName, otherIds)
@@ -1657,11 +1670,16 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   @override
-  FutureOr<R> doSelectRelationship<R>(TransactionOperation op,
-      String entityName, String table, dynamic id, String otherTableName,
+  FutureOr<R> doSelectRelationship<R>(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      String field,
+      dynamic id,
+      String otherTableName,
       [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
     return generateSelectRelationshipSQL(
-            op.transaction, entityName, table, id, otherTableName)
+            op.transaction, entityName, table, field, id, otherTableName)
         .resolveMapped((sql) {
       return selectRelationshipSQL(
               op, entityName, table, sql, id, otherTableName)
@@ -1670,11 +1688,16 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   @override
-  FutureOr<R> doSelectRelationships<R>(TransactionOperation op,
-      String entityName, String table, List ids, String otherTableName,
+  FutureOr<R> doSelectRelationships<R>(
+      TransactionOperation op,
+      String entityName,
+      String table,
+      String field,
+      List ids,
+      String otherTableName,
       [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
     return generateSelectRelationshipsSQL(
-            op.transaction, entityName, table, ids, otherTableName)
+            op.transaction, entityName, table, field, ids, otherTableName)
         .resolveMapped((sql) {
       return selectRelationshipsSQL(
               op, entityName, table, sql, ids, otherTableName)
@@ -1774,9 +1797,9 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
   }
 
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(Transaction transaction,
-      dynamic id, String otherTableName, List otherIds) {
+      String field, dynamic id, String otherTableName, List otherIds) {
     return databaseAdapter.generateInsertRelationshipSQLs(
-        transaction, name, tableName, id, otherTableName, otherIds);
+        transaction, name, tableName, field, id, otherTableName, otherIds);
   }
 
   FutureOr<bool> insertRelationshipSQLs(TransactionOperation op, List<SQL> sqls,
@@ -1785,10 +1808,10 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
         op, name, tableName, sqls, id, otherTableName, otherIds);
   }
 
-  FutureOr<SQL> generateSelectRelationshipSQL(
-      Transaction transaction, dynamic id, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipSQL(Transaction transaction,
+      String field, dynamic id, String otherTableName) {
     return databaseAdapter.generateSelectRelationshipSQL(
-        transaction, name, tableName, id, otherTableName);
+        transaction, name, tableName, field, id, otherTableName);
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipSQL(
@@ -1797,10 +1820,10 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
         op, name, tableName, sql, id, otherTableName);
   }
 
-  FutureOr<SQL> generateSelectRelationshipsSQL(
-      Transaction transaction, List<dynamic> ids, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipsSQL(Transaction transaction,
+      String field, List<dynamic> ids, String otherTableName) {
     return databaseAdapter.generateSelectRelationshipsSQL(
-        transaction, name, tableName, ids, otherTableName);
+        transaction, name, tableName, field, ids, otherTableName);
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(

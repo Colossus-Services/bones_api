@@ -3,6 +3,9 @@ import 'package:statistics/statistics.dart';
 
 part 'bones_api_test_entities.reflection.g.dart';
 
+final storeEntityHandler =
+    GenericEntityHandler<Store>(instantiatorFromMap: (m) => Store.fromMap(m));
+
 final addressEntityHandler = GenericEntityHandler<Address>(
     instantiatorFromMap: (m) => Address.fromMap(m));
 
@@ -11,6 +14,11 @@ final roleEntityHandler =
 
 final userEntityHandler =
     GenericEntityHandler<User>(instantiatorFromMap: (m) => User.fromMap(m));
+
+class StoreAPIRepository extends APIRepository<Store> {
+  StoreAPIRepository(EntityRepositoryProvider provider)
+      : super(provider: provider);
+}
 
 class AddressAPIRepository extends APIRepository<Address> {
   AddressAPIRepository(EntityRepositoryProvider provider)
@@ -100,7 +108,7 @@ class User extends Entity {
       map.getAsString('email')!,
       map.getAsString('password')!,
       map.getAs<Address>('address')!,
-      map.getAsList<Role>('roles', def: [])!,
+      map.getAsList<Role>('roles', def: <Role>[])!,
       id: map['id'],
       level: map['level'],
       wakeUpTime: map['wakeUpTime'],
@@ -254,6 +262,110 @@ class User extends Entity {
 }
 
 @EnableReflection()
+class Store extends Entity {
+  int? id;
+
+  @EntityField.maximum(100)
+  String name;
+
+  int? number;
+
+  Store(this.name, this.number, {this.id});
+
+  Store.empty() : this('', 0);
+
+  static FutureOr<Store> fromMap(Map<String, dynamic> map) =>
+      Store(map.getAsString('name')!, map.getAsInt('number')!, id: map['id']);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Store && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String get idFieldName => 'id';
+
+  @JsonField.hidden()
+  @override
+  List<String> get fieldsNames => const <String>['id', 'name', 'number'];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'name':
+        return name as V?;
+      case 'number':
+        return number as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tInt;
+      case 'name':
+        return TypeInfo.tString;
+      case 'number':
+        return TypeInfo.tInt;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
+    switch (key) {
+      case 'name':
+        return [
+          EntityField.maximum(100),
+        ];
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        {
+          id = value as int?;
+          break;
+        }
+      case 'name':
+        {
+          name = value as String;
+          break;
+        }
+
+      case 'number':
+        {
+          number = value as int?;
+          break;
+        }
+
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        'name': name,
+        'number': number,
+      };
+}
+
+@EnableReflection()
 class Address extends Entity {
   int? id;
 
@@ -268,19 +380,21 @@ class Address extends Entity {
 
   int number;
 
-  Address(
-    this.state,
-    this.city,
-    this.street,
-    this.number, {
-    this.id,
-  });
+  List<Store> stores;
+  List<Store> closedStores;
+
+  Address(this.state, this.city, this.street, this.number,
+      {this.id, List<Store>? stores, List<Store>? closedStores})
+      : stores = stores ?? <Store>[],
+        closedStores = closedStores ?? <Store>[];
 
   Address.empty() : this('', '', '', 0);
 
   Address.fromMap(Map<String, dynamic> map)
       : this(map.getAsString('state')!, map.getAsString('city')!,
             map.getAsString('street')!, map.getAsInt('number')!,
+            stores: map.getAsList<Store>('stores', def: <Store>[])!,
+            closedStores: map.getAsList<Store>('closedStores', def: <Store>[])!,
             id: map.getAsInt('id'));
 
   @override
@@ -307,8 +421,15 @@ class Address extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames =>
-      const <String>['id', 'state', 'city', 'street', 'number'];
+  List<String> get fieldsNames => const <String>[
+        'id',
+        'state',
+        'city',
+        'street',
+        'number',
+        'stores',
+        'closedStores'
+      ];
 
   @override
   V? getField<V>(String key) {
@@ -323,6 +444,10 @@ class Address extends Entity {
         return street as V?;
       case 'number':
         return number as V?;
+      case 'stores':
+        return stores as V?;
+      case 'closedStores':
+        return closedStores as V?;
       default:
         return null;
     }
@@ -341,6 +466,10 @@ class Address extends Entity {
         return TypeInfo.tString;
       case 'number':
         return TypeInfo.tInt;
+      case 'stores':
+        return TypeInfo(List, [Store]);
+      case 'closedStores':
+        return TypeInfo(List, [Store]);
       default:
         return null;
     }
@@ -389,6 +518,16 @@ class Address extends Entity {
           number = int.parse('$value');
           break;
         }
+      case 'stores':
+        {
+          stores = value as List<Store>;
+          break;
+        }
+      case 'closedStores':
+        {
+          closedStores = value as List<Store>;
+          break;
+        }
       default:
         return;
     }
@@ -401,6 +540,8 @@ class Address extends Entity {
         'city': city,
         'street': street,
         'number': number,
+        'stores': stores.map((e) => e.toJson()).toList(),
+        'closedStores': closedStores.map((e) => e.toJson()).toList(),
       };
 }
 
