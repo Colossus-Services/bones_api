@@ -2,6 +2,7 @@
 
 - `SQLAdapter`:
   - generateTables: fix, to avoid generation if `capability.tableSQL` is `false`.
+- reflection_factory: ^1.2.1
 
 ## 1.2.19
 
