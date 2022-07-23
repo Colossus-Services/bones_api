@@ -349,11 +349,14 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     return super.populateImpl();
   }
 
-  FutureOr<List<String>> generateTables() =>
-      generateFullCreateTableSQLs(withDate: false)
-          .resolveMapped((fullCreateTableSQLs) {
-        return populateTables(fullCreateTableSQLs);
-      });
+  FutureOr<List<String>> generateTables() {
+    if (!capability.tableSQL) return <String>[];
+
+    return generateFullCreateTableSQLs(withDate: false)
+        .resolveMapped((fullCreateTableSQLs) {
+      return populateTables(fullCreateTableSQLs);
+    });
+  }
 
   FutureOr<List<String>> populateTables(Object? tables) {
     if (tables == null) {

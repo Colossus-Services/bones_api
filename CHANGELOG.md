@@ -1,3 +1,8 @@
+## 1.2.20
+
+- `SQLAdapter`:
+  - generateTables: fix, to avoid generation if `capability.tableSQL` is `false`.
+
 ## 1.2.19
 
 - `TableScheme`:
