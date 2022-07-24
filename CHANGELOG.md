@@ -1,3 +1,8 @@
+## 1.2.22
+
+- `SQLAdapterCapability`:
+  - Fix declaration for `PostgreSQLAdapter` and `MySQLAdapter`. 
+
 ## 1.2.21
 
 - `APIRepository`:

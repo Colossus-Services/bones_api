@@ -78,7 +78,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
               dialect: 'MySQL',
               transactions: true,
               transactionAbort: true,
-              tableSQL: false),
+              tableSQL: true),
           generateTables: generateTables,
           populateTables: populateTables,
           populateSource: populateSource,
