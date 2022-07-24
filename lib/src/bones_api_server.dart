@@ -915,7 +915,11 @@ class APIServer {
         return Response(400, body: payload, headers: headers);
       case APIResponseStatus.ERROR:
         {
-          var retError = resolveBody(apiResponse.error, apiResponse);
+          var error = apiResponse.error ?? '';
+          var stackTrace = apiResponse.stackTrace;
+          var errorContent = stackTrace != null ? '$error\n$stackTrace' : error;
+
+          var retError = resolveBody(errorContent, apiResponse);
 
           return retError.resolveMapped((error) {
             return Response.internalServerError(body: error, headers: headers);

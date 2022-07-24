@@ -3305,7 +3305,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   /// Executes the transaction operations dispatches inside [block] then [commit]s.
-  FutureOr<R?> execute<R>(FutureOr<R?> Function() block) {
+  FutureOr<R?> execute<R>(FutureOr<R> Function() block) {
     if (_commitCalled) {
       throw StateError('Transaction committed already dispatched: $this');
     }
@@ -3317,12 +3317,34 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _executingTransaction = this;
 
-    return _errorZone.asyncTry<R?>(block, onFinally: () {
-      return asyncTry(() => commit<Object?>(), onFinally: () {
-        _executingTransaction = null;
-      });
-    });
+    return _errorZone.asyncTry<R>(block, onFinally: _executeCommit);
   }
+
+  /// Executes the transaction operations dispatches inside [block] then [commit]s.
+  /// If any error occurs it returns the value returned by [onError].
+  FutureOr<R> executeOrError<R>(FutureOr<R> Function() block,
+      {required R Function(
+              Transaction transaction, Object error, StackTrace stackTrace)
+          onError}) {
+    if (_commitCalled) {
+      throw StateError('Transaction committed already dispatched: $this');
+    }
+
+    if (_executingTransaction != null) {
+      throw StateError(
+          'Already executing a Transaction: _executingTransaction');
+    }
+
+    _executingTransaction = this;
+
+    return _errorZone
+        .asyncTry<R>(block,
+            onFinally: _executeCommit, onError: (e, s) => onError(this, e, s))
+        .resolveMapped((r) => r as R);
+  }
+
+  FutureOr<void> _executeCommit() =>
+      asyncTry(commit, onFinally: () => _executingTransaction = null);
 
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 

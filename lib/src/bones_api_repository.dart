@@ -60,86 +60,105 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   EventStream<O> get onDelete => entityRepository.onDelete;
 
-  FutureOr<bool> existsID(dynamic id) => entityRepository.existsID(id);
+  FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) =>
+      entityRepository.existsID(id, transaction: transaction);
 
-  FutureOr<O?> selectByID(dynamic id) => entityRepository.selectByID(id);
+  FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) =>
+      entityRepository.selectByID(id, transaction: transaction);
 
-  FutureOr<Iterable<O>> selectAll({int? limit}) =>
-      entityRepository.selectAll(limit: limit);
+  FutureOr<List<O?>> selectByIDs(List<dynamic> ids,
+          {Transaction? transaction}) =>
+      entityRepository.selectByIDs(ids, transaction: transaction);
+
+  FutureOr<Iterable<O>> selectAll({int? limit, Transaction? transaction}) =>
+      entityRepository.selectAll(limit: limit, transaction: transaction);
 
   FutureOr<int> length() => entityRepository.length();
 
   FutureOr<O?> selectFirstByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
       entityRepository.selectFirstByQuery(
         query,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
+        transaction: transaction,
       );
 
   FutureOr<Iterable<O>> selectByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters,
-          int? limit}) =>
+          int? limit,
+          Transaction? transaction}) =>
       entityRepository.selectByQuery(query,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
-          limit: limit);
+          limit: limit,
+          transaction: transaction);
 
   FutureOr<Iterable<O>> select(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters,
-          int? limit}) =>
+          int? limit,
+          Transaction? transaction}) =>
       entityRepository.select(matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
-          limit: limit);
+          limit: limit,
+          transaction: transaction);
 
   FutureOr<Iterable<O>> deleteByQuery(String query,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
       entityRepository.deleteByQuery(query,
           parameters: parameters,
           positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+          namedParameters: namedParameters,
+          transaction: transaction);
 
-  FutureOr<O?> deleteEntity(O o) => entityRepository.deleteEntity(o);
+  FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
+      entityRepository.deleteEntity(o, transaction: transaction);
 
-  FutureOr<O?> tryDeleteEntity(O o) => entityRepository.tryDeleteEntity(o);
+  FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>
+      entityRepository.tryDeleteEntity(o, transaction: transaction);
 
-  FutureOr<O?> deleteByID(dynamic id) => entityRepository.deleteByID(id);
+  FutureOr<O?> deleteByID(dynamic id, {Transaction? transaction}) =>
+      entityRepository.deleteByID(id, transaction: transaction);
 
-  FutureOr<O?> tryDeleteByID(dynamic id) => entityRepository.tryDeleteByID(id);
+  FutureOr<O?> tryDeleteByID(dynamic id, {Transaction? transaction}) =>
+      entityRepository.tryDeleteByID(id, transaction: transaction);
 
   FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
       entityRepository.delete(matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters);
 
-  FutureOr<Iterable> deleteEntityCascade(O o) =>
-      entityRepository.deleteEntityCascade(o);
+  FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) =>
+      entityRepository.deleteEntityCascade(o, transaction: transaction);
 
   FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
       entityRepository.store(o, transaction: transaction);
 
   FutureOr<O> storeFromJson(Map<String, dynamic> json,
           {Transaction? transaction}) =>
-      entityRepository.storeFromJson(json);
+      entityRepository.storeFromJson(json, transaction: transaction);
 
   FutureOr<List<O>> storeAllFromJson(
           Iterable<Map<String, dynamic>> entitiesJson,
           {Transaction? transaction}) =>
-      entityRepository.storeAllFromJson(entitiesJson);
+      entityRepository.storeAllFromJson(entitiesJson, transaction: transaction);
 }

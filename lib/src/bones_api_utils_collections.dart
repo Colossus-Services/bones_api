@@ -303,3 +303,84 @@ Enum? enumFromName(String name, Iterable<Enum> enumValues) {
   }
   return null;
 }
+
+/// Extension that ads cached methods to a [Map].
+extension MapAsCacheExtension<K, V> on Map<K, V> {
+  /// Returns [key] value or computes it and caches it.
+  /// See [checkCacheLimit] and [getCachedAsync].
+  V getCached(K key, V Function() computer, {int? cacheLimit}) {
+    checkCacheLimit(cacheLimit);
+    return putIfAbsent(key, computer);
+  }
+
+  V? getCachedNullable(K key, V? Function() computer, {int? cacheLimit}) {
+    var cached = this[key];
+    if (cached != null) return cached;
+
+    checkCacheLimit(cacheLimit);
+
+    var val = computer();
+    if (val == null) return val;
+
+    this[key] = val;
+    return val;
+  }
+
+  /// Same as [getCached] but accepts a [computer] that returns a [Future].
+  /// See [checkCacheLimit] and [getCachedAsync].
+  FutureOr<V> getCachedAsync(K key, FutureOr<V> Function() computer,
+      {int? cacheLimit}) {
+    var cached = this[key];
+    if (cached != null) return cached;
+
+    checkCacheLimit(cacheLimit);
+
+    return computer().resolveMapped((val) {
+      this[key] = val;
+      return val;
+    });
+  }
+
+  FutureOr<V?> getCachedAsyncNullable(K key, FutureOr<V?> Function() computer,
+      {int? cacheLimit}) {
+    var cached = this[key];
+    if (cached != null) return cached;
+
+    checkCacheLimit(cacheLimit);
+
+    return computer().resolveMapped((val) {
+      if (val == null) return null;
+      this[key] = val;
+      return val;
+    });
+  }
+
+  /// Checks if this [Map.length] is bigger than [cacheLimit] and
+  /// removes elements to not exceed the [cacheLimit].
+  int checkCacheLimit(int? cacheLimit) {
+    if (cacheLimit == null) return 0;
+
+    if (cacheLimit <= 0) {
+      var length = this.length;
+      clear();
+      return length;
+    }
+
+    var deleted = 0;
+
+    while (true) {
+      var length = this.length;
+      if (length == 0 || length <= cacheLimit) {
+        break;
+      }
+
+      var k = keys.first;
+      remove(k);
+      var lng = this.length;
+      if (lng >= length) break;
+      deleted++;
+    }
+
+    return deleted;
+  }
+}

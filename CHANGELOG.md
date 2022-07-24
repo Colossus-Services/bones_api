@@ -1,3 +1,15 @@
+## 1.2.21
+
+- `APIRepository`:
+  - Add missing `transaction` parameters.
+- `Transaction`:
+  - Added `executeOrError`.
+- `APIResponse`:
+  - added field `stackTrace`.
+- `APIRouteHandler`:
+  - Added logging of route call. 
+- Added `MapAsCacheExtension`.
+
 ## 1.2.20
 
 - `SQLAdapter`:

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
@@ -16,6 +17,8 @@ import 'bones_api_security.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_arguments.dart';
 import 'bones_api_utils_json.dart';
+
+final _log = logging.Logger('APIRoot');
 
 /// An [APIRoot] [APIRequest] handler.
 ///
@@ -29,7 +32,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.2.20';
+  static const String VERSION = '1.2.21';
 
   static bool _boot = false;
 
@@ -581,9 +584,14 @@ class APIRouteHandler<T> {
   /// Calls this route.
   FutureOr<APIResponse<T>> call(APIRequest request) {
     if (!checkRules(request)) {
+      _log.warning(
+          "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules");
+
       return APIResponse.unauthorized(
           payloadDynamic: 'UNAUTHORIZED: Rules issues $rules');
     }
+
+    _log.info("CALL> ${module.name}.$routeName( $parameters )");
 
     return function(request);
   }
@@ -1562,6 +1570,8 @@ class APIResponse<T> extends APIPayload {
   /// The response error.
   final dynamic error;
 
+  final StackTrace? stackTrace;
+
   /// Constructs an [APIResponse].
   ///
   /// - [payloadDynamic] is only used if [payload] is `null` and [T] accepts the [payloadDynamic] value.
@@ -1572,6 +1582,7 @@ class APIResponse<T> extends APIPayload {
       this.payloadMimeType,
       this.payloadFileExtension,
       this.error,
+      this.stackTrace,
       Map<String, Duration>? metrics})
       : payload = _resolvePayload(payload, payloadDynamic),
         _metrics = metrics;
@@ -1709,10 +1720,12 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.error(
       {Map<String, dynamic>? headers,
       dynamic error,
+      StackTrace? stackTrace,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.ERROR,
         headers: headers ?? <String, dynamic>{},
         error: error,
+        stackTrace: stackTrace,
         metrics: metrics);
   }
 
@@ -1720,10 +1733,12 @@ class APIResponse<T> extends APIPayload {
   APIResponse<T> asError(
       {Map<String, dynamic>? headers,
       dynamic error,
+      StackTrace? stackTrace,
       Map<String, Duration>? metrics}) {
     return APIResponse.error(
         headers: headers ?? this.headers,
         error: error ?? this.error,
+        stackTrace: stackTrace ?? this.stackTrace,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }
@@ -1732,8 +1747,10 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.from(dynamic o) {
     if (o == null) {
       return APIResponse.notFound();
-    } else if (o is Error || o is Exception) {
-      return APIResponse.error(error: '$o');
+    } else if (o is Error) {
+      return APIResponse.error(error: o, stackTrace: o.stackTrace);
+    } else if (o is Exception) {
+      return APIResponse.error(error: o);
     } else {
       return APIResponse.ok(o);
     }

@@ -235,7 +235,7 @@ abstract class APIModule with Initializable {
           e,
           s);
       var error = 'ERROR: $e\n$s';
-      return APIResponse.error(error: error);
+      return APIResponse.error(error: error, stackTrace: s);
     }
   }
 
