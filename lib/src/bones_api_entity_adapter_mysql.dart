@@ -32,12 +32,14 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   static FutureOr<MySQLAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     try {
       return MySQLAdapter.fromConfig(config,
           minConnections: minConnections,
           maxConnections: maxConnections,
-          parentRepositoryProvider: parentRepositoryProvider);
+          parentRepositoryProvider: parentRepositoryProvider,
+          workingPath: workingPath);
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
@@ -63,7 +65,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider})
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath})
       : host = host ?? 'localhost',
         port = port ?? 3306,
         _password = (password != null && password is! PasswordProvider
@@ -83,6 +86,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
           populateTables: populateTables,
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
+          workingPath: workingPath,
         ) {
     boot();
 
@@ -102,7 +106,8 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       int? defaultPort,
       int? minConnections,
       int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     boot();
 
     var host = config?['host'] ?? defaultHost;
@@ -142,6 +147,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       populateTables: populateTables,
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
+      workingPath: workingPath,
     );
   }
 

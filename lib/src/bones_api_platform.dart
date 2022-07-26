@@ -77,7 +77,7 @@ abstract class APIPlatform {
   void stderrLn(Object? o);
 
   /// Resolves [filePath] to the platform actual file path.
-  String? resolveFilePath(String filePath);
+  String? resolveFilePath(String filePath, {String? parentPath});
 
   /// Reads a [filePath] data as [String].
   FutureOr<String?> readFileAsString(String filePath);

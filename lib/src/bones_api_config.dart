@@ -27,6 +27,28 @@ class APIConfig {
   /// The source of this configuration.
   String? get source => _source;
 
+  /// The source parent path of this configuration.
+  String? get sourceParentPath {
+    var source = _source;
+    if (source == null || source.isEmpty) return null;
+
+    var idx = source.lastIndexOf(RegExp(r'[/\\]'));
+    if (idx >= 0) {
+      var parent = source.substring(0, idx);
+
+      if (parent.startsWith(RegExp(r'^file:/'))) {
+        var uri = Uri.tryParse(parent);
+        if (uri != null) {
+          parent = uri.toFilePath();
+        }
+      }
+
+      return parent;
+    }
+
+    return null;
+  }
+
   /// Returns `true` if the configuration [properties] is empty.
   bool get isEmpty => _properties.isEmpty;
 

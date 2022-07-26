@@ -853,6 +853,7 @@ abstract class SQLEntityRepositoryProvider<A extends SQLAdapter>
   FutureOr<A> buildAdapter() => SQLAdapter.fromConfig(
         adapterConfig,
         parentRepositoryProvider: this,
+        workingPath: workingPath,
       );
 
   @override

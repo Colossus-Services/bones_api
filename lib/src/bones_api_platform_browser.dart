@@ -72,8 +72,31 @@ class APIPlatformBrowser extends APIPlatform {
   @override
   void stderrLn(Object? o) => window.console.error(o);
 
+  static final RegExp _regExpUriStart = RegExp(r'^\w+:/');
+
   @override
-  String? resolveFilePath(String filePath) {
+  String? resolveFilePath(String filePath, {String? parentPath}) {
+    if (parentPath != null &&
+        parentPath.isNotEmpty &&
+        !filePath.startsWith('/')) {
+      if (!parentPath.endsWith('/')) {
+        parentPath += '/';
+      }
+      filePath = '$parentPath$filePath';
+    }
+
+    if (filePath.startsWith(_regExpUriStart)) {
+      var uri = Uri.tryParse(filePath);
+      if (uri != null) {
+        var path = uri.toFilePath();
+        var uriBasePath = getUriBase().path;
+        if (path.startsWith(uriBasePath)) {
+          path = path.substring(uriBasePath.length);
+        }
+        filePath = path;
+      }
+    }
+
     var url = resolveURL(filePath, baseUri: getUriBase());
     return url;
   }

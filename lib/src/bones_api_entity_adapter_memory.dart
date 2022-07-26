@@ -54,12 +54,14 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   static FutureOr<MemorySQLAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     try {
       return MemorySQLAdapter.fromConfig(config,
           minConnections: minConnections,
           maxConnections: maxConnections,
-          parentRepositoryProvider: parentRepositoryProvider);
+          parentRepositoryProvider: parentRepositoryProvider,
+          workingPath: workingPath);
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
@@ -76,7 +78,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider})
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath})
       : super(
           minConnections ?? 1,
           maxConnections ?? 3,
@@ -89,6 +92,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
           populateTables: populateTables,
           populateSource: populateSource,
           parentRepositoryProvider: parentRepositoryProvider,
+          workingPath: workingPath,
         ) {
     boot();
 
@@ -98,7 +102,8 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   static FutureOr<MemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
       {int? minConnections,
       int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     boot();
 
     minConnections ??= config?['minConnections'] ?? 1;
@@ -127,6 +132,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      workingPath: workingPath,
     );
 
     return adapter;

@@ -29,6 +29,7 @@ void main(List<String> args) async {
   var commandRunner = CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
     ..addCommand(MyCommandServe())
     ..addCommand(MyCommandConsole())
+    ..addCommand(MyCommandInspect())
     ..addCommand(commandInfo)
     ..addCommand(commandCreate);
 
@@ -140,6 +141,8 @@ class MyCommandServe extends CommandSourceFileBase {
         help: 'Server listen secure port (HTTPS).',
         aliases: ['secureport']);
 
+    argParser.addOption('lib', help: 'Project APIRoot Library file name.');
+
     argParser.addOption('class',
         abbr: 'c', help: 'Project APIRoot Class name.');
 
@@ -178,6 +181,8 @@ class MyCommandServe extends CommandSourceFileBase {
         help:
             'Allows automatic reflection build if the inspector detects the need at startup.');
   }
+
+  String? get argLibName => argResults!['lib'];
 
   String? get argClass => argResults!['class'];
 
@@ -222,6 +227,7 @@ class MyCommandServe extends CommandSourceFileBase {
   @override
   FutureOr<bool> run() async {
     var directory = argDirectory;
+    var apiRootLib = argLibName;
     var apiRootClass = argClass;
     var address = argAddress;
     var port = argPort;
@@ -306,6 +312,7 @@ class MyCommandServe extends CommandSourceFileBase {
     return await _spawnAPIServerIsolate(
         parametersMessage,
         directory,
+        apiRootLib,
         apiRootClass!,
         spawner,
         address,
@@ -323,6 +330,7 @@ class MyCommandServe extends CommandSourceFileBase {
   Future<bool> _spawnAPIServerIsolate(
       List<String> parametersMessage,
       String directory,
+      String? apiRootLib,
       String apiRootClass,
       DartSpawner spawner,
       String address,
@@ -367,7 +375,16 @@ class MyCommandServe extends CommandSourceFileBase {
     }
 
     var projectPackageName = (await spawner.projectPackageName)!;
-    var projectLibraryName = (await spawner.projectLibraryName)!;
+
+    var projectLibraryName = argLibName ?? projectPackageName;
+    projectLibraryName = projectLibraryName.trim();
+
+    if (projectLibraryName.isEmpty) projectLibraryName = projectPackageName;
+
+    if (projectLibraryName.endsWith('.dart')) {
+      projectLibraryName =
+          projectLibraryName.substring(0, projectLibraryName.length - 5);
+    }
 
     var dartScript = buildDartScript(
         spawner.id, projectPackageName, projectLibraryName, apiRootClass);
@@ -416,44 +433,10 @@ class MyCommandServe extends CommandSourceFileBase {
   }
 
   Future<bool> _inspectReflection(DartSpawner spawner, bool allowBuild) async {
-    var reflectionInspector =
-        ReflectionInspector(await spawner.projectDirectory);
+    var dir = await spawner.projectDirectory;
+    var myCommandInspect = MyCommandInspect(projectDirectory: dir);
 
-    var reflectionOK = true;
-
-    void openReflectionIssues() {
-      if (!reflectionOK) return;
-      reflectionOK = false;
-
-      print(
-          '--------------------------------------------------------------------------------');
-      print('\nReflection files inspection:');
-    }
-
-    var missingGeneratedReflection =
-        reflectionInspector.dartFilesMissingGeneratedReflection;
-
-    if (missingGeneratedReflection.isNotEmpty) {
-      openReflectionIssues();
-
-      print('\n** WARNING: Missing Reflection files for:');
-      for (var f in missingGeneratedReflection) {
-        print('  - ${f.path}');
-      }
-      print('');
-    }
-
-    var expiredReflection = reflectionInspector.dartFilesWithExpiredReflection;
-
-    if (expiredReflection.isNotEmpty) {
-      openReflectionIssues();
-
-      print('\n** WARNING: Expired reflection files for:');
-      for (var f in expiredReflection) {
-        print('  - ${f.path}');
-      }
-      print('');
-    }
+    var reflectionOK = await myCommandInspect.inspectReflection();
 
     if (!reflectionOK) {
       if (allowBuild) {
@@ -466,8 +449,6 @@ class MyCommandServe extends CommandSourceFileBase {
 
       print(
           '\n--------------------------------------------------------------------------------');
-    } else {
-      print('Reflection files inspection: OK\n');
     }
 
     return reflectionOK;
@@ -652,6 +633,70 @@ Future<void> runAPIServer(List<String> args) async {
     ''';
 
     return script;
+  }
+}
+
+class MyCommandInspect extends CommandSourceFileBase {
+  @override
+  final String description =
+      'Inspect missing `reflection_factory` generated files.';
+
+  @override
+  final String name = 'inspect';
+
+  Directory? projectDirectory;
+
+  MyCommandInspect({this.projectDirectory});
+
+  @override
+  FutureOr<bool> run() => inspectReflection();
+
+  Future<bool> inspectReflection() async {
+    var dir = projectDirectory ?? Directory(argDirectory!);
+
+    var reflectionInspector = ReflectionInspector(dir);
+
+    var reflectionOK = true;
+
+    void openReflectionIssues() {
+      if (!reflectionOK) return;
+      reflectionOK = false;
+
+      print(
+          '--------------------------------------------------------------------------------');
+      print('\nReflection files inspection:');
+    }
+
+    var missingGeneratedReflection =
+        reflectionInspector.dartFilesMissingGeneratedReflection;
+
+    if (missingGeneratedReflection.isNotEmpty) {
+      openReflectionIssues();
+
+      print('\n** WARNING: Missing Reflection files for:');
+      for (var f in missingGeneratedReflection) {
+        print('  - ${f.path}');
+      }
+      print('');
+    }
+
+    var expiredReflection = reflectionInspector.dartFilesWithExpiredReflection;
+
+    if (expiredReflection.isNotEmpty) {
+      openReflectionIssues();
+
+      print('\n** WARNING: Expired reflection files for:');
+      for (var f in expiredReflection) {
+        print('  - ${f.path}');
+      }
+      print('');
+    }
+
+    if (reflectionOK) {
+      print('Reflection files inspection: OK\n');
+    }
+
+    return reflectionOK;
   }
 }
 

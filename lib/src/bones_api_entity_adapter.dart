@@ -69,7 +69,8 @@ typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>>
     = FutureOr<A?> Function(Map<String, dynamic> config,
         {int? minConnections,
         int? maxConnections,
-        EntityRepositoryProvider? parentRepositoryProvider});
+        EntityRepositoryProvider? parentRepositoryProvider,
+        String? workingPath});
 
 typedef PreFinishDBOperation<T, R> = FutureOr<R> Function(T result);
 
@@ -183,8 +184,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   final EntityRepositoryProvider? parentRepositoryProvider;
 
   DBAdapter(this.minConnections, this.maxConnections, this.capability,
-      {this.parentRepositoryProvider, Object? populateSource})
-      : _populateSource = populateSource {
+      {this.parentRepositoryProvider,
+      Object? populateSource,
+      String? workingPath})
+      : _populateSource = populateSource,
+        _workingPath = workingPath {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
@@ -194,7 +198,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       Map<String, dynamic> config,
       {int minConnections = 1,
       int maxConnections = 3,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     boot();
 
     var instantiators = getAdapterInstantiatorsFromConfig(config);
@@ -207,7 +212,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     return instantiateAdaptor<Object, DBAdapter<Object>>(instantiators, config,
             minConnections: minConnections,
             maxConnections: maxConnections,
-            parentRepositoryProvider: parentRepositoryProvider)
+            parentRepositoryProvider: parentRepositoryProvider,
+            workingPath: workingPath)
         .resolveMapped((adapter) => adapter as A);
   }
 
@@ -218,7 +224,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           Map<String, dynamic> config,
           {int minConnections = 1,
           int maxConnections = 3,
-          EntityRepositoryProvider? parentRepositoryProvider}) {
+          EntityRepositoryProvider? parentRepositoryProvider,
+          String? workingPath}) {
     if (instantiators.isEmpty) {
       throw StateError(
           "No `$A` instantiator for `config` keys: ${config.keys.toList()}");
@@ -233,7 +240,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       var ret = f(conf,
           minConnections: minConnections,
           maxConnections: maxConnections,
-          parentRepositoryProvider: parentRepositoryProvider);
+          parentRepositoryProvider: parentRepositoryProvider,
+          workingPath: workingPath);
+
       if (ret == null) {
         continue;
       } else if (ret is A) {
@@ -271,6 +280,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   Map<String, dynamic> information({bool extended = false, String? table}) =>
       <String, dynamic>{};
 
+  final String? _workingPath;
+
   Object? _populateSource;
 
   FutureOr<InitializationResult> populateImpl() =>
@@ -285,7 +296,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       ]);
     }
 
-    return populateFromSource(populateSource).resolveMapped((val) {
+    return populateFromSource(populateSource, workingPath: _workingPath)
+        .resolveMapped((val) {
       var result = InitializationResult.ok(this, dependencies: [
         if (parentRepositoryProvider != null) parentRepositoryProvider!,
         ...entityRepositories,
@@ -853,6 +865,8 @@ class DBRepositoryAdapter<O> with Initializable {
 /// Base class for [EntityRepositoryProvider] with [DBAdapter]s.
 abstract class DBEntityRepositoryProvider<A extends DBAdapter>
     extends EntityRepositoryProvider {
+  String? get workingPath => null;
+
   Map<String, dynamic> get adapterConfig;
 
   A? _adapter;
@@ -869,6 +883,7 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
   FutureOr<A> buildAdapter() => DBAdapter.fromConfig(
         adapterConfig,
         parentRepositoryProvider: this,
+        workingPath: workingPath,
       );
 
   @override

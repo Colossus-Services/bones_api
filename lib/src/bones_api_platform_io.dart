@@ -73,8 +73,26 @@ class APIPlatformVM extends APIPlatform {
   @override
   void stderrLn(Object? o) => io.stderr.writeln(o);
 
+  static final RegExp _regExpUriFileStart = RegExp(r'^file:/');
+
   @override
-  String? resolveFilePath(String filePath) {
+  String? resolveFilePath(String filePath, {String? parentPath}) {
+    if (parentPath != null &&
+        parentPath.isNotEmpty &&
+        !filePath.startsWith('/')) {
+      if (!parentPath.endsWith('/')) {
+        parentPath += '/';
+      }
+      filePath = '$parentPath$filePath';
+    }
+
+    if (filePath.startsWith(_regExpUriFileStart)) {
+      var uri = Uri.tryParse(filePath);
+      if (uri != null) {
+        filePath = uri.toFilePath();
+      }
+    }
+
     var file = io.File(filePath).absolute;
     return file.path;
   }

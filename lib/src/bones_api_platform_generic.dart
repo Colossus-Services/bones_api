@@ -59,7 +59,7 @@ class APIPlatformGeneric extends APIPlatform {
   void stderrLn(Object? o) => stdout(o);
 
   @override
-  String? resolveFilePath(String filePath) => filePath;
+  String? resolveFilePath(String filePath, {String? parentPath}) => filePath;
 
   @override
   String? readFileAsString(String filePath) => null;

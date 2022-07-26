@@ -94,6 +94,7 @@ y=zzz
       var apiConfig = await APIConfig.fromAsync('$testDir/api-test.conf');
 
       expect(apiConfig!.source, endsWith('api-test.conf'));
+      expect(apiConfig.sourceParentPath, endsWith(testDir));
 
       expect(apiConfig.isEmpty, isFalse);
       expect(apiConfig.isNotEmpty, isTrue);

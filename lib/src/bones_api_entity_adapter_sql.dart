@@ -290,12 +290,14 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       {EntityRepositoryProvider? parentRepositoryProvider,
       bool generateTables = false,
       Object? populateTables,
-      Object? populateSource})
+      Object? populateSource,
+      String? workingPath})
       : _generateTables = generateTables,
         _populateTables = populateTables,
         super(minConnections, maxConnections, capability,
             parentRepositoryProvider: parentRepositoryProvider,
-            populateSource: populateSource) {
+            populateSource: populateSource,
+            workingPath: workingPath) {
     boot();
 
     _conditionSQLGenerator =
@@ -306,7 +308,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       Map<String, dynamic> config,
       {int minConnections = 1,
       int maxConnections = 3,
-      EntityRepositoryProvider? parentRepositoryProvider}) {
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath}) {
     boot();
 
     var instantiators = getAdapterInstantiatorsFromConfig<C, A>(config);
@@ -319,7 +322,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     return DBAdapter.instantiateAdaptor<C, A>(instantiators, config,
         minConnections: minConnections,
         maxConnections: maxConnections,
-        parentRepositoryProvider: parentRepositoryProvider);
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath);
   }
 
   bool _generateTables = false;
@@ -365,10 +369,15 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       if (RegExp(r'^\S+\.sql$').hasMatch(tables)) {
         var apiPlatform = APIPlatform.get();
 
-        _log.info(
-            'Reading $this populate tables file: ${apiPlatform.resolveFilePath(tables)}');
+        var filePath = apiPlatform.resolveFilePath(tables);
 
-        var fileData = apiPlatform.readFileAsString(tables);
+        if (filePath == null) {
+          throw StateError("Can't resolve tables file path: $tables");
+        }
+
+        _log.info('Reading $this populate tables file: $filePath');
+
+        var fileData = apiPlatform.readFileAsString(filePath);
 
         if (fileData != null) {
           return fileData.resolveMapped((data) {

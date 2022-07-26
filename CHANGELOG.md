@@ -1,3 +1,18 @@
+## 1.2.23
+
+- `APIConfig`:
+  - Added `sourceParentPath`.
+- `EntityRepositoryProvider`:
+  - `populateFromSource`: added parameter `workingPath`.
+- `DBAdapter` and `SQLAdapter`:
+  - added parameter `workingPath`.
+- `APIPlatform`:
+  - `resolveFilePath`: added parameter `parentPath`.
+- `bin/bones_api.dart`:
+  - Added command `inspect`.
+- Updated `lib/src/template/bones_api_template.tar.gz`.
+- reflection_factory: ^1.2.2
+
 ## 1.2.22
 
 - `SQLAdapterCapability`:

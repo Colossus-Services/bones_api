@@ -2330,7 +2330,8 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
   static const _logSectionClose =
       '\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>';
 
-  FutureOr<Map<String, List<Object>>> populateFromSource(Object? source) {
+  FutureOr<Map<String, List<Object>>> populateFromSource(Object? source,
+      {String? workingPath}) {
     if (source == null) {
       return <String, List<Object>>{};
     } else if (source is Map<String, Iterable<Map<String, dynamic>>>) {
@@ -2345,10 +2346,16 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       if (RegExp(r'^\S+\.json$').hasMatch(source)) {
         var apiPlatform = APIPlatform.get();
 
-        _log.info(
-            'Reading $this populate source file: ${apiPlatform.resolveFilePath(source)}');
+        var filePath =
+            apiPlatform.resolveFilePath(source, parentPath: workingPath);
 
-        var fileData = apiPlatform.readFileAsString(source);
+        if (filePath == null) {
+          throw StateError("Can't resolve source file path: $source");
+        }
+
+        _log.info('Reading $this populate source file: $filePath');
+
+        var fileData = apiPlatform.readFileAsString(filePath);
 
         if (fileData != null) {
           return fileData.resolveMapped((data) {
