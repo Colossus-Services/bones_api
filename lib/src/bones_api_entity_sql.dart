@@ -38,14 +38,16 @@ class SQLEntityRepository<O extends Object> extends EntityRepository<O>
         ]);
       });
 
-  String get dialect => sqlRepositoryAdapter.dialect;
+  SQLDialect get dialect => sqlRepositoryAdapter.dialect;
+
+  String get dialectName => sqlRepositoryAdapter.dialectName;
 
   String get tableName => sqlRepositoryAdapter.tableName;
 
   @override
   Map<String, dynamic> information({bool extended = false}) => {
         'queryType': 'SQL',
-        'dialect': dialect,
+        'dialect': dialectName,
         'table': name,
         if (extended)
           'sqlAdapter': sqlRepositoryAdapter.information(extended: true),

@@ -193,7 +193,7 @@ class SQLAdapterCapability extends DBAdapterCapability {
   final bool tableSQL;
 
   const SQLAdapterCapability(
-      {required String dialect,
+      {required SQLDialect dialect,
       required bool transactions,
       required bool transactionAbort,
       required this.tableSQL})
@@ -301,7 +301,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     boot();
 
     _conditionSQLGenerator =
-        ConditionSQLEncoder(this, sqlElementQuote: sqlElementQuote);
+        ConditionSQLEncoder(this, sqlElementQuote: dialect.elementQuote);
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends SQLAdapter<C>>(
@@ -511,24 +511,6 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         return allSQLs;
       });
 
-  /// If `true` indicates that this adapter's SQL uses the `OUTPUT` syntax for inserts/deletes.
-  bool get sqlAcceptsOutputSyntax;
-
-  /// If `true` indicates that this adapter's SQL uses the `RETURNING` syntax for inserts/deletes.
-  bool get sqlAcceptsReturningSyntax;
-
-  /// If `true` indicates that this adapter's SQL needs a temporary table to return rows for inserts/deletes.
-  bool get sqlAcceptsTemporaryTableForReturning;
-
-  /// If `true` indicates that this adapter's SQL can use the `DEFAULT VALUES` directive for inserts.
-  bool get sqlAcceptsInsertDefaultValues;
-
-  /// If `true` indicates that this adapter's SQL uses the `IGNORE` syntax for inserts.
-  bool get sqlAcceptsInsertIgnore;
-
-  /// If `true` indicates that this adapter's SQL uses the `ON CONFLICT` syntax for inserts.
-  bool get sqlAcceptsInsertOnConflict;
-
   /// Converts [value] to an acceptable SQL value for the adapter.
   Object? valueToSQL(Object? value) {
     if (value == null) {
@@ -625,7 +607,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters}) {
-    var q = sqlElementQuote;
+    var q = dialect.elementQuote;
 
     if (matcher == null) {
       var sqlQuery = 'SELECT count(*) as ${q}count$q FROM $q$table$q ';
@@ -719,7 +701,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         var idFieldName = tableScheme.idFieldName;
         assert(idFieldName != null && idFieldName.isNotEmpty);
 
-        var q = sqlElementQuote;
+        var q = dialect.elementQuote;
 
         var sql = StringBuffer();
 
@@ -733,7 +715,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           sql.write(')');
         }
 
-        if (sqlAcceptsOutputSyntax) {
+        if (dialect.acceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
           sql.write(q);
           sql.write(idFieldName);
@@ -745,14 +727,14 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           sql.write(values.join(' , '));
           sql.write(')');
         } else {
-          if (sqlAcceptsInsertDefaultValues) {
+          if (dialect.acceptsInsertDefaultValues) {
             sql.write(' DEFAULT VALUES ');
           } else {
             sql.write(' VALUES () ');
           }
         }
 
-        if (sqlAcceptsReturningSyntax) {
+        if (dialect.acceptsReturningSyntax) {
           sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
@@ -823,7 +805,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
-        var q = sqlElementQuote;
+        var q = dialect.elementQuote;
         var sql = StringBuffer();
 
         sql.write('UPDATE $q');
@@ -842,7 +824,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
           sql.write(v);
         }
 
-        if (sqlAcceptsOutputSyntax) {
+        if (dialect.acceptsOutputSyntax) {
           sql.write(' OUTPUT INSERTED.');
           sql.write(q);
           sql.write(idFieldName);
@@ -854,7 +836,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         var conditionSQL = '$idFieldName = $idPlaceholder';
         sql.write(conditionSQL);
 
-        if (sqlAcceptsReturningSyntax) {
+        if (dialect.acceptsReturningSyntax) {
           sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
         }
 
@@ -932,12 +914,12 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
     var parameters = {sourceIdField: id, targetIdField: otherId};
 
-    var q = sqlElementQuote;
+    var q = dialect.elementQuote;
     var sql = StringBuffer();
 
     sql.write('INSERT ');
 
-    if (sqlAcceptsInsertIgnore) {
+    if (dialect.acceptsInsertIgnore) {
       sql.write('IGNORE ');
     }
 
@@ -950,7 +932,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
     sql.write('$q)');
     sql.write(' VALUES ( @$sourceIdField , @$targetIdField )');
 
-    if (sqlAcceptsInsertOnConflict) {
+    if (dialect.acceptsInsertOnConflict) {
       sql.write(' ON CONFLICT DO NOTHING ');
     }
 
@@ -985,7 +967,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       otherIdsParameters.add('@$key');
     }
 
-    var q = sqlElementQuote;
+    var q = dialect.elementQuote;
 
     var sqlCondition = StringBuffer();
 
@@ -1078,7 +1060,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
       var parameters = {'source_id': id};
 
-      var q = sqlElementQuote;
+      var q = dialect.elementQuote;
 
       var conditionSQL =
           '$q${relationship.sourceRelationshipField}$q = @source_id';
@@ -1153,7 +1135,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
             "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
       }
 
-      var q = sqlElementQuote;
+      var q = dialect.elementQuote;
 
       var conditionSQL =
           StringBuffer('$q${relationship.sourceRelationshipField}$q IN (');
@@ -1268,7 +1250,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
         namedParameters: namedParameters,
         sqlBuilder: (String from, EncodingContext context) {
       var tableAlias = context.resolveEntityAlias(table);
-      var q = sqlElementQuote;
+      var q = dialect.elementQuote;
       var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
       var sql = 'SELECT $q$tableAlias$q.* $from$limitStr';
       return sql;
@@ -1298,7 +1280,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       var tableAlias =
           _conditionSQLGenerator.resolveEntityAlias(encodedSQL, table);
 
-      var q = sqlElementQuote;
+      var q = dialect.elementQuote;
 
       if (encodedSQL.fieldsReferencedTables.isEmpty &&
           encodedSQL.relationshipTables.isEmpty) {
@@ -1502,22 +1484,22 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
       var sql = StringBuffer();
       sql.write('DELETE ');
 
-      if (sqlAcceptsOutputSyntax) {
+      if (dialect.acceptsOutputSyntax) {
         sql.write(' OUTPUT DELETED.* ');
       }
 
       sql.write(from);
 
-      if (sqlAcceptsReturningSyntax) {
+      if (dialect.acceptsReturningSyntax) {
         sql.write(' RETURNING "$tableAlias".*');
       }
 
       return sql.toString();
     });
 
-    if (sqlAcceptsTemporaryTableForReturning &&
-        !sqlAcceptsOutputSyntax &&
-        !sqlAcceptsReturningSyntax) {
+    if (dialect.acceptsTemporaryTableForReturning &&
+        !dialect.acceptsOutputSyntax &&
+        !dialect.acceptsReturningSyntax) {
       return retDeleteSQL.resolveMapped((deleteSQL) {
         var conditionSQL = deleteSQL.sqlCondition;
 
@@ -1525,7 +1507,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
         var tmpTable = createTemporaryTableName(table);
 
-        var q = sqlElementQuote;
+        var q = dialect.elementQuote;
 
         var sqlSelAll = tableAlias != null ? ' $q$tableAlias$q.* ' : '*';
         var sqlAsTableAlias = tableAlias != null ? ' as $q$tableAlias$q ' : '';
@@ -1739,6 +1721,9 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
   SQLRepositoryAdapter(SQLAdapter databaseAdapter, String name,
       {String? tableName, Type? type})
       : super(databaseAdapter, name, tableName: tableName, type: type);
+
+  @override
+  SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
   FutureOr<InitializationResult> initialize() =>

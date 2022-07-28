@@ -1,3 +1,14 @@
+## 1.2.24
+
+- `bin/bones_api.dart`:
+  - Fix parameter `--lib` when respawning for Hot Reload.
+- Added `SQLDialect` for better handling of syntax varaitions.
+- `SQLAdapter`:
+  - Moved to `SQLDialect`:
+    `sqlElementQuote`, `sqlAcceptsOutputSyntax`, `sqlAcceptsReturningSyntax`, `sqlAcceptsTemporaryTableForReturning`,
+    `sqlAcceptsInsertDefaultValues`, `sqlAcceptsInsertIgnore`, `sqlAcceptsInsertOnConflict`.
+- `SQLGenerator`: allow `VARCHAR PRIMARY KEY`.
+
 ## 1.2.23
 
 - `APIConfig`:

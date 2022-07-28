@@ -13,6 +13,7 @@ import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
+import 'bones_api_sql_builder.dart';
 import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('PostgreAdapter');
@@ -80,7 +81,14 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
           minConnections,
           maxConnections,
           const SQLAdapterCapability(
-              dialect: 'PostgreSQL',
+              dialect: SQLDialect(
+                'PostgreSQL',
+                elementQuote: '"',
+                acceptsReturningSyntax: true,
+                acceptsInsertDefaultValues: true,
+                acceptsInsertOnConflict: true,
+                acceptsVarcharWithoutMaximumSize: true,
+              ),
               transactions: true,
               transactionAbort: true,
               tableSQL: true),
@@ -110,11 +118,12 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       String? workingPath}) {
     boot();
 
-    var host = config?['host'] ?? defaultHost;
-    var port = config?['port'] ?? defaultPort;
-    var database = config?['database'] ?? config?['db'] ?? defaultDatabase;
-    var username = config?['username'] ?? config?['user'] ?? defaultUsername;
-    var password = config?['password'] ?? config?['pass'];
+    String? host = config?['host'] ?? defaultHost;
+    int? port = config?['port'] ?? defaultPort;
+    String? database = config?['database'] ?? config?['db'] ?? defaultDatabase;
+    String? username =
+        config?['username'] ?? config?['user'] ?? defaultUsername;
+    String? password = config?['password'] ?? config?['pass'];
 
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
@@ -135,6 +144,9 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       populateSource = populate['source'];
     }
 
+    if (database == null) throw ArgumentError.notNull('database');
+    if (username == null) throw ArgumentError.notNull('username');
+
     return PostgreSQLAdapter(
       database,
       username,
@@ -150,6 +162,9 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       workingPath: workingPath,
     );
   }
+
+  @override
+  SQLDialect get dialect => super.dialect as SQLDialect;
 
   FutureOr<String> _getPassword() {
     if (_password != null) {
@@ -180,27 +195,6 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       if (parentRepositoryProvider != null) parentRepositoryProvider
     ];
   }
-
-  @override
-  String get sqlElementQuote => '"';
-
-  @override
-  bool get sqlAcceptsOutputSyntax => false;
-
-  @override
-  bool get sqlAcceptsReturningSyntax => true;
-
-  @override
-  bool get sqlAcceptsTemporaryTableForReturning => false;
-
-  @override
-  bool get sqlAcceptsInsertDefaultValues => true;
-
-  @override
-  bool get sqlAcceptsInsertIgnore => false;
-
-  @override
-  bool get sqlAcceptsInsertOnConflict => true;
 
   @override
   Object resolveError(Object error, StackTrace stackTrace) {
@@ -761,6 +755,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       }
 
       var idFieldName = tableScheme.idFieldName ?? 'id';
+      var idFieldType = tableScheme.fieldsTypes[idFieldName] ?? int;
       var id = fields[idFieldName];
 
       if (id == null) {
@@ -774,8 +769,8 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
         return doInsertSQL(
                 entityName, table, insertSQL, transaction, connection)
-            .resolveMapped((res) => _fixeTableSequence(
-                transaction, entityName, table, idFieldName, connection, res));
+            .resolveMapped((res) => _fixeTableSequence(transaction, entityName,
+                table, idFieldName, idFieldType, connection, res));
       });
     });
   }
@@ -785,8 +780,13 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
       String entityName,
       String table,
       String idFieldName,
+      Type idFieldType,
       PostgreSQLExecutionContext connection,
       Object? lastInsertResult) {
+    if (!idFieldType.isEntityIDType && !idFieldType.isNumericType) {
+      return lastInsertResult;
+    }
+
     var fixSql =
         "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), coalesce(max(id),0) + 1, false) FROM \"$table\"";
 

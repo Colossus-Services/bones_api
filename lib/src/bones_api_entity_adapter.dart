@@ -44,10 +44,28 @@ class MultipleSQL implements SQLWrapper {
   int get sqlsLength => sqls.length;
 }
 
+class DBDialect {
+  final String name;
+
+  const DBDialect(this.name);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is DBDialect && name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+
+  @override
+  String toString() {
+    return '$runtimeType{name: $name}';
+  }
+}
+
 /// [DBAdapter] capabilities.
 class DBAdapterCapability {
   /// The dialect of the DB.
-  final String dialect;
+  final DBDialect dialect;
 
   /// `true` if the DB supports transactions.
   final bool transactions;
@@ -179,7 +197,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   final DBAdapterCapability capability;
 
   /// The DB dialect of this adapter.
-  String get dialect => capability.dialect;
+  DBDialect get dialect => capability.dialect;
+
+  /// The DB dialect name of this adapter.
+  String get dialectName => capability.dialect.name;
 
   final EntityRepositoryProvider? parentRepositoryProvider;
 
@@ -771,7 +792,9 @@ class DBRepositoryAdapter<O> with Initializable {
   FutureOr<InitializationResult> initialize() =>
       databaseAdapter.ensureInitialized(parent: this);
 
-  String get dialect => databaseAdapter.dialect;
+  DBDialect get dialect => databaseAdapter.dialect;
+
+  String get dialectName => databaseAdapter.dialectName;
 
   SchemeProvider get schemeProvider => databaseAdapter;
 

@@ -14,6 +14,7 @@ import 'bones_api_entity_annotation.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
+import 'bones_api_sql_builder.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
@@ -84,7 +85,11 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
           minConnections ?? 1,
           maxConnections ?? 3,
           const SQLAdapterCapability(
-              dialect: 'generic',
+              dialect: SQLDialect(
+                'generic',
+                acceptsReturningSyntax: true,
+                acceptsInsertIgnore: true,
+              ),
               transactions: true,
               transactionAbort: true,
               tableSQL: false),
@@ -139,6 +144,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 
   @override
+  SQLDialect get dialect => super.dialect as SQLDialect;
+
+  @override
   Object resolveError(Object error, StackTrace stackTrace) {
     if (error is MemorySQLAdapterException) {
       return error;
@@ -163,27 +171,6 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     _tables.clear();
     return true;
   }
-
-  @override
-  String get sqlElementQuote => '';
-
-  @override
-  bool get sqlAcceptsOutputSyntax => false;
-
-  @override
-  bool get sqlAcceptsReturningSyntax => true;
-
-  @override
-  bool get sqlAcceptsTemporaryTableForReturning => false;
-
-  @override
-  bool get sqlAcceptsInsertDefaultValues => false;
-
-  @override
-  bool get sqlAcceptsInsertIgnore => true;
-
-  @override
-  bool get sqlAcceptsInsertOnConflict => false;
 
   @override
   String getConnectionURL(MemorySQLAdapterContext connection) =>

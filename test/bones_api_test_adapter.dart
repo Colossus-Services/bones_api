@@ -154,14 +154,14 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       expect(fullCreateTableSQLs, contains('-- Test Generated SQL'));
       expect(fullCreateTableSQLs,
           contains('-- SQLAdapter: ${sqlAdapter.runtimeType}'));
-      expect(
-          fullCreateTableSQLs, contains('-- Dialect: ${sqlAdapter.dialect}'));
+      expect(fullCreateTableSQLs,
+          contains('-- Dialect: ${sqlAdapter.dialect.name}'));
       expect(fullCreateTableSQLs,
           contains('-- Generator: BonesAPI/${BonesAPI.VERSION}'));
 
       expect(fullCreateTableSQLs, contains('-- Entity: Address @ address'));
 
-      var q = sqlAdapter.sqlElementQuote;
+      var q = sqlAdapter.dialect.elementQuote;
       var reS = r'(?:\s+|--[^\n]+)+';
       var reAnyType = r'\w+[^\n]*?';
       var reArg = r'(?:\([^ \t\(\)]+\))';

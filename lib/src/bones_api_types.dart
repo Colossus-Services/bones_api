@@ -1,10 +1,8 @@
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
-import 'package:statistics/statistics.dart';
-
-import 'package:data_serializer/data_serializer.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 extension GenericObjectExtension on Object? {
   bool get isPrimitiveValue {
@@ -15,6 +13,38 @@ extension GenericObjectExtension on Object? {
   bool get isEntityIDBasicType {
     var self = this;
     return self is num || self is String;
+  }
+}
+
+extension TypeExtension on Type {
+  bool get isPrimitiveType {
+    var self = this;
+    return self == int ||
+        self == double ||
+        self == num ||
+        self == String ||
+        self == bool;
+  }
+
+  bool get isEntityIDBasicType {
+    var self = this;
+    return self == int || self == num || self == String;
+  }
+
+  bool get isEntityIDType {
+    var self = this;
+    return isEntityIDBasicType || self == BigInt || self == DynamicInt;
+  }
+
+  bool get isNumericType {
+    var self = this;
+    return self == int ||
+        self == double ||
+        self == num ||
+        self == BigInt ||
+        self == DynamicInt ||
+        self == Decimal ||
+        self == DynamicNumber;
   }
 }
 

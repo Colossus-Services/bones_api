@@ -11,6 +11,7 @@ import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_sql_builder.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_utils_timedmap.dart';
 
@@ -78,7 +79,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
           minConnections,
           maxConnections,
           const SQLAdapterCapability(
-              dialect: 'MySQL',
+              dialect: SQLDialect(
+                'MySQL',
+                elementQuote: '`',
+                acceptsTemporaryTableForReturning: true,
+                acceptsInsertIgnore: true,
+              ),
               transactions: true,
               transactionAbort: true,
               tableSQL: true),
@@ -110,11 +116,12 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       String? workingPath}) {
     boot();
 
-    var host = config?['host'] ?? defaultHost;
-    var port = config?['port'] ?? defaultPort;
-    var database = config?['database'] ?? config?['db'] ?? defaultDatabase;
-    var username = config?['username'] ?? config?['user'] ?? defaultUsername;
-    var password = config?['password'] ?? config?['pass'];
+    String? host = config?['host'] ?? defaultHost;
+    int? port = config?['port'] ?? defaultPort;
+    String? database = config?['database'] ?? config?['db'] ?? defaultDatabase;
+    String? username =
+        config?['username'] ?? config?['user'] ?? defaultUsername;
+    String? password = config?['password'] ?? config?['pass'];
 
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
@@ -134,6 +141,9 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
+
+    if (database == null) throw ArgumentError.notNull('database');
+    if (username == null) throw ArgumentError.notNull('username');
 
     return MySQLAdapter(
       database,
@@ -168,25 +178,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  String get sqlElementQuote => '`';
-
-  @override
-  bool get sqlAcceptsOutputSyntax => false;
-
-  @override
-  bool get sqlAcceptsReturningSyntax => false;
-
-  @override
-  bool get sqlAcceptsTemporaryTableForReturning => true;
-
-  @override
-  bool get sqlAcceptsInsertDefaultValues => false;
-
-  @override
-  bool get sqlAcceptsInsertIgnore => true;
-
-  @override
-  bool get sqlAcceptsInsertOnConflict => false;
+  SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
   String getConnectionURL(MySqlConnectionWrapper connection) {

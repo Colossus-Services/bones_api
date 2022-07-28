@@ -107,7 +107,7 @@ Future<void> main() async {
         print(adapter);
 
         expect(adapter, isNotNull);
-        expect(adapter.dialect, api.apiConfig['dialect']);
+        expect(adapter.dialect.name, api.apiConfig['dialect']);
 
         var connection = await adapter.createPoolElement();
         expect(connection, isNotNull);

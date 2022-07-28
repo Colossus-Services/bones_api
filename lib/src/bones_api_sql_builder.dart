@@ -6,6 +6,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_base.dart';
+import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_types.dart';
@@ -76,10 +77,63 @@ class SQLEntry {
   String toString() => comment == null ? sql : '$sql  -- $comment';
 }
 
+class SQLDialect extends DBDialect {
+  /// The type of "quote" to use to reference elements (tables and columns).
+  final String elementQuote;
+
+  /// If `true` indicates that this adapter's SQL uses the `OUTPUT` syntax for inserts/deletes.
+  final bool acceptsOutputSyntax;
+
+  /// If `true` indicates that this adapter's SQL uses the `RETURNING` syntax for inserts/deletes.
+  final bool acceptsReturningSyntax;
+
+  /// If `true` indicates that this adapter's SQL needs a temporary table to return rows for inserts/deletes.
+  final bool acceptsTemporaryTableForReturning;
+
+  /// If `true` indicates that this adapter's SQL can use the `DEFAULT VALUES` directive for inserts.
+  final bool acceptsInsertDefaultValues;
+
+  /// If `true` indicates that this adapter's SQL uses the `IGNORE` syntax for inserts.
+  final bool acceptsInsertIgnore;
+
+  /// If `true` indicates that this adapter's SQL uses the `ON CONFLICT` syntax for inserts.
+  final bool acceptsInsertOnConflict;
+
+  /// If `true` indicates that the `VARCHAR` can be defined without a maximum size.
+  final bool acceptsVarcharWithoutMaximumSize;
+
+  const SQLDialect(
+    String name, {
+    this.elementQuote = '',
+    this.acceptsOutputSyntax = false,
+    this.acceptsReturningSyntax = false,
+    this.acceptsTemporaryTableForReturning = false,
+    this.acceptsInsertDefaultValues = false,
+    this.acceptsInsertIgnore = false,
+    this.acceptsInsertOnConflict = false,
+    this.acceptsVarcharWithoutMaximumSize = false,
+  }) : super(name);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SQLDialect &&
+          runtimeType == other.runtimeType &&
+          name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+
+  @override
+  String toString() {
+    return 'SQLDialect{name: $name, elementQuote: $elementQuote, acceptsOutputSyntax: $acceptsOutputSyntax, acceptsReturningSyntax: $acceptsReturningSyntax, acceptsTemporaryTableForReturning: $acceptsTemporaryTableForReturning, acceptsInsertDefaultValues: $acceptsInsertDefaultValues, acceptsInsertIgnore: $acceptsInsertIgnore, acceptsInsertOnConflict: $acceptsInsertOnConflict}';
+  }
+}
+
 /// Base class for SQL builders
 abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// The SQL dialect.
-  final String dialect;
+  final SQLDialect dialect;
 
   /// The quote of the dialect.
   final String q;
@@ -123,7 +177,7 @@ abstract class TableSQL extends SQLBuilder {
   /// The parent table;
   final String? parentTable;
 
-  TableSQL(String dialect, this.table, this.entries,
+  TableSQL(SQLDialect dialect, this.table, this.entries,
       {String q = '"', this.parentTable})
       : super(dialect, q);
 
@@ -142,7 +196,7 @@ class CreateTableSQL extends TableSQL {
   /// The associated [EntityRepository] of this table.
   EntityRepository? entityRepository;
 
-  CreateTableSQL(String dialect, String table, List<SQLEntry> entries,
+  CreateTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
       {String q = '"',
       this.alterTables,
       this.relationships,
@@ -319,7 +373,7 @@ class AlterTableSQL extends TableSQL {
   @override
   List<CreateTableSQL>? extraSQLBuilders;
 
-  AlterTableSQL(String dialect, String table, List<SQLEntry> entries,
+  AlterTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
       {String q = '"', this.extraSQLBuilders, String? parentTable})
       : super(dialect, table, entries, q: q, parentTable: parentTable);
 
@@ -681,10 +735,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 /// Base class for a `SQL` generator.
 abstract class SQLGenerator {
   /// The generated SQL dialect.
-  String get dialect;
+  SQLDialect get dialect;
 
-  /// The type of "quote" to use to reference elements (tables and columns).
-  String get sqlElementQuote;
+  /// The generated SQL dialect name.
+  String get dialectName;
 
   EntityRepository<O>? getEntityRepository<O extends Object>(
       {O? obj, Type? type, String? name, String? tableName});
@@ -785,8 +839,20 @@ abstract class SQLGenerator {
     }
   }
 
-  String? primaryKeyTypeToSQLType(Type type) {
-    return 'SERIAL PRIMARY KEY';
+  String? primaryKeyTypeToSQLType(Type type,
+      {List<EntityField>? entityFieldAnnotations}) {
+    if (type.isNumericType) {
+      return 'SERIAL PRIMARY KEY';
+    } else if (type == String) {
+      if (dialect.acceptsVarcharWithoutMaximumSize) {
+        return 'VARCHAR PRIMARY KEY';
+      } else {
+        var maximum = entityFieldAnnotations?.maximum.firstOrNull ?? 254;
+        return 'VARCHAR($maximum) PRIMARY KEY';
+      }
+    } else {
+      return 'PRIMARY KEY';
+    }
   }
 
   /// Returns: table -> idName: sqlType
@@ -863,7 +929,7 @@ abstract class SQLGenerator {
           "Can't resolve `EntityRepository`> obj: $obj ; type: $type ; name: $name ; tableName: $tableName");
     }
 
-    var q = sqlElementQuote;
+    var q = dialect.elementQuote;
 
     var entityType = entityRepository.type;
     var entityHandler = entityRepository.entityHandler;
@@ -874,7 +940,13 @@ abstract class SQLGenerator {
     var idType = entityHandler.idType();
 
     var idColumnName = normalizeColumnName(idFieldName);
-    var idTypeSQL = primaryKeyTypeToSQLType(idType);
+    var idAnnotations = entityHandler
+        .getFieldEntityAnnotations(null, idFieldName)
+        ?.whereType<EntityField>()
+        .toList();
+
+    var idTypeSQL =
+        primaryKeyTypeToSQLType(idType, entityFieldAnnotations: idAnnotations);
 
     var sqlEntries = <SQLEntry>[
       SQLEntry('COLUMN', ' $q$idColumnName$q $idTypeSQL',
@@ -913,6 +985,7 @@ abstract class SQLGenerator {
 
       var fieldSQLType = typeToSQLType(fieldType.type, columnName,
           entityFieldAnnotations: entityFieldAnnotations);
+
       if (fieldSQLType == null) {
         var entityType = await entityTypeToSQLType(fieldType.type, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
@@ -1113,7 +1186,7 @@ abstract class SQLGenerator {
       }
 
       fullSQL.write('-- SQLAdapter: $runtimeType\n');
-      fullSQL.write('-- Dialect: $dialect\n');
+      fullSQL.write('-- Dialect: ${dialect.name}\n');
       fullSQL.write('-- Generator: BonesAPI/${BonesAPI.VERSION}\n');
       if (withDate) fullSQL.write('-- Date: ${DateTime.now()}\n');
       fullSQL.write('\n');

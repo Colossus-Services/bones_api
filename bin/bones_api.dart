@@ -294,6 +294,7 @@ class MyCommandServe extends CommandSourceFileBase {
         await _spawnDartVMForHotReload(
             spawner,
             directory,
+            apiRootLib,
             apiRootClass!,
             address,
             port,
@@ -496,6 +497,7 @@ class MyCommandServe extends CommandSourceFileBase {
   Future<void> _spawnDartVMForHotReload(
       DartSpawner spawner,
       String directory,
+      String? apiRootLib,
       String apiRootClass,
       String address,
       String port,
@@ -529,6 +531,7 @@ class MyCommandServe extends CommandSourceFileBase {
           'serve',
           '--directory',
           directory,
+          if (apiRootLib != null) ...['--lib', apiRootLib],
           '--class',
           apiRootClass,
           '--address',
