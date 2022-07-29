@@ -362,17 +362,16 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   FutureOr<Object?> resolveFieldValue(
-      String fieldName, TypeInfo? fieldType, Object? value,
-      {EntityProvider? entityProvider,
-      EntityCache? entityCache,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityRepositoryProvider? entityRepositoryProvider}) {
-    return resolveValueByType(fieldType, value,
-        entityProvider: entityProvider,
-        entityCache: entityCache,
-        entityHandlerProvider: entityHandlerProvider,
-        entityRepositoryProvider: entityRepositoryProvider);
-  }
+          String fieldName, TypeInfo? fieldType, Object? value,
+          {EntityProvider? entityProvider,
+          EntityCache? entityCache,
+          EntityHandlerProvider? entityHandlerProvider,
+          EntityRepositoryProvider? entityRepositoryProvider}) =>
+      resolveValueByType(fieldType, value,
+          entityProvider: entityProvider,
+          entityCache: entityCache,
+          entityHandlerProvider: entityHandlerProvider,
+          entityRepositoryProvider: entityRepositoryProvider);
 
   FutureOr<Map<String, Object?>> resolveFieldsNamesAndValues(
       Map<String, dynamic> fields,
