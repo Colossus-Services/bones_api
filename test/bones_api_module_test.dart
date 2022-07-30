@@ -147,7 +147,8 @@ void main() {
 User _buildTestUser() {
   return User('smith@email.com', '123456', Address('CA', 'NY', '', 101), [],
       id: 10001,
-      creationTime: DateTime.fromMillisecondsSinceEpoch(1665501194000));
+      creationTime:
+          DateTime.fromMillisecondsSinceEpoch(1665501194000, isUtc: true));
 }
 
 Map<String, Object?> _buildTestUserJson(int id, String email, int n) {
