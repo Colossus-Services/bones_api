@@ -257,7 +257,7 @@ class User extends Entity {
         'roles': roles.map((e) => e.toJson()).toList(),
         'level': level,
         'wakeUpTime': wakeUpTime,
-        'creationTime': creationTime.millisecondsSinceEpoch,
+        'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
       };
 }
 
