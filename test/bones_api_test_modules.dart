@@ -27,7 +27,7 @@ class UserModule extends APIModule {
 
   APIResponse<User> getUser(int id) => APIResponse.ok(User(
       'joe@email.com', 'pass123', Address('SC', 'NY', '', 123), [],
-      creationTime: DateTime(2021, 10, 11, 12, 13, 14)));
+      creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14)));
 
   APIResponse<User> echoUser(User user) =>
       APIResponse.ok(user..email += '.echo');
