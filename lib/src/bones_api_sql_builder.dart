@@ -841,7 +841,7 @@ abstract class SQLGenerator {
 
   String? primaryKeyTypeToSQLType(Type type,
       {List<EntityField>? entityFieldAnnotations}) {
-    if (type.isNumericType) {
+    if (type.isNumericOrDynamicNumberType) {
       return 'SERIAL PRIMARY KEY';
     } else if (type == String) {
       if (dialect.acceptsVarcharWithoutMaximumSize) {

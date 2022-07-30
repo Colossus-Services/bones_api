@@ -4,8 +4,9 @@ import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
-import 'package:reflection_factory/reflection_factory.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
+import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
@@ -405,13 +406,15 @@ abstract class APIRoot with Initializable, Closable {
     }
   }
 
+  static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;
+
   FutureOr<APIResponse<T>> _callImpl<T>(
       APIRequest apiRequest, APISecurity? apiSecurity) {
     var pathPartRoot = apiRequest.pathParts[0];
 
     if (pathPartRoot == 'API-INFO') {
       var info = apiInfo(apiRequest);
-      return APIResponse.ok(info as T)..payloadMimeType = 'application/json';
+      return APIResponse.ok(info as T, mimeType: _mimeTypeJson);
     }
 
     var module = getModuleByRequest(apiRequest);
@@ -772,11 +775,17 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
 
 /// Base class for payload.
 abstract class APIPayload {
+  static MimeType? resolveMimeType(Object? mimeType) {
+    if (mimeType == null) return null;
+    if (mimeType is MimeType) return mimeType;
+    return MimeType.parse(mimeType.toString());
+  }
+
   /// The payload.
   dynamic get payload;
 
   /// The payload MIME Type.
-  String? get payloadMimeType;
+  MimeType? get payloadMimeType;
 
   /// The payload usual file name extension.
   String? get payloadFileExtension;
@@ -872,9 +881,15 @@ class APIRequest extends APIPayload {
     return Uint8List.fromList(bs);
   }
 
+  MimeType? _payloadMimeType;
+
   /// The payload/body MIME Type.
   @override
-  String? payloadMimeType;
+  MimeType? get payloadMimeType => _payloadMimeType;
+
+  set payloadMimeType(Object? value) {
+    _payloadMimeType = APIPayload.resolveMimeType(value);
+  }
 
   /// The payload usual file name extension.
   @override
@@ -910,7 +925,7 @@ class APIRequest extends APIPayload {
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       this.payload,
-      this.payloadMimeType,
+      Object? payloadMimeType,
       this.payloadFileExtension,
       this.sessionID,
       this.newSession = false,
@@ -922,6 +937,7 @@ class APIRequest extends APIPayload {
       Uri? requestedUri,
       this.originalRequest})
       : parameters = parameters ?? <String, dynamic>{},
+        _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         headers = headers ?? <String, dynamic>{},
         _pathParts = _buildPathParts(path),
         scheme = scheme?.trim(),
@@ -1051,11 +1067,13 @@ class APIRequest extends APIPayload {
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       dynamic payload,
+      Object? payloadMimeType,
       APICredential? credential}) {
     return APIRequest(APIRequestMethod.POST, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadMimeType: payloadMimeType,
         credential: credential);
   }
 
@@ -1064,11 +1082,13 @@ class APIRequest extends APIPayload {
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       dynamic payload,
+      Object? payloadMimeType,
       APICredential? credential}) {
     return APIRequest(APIRequestMethod.PUT, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadMimeType: payloadMimeType,
         credential: credential);
   }
 
@@ -1077,11 +1097,13 @@ class APIRequest extends APIPayload {
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       dynamic payload,
+      Object? payloadMimeType,
       APICredential? credential}) {
     return APIRequest(APIRequestMethod.DELETE, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadMimeType: payloadMimeType,
         credential: credential);
   }
 
@@ -1090,11 +1112,13 @@ class APIRequest extends APIPayload {
       {Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       dynamic payload,
+      Object? payloadMimeType,
       APICredential? credential}) {
     return APIRequest(APIRequestMethod.PATCH, path,
         parameters: parameters ?? <String, dynamic>{},
         headers: headers ?? <String, dynamic>{},
         payload: payload,
+        payloadMimeType: payloadMimeType,
         credential: credential);
   }
 
@@ -1543,9 +1567,15 @@ class APIResponse<T> extends APIPayload {
   @override
   final T? payload;
 
+  MimeType? _payloadMimeType;
+
   /// The payload/body MIME Type.
   @override
-  String? payloadMimeType;
+  MimeType? get payloadMimeType => _payloadMimeType;
+
+  set payloadMimeType(Object? value) {
+    _payloadMimeType = APIPayload.resolveMimeType(value);
+  }
 
   /// The payload usual file name extension.
   @override
@@ -1579,12 +1609,13 @@ class APIResponse<T> extends APIPayload {
       {this.headers = const <String, dynamic>{},
       T? payload,
       Object? payloadDynamic,
-      this.payloadMimeType,
+      Object? payloadMimeType,
       this.payloadFileExtension,
       this.error,
       this.stackTrace,
       Map<String, Duration>? metrics})
       : payload = _resolvePayload(payload, payloadDynamic),
+        _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         _metrics = metrics;
 
   static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) =>
@@ -1597,7 +1628,7 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.ok(T? payload,
       {Object? payloadDynamic,
       Map<String, dynamic>? headers,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
@@ -1612,7 +1643,7 @@ class APIResponse<T> extends APIPayload {
       {T? payload,
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.ok(
         payload ?? (payloadDynamic == null ? this.payload : null),
@@ -1628,7 +1659,7 @@ class APIResponse<T> extends APIPayload {
       {Map<String, dynamic>? headers,
       T? payload,
       Object? payloadDynamic,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
         headers: headers ?? <String, dynamic>{},
@@ -1643,7 +1674,7 @@ class APIResponse<T> extends APIPayload {
       {T? payload,
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.notFound(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
@@ -1659,7 +1690,7 @@ class APIResponse<T> extends APIPayload {
       {Map<String, dynamic>? headers,
       T? payload,
       Object? payloadDynamic,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
         headers: headers ?? <String, dynamic>{},
@@ -1674,7 +1705,7 @@ class APIResponse<T> extends APIPayload {
       {T? payload,
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.unauthorized(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
@@ -1690,7 +1721,7 @@ class APIResponse<T> extends APIPayload {
       {Map<String, dynamic>? headers,
       T? payload,
       Object? payloadDynamic,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.BAD_REQUEST,
         headers: headers ?? <String, dynamic>{},
@@ -1705,7 +1736,7 @@ class APIResponse<T> extends APIPayload {
       {T? payload,
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
-      String? mimeType,
+      Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse.badRequest(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),

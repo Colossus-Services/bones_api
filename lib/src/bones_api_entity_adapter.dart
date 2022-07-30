@@ -1,13 +1,13 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' hide IterableIntExtension;
-import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_adapter_db_relational.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
@@ -15,34 +15,6 @@ import 'bones_api_mixin.dart';
 final _log = logging.Logger('DBAdapter');
 
 typedef PasswordProvider = FutureOr<String> Function(String user);
-
-/// [SQL] wrapper interface.
-abstract class SQLWrapper {
-  /// The amount of [SQL]s.
-  int get sqlsLength;
-
-  /// Returns the main [SQL].
-  SQL get mainSQL;
-
-  /// Returns all wrapped [SQL]s.
-  Iterable<SQL> get allSQLs;
-}
-
-/// Class to wrap multiple [SQL]s.
-class MultipleSQL implements SQLWrapper {
-  final List<SQL> sqls;
-
-  MultipleSQL(this.sqls);
-
-  @override
-  Iterable<SQL> get allSQLs => sqls;
-
-  @override
-  SQL get mainSQL => sqls.first;
-
-  @override
-  int get sqlsLength => sqls.length;
-}
 
 class DBDialect {
   final String name;
@@ -107,7 +79,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     if (_boot) return;
     _boot = true;
 
-    SQLAdapter.boot();
+    DBRelationalAdapter.boot();
   }
 
   static final Map<String, DBAdapterInstantiator> _registeredAdaptersByName =
@@ -159,7 +131,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
       getAdapterInstantiatorsFromConfig<C extends Object,
-              A extends SQLAdapter<C>>(Map<String, dynamic> config) =>
+              A extends DBAdapter<C>>(Map<String, dynamic> config) =>
           getAdapterInstantiatorsFromConfigImpl<C, A>(
               config, registeredAdaptersNames, getAdapterInstantiator);
 
@@ -451,6 +423,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     return entityHandler as EntityHandler<T>?;
   }
 
+  void checkEntityFields<O>(O o, String entityName, String table,
+      {EntityHandler<O>? entityHandler}) {}
+
   FutureOr<int> doCount(
       TransactionOperation op, String entityName, String table,
       {EntityMatcher? matcher,
@@ -458,14 +433,6 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
       PreFinishDBOperation<int, int>? preFinish});
-
-  FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit,
-      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
 
   FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
       String table, O o, Map<String, dynamic> fields,
@@ -476,34 +443,6 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       {String? idFieldName,
       PreFinishDBOperation<dynamic, dynamic>? preFinish,
       bool allowAutoInsert = false});
-
-  FutureOr<bool> doInsertRelationship(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName,
-      List otherIds,
-      [PreFinishDBOperation<bool, bool>? preFinish]);
-
-  FutureOr<R> doSelectRelationship<R>(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName,
-      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
-
-  FutureOr<R> doSelectRelationships<R>(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      List<dynamic> ids,
-      String otherTableName,
-      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]);
 
   FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
       String table, EntityMatcher matcher,
@@ -520,14 +459,6 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   bool get callCloseTransactionRequired;
 
   FutureOr<void> closeTransaction(Transaction transaction, C? connection);
-
-  static int temporaryTableIdCount = 0;
-
-  static String createTemporaryTableName(String prefix) {
-    var id = ++temporaryTableIdCount;
-    var seed = DateTime.now().microsecondsSinceEpoch;
-    return '${prefix}_${seed}_$id';
-  }
 
   /// Returns the URL of the [connection].
   String getConnectionURL(C connection);
@@ -774,6 +705,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 }
 
+/// An adapter for [EntityRepository] and [DBAdapter].
 class DBRepositoryAdapter<O> with Initializable {
   final DBAdapter databaseAdapter;
 
@@ -804,6 +736,9 @@ class DBRepositoryAdapter<O> with Initializable {
   Map<String, dynamic> information({bool extended = false}) =>
       databaseAdapter.information(extended: extended, table: tableName);
 
+  void checkEntityFields(O o, EntityHandler<O> entityHandler) => databaseAdapter
+      .checkEntityFields<O>(o, name, tableName, entityHandler: entityHandler);
+
   FutureOr<int> doCount(TransactionOperation op,
           {EntityMatcher? matcher,
           Object? parameters,
@@ -815,20 +750,6 @@ class DBRepositoryAdapter<O> with Initializable {
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
-          preFinish: preFinish);
-
-  FutureOr<R> doSelect<R>(TransactionOperation op, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          int? limit,
-          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish}) =>
-      databaseAdapter.doSelect<R>(op, name, tableName, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          limit: limit,
           preFinish: preFinish);
 
   FutureOr<dynamic> doInsert(
@@ -847,26 +768,6 @@ class DBRepositoryAdapter<O> with Initializable {
           idFieldName: idFieldName,
           preFinish: preFinish,
           allowAutoInsert: allowAutoInsert);
-
-  FutureOr<bool> doInsertRelationship(TransactionOperation op, String field,
-          dynamic id, String otherTableName, List otherIds,
-          [PreFinishDBOperation<bool, bool>? preFinish]) =>
-      databaseAdapter.doInsertRelationship(
-          op, name, tableName, field, id, otherTableName, otherIds, preFinish);
-
-  FutureOr<R> doSelectRelationship<R>(TransactionOperation op, String field,
-          dynamic id, String otherTableName,
-          [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish]) =>
-      databaseAdapter.doSelectRelationship<R>(
-          op, name, tableName, field, id, otherTableName, preFinish);
-
-  FutureOr<R> doSelectRelationships<R>(TransactionOperation op, String field,
-          List<dynamic> ids, String otherTableName,
-          [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish]) =>
-      databaseAdapter.doSelectRelationships<R>(
-          op, name, tableName, field, ids, otherTableName, preFinish);
 
   FutureOr<R> doDelete<R>(TransactionOperation op, EntityMatcher matcher,
           {Object? parameters,

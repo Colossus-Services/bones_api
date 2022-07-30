@@ -8,6 +8,16 @@
     `sqlElementQuote`, `sqlAcceptsOutputSyntax`, `sqlAcceptsReturningSyntax`, `sqlAcceptsTemporaryTableForReturning`,
     `sqlAcceptsInsertDefaultValues`, `sqlAcceptsInsertIgnore`, `sqlAcceptsInsertOnConflict`.
 - `SQLGenerator`: allow `VARCHAR PRIMARY KEY`.
+- `EntityHandler`:
+  - Fix `EntityCache` interaction issues:
+    - Some instance were not being cached depending on the instantiation type.
+    - Internal call to `Json.fromJson` were wrongly clearing the `EntityCache`.
+  - Respecting new parameter `EntityCache.allowEntityFetch`.
+- `APIPayload` (`APIRequest`, `APIResponse`):
+  - Changed `payloadMimeType` from `String` to `MimeType`.
+- async_extension: ^1.0.10
+- reflection_factory: ^1.2.3
+- statistics: ^1.0.22
 
 ## 1.2.23
 

@@ -1,4 +1,5 @@
 import 'package:bones_api/bones_api.dart';
+import 'package:collection/collection.dart';
 
 import 'bones_api_test_entities.dart';
 
@@ -24,8 +25,19 @@ class UserModule extends APIModule {
 
   Future<String> notARouteAsync(int n) async => 'foo';
 
-  APIResponse<User> getUser(int id) => APIResponse.ok(
-      User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+  APIResponse<User> getUser(int id) => APIResponse.ok(User(
+      'joe@email.com', 'pass123', Address('SC', 'NY', '', 123), [],
+      creationTime: DateTime(2021, 10, 11, 12, 13, 14)));
+
+  APIResponse<User> echoUser(User user) =>
+      APIResponse.ok(user..email += '.echo');
+
+  APIResponse<List<User>> echoListUser(List<User> users) => APIResponse.ok(
+      users.mapIndexed((i, e) => e..email += '.echo[$i]').toList());
+
+  APIResponse<List<User>> echoListUser2(String msg, List<User> users) =>
+      APIResponse.ok(
+          users.mapIndexed((i, e) => e..email += '.echo[$i]{$msg}').toList());
 
   APIResponse getDynamic(int id) => APIResponse.ok(
       User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));

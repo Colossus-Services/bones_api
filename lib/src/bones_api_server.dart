@@ -597,6 +597,7 @@ class APIServer {
             : <String, dynamic>{...parameters, ...payloadMap};
 
         payload = null;
+        mimeType = null;
       } else {
         parametersResolved = Map<String, dynamic>.from(parameters);
       }
@@ -612,7 +613,8 @@ class APIServer {
           scheme: scheme,
           requestedUri: request.requestedUri,
           originalRequest: request,
-          payload: payload);
+          payload: payload,
+          payloadMimeType: mimeType);
 
       return req;
     });
@@ -638,35 +640,35 @@ class APIServer {
     return cookies;
   }
 
-  FutureOr<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
+  static final MimeType _mimeTypeTextPlain =
+      MimeType.parse(MimeType.textPlain)!;
+
+  Future<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
     var contentLength = request.contentLength;
     var contentType = request.headers['content-type'];
 
-    if (contentLength == null && contentType == null) return null;
+    if (contentLength == null && contentType == null) return Future.value(null);
 
-    var mimeType = contentType != null ? MimeType.parse(contentType) : null;
+    var mimeType = MimeType.parse(contentType) ?? _mimeTypeTextPlain;
 
-    if (mimeType == null || mimeType.isText) {
-      return request.readAsString().resolveMapped((val) =>
-          MapEntry((mimeType ?? MimeType.parse(MimeType.textPlain)!), val));
-    }
+    if (mimeType.isStringType) {
+      return request.readAsString().then((s) {
+        Object? payload = s;
+        if (mimeType.isJSON) {
+          payload = json.decode(s);
+        } else if (mimeType.isFormURLEncoded) {
+          payload = decodeQueryStringParameters(s);
+        }
 
-    if (mimeType.isJSON) {
-      return request
-          .readAsString()
-          .resolveMapped((s) => MapEntry(mimeType, json.decode(s)));
-    }
-
-    if (mimeType.isFormURLEncoded) {
-      return request.readAsString().resolveMapped(
-          (s) => MapEntry(mimeType, decodeQueryStringParameters(s)));
+        return payload == null ? null : MapEntry(mimeType, payload);
+      });
     }
 
     return request
         .read()
         .expand((bs) => bs)
         .toList()
-        .resolveMapped((bs) => MapEntry(mimeType, Uint8List.fromList(bs)));
+        .then((bs) => MapEntry(mimeType, Uint8List.fromList(bs)));
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');
@@ -888,9 +890,8 @@ class APIServer {
     apiResponse.stopAllMetrics();
 
     var contentType = apiResponse.payloadMimeType;
-    if (contentType != null && contentType.isNotEmpty) {
-      contentType = _fixContentType(contentType);
-      headers['content-type'] = contentType;
+    if (contentType != null) {
+      headers['content-type'] = contentType.toString();
     }
 
     headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
@@ -928,29 +929,6 @@ class APIServer {
       default:
         return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',
             headers: headers);
-    }
-  }
-
-  String _fixContentType(String contentType) {
-    var contentTypeLC = contentType.trim().toLowerCase();
-
-    switch (contentTypeLC) {
-      case 'json':
-        return 'application/json';
-      case 'js':
-      case 'javascript':
-        return 'application/javascript';
-      case 'text':
-        return 'text/plain';
-      case 'html':
-        return 'text/html';
-      case 'png':
-        return 'image/png';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      default:
-        return contentType;
     }
   }
 

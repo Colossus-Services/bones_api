@@ -1,50 +1,46 @@
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
-extension GenericObjectExtension on Object? {
-  bool get isPrimitiveValue {
+/// Extension for entity [Type]s.
+extension APIEntityTypeExtension on Type {
+  /// Returns `true` if `this` [Type] is an [int] or [String].
+  bool get isEntityIDPrimitiveType {
     var self = this;
-    return self is num || self is String || self is bool;
+    return self == int || self == String;
   }
 
-  bool get isEntityIDBasicType {
+  /// Returns `true` if `this` [Type] is an [int], [BigInt] or [String].
+  bool get isEntityIDType {
     var self = this;
-    return self is num || self is String;
+    return isEntityIDPrimitiveType || self == BigInt;
   }
 }
 
-extension TypeExtension on Type {
-  bool get isPrimitiveType {
+/// Extension for entity [Object]s.
+extension APIEntityObjectExtension on Object? {
+  /// Returns `true` if `this` object is an [int] or [String].
+  bool get isEntityIDPrimitiveType {
     var self = this;
-    return self == int ||
-        self == double ||
-        self == num ||
-        self == String ||
-        self == bool;
+    return self is int || self is String;
   }
 
-  bool get isEntityIDBasicType {
-    var self = this;
-    return self == int || self == num || self == String;
-  }
-
+  /// Returns `true` if `this` object is an [int], [BigInt] or [String].
   bool get isEntityIDType {
     var self = this;
-    return isEntityIDBasicType || self == BigInt || self == DynamicInt;
+    return isEntityIDPrimitiveType || self is BigInt;
   }
+}
 
-  bool get isNumericType {
-    var self = this;
-    return self == int ||
-        self == double ||
-        self == num ||
-        self == BigInt ||
-        self == DynamicInt ||
-        self == Decimal ||
-        self == DynamicNumber;
+extension ListOfStringExtension on List<String> {
+  bool containsIgnoreCase(String s) {
+    for (var e in this) {
+      if (equalsIgnoreAsciiCase(e, s)) return true;
+    }
+    return false;
   }
 }
 

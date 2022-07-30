@@ -53,11 +53,12 @@ class Json {
       bool removeNullFields = false,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonCodec = _buildJsonEncoder(maskField, maskText, removeField,
         removeNullFields, toEncodable, entityHandlerProvider, entityCache);
 
-    return jsonCodec.toJson(o);
+    return jsonCodec.toJson(o, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Transforms [o] to an encoded JSON.
@@ -72,11 +73,13 @@ class Json {
       bool removeNullFields = false,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
         removeNullFields, toEncodable, entityHandlerProvider, entityCache);
 
-    return jsonEncoder.encode(o, pretty: pretty);
+    return jsonEncoder.encode(o,
+        pretty: pretty, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Sames as [encode] but returns a [Uint8List].
@@ -88,11 +91,13 @@ class Json {
       bool removeNullFields = false,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
         removeNullFields, toEncodable, entityHandlerProvider, entityCache);
 
-    return jsonEncoder.encodeToBytes(o, pretty: pretty);
+    return jsonEncoder.encodeToBytes(o,
+        pretty: pretty, autoResetEntityCache: autoResetEntityCache);
   }
 
   static final JsonEncoder defaultEncoder = JsonEncoder(
@@ -162,11 +167,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJson<T>(o, type: type);
+    return jsonDecoder.fromJson<T>(o,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to [type] allowing async calls ([Future] and [FutureOr]).
@@ -174,11 +181,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJsonAsync<T>(o, type: type);
+    return jsonDecoder.fromJsonAsync<T>(o,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to as [List] of [type].
@@ -186,11 +195,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJsonList<T>(o, type: type);
+    return jsonDecoder.fromJsonList<T>(o,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to as [List] of [type] allowing async calls ([Future] and [FutureOr]).
@@ -198,11 +209,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJsonListAsync<T>(o, type: type);
+    return jsonDecoder.fromJsonListAsync<T>(o,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [map] to [type].
@@ -210,11 +223,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJsonMap<T>(map, type: type);
+    return jsonDecoder.fromJsonMap<T>(map,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [map] to [type] allowing async calls ([Future] and [FutureOr]).
@@ -222,11 +237,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.fromJsonMapAsync<T>(map, type: type);
+    return jsonDecoder.fromJsonMapAsync<T>(map,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Decodes [encodedJson] to a JSON collection/data.
@@ -234,11 +251,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.decode(encodedJson, type: type);
+    return jsonDecoder.decode(encodedJson,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Sames as [decode] but from a [Uint8List].
@@ -246,11 +265,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.decodeFromBytes(encodedJsonBytes, type: type);
+    return jsonDecoder.decodeFromBytes(encodedJsonBytes,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Decodes [encodedJson] to a JSON collection/data accepting async values.
@@ -258,11 +279,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.decodeAsync(encodedJson, type: type);
+    return jsonDecoder.decodeAsync(encodedJson,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Sames as [decodeAsync] but from a [Uint8List].
@@ -271,11 +294,13 @@ class Json {
       {Type? type,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
     var jsonDecoder =
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
-    return jsonDecoder.decodeFromBytesAsync(encodedJsonBytes, type: type);
+    return jsonDecoder.decodeFromBytesAsync(encodedJsonBytes,
+        type: type, autoResetEntityCache: autoResetEntityCache);
   }
 
   static final JsonDecoder defaultDecoder = JsonDecoder(

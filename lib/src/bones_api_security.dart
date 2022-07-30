@@ -2,10 +2,14 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:logging/logging.dart' as logging;
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_session.dart';
+
+final _log = logging.Logger('APISecurity');
 
 abstract class APISecurity {
   final Duration tokenDuration;
@@ -47,6 +51,9 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> authenticate(APICredential? credential) {
     if (credential == null) return null;
+
+    _log.info(
+        "authenticate> ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;

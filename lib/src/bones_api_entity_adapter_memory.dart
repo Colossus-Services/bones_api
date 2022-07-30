@@ -13,7 +13,6 @@ import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
-import 'bones_api_types.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_utils_collections.dart';
 

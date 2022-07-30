@@ -9,6 +9,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_adapter_db_relational.dart';
 import 'bones_api_entity_adapter_memory.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_platform.dart';
@@ -18,6 +19,34 @@ import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('SQLAdapter');
+
+/// [SQL] wrapper interface.
+abstract class SQLWrapper {
+  /// The amount of [SQL]s.
+  int get sqlsLength;
+
+  /// Returns the main [SQL].
+  SQL get mainSQL;
+
+  /// Returns all wrapped [SQL]s.
+  Iterable<SQL> get allSQLs;
+}
+
+/// Class to wrap multiple [SQL]s.
+class MultipleSQL implements SQLWrapper {
+  final List<SQL> sqls;
+
+  MultipleSQL(this.sqls);
+
+  @override
+  Iterable<SQL> get allSQLs => sqls;
+
+  @override
+  SQL get mainSQL => sqls.first;
+
+  @override
+  int get sqlsLength => sqls.length;
+}
 
 /// An encoded SQL representation.
 /// This is used by a [SQLAdapter] to execute queries.
@@ -212,7 +241,7 @@ typedef SQLAdapterInstantiator<C extends Object, A extends SQLAdapter<C>>
 /// adjust the generated `SQL`s to the correct dialect.
 ///
 /// All [SQLAdapter]s comes with a built-in connection pool.
-abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
+abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     with SQLGenerator {
   static bool _boot = false;
 
@@ -244,7 +273,7 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
 
     _registeredAdaptersByType[type] = adapterInstantiator;
 
-    DBAdapter.registerAdapter(names, type, adapterInstantiator);
+    DBRelationalAdapter.registerAdapter(names, type, adapterInstantiator);
   }
 
   static SQLAdapterInstantiator<C, A>?
@@ -597,9 +626,6 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 
   FutureOr<bool> executeTableSQL(String createTableSQL);
-
-  void checkEntityFields<O>(O o, String entityName, String table,
-      {EntityHandler<O>? entityHandler}) {}
 
   FutureOr<SQL> generateCountSQL(
       Transaction transaction, String entityName, String table,
@@ -1714,7 +1740,8 @@ abstract class SQLAdapter<C extends Object> extends DBAdapter<C>
   }
 }
 
-class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
+/// An adapter for [EntityRepository] and [SQLAdapter].
+class SQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
   @override
   SQLAdapter get databaseAdapter => super.databaseAdapter as SQLAdapter;
 
@@ -1724,13 +1751,6 @@ class SQLRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
 
   @override
   SQLDialect get dialect => super.dialect as SQLDialect;
-
-  @override
-  FutureOr<InitializationResult> initialize() =>
-      databaseAdapter.ensureInitialized(parent: this);
-
-  void checkEntityFields(O o, EntityHandler<O> entityHandler) => databaseAdapter
-      .checkEntityFields<O>(o, name, tableName, entityHandler: entityHandler);
 
   FutureOr<SQL> generateCountSQL(Transaction transaction,
           {EntityMatcher? matcher,

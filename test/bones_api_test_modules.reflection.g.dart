@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.2
+// BUILDER: reflection_factory/1.2.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -34,7 +34,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.15.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.2');
+  Version get reflectionFactoryVersion => Version.parse('1.2.3');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -361,6 +361,9 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         'checkInitialized',
         'configure',
         'doInitialization',
+        'echoListUser',
+        'echoListUser2',
+        'echoUser',
         'ensureConfigured',
         'ensureInitialized',
         'ensureInitializedAsync',
@@ -449,6 +452,63 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tInt, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'echouser':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'echoUser',
+            TypeReflection(APIResponse, [User]),
+            false,
+            (o) => o!.echoUser,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection(User), 'user', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'echolistuser':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'echoListUser',
+            TypeReflection(APIResponse, [
+              TypeReflection(List, [User])
+            ]),
+            false,
+            (o) => o!.echoListUser,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection(List, [User]), 'users', false,
+                  true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'echolistuser2':
+        return MethodReflection<UserModule, R>(
+            this,
+            UserModule,
+            'echoListUser2',
+            TypeReflection(APIResponse, [
+              TypeReflection(List, [User])
+            ]),
+            false,
+            (o) => o!.echoListUser2,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'msg', false, true, null, null),
+              ParameterReflection(TypeReflection(List, [User]), 'users', false,
+                  true, null, null)
             ],
             null,
             null,

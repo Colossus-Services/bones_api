@@ -105,7 +105,7 @@ void main() {
           equals(
               'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }'));
 
-      expect(res.payloadMimeType, equals('text/plain'));
+      expect(res.payloadMimeType.toString(), equals('text/plain'));
     });
 
     test('404 module', () async {
