@@ -2,6 +2,7 @@
 
 - Fix resolution of `EntityRepository` when the same instance is returned by multiple providers.
 - Fix `selectByID` with null parameters and null ID.
+- Fix resolution of route parameters with a type of `List` of entities. 
 
 ## 1.2.25
 
