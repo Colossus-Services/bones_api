@@ -537,7 +537,7 @@ class APIRouteBuilder<M extends APIModule> {
   Object? _resolveValueType(TypeInfo typeInfo, Object? value) {
     if (value == null) {
       return null;
-    } else if (typeInfo.isOf(value.runtimeType)) {
+    } else if (typeInfo.type == value.runtimeType && !typeInfo.hasArguments) {
       return value;
     } else if (typeInfo.isNumber) {
       var n = typeInfo.parse(value);
