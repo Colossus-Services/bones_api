@@ -1,9 +1,14 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity_adapter_sql.dart';
+
+final _log = logging.Logger('DBRelationalAdapter');
 
 /// Base class for Relational DB adapters.
 ///
@@ -113,6 +118,12 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
         .resolveMapped((adapter) => adapter as A);
   }
 
+  @override
+  DBRelationalRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
+          {String? tableName, Type? type}) =>
+      super.createRepositoryAdapter<O>(name, tableName: tableName, type: type)
+          as DBRelationalRepositoryAdapter<O>?;
+
   FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
       String table, EntityMatcher matcher,
       {Object? parameters,
@@ -198,6 +209,467 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
   @override
   String toString() =>
       'DBRelRepositoryAdapter{name: $name, tableName: $tableName, type: $type}';
+}
+
+class DBRelationalEntityRepository<O extends Object>
+    extends DBEntityRepository<O> {
+  @override
+  DBRelationalRepositoryAdapter<O> get repositoryAdapter =>
+      super.repositoryAdapter as DBRelationalRepositoryAdapter<O>;
+
+  DBRelationalEntityRepository(
+      DBRelationalAdapter adapter, String name, EntityHandler<O> entityHandler,
+      {DBRelationalRepositoryAdapter<O>? repositoryAdapter, Type? type})
+      : super(adapter, name, entityHandler,
+            repositoryAdapter: repositoryAdapter, type: type);
+
+  @override
+  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+    checkNotClosed();
+
+    var id = getID(o, entityHandler: entityHandler);
+
+    if (id == null || entityHasChangedFields(o)) {
+      return store(o, transaction: transaction);
+    } else {
+      if (isTrackingEntity(o)) {
+        return ensureReferencesStored(o, transaction: transaction)
+            .resolveWithValue(id);
+      }
+
+      return existsID(id, transaction: transaction).resolveMapped((exists) {
+        if (!exists) {
+          return store(o, transaction: transaction);
+        } else {
+          return ensureReferencesStored(o, transaction: transaction)
+              .resolveWithValue(id);
+        }
+      });
+    }
+  }
+
+  @override
+  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+    checkNotClosed();
+
+    transaction ??= Transaction.executingOrNew(autoCommit: true);
+
+    var fieldsNames = entityHandler.fieldsNames(o);
+
+    var futures = fieldsNames
+        .map((fieldName) {
+          var value = entityHandler.getField(o, fieldName);
+          if (value == null) return null;
+
+          var fieldType = entityHandler.getFieldType(o, fieldName)!;
+
+          if (value is List && fieldType.isList && fieldType.hasArguments) {
+            var elementType = fieldType.arguments.first;
+            if (!EntityHandler.isValidEntityType(elementType.type)) return null;
+
+            var elementRepository =
+                provider.getEntityRepositoryByType(elementType.type);
+            if (elementRepository == null) return null;
+
+            var futures = value.map((e) {
+              return elementRepository.ensureStored(e,
+                  transaction: transaction);
+            }).toList();
+            return futures.resolveAll();
+          } else {
+            if (!EntityHandler.isValidEntityType(fieldType.type)) return null;
+
+            var repository =
+                provider.getEntityRepository(type: fieldType.type, obj: value);
+            if (repository == null) return null;
+
+            var stored =
+                repository.ensureStored(value, transaction: transaction);
+            return stored;
+          }
+        })
+        .whereNotNullSync()
+        .toList(growable: false);
+
+    return futures.resolveAllWithValue(true);
+  }
+
+  @override
+  FutureOr<List<O>> select(EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    checkNotClosed();
+
+    var op = TransactionOperationSelect(
+        name, operationExecutor, matcher, transaction);
+
+    try {
+      return repositoryAdapter.doSelect(op, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit, preFinish: (results) {
+        return resolveEntities(op.transaction, results);
+      });
+    } catch (e, s) {
+      var message = 'select> '
+          'matcher: $matcher ; '
+          'parameters: $parameters ; '
+          'positionalParameters: $positionalParameters ; '
+          'namedParameters: $namedParameters ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  @override
+  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit}) =>
+      select(ConditionANY(), limit: limit);
+
+  @override
+  bool isStored(O o, {Transaction? transaction}) {
+    var id = entityHandler.getID(o);
+    return id != null;
+  }
+
+  @override
+  void checkEntityFields(O o) {
+    entityHandler.checkAllFieldsValues(o);
+
+    repositoryAdapter.checkEntityFields(o, entityHandler);
+  }
+
+  @override
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) {
+    checkNotClosed();
+
+    checkEntityFields(o);
+
+    if (isStored(o, transaction: transaction)) {
+      return _update(o, transaction, true);
+    }
+
+    var op = TransactionOperationStore(name, operationExecutor, o, transaction);
+
+    try {
+      return ensureReferencesStored(o, transaction: op.transaction)
+          .resolveWith(() {
+        var idFieldsName = entityHandler.idFieldName(o);
+        var fields = entityHandler.getFields(o);
+
+        return repositoryAdapter.doInsert(op, o, fields,
+            idFieldName: idFieldsName, preFinish: (id) {
+          entityHandler.setID(o, id);
+
+          return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+            trackEntity(o);
+            return id; // pre-finish
+          });
+        });
+      });
+    } catch (e, s) {
+      var message = 'store> '
+          'o: $o ; '
+          'transaction: ${op.transaction} ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  FutureOr<dynamic> _update(
+      O o, Transaction? transaction, bool allowAutoInsert) {
+    var op =
+        TransactionOperationUpdate(name, operationExecutor, o, transaction);
+
+    return ensureReferencesStored(o, transaction: op.transaction)
+        .resolveWith(() {
+      var idFieldsName = entityHandler.idFieldName(o);
+      var id = entityHandler.getID(o);
+      var fields = entityHandler.getFields(o);
+
+      var changedFields = getEntityChangedFields(o);
+      if (changedFields != null) {
+        if (changedFields.isEmpty) {
+          return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+            trackEntity(o);
+            return op.finish(id);
+          });
+        }
+
+        fields.removeWhere((key, value) => !changedFields.contains(key));
+      }
+
+      return repositoryAdapter.doUpdate(op, o, id, fields,
+          idFieldName: idFieldsName,
+          allowAutoInsert: allowAutoInsert, preFinish: (id) {
+        return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+          trackEntity(o);
+          return id; // pre-finish
+        });
+      });
+    });
+  }
+
+  FutureOr<bool> _ensureRelationshipsStored(O o, Transaction? transaction) {
+    var fieldsListEntity = entityHandler.fieldsWithTypeListEntity(o);
+    if (fieldsListEntity.isEmpty) return false;
+
+    var ret = fieldsListEntity.entries.map((e) {
+      var field = e.key;
+      var fieldType = e.value;
+      var values = entityHandler.getField(o, field);
+      return setRelationship(o, field, values,
+          fieldType: fieldType, transaction: transaction);
+    }).resolveAll();
+
+    return ret.resolveWithValue(true);
+  }
+
+  @override
+  FutureOr<bool> setRelationship<E extends Object>(
+      O o, String field, List<E> values,
+      {TypeInfo? fieldType, Transaction? transaction}) {
+    fieldType ??= entityHandler.getFieldType(o, field)!;
+
+    var op = TransactionOperationStoreRelationship(
+        name, operationExecutor, o, values, transaction);
+
+    var valuesType = fieldType.listEntityType!.type;
+    String valuesTableName = _resolveTableName(valuesType);
+    var valuesEntityHandler = _resolveEntityHandler(valuesType);
+
+    var oId = entityHandler.getID(o);
+    var othersIds = values.map((e) => valuesEntityHandler.getID(e)).toList();
+
+    try {
+      return repositoryAdapter.doInsertRelationship(
+          op, field, oId, valuesTableName, othersIds);
+    } catch (e, s) {
+      var message = 'setRelationship[$valuesTableName]> '
+          'o: $o ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'values: $values ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  @override
+  FutureOr<Iterable<dynamic>> selectRelationship<E>(O? o, String field,
+      {Object? oId, TypeInfo? fieldType, Transaction? transaction}) {
+    fieldType ??= entityHandler.getFieldType(o, field)!;
+
+    oId ??= entityHandler.getID(o!);
+
+    var cachedRelationship =
+        _getCachedEntityRelationship(oId, field, fieldType, transaction);
+    if (cachedRelationship != null) {
+      return cachedRelationship;
+    }
+
+    var op = TransactionOperationSelectRelationship(
+        name, operationExecutor, o ?? oId, transaction);
+
+    var valuesType = fieldType.listEntityType!.type;
+    String valuesTableName = _resolveTableName(valuesType);
+
+    try {
+      return repositoryAdapter
+          .doSelectRelationship(op, field, oId, valuesTableName, (sel) {
+        var valuesIds = sel.map((e) => e['target_id']!).cast<E>().toList();
+        return valuesIds;
+      });
+    } catch (e, s) {
+      var message = 'selectRelationship[valuesTableName]> '
+          'o: $o ; '
+          'oId: $oId ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  Iterable<dynamic>? _getCachedEntityRelationship<E>(
+      dynamic id, String field, TypeInfo fieldType, Transaction? transaction) {
+    var cachedEntity = transaction?.getCachedEntityByID(id, type: type);
+    if (cachedEntity != null) {
+      var fieldValue = entityHandler.getField(cachedEntity, field);
+      if (fieldValue != null) {
+        var fieldEntityHandler = entityHandler.getEntityHandler(
+            type: fieldType.isListEntity
+                ? fieldType.listEntityType!.type
+                : fieldType.type);
+
+        if (fieldEntityHandler != null) {
+          if (fieldValue is Iterable) {
+            var fieldIds =
+                fieldValue.map((e) => fieldEntityHandler.getID(e)).toList();
+            return fieldIds;
+          } else {
+            var fieldId = fieldEntityHandler.getID(fieldValue);
+            return [fieldId];
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  Map<dynamic, List<dynamic>>? _getCachedEntitiesRelationships<E>(
+      List<dynamic> ids,
+      String field,
+      TypeInfo fieldType,
+      Transaction? transaction) {
+    if (transaction == null) return null;
+
+    var cachedEntities = transaction.getCachedEntitiesByIDs(ids,
+        type: type, removeCachedIDs: true);
+
+    if (cachedEntities != null && cachedEntities.isNotEmpty) {
+      var fieldEntityHandler = entityHandler.getEntityHandler(
+          type: fieldType.isListEntity
+              ? fieldType.listEntityType!.type
+              : fieldType.type);
+
+      if (fieldEntityHandler == null) return null;
+
+      var relationshipEntries = cachedEntities.entries.map((e) {
+        var id = e.key;
+        var entity = e.value;
+
+        var fieldValue = entityHandler.getField(entity as dynamic, field);
+
+        if (fieldValue != null) {
+          if (fieldValue is Iterable) {
+            var fieldIds =
+                fieldValue.map((e) => fieldEntityHandler.getID(e)).toList();
+            return MapEntry(id, fieldIds);
+          } else {
+            var fieldId = fieldEntityHandler.getID(fieldValue);
+            return MapEntry(id, [fieldId]);
+          }
+        }
+
+        return null;
+      }).whereNotNull();
+
+      var relationships = Map.fromEntries(relationshipEntries);
+
+      if (relationships.isNotEmpty) {
+        return relationships;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
+      List<O>? os, String field,
+      {List<dynamic>? oIds, TypeInfo? fieldType, Transaction? transaction}) {
+    oIds ??= os!
+        .map((o) => getID(o, entityHandler: entityHandler)! as Object)
+        .toList();
+
+    fieldType ??= entityHandler.getFieldType(os?.first, field)!;
+
+    if (oIds.isEmpty) {
+      return <dynamic, Iterable<dynamic>>{};
+    } else if (oIds.length == 1) {
+      var id = oIds.first;
+
+      return selectRelationship(null, field,
+              oId: id, fieldType: fieldType, transaction: transaction)
+          .resolveMapped((targetIds) {
+        return <dynamic, Iterable<dynamic>>{
+          id: targetIds is List ? targetIds : targetIds.toList()
+        };
+      });
+    }
+
+    var oIdsOrig = oIds.toList(growable: false);
+
+    var cachedRelationships =
+        _getCachedEntitiesRelationships(oIds, field, fieldType, transaction);
+
+    if (cachedRelationships != null && oIds.isEmpty) {
+      return cachedRelationships;
+    }
+
+    var op = TransactionOperationSelectRelationships(
+        name, operationExecutor, os ?? oIds, transaction);
+
+    var valuesType = fieldType.listEntityType!.type;
+    String valuesTableName = _resolveTableName(valuesType);
+
+    try {
+      return repositoryAdapter
+          .doSelectRelationships(op, field, oIds, valuesTableName, (sel) {
+        var relationships = sel.groupListsBy((e) => e['source_id']!).map(
+            (id, l) => MapEntry(id, l.map((m) => m['target_id']).toList()));
+
+        if (cachedRelationships != null && cachedRelationships.isNotEmpty) {
+          relationships = Map<dynamic, List<dynamic>>.fromEntries(oIdsOrig.map(
+              (id) => MapEntry<dynamic, List<dynamic>>(
+                  id,
+                  relationships[id] ??
+                      cachedRelationships[id] as List<dynamic>)));
+        }
+
+        return relationships;
+      });
+    } catch (e, s) {
+      var message = 'selectRelationships> '
+          'os: $os ; '
+          'oIds: $oIds ; '
+          'field: $field ; '
+          'fieldType: $fieldType ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  String _resolveTableName(Type type) {
+    var repository =
+        repositoryAdapter.databaseAdapter.getRepositoryAdapterByType(type);
+    if (repository == null) {
+      throw StateError("Can't resolve `SQLRepositoryAdapter` for type: $type");
+    }
+
+    return repository.tableName;
+  }
+
+  EntityHandler<E> _resolveEntityHandler<E>(Type type) {
+    var entityRepository = entityHandler.getEntityRepositoryByType(type,
+        entityRepositoryProvider: provider,
+        entityHandlerProvider: entityHandler.provider);
+
+    var entityHandler2 = entityRepository?.entityHandler;
+    entityHandler2 ??= entityHandler.getEntityHandler(type: type);
+
+    if (entityHandler2 == null) {
+      throw StateError("Can't resolve EntityHandler for type: $type");
+    }
+
+    return entityHandler2 as EntityHandler<E>;
+  }
+
+  @override
+  String toString() {
+    var info = information();
+    return '$runtimeType[$name]@${provider.runtimeType}$info';
+  }
 }
 
 /// Base class for [EntityRepositoryProvider] with [DBRelationalAdapter]s.

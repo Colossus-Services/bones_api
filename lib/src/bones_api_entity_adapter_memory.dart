@@ -58,8 +58,6 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       String? workingPath}) {
     try {
       return MemorySQLAdapter.fromConfig(config,
-          minConnections: minConnections,
-          maxConnections: maxConnections,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -68,21 +66,15 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
   }
 
-  static int _idCount = 0;
-
-  final int id = ++_idCount;
-
   MemorySQLAdapter(
-      {int? minConnections,
-      int? maxConnections,
-      bool generateTables = false,
+      {bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
-          minConnections ?? 1,
-          maxConnections ?? 3,
+          1,
+          3,
           const SQLAdapterCapability(
               dialect: SQLDialect(
                 'generic',
@@ -104,14 +96,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 
   static FutureOr<MemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
-      {int? minConnections,
-      int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider,
+      {EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     boot();
-
-    minConnections ??= config?['minConnections'] ?? 1;
-    maxConnections ??= config?['maxConnections'] ?? 3;
 
     var populate = config?['populate'];
 
@@ -130,8 +117,6 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
 
     var adapter = MemorySQLAdapter(
-      minConnections: minConnections,
-      maxConnections: maxConnections,
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -1071,7 +1056,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'MemorySQLAdapter{id: $id$tablesStr$closedStr}';
+    return 'MemorySQLAdapter{id: $instanceID$tablesStr$closedStr}';
   }
 }
 

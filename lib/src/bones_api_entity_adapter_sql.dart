@@ -1037,6 +1037,10 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       dynamic id,
       String otherTable,
       List otherIds) {
+    if (sqls.length == 1 && sqls.first.isDummy) {
+      return true;
+    }
+
     return executeTransactionOperation(op, sqls.first, (connection) {
       _log.info(
           '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
@@ -1611,7 +1615,7 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   @override
   SQLRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(
           String tableName) =>
-      super.getRepositoryAdapterByTableName(tableName)
+      super.getRepositoryAdapterByTableName<O>(tableName)
           as SQLRepositoryAdapter<O>?;
 
   FutureOr<R> _finishOperation<T, R>(
@@ -1643,7 +1647,8 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   @override
   FutureOr doInsert<O>(TransactionOperation op, String entityName, String table,
       O o, Map<String, dynamic> fields,
-      {String? idFieldName, PreFinishDBOperation? preFinish}) {
+      {String? idFieldName,
+      PreFinishDBOperation<dynamic, dynamic>? preFinish}) {
     return generateInsertSQL(op.transaction, entityName, table, fields)
         .resolveMapped((sql) {
       return insertSQL(op, entityName, table, sql, fields)
@@ -1666,6 +1671,30 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sqls) {
       return insertRelationshipSQLs(
               op, entityName, table, sqls, id, otherTableName, otherIds)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
+
+  @override
+  FutureOr<R?> doSelectByID<R>(
+      TransactionOperation op, String entityName, String table, Object id,
+      {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) {
+    return generateSelectSQL(op.transaction, entityName, table, ConditionID(id))
+        .resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishOperation(op, r.firstOrNull, preFinish));
+    });
+  }
+
+  @override
+  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
+      String table, List<Object> ids,
+      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
+          preFinish}) {
+    return generateSelectSQL(
+            op.transaction, entityName, table, ConditionIdIN(ids))
+        .resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql)
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }

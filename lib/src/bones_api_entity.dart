@@ -1,11 +1,18 @@
 import 'dart:convert' as dart_convert;
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
-    show Decimal, DynamicInt, IterableMapEntryExtension, NumericTypeExtension;
+    show
+        Decimal,
+        DynamicInt,
+        DynamicNumber,
+        IterableMapEntryExtension,
+        NumericTypeExtension,
+        IterableExtension;
 import 'package:swiss_knife/swiss_knife.dart' show EventStream;
 
 import 'bones_api_condition.dart';
@@ -185,7 +192,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return true;
     }
 
-    if (type == DateTime || type == Time || type == Decimal) return true;
+    if (type == DateTime ||
+        type == Time ||
+        type == BigInt ||
+        type == Decimal ||
+        type == DynamicInt ||
+        type == DynamicNumber ||
+        type == Uint8List) return true;
 
     return false;
   }
@@ -406,6 +419,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
   static final TypeInfo _typeInfoTime = TypeInfo(Time);
   static final TypeInfo _typeInfoDecimal = TypeInfo(Decimal);
   static final TypeInfo _typeInfoDynamicInt = TypeInfo(DynamicInt);
+  static final TypeInfo _typeInfoUint8List = TypeInfo(Uint8List);
 
   FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value,
       {EntityProvider? entityProvider,
@@ -431,6 +445,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return Decimal.from(value) as T?;
     } else if (type.equalsType(_typeInfoDynamicInt)) {
       return DynamicInt.from(value) as T?;
+    } else if (type.equalsType(_typeInfoUint8List)) {
+      return TypeParser.parseUInt8List(value) as T?;
     }
 
     entityCache ??= JsonEntityCacheSimple();
@@ -1349,7 +1365,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   @override
   EntityHandler<T>? getEntityHandler<T>(
       {T? obj, Type? type, EntityHandler? knownEntityHandler}) {
-    var entityHandler = super.getEntityHandler(
+    var entityHandler = super.getEntityHandler<T>(
         obj: obj, type: type, knownEntityHandler: knownEntityHandler);
     if (entityHandler != null) {
       return entityHandler;
@@ -1812,15 +1828,14 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       Map<String, Object?>? namedParameters,
       Transaction? transaction});
 
-  FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) {
-    transaction ??= Transaction.autoCommit();
-    return deleteCascadeGeneric(o, transaction,
-        entityHandler: EntityHandlerProvider.globalProvider
-            .getEntityHandler(obj: o, type: O),
-        entityRepository: EntityRepositoryProvider.globalProvider
-            .getEntityRepository(obj: o, type: O),
-        repositoryProvider: EntityRepositoryProvider.globalProvider);
-  }
+  FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) =>
+      deleteCascadeGeneric(o,
+          transaction: transaction,
+          entityHandler: EntityHandlerProvider.globalProvider
+              .getEntityHandler(obj: o, type: O),
+          entityRepository: EntityRepositoryProvider.globalProvider
+              .getEntityRepository(obj: o, type: O),
+          repositoryProvider: EntityRepositoryProvider.globalProvider);
 
   static EntityRepository<O>? _resolveRepositoryProvider<O extends Object>(
           EntityHandler? entityHandler,
@@ -1832,9 +1847,9 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       repositoryProvider?.getEntityRepository<O>(obj: obj, type: type) ??
       entityHandler?.getEntityRepository<O>(obj: obj, type: type);
 
-  static Future<Iterable> deleteCascadeGeneric<O extends Object>(
-      O o, Transaction transaction,
-      {EntityHandler<O>? entityHandler,
+  static Future<Iterable> deleteCascadeGeneric<O extends Object>(O o,
+      {Transaction? transaction,
+      EntityHandler<O>? entityHandler,
       EntityRepository<O>? entityRepository,
       EntityRepositoryProvider? repositoryProvider}) async {
     entityRepository ??= _resolveRepositoryProvider<O>(
@@ -1851,10 +1866,11 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
     var deleted = <Object>[];
 
-    await _deleteCascadeGenericImpl(o, transaction, entityHandler,
-        entityRepository, repositoryProvider, deleted);
-
-    return deleted;
+    return Transaction.executeBlock(
+        (transaction) => _deleteCascadeGenericImpl(o, transaction,
+                entityHandler, entityRepository, repositoryProvider, deleted)
+            .resolveWithValue(deleted),
+        transaction: transaction);
   }
 
   static EntityHandler<O>? _resolveEntityHandler<O extends Object>(
@@ -1987,7 +2003,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       await d();
     }
 
-    var del = await entityRepository.deleteByID(id);
+    var del = await entityRepository.deleteByID(id, transaction: transaction);
 
     for (var d in posDeleteCalls) {
       await d();
@@ -2013,6 +2029,10 @@ class EntityRepositoryProvider
 
   final Map<Type, EntityRepository> _entityRepositories =
       <Type, EntityRepository>{};
+
+  static int _instanceIDCount = 0;
+
+  final int instanceID = ++_instanceIDCount;
 
   EntityRepositoryProvider() {
     _globalProvider.notifyKnownEntityRepositoryProvider(this);
@@ -2564,18 +2584,18 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           parent: provider);
 
   FutureOr<List<O>> _storeAllFromJsonImpl(
-      Iterable<Map<String, dynamic>> entitiesJson, Transaction? transaction) {
-    transaction ??= Transaction.autoCommit();
+          Iterable<Map<String, dynamic>> entitiesJson,
+          Transaction? transaction) =>
+      Transaction.executeBlock((transaction) {
+        var osAsync = entitiesJson
+            .map((e) => createFromMap(e,
+                entityCache: transaction, entityProvider: provider))
+            .resolveAll();
 
-    var osAsync = entitiesJson
-        .map((e) => createFromMap(e,
-            entityCache: transaction, entityProvider: provider))
-        .resolveAll();
-
-    return osAsync.resolveMapped((os) {
-      return storeAll(os, transaction: transaction).resolveWithValue(os);
-    });
-  }
+        return osAsync.resolveMapped((os) {
+          return storeAll(os, transaction: transaction).resolveWithValue(os);
+        });
+      }, transaction: transaction);
 
   FutureOr<O> storeFromJson(Map<String, dynamic> json,
           {Transaction? transaction}) =>
@@ -2583,15 +2603,14 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           parent: provider);
 
   FutureOr<O> _storeFromJsonImpl(
-      Map<String, dynamic> json, Transaction? transaction) {
-    transaction ??= Transaction.autoCommit();
+          Map<String, dynamic> json, Transaction? transaction) =>
+      Transaction.executeBlock((transaction) {
+        var oAsync = createFromMap(json, entityCache: transaction);
 
-    var oAsync = createFromMap(json, entityCache: transaction);
-
-    return oAsync.resolveMapped((o) {
-      return store(o, transaction: transaction).resolveWithValue(o);
-    });
-  }
+        return oAsync.resolveMapped((o) {
+          return store(o, transaction: transaction).resolveWithValue(o);
+        });
+      }, transaction: transaction);
 
   FutureOr<O> createFromMap(Map<String, dynamic> fields,
       {EntityProvider? entityProvider, EntityCache? entityCache}) {
@@ -2897,12 +2916,13 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) {
     checkNotClosed();
 
-    transaction ??= Transaction.autoCommit();
-
-    return EntityStorage.deleteCascadeGeneric(o, transaction,
-        entityHandler: entityHandler,
-        entityRepository: this,
-        repositoryProvider: provider);
+    return Transaction.executeBlock(
+        (transaction) => EntityStorage.deleteCascadeGeneric(o,
+            transaction: transaction,
+            entityHandler: entityHandler,
+            entityRepository: this,
+            repositoryProvider: provider),
+        transaction: transaction);
   }
 
   Map<String, dynamic> information({bool extended = false});
@@ -2940,7 +2960,12 @@ class TransactionAbortedError extends Error {
 
   @override
   String toString() {
-    return 'TransactionAbortedError{reason: $reason, payload: $payload}';
+    var l = [
+      if (reason != null) 'reason: $reason',
+      if (abortError != null) 'abortError: $abortError',
+    ];
+
+    return 'TransactionAbortedError> ${l.join(' ; ')}';
   }
 }
 
@@ -2950,14 +2975,25 @@ typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
 
 /// An [EntityRepository] transaction.
 class Transaction extends JsonEntityCacheSimple implements EntityProvider {
-  static Transaction? _executingTransaction;
+  static final ZoneField<Transaction> _executingTransaction =
+      ZoneField<Transaction>(_errorZone);
 
-  static Transaction? get executingTransaction => _executingTransaction;
+  /// The current executing transaction.
+  /// See [execute] and [executeBlock].
+  static Transaction? get executingTransaction => _executingTransaction.get();
 
   final List<TransactionOperation> _operations = <TransactionOperation>[];
 
+  List<TransactionOperation> get operations =>
+      UnmodifiableListView(_operations);
+
+  Object? get executor => _operations.firstOrNull?.executor;
+
   final List<TransactionOperation> _executedOperations =
       <TransactionOperation>[];
+
+  List<TransactionOperation> get executedOperations =>
+      UnmodifiableListView(_executedOperations);
 
   final bool autoCommit;
 
@@ -2974,16 +3010,64 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   @override
   bool get allowEntityFetch => true;
 
-  Transaction({this.autoCommit = false}) : super() {
+  bool _external;
+
+  Transaction({bool autoCommit = false}) : this._(autoCommit, true);
+
+  Transaction._(this.autoCommit, [this._external = false]) : super() {
     _transactionCompleter = _errorZone.createCompleter();
     _resultCompleter = _errorZone.createCompleter();
     _openCompleter = _errorZone.createCompleter<bool>();
   }
 
-  Transaction.autoCommit() : this(autoCommit: true);
+  Transaction.autoCommit() : this._(true, true);
 
-  factory Transaction.executingOrNew({bool autoCommit = true}) {
-    return _executingTransaction ?? Transaction(autoCommit: autoCommit);
+  factory Transaction.executingOrNew({required bool autoCommit}) {
+    return executingTransaction ?? Transaction._(autoCommit, true);
+  }
+
+  /// Executes [block] inside a [Transaction] and [commit]s it.
+  /// - If the parameter [transaction] is provided it will be used as the [Transaction] instance.
+  /// - If [allowExecutingTransaction] is `true` (default) and [transaction] is not provided
+  ///   [executingTransaction] will be used.
+  /// - If [transaction] is null and [allowExecutingTransaction] is false, or
+  ///   no [executingTransaction] can be found, a new [Transaction] instance
+  ///   will be created.
+  /// - See [execute].
+  static FutureOr<R> executeBlock<R>(
+      FutureOr<R> Function(Transaction transaction) block,
+      {Transaction? transaction,
+      bool allowExecutingTransaction = true}) {
+    if (transaction == null && allowExecutingTransaction) {
+      transaction = executingTransaction;
+    }
+
+    if (transaction != null) {
+      return block(transaction);
+    }
+
+    transaction = Transaction();
+
+    return transaction
+        ._executeImpl(() => block(transaction!))
+        .resolveMapped((r) {
+      if (r == null) {
+        try {
+          return r as R;
+        } catch (e, s) {
+          var abortError =
+              transaction!.abortedError ?? transaction._resolveAbortError(e, s);
+          var abortStackTrace = abortError.abortStackTrace;
+          if (abortStackTrace != null) {
+            Error.throwWithStackTrace(abortError, abortStackTrace);
+          } else {
+            throw abortError;
+          }
+        }
+      }
+
+      return r;
+    });
   }
 
   static Zone? _errorZoneInstance;
@@ -3025,6 +3109,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   bool _committed = false;
 
   bool get isCommitted => _committed;
+
+  bool get isCommitting => _commitCalled && (!_committed && !_aborted);
 
   int get length => _operations.length;
 
@@ -3114,12 +3200,26 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     if (_operations.contains(op)) {
       throw StateError("Operation already in transaction: $op");
     }
+
+    if (_committed) {
+      throw StateError("Transaction already committed:\n$this");
+    }
+
+    if (_aborted) {
+      throw StateError("Transaction already aborted:\n$this");
+    }
+
+    if (_commitCalled) {
+      throw StateError("Transaction is committing:\n$this");
+    }
+
     _operations.add(op);
     op.id = _operations.length;
   }
 
-  FutureOr<R> finishOperation<R>(TransactionOperation op, R result) {
-    _markOperationExecuted(op, result);
+  FutureOr<R> finishOperation<R>(TransactionOperation op, R result,
+      {bool allowAutoCommit = true}) {
+    _markOperationExecuted(op, result, allowAutoCommit);
 
     if (op.transactionRoot && !op.externalTransaction && length > 1) {
       return resultFuture.then((_) => result);
@@ -3130,17 +3230,30 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
   }
 
+  void finishOperationVoid<R>(TransactionOperation op, R result,
+      {bool allowAutoCommit = true}) {
+    _markOperationExecuted(op, result, allowAutoCommit);
+  }
+
   Completer<bool>? _waitingExecutedOperation;
 
   Object? _lastResult;
 
-  void _markOperationExecuted(TransactionOperation op, Object? result) {
+  void _markOperationExecuted(
+      TransactionOperation op, Object? result, bool allowAutoCommit) {
     if (_executedOperations.contains(op)) {
       throw StateError("Operation already executed in transaction: $op");
     }
+
+    if (_committed) {
+      throw StateError("Transaction already committed:\n$this");
+    }
+
     _executedOperations.add(op);
 
-    _lastResult = result;
+    if (!_aborted) {
+      _lastResult = result;
+    }
 
     var waitingExecutedOperation = _waitingExecutedOperation;
     if (waitingExecutedOperation != null &&
@@ -3149,7 +3262,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       _waitingExecutedOperation = null;
     }
 
-    _doAutoCommit();
+    if (allowAutoCommit) {
+      _doAutoCommit();
+    }
   }
 
   FutureOr<bool> waitAllExecuted() {
@@ -3173,10 +3288,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
   }
 
+  bool get isFinished => _committed || _aborted;
+
   bool _commitCalled = false;
 
   FutureOr<R?> commit<R>() {
     if (_aborted) {
+      if (_commitCalled) {
+        return null;
+      }
+
+      _commitCalled = true;
+
       return _abortImpl().resolveMapped((_) => null);
     }
 
@@ -3214,10 +3337,19 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   FutureOr<R?> _commitComplete<R>(Object? result) {
+    if (_executedOperations.length < _operations.length) {
+      throw StateError(
+          "Not all operations in Transaction finished yet:\n$this");
+    }
+
     var transactionResult = this.transactionResult;
     if (transactionResult != null) {
       if (transactionResult is Future) {
-        var ret = transactionResult.then((r) => _commitCompleteFinish<R>(r));
+        var parentStackTrace = StackTrace.current;
+
+        var ret = transactionResult
+            .then((r) => _commitCompleteFinish<R>(r, parentStackTrace));
+
         _transactionCompleter.complete(result);
         return ret;
       } else {
@@ -3225,18 +3357,33 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         return _commitCompleteFinish<R>(result);
       }
     } else {
-      var ret =
-          _transactionCompleter.future.then((r) => _commitCompleteFinish<R>(r));
+      var parentStackTrace = StackTrace.current;
+
+      var ret = _transactionCompleter.future
+          .then((r) => _commitCompleteFinish<R>(r, parentStackTrace));
 
       _transactionCompleter.complete(result);
       return ret;
     }
   }
 
-  R? _commitCompleteFinish<R>(Object? result) {
+  R? _commitCompleteFinish<R>(Object? result, [StackTrace? parentStackTrace]) {
+    if (_executedOperations.length < _operations.length) {
+      var error =
+          StateError("Not all operations in Transaction finished yet:\n$this");
+
+      if (parentStackTrace != null) {
+        Error.throwWithStackTrace(error, parentStackTrace);
+      } else {
+        throw error;
+      }
+    }
+
     _committed = true;
+
     _logTransaction.info(
-        '[transaction:$id] Committed> ops: ${_operations.length} ; root: ${_operations.first} > result: $result');
+        '[transaction:$id] Committed> ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: $result');
+
     _resultCompleter.complete(result);
     return result as R?;
   }
@@ -3267,11 +3414,27 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     payload ??= _lastResult;
 
-    TransactionAbortedError abortError;
+    var abortError = _resolveAbortError(error, stackTrace, reason, payload);
+
+    _abortedError = abortError;
+    _aborted = true;
+
+    for (var op in _operations.whereNotIn(_executedOperations)) {
+      finishOperationVoid(op, null, allowAutoCommit: false);
+    }
+
+    return abortError;
+  }
+
+  TransactionAbortedError _resolveAbortError(
+      Object? error, StackTrace? stackTrace,
+      [String? reason, Object? payload]) {
     if (error is TransactionAbortedError) {
       stackTrace ??=
           error.abortStackTrace ?? error.stackTrace ?? StackTrace.current;
-      abortError = error.withAbortStackTrace(stackTrace);
+
+      var abortError = error.withAbortStackTrace(stackTrace);
+      return abortError;
     } else {
       if (error is Error) {
         stackTrace ??= error.stackTrace ?? StackTrace.current;
@@ -3279,17 +3442,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         stackTrace ??= StackTrace.current;
       }
 
-      abortError = TransactionAbortedError(
+      return TransactionAbortedError(
           reason: reason,
           payload: payload,
           abortError: error,
           abortStackTrace: stackTrace);
     }
-
-    _abortedError = abortError;
-    _aborted = true;
-
-    return abortError;
   }
 
   FutureOr<TransactionAbortedError> _abortImpl() {
@@ -3324,46 +3482,56 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   /// Executes the transaction operations dispatches inside [block] then [commit]s.
-  FutureOr<R?> execute<R>(FutureOr<R> Function() block) {
-    if (_commitCalled) {
-      throw StateError('Transaction committed already dispatched: $this');
-    }
-
-    if (_executingTransaction != null) {
-      throw StateError(
-          'Already executing a Transaction: _executingTransaction');
-    }
-
-    _executingTransaction = this;
-
-    return _errorZone.asyncTry<R>(block, onFinally: _executeCommit);
-  }
+  FutureOr<R?> execute<R>(FutureOr<R> Function() block) => _executeImpl(block);
 
   /// Executes the transaction operations dispatches inside [block] then [commit]s.
   /// If any error occurs it returns the value returned by [onError].
   FutureOr<R> executeOrError<R>(FutureOr<R> Function() block,
-      {required R Function(
-              Transaction transaction, Object error, StackTrace stackTrace)
+          {required R Function(
+                  Transaction transaction, Object error, StackTrace stackTrace)
+              onError}) =>
+      _executeImpl(block, onError: onError).resolveMapped((r) => r as R);
+
+  FutureOr<R?> _executeImpl<R>(FutureOr<R> Function() block,
+      {R Function(Transaction transaction, Object error, StackTrace stackTrace)?
           onError}) {
-    if (_commitCalled) {
-      throw StateError('Transaction committed already dispatched: $this');
+    if (isFinished) {
+      throw StateError('Transaction already finished: $this');
     }
 
-    if (_executingTransaction != null) {
+    if (executingTransaction != null) {
       throw StateError(
           'Already executing a Transaction: _executingTransaction');
     }
 
-    _executingTransaction = this;
+    var zone = _executingTransaction.createContextZone();
+    _executingTransaction.set(this, contextZone: zone);
 
-    return _errorZone
-        .asyncTry<R>(block,
-            onFinally: _executeCommit, onError: (e, s) => onError(this, e, s))
-        .resolveMapped((r) => r as R);
+    if (onError != null) {
+      return zone.asyncTry<R>(
+        block,
+        onError: (e, s) =>
+            _executeCommit(zone).resolveMapped((val) => onError(this, e, s)),
+        onFinally: () => _executeCommit(zone),
+      );
+    } else {
+      return zone.asyncTry<R>(
+        block,
+        onError: (e, s) => _executeCommit(zone),
+        onFinally: () => _executeCommit(zone),
+      );
+    }
   }
 
-  FutureOr<void> _executeCommit() =>
-      asyncTry(commit, onFinally: () => _executingTransaction = null);
+  FutureOr<void> _executeCommit(Zone zone) {
+    if (_commitCalled) return null;
+
+    return asyncTry(commit, onFinally: () {
+      if (identical(_executingTransaction.get(zone), this)) {
+        _executingTransaction.disposeContextZone(zone);
+      }
+    });
+  }
 
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
@@ -3428,7 +3596,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       _log.severe("Error executing transaction operation!", error, stackTrace);
     }
 
-    throw error;
+    if (!_aborted) {
+      abort(error: error, stackTrace: stackTrace);
+    }
+
+    Error.throwWithStackTrace(error, stackTrace);
   }
 
   @override
@@ -3436,23 +3608,27 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       getCachedEntityByID(id, type: type);
 
   @override
-  String toString() {
+  String toString({bool compact = false}) {
     return [
       'Transaction[#$id]{\n',
       '  open: $isOpen\n',
       '  executing: $isExecuting\n',
-      '  committed: $isCommitted\n',
+      '  committed: ${isCommitted ? 'true' : (isCommitting ? 'committing...' : 'false')}\n',
       '  aborted: $isAborted\n',
       '  abortedError: $abortedError\n',
       '  cachedEntities: $cachedEntitiesLength\n',
-      '  operations: [\n',
-      if (_operations.isNotEmpty) '    ${_operations.join(',\n    ')}',
-      '\n  ],\n',
-      '  executedOperations: [\n',
-      if (_executedOperations.isNotEmpty)
+      '  external: $_external\n',
+      if (compact) '  operations: ${operations.length}\n',
+      if (!compact) '  operations: [\n',
+      if (!compact && _operations.isNotEmpty)
+        '    ${_operations.join(',\n    ')}',
+      if (!compact) '\n  ],\n',
+      if (compact) '  executedOperations: ${executedOperations.length}\n',
+      if (!compact) '  executedOperations: [\n',
+      if (!compact && _executedOperations.isNotEmpty)
         '    ${_executedOperations.join(',\n    ')}',
-      '\n  ]\n',
-      '  result: $_result\n',
+      if (!compact) '\n  ]\n',
+      if (_commitCalled) '  result: $_result\n',
       '}'
     ].join();
   }
@@ -3465,21 +3641,65 @@ abstract class TransactionOperation {
 
   int? id;
 
+  final Object executor;
+
   late final Transaction transaction;
+  bool _transactionResolved = false;
+
   late final bool externalTransaction;
   late final bool transactionRoot;
 
   TransactionOperation(
-      this.type, this.repositoryName, Transaction? transaction) {
-    externalTransaction = transaction != null;
-
-    var resolvedTransaction = transaction ?? Transaction.executingOrNew();
+      this.type, this.repositoryName, this.executor, Transaction? transaction) {
+    var resolvedTransaction =
+        resolveTransaction(transaction: transaction, operation: this);
     this.transaction = resolvedTransaction;
+    _transactionResolved = true;
+
+    externalTransaction = identical(resolvedTransaction, transaction);
 
     transactionRoot =
         resolvedTransaction.isEmpty && !resolvedTransaction.isExecuting;
 
     resolvedTransaction.addOperation(this);
+  }
+
+  static Transaction resolveTransaction(
+      {Transaction? transaction, TransactionOperation? operation}) {
+    if (transaction == null &&
+        operation != null &&
+        operation._transactionResolved) {
+      return operation.transaction;
+    }
+
+    transaction ??= Transaction.executingTransaction;
+
+    if (transaction == null) {
+      return Transaction._(true);
+    }
+
+    var transactionExecutor = transaction.executor;
+
+    if (transactionExecutor != null &&
+        operation != null &&
+        operation.executor != transactionExecutor &&
+        operation is! TransactionOperationSubTransaction) {
+      var subTransaction = Transaction._(true);
+
+      var opSubTransaction = TransactionOperationSubTransaction(
+          operation.repositoryName,
+          operation.executor,
+          transaction,
+          subTransaction);
+
+      subTransaction.transactionFuture.then((result) {
+        opSubTransaction.finish(result);
+      });
+
+      return subTransaction;
+    }
+
+    return transaction;
   }
 
   int get transactionId => transaction.id;
@@ -3491,55 +3711,78 @@ abstract class TransactionOperation {
   FutureOr<R> finish<R>(R result) => transaction.finishOperation(this, result);
 }
 
-class TransactionOperationSelect<O> extends TransactionOperation {
-  final EntityMatcher matcher;
+class TransactionOperationSubTransaction<O> extends TransactionOperation {
+  final Transaction subTransaction;
 
-  TransactionOperationSelect(String repositoryName, this.matcher,
-      [Transaction? transaction])
-      : super(TransactionOperationType.select, repositoryName, transaction);
+  TransactionOperationSubTransaction(
+    String repositoryName,
+    Object executor,
+    Transaction parentTransaction,
+    this.subTransaction,
+  ) : super(TransactionOperationType.subTransaction, repositoryName, executor,
+            parentTransaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:select@$repositoryName]{matcher: $matcher$_commandToString}';
+    return 'TransactionOperationSubTransaction[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}';
+  }
+}
+
+class TransactionOperationSelect<O> extends TransactionOperation {
+  final EntityMatcher matcher;
+
+  TransactionOperationSelect(
+      String repositoryName, Object executor, this.matcher,
+      [Transaction? transaction])
+      : super(TransactionOperationType.select, repositoryName, executor,
+            transaction);
+
+  @override
+  String toString() {
+    return 'TransactionOperation[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}';
   }
 }
 
 class TransactionOperationCount<O> extends TransactionOperation {
   final EntityMatcher? matcher;
 
-  TransactionOperationCount(String repositoryName,
+  TransactionOperationCount(String repositoryName, Object executor,
       [this.matcher, Transaction? transaction])
-      : super(TransactionOperationType.count, repositoryName, transaction);
+      : super(TransactionOperationType.count, repositoryName, executor,
+            transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:count@$repositoryName]{matcher: $matcher$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}';
   }
 }
 
 class TransactionOperationStore<O> extends TransactionOperation {
   final O entity;
 
-  TransactionOperationStore(String repositoryName, this.entity,
+  TransactionOperationStore(String repositoryName, Object executor, this.entity,
       [Transaction? transaction])
-      : super(TransactionOperationType.store, repositoryName, transaction);
+      : super(TransactionOperationType.store, repositoryName, executor,
+            transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:store@$repositoryName]{entity: $entity$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}';
   }
 }
 
 class TransactionOperationUpdate<O> extends TransactionOperation {
   final O entity;
 
-  TransactionOperationUpdate(String repositoryName, this.entity,
+  TransactionOperationUpdate(
+      String repositoryName, Object executor, this.entity,
       [Transaction? transaction])
-      : super(TransactionOperationType.update, repositoryName, transaction);
+      : super(TransactionOperationType.update, repositoryName, executor,
+            transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:update@$repositoryName]{entity: $entity$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}';
   }
 }
 
@@ -3548,14 +3791,14 @@ class TransactionOperationStoreRelationship<O, E> extends TransactionOperation {
   final List<E> others;
 
   TransactionOperationStoreRelationship(
-      String repositoryName, this.entity, this.others,
+      String repositoryName, Object executor, this.entity, this.others,
       [Transaction? transaction])
       : super(TransactionOperationType.storeRelationship, repositoryName,
-            transaction);
+            executor, transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}';
   }
 }
 
@@ -3565,59 +3808,64 @@ class TransactionOperationConstrainRelationship<O, E>
   final List<E> others;
 
   TransactionOperationConstrainRelationship(
-      String repositoryName, this.entity, this.others,
+      String repositoryName, Object executor, this.entity, this.others,
       [Transaction? transaction])
       : super(TransactionOperationType.constrainRelationship, repositoryName,
-            transaction);
+            executor, transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}';
   }
 }
 
 class TransactionOperationSelectRelationship<O> extends TransactionOperation {
   final O entity;
 
-  TransactionOperationSelectRelationship(String repositoryName, this.entity,
+  TransactionOperationSelectRelationship(
+      String repositoryName, Object executor, this.entity,
       [Transaction? transaction])
       : super(TransactionOperationType.selectRelationship, repositoryName,
-            transaction);
+            executor, transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:selectRelationship@$repositoryName]{entity: $entity$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}';
   }
 }
 
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
   final List<O> entities;
 
-  TransactionOperationSelectRelationships(String repositoryName, this.entities,
+  TransactionOperationSelectRelationships(
+      String repositoryName, Object executor, this.entities,
       [Transaction? transaction])
       : super(TransactionOperationType.selectRelationships, repositoryName,
-            transaction);
+            executor, transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:selectRelationships@$repositoryName]{entities: $entities$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationships@$repositoryName]{entities: $entities$_commandToString}';
   }
 }
 
 class TransactionOperationDelete<O> extends TransactionOperation {
   final EntityMatcher matcher;
 
-  TransactionOperationDelete(String repositoryName, this.matcher,
+  TransactionOperationDelete(
+      String repositoryName, Object executor, this.matcher,
       [Transaction? transaction])
-      : super(TransactionOperationType.delete, repositoryName, transaction);
+      : super(TransactionOperationType.delete, repositoryName, executor,
+            transaction);
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id:delete@$repositoryName]{matcher: $matcher$_commandToString}';
+    return 'TransactionOperation[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}';
   }
 }
 
 enum TransactionOperationType {
+  subTransaction,
   select,
   count,
   store,
@@ -3632,6 +3880,8 @@ enum TransactionOperationType {
 extension TransactionOperationTypeExtension on TransactionOperationType {
   String get name {
     switch (this) {
+      case TransactionOperationType.subTransaction:
+        return 'subTransaction';
       case TransactionOperationType.select:
         return 'select';
       case TransactionOperationType.count:
@@ -3758,7 +4008,7 @@ abstract class IterableEntityRepository<O extends Object>
 
     checkEntityFields(o);
 
-    var op = TransactionOperationStore(name, o, transaction);
+    var op = TransactionOperationStore(name, this, o, transaction);
 
     return ensureReferencesStored(o, transaction: op.transaction)
         .resolveWith(() {
@@ -3770,7 +4020,7 @@ abstract class IterableEntityRepository<O extends Object>
         put(o);
       }
 
-      op.transaction._markOperationExecuted(op, oId);
+      op.finish(oId);
 
       trackEntity(o, stored: true);
 
@@ -3809,14 +4059,15 @@ abstract class IterableEntityRepository<O extends Object>
       });
 
   @override
-  Iterable<dynamic> storeAll(Iterable<O> os, {Transaction? transaction}) {
+  FutureOr<Iterable<dynamic>> storeAll(Iterable<O> os,
+      {Transaction? transaction}) {
     checkNotClosed();
 
-    transaction ??= Transaction.autoCommit();
+    return Transaction.executeBlock((transaction) {
+      var result = os.map((o) => store(o, transaction: transaction)).toList();
 
-    var result = os.map((o) => store(o, transaction: transaction)).toList();
-
-    return result;
+      return result;
+    }, transaction: transaction);
   }
 
   @override
@@ -3831,8 +4082,8 @@ abstract class IterableEntityRepository<O extends Object>
       throw StateError("Field `$field` not a `List` entity type: $fieldType");
     }
 
-    var op =
-        TransactionOperationStoreRelationship(name, o, values, transaction);
+    var op = TransactionOperationStoreRelationship(
+        name, this, o, values, transaction);
 
     var valuesType = fieldType.listEntityType!.type;
     var valuesRepository = provider.getEntityRepository<E>(type: valuesType)!;
@@ -3845,7 +4096,7 @@ abstract class IterableEntityRepository<O extends Object>
 
     return putRelationship(oId, valuesType, valuesIdsNotNull)
         .resolveMapped((ok) {
-      op.transaction._markOperationExecuted(op, ok);
+      op.finish(ok);
       return ok;
     });
   }
@@ -3868,11 +4119,11 @@ abstract class IterableEntityRepository<O extends Object>
 
     var valuesType = fieldType.listEntityType!.type;
 
-    var op =
-        TransactionOperationSelectRelationship(name, o ?? oId, transaction);
+    var op = TransactionOperationSelectRelationship(
+        name, this, o ?? oId, transaction);
 
     var valuesIds = getRelationship(oId!, valuesType);
-    op.transaction._markOperationExecuted(op, valuesIds);
+    op.finish(valuesIds);
 
     return valuesIds;
   }
@@ -3906,7 +4157,7 @@ abstract class IterableEntityRepository<O extends Object>
   FutureOr<dynamic> ensureStored(O o, {Transaction? transaction}) {
     checkNotClosed();
 
-    transaction ??= Transaction.autoCommit();
+    transaction ??= Transaction.executingOrNew(autoCommit: true);
 
     var id = getID(o, entityHandler: entityHandler);
 
@@ -3922,7 +4173,7 @@ abstract class IterableEntityRepository<O extends Object>
   FutureOr<bool> ensureReferencesStored(O o, {Transaction? transaction}) {
     checkNotClosed();
 
-    transaction ??= Transaction.autoCommit();
+    transaction ??= Transaction.executingOrNew(autoCommit: true);
 
     var fieldsNames = entityHandler.fieldsNames(o);
 

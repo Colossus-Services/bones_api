@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
@@ -7,6 +8,7 @@ import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show Decimal, DynamicInt, DynamicNumber, ListExtension;
+import 'package:data_serializer/data_serializer.dart';
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
@@ -491,33 +493,53 @@ class APIRouteBuilder<M extends APIModule> {
 
   Object? _resolveRequestParameter(APIRequest request,
       ParameterReflection parameter, bool payloadIsParametersMap) {
-    var typeReflection = parameter.type;
-    if (typeReflection.isOfType(APIRequest)) {
-      return request;
-    }
+    var parameterTypeInfo = parameter.type.typeInfo;
 
-    if (typeReflection.isOfType(APICredential)) {
+    if (parameterTypeInfo.isOf(APIRequest)) {
+      return request;
+    } else if (parameterTypeInfo.isOf(APICredential)) {
       return request.credential;
     }
 
-    if (typeReflection.isOfType(Uint8List)) {
-      return request.payloadAsBytes;
-    }
+    Object? value = request.getParameterIgnoreCase(parameter.name);
 
-    var typeInfo = TypeInfo.from(typeReflection);
-
-    var value = request.getParameterIgnoreCase(parameter.name);
-
-    if (value == null) {
-      if (request.hasPayload) {
-        return _resolveRequestParameterFromPayload(
-            parameter.name, typeInfo, request.payload, payloadIsParametersMap);
+    if (value == null && request.hasPayload) {
+      if (payloadIsParametersMap) {
+        var map = request.payload as Map<String, Object?>;
+        value = map.getIgnoreCase(parameter.name);
       } else {
-        return null;
+        if (parameterTypeInfo.isUInt8List) {
+          return request.payloadAsBytes;
+        }
+
+        var payload = request.payload;
+        var payloadTypeInfo = TypeInfo.from(payload);
+
+        if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
+          return payload;
+        } else if (payload is Map &&
+            EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
+          return _resolveValueAsEntity(parameterTypeInfo, payload);
+        } else if (payload is List &&
+            parameterTypeInfo.isListEntity &&
+            EntityHandler.isValidEntityType(
+                parameterTypeInfo.listEntityType!.type)) {
+          return _resolveValueAsEntity(parameterTypeInfo, payload);
+        }
       }
     }
 
-    if (typeInfo.isNumber) {
+    if (value == null) return null;
+
+    return _resolveValueType(parameterTypeInfo, value);
+  }
+
+  Object? _resolveValueType(TypeInfo typeInfo, Object? value) {
+    if (value == null) {
+      return null;
+    } else if (typeInfo.isOf(value.runtimeType)) {
+      return value;
+    } else if (typeInfo.isNumber) {
       var n = typeInfo.parse(value);
       return n;
     } else if (typeInfo.isString) {
@@ -531,6 +553,9 @@ class APIRouteBuilder<M extends APIModule> {
       return DynamicNumber.from(value);
     } else if (typeInfo.equalsType(_typeInfoTime)) {
       return Time.from(value);
+    } else if (typeInfo.isUInt8List) {
+      var bytes = _resolveRequestParameterValueAsBytes(value);
+      return bytes;
     } else {
       if (!typeInfo.isPrimitiveType) {
         var o = _resolveValueAsEntity(typeInfo, value);
@@ -542,38 +567,29 @@ class APIRouteBuilder<M extends APIModule> {
     }
   }
 
-  Object? _resolveRequestParameterFromPayload(String parameterName,
-      TypeInfo parameterTypeInfo, Object payload, bool payloadIsParametersMap) {
-    var payloadTypeInfo = TypeInfo.from(payload);
-
-    if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
-      return payload;
+  Uint8List? _resolveRequestParameterValueAsBytes(Object value) {
+    if (value is List<int>) {
+      var data = value.asUint8List;
+      return data;
+    } else if (value is String) {
+      try {
+        var data = base64.decode(value);
+        return data;
+      } catch (_) {
+        // not a base64 data:
+        return null;
+      }
     }
 
-    if (!payloadIsParametersMap && parameterTypeInfo.isPrimitiveType) {
-      return null;
-    }
-
-    Object? value = payload;
-    TypeInfo? valueTypeInfo = payloadTypeInfo;
-
-    if (payloadIsParametersMap) {
-      var map = payload as Map<String, Object?>;
-      value = map.getIgnoreCase(parameterName);
-      valueTypeInfo = null;
-    }
-
-    var entityCache = JsonEntityCacheSimple();
-
-    return _resolveValueAsEntity(
-        parameterTypeInfo, value, valueTypeInfo, entityCache);
+    return null;
   }
 
   Object? _resolveValueAsEntity(TypeInfo parameterTypeInfo, Object? value,
-      [TypeInfo? valueTypeInfo, EntityCache? entityCache]) {
+      [EntityCache? entityCache]) {
     if (value == null) return null;
 
-    valueTypeInfo ??= TypeInfo.from(value);
+    entityCache ??= JsonEntityCacheSimple();
+    var valueTypeInfo = TypeInfo.from(value);
 
     if (parameterTypeInfo.equalsTypeAndArguments(valueTypeInfo)) {
       return value;
@@ -586,15 +602,14 @@ class APIRouteBuilder<M extends APIModule> {
 
       if (value is Iterable) {
         var list = value
-            .map((e) =>
-                _resolveValueAsEntity(listEntityType, e, null, entityCache))
+            .map((e) => _resolveValueAsEntity(listEntityType, e, entityCache))
             .toList();
 
         return _castList(list, listEntityType);
       } else {
         var list = TypeParser.parseList(value,
             elementParser: (e) =>
-                _resolveValueAsEntity(listEntityType, e, null, entityCache));
+                _resolveValueAsEntity(listEntityType, e, entityCache));
 
         if (list != null) {
           return _castList(list, listEntityType);

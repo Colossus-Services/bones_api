@@ -1,3 +1,24 @@
+## 1.2.25
+
+- Added `ZoneField`:
+  - A field value based on the current `Zone`.
+  - Used to correctly resolve `Transaction.executingTransaction` and
+    allow multiple simultaneous `Transaction`s. 
+- `APIRouteBuilder`:
+  - Improve resolution of request parameters (entities, `Decimal` and bytes).
+  - Allow resolution of entities and parameters using the request's payload.
+- New `MemoryObjectAdapter`: allow storage of objects without relationships.
+- Added `DBRelationalAdapter`:
+  - Refactor `DBAdapter` and `SQLAdapter` to have an intermediate `DBRelationalAdapter`.
+- `Transaction`:
+  - Fix finalization when some complex asynchronous errors happens in the `Transaction`.
+  - Added `TransactionOperationSubTransaction`, to wrap sub transactions as an operation
+    of the parent transaction (used when multiple `DBAdapter`s are used in a `Transaction`).
+- data_serializer: ^1.0.7
+- map_history: ^1.0.3
+- async_extension: ^1.0.11
+- reflection_factory: ^1.2.4
+ 
 ## 1.2.24
 
 - `bin/bones_api.dart`:

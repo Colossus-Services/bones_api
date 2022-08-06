@@ -1101,12 +1101,27 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       expect(usersResult1.address.state, equals('EX2'));
       expect(usersResult1.roles, isEmpty);
 
+      var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
+
+      print('DELETE CASCADE [ERROR]:');
+      print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+
+      expect(Transaction.executingTransaction, isNull);
+
+      await expectLater(
+          () async => await addressAPIRepository
+              .deleteEntityCascade(usersResult0.address),
+          throwsA(isA<TransactionAbortedError>()));
 
       print('DELETE CASCADE:');
       print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
 
+      expect(Transaction.executingTransaction, isNull);
+
       var deleted = await userAPIRepository.deleteEntityCascade(usersResult0);
+
+      expect(Transaction.executingTransaction, isNull);
 
       print(deleted);
 

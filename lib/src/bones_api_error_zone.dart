@@ -20,6 +20,7 @@ Zone createErrorZone({
   String uncaughtErrorTitle = 'Unhandled exception:',
   bool printErrorToStderr = true,
   OnUncaughtError? onUncaughtError,
+  Zone? parentZone,
 }) {
   var zoneId = ++_errorZoneIDCount;
 
@@ -29,7 +30,9 @@ Zone createErrorZone({
             onUncaughtError, self, parent, zone, error, stackTrace),
   );
 
-  var zone = Zone.current
+  parentZone ??= Zone.current;
+
+  var zone = parentZone
       .fork(specification: zoneSpecification, zoneValues: {'zoneID': zoneId});
   return zone;
 }
@@ -102,3 +105,60 @@ void printZoneError(Object error, StackTrace stackTrace,
 
 /// Similar to [print] but prints to `STDERR`.
 void printToZoneStderr(Object? o) => printToZoneStderrImpl(o);
+
+/// A field value based in [Zone]s.
+/// This is similar to `ThreadLocal` in Java,
+/// but based in the current [Zone] or a passed [contextZone].
+class ZoneField<T extends Object> {
+  /// The parent zone of all [contextZone]s.
+  final Zone parentZone;
+
+  ZoneField(this.parentZone);
+
+  final Expando<T> _values = Expando<T>();
+
+  /// Gets the value associated with the [contextZone].
+  /// - If [contextZone] is not provided it will get from [ZoneField.contextZone].
+  T? get([Zone? contextZone]) {
+    contextZone ??= this.contextZone;
+    var t = _values[contextZone];
+    return t;
+  }
+
+  /// Sets the value associated with the [contextZone].
+  /// - If [contextZone] is not provided it will get from [ZoneField.contextZone].
+  T? set(T? value, {Zone? contextZone}) {
+    contextZone ??= this.contextZone;
+    var prev = _values[contextZone];
+    _values[contextZone] = value;
+    return prev;
+  }
+
+  final List<Zone> _zones = <Zone>[];
+
+  /// Creates a new [contextZone] to store values.
+  Zone createContextZone() {
+    var zone = parentZone.fork(specification: ZoneSpecification());
+    _zones.add(zone);
+    return zone;
+  }
+
+  /// Disposes the [contextZone] and any related value.
+  void disposeContextZone(Zone contextZone) {
+    _zones.remove(contextZone);
+    _values[contextZone] = null;
+  }
+
+  /// Returns the current context zone.
+  Zone get contextZone {
+    var currentZone = Zone.current;
+
+    for (var e in _zones) {
+      if (identical(e, currentZone)) {
+        return e;
+      }
+    }
+
+    return currentZone;
+  }
+}
