@@ -1,3 +1,8 @@
+## 1.2.26
+
+- Fix resolution of `EntityRepository` when the same instance is returned by multiple providers.
+- Fix `selectByID` with null parameters and null ID.
+
 ## 1.2.25
 
 - Added `ZoneField`:

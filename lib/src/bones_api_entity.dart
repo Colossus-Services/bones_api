@@ -2275,6 +2275,7 @@ extension IterableEntityRepositoryProviderExtension
 
     if (entityRepositoriesLength > 1) {
       entityRepositories = entityRepositories.toSet().toList();
+      entityRepositoriesLength = entityRepositories.length;
     }
 
     if (entityRepositoriesLength == 1) {
@@ -2338,6 +2339,10 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     for (var e in entries.entries) {
       var typeName = e.key;
       var typeEntries = e.value;
+      if (typeEntries.isEmpty) {
+        results[typeName] = [];
+        continue;
+      }
 
       _log.info(
           'Populating `$typeName`: ${typeEntries.length} JSON entries...$_logSectionOpen');
@@ -2759,6 +2764,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
   @override
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
+    if (id == null) return null;
+
     checkNotClosed();
 
     var cachedEntity = transaction?.getCachedEntityByID(id, type: type);
@@ -2776,6 +2783,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   FutureOr<List<O?>> selectByIDs(List<dynamic> ids,
       {Transaction? transaction}) {
     if (ids.isEmpty) return <O?>[];
+
+    checkNotClosed();
 
     var idsUnique = ids.length == 1 ? ids : ids.toSet().toList();
 

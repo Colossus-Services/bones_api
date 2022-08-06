@@ -947,10 +947,16 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   FutureOr<O?> _selectByID(
       Transaction? transaction, ConditionID matcher, Object? parameters) {
+    var id = matcher.idValue ?? matcher.getID(parameters);
+
+    if (id == null && parameters != null) {
+      id = matcher.getID(parameters);
+    }
+
+    if (id == null) return null;
+
     var op = TransactionOperationSelect(
         name, operationExecutor, matcher, transaction);
-
-    var id = matcher.idValue ?? matcher.getID(parameters);
 
     try {
       return repositoryAdapter.doSelectByID<O?>(op, id, preFinish: (results) {
@@ -969,10 +975,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   FutureOr<List<O>> _selectByIDs(
       Transaction? transaction, ConditionIdIN matcher, Object? parameters) {
+    var ids = matcher.idsValues.whereNotNull().toList();
+    if (ids.isEmpty) return <O>[];
+
     var op = TransactionOperationSelect(
         name, operationExecutor, matcher, transaction);
 
-    var ids = matcher.idsValues.whereNotNull().toList();
     try {
       return repositoryAdapter.doSelectByIDs<O>(op, ids, preFinish: (results) {
         return resolveEntities(op.transaction, results);
