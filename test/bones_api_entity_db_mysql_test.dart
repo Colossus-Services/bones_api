@@ -1,11 +1,11 @@
 @TestOn('vm')
 @Tags(['docker', 'mysql', 'slow'])
 @Timeout(Duration(minutes: 4))
-import 'package:bones_api/bones_api_adapter_mysql.dart';
+import 'package:bones_api/bones_api_db_mysql.dart';
 import 'package:bones_api/bones_api_test_mysql.dart';
 import 'package:test/test.dart';
 
-import 'bones_api_test_adapter.dart';
+import 'bones_api_entity_db_tests_base.dart';
 
 final dbUser = 'myuser';
 final dbPass = 'mypass';
@@ -35,7 +35,7 @@ Future<void> main() async {
 Future<bool> _runTest(bool useReflection) => runAdapterTests(
       'MySQL',
       MySQLTestConfig(),
-      (provider, dbPort) => MySQLAdapter(
+      (provider, dbPort) => DBMySQLAdapter(
         dbName,
         dbUser,
         password: dbPass,

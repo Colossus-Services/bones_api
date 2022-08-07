@@ -1,7 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 
-import 'bones_api_entity_adapter_mysql.dart';
+import 'bones_api_entity_db_mysql.dart';
 import 'bones_api_test_utils.dart';
 import 'bones_api_test_utils_freeport.dart' as freeport;
 
@@ -16,7 +16,7 @@ class APITestConfigDockerMySQL
       this.forceNativePasswordAuthentication = true})
       : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
-    MySQLAdapter.boot();
+    DBMySQLAdapter.boot();
   }
 
   @override

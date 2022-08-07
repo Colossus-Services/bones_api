@@ -1,11 +1,11 @@
 @TestOn('vm')
 @Tags(['docker', 'postgres', 'entities', 'slow'])
 @Timeout(Duration(minutes: 4))
-import 'package:bones_api/bones_api_adapter_postgre.dart';
+import 'package:bones_api/bones_api_db_postgre.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
 import 'package:test/test.dart';
 
-import 'bones_api_test_adapter.dart';
+import 'bones_api_entity_db_tests_base.dart';
 
 final dbUser = 'postgres';
 final dbPass = '123456';
@@ -33,7 +33,7 @@ Future<void> main() async {
 Future<bool> _runTest(bool useReflection) => runAdapterTests(
       'PostgreSQL',
       PostgresTestConfig(),
-      (provider, dbPort) => PostgreSQLAdapter(
+      (provider, dbPort) => DBPostgreSQLAdapter(
         dbName,
         dbUser,
         password: dbPass,

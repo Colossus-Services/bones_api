@@ -31,9 +31,10 @@ typedef APIRequestHandler = FutureOr<APIResponse<T>?> Function<T>(
 typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
     [Object? error, StackTrace? stackTrace]);
 
+/// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.2.26';
+  static const String VERSION = '1.3.0';
 
   static bool _boot = false;
 

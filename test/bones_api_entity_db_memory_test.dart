@@ -3,7 +3,7 @@
 import 'package:bones_api/bones_api_test.dart';
 import 'package:test/test.dart';
 
-import 'bones_api_test_adapter.dart';
+import 'bones_api_entity_db_tests_base.dart';
 
 class MemoryTestConfig extends APITestConfigDBMemory {
   MemoryTestConfig()
@@ -24,7 +24,7 @@ Future<void> main() async {
 Future<bool> _runTest(bool useReflection) => runAdapterTests(
       'DBMemory',
       MemoryTestConfig(),
-      (provider, dbPort) => MemorySQLAdapter(
+      (provider, dbPort) => DBMemorySQLAdapter(
         parentRepositoryProvider: provider,
       ),
       '"',

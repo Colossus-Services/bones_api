@@ -6,8 +6,8 @@ import 'package:logging/logging.dart' as logging;
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter_memory.dart';
-import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_db_memory.dart';
+import 'bones_api_entity_db_sql.dart';
 import 'bones_api_root_starter.dart';
 import 'bones_api_utils_collections.dart';
 
@@ -314,14 +314,14 @@ class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
   @override
   FutureOr<int> resolveFreePort(int port) => 5000;
 
-  MemorySQLAdapter? sqlAdapter;
+  DBMemorySQLAdapter? sqlAdapter;
 
   @override
   FutureOr<bool> startImpl() {
     _started = false;
 
     sqlAdapter =
-        MemorySQLAdapter(parentRepositoryProvider: parentRepositoryProvider);
+        DBMemorySQLAdapter(parentRepositoryProvider: parentRepositoryProvider);
 
     _log.info('** STARTED> $this');
 
@@ -373,7 +373,7 @@ mixin APITestConfigDBSQLMixin on APITestConfigDBMixin {
 
   /// Perform a create table SQL.
   Future<List<String?>> createTableSQL(String sqls) async {
-    var list = SQLAdapter.extractTableSQLs(sqls);
+    var list = DBSQLAdapter.extractTableSQLs(sqls);
     if (list.isEmpty) return <String>[];
 
     var results = Future.wait(list.map(runSQL));
@@ -391,7 +391,7 @@ abstract class APITestConfigDBSQL extends APITestConfigDB {
 
   /// Perform a create table SQL.
   Future<List<String?>> createTableSQL(String sqls) async {
-    var list = SQLAdapter.extractTableSQLs(sqls);
+    var list = DBSQLAdapter.extractTableSQLs(sqls);
     if (list.isEmpty) return <String>[];
 
     var results = Future.wait(list.map(runSQL));

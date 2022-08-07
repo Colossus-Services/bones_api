@@ -1,7 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 
-import 'bones_api_entity_adapter_postgres.dart';
+import 'bones_api_entity_db_postgres.dart';
 import 'bones_api_test_utils.dart';
 import 'bones_api_test_utils_freeport.dart' as freeport;
 
@@ -12,7 +12,7 @@ class APITestConfigDockerPostgreSQL
       {DockerHost? dockerHost, String? containerNamePrefix})
       : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
-    PostgreSQLAdapter.boot();
+    DBPostgreSQLAdapter.boot();
   }
 
   @override

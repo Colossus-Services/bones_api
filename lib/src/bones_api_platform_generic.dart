@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-import 'bones_api_platform.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_platform.dart';
 
 class APIPlatformGeneric extends APIPlatform {
   @override

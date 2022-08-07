@@ -6,9 +6,9 @@ import 'package:statistics/statistics.dart' show Decimal;
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
-import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
@@ -18,7 +18,7 @@ import 'bones_api_utils_timedmap.dart';
 final _log = logging.Logger('MySQLAdapter');
 
 /// A MySQL adapter.
-class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
+class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   static bool _boot = false;
 
   static void boot() {
@@ -27,16 +27,16 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
     Transaction.registerErrorFilter((e, s) => e is MySqlException);
 
-    SQLAdapter.registerAdapter(['mysql'], MySQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter(['mysql'], DBMySQLAdapter, _instantiate);
   }
 
-  static FutureOr<MySQLAdapter?> _instantiate(config,
+  static FutureOr<DBMySQLAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return MySQLAdapter.fromConfig(config,
+      return DBMySQLAdapter.fromConfig(config,
           minConnections: minConnections,
           maxConnections: maxConnections,
           parentRepositoryProvider: parentRepositoryProvider,
@@ -56,7 +56,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
-  MySQLAdapter(this.databaseName, this.username,
+  DBMySQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
       PasswordProvider? passwordProvider,
@@ -78,7 +78,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
         super(
           minConnections,
           maxConnections,
-          const SQLAdapterCapability(
+          const DBSQLAdapterCapability(
               dialect: SQLDialect(
                 'MySQL',
                 elementQuote: '`',
@@ -105,7 +105,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory MySQLAdapter.fromConfig(Map<String, dynamic>? config,
+  factory DBMySQLAdapter.fromConfig(Map<String, dynamic>? config,
       {String? defaultDatabase,
       String? defaultUsername,
       String? defaultHost,
@@ -145,7 +145,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     if (database == null) throw ArgumentError.notNull('database');
     if (username == null) throw ArgumentError.notNull('username');
 
-    return MySQLAdapter(
+    return DBMySQLAdapter(
       database,
       username,
       password: password,
@@ -181,7 +181,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
-  String getConnectionURL(MySqlConnectionWrapper connection) {
+  String getConnectionURL(DBMySqlConnectionWrapper connection) {
     return 'mysql://$username@$host:$port/$databaseName';
   }
 
@@ -195,7 +195,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   int _connectionCount = 0;
 
   @override
-  FutureOr<MySqlConnectionWrapper> createConnection() async {
+  FutureOr<DBMySqlConnectionWrapper> createConnection() async {
     var password = await _getPassword();
 
     var count = ++_connectionCount;
@@ -212,7 +212,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
     var connection = await _errorZone
         .runGuardedAsync(() => MySqlConnection.connect(connSettings));
 
-    var connWrapper = _MySqlConnectionWrapped(connection);
+    var connWrapper = _DBMySqlConnectionWrapped(connection);
 
     var connUrl = getConnectionURL(connWrapper);
 
@@ -222,7 +222,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<bool> closeConnection(MySqlConnectionWrapper connection) {
+  FutureOr<bool> closeConnection(DBMySqlConnectionWrapper connection) {
     _log.info('closeConnection> $connection');
 
     connection.connection.close();
@@ -231,7 +231,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<bool> isConnectionValid(MySqlConnectionWrapper connection) {
+  FutureOr<bool> isConnectionValid(DBMySqlConnectionWrapper connection) {
     return true;
   }
 
@@ -308,7 +308,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   FutureOr<String> _findIDField(
-      MySqlConnectionWrapper connection, String table, Results scheme) async {
+      DBMySqlConnectionWrapper connection, String table, Results scheme) async {
     var field = scheme.firstWhereOrNull((f) => f['Key'] == 'PRI');
     var name = field?['Field'] ?? 'id';
 
@@ -368,7 +368,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   Future<List<TableRelationshipReference>> _findRelationshipTables(
-      MySqlConnectionWrapper connection,
+      DBMySqlConnectionWrapper connection,
       String table,
       String idFieldName) async {
     var tablesNames = await _listTablesNames(connection);
@@ -418,7 +418,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   Future<List<String>> _listTablesNames(
-      MySqlConnectionWrapper connection) async {
+      DBMySqlConnectionWrapper connection) async {
     var sql = '''
     SHOW TABLES
     ''';
@@ -435,7 +435,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-      MySqlConnectionWrapper connection, String table) {
+      DBMySqlConnectionWrapper connection, String table) {
     var prev = _findFieldsReferencedTablesCache[table];
     if (prev != null) return prev;
 
@@ -449,7 +449,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
-      MySqlConnectionWrapper connection, String table) async {
+      DBMySqlConnectionWrapper connection, String table) async {
     var sql = '''
     SELECT 
       CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
@@ -535,7 +535,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, MySqlConnectionWrapper connection) {
+      Transaction transaction, DBMySqlConnectionWrapper connection) {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
@@ -550,7 +550,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       String table,
       SQL sql,
       Transaction transaction,
-      MySqlConnectionWrapper connection) {
+      DBMySqlConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -567,7 +567,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       String table,
       SQL sql,
       Transaction transaction,
-      MySqlConnectionWrapper connection) {
+      DBMySqlConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var preSQLs = sql.preSQL;
@@ -581,14 +581,14 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 
   FutureOr<List<Results>> _executeSQLs(
-          List<SQL> sql, MySqlConnectionWrapper connection) =>
+          List<SQL> sql, DBMySqlConnectionWrapper connection) =>
       sql
           .map((e) =>
               connection.query(e.sqlPositional, e.parametersValuesByPosition))
           .resolveAll();
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteSQLImpl(
-      String table, SQL sql, MySqlConnectionWrapper connection) {
+      String table, SQL sql, DBMySqlConnectionWrapper connection) {
     FutureOr<Results> sqlRet =
         connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
 
@@ -609,7 +609,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, MySqlConnectionWrapper connection) {
+      Transaction transaction, DBMySqlConnectionWrapper connection) {
     if (sql.isDummy) return null;
 
     return connection
@@ -619,7 +619,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, MySqlConnectionWrapper connection,
+      Transaction transaction, DBMySqlConnectionWrapper connection,
       {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
@@ -684,7 +684,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   Object resolveError(Object error, StackTrace stackTrace) {
-    if (error is MySQLAdapterException) {
+    if (error is DBMySQLAdapterException) {
       return error;
     } else if (error is MySqlException) {
       if (error.errorNumber == 1062) {
@@ -714,19 +714,19 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
       }
     }
 
-    return MySQLAdapterException('error', '$error',
+    return DBMySQLAdapterException('error', '$error',
         parentError: error, parentStackTrace: stackTrace);
   }
 
   @override
-  FutureOr<MySqlConnectionWrapper> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<MySqlConnectionWrapper>();
+  FutureOr<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
+    var contextCompleter = Completer<DBMySqlConnectionWrapper>();
 
     var result = executeWithPool(
       (connection) {
         return connection.connection.transaction((t) {
           var transactionWrap =
-              _MySqlConnectionTransaction(connection.connection, t);
+              _DBMySqlConnectionTransaction(connection.connection, t);
           contextCompleter.complete(transactionWrap);
 
           return transaction.transactionFuture.catchError((e, s) {
@@ -746,7 +746,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   @override
   bool cancelTransaction(
       Transaction transaction,
-      MySqlConnectionWrapper connection,
+      DBMySqlConnectionWrapper connection,
       Object? error,
       StackTrace? stackTrace) {
     return true;
@@ -757,7 +757,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, MySqlConnectionWrapper? connection) {}
+      Transaction transaction, DBMySqlConnectionWrapper? connection) {}
 
   @override
   String toString() {
@@ -766,7 +766,7 @@ class MySQLAdapter extends SQLAdapter<MySqlConnectionWrapper> {
   }
 }
 
-abstract class MySqlConnectionWrapper {
+abstract class DBMySqlConnectionWrapper {
   MySqlConnection get connection;
 
   Future<Results> query(String sql, [List<Object?>? values]);
@@ -774,11 +774,11 @@ abstract class MySqlConnectionWrapper {
   Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values);
 }
 
-class _MySqlConnectionWrapped implements MySqlConnectionWrapper {
+class _DBMySqlConnectionWrapped implements DBMySqlConnectionWrapper {
   @override
   final MySqlConnection connection;
 
-  _MySqlConnectionWrapped(this.connection);
+  _DBMySqlConnectionWrapped(this.connection);
 
   @override
   Future<Results> query(String sql, [List<Object?>? values]) =>
@@ -790,13 +790,13 @@ class _MySqlConnectionWrapped implements MySqlConnectionWrapper {
       connection.queryMulti(sql, values.map((e) => e.cast<Object?>()));
 }
 
-class _MySqlConnectionTransaction implements MySqlConnectionWrapper {
+class _DBMySqlConnectionTransaction implements DBMySqlConnectionWrapper {
   @override
   final MySqlConnection connection;
 
   final TransactionContext transaction;
 
-  _MySqlConnectionTransaction(this.connection, this.transaction);
+  _DBMySqlConnectionTransaction(this.connection, this.transaction);
 
   @override
   Future<Results> query(String sql, [List<Object?>? values]) =>
@@ -808,9 +808,9 @@ class _MySqlConnectionTransaction implements MySqlConnectionWrapper {
       transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
 }
 
-/// Exception thrown by [MySQLAdapter] operations.
-class MySQLAdapterException extends SQLAdapterException {
-  MySQLAdapterException(String type, String message,
+/// Exception thrown by [DBMySQLAdapter] operations.
+class DBMySQLAdapterException extends DBSQLAdapterException {
+  DBMySQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

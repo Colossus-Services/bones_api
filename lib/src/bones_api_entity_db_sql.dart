@@ -8,9 +8,9 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
-import 'bones_api_entity_adapter_db_relational.dart';
-import 'bones_api_entity_adapter_memory.dart';
+import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_memory.dart';
+import 'bones_api_entity_db_relational.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_sql_builder.dart';
@@ -49,7 +49,7 @@ class MultipleSQL implements SQLWrapper {
 }
 
 /// An encoded SQL representation.
-/// This is used by a [SQLAdapter] to execute queries.
+/// This is used by a [DBSQLAdapter] to execute queries.
 class SQL implements SQLWrapper {
   static final SQL dummy = SQL(
       'dummy', <dynamic>[], <String, dynamic>{}, <String, dynamic>{},
@@ -215,13 +215,13 @@ class SQL implements SQLWrapper {
   }
 }
 
-/// [SQLAdapter] capabilities.
-class SQLAdapterCapability extends DBAdapterCapability {
+/// [DBSQLAdapter] capabilities.
+class DBSQLAdapterCapability extends DBAdapterCapability {
   /// `true` if the adapter supports table SQLs.
-  /// See [SQLAdapter.populateTables].
+  /// See [DBSQLAdapter.populateTables].
   final bool tableSQL;
 
-  const SQLAdapterCapability(
+  const DBSQLAdapterCapability(
       {required SQLDialect dialect,
       required bool transactions,
       required bool transactionAbort,
@@ -232,16 +232,16 @@ class SQLAdapterCapability extends DBAdapterCapability {
             transactionAbort: transactionAbort);
 }
 
-typedef SQLAdapterInstantiator<C extends Object, A extends SQLAdapter<C>>
+typedef DBSQLAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>
     = DBAdapterInstantiator<C, A>;
 
 /// Base class for SQL DB adapters.
 ///
-/// A [SQLAdapter] implementation is responsible to connect to the database and
+/// A [DBSQLAdapter] implementation is responsible to connect to the database and
 /// adjust the generated `SQL`s to the correct dialect.
 ///
-/// All [SQLAdapter]s comes with a built-in connection pool.
-abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
+/// All [DBSQLAdapter]s comes with a built-in connection pool.
+abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     with SQLGenerator {
   static bool _boot = false;
 
@@ -249,13 +249,13 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (_boot) return;
     _boot = true;
 
-    MemorySQLAdapter.boot();
+    DBMemorySQLAdapter.boot();
   }
 
-  static final Map<String, SQLAdapterInstantiator> _registeredAdaptersByName =
-      <String, SQLAdapterInstantiator>{};
-  static final Map<Type, SQLAdapterInstantiator> _registeredAdaptersByType =
-      <Type, SQLAdapterInstantiator>{};
+  static final Map<String, DBSQLAdapterInstantiator> _registeredAdaptersByName =
+      <String, DBSQLAdapterInstantiator>{};
+  static final Map<Type, DBSQLAdapterInstantiator> _registeredAdaptersByType =
+      <Type, DBSQLAdapterInstantiator>{};
 
   static List<String> get registeredAdaptersNames =>
       _registeredAdaptersByName.keys.toList();
@@ -263,10 +263,10 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   static List<Type> get registeredAdaptersTypes =>
       _registeredAdaptersByType.keys.toList();
 
-  static void registerAdapter<C extends Object, A extends SQLAdapter<C>>(
+  static void registerAdapter<C extends Object, A extends DBSQLAdapter<C>>(
       List<String> names,
       Type type,
-      SQLAdapterInstantiator<C, A> adapterInstantiator) {
+      DBSQLAdapterInstantiator<C, A> adapterInstantiator) {
     for (var name in names) {
       _registeredAdaptersByName[name] = adapterInstantiator;
     }
@@ -276,8 +276,8 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     DBRelationalAdapter.registerAdapter(names, type, adapterInstantiator);
   }
 
-  static SQLAdapterInstantiator<C, A>?
-      getAdapterInstantiator<C extends Object, A extends SQLAdapter<C>>(
+  static DBSQLAdapterInstantiator<C, A>?
+      getAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>(
           {String? name, Type? type}) {
     if (name == null && type == null) {
       throw ArgumentError(
@@ -286,14 +286,14 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (name != null) {
       var adapter = _registeredAdaptersByName[name];
-      if (adapter is SQLAdapterInstantiator<C, A>) {
+      if (adapter is DBSQLAdapterInstantiator<C, A>) {
         return adapter;
       }
     }
 
     if (type != null) {
       var adapter = _registeredAdaptersByType[type];
-      if (adapter is SQLAdapterInstantiator<C, A>) {
+      if (adapter is DBSQLAdapterInstantiator<C, A>) {
         return adapter;
       }
     }
@@ -301,21 +301,21 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return null;
   }
 
-  static List<MapEntry<SQLAdapterInstantiator<C, A>, Map<String, dynamic>>>
+  static List<MapEntry<DBSQLAdapterInstantiator<C, A>, Map<String, dynamic>>>
       getAdapterInstantiatorsFromConfig<C extends Object,
-              A extends SQLAdapter<C>>(Map<String, dynamic> config) =>
+              A extends DBSQLAdapter<C>>(Map<String, dynamic> config) =>
           DBAdapter.getAdapterInstantiatorsFromConfigImpl<C, A>(
               config, registeredAdaptersNames, getAdapterInstantiator);
 
-  /// The [SQLAdapter] capability.
+  /// The [DBSQLAdapter] capability.
   @override
-  SQLAdapterCapability get capability =>
-      super.capability as SQLAdapterCapability;
+  DBSQLAdapterCapability get capability =>
+      super.capability as DBSQLAdapterCapability;
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  SQLAdapter(
-      int minConnections, int maxConnections, SQLAdapterCapability capability,
+  DBSQLAdapter(
+      int minConnections, int maxConnections, DBSQLAdapterCapability capability,
       {EntityRepositoryProvider? parentRepositoryProvider,
       bool generateTables = false,
       Object? populateTables,
@@ -333,7 +333,7 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ConditionSQLEncoder(this, sqlElementQuote: dialect.elementQuote);
   }
 
-  static FutureOr<A> fromConfig<C extends Object, A extends SQLAdapter<C>>(
+  static FutureOr<A> fromConfig<C extends Object, A extends DBSQLAdapter<C>>(
       Map<String, dynamic> config,
       {int minConnections = 1,
       int maxConnections = 3,
@@ -1230,7 +1230,7 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   Object resolveError(Object error, StackTrace stackTrace) =>
-      SQLAdapterException('error', '$error',
+      DBSQLAdapterException('error', '$error',
           parentError: error, parentStackTrace: stackTrace);
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
@@ -1592,31 +1592,31 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   );
 
   @override
-  SQLRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
+  DBSQLRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
           {String? tableName, Type? type}) =>
       super.createRepositoryAdapter<O>(name, tableName: tableName, type: type)
-          as SQLRepositoryAdapter<O>?;
+          as DBSQLRepositoryAdapter<O>?;
 
   @override
-  SQLRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
+  DBSQLRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
           String name, String? tableName, Type? type) =>
-      SQLRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
+      DBSQLRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
 
   @override
-  SQLRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
+  DBSQLRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
     String name,
   ) =>
-      super.getRepositoryAdapterByName<O>(name) as SQLRepositoryAdapter<O>?;
+      super.getRepositoryAdapterByName<O>(name) as DBSQLRepositoryAdapter<O>?;
 
   @override
-  SQLRepositoryAdapter<O>? getRepositoryAdapterByType<O>(Type type) =>
-      super.getRepositoryAdapterByType<O>(type) as SQLRepositoryAdapter<O>?;
+  DBSQLRepositoryAdapter<O>? getRepositoryAdapterByType<O>(Type type) =>
+      super.getRepositoryAdapterByType<O>(type) as DBSQLRepositoryAdapter<O>?;
 
   @override
-  SQLRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(
+  DBSQLRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(
           String tableName) =>
       super.getRepositoryAdapterByTableName<O>(tableName)
-          as SQLRepositoryAdapter<O>?;
+          as DBSQLRepositoryAdapter<O>?;
 
   FutureOr<R> _finishOperation<T, R>(
       TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
@@ -1769,12 +1769,12 @@ abstract class SQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 }
 
-/// An adapter for [EntityRepository] and [SQLAdapter].
-class SQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
+/// An adapter for [EntityRepository] and [DBSQLAdapter].
+class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
   @override
-  SQLAdapter get databaseAdapter => super.databaseAdapter as SQLAdapter;
+  DBSQLAdapter get databaseAdapter => super.databaseAdapter as DBSQLAdapter;
 
-  SQLRepositoryAdapter(SQLAdapter databaseAdapter, String name,
+  DBSQLRepositoryAdapter(DBSQLAdapter databaseAdapter, String name,
       {String? tableName, Type? type})
       : super(databaseAdapter, name, tableName: tableName, type: type);
 
@@ -1902,8 +1902,8 @@ class SQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
 }
 
 /// A [SQLAdapter] [Exception].
-class SQLAdapterException extends DBAdapterException {
-  SQLAdapterException(String type, String message,
+class DBSQLAdapterException extends DBAdapterException {
+  DBSQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

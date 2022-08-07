@@ -7,7 +7,7 @@ import 'package:statistics/statistics.dart' hide IterableIntExtension;
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter_db_relational.dart';
+import 'bones_api_entity_db_relational.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
@@ -631,7 +631,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
       if (tableName != null) {
         entityRepository = _entityRepositories.values.where((e) {
-          if (e is SQLEntityRepository) {
+          if (e is DBSQLEntityRepository) {
             return e.tableName == tableName;
           } else {
             return e.name == tableName;

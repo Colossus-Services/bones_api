@@ -1,7 +1,9 @@
 // Documentation canonicals:
 // - Generated with:
+//   ## remove the documentation canonicals from this file first.
 //   $> dart doc --dry-run 2>/tmp/dartdoc.txt
 //   $> cat /tmp/dartdoc.txt | grep "ambiguous reexport " |  awk '{ print $5 }' | sed 's/,//' | awk '{ print "/// {@canonicalFor " $0 "}" }'
+//   ## then sort the documentation canonicals lines to have a deterministic list.
 //
 /// {@canonicalFor bones_api_authentication.APIAuthentication}
 /// {@canonicalFor bones_api_authentication.APICredential}
@@ -112,29 +114,53 @@
 /// {@canonicalFor bones_api_entity.TransactionOperationSelect}
 /// {@canonicalFor bones_api_entity.TransactionOperationStoreRelationship}
 /// {@canonicalFor bones_api_entity.TransactionOperationStore}
+/// {@canonicalFor bones_api_entity.TransactionOperationSubTransaction}
 /// {@canonicalFor bones_api_entity.TransactionOperationTypeExtension}
 /// {@canonicalFor bones_api_entity.TransactionOperationType}
 /// {@canonicalFor bones_api_entity.TransactionOperationUpdate}
 /// {@canonicalFor bones_api_entity.TransactionOperation}
 /// {@canonicalFor bones_api_entity.Transaction}
-/// {@canonicalFor bones_api_entity_adapter.DBAdapterCapability}
-/// {@canonicalFor bones_api_entity_adapter.DBAdapterInstantiator}
-/// {@canonicalFor bones_api_entity_adapter.DBAdapter}
-/// {@canonicalFor bones_api_entity_adapter.DBEntityRepositoryProvider}
-/// {@canonicalFor bones_api_entity_adapter.DBRepositoryAdapter}
-/// {@canonicalFor bones_api_entity_adapter.MultipleSQL}
-/// {@canonicalFor bones_api_entity_adapter.PasswordProvider}
-/// {@canonicalFor bones_api_entity_adapter.PreFinishDBOperation}
-/// {@canonicalFor bones_api_entity_adapter.SQLWrapper}
-/// {@canonicalFor bones_api_entity_adapter_memory.MemorySQLAdapterContext}
-/// {@canonicalFor bones_api_entity_adapter_memory.MemorySQLAdapter}
-/// {@canonicalFor bones_api_entity_adapter_sql.SQLAdapterCapability}
-/// {@canonicalFor bones_api_entity_adapter_sql.SQLAdapterInstantiator}
-/// {@canonicalFor bones_api_entity_adapter_sql.SQLAdapter}
-/// {@canonicalFor bones_api_entity_adapter_sql.SQLRepositoryAdapter}
-/// {@canonicalFor bones_api_entity_adapter_sql.SQL}
-/// {@canonicalFor bones_api_entity_sql.SQLEntityRepositoryProvider}
-/// {@canonicalFor bones_api_entity_sql.SQLEntityRepository}
+/// {@canonicalFor bones_api_entity_annotation.EntityAnnotation}
+/// {@canonicalFor bones_api_entity_annotation.EntityFieldInvalid}
+/// {@canonicalFor bones_api_entity_annotation.EntityField}
+/// {@canonicalFor bones_api_entity_annotation.IterableEntityAnnotationExtension}
+/// {@canonicalFor bones_api_entity_annotation.IterableEntityFieldExtension}
+/// {@canonicalFor bones_api_entity_db.DBAdapterCapability}
+/// {@canonicalFor bones_api_entity_db.DBAdapterException}
+/// {@canonicalFor bones_api_entity_db.DBAdapterInstantiator}
+/// {@canonicalFor bones_api_entity_db.DBAdapter}
+/// {@canonicalFor bones_api_entity_db.DBDialect}
+/// {@canonicalFor bones_api_entity_db.DBEntityRepositoryProvider}
+/// {@canonicalFor bones_api_entity_db.DBEntityRepository}
+/// {@canonicalFor bones_api_entity_db.DBRepositoryAdapter}
+/// {@canonicalFor bones_api_entity_db.PasswordProvider}
+/// {@canonicalFor bones_api_entity_db.PreFinishDBOperation}
+/// {@canonicalFor bones_api_entity_db_memory.DBMemorySQLAdapterContext}
+/// {@canonicalFor bones_api_entity_db_memory.DBMemorySQLAdapterException}
+/// {@canonicalFor bones_api_entity_db_memory.DBMemorySQLAdapter}
+/// {@canonicalFor bones_api_entity_db_object_memory.DBMemoryObjectAdapterContext}
+/// {@canonicalFor bones_api_entity_db_object_memory.DBMemoryObjectAdapterException}
+/// {@canonicalFor bones_api_entity_db_object_memory.DBMemoryObjectAdapter}
+/// {@canonicalFor bones_api_entity_db_relational.DBRelationalAdapter}
+/// {@canonicalFor bones_api_entity_db_relational.DBRelationalEntityRepositoryProvider}
+/// {@canonicalFor bones_api_entity_db_relational.DBRelationalEntityRepository}
+/// {@canonicalFor bones_api_entity_db_relational.DBRelationalRepositoryAdapter}
+/// {@canonicalFor bones_api_entity_db_sql.DBSQLAdapterCapability}
+/// {@canonicalFor bones_api_entity_db_sql.DBSQLAdapterException}
+/// {@canonicalFor bones_api_entity_db_sql.DBSQLAdapterInstantiator}
+/// {@canonicalFor bones_api_entity_db_sql.DBSQLAdapter}
+/// {@canonicalFor bones_api_entity_db_sql.DBSQLRepositoryAdapter}
+/// {@canonicalFor bones_api_entity_db_sql.MultipleSQL}
+/// {@canonicalFor bones_api_entity_db_sql.SQLWrapper}
+/// {@canonicalFor bones_api_entity_db_sql.SQL}
+/// {@canonicalFor bones_api_entity_sql.DBSQLEntityRepositoryProvider}
+/// {@canonicalFor bones_api_entity_sql.DBSQLEntityRepository}
+/// {@canonicalFor bones_api_error_zone.ErrorZoneExtension}
+/// {@canonicalFor bones_api_error_zone.OnUncaughtError}
+/// {@canonicalFor bones_api_error_zone.ZoneField}
+/// {@canonicalFor bones_api_error_zone.createErrorZone}
+/// {@canonicalFor bones_api_error_zone.printToZoneStderr}
+/// {@canonicalFor bones_api_error_zone.printZoneError}
 /// {@canonicalFor bones_api_extension.ClassReflectionExtension}
 /// {@canonicalFor bones_api_extension.MapGetterExtension}
 /// {@canonicalFor bones_api_extension.MapMultiValueExtension}
@@ -172,6 +198,7 @@
 /// {@canonicalFor bones_api_sql_builder.SQLBuilderListExtension}
 /// {@canonicalFor bones_api_sql_builder.SQLBuilder}
 /// {@canonicalFor bones_api_sql_builder.SQLColumn}
+/// {@canonicalFor bones_api_sql_builder.SQLDialect}
 /// {@canonicalFor bones_api_sql_builder.SQLEntry}
 /// {@canonicalFor bones_api_sql_builder.SQLGenerator}
 /// {@canonicalFor bones_api_sql_builder.TableSQL}
@@ -186,9 +213,17 @@
 /// {@canonicalFor bones_api_test_utils.APITestConfigDocker}
 /// {@canonicalFor bones_api_test_utils.APITestConfigExtension}
 /// {@canonicalFor bones_api_test_utils.APITestConfig}
-/// {@canonicalFor bones_api_types.GenericObjectExtension}
+/// {@canonicalFor bones_api_types.APIEntityObjectExtension}
+/// {@canonicalFor bones_api_types.APIEntityTypeExtension}
+/// {@canonicalFor bones_api_types.ListOfStringExtension}
 /// {@canonicalFor bones_api_types.Time}
+/// {@canonicalFor bones_api_utils.FieldNameMapper}
+/// {@canonicalFor bones_api_utils.KeyMapper}
+/// {@canonicalFor bones_api_utils.StringUtils}
+/// {@canonicalFor bones_api_utils.tryCallMapped}
+/// {@canonicalFor bones_api_utils.tryCall}
 /// {@canonicalFor bones_api_utils_arguments.Arguments}
+/// {@canonicalFor bones_api_utils_collections.MapAsCacheExtension}
 /// {@canonicalFor bones_api_utils_collections.PositionalFields}
 /// {@canonicalFor bones_api_utils_collections.ValueEquality}
 /// {@canonicalFor bones_api_utils_collections.deepCopyList}
@@ -228,13 +263,13 @@ export 'src/bones_api_condition_parser.dart';
 export 'src/bones_api_condition_sql.dart';
 export 'src/bones_api_config.dart';
 export 'src/bones_api_entity.dart';
-export 'src/bones_api_entity_adapter.dart';
-export 'src/bones_api_entity_adapter_db_relational.dart';
-export 'src/bones_api_entity_adapter_memory.dart';
-export 'src/bones_api_entity_adapter_obj_memory.dart';
-export 'src/bones_api_entity_adapter_sql.dart';
 export 'src/bones_api_entity_annotation.dart';
+export 'src/bones_api_entity_db.dart';
+export 'src/bones_api_entity_db_memory.dart';
+export 'src/bones_api_entity_db_object_memory.dart';
+export 'src/bones_api_entity_db_relational.dart';
 export 'src/bones_api_entity_sql.dart';
+export 'src/bones_api_entity_db_sql.dart';
 export 'src/bones_api_error_zone.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_initializable.dart';

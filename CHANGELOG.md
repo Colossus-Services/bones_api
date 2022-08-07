@@ -1,3 +1,17 @@
+## 1.3.0
+
+- Clean code:
+  - Renamed `MemorySQLAdapter` to `DBMemorySQLAdapter`.
+  - Renamed `MemoryObjectAdapter` to `DBMemoryObjectAdapter`.
+  - Renamed `SQLAdapter` to `DBSQLAdapter`.
+    - Renamed `SQLEntityRepository` to `DBSQLEntityRepository`.
+    - Renamed `SQLEntityRepositoryProvider` to `DBSQLEntityRepositoryProvider`.
+  - Renamed `MySQLAdapter` to `DBMySQLAdapter`.
+  - Renamed `PostgreSQLAdapter` to `DBPostgreSQLAdapter`.
+  - Renamed `bones_api_adapter_mysql.dart` to `bones_api_db_mysql.dart`.
+  - Renamed `bones_api_adapter_postgre.dart` to `bones_api_db_postgre.dart`.
+  - Renamed some `lib/src/*.dart` files.
+
 ## 1.2.26
 
 - Fix resolution of `EntityRepository` when the same instance is returned by multiple providers.

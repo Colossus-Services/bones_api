@@ -1,11 +1,11 @@
 @TestOn('vm')
 @Tags(['version'])
 
-import 'package:pubspec/pubspec.dart';
-import 'package:test/test.dart';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
+import 'package:pubspec/pubspec.dart';
+import 'package:test/test.dart';
 
 void main() {
   group('Bones_API.VERSION', () {

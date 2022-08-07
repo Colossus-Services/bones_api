@@ -503,7 +503,7 @@ abstract class SchemeProvider {
   /// Returns the table name for [entityRepository].
   FutureOr<String> getTableForEntityRepository(
       EntityRepository entityRepository) {
-    if (entityRepository is SQLEntityRepository) {
+    if (entityRepository is DBSQLEntityRepository) {
       return entityRepository.tableName;
     } else {
       return entityRepository.name;

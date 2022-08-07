@@ -1,8 +1,7 @@
 @TestOn('vm')
 import 'package:bones_api/bones_api_server.dart';
-import 'package:test/test.dart';
-
 import 'package:logging/logging.dart' as logging;
+import 'package:test/test.dart';
 
 void main() {
   group('APIHotReload', () {

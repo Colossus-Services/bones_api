@@ -5,8 +5,8 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
-import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_sql.dart';
 
 final _log = logging.Logger('DBRelationalAdapter');
 
@@ -23,7 +23,7 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
     if (_boot) return;
     _boot = true;
 
-    SQLAdapter.boot();
+    DBSQLAdapter.boot();
   }
 
   static final Map<String, DBAdapterInstantiator> _registeredAdaptersByName =

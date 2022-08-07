@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:data_serializer/data_serializer.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mercury_client/mercury_client.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show Decimal, DynamicInt, DynamicNumber, ListExtension;
-import 'package:data_serializer/data_serializer.dart';
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';

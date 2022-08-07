@@ -2,8 +2,8 @@
 import 'package:bones_api/bones_api_server.dart';
 import 'package:test/test.dart';
 
-import 'bones_api_test_modules.dart';
 import 'bones_api_test_entities.dart';
+import 'bones_api_test_modules.dart';
 
 void main() {
   group('APIRoot', () {

@@ -6,9 +6,9 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
-import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
@@ -19,7 +19,7 @@ import 'bones_api_utils_timedmap.dart';
 final _log = logging.Logger('PostgreAdapter');
 
 /// A PostgreSQL adapter.
-class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
+class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
   static bool _boot = false;
 
   static void boot() {
@@ -28,17 +28,17 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
     Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
 
-    SQLAdapter.registerAdapter(
-        ['postgres', 'postgre', 'postgresql'], PostgreSQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter(['postgres', 'postgre', 'postgresql'],
+        DBPostgreSQLAdapter, _instantiate);
   }
 
-  static FutureOr<PostgreSQLAdapter?> _instantiate(config,
+  static FutureOr<DBPostgreSQLAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return PostgreSQLAdapter.fromConfig(config,
+      return DBPostgreSQLAdapter.fromConfig(config,
           minConnections: minConnections,
           maxConnections: maxConnections,
           parentRepositoryProvider: parentRepositoryProvider,
@@ -58,7 +58,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
-  PostgreSQLAdapter(this.databaseName, this.username,
+  DBPostgreSQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
       PasswordProvider? passwordProvider,
@@ -80,7 +80,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
         super(
           minConnections,
           maxConnections,
-          const SQLAdapterCapability(
+          const DBSQLAdapterCapability(
               dialect: SQLDialect(
                 'PostgreSQL',
                 elementQuote: '"',
@@ -107,7 +107,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  factory PostgreSQLAdapter.fromConfig(Map<String, dynamic>? config,
+  factory DBPostgreSQLAdapter.fromConfig(Map<String, dynamic>? config,
       {String? defaultDatabase,
       String? defaultUsername,
       String? defaultHost,
@@ -147,7 +147,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
     if (database == null) throw ArgumentError.notNull('database');
     if (username == null) throw ArgumentError.notNull('username');
 
-    return PostgreSQLAdapter(
+    return DBPostgreSQLAdapter(
       database,
       username,
       password: password,
@@ -198,7 +198,7 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
 
   @override
   Object resolveError(Object error, StackTrace stackTrace) {
-    if (error is PostgreSQLAdapterException) {
+    if (error is DBPostgreSQLAdapterException) {
       return error;
     } else if (error is PostgreSQLException) {
       if (error.severity == PostgreSQLSeverity.error) {
@@ -208,14 +208,14 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
               tableName: error.tableName,
               parentError: error);
         } else if (error.code == '23503') {
-          return PostgreSQLAdapterException("delete.constraint",
+          return DBPostgreSQLAdapterException("delete.constraint",
               '${error.message} ; Detail: ${error.detail} ; Table: ${error.tableName} ; Constraint: ${error.constraintName}',
               parentError: error, parentStackTrace: stackTrace);
         }
       }
     }
 
-    return PostgreSQLAdapterException('error', '$error',
+    return DBPostgreSQLAdapterException('error', '$error',
         parentError: error, parentStackTrace: stackTrace);
   }
 
@@ -873,9 +873,9 @@ class PostgreSQLAdapter extends SQLAdapter<PostgreSQLExecutionContext> {
   }
 }
 
-/// Exception thrown by [PostgreSQLAdapter] operations.
-class PostgreSQLAdapterException extends SQLAdapterException {
-  PostgreSQLAdapterException(String type, String message,
+/// Exception thrown by [DBPostgreSQLAdapter] operations.
+class DBPostgreSQLAdapterException extends DBSQLAdapterException {
+  DBPostgreSQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

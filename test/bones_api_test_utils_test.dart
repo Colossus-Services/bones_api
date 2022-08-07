@@ -103,7 +103,7 @@ Future<void> main() async {
               ]
             }));
 
-        var adapter = await SQLAdapter.fromConfig(api.apiConfig['db']);
+        var adapter = await DBSQLAdapter.fromConfig(api.apiConfig['db']);
         print(adapter);
 
         expect(adapter, isNotNull);

@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 
-import 'bones_api_base.dart';
 import 'bones_api_authentication.dart';
+import 'bones_api_base.dart';
 import 'bones_api_security.dart';
 
 /// An [APIRoot] session.

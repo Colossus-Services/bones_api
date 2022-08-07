@@ -9,19 +9,19 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
+import 'bones_api_entity_db.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 
 final _log = logging.Logger('MemoryObjectAdapter');
 
-class MemoryObjectAdapterContext
-    implements Comparable<MemoryObjectAdapterContext> {
+class DBMemoryObjectAdapterContext
+    implements Comparable<DBMemoryObjectAdapterContext> {
   final int id;
 
   final Map<String, int> tablesVersions;
 
-  MemoryObjectAdapterContext(this.id, this.tablesVersions);
+  DBMemoryObjectAdapterContext(this.id, this.tablesVersions);
 
   bool _closed = false;
 
@@ -32,13 +32,13 @@ class MemoryObjectAdapterContext
   }
 
   @override
-  int compareTo(MemoryObjectAdapterContext other) => id.compareTo(other.id);
+  int compareTo(DBMemoryObjectAdapterContext other) => id.compareTo(other.id);
 }
 
 /// A [SQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
+class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
@@ -46,16 +46,16 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
     _boot = true;
 
     DBAdapter.registerAdapter(
-        ['object', 'obj'], MemoryObjectAdapter, _instantiate);
+        ['object', 'obj'], DBMemoryObjectAdapter, _instantiate);
   }
 
-  static FutureOr<MemoryObjectAdapter?> _instantiate(config,
+  static FutureOr<DBMemoryObjectAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return MemoryObjectAdapter.fromConfig(config,
+      return DBMemoryObjectAdapter.fromConfig(config,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -64,7 +64,7 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
     }
   }
 
-  MemoryObjectAdapter(
+  DBMemoryObjectAdapter(
       {bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
@@ -86,7 +86,8 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<MemoryObjectAdapter> fromConfig(Map<String, dynamic>? config,
+  static FutureOr<DBMemoryObjectAdapter> fromConfig(
+      Map<String, dynamic>? config,
       {EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     boot();
@@ -107,7 +108,7 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
       populateSource = populate['source'];
     }
 
-    var adapter = MemoryObjectAdapter(
+    var adapter = DBMemoryObjectAdapter(
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -135,21 +136,21 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   }
 
   @override
-  String getConnectionURL(MemoryObjectAdapterContext connection) =>
+  String getConnectionURL(DBMemoryObjectAdapterContext connection) =>
       'memory://${connection.id}';
 
   int _connectionCount = 0;
 
   @override
-  MemoryObjectAdapterContext createConnection() {
+  DBMemoryObjectAdapterContext createConnection() {
     var id = ++_connectionCount;
     var tablesVersions = this.tablesVersions;
 
-    return MemoryObjectAdapterContext(id, tablesVersions);
+    return DBMemoryObjectAdapterContext(id, tablesVersions);
   }
 
   @override
-  FutureOr<bool> closeConnection(MemoryObjectAdapterContext connection) {
+  FutureOr<bool> closeConnection(DBMemoryObjectAdapterContext connection) {
     connection.close();
     return true;
   }
@@ -396,11 +397,11 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
-  final Map<MemoryObjectAdapterContext, DateTime> _openTransactionsContexts =
-      <MemoryObjectAdapterContext, DateTime>{};
+  final Map<DBMemoryObjectAdapterContext, DateTime> _openTransactionsContexts =
+      <DBMemoryObjectAdapterContext, DateTime>{};
 
   @override
-  FutureOr<MemoryObjectAdapterContext> openTransaction(
+  FutureOr<DBMemoryObjectAdapterContext> openTransaction(
       Transaction transaction) {
     return createConnection().resolveMapped((conn) {
       _openTransactionsContexts[conn] = DateTime.now();
@@ -416,7 +417,7 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   @override
   bool cancelTransaction(
       Transaction transaction,
-      MemoryObjectAdapterContext connection,
+      DBMemoryObjectAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -429,16 +430,16 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, MemoryObjectAdapterContext? connection) {
+      Transaction transaction, DBMemoryObjectAdapterContext? connection) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
   }
 
-  final ListQueue<MemoryObjectAdapterContext> _consolidateContextQueue =
-      ListQueue<MemoryObjectAdapterContext>();
+  final ListQueue<DBMemoryObjectAdapterContext> _consolidateContextQueue =
+      ListQueue<DBMemoryObjectAdapterContext>();
 
-  void _consolidateTransactionContext(MemoryObjectAdapterContext context) {
+  void _consolidateTransactionContext(DBMemoryObjectAdapterContext context) {
     _openTransactionsContexts.remove(context);
 
     if (_openTransactionsContexts.isNotEmpty) {
@@ -737,7 +738,7 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   }
 
   Object resolveError(Object error, StackTrace stackTrace) =>
-      MemoryObjectAdapterException('error', '$error',
+      DBMemoryObjectAdapterException('error', '$error',
           parentError: error, parentStackTrace: stackTrace);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -750,7 +751,7 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   }
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(MemoryObjectAdapterContext connection) f) {
+      FutureOr<R> Function(DBMemoryObjectAdapterContext connection) f) {
     var transaction = op.transaction;
 
     if (transaction.length == 1 && !transaction.isExecuting) {
@@ -767,14 +768,14 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
-            ? () => closeTransaction(
-                transaction, transaction.context as MemoryObjectAdapterContext?)
+            ? () => closeTransaction(transaction,
+                transaction.context as DBMemoryObjectAdapterContext?)
             : null,
       );
     }
 
     return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, MemoryObjectAdapterContext>(
+      return transaction.addExecution<R, DBMemoryObjectAdapterContext>(
         (c) => f(c),
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
@@ -783,9 +784,9 @@ class MemoryObjectAdapter extends DBAdapter<MemoryObjectAdapterContext> {
   }
 }
 
-/// Error thrown by [MemoryObjectAdapter] operations.
-class MemoryObjectAdapterException extends DBAdapterException {
-  MemoryObjectAdapterException(String type, String message,
+/// Error thrown by [DBMemoryObjectAdapter] operations.
+class DBMemoryObjectAdapterException extends DBAdapterException {
+  DBMemoryObjectAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

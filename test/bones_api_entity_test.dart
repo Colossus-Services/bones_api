@@ -11,18 +11,18 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 
   factory APIEntityRepositoryProvider() => _instance;
 
-  late final MemorySQLAdapter sqlAdapter;
+  late final DBMemorySQLAdapter sqlAdapter;
 
-  late final SQLEntityRepository<Store> storeSQLRepository;
-  late final SQLEntityRepository<Address> addressSQLRepository;
-  late final SQLEntityRepository<Role> roleSQLRepository;
-  late final SQLEntityRepository<User> userSQLRepository;
+  late final DBSQLEntityRepository<Store> storeSQLRepository;
+  late final DBSQLEntityRepository<Address> addressSQLRepository;
+  late final DBSQLEntityRepository<Role> roleSQLRepository;
+  late final DBSQLEntityRepository<User> userSQLRepository;
 
   late final AddressAPIRepository addressAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
   APIEntityRepositoryProvider._() {
-    sqlAdapter = MemorySQLAdapter(parentRepositoryProvider: this)
+    sqlAdapter = DBMemorySQLAdapter(parentRepositoryProvider: this)
       ..addTableSchemes([
         TableScheme('user', idFieldName: 'id', fieldsTypes: {
           'id': int,
@@ -76,19 +76,19 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
       ]);
 
     storeSQLRepository =
-        SQLEntityRepository<Store>(sqlAdapter, 'store', storeEntityHandler)
+        DBSQLEntityRepository<Store>(sqlAdapter, 'store', storeEntityHandler)
           ..ensureInitialized();
 
-    addressSQLRepository = SQLEntityRepository<Address>(
+    addressSQLRepository = DBSQLEntityRepository<Address>(
         sqlAdapter, 'address', addressEntityHandler)
       ..ensureInitialized();
 
     roleSQLRepository =
-        SQLEntityRepository<Role>(sqlAdapter, 'role', roleEntityHandler)
+        DBSQLEntityRepository<Role>(sqlAdapter, 'role', roleEntityHandler)
           ..ensureInitialized();
 
     userSQLRepository =
-        SQLEntityRepository<User>(sqlAdapter, 'user', userEntityHandler)
+        DBSQLEntityRepository<User>(sqlAdapter, 'user', userEntityHandler)
           ..ensureInitialized();
 
     addressAPIRepository = AddressAPIRepository(this)..ensureConfigured();

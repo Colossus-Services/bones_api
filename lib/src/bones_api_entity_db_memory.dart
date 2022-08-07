@@ -9,8 +9,8 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter_sql.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_db_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
@@ -18,12 +18,13 @@ import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('MemorySQLAdapter');
 
-class MemorySQLAdapterContext implements Comparable<MemorySQLAdapterContext> {
+class DBMemorySQLAdapterContext
+    implements Comparable<DBMemorySQLAdapterContext> {
   final int id;
 
   final Map<String, int> tablesVersions;
 
-  MemorySQLAdapterContext(this.id, this.tablesVersions);
+  DBMemorySQLAdapterContext(this.id, this.tablesVersions);
 
   bool _closed = false;
 
@@ -34,30 +35,30 @@ class MemorySQLAdapterContext implements Comparable<MemorySQLAdapterContext> {
   }
 
   @override
-  int compareTo(MemorySQLAdapterContext other) => id.compareTo(other.id);
+  int compareTo(DBMemorySQLAdapterContext other) => id.compareTo(other.id);
 }
 
-/// A [SQLAdapter] that stores tables data in memory.
+/// A [DBSQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
+class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
     if (_boot) return;
     _boot = true;
 
-    SQLAdapter.registerAdapter(
-        ['memory', 'mem'], MemorySQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter(
+        ['memory', 'mem'], DBMemorySQLAdapter, _instantiate);
   }
 
-  static FutureOr<MemorySQLAdapter?> _instantiate(config,
+  static FutureOr<DBMemorySQLAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return MemorySQLAdapter.fromConfig(config,
+      return DBMemorySQLAdapter.fromConfig(config,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -66,7 +67,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     }
   }
 
-  MemorySQLAdapter(
+  DBMemorySQLAdapter(
       {bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
@@ -75,7 +76,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       : super(
           1,
           3,
-          const SQLAdapterCapability(
+          const DBSQLAdapterCapability(
               dialect: SQLDialect(
                 'generic',
                 acceptsReturningSyntax: true,
@@ -95,7 +96,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<MemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
+  static FutureOr<DBMemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
       {EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     boot();
@@ -116,7 +117,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       populateSource = populate['source'];
     }
 
-    var adapter = MemorySQLAdapter(
+    var adapter = DBMemorySQLAdapter(
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -132,11 +133,11 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   Object resolveError(Object error, StackTrace stackTrace) {
-    if (error is MemorySQLAdapterException) {
+    if (error is DBMemorySQLAdapterException) {
       return error;
     }
 
-    return MemorySQLAdapterException('error', '$error',
+    return DBMemorySQLAdapterException('error', '$error',
         parentError: error, parentStackTrace: stackTrace);
   }
 
@@ -157,21 +158,21 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 
   @override
-  String getConnectionURL(MemorySQLAdapterContext connection) =>
+  String getConnectionURL(DBMemorySQLAdapterContext connection) =>
       'memory://${connection.id}';
 
   int _connectionCount = 0;
 
   @override
-  MemorySQLAdapterContext createConnection() {
+  DBMemorySQLAdapterContext createConnection() {
     var id = ++_connectionCount;
     var tablesVersions = this.tablesVersions;
 
-    return MemorySQLAdapterContext(id, tablesVersions);
+    return DBMemorySQLAdapterContext(id, tablesVersions);
   }
 
   @override
-  FutureOr<bool> closeConnection(MemorySQLAdapterContext connection) {
+  FutureOr<bool> closeConnection(DBMemorySQLAdapterContext connection) {
     connection.close();
     return true;
   }
@@ -342,7 +343,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, MemorySQLAdapterContext connection) {
+      Transaction transaction, DBMemorySQLAdapterContext connection) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -358,7 +359,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   FutureOr doInsertRelationshipSQL(String entityName, String table, SQL sql,
-      Transaction transaction, MemorySQLAdapterContext connection) {
+      Transaction transaction, DBMemorySQLAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var entry = _normalizeEntityJSON(
@@ -382,7 +383,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   FutureOr doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, MemorySQLAdapterContext connection) {
+      Transaction transaction, DBMemorySQLAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
@@ -459,7 +460,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, MemorySQLAdapterContext connection,
+      Transaction transaction, DBMemorySQLAdapterContext connection,
       {bool allowAutoInsert = false}) {
     if (sql.isDummy) return null;
 
@@ -518,7 +519,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       String table,
       SQL sql,
       Transaction transaction,
-      MemorySQLAdapterContext connection) {
+      DBMemorySQLAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var sel = _selectEntries(table, sql);
@@ -594,7 +595,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
       String table,
       SQL sql,
       Transaction transaction,
-      MemorySQLAdapterContext connection) {
+      DBMemorySQLAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var map = _getTableMap(table, false);
@@ -648,7 +649,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
         var refId = ref.value.key;
         var refFieldName = ref.value.value.key;
         var refFieldValue = ref.value.value.value;
-        throw MemorySQLAdapterException("delete.constraint",
+        throw DBMemorySQLAdapterException("delete.constraint",
             "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
       }
     }
@@ -964,11 +965,11 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
-  final Map<MemorySQLAdapterContext, DateTime> _openTransactionsContexts =
-      <MemorySQLAdapterContext, DateTime>{};
+  final Map<DBMemorySQLAdapterContext, DateTime> _openTransactionsContexts =
+      <DBMemorySQLAdapterContext, DateTime>{};
 
   @override
-  FutureOr<MemorySQLAdapterContext> openTransaction(Transaction transaction) {
+  FutureOr<DBMemorySQLAdapterContext> openTransaction(Transaction transaction) {
     return createConnection().resolveMapped((conn) {
       _openTransactionsContexts[conn] = DateTime.now();
 
@@ -983,7 +984,7 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   @override
   bool cancelTransaction(
       Transaction transaction,
-      MemorySQLAdapterContext connection,
+      DBMemorySQLAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -996,16 +997,16 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, MemorySQLAdapterContext? connection) {
+      Transaction transaction, DBMemorySQLAdapterContext? connection) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
   }
 
-  final ListQueue<MemorySQLAdapterContext> _consolidateContextQueue =
-      ListQueue<MemorySQLAdapterContext>();
+  final ListQueue<DBMemorySQLAdapterContext> _consolidateContextQueue =
+      ListQueue<DBMemorySQLAdapterContext>();
 
-  void _consolidateTransactionContext(MemorySQLAdapterContext context) {
+  void _consolidateTransactionContext(DBMemorySQLAdapterContext context) {
     _openTransactionsContexts.remove(context);
 
     if (_openTransactionsContexts.isNotEmpty) {
@@ -1060,9 +1061,9 @@ class MemorySQLAdapter extends SQLAdapter<MemorySQLAdapterContext> {
   }
 }
 
-/// Error thrown by [MemorySQLAdapter] operations.
-class MemorySQLAdapterException extends SQLAdapterException {
-  MemorySQLAdapterException(String type, String message,
+/// Error thrown by [DBMemorySQLAdapter] operations.
+class DBMemorySQLAdapterException extends DBSQLAdapterException {
+  DBMemorySQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

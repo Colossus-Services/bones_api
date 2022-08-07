@@ -10,10 +10,10 @@ import 'bones_api_test_entities.dart';
 
 final _log = logging.Logger('bones_api_test_adapter');
 
-typedef SQLAdapterCreator = SQLAdapter Function(
+typedef SQLAdapterCreator = DBSQLAdapter Function(
     EntityRepositoryProvider? parentRepositoryProvider, int dbPort);
 
-class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
+class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final SQLAdapterCreator sqlAdapterCreator;
   final int dbPort;
 
@@ -22,7 +22,7 @@ class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
   final EntityHandler<Role> roleEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
-  late final SQLAdapter sqlAdapter;
+  late final DBSQLAdapter sqlAdapter;
 
   late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
@@ -36,28 +36,28 @@ class TestEntityRepositoryProvider extends SQLEntityRepositoryProvider {
       this.userEntityHandler,
       this.sqlAdapterCreator,
       this.dbPort) {
-    sqlAdapter = adapter as SQLAdapter;
+    sqlAdapter = adapter as DBSQLAdapter;
     buildRepositories(sqlAdapter);
   }
 
   @override
   Map<String, dynamic> get adapterConfig => {};
 
-  List<SQLEntityRepository<Object>>? _repositories;
+  List<DBSQLEntityRepository<Object>>? _repositories;
 
   @override
-  List<SQLEntityRepository<Object>> buildRepositories(
-      SQLAdapter<Object> adapter) {
+  List<DBSQLEntityRepository<Object>> buildRepositories(
+      DBSQLAdapter<Object> adapter) {
     return _repositories ??= [
-      SQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
-      SQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
-      SQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
-      SQLEntityRepository<User>(adapter, 'user', userEntityHandler)
+      DBSQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
+      DBSQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
+      DBSQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
+      DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler)
     ].asUnmodifiableView;
   }
 
   @override
-  FutureOr<SQLAdapter<Object>> buildAdapter() =>
+  FutureOr<DBSQLAdapter<Object>> buildAdapter() =>
       sqlAdapterCreator(this, dbPort);
 
   @override

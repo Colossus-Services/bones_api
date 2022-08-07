@@ -1,21 +1,21 @@
 import 'package:async_extension/async_extension.dart';
 
 import 'bones_api_entity.dart';
-import 'bones_api_entity_adapter.dart';
-import 'bones_api_entity_adapter_db_relational.dart';
-import 'bones_api_entity_adapter_sql.dart';
+import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_relational.dart';
+import 'bones_api_entity_db_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
 
-class SQLEntityRepository<O extends Object>
+class DBSQLEntityRepository<O extends Object>
     extends DBRelationalEntityRepository<O> {
   @override
-  SQLRepositoryAdapter<O> get repositoryAdapter =>
-      super.repositoryAdapter as SQLRepositoryAdapter<O>;
+  DBSQLRepositoryAdapter<O> get repositoryAdapter =>
+      super.repositoryAdapter as DBSQLRepositoryAdapter<O>;
 
-  SQLEntityRepository(
-      SQLAdapter adapter, String name, EntityHandler<O> entityHandler,
-      {SQLRepositoryAdapter<O>? repositoryAdapter, Type? type})
+  DBSQLEntityRepository(
+      DBSQLAdapter adapter, String name, EntityHandler<O> entityHandler,
+      {DBSQLRepositoryAdapter<O>? repositoryAdapter, Type? type})
       : super(adapter, name, entityHandler,
             repositoryAdapter: repositoryAdapter, type: type);
 
@@ -62,18 +62,18 @@ class SQLEntityRepository<O extends Object>
   }
 }
 
-/// Base class for [EntityRepositoryProvider] with [SQLAdapter]s.
-abstract class SQLEntityRepositoryProvider<A extends SQLAdapter>
+/// Base class for [EntityRepositoryProvider] with [DBSQLAdapter]s.
+abstract class DBSQLEntityRepositoryProvider<A extends DBSQLAdapter>
     extends DBEntityRepositoryProvider<A> {
   @override
-  FutureOr<A> buildAdapter() => SQLAdapter.fromConfig(
+  FutureOr<A> buildAdapter() => DBSQLAdapter.fromConfig(
         adapterConfig,
         parentRepositoryProvider: this,
         workingPath: workingPath,
       );
 
   @override
-  List<SQLEntityRepository> buildRepositories(SQLAdapter adapter);
+  List<DBSQLEntityRepository> buildRepositories(DBSQLAdapter adapter);
 
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
       adapter.resolveMapped((adapter) => adapter.generateCreateTableSQLs());

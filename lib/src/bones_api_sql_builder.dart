@@ -6,9 +6,9 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_base.dart';
-import 'bones_api_entity_adapter.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_db.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
