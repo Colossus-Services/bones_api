@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.4
+// BUILDER: reflection_factory/1.2.5
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -31,10 +31,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.15.0');
+  Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.4');
+  Version get reflectionFactoryVersion => Version.parse('1.2.5');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>

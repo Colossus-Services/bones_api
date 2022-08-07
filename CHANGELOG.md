@@ -3,6 +3,8 @@
 - Fix resolution of `EntityRepository` when the same instance is returned by multiple providers.
 - Fix `selectByID` with null parameters and null ID.
 - Fix resolution of route parameters with a type of `List` of entities. 
+- sdk: '>=2.17.0 <3.0.0'
+- reflection_factory: ^1.2.5
 
 ## 1.2.25
 
