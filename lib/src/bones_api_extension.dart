@@ -23,10 +23,13 @@ extension ReflectionFactoryExtension on ReflectionFactory {
   FutureOr<O?> createFromMap<O>(Map<String, dynamic> map,
       {Type? classType,
       EntityProvider? entityProvider,
-      EntityCache? entityCache}) {
+      EntityCache? entityCache,
+      EntityResolutionRules? resolutionRules}) {
     var entityHandler = getRegisterEntityHandler<O>(classType);
     return entityHandler?.createFromMap(map,
-        entityProvider: entityProvider, entityCache: entityCache);
+        entityProvider: entityProvider,
+        entityCache: entityCache,
+        resolutionRules: resolutionRules);
   }
 }
 
@@ -85,9 +88,13 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
 
   /// Creates an instance [O] from [map].
   FutureOr<O> createFromMap(Map<String, dynamic> map,
-      {EntityProvider? entityProvider, EntityCache? entityCache}) {
+      {EntityProvider? entityProvider,
+      EntityCache? entityCache,
+      EntityResolutionRules? resolutionRules}) {
     return entityHandler.createFromMap(map,
-        entityProvider: entityProvider, entityCache: entityCache);
+        entityProvider: entityProvider,
+        entityCache: entityCache,
+        resolutionRules: resolutionRules);
   }
 
   /// Lists the API methods of this reflected class.

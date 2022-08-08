@@ -492,7 +492,8 @@ class APIRouteBuilder<M extends APIModule> {
   static final TypeInfo _typeInfoTime = TypeInfo.fromType(Time);
 
   Object? _resolveRequestParameter(APIRequest request,
-      ParameterReflection parameter, bool payloadIsParametersMap) {
+      ParameterReflection parameter, bool payloadIsParametersMap,
+      {EntityResolutionRules? resolutionRules}) {
     var parameterTypeInfo = parameter.type.typeInfo;
 
     if (parameterTypeInfo.isOf(APIRequest)) {
@@ -519,12 +520,14 @@ class APIRouteBuilder<M extends APIModule> {
           return payload;
         } else if (payload is Map &&
             EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
-          return _resolveValueAsEntity(parameterTypeInfo, payload);
+          return _resolveValueAsEntity(parameterTypeInfo, payload,
+              resolutionRules: resolutionRules);
         } else if (payload is List &&
             parameterTypeInfo.isListEntity &&
             EntityHandler.isValidEntityType(
                 parameterTypeInfo.listEntityType!.type)) {
-          return _resolveValueAsEntity(parameterTypeInfo, payload);
+          return _resolveValueAsEntity(parameterTypeInfo, payload,
+              resolutionRules: resolutionRules);
         }
       }
     }
@@ -534,7 +537,8 @@ class APIRouteBuilder<M extends APIModule> {
     return _resolveValueType(parameterTypeInfo, value);
   }
 
-  Object? _resolveValueType(TypeInfo typeInfo, Object? value) {
+  Object? _resolveValueType(TypeInfo typeInfo, Object? value,
+      {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
     if (value == null) {
       return null;
     } else if (typeInfo.type == value.runtimeType && !typeInfo.hasArguments) {
@@ -558,7 +562,8 @@ class APIRouteBuilder<M extends APIModule> {
       return bytes;
     } else {
       if (!typeInfo.isPrimitiveType) {
-        var o = _resolveValueAsEntity(typeInfo, value);
+        var o = _resolveValueAsEntity(typeInfo, value,
+            entityCache: entityCache, resolutionRules: resolutionRules);
         if (o != null) return o;
       }
 
@@ -585,7 +590,7 @@ class APIRouteBuilder<M extends APIModule> {
   }
 
   Object? _resolveValueAsEntity(TypeInfo parameterTypeInfo, Object? value,
-      [EntityCache? entityCache]) {
+      {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
     if (value == null) return null;
 
     entityCache ??= JsonEntityCacheSimple();
@@ -602,14 +607,15 @@ class APIRouteBuilder<M extends APIModule> {
 
       if (value is Iterable) {
         var list = value
-            .map((e) => _resolveValueAsEntity(listEntityType, e, entityCache))
+            .map((e) => _resolveValueAsEntity(listEntityType, e,
+                entityCache: entityCache, resolutionRules: resolutionRules))
             .toList();
 
         return _castList(list, listEntityType);
       } else {
         var list = TypeParser.parseList(value,
-            elementParser: (e) =>
-                _resolveValueAsEntity(listEntityType, e, entityCache));
+            elementParser: (e) => _resolveValueAsEntity(listEntityType, e,
+                entityCache: entityCache, resolutionRules: resolutionRules));
 
         if (list != null) {
           return _castList(list, listEntityType);
@@ -625,7 +631,8 @@ class APIRouteBuilder<M extends APIModule> {
               ? value
               : value.map((k, v) => MapEntry(k.toString(), v));
 
-          var o = classReflection.createFromMap(map, entityCache: entityCache);
+          var o = classReflection.createFromMap(map,
+              entityCache: entityCache, resolutionRules: resolutionRules);
           if (o != null) {
             return o;
           }

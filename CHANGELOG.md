@@ -1,3 +1,9 @@
+## 1.3.3
+
+- Added `EntityResolutionRules`.
+- `populateFromSource`:
+  - Allow source samples with `url(path/to/file.txt)`, that will be read from a local file. 
+
 ## 1.3.2
 
 - Clean code.

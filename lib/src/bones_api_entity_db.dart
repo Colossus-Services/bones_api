@@ -294,7 +294,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       ]);
     }
 
-    return populateFromSource(populateSource, workingPath: _workingPath)
+    return populateFromSource(populateSource,
+            workingPath: _workingPath,
+            resolutionRules: EntityResolutionRules(allowReadFile: true))
         .resolveMapped((val) {
       var result = InitializationResult.ok(this, dependencies: [
         if (parentRepositoryProvider != null) parentRepositoryProvider!,
@@ -1000,7 +1002,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       select(ConditionANY(), limit: limit);
 
   FutureOr<List<O>> resolveEntities(
-      Transaction transaction, Iterable<Map<String, dynamic>?>? results) {
+      Transaction transaction, Iterable<Map<String, dynamic>?>? results,
+      {EntityResolutionRules? resolutionRules}) {
     if (results == null) return <O>[];
 
     if (results is List && results.isEmpty) return <O>[];
@@ -1035,16 +1038,18 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           );
 
           return resolveRelationshipsFields.resolveAllWith(() =>
-              _resolveEntitiesSubEntities(transaction, entries, fieldsEntity));
+              _resolveEntitiesSubEntities(
+                  transaction, resolutionRules, entries, fieldsEntity));
         } else {
           return _resolveEntitiesSubEntities(
-              transaction, entries, fieldsEntity);
+              transaction, resolutionRules, entries, fieldsEntity);
         }
       });
 
       return _resolveEntitiesFutures(transaction, ret);
     } else {
-      var ret = _resolveEntitiesSubEntities(transaction, entries, fieldsEntity);
+      var ret = _resolveEntitiesSubEntities(
+          transaction, resolutionRules, entries, fieldsEntity);
       return _resolveEntitiesFutures(transaction, ret);
     }
   }
@@ -1064,29 +1069,33 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   List<FutureOr<O>> _resolveEntitiesSimple(
-      Transaction transaction, Iterable<Map<String, dynamic>> results) {
+      Transaction transaction,
+      EntityResolutionRules? resolutionRules,
+      Iterable<Map<String, dynamic>> results) {
     return results.map((e) {
       return entityHandler.createFromMap(e,
           entityProvider: transaction,
           entityCache: transaction,
           entityRepositoryProvider: provider,
-          entityHandlerProvider: entityHandler.provider);
+          entityHandlerProvider: entityHandler.provider,
+          resolutionRules: resolutionRules);
     }).toList();
   }
 
   FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
       Transaction transaction,
+      EntityResolutionRules? resolutionRules,
       Iterable<Map<String, dynamic>> results,
       Map<String, TypeInfo> fieldsEntity) {
     if (fieldsEntity.isEmpty) {
-      return _resolveEntitiesSimple(transaction, results);
+      return _resolveEntitiesSimple(transaction, resolutionRules, results);
     }
 
     var resultsList =
         results is List<Map<String, dynamic>> ? results : results.toList();
 
     if (resultsList.length == 1) {
-      return _resolveEntitiesSimple(transaction, resultsList);
+      return _resolveEntitiesSimple(transaction, resolutionRules, resultsList);
     }
 
     var fieldsEntityRepositories = fieldsEntity.entries
@@ -1130,11 +1139,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           }
         }
 
-        return _resolveEntitiesSimple(transaction, resultsList);
+        return _resolveEntitiesSimple(
+            transaction, resolutionRules, resultsList);
       });
     }
 
-    return _resolveEntitiesSimple(transaction, results);
+    return _resolveEntitiesSimple(transaction, resolutionRules, results);
   }
 
   Iterable<FutureOr<bool>> _resolveRelationshipFields(
