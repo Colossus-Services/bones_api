@@ -13,7 +13,7 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 
-final _log = logging.Logger('MemoryObjectAdapter');
+final _log = logging.Logger('DBMemoryObjectAdapter');
 
 class DBMemoryObjectAdapterContext
     implements Comparable<DBMemoryObjectAdapterContext> {
@@ -490,7 +490,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'MemoryObjectAdapter{id: $instanceID$tablesStr$closedStr}';
+    return 'DBMemoryObjectAdapter#$instanceID{$tablesStr$closedStr}';
   }
 
   @override

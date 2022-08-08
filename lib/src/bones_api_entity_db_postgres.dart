@@ -16,7 +16,7 @@ import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('PostgreAdapter');
+final _log = logging.Logger('DBPostgreSQLAdapter');
 
 /// A PostgreSQL adapter.
 class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
@@ -869,7 +869,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
   @override
   String toString() {
     var closedStr = isClosed ? ', closed' : '';
-    return 'PostgreSQLAdapter{$databaseName@$host:$port$closedStr}';
+    return 'DBPostgreSQLAdapter#$instanceID{$databaseName@$host:$port$closedStr}';
   }
 }
 

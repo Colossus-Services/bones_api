@@ -1,3 +1,10 @@
+## 1.3.1
+
+- `DBMemorySQLAdapter`, `DBMemoryObjectAdapter`, `DBPostgreSQLAdapter` `DBMySQLAdapter`:
+  - Improve `toString`: show `instanceID`.
+- `SQLGenerator`:
+  - Fix CONSTRAINT to an entity type from another DBAdapter. 
+
 ## 1.3.0
 
 - Clean code:

@@ -15,7 +15,7 @@ import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('MySQLAdapter');
+final _log = logging.Logger('DBMySQLAdapter');
 
 /// A MySQL adapter.
 class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
@@ -189,7 +189,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
 
   Zone get _errorZone {
     return _errorZoneInstance ??=
-        createErrorZone(uncaughtErrorTitle: 'MySQLAdapter ERROR:');
+        createErrorZone(uncaughtErrorTitle: 'DBMySQLAdapter ERROR:');
   }
 
   int _connectionCount = 0;
@@ -762,7 +762,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   @override
   String toString() {
     var closedStr = isClosed ? ', closed' : '';
-    return 'MySQLAdapter{$databaseName@$host:$port$closedStr}';
+    return 'DBMySQLAdapter#$instanceID{$databaseName@$host:$port$closedStr}';
   }
 }
 

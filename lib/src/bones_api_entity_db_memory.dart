@@ -16,7 +16,7 @@ import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_utils_collections.dart';
 
-final _log = logging.Logger('MemorySQLAdapter');
+final _log = logging.Logger('DBMemorySQLAdapter');
 
 class DBMemorySQLAdapterContext
     implements Comparable<DBMemorySQLAdapterContext> {
@@ -1057,7 +1057,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'MemorySQLAdapter{id: $instanceID$tablesStr$closedStr}';
+    return 'DBMemorySQLAdapter#$instanceID{id: $instanceID$tablesStr$closedStr}';
   }
 }
 

@@ -855,31 +855,52 @@ abstract class SQLGenerator {
     }
   }
 
-  /// Returns: table -> idName: sqlType
+  /// Returns `true` if [columnType] is a sibling of the [tableRepository].
+  bool isSiblingEntityType(EntityRepository tableRepository, Type columnType,
+      {EntityRepository? columnRepository}) {
+    columnRepository ??= getEntityRepositoryByType(columnType);
+    if (columnRepository == null) return false;
+
+    if (tableRepository is DBEntityRepository) {
+      var tableAdapter = tableRepository.repositoryAdapter.databaseAdapter;
+
+      if (columnRepository is DBEntityRepository) {
+        var columnAdapter = columnRepository.repositoryAdapter.databaseAdapter;
+        if (columnAdapter != tableAdapter) {
+          return false;
+        }
+      }
+    } else if (tableRepository.provider != columnRepository.provider) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Returns info for the column: table -> idName: sqlType
   FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
       Type type, String? column,
       {List<EntityField>? entityFieldAnnotations}) {
     var typeEntityRepository = getEntityRepositoryByType(type);
+    if (typeEntityRepository == null) return null;
 
-    if (typeEntityRepository != null) {
-      var entityHandler = typeEntityRepository.entityHandler;
+    var entityHandler = typeEntityRepository.entityHandler;
 
-      var idName = entityHandler.idFieldName();
-      var idType = entityHandler.idType();
-      var idEntityAnnotations = entityHandler
-          .getFieldEntityAnnotations(null, idName)
-          ?.whereType<EntityField>()
-          .toList();
+    var idName = entityHandler.idFieldName();
+    var idType = entityHandler.idType();
+    var idEntityAnnotations = entityHandler
+        .getFieldEntityAnnotations(null, idName)
+        ?.whereType<EntityField>()
+        .toList();
 
-      var sqlType = foreignKeyTypeToSQLType(idType, idName,
-          entityFieldAnnotations: idEntityAnnotations);
+    var sqlType = foreignKeyTypeToSQLType(idType, idName,
+        entityFieldAnnotations: idEntityAnnotations);
 
-      if (sqlType != null) {
-        return getTableForEntityRepository(typeEntityRepository)
-            .resolveMapped((table) {
-          return MapEntry(table, MapEntry(idName, sqlType));
-        });
-      }
+    if (sqlType != null) {
+      return getTableForEntityRepository(typeEntityRepository)
+          .resolveMapped((table) {
+        return MapEntry(table, MapEntry(idName, sqlType));
+      });
     }
 
     return null;
@@ -967,6 +988,10 @@ abstract class SQLGenerator {
     var referenceFields =
         <String, MapEntry<String, MapEntry<String, String>>>{};
 
+    if (table == 'item') {
+      print('!!!');
+    }
+
     for (var e in fieldsEntries) {
       var fieldName = e.key;
       var fieldType = e.value;
@@ -990,7 +1015,10 @@ abstract class SQLGenerator {
         var entityType = await entityTypeToSQLType(fieldType.type, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
         if (entityType != null) {
-          referenceFields[columnName] = entityType;
+          if (isSiblingEntityType(entityRepository, fieldType.type)) {
+            referenceFields[columnName] = entityType;
+          }
+
           fieldSQLType = entityType.value.value;
 
           refTable = entityType.key;
