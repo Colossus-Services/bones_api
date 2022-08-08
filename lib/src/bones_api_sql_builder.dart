@@ -988,10 +988,6 @@ abstract class SQLGenerator {
     var referenceFields =
         <String, MapEntry<String, MapEntry<String, String>>>{};
 
-    if (table == 'item') {
-      print('!!!');
-    }
-
     for (var e in fieldsEntries) {
       var fieldName = e.key;
       var fieldType = e.value;

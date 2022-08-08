@@ -1,3 +1,7 @@
+## 1.3.2
+
+- Clean code.
+
 ## 1.3.1
 
 - `DBMemorySQLAdapter`, `DBMemoryObjectAdapter`, `DBPostgreSQLAdapter` `DBMySQLAdapter`:
