@@ -1,3 +1,8 @@
+## 1.3.4
+
+- `APIRouteBuilder`: Accepts Data URL for `Uint8List` parameters.
+- `APIModuleHttpProxy.doRequest`: converts `Uint8List` to Data URL (through `Json.toJson`).
+
 ## 1.3.3
 
 - Added `EntityResolutionRules`.

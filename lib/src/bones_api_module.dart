@@ -9,7 +9,7 @@ import 'package:meta/meta_meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show Decimal, DynamicInt, DynamicNumber, ListExtension;
-import 'package:swiss_knife/swiss_knife.dart' show MimeType;
+import 'package:swiss_knife/swiss_knife.dart' show MimeType, DataURLBase64;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -577,12 +577,23 @@ class APIRouteBuilder<M extends APIModule> {
       var data = value.asUint8List;
       return data;
     } else if (value is String) {
+      var dataUrl = DataURLBase64.parse(value);
+      if (dataUrl != null) {
+        return dataUrl.payloadArrayBuffer;
+      }
+
       try {
         var data = base64.decode(value);
         return data;
       } catch (_) {
         // not a base64 data:
-        return null;
+      }
+
+      try {
+        var data = hex.decode(value);
+        return data;
+      } catch (_) {
+        // not a base64 data:
       }
     }
 
@@ -760,9 +771,10 @@ class APIModuleHttpProxy implements ClassProxyListener {
 
     parameters = parameters.map((key, value) {
       var val = value;
-      if (!value.isPrimitiveValue &&
-          !value.isPrimitiveList &&
-          !value.isPrimitiveMap) {
+      if ((!value.isPrimitiveValue &&
+              !value.isPrimitiveList &&
+              !value.isPrimitiveMap) ||
+          (value is Uint8List)) {
         val = Json.toJson(value);
         needsJsonRequest = true;
       }
