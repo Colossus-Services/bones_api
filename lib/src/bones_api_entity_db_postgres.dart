@@ -721,7 +721,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
       Transaction transaction, PostgreSQLExecutionContext connection,
       {bool allowAutoInsert = false}) {
-    if (sql.isDummy) return null;
+    if (sql.isFullyDummy) return id;
 
     return connection
         .mappedResultsQuery(sql.sql,

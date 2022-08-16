@@ -462,7 +462,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
       Transaction transaction, DBMemorySQLAdapterContext connection,
       {bool allowAutoInsert = false}) {
-    if (sql.isDummy) return null;
+    if (sql.isDummy) return id;
 
     var map = _getTableMap(table, true)!;
 

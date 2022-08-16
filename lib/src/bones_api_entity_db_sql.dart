@@ -11,6 +11,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_memory.dart';
 import 'bones_api_entity_db_relational.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_sql_builder.dart';
@@ -100,9 +101,15 @@ class SQL implements SQLWrapper {
   List<SQL>? posSQL;
   int? posSQLReturnIndex;
 
-  bool get hasPreSQL => preSQL != null && preSQL!.isNotEmpty;
+  bool get hasPreSQL {
+    var preSQL = this.preSQL;
+    return preSQL != null && preSQL.isNotEmpty;
+  }
 
-  bool get hasPosSQL => posSQL != null && posSQL!.isNotEmpty;
+  bool get hasPosSQL {
+    var posSQL = this.posSQL;
+    return posSQL != null && posSQL.isNotEmpty;
+  }
 
   bool get hasPreOrPosSQL => hasPreSQL || hasPosSQL;
 
@@ -127,6 +134,8 @@ class SQL implements SQLWrapper {
         placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
 
   bool get isDummy => this == dummy;
+
+  bool get isFullyDummy => isDummy && !hasPreOrPosSQL;
 
   String get sqlPositional {
     if (_sqlPositional == null) _computeSQLPositional();
@@ -565,63 +574,66 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   FutureOr<String> fieldValueToSQL(
-      EncodingContext context,
-      TableScheme tableScheme,
-      String fieldName,
-      Object? value,
-      Map<String, Object?> fieldsValues) {
-    var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
+          EncodingContext context,
+          TableScheme tableScheme,
+          String fieldName,
+          Object? value,
+          Map<String, Object?> fieldsValues) =>
+      _resolveFieldValueToSQL(context, tableScheme, fieldName, value)
+          .resolveMapped((refId) {
+        fieldsValues.putIfAbsent(fieldName, () => refId);
+        var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
+        return valueSQL;
+      });
 
-    if (fieldRef == null || value == null) {
-      fieldsValues.putIfAbsent(fieldName, () => valueToSQL(value));
-      var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
-      return valueSQL;
+  FutureOr<Object?> _resolveFieldValueToSQL(
+    EncodingContext context,
+    TableScheme tableScheme,
+    String fieldName,
+    Object? value,
+  ) {
+    if (value == null) {
+      return null;
+    }
+
+    var refEntityRepository = getEntityRepository(obj: value);
+
+    if (refEntityRepository == null) {
+      return _getValueEntityID(value) ?? valueToSQL(value);
     } else {
       var refEntity = value;
-      var refEntityRepository = getEntityRepository(obj: refEntity);
+      var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
 
-      if (refEntityRepository != null) {
-        var refId = refEntityRepository.entityHandler
-            .getField(refEntity, fieldRef.targetField);
+      var refEntityHandler = refEntityRepository.entityHandler;
 
-        if (refId != null) {
-          fieldsValues.putIfAbsent(fieldName, () => refId);
-          var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
-          return valueSQL;
-        } else {
-          var retRefId = refEntityRepository.store(refEntity,
-              transaction: context.transaction);
-          return retRefId.resolveMapped((refId) {
-            fieldsValues.putIfAbsent(fieldName, () => refId);
-            var valueSQL =
-                _conditionSQLGenerator.parameterPlaceholder(fieldName);
-            return valueSQL;
-          });
-        }
-      } else {
-        if (value is Entity) {
-          var refId = value.getID();
+      var refId = fieldRef != null
+          ? refEntityHandler.getField(refEntity, fieldRef.targetField)
+          : refEntityHandler.getID(value);
 
-          fieldsValues.putIfAbsent(fieldName, () => refId);
-          var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
-          return valueSQL;
-        } else {
-          var reflection =
-              ReflectionFactory().getRegisterClassReflection(value.runtimeType);
-          if (reflection != null) {
-            var fieldId = tableScheme.idFieldName ?? 'id';
+      if (refId != null) return refId;
 
-            var refId = reflection.getField(fieldId, value);
+      var retRefId = refEntityRepository.store(refEntity,
+          transaction: context.transaction);
+      return retRefId;
+    }
+  }
 
-            fieldsValues.putIfAbsent(fieldName, () => refId);
-            var valueSQL =
-                _conditionSQLGenerator.parameterPlaceholder(fieldName);
-            return valueSQL;
-          }
-        }
+  Object? _getValueEntityID(Object entity) {
+    if (entity is Entity) {
+      var refId = entity.getID();
+      return refId;
+    } else {
+      var valueType = entity.runtimeType;
 
-        return 'null';
-      }
+      var reflectionFactory = ReflectionFactory();
+
+      var reflection = reflectionFactory.getRegisterClassReflection(valueType);
+
+      var refEntityHandler = reflection?.entityHandler ??
+          reflectionFactory.getRegisterEntityHandler(valueType);
+
+      var refId = refEntityHandler?.getID(entity);
+      return refId;
     }
   }
 
@@ -878,7 +890,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   FutureOr<dynamic> updateSQL(TransactionOperation op, String entityName,
       String table, SQL sql, Object id, Map<String, Object?> fields,
       {bool allowAutoInsert = false}) {
-    if (sql.isDummy) return null;
+    if (sql.isDummy) return id;
 
     return executeTransactionOperation(op, sql, (connection) {
       _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
@@ -1017,10 +1029,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     sql.write(conditionSQL);
     sql.write(' )');
 
-    var condition = GroupConditionAND([
-      KeyConditionEQ([ConditionKeyField(sourceIdField)], id),
-      KeyConditionNotIN([ConditionKeyField(targetIdField)], otherIds),
-    ]);
+    Condition condition;
+
+    if (otherIdsParameters.isNotEmpty) {
+      condition = GroupConditionAND([
+        KeyConditionEQ([ConditionKeyField(sourceIdField)], id),
+        KeyConditionNotIN([ConditionKeyField(targetIdField)], otherIds),
+      ]);
+    } else {
+      condition = KeyConditionEQ([ConditionKeyField(sourceIdField)], id);
+    }
 
     return SQL(sql.toString(), null, parameters, parameters,
         condition: condition,
@@ -1037,7 +1055,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       dynamic id,
       String otherTable,
       List otherIds) {
-    if (sqls.length == 1 && sqls.first.isDummy) {
+    if (sqls.length == 1 && sqls.first.isFullyDummy) {
       return true;
     }
 

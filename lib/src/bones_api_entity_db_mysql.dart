@@ -558,8 +558,13 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
         .resolveMapped(_resultsToEntitiesMaps);
   }
 
-  List<Map<String, dynamic>> _resultsToEntitiesMaps(Results results) =>
-      results.map((e) => e.fields).whereType<Map<String, dynamic>>().toList();
+  List<Map<String, dynamic>> _resultsToEntitiesMaps(Results? results) {
+    if (results == null) return <Map<String, dynamic>>[];
+    return results
+        .map((e) => e.fields)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
@@ -568,7 +573,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
       SQL sql,
       Transaction transaction,
       DBMySqlConnectionWrapper connection) {
-    if (sql.isDummy) return <Map<String, dynamic>>[];
+    if (sql.isFullyDummy) return <Map<String, dynamic>>[];
 
     var preSQLs = sql.preSQL;
 
@@ -589,8 +594,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteSQLImpl(
       String table, SQL sql, DBMySqlConnectionWrapper connection) {
-    FutureOr<Results> sqlRet =
-        connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
+    FutureOr<Results?> sqlRet = sql.isDummy
+        ? null
+        : connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
 
     var posSQLs = sql.posSQL;
 
@@ -621,7 +627,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
       Transaction transaction, DBMySqlConnectionWrapper connection,
       {bool allowAutoInsert = false}) {
-    if (sql.isDummy) return null;
+    if (sql.isDummy) return id;
 
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)

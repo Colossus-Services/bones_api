@@ -1,3 +1,11 @@
+## 1.3.5
+
+- `SQL`:
+  - Added `isFullyDummy`.
+- `DBSQLAdapter`:
+  - Improve `fieldValueToSQL` when the entity is from another adapter.
+  - `updateSQL` and `doUpdateSQL`: return the ID even when the `SQL.isDummy`.
+
 ## 1.3.4
 
 - `APIRouteBuilder`: Accepts Data URL for `Uint8List` parameters.

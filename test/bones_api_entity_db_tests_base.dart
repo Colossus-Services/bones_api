@@ -942,6 +942,15 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
             user3.roles.map(
                 (e) => entityByReflection ? e.toJsonFromFields() : e.toJson()),
             equals(rolesJson3));
+
+        user3.roles = [];
+
+        var ok4 = await userAPIRepository.store(user3);
+        expect(ok4, equals(user.id));
+
+        var user4 = await userAPIRepository.selectByID(user.id);
+        expect(user4!.email, equals(user.email));
+        expect(user4.roles, isEmpty);
       }
 
       {
@@ -1037,11 +1046,6 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
     });
 
     test('populate', () async {
-      if (testConfigDB.dbType.toLowerCase() == 'mysqlx') {
-        testLog.warning('SKIPPING POPULATE TEST FOR MYSQL: MySQL Driver issue');
-        return;
-      }
-
       var result = await entityRepositoryProvider.storeAllFromJson({
         'user': [
           {
