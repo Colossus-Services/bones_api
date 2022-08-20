@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:async_events/async_events.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
@@ -34,7 +35,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.5';
+  static const String VERSION = '1.3.6';
 
   static bool _boot = false;
 
@@ -42,6 +43,7 @@ class BonesAPI {
     if (_boot) return;
     _boot = true;
 
+    AsyncEvent.boot();
     Json.boot();
   }
 }

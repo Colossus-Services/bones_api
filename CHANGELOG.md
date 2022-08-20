@@ -1,3 +1,12 @@
+## 1.3.6
+
+- Added integration with `AsyncEvent`.
+- reflection_factory: ^1.2.6
+- async_events: ^1.0.3
+- postgres: ^2.4.6
+- shelf: ^1.3.2
+- yaml_writer: ^1.0.2
+
 ## 1.3.5
 
 - `SQL`:
