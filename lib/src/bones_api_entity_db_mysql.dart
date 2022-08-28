@@ -77,6 +77,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
         super(
+          'mysql',
           minConnections,
           maxConnections,
           const DBSQLAdapterCapability(

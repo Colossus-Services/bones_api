@@ -79,6 +79,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
         _passwordProvider = passwordProvider ??
             (password is PasswordProvider ? password : null),
         super(
+          'postgresql',
           minConnections,
           maxConnections,
           const DBSQLAdapterCapability(

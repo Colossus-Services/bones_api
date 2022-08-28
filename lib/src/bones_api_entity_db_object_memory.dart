@@ -71,6 +71,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
+          'object',
           1,
           3,
           const DBAdapterCapability(

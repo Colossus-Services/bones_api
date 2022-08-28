@@ -323,8 +323,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  DBSQLAdapter(
-      int minConnections, int maxConnections, DBSQLAdapterCapability capability,
+  DBSQLAdapter(String name, int minConnections, int maxConnections,
+      DBSQLAdapterCapability capability,
       {EntityRepositoryProvider? parentRepositoryProvider,
       bool generateTables = false,
       Object? populateTables,
@@ -332,7 +332,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       String? workingPath})
       : _generateTables = generateTables,
         _populateTables = populateTables,
-        super(minConnections, maxConnections, capability,
+        super(name, minConnections, maxConnections, capability,
             parentRepositoryProvider: parentRepositoryProvider,
             populateSource: populateSource,
             workingPath: workingPath) {

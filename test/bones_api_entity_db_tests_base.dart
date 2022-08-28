@@ -216,6 +216,27 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           allOf(contains(tableUserRegexp), contains(tableUserUniqueRegexp)));
     });
 
+    test('sqlAdapter', () async {
+      _log.info('APITestConfigDB: $testConfigDB');
+
+      expect(testConfigDB.isStarted, isTrue);
+
+      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      expect(sqlAdapter, isNotNull);
+
+      _log.info('SQLDialect: ${sqlAdapter.dialect}');
+
+      expect(sqlAdapter.capability.transactions, isTrue);
+      expect(sqlAdapter.capability.transactionAbort, isTrue);
+      expect(sqlAdapter.capability.fullTransaction, isTrue);
+
+      expect(
+          DBAdapter.registeredAdaptersNames.contains(sqlAdapter.name), isTrue);
+
+      expect(DBAdapter.registeredAdaptersTypes.contains(sqlAdapter.runtimeType),
+          isTrue);
+    });
+
     test('create table', () async {
       if (testConfigDB is! APITestConfigDBSQL) {
         _log.info("Not a `APITestConfigDBSQL`: skipping table creation SQLs.");

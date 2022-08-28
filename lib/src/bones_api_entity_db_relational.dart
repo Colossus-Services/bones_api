@@ -81,12 +81,12 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
           DBAdapter.getAdapterInstantiatorsFromConfigImpl<C, A>(
               config, registeredAdaptersNames, getAdapterInstantiator);
 
-  DBRelationalAdapter(
-      int minConnections, int maxConnections, DBAdapterCapability capability,
+  DBRelationalAdapter(String name, int minConnections, int maxConnections,
+      DBAdapterCapability capability,
       {EntityRepositoryProvider? parentRepositoryProvider,
       Object? populateSource,
       String? workingPath})
-      : super(minConnections, maxConnections, capability,
+      : super(name, minConnections, maxConnections, capability,
             parentRepositoryProvider: parentRepositoryProvider,
             populateSource: populateSource,
             workingPath: workingPath) {

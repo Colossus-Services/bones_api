@@ -159,6 +159,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
               .toList()
             ..sort((a, b) => a.value.length.compareTo(b.value.length));
 
+  /// The name of the adapter.
+  final String name;
+
   /// The minimum number of connections in the pool of this adapter.
   final int minConnections;
 
@@ -181,7 +184,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   final int instanceID = ++_instanceIDCount;
 
-  DBAdapter(this.minConnections, this.maxConnections, this.capability,
+  DBAdapter(
+      this.name, this.minConnections, this.maxConnections, this.capability,
       {this.parentRepositoryProvider,
       Object? populateSource,
       String? workingPath})
