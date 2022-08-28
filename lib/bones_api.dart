@@ -84,14 +84,17 @@
 /// {@canonicalFor bones_api_entity.ClassReflectionEntityHandler}
 /// {@canonicalFor bones_api_entity.EntityAccessor}
 /// {@canonicalFor bones_api_entity.EntityCache}
+/// {@canonicalFor bones_api_entity.EntityFetcher}
 /// {@canonicalFor bones_api_entity.EntityFieldAccessorGeneric}
 /// {@canonicalFor bones_api_entity.EntityFieldAccessor}
 /// {@canonicalFor bones_api_entity.EntityHandlerProvider}
 /// {@canonicalFor bones_api_entity.EntityHandler}
 /// {@canonicalFor bones_api_entity.EntityProvider}
+/// {@canonicalFor bones_api_entity.EntityReference}
 /// {@canonicalFor bones_api_entity.EntityRepositoryProviderExtension}
 /// {@canonicalFor bones_api_entity.EntityRepositoryProvider}
 /// {@canonicalFor bones_api_entity.EntityRepository}
+/// {@canonicalFor bones_api_entity.EntityResolutionRules}
 /// {@canonicalFor bones_api_entity.EntitySource}
 /// {@canonicalFor bones_api_entity.EntityStorage}
 /// {@canonicalFor bones_api_entity.Entity}
@@ -120,6 +123,7 @@
 /// {@canonicalFor bones_api_entity.TransactionOperationUpdate}
 /// {@canonicalFor bones_api_entity.TransactionOperation}
 /// {@canonicalFor bones_api_entity.Transaction}
+/// {@canonicalFor bones_api_entity.TypeInfoEntityExtension}
 /// {@canonicalFor bones_api_entity_annotation.EntityAnnotation}
 /// {@canonicalFor bones_api_entity_annotation.EntityFieldInvalid}
 /// {@canonicalFor bones_api_entity_annotation.EntityField}

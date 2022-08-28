@@ -2,7 +2,7 @@
 
 - Added `EntityReference`:
   An entity field wrapper that allows lazy load of sub-entities.
-- Expose `EntityResolutionRules` to allow lazy or eager selects.
+- Added `EntityResolutionRules` to allow lazy or eager selects.
 
 ## 1.3.6
 
