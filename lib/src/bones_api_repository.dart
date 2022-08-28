@@ -63,15 +63,24 @@ abstract class APIRepository<O extends Object> with Initializable {
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) =>
       entityRepository.existsID(id, transaction: transaction);
 
-  FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) =>
-      entityRepository.selectByID(id, transaction: transaction);
+  FutureOr<O?> selectByID(dynamic id,
+          {Transaction? transaction, EntityResolutionRules? resolutionRules}) =>
+      entityRepository.selectByID(id,
+          transaction: transaction, resolutionRules: resolutionRules);
 
   FutureOr<List<O?>> selectByIDs(List<dynamic> ids,
-          {Transaction? transaction}) =>
-      entityRepository.selectByIDs(ids, transaction: transaction);
+          {Transaction? transaction, EntityResolutionRules? resolutionRules}) =>
+      entityRepository.selectByIDs(ids,
+          transaction: transaction, resolutionRules: resolutionRules);
 
-  FutureOr<Iterable<O>> selectAll({int? limit, Transaction? transaction}) =>
-      entityRepository.selectAll(limit: limit, transaction: transaction);
+  FutureOr<Iterable<O>> selectAll(
+          {int? limit,
+          Transaction? transaction,
+          EntityResolutionRules? resolutionRules}) =>
+      entityRepository.selectAll(
+          limit: limit,
+          transaction: transaction,
+          resolutionRules: resolutionRules);
 
   FutureOr<int> length() => entityRepository.length();
 
@@ -79,13 +88,15 @@ abstract class APIRepository<O extends Object> with Initializable {
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters,
-          Transaction? transaction}) =>
+          Transaction? transaction,
+          EntityResolutionRules? resolutionRules}) =>
       entityRepository.selectFirstByQuery(
         query,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         transaction: transaction,
+        resolutionRules: resolutionRules,
       );
 
   FutureOr<Iterable<O>> selectByQuery(String query,
@@ -93,26 +104,30 @@ abstract class APIRepository<O extends Object> with Initializable {
           List? positionalParameters,
           Map<String, Object?>? namedParameters,
           int? limit,
-          Transaction? transaction}) =>
+          Transaction? transaction,
+          EntityResolutionRules? resolutionRules}) =>
       entityRepository.selectByQuery(query,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
           limit: limit,
-          transaction: transaction);
+          transaction: transaction,
+          resolutionRules: resolutionRules);
 
   FutureOr<Iterable<O>> select(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,
           Map<String, Object?>? namedParameters,
           int? limit,
-          Transaction? transaction}) =>
+          Transaction? transaction,
+          EntityResolutionRules? resolutionRules}) =>
       entityRepository.select(matcher,
           parameters: parameters,
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
           limit: limit,
-          transaction: transaction);
+          transaction: transaction,
+          resolutionRules: resolutionRules);
 
   FutureOr<Iterable<O>> deleteByQuery(String query,
           {Object? parameters,

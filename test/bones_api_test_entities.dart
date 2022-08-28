@@ -3,17 +3,21 @@ import 'package:statistics/statistics.dart';
 
 part 'bones_api_test_entities.reflection.g.dart';
 
-final storeEntityHandler =
-    GenericEntityHandler<Store>(instantiatorFromMap: (m) => Store.fromMap(m));
+final storeEntityHandler = GenericEntityHandler<Store>(
+    instantiatorDefault: Store.empty, instantiatorFromMap: Store.fromMap);
 
 final addressEntityHandler = GenericEntityHandler<Address>(
+    instantiatorDefault: Address.empty,
     instantiatorFromMap: (m) => Address.fromMap(m));
 
 final roleEntityHandler =
-    GenericEntityHandler<Role>(instantiatorFromMap: (m) => Role.fromMap(m));
+    GenericEntityHandler<Role>(instantiatorFromMap: Role.fromMap);
 
-final userEntityHandler =
-    GenericEntityHandler<User>(instantiatorFromMap: (m) => User.fromMap(m));
+final userInfoEntityHandler = GenericEntityHandler<UserInfo>(
+    instantiatorDefault: UserInfo.empty, instantiatorFromMap: UserInfo.fromMap);
+
+final userEntityHandler = GenericEntityHandler<User>(
+    instantiatorDefault: User.empty, instantiatorFromMap: User.fromMap);
 
 class StoreAPIRepository extends APIRepository<Store> {
   StoreAPIRepository(EntityRepositoryProvider provider)
@@ -31,6 +35,11 @@ class AddressAPIRepository extends APIRepository<Address> {
 
 class RoleAPIRepository extends APIRepository<Role> {
   RoleAPIRepository(EntityRepositoryProvider provider)
+      : super(provider: provider);
+}
+
+class UserInfoAPIRepository extends APIRepository<UserInfo> {
+  UserInfoAPIRepository(EntityRepositoryProvider provider)
       : super(provider: provider);
 }
 
@@ -96,11 +105,19 @@ class User extends Entity {
 
   Time? wakeUpTime;
 
+  EntityReference<UserInfo> userInfo;
+
   DateTime creationTime;
 
   User(this.email, this.password, this.address, this.roles,
-      {this.id, this.level, this.wakeUpTime, DateTime? creationTime})
-      : creationTime = creationTime ?? DateTime.now();
+      {this.id,
+      this.level,
+      this.wakeUpTime,
+      Object? userInfo,
+      DateTime? creationTime})
+      : userInfo = EntityReference<UserInfo>.from(userInfo,
+            entityHandler: userInfoEntityHandler),
+        creationTime = creationTime ?? DateTime.now();
 
   User.empty() : this('', '', Address.empty(), <Role>[]);
 
@@ -112,6 +129,7 @@ class User extends Entity {
       id: map['id'],
       level: map['level'],
       wakeUpTime: map['wakeUpTime'],
+      userInfo: map['userInfo'],
       creationTime: map['creationTime']);
 
   @override
@@ -135,6 +153,7 @@ class User extends Entity {
         'roles',
         'level',
         'wakeUpTime',
+        'userInfo',
         'creationTime'
       ];
 
@@ -155,6 +174,8 @@ class User extends Entity {
         return level as V?;
       case 'wakeUpTime':
         return wakeUpTime as V?;
+      case 'userInfo':
+        return userInfo as V?;
       case 'creationTime':
         return creationTime as V?;
       default:
@@ -179,6 +200,8 @@ class User extends Entity {
         return TypeInfo.tInt;
       case 'wakeUpTime':
         return TypeInfo(Time);
+      case 'userInfo':
+        return TypeInfo.fromType(EntityReference, [UserInfo]);
       case 'creationTime':
         return TypeInfo(DateTime);
       default:
@@ -238,6 +261,11 @@ class User extends Entity {
           wakeUpTime = value as Time?;
           break;
         }
+      case 'userInfo':
+        {
+          userInfo = EntityReference<UserInfo>.from(value);
+          break;
+        }
       case 'creationTime':
         {
           creationTime = value as DateTime;
@@ -257,7 +285,99 @@ class User extends Entity {
         'roles': roles.map((e) => e.toJson()).toList(),
         'level': level,
         'wakeUpTime': wakeUpTime,
+        'userInfo': userInfo.toJson(),
         'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
+      };
+}
+
+@EnableReflection()
+class UserInfo extends Entity {
+  int? id;
+
+  @EntityField.maximum(1000)
+  String info;
+
+  UserInfo(this.info, {this.id});
+
+  UserInfo.empty() : this('');
+
+  static FutureOr<UserInfo> fromMap(Map<String, dynamic> map) =>
+      UserInfo(map.getAsString('info')!, id: map['id']);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserInfo && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String get idFieldName => 'id';
+
+  @JsonField.hidden()
+  @override
+  List<String> get fieldsNames => const <String>['id', 'info'];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'info':
+        return info as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tInt;
+      case 'info':
+        return TypeInfo.tString;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
+    switch (key) {
+      case 'info':
+        return [
+          EntityField.maximum(1000),
+        ];
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        {
+          id = value as int?;
+          break;
+        }
+      case 'info':
+        {
+          info = value as String;
+          break;
+        }
+
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        'info': info,
       };
 }
 

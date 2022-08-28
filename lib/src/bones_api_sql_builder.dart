@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -745,27 +743,30 @@ abstract class SQLGenerator {
 
   EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type);
 
+  EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
+      TypeInfo typeInfo);
+
   FutureOr<String> getTableForEntityRepository(
       EntityRepository entityRepository);
 
-  String? typeToSQLType(Type type, String column,
+  String? typeToSQLType(TypeInfo type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
-    if (type == String) {
+    if (type.isString) {
       var maximum = entityFieldAnnotations?.maximum.firstOrNull;
       return maximum != null && maximum > 0 ? 'VARCHAR($maximum)' : 'VARCHAR';
-    } else if (type == bool) {
+    } else if (type.isBool) {
       return 'BOOLEAN';
-    } else if (type == DateTime) {
+    } else if (type.isDateTime) {
       return 'TIMESTAMP';
-    } else if (type == Time) {
+    } else if (type.type == Time) {
       return 'TIME';
-    } else if (type == double || type == Decimal) {
+    } else if (type.isDouble || type.type == Decimal) {
       return 'DECIMAL';
-    } else if (type == int) {
+    } else if (type.isInt) {
       return 'INT';
-    } else if (type == BigInt || type == DynamicInt) {
+    } else if (type.isBigInt || type.type == DynamicInt) {
       return 'BIGINT';
-    } else if (type == Uint8List) {
+    } else if (type.isUInt8List) {
       return 'BLOB';
     }
 
@@ -879,9 +880,9 @@ abstract class SQLGenerator {
 
   /// Returns info for the column: table -> idName: sqlType
   FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
-      Type type, String? column,
+      TypeInfo type, String? column,
       {List<EntityField>? entityFieldAnnotations}) {
-    var typeEntityRepository = getEntityRepositoryByType(type);
+    var typeEntityRepository = getEntityRepositoryByTypeInfo(type);
     if (typeEntityRepository == null) return null;
 
     var entityHandler = typeEntityRepository.entityHandler;
@@ -893,7 +894,7 @@ abstract class SQLGenerator {
         ?.whereType<EntityField>()
         .toList();
 
-    var sqlType = foreignKeyTypeToSQLType(idType, idName,
+    var sqlType = foreignKeyTypeToSQLType(TypeInfo.fromType(idType), idName,
         entityFieldAnnotations: idEntityAnnotations);
 
     if (sqlType != null) {
@@ -906,10 +907,10 @@ abstract class SQLGenerator {
     return null;
   }
 
-  String? foreignKeyTypeToSQLType(Type idType, String idName,
+  String? foreignKeyTypeToSQLType(TypeInfo idType, String idName,
       {List<EntityField>? entityFieldAnnotations}) {
-    if (idType == int) {
-      idType = BigInt;
+    if (idType.isInt) {
+      idType = TypeInfo.tBigInt;
     }
 
     var sqlType = typeToSQLType(idType, idName,
@@ -1004,11 +1005,11 @@ abstract class SQLGenerator {
       String? refTable;
       String? refColumn;
 
-      var fieldSQLType = typeToSQLType(fieldType.type, columnName,
+      var fieldSQLType = typeToSQLType(fieldType, columnName,
           entityFieldAnnotations: entityFieldAnnotations);
 
       if (fieldSQLType == null) {
-        var entityType = await entityTypeToSQLType(fieldType.type, columnName,
+        var entityType = await entityTypeToSQLType(fieldType, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
         if (entityType != null) {
           if (isSiblingEntityType(entityRepository, fieldType.type)) {
@@ -1121,10 +1122,11 @@ abstract class SQLGenerator {
       var columnName = normalizeColumnName(fieldName);
 
       var srcFieldName = normalizeColumnName(table);
-      var relSrcType = foreignKeyTypeToSQLType(idType, srcFieldName,
+      var relSrcType = foreignKeyTypeToSQLType(
+          TypeInfo.fromType(idType), srcFieldName,
           entityFieldAnnotations: entityFieldAnnotations);
 
-      var relDstType = await entityTypeToSQLType(fieldType.type, null);
+      var relDstType = await entityTypeToSQLType(fieldType, null);
       if (relDstType == null) continue;
 
       var relDstTable = relDstType.key;

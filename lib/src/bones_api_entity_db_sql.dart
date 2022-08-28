@@ -596,19 +596,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       return null;
     }
 
-    var refEntityRepository = getEntityRepository(obj: value);
+    if (value is EntityReference) {
+      if (value.isNull) {
+        return null;
+      } else if (value.isIdSet) {
+        var refId = value.id!;
+        return refId;
+      } else if (value.isEntitySet) {
+        value = value.entity!;
+      }
+    }
+
+    final refEntity = value!;
+
+    var refEntityRepository = getEntityRepository(obj: refEntity);
 
     if (refEntityRepository == null) {
-      return _getValueEntityID(value) ?? valueToSQL(value);
+      return _getValueEntityID(refEntity) ?? valueToSQL(refEntity);
     } else {
-      var refEntity = value;
       var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
 
       var refEntityHandler = refEntityRepository.entityHandler;
 
       var refId = fieldRef != null
           ? refEntityHandler.getField(refEntity, fieldRef.targetField)
-          : refEntityHandler.getID(value);
+          : refEntityHandler.getID(refEntity);
 
       if (refId != null) return refId;
 

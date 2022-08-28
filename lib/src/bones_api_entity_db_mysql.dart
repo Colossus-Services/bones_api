@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mysql1/mysql1.dart';
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' show Decimal;
 
 import 'bones_api_condition_encoder.dart';
@@ -498,7 +499,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   }
 
   @override
-  String? typeToSQLType(Type type, String column,
+  String? typeToSQLType(TypeInfo type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
     var sqlType = super.typeToSQLType(type, column,
         entityFieldAnnotations: entityFieldAnnotations);
@@ -514,7 +515,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   }
 
   @override
-  String? foreignKeyTypeToSQLType(Type idType, String idName,
+  String? foreignKeyTypeToSQLType(TypeInfo idType, String idName,
       {List<EntityField>? entityFieldAnnotations}) {
     var sqlType = super.foreignKeyTypeToSQLType(idType, idName,
         entityFieldAnnotations: entityFieldAnnotations);

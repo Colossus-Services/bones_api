@@ -35,7 +35,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.6';
+  static const String VERSION = '1.3.7';
 
   static bool _boot = false;
 
@@ -368,7 +368,8 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Calls the API.
-  FutureOr<APIResponse<T>> call<T>(APIRequest request) {
+  FutureOr<APIResponse<T>> call<T>(APIRequest request,
+      {bool externalCall = false}) {
     if (request.method == APIRequestMethod.OPTIONS) {
       throw ArgumentError("Can't perform a call with an `OPTIONS` method. "
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
@@ -377,13 +378,17 @@ abstract class APIRoot with Initializable, Closable {
     var ret = _ensureModulesLoaded();
 
     if (ret is Future<InitializationResult>) {
-      return ret.then((_) => _preCall(request));
+      return ret.then((_) => _preCall(request, externalCall));
     } else {
-      return _preCall(request);
+      return _preCall(request, externalCall);
     }
   }
 
-  FutureOr<APIResponse<T>> _preCall<T>(APIRequest request) {
+  FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
+    if (!externalCall) {
+      request.credential = request.credential?.copy(withUsernameEntity: false);
+    }
+
     var preResponse = callHandlers<T>(
         preApiRequestHandlers, request, 'preApiRequestHandlers');
 
@@ -701,7 +706,7 @@ class APIRouteInfo {
   Map<String, String> get parametersAsJson =>
       Map<String, String>.fromEntries(parameters!.entries
           .where((e) => !e.value.isOf(APIRequest))
-          .map((e) => MapEntry(e.key, e.value.toString())));
+          .map((e) => MapEntry(e.key, e.value.toString(withT: false))));
 }
 
 APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {

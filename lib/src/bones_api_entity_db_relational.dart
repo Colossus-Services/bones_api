@@ -268,7 +268,7 @@ class DBRelationalEntityRepository<O extends Object>
             if (!EntityHandler.isValidEntityType(elementType.type)) return null;
 
             var elementRepository =
-                provider.getEntityRepositoryByType(elementType.type);
+                provider.getEntityRepositoryByTypeInfo(elementType);
             if (elementRepository == null) return null;
 
             var futures = value.map((e) {
@@ -277,14 +277,22 @@ class DBRelationalEntityRepository<O extends Object>
             }).toList();
             return futures.resolveAll();
           } else {
-            if (!EntityHandler.isValidEntityType(fieldType.type)) return null;
+            var entityType = fieldType.entityType;
+            if (entityType == null) return null;
+
+            var entity = value;
+
+            if (value is EntityReference) {
+              if (!value.isEntitySet) return false;
+              entity = value.entity;
+            }
 
             var repository =
-                provider.getEntityRepository(type: fieldType.type, obj: value);
+                provider.getEntityRepository(type: entityType, obj: entity);
             if (repository == null) return null;
 
             var stored =
-                repository.ensureStored(value, transaction: transaction);
+                repository.ensureStored(entity, transaction: transaction);
             return stored;
           }
         })
@@ -300,7 +308,8 @@ class DBRelationalEntityRepository<O extends Object>
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
       Transaction? transaction,
-      int? limit}) {
+      int? limit,
+      EntityResolutionRules? resolutionRules}) {
     checkNotClosed();
 
     var op = TransactionOperationSelect(
@@ -312,7 +321,8 @@ class DBRelationalEntityRepository<O extends Object>
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
           limit: limit, preFinish: (results) {
-        return resolveEntities(op.transaction, results);
+        return resolveEntities(op.transaction, results,
+            resolutionRules: resolutionRules);
       });
     } catch (e, s) {
       var message = 'select> '
@@ -327,8 +337,11 @@ class DBRelationalEntityRepository<O extends Object>
   }
 
   @override
-  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit}) =>
-      select(ConditionANY(), limit: limit);
+  FutureOr<Iterable<O>> selectAll(
+          {Transaction? transaction,
+          int? limit,
+          EntityResolutionRules? resolutionRules}) =>
+      select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
 
   @override
   bool isStored(O o, {Transaction? transaction}) {

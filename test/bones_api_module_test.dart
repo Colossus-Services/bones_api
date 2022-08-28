@@ -68,6 +68,7 @@ void main() {
             'roles': [],
             'level': null,
             'wakeUpTime': null,
+            'userInfo': null,
             'creationTime': 1633954394000
           }));
 
@@ -87,6 +88,16 @@ void main() {
               .payload
               .toJson(),
           equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102)));
+
+      expect(
+          (await apiRoot.call(APIRequest.post('/user/echoUser',
+                  payload: _buildTestUserJson(10002, 'jsmith@email.com', 102,
+                      userInfo: 'the info', userInfoId: 1002),
+                  payloadMimeType: 'json')))
+              .payload
+              .toJson(),
+          equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102,
+              userInfo: 'the info', userInfoId: 1002, userInfoRef: true)));
 
       expect(
           (await apiRoot.call(APIRequest.post('/user/echoListUser',
@@ -153,7 +164,8 @@ User _buildTestUser() {
           DateTime.fromMillisecondsSinceEpoch(1665501194000, isUtc: true));
 }
 
-Map<String, Object?> _buildTestUserJson(int id, String email, int n) {
+Map<String, Object?> _buildTestUserJson(int id, String email, int n,
+    {String? userInfo, int? userInfoId, bool userInfoRef = false}) {
   return {
     'id': id,
     'email': email,
@@ -169,6 +181,21 @@ Map<String, Object?> _buildTestUserJson(int id, String email, int n) {
     'roles': [],
     'level': null,
     'wakeUpTime': null,
+    'userInfo': (userInfo == null)
+        ? null
+        : (userInfoRef
+            ? {
+                'EntityReference': 'UserInfo',
+                if (userInfoId != null) 'id': userInfoId,
+                'entity': {
+                  if (userInfoId != null) 'id': userInfoId,
+                  'info': userInfo,
+                }
+              }
+            : {
+                if (userInfoId != null) 'id': userInfoId,
+                'info': userInfo,
+              }),
     'creationTime': 1665501194000
   };
 }

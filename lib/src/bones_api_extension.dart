@@ -150,7 +150,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
   /// See [TypeParser.parserFor].
   T? getAs<T>(K key, {T? defaultValue, bool ignoreCase = false}) {
     var parser = TypeParser.parserFor<T>();
-    return getParsed(key, parser == null ? null : (o) => parser(o) as T?,
+    return getParsed(key, parser == null ? null : (o) => parser(o),
         defaultValue: defaultValue, ignoreCase: ignoreCase);
   }
 
