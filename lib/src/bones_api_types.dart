@@ -44,13 +44,13 @@ extension APIEntityObjectExtension on Object? {
 
   /// Returns an entity instance.
   /// - If it's an [EntityReference] returns [EntityReference.entity].
-  /// - If [isEntityIDType] returns `this` object.
+  /// - If ![isEntityIDType] returns `this` object.
   /// - Otherwise returns `null`.
   Object? get resolveEntityInstance {
     var self = this;
     return self is EntityReference
         ? self.entity
-        : (isEntityIDType ? self : null);
+        : (!isEntityIDType ? self : null);
   }
 }
 

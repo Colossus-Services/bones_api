@@ -53,9 +53,15 @@ void main() {
     test('authenticate', () {
       var apiSecurity = _MyAPISecurity();
 
-      expect(
-          apiSecurity.authenticate(APICredential('foo', passwordHash: 'foo')),
-          isNotNull);
+      {
+        var credential = APICredential('foo', passwordHash: 'foo');
+        expect(apiSecurity.authenticate(credential), isNotNull);
+
+        expect(credential.usernameEntity, isNotEmpty);
+
+        expect(
+            credential.copy(withUsernameEntity: false).usernameEntity, isNull);
+      }
 
       expect(
           apiSecurity.authenticate(APICredential('bar', passwordHash: 'bar')),
@@ -363,6 +369,16 @@ class _MyAPISecurity extends APISecurity {
     }
 
     return super.generateToken(username);
+  }
+
+  @override
+  FutureOr<APICredential> prepareCredential(APICredential credential) {
+    credential.usernameEntity = {
+      'username': credential.username,
+      if (credential.hasToken) 'token': credential.token,
+    };
+
+    return credential;
   }
 
   @override

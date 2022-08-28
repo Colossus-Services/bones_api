@@ -374,6 +374,12 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(address.id, equals(1));
         expect(role.id, equals(1));
 
+        expect(user.address.isEntityReference, isFalse);
+        expect(user.userInfo.isEntityReference, isTrue);
+
+        expect(user.address.resolveEntityInstance, isA<Address>());
+        expect(user.userInfo.resolveEntityInstance, isA<UserInfo>());
+
         expect((await userInfoAPIRepository.selectAll()).length, equals(1));
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
