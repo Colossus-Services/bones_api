@@ -3,7 +3,7 @@
 - Added `EntityReference`:
   An entity field wrapper that allows lazy load of sub-entities.
 - Added `EntityResolutionRules` to allow lazy or eager selects.
-- reflection_factory: ^1.2.7
+- reflection_factory: ^1.2.8
 
 ## 1.3.6
 
