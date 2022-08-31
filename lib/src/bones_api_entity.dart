@@ -813,7 +813,8 @@ class EntityReference<T> {
   /// Same as [get] but won't return `null`.
   FutureOr<T> getNotNull() => get().resolveMapped((o) {
         if (o == null) {
-          throw StateError("Null entity. Can't `get` entity (`$type`) with ID `$id`.");
+          throw StateError(
+              "Null entity. Can't `get` entity (`$type`) with ID `$id`.");
         }
         return o;
       });
