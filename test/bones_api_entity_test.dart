@@ -309,6 +309,7 @@ void main() {
         expect(ref.entityToJson(), isNull);
 
         expect(ref.get(), equals(UserInfo('The 1001 info#0', id: 1001)));
+        expect(ref.getNotNull(), equals(UserInfo('The 1001 info#0', id: 1001)));
 
         expect(ref.isIdSet, isTrue);
         expect(ref.isEntitySet, isTrue);

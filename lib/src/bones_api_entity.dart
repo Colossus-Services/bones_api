@@ -810,6 +810,14 @@ class EntityReference<T> {
     return _fetchAndSet();
   }
 
+  /// Same as [get] but won't return `null`.
+  FutureOr<T> getNotNull() => get().resolveMapped((o) {
+        if (o == null) {
+          throw StateError("Null entity. Can't `get` entity (`$type`) with ID `$id`.");
+        }
+        return o;
+      });
+
   /// Disposes the current loaded [entity] instance and returns it.
   /// Id [id] is defined it will keep it.
   T? disposeEntity() {
