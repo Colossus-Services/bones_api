@@ -1004,7 +1004,7 @@ class _MyEntityProvider implements EntityProvider {
   int status = 0;
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
     type ??= O;
 
     if (type == UserInfo) {

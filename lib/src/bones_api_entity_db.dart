@@ -312,11 +312,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
     if (id == null || type == null) return null;
 
     var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
+      if (sync) return null;
       return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
     }
 

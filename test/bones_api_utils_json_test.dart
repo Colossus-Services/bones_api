@@ -64,6 +64,13 @@ void main() {
                   enabled: false, value: Decimal.parse('456.789')),
               removeNullFields: true),
           equals({'type': 'guest', 'enabled': false, 'value': '456.789'}));
+
+      expect(
+          Json.toJson(EntityReference.fromEntity(Role(RoleType.admin))),
+          equals({
+            'EntityReference': 'Role',
+            'entity': {'enabled': true, 'type': 'admin'}
+          }));
     });
 
     test('fromJson', () async {
@@ -132,6 +139,49 @@ void main() {
 
         expect(user3, isA<User>());
         expect(user3!.id, equals(1001));
+      }
+
+      {
+        var role = Role(RoleType.admin, id: 11);
+
+        var entityReference1 = Json.fromJson<EntityReference>({
+          'EntityReference': 'Role',
+          'entity': {'enabled': true, 'type': 'admin', 'id': 11}
+        });
+        expect(
+            entityReference1,
+            allOf(isA<EntityReference<Role>>()
+                .having((e) => e.entity, 'equals entity', equals(role))));
+
+        var entityReference2 = Json.fromJson<EntityReference>(
+            {'EntityReference': 'Role', 'id': 11});
+        expect(
+            entityReference2,
+            allOf(isA<EntityReference<Role>>()
+                .having((e) => e.entity, 'null entity', isNull)));
+
+        expect(entityReference2!.get(), isNull);
+        expect(
+            () => entityReference2.getNotNull(),
+            throwsA(isA<StateError>().having(
+                (e) => e.message,
+                "Can't get entity message",
+                contains("Can't `get` entity `Role` with ID `11`"))));
+
+        var entityCache = JsonEntityCacheSimple();
+
+        entityCache.cacheEntity(role);
+
+        var entityReference3 = Json.fromJson<EntityReference>(
+            {'EntityReference': 'Role', 'id': 11},
+            entityCache: entityCache, autoResetEntityCache: false);
+
+        expect(
+            entityReference3,
+            allOf(isA<EntityReference<Role>>()
+                .having((e) => e.entity, 'equals entity', equals(role))));
+
+        expect(entityReference3!.get(), isNotNull);
       }
     });
 
