@@ -49,15 +49,23 @@ abstract class APISecurity {
   APIToken createToken(String username) => APIToken(username,
       token: generateToken(username), duration: tokenDuration);
 
+  FutureOr<APICredential> prepareCredential(APICredential credential) =>
+      credential;
+
   FutureOr<APIAuthentication?> authenticate(APICredential? credential) {
     if (credential == null) return null;
 
+    return prepareCredential(credential).resolveMapped(_authenticateImpl);
+  }
+
+  FutureOr<APIAuthentication?> _authenticateImpl(APICredential credential,
+      [bool resume = false]) {
     _log.info(
-        "authenticate> ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
+        "authenticate${resume ? '[resume]' : ''}> ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
-      return _resolveAuthentication(credential, false);
+      return _resolveAuthentication(credential, resume);
     });
   }
 
@@ -92,12 +100,13 @@ abstract class APISecurity {
 
     var credential = APICredential(token.username, token: token.token);
 
-    return checkCredential(credential).then((ok) {
-      if (!ok) return null;
-
-      return _resolveAuthentication(credential, true);
-    });
+    return prepareCredential(credential)
+        .resolveMapped(_resumeAuthenticationImpl);
   }
+
+  FutureOr<APIAuthentication?> _resumeAuthenticationImpl(
+          APICredential credential) =>
+      _authenticateImpl(credential, true);
 
   APIToken? getValidToken(String username, {bool autoCreate = true}) {
     List<APIToken> tokens = getUsernameValidTokens(username);

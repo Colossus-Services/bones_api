@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.6
+// BUILDER: reflection_factory/1.2.9
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -35,7 +35,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -88,8 +88,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             '',
             () => (APIRoot apiRoot) => MyInfoModule(apiRoot),
             const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection(APIRoot), 'apiRoot', false, true, null, null)
+              ParameterReflection(TypeReflection<APIRoot>(APIRoot), 'apiRoot',
+                  false, true, null, null)
             ],
             null,
             null,
@@ -148,7 +148,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection(APIRoot),
+          TypeReflection<APIRoot>(APIRoot),
           'apiRoot',
           false,
           (o) => () => o!.apiRoot as T,
@@ -190,7 +190,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection(APIConfig),
+          TypeReflection<APIConfig>(APIConfig),
           'apiConfig',
           false,
           (o) => () => o!.apiConfig as T,
@@ -232,7 +232,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection(APIRouteBuilder, [APIModule]),
+          TypeReflection<APIRouteBuilder<APIModule>>(APIRouteBuilder,
+              <TypeReflection>[TypeReflection<APIModule>(APIModule)]),
           'routes',
           false,
           (o) => () => o!.routes as T,
@@ -260,7 +261,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection(APISecurity),
+          TypeReflection<APISecurity>(APISecurity),
           'security',
           true,
           (o) => () => o!.security as T,
@@ -288,7 +289,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection(InitializationStatus),
+          TypeReflection<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
           (o) => () => o!.initializationStatus as T,
@@ -403,8 +404,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'echo',
-            TypeReflection(FutureOr, [
-              TypeReflection(APIResponse, [String])
+            TypeReflection<FutureOr<APIResponse<String>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<APIResponse<String>>(
+                  APIResponse, <TypeReflection>[TypeReflection.tString])
             ]),
             false,
             (o) => o!.echo,
@@ -413,8 +416,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tString, 'msg', false, true, null, null),
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -424,8 +427,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'toUpperCase',
-            TypeReflection(FutureOr, [
-              TypeReflection(APIResponse, [String])
+            TypeReflection<FutureOr<APIResponse<String>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<APIResponse<String>>(
+                  APIResponse, <TypeReflection>[TypeReflection.tString])
             ]),
             false,
             (o) => o!.toUpperCase,
@@ -457,7 +462,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'initialize',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.initialize,
             obj,
@@ -471,7 +479,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRoutesHandlersNames',
-            TypeReflection(Iterable, [String]),
+            TypeReflection<Iterable<String>>(
+                Iterable, <TypeReflection>[TypeReflection.tString]),
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
@@ -479,8 +488,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'method': ParameterReflection(TypeReflection(APIRequestMethod),
-                  'method', true, false, null, null)
+              'method': ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'addroute':
@@ -488,30 +502,49 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'addRoute',
-            TypeReflection(APIModule),
+            TypeReflection<APIModule>(APIModule),
             false,
             (o) => o!.addRoute,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequestMethod), 'method',
-                  true, true, null, null),
+              ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  true,
+                  null,
+                  null),
               ParameterReflection(
                   TypeReflection.tString, 'name', false, true, null, null),
-              ParameterReflection(TypeReflection(APIRouteFunction, [dynamic]),
-                  'function', false, true, null, null)
+              ParameterReflection(
+                  TypeReflection<APIRouteFunction<dynamic>>(APIRouteFunction,
+                      <TypeReflection>[TypeReflection.tDynamic]),
+                  'function',
+                  false,
+                  true,
+                  null,
+                  null)
             ],
             null,
             const <String, ParameterReflection>{
               'parameters': ParameterReflection(
-                  TypeReflection(Map, [String, TypeInfo]),
+                  TypeReflection<Map<String, TypeInfo<dynamic>>>(
+                      Map, <TypeReflection>[
+                    TypeReflection.tString,
+                    TypeReflection<TypeInfo<dynamic>>(
+                        TypeInfo, <TypeReflection>[TypeReflection.tDynamic])
+                  ]),
                   'parameters',
                   true,
                   false,
                   null,
                   null),
               'rules': ParameterReflection(
-                  TypeReflection(Iterable, [APIRouteRule]),
+                  TypeReflection<Iterable<APIRouteRule>>(
+                      Iterable, <TypeReflection>[
+                    TypeReflection<APIRouteRule>(APIRouteRule)
+                  ]),
                   'rules',
                   true,
                   false,
@@ -524,7 +557,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRouteHandler',
-            TypeReflection(APIRouteHandler, [dynamic]),
+            TypeReflection<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getRouteHandler,
             obj,
@@ -534,8 +568,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
                   TypeReflection.tString, 'name', false, true, null, null)
             ],
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequestMethod), 'method',
-                  true, false, null, null)
+              ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  false,
+                  null,
+                  null)
             ],
             null,
             null);
@@ -544,14 +583,15 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRouteHandlerByRequest',
-            TypeReflection(APIRouteHandler, [dynamic]),
+            TypeReflection<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -567,8 +607,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -578,16 +618,18 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'call',
-            TypeReflection(FutureOr, [
-              TypeReflection(APIResponse, [dynamic])
+            TypeReflection<FutureOr<APIResponse<dynamic>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<APIResponse<dynamic>>(
+                  APIResponse, <TypeReflection>[TypeReflection.tDynamic])
             ]),
             false,
             (o) => o!.call,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -603,8 +645,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
-                  false, true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'apiRequest', false, true, null, null)
             ],
             null,
             null,
@@ -614,15 +656,15 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'apiInfo',
-            TypeReflection(APIModuleInfo),
+            TypeReflection<APIModuleInfo>(APIModuleInfo),
             false,
             (o) => o!.apiInfo,
             obj,
             false,
             null,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
-                  true, false, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'apiRequest', true, false, null, null)
             ],
             null,
             null);
@@ -631,7 +673,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'ensureInitialized',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.ensureInitialized,
             obj,
@@ -639,8 +684,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'ensureinitializedasync':
@@ -648,7 +698,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'ensureInitializedAsync',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
@@ -656,8 +709,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'doinitialization':
@@ -665,7 +723,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'doInitialization',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.doInitialization,
             obj,
@@ -673,8 +734,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'initializedependencies':
@@ -682,8 +748,11 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'initializeDependencies',
-            TypeReflection(FutureOr, [
-              TypeReflection(List, [Initializable])
+            TypeReflection<FutureOr<List<Initializable>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<List<Initializable>>(List, <TypeReflection>[
+                TypeReflection<Initializable>(Initializable)
+              ])
             ]),
             false,
             (o) => o!.initializeDependencies,
@@ -719,7 +788,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             false,
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection(ExecuteInitializedCallback, [dynamic]),
+                  TypeReflection<ExecuteInitializedCallback<dynamic>>(
+                      ExecuteInitializedCallback,
+                      <TypeReflection>[TypeReflection.tDynamic]),
                   'callback',
                   false,
                   true,
@@ -728,8 +799,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             ],
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       default:

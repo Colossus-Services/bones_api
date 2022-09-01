@@ -670,13 +670,18 @@ class APIRouteBuilder<M extends APIModule> {
     var classReflection =
         reflectionFactory.getRegisterClassReflection(typeInfo.type);
     if (classReflection != null) {
-      return classReflection.castList(list, typeInfo.type) ?? list;
+      var nullable = list.any((e) => e == null);
+      return classReflection.castList(list, typeInfo.type,
+              nullable: nullable) ??
+          list;
     }
 
     var enumReflection =
         reflectionFactory.getRegisterEnumReflection(typeInfo.type);
     if (enumReflection != null) {
-      return enumReflection.castList(list, typeInfo.type) ?? list;
+      var nullable = list.any((e) => e == null);
+      return enumReflection.castList(list, typeInfo.type, nullable: nullable) ??
+          list;
     }
 
     return list;

@@ -20,6 +20,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final EntityHandler<Store> storeEntityHandler;
   final EntityHandler<Address> addressEntityHandler;
   final EntityHandler<Role> roleEntityHandler;
+  final EntityHandler<UserInfo> userInfoEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
   late final DBSQLAdapter sqlAdapter;
@@ -27,12 +28,14 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
   late final RoleAPIRepository roleAPIRepository;
+  late final UserInfoAPIRepository userInfoAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
   TestEntityRepositoryProvider(
       this.storeEntityHandler,
       this.addressEntityHandler,
       this.roleEntityHandler,
+      this.userInfoEntityHandler,
       this.userEntityHandler,
       this.sqlAdapterCreator,
       this.dbPort) {
@@ -52,6 +55,8 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
       DBSQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
       DBSQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
       DBSQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
+      DBSQLEntityRepository<UserInfo>(
+          adapter, 'user_info', userInfoEntityHandler),
       DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler)
     ].asUnmodifiableView;
   }
@@ -65,6 +70,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
         storeAPIRepository = StoreAPIRepository(this),
         addressAPIRepository = AddressAPIRepository(this),
         roleAPIRepository = RoleAPIRepository(this),
+        userInfoAPIRepository = UserInfoAPIRepository(this),
         userAPIRepository = UserAPIRepository(this),
       ];
 }
@@ -73,20 +79,25 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
         bool entityByReflection,
         SQLAdapterCreator sqlAdapterCreator,
         int dbPort) =>
-    TestEntityRepositoryProvider(
-      entityByReflection ? Store$reflection().entityHandler : storeEntityHandler
-        ..inspectObject(Store.empty()),
-      entityByReflection
-          ? Address$reflection().entityHandler
-          : addressEntityHandler
-        ..inspectObject(Address.empty()),
-      entityByReflection ? Role$reflection().entityHandler : roleEntityHandler
-        ..inspectObject(Role(RoleType.unknown)),
-      entityByReflection ? User$reflection().entityHandler : userEntityHandler
-        ..inspectObject(User('', '', Address.empty(), [])),
-      sqlAdapterCreator,
-      dbPort,
-    );
+    entityByReflection
+        ? TestEntityRepositoryProvider(
+            Store$reflection().entityHandler,
+            Address$reflection().entityHandler,
+            Role$reflection().entityHandler,
+            UserInfo$reflection().entityHandler,
+            User$reflection().entityHandler,
+            sqlAdapterCreator,
+            dbPort,
+          )
+        : TestEntityRepositoryProvider(
+            storeEntityHandler..inspectObject(Store.empty()),
+            addressEntityHandler..inspectObject(Address.empty()),
+            roleEntityHandler..inspectObject(Role.empty()),
+            userInfoEntityHandler..inspectObject(UserInfo.empty()),
+            userEntityHandler..inspectObject(User.empty()),
+            sqlAdapterCreator,
+            dbPort,
+          );
 
 Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
     SQLAdapterCreator sqlAdapterCreator, String cmdQuote, String serialIntType,
@@ -195,6 +206,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
               '${q}email$q VARCHAR$reArg?,$reS'
               '${q}level$q INT,$reS'
               '${q}password$q VARCHAR$reArg?,$reS'
+              '${q}user_info$q BIGINT.*?,$reS'
               '${q}wake_up_time$q TIME.*?,$reS'
               'CONSTRAINT');
 
@@ -202,6 +214,27 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
       expect(fullCreateTableSQLs,
           allOf(contains(tableUserRegexp), contains(tableUserUniqueRegexp)));
+    });
+
+    test('sqlAdapter', () async {
+      _log.info('APITestConfigDB: $testConfigDB');
+
+      expect(testConfigDB.isStarted, isTrue);
+
+      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      expect(sqlAdapter, isNotNull);
+
+      _log.info('SQLDialect: ${sqlAdapter.dialect}');
+
+      expect(sqlAdapter.capability.transactions, isTrue);
+      expect(sqlAdapter.capability.transactionAbort, isTrue);
+      expect(sqlAdapter.capability.fullTransaction, isTrue);
+
+      expect(
+          DBAdapter.registeredAdaptersNames.contains(sqlAdapter.name), isTrue);
+
+      expect(DBAdapter.registeredAdaptersTypes.contains(sqlAdapter.runtimeType),
+          isTrue);
     });
 
     test('create table', () async {
@@ -260,6 +293,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       var storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
       var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
       var roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+      var userInfoAPIRepository =
+          entityRepositoryProvider.userInfoAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
 
       expect(await userAPIRepository.length(), equals(0));
@@ -340,10 +375,13 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect((await storeAPIRepository.selectAll()).length, equals(0));
         expect((await addressAPIRepository.selectAll()).length, equals(0));
+        expect((await userInfoAPIRepository.selectAll()).length, equals(0));
         expect((await userAPIRepository.selectAll()).length, equals(0));
 
         var user = User('joe@$testDomain', '123', address, [role],
-            level: 100, creationTime: user1CreationTime);
+            level: 100,
+            userInfo: UserInfo('The user joe'),
+            creationTime: user1CreationTime);
 
         expect(user.reflection.allFieldsValids(), isTrue);
 
@@ -353,18 +391,48 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         user1Id = id;
 
         expect(user.id, equals(1));
+        expect(user.userInfo.id, equals(1));
         expect(address.id, equals(1));
         expect(role.id, equals(1));
 
+        expect(user.address.isEntityReference, isFalse);
+        expect(user.userInfo.isEntityReference, isTrue);
+
+        expect(user.address.resolveEntityInstance, isA<Address>());
+        expect(user.userInfo.resolveEntityInstance, isA<UserInfo>());
+
+        expect((await userInfoAPIRepository.selectAll()).length, equals(1));
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
         expect((await storeAPIRepository.selectAll()).length, equals(3));
 
+        expect((await userInfoAPIRepository.existsID(1)), isTrue);
         expect((await userAPIRepository.existsID(1)), isTrue);
         expect((await addressAPIRepository.existsID(1)), isTrue);
 
-        expect((await userAPIRepository.selectByID(1))?.email,
-            equals('joe@$testDomain'));
+        {
+          var user = await userAPIRepository.selectByID(1);
+          expect(user!.email, equals('joe@$testDomain'));
+
+          expect(user.userInfo.isNull, isFalse);
+          expect(user.userInfo.id, equals(1));
+          expect(user.userInfo.isEntitySet, isFalse);
+        }
+
+        {
+          print('!!!');
+          var user = await userAPIRepository.selectByID(1,
+              resolutionRules:
+                  EntityResolutionRules.fetch(eagerEntityTypes: [UserInfo]));
+          expect(user!.email, equals('joe@$testDomain'));
+
+          expect(user.userInfo.isNull, isFalse);
+          expect(user.userInfo.id, equals(1));
+          expect(user.userInfo.isEntitySet, isTrue);
+          expect(user.userInfo.entityToJson(),
+              equals(UserInfo('The user joe', id: 1).toJson()));
+        }
+
         expect((await addressAPIRepository.selectByID(1))?.city,
             equals('New York'));
 
@@ -424,6 +492,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var user = User('smith@$testDomain', 'abc', address,
             [Role(RoleType.guest, value: Decimal.parse('123.45'))],
             wakeUpTime: user2WakeupTime, creationTime: user2CreationTime);
+
         final id = await userAPIRepository.store(user);
         expect(id, greaterThanOrEqualTo(2));
 
@@ -432,7 +501,9 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect((await userAPIRepository.selectAll()).length, equals(2));
 
         var user2 = await userAPIRepository.selectByID(id);
-        expect(user2!.wakeUpTime, equals(user2WakeupTime));
+
+        expect(user2!.userInfo.isNull, isTrue);
+        expect(user2.wakeUpTime, equals(user2WakeupTime));
 
         user2.wakeUpTime = null;
         var id2 = await userAPIRepository.store(user2);
@@ -635,8 +706,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         print(transaction);
 
         expect(result!.length, equals(3));
-        expect(transaction.length, equals(9));
-        expect(transaction.cachedEntitiesLength, equals(12));
+        expect(transaction.length, equals(10));
+        expect(transaction.cachedEntitiesLength, equals(13));
       }
 
       {
@@ -671,7 +742,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(12));
+        expect(transaction.cachedEntitiesLength, equals(13));
       }
 
       {
@@ -710,7 +781,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(12));
+        expect(transaction.cachedEntitiesLength, equals(13));
       }
 
       {

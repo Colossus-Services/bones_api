@@ -77,7 +77,7 @@ Future<void> main() async {
       .resolveSupported();
 
   group('APITestConfig (basic start/stop)', () {
-    Future<void> _testDB(APITestConfigDB apiTestConfig) async {
+    Future<void> testDB(APITestConfigDB apiTestConfig) async {
       expect(apiTestConfig.isSupported, isTrue);
 
       var apiRootStarter = apiTestConfig
@@ -124,14 +124,14 @@ Future<void> main() async {
       }
     }
 
-    test('memory', () => _testDB(apiTestConfigMemory),
+    test('memory', () => testDB(apiTestConfigMemory),
         skip: apiTestConfigMemory.unsupportedReason);
 
-    test('postgres', () => _testDB(apiTestConfigPostgres),
+    test('postgres', () => testDB(apiTestConfigPostgres),
         skip: apiTestConfigPostgres.unsupportedReason,
         tags: ['docker', 'slow']);
 
-    test('mysql', () => _testDB(apiTestConfigMySQL),
+    test('mysql', () => testDB(apiTestConfigMySQL),
         skip: apiTestConfigMySQL.unsupportedReason, tags: ['docker', 'slow']);
   });
 }

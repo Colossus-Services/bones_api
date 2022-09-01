@@ -74,6 +74,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
+          'memory',
           1,
           3,
           const DBSQLAdapterCapability(
@@ -423,11 +424,27 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       var fieldType = entityHandler.getFieldType(null, key);
 
       if (fieldType != null) {
+        if (fieldType.isEntityReferenceType && value is EntityReference) {
+          if (value.isNull) {
+            return MapEntry(key, null);
+          }
+
+          var id = value.id;
+
+          if (id != null) {
+            return MapEntry(key, id);
+          } else if (value.isEntitySet) {
+            fieldType = TypeInfo.fromType(value.type);
+            value = value.entity;
+          }
+        }
+
         if (fieldType.isIterable && fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =
-              getEntityRepositoryByType(listEntityType.type);
+              getEntityRepositoryByTypeInfo(listEntityType);
+
           if (fieldListEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
@@ -442,13 +459,25 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
               .toList();
         } else if (!fieldType.isPrimitiveType &&
             EntityHandler.isValidEntityType(fieldType.type)) {
-          var fieldEntityRepository = getEntityRepositoryByType(fieldType.type);
+          var fieldEntityRepository = getEntityRepositoryByTypeInfo(fieldType);
           if (fieldEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
           }
 
           value = fieldEntityRepository.getEntityID(value);
+        }
+      } else if (value is EntityReference) {
+        if (value.isNull) {
+          return MapEntry(key, null);
+        }
+
+        var id = value.id;
+
+        if (id != null) {
+          return MapEntry(key, id);
+        } else if (value.isEntitySet) {
+          value = value.entityToJson();
         }
       }
 

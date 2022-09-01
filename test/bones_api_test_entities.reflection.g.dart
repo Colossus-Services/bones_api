@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.6
+// BUILDER: reflection_factory/1.2.9
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -38,6 +38,12 @@ User User$fromJson(Map<String, Object?> map) =>
 // ignore: non_constant_identifier_names
 User User$fromJsonEncoded(String jsonEncoded) =>
     User$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
+UserInfo UserInfo$fromJson(Map<String, Object?> map) =>
+    UserInfo$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+UserInfo UserInfo$fromJsonEncoded(String jsonEncoded) =>
+    UserInfo$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
 class Address$reflection extends ClassReflection<Address> {
   Address$reflection([Address? object]) : super(Address, object);
@@ -56,7 +62,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -124,12 +130,24 @@ class Address$reflection extends ClassReflection<Address> {
             ],
             null,
             const <String, ParameterReflection>{
-              'closedStores': ParameterReflection(TypeReflection(List, [Store]),
-                  'closedStores', true, false, null, null),
+              'closedStores': ParameterReflection(
+                  TypeReflection<List<Store>>(
+                      List, <TypeReflection>[TypeReflection<Store>(Store)]),
+                  'closedStores',
+                  true,
+                  false,
+                  null,
+                  null),
               'id': ParameterReflection(
                   TypeReflection.tInt, 'id', true, false, null, null),
-              'stores': ParameterReflection(TypeReflection(List, [Store]),
-                  'stores', true, false, null, null)
+              'stores': ParameterReflection(
+                  TypeReflection<List<Store>>(
+                      List, <TypeReflection>[TypeReflection<Store>(Store)]),
+                  'stores',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'empty':
@@ -270,7 +288,8 @@ class Address$reflection extends ClassReflection<Address> {
         return FieldReflection<Address, T>(
           this,
           Address,
-          TypeReflection(List, [Store]),
+          TypeReflection<List<Store>>(
+              List, <TypeReflection>[TypeReflection<Store>(Store)]),
           'stores',
           false,
           (o) => () => o!.stores as T,
@@ -284,7 +303,8 @@ class Address$reflection extends ClassReflection<Address> {
         return FieldReflection<Address, T>(
           this,
           Address,
-          TypeReflection(List, [Store]),
+          TypeReflection<List<Store>>(
+              List, <TypeReflection>[TypeReflection<Store>(Store)]),
           'closedStores',
           false,
           (o) => () => o!.closedStores as T,
@@ -390,7 +410,8 @@ class Address$reflection extends ClassReflection<Address> {
             this,
             Address,
             'getFieldType',
-            TypeReflection(TypeInfo),
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -407,7 +428,9 @@ class Address$reflection extends ClassReflection<Address> {
             this,
             Address,
             'getFieldEntityAnnotations',
-            TypeReflection(List, [EntityAnnotation]),
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
             true,
             (o) => o!.getFieldEntityAnnotations,
             obj,
@@ -528,7 +551,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -582,8 +605,8 @@ class Role$reflection extends ClassReflection<Role> {
                     {int? id, bool enabled = true, Decimal? value}) =>
                 Role(type, id: id, enabled: enabled, value: value),
             const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection(RoleType), 'type', false, true, null, null)
+              ParameterReflection(TypeReflection<RoleType>(RoleType), 'type',
+                  false, true, null, null)
             ],
             null,
             const <String, ParameterReflection>{
@@ -591,8 +614,8 @@ class Role$reflection extends ClassReflection<Role> {
                   TypeReflection.tBool, 'enabled', false, false, true, null),
               'id': ParameterReflection(
                   TypeReflection.tInt, 'id', true, false, null, null),
-              'value': ParameterReflection(
-                  TypeReflection(Decimal), 'value', true, false, null, null)
+              'value': ParameterReflection(TypeReflection<Decimal>(Decimal),
+                  'value', true, false, null, null)
             },
             null);
       case 'empty':
@@ -674,7 +697,7 @@ class Role$reflection extends ClassReflection<Role> {
         return FieldReflection<Role, T>(
           this,
           Role,
-          TypeReflection(RoleType),
+          TypeReflection<RoleType>(RoleType),
           'type',
           false,
           (o) => () => o!.type as T,
@@ -702,7 +725,7 @@ class Role$reflection extends ClassReflection<Role> {
         return FieldReflection<Role, T>(
           this,
           Role,
-          TypeReflection(Decimal),
+          TypeReflection<Decimal>(Decimal),
           'value',
           true,
           (o) => () => o!.value as T,
@@ -808,7 +831,8 @@ class Role$reflection extends ClassReflection<Role> {
             this,
             Role,
             'getFieldType',
-            TypeReflection(TypeInfo),
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -889,7 +913,9 @@ class Role$reflection extends ClassReflection<Role> {
             this,
             Entity,
             'getFieldEntityAnnotations',
-            TypeReflection(List, [EntityAnnotation]),
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
             true,
             (o) => o!.getFieldEntityAnnotations,
             obj,
@@ -946,7 +972,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -1010,7 +1036,7 @@ class Store$reflection extends ClassReflection<Store> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   Store$reflection withObject([Store? obj]) => Store$reflection(obj);
@@ -1259,7 +1285,8 @@ class Store$reflection extends ClassReflection<Store> {
             this,
             Store,
             'getFieldType',
-            TypeReflection(TypeInfo),
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -1276,7 +1303,9 @@ class Store$reflection extends ClassReflection<Store> {
             this,
             Store,
             'getFieldEntityAnnotations',
-            TypeReflection(List, [EntityAnnotation]),
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
             true,
             (o) => o!.getFieldEntityAnnotations,
             obj,
@@ -1384,7 +1413,8 @@ class Store$reflection extends ClassReflection<Store> {
             this,
             Store,
             'fromMap',
-            TypeReflection(FutureOr, [Store]),
+            TypeReflection<FutureOr<Store>>(
+                FutureOr, <TypeReflection>[TypeReflection<Store>(Store)]),
             false,
             (o) => Store.fromMap,
             null,
@@ -1419,7 +1449,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -1474,32 +1504,47 @@ class User$reflection extends ClassReflection<User> {
                     {int? id,
                     int? level,
                     Time? wakeUpTime,
+                    Object? userInfo,
                     DateTime? creationTime}) =>
                 User(email, password, address, roles,
                     id: id,
                     level: level,
                     wakeUpTime: wakeUpTime,
+                    userInfo: userInfo,
                     creationTime: creationTime),
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tString, 'email', false, true, null, null),
               ParameterReflection(
                   TypeReflection.tString, 'password', false, true, null, null),
+              ParameterReflection(TypeReflection<Address>(Address), 'address',
+                  false, true, null, null),
               ParameterReflection(
-                  TypeReflection(Address), 'address', false, true, null, null),
-              ParameterReflection(TypeReflection(List, [Role]), 'roles', false,
-                  true, null, null)
+                  TypeReflection<List<Role>>(
+                      List, <TypeReflection>[TypeReflection<Role>(Role)]),
+                  'roles',
+                  false,
+                  true,
+                  null,
+                  null)
             ],
             null,
             const <String, ParameterReflection>{
-              'creationTime': ParameterReflection(TypeReflection(DateTime),
-                  'creationTime', true, false, null, null),
+              'creationTime': ParameterReflection(
+                  TypeReflection<DateTime>(DateTime),
+                  'creationTime',
+                  true,
+                  false,
+                  null,
+                  null),
               'id': ParameterReflection(
                   TypeReflection.tInt, 'id', true, false, null, null),
               'level': ParameterReflection(
                   TypeReflection.tInt, 'level', true, false, null, null),
-              'wakeUpTime': ParameterReflection(
-                  TypeReflection(Time), 'wakeUpTime', true, false, null, null)
+              'userInfo': ParameterReflection(
+                  TypeReflection.tObject, 'userInfo', true, false, null, null),
+              'wakeUpTime': ParameterReflection(TypeReflection<Time>(Time),
+                  'wakeUpTime', true, false, null, null)
             },
             null);
       case 'empty':
@@ -1544,6 +1589,7 @@ class User$reflection extends ClassReflection<User> {
         'level',
         'password',
         'roles',
+        'userInfo',
         'wakeUpTime'
       ];
 
@@ -1604,7 +1650,7 @@ class User$reflection extends ClassReflection<User> {
         return FieldReflection<User, T>(
           this,
           User,
-          TypeReflection(Address),
+          TypeReflection<Address>(Address),
           'address',
           false,
           (o) => () => o!.address as T,
@@ -1618,7 +1664,8 @@ class User$reflection extends ClassReflection<User> {
         return FieldReflection<User, T>(
           this,
           User,
-          TypeReflection(List, [Role]),
+          TypeReflection<List<Role>>(
+              List, <TypeReflection>[TypeReflection<Role>(Role)]),
           'roles',
           false,
           (o) => () => o!.roles as T,
@@ -1646,7 +1693,7 @@ class User$reflection extends ClassReflection<User> {
         return FieldReflection<User, T>(
           this,
           User,
-          TypeReflection(Time),
+          TypeReflection<Time>(Time),
           'wakeUpTime',
           true,
           (o) => () => o!.wakeUpTime as T,
@@ -1656,11 +1703,26 @@ class User$reflection extends ClassReflection<User> {
           false,
           null,
         );
+      case 'userinfo':
+        return FieldReflection<User, T>(
+          this,
+          User,
+          TypeReflection<EntityReference<UserInfo>>(EntityReference,
+              <TypeReflection>[TypeReflection<UserInfo>(UserInfo)]),
+          'userInfo',
+          false,
+          (o) => () => o!.userInfo as T,
+          (o) => (T? v) => o!.userInfo = v as EntityReference<UserInfo>,
+          obj,
+          false,
+          false,
+          null,
+        );
       case 'creationtime':
         return FieldReflection<User, T>(
           this,
           User,
-          TypeReflection(DateTime),
+          TypeReflection<DateTime>(DateTime),
           'creationTime',
           false,
           (o) => () => o!.creationTime as T,
@@ -1766,7 +1828,8 @@ class User$reflection extends ClassReflection<User> {
             this,
             User,
             'getFieldType',
-            TypeReflection(TypeInfo),
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -1783,7 +1846,9 @@ class User$reflection extends ClassReflection<User> {
             this,
             User,
             'getFieldEntityAnnotations',
-            TypeReflection(List, [EntityAnnotation]),
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
             true,
             (o) => o!.getFieldEntityAnnotations,
             obj,
@@ -1891,9 +1956,400 @@ class User$reflection extends ClassReflection<User> {
             this,
             User,
             'fromMap',
-            TypeReflection(FutureOr, [User]),
+            TypeReflection<FutureOr<User>>(
+                FutureOr, <TypeReflection>[TypeReflection<User>(User)]),
             false,
             (o) => User.fromMap,
+            null,
+            true,
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection.tMapStringDynamic, 'map',
+                  false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      default:
+        return null;
+    }
+  }
+}
+
+class UserInfo$reflection extends ClassReflection<UserInfo> {
+  UserInfo$reflection([UserInfo? object]) : super(UserInfo, object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('2.17.0');
+
+  @override
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+
+  @override
+  UserInfo$reflection withObject([UserInfo? obj]) => UserInfo$reflection(obj);
+
+  static UserInfo$reflection? _withoutObjectInstance;
+  @override
+  UserInfo$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as UserInfo$reflection;
+
+  static UserInfo$reflection get staticInstance =>
+      _withoutObjectInstance ??= UserInfo$reflection();
+
+  @override
+  UserInfo$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    UserInfo$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => false;
+  @override
+  UserInfo? createInstanceWithDefaultConstructor() => null;
+
+  @override
+  bool get hasEmptyConstructor => true;
+  @override
+  UserInfo? createInstanceWithEmptyConstructor() => UserInfo.empty();
+  @override
+  bool get hasNoRequiredArgsConstructor => true;
+  @override
+  UserInfo? createInstanceWithNoRequiredArgsConstructor() => UserInfo.empty();
+
+  @override
+  List<String> get constructorsNames => const <String>['', 'empty'];
+
+  @override
+  ConstructorReflection<UserInfo>? constructor<R>(String constructorName) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case '':
+        return ConstructorReflection<UserInfo>(
+            this,
+            UserInfo,
+            '',
+            () => (String info, {int? id}) => UserInfo(info, id: id),
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'info', false, true, null, null)
+            ],
+            null,
+            const <String, ParameterReflection>{
+              'id': ParameterReflection(
+                  TypeReflection.tInt, 'id', true, false, null, null)
+            },
+            null);
+      case 'empty':
+        return ConstructorReflection<UserInfo>(this, UserInfo, 'empty',
+            () => () => UserInfo.empty(), null, null, null, null);
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+
+  @override
+  List<ClassReflection> siblingsClassReflection() =>
+      _siblingsReflection().whereType<ClassReflection>().toList();
+
+  @override
+  List<Reflection> siblingsReflection() => _siblingsReflection();
+
+  @override
+  List<Type> get supperTypes => const <Type>[Entity];
+
+  @override
+  bool get hasMethodToJson => true;
+
+  @override
+  Object? callMethodToJson([UserInfo? obj]) {
+    obj ??= object;
+    return obj?.toJson();
+  }
+
+  @override
+  List<String> get fieldsNames =>
+      const <String>['fieldsNames', 'hashCode', 'id', 'idFieldName', 'info'];
+
+  @override
+  FieldReflection<UserInfo, T>? field<T>(String fieldName, [UserInfo? obj]) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'id':
+        return FieldReflection<UserInfo, T>(
+          this,
+          UserInfo,
+          TypeReflection.tInt,
+          'id',
+          true,
+          (o) => () => o!.id as T,
+          (o) => (T? v) => o!.id = v as int?,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'info':
+        return FieldReflection<UserInfo, T>(
+          this,
+          UserInfo,
+          TypeReflection.tString,
+          'info',
+          false,
+          (o) => () => o!.info as T,
+          (o) => (T? v) => o!.info = v as String,
+          obj,
+          false,
+          false,
+          [EntityField.maximum(1000)],
+        );
+      case 'hashcode':
+        return FieldReflection<UserInfo, T>(
+          this,
+          UserInfo,
+          TypeReflection.tInt,
+          'hashCode',
+          false,
+          (o) => () => o!.hashCode as T,
+          null,
+          obj,
+          false,
+          false,
+          [override],
+        );
+      case 'idfieldname':
+        return FieldReflection<UserInfo, T>(
+          this,
+          UserInfo,
+          TypeReflection.tString,
+          'idFieldName',
+          false,
+          (o) => () => o!.idFieldName as T,
+          null,
+          obj,
+          false,
+          false,
+          [override],
+        );
+      case 'fieldsnames':
+        return FieldReflection<UserInfo, T>(
+          this,
+          UserInfo,
+          TypeReflection.tListString,
+          'fieldsNames',
+          false,
+          (o) => () => o!.fieldsNames as T,
+          null,
+          obj,
+          false,
+          false,
+          [JsonField.hidden(), override],
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<String> get staticFieldsNames => const <String>[];
+
+  @override
+  FieldReflection<UserInfo, T>? staticField<T>(String fieldName) {
+    return null;
+  }
+
+  @override
+  List<String> get methodsNames => const <String>[
+        'getField',
+        'getFieldEntityAnnotations',
+        'getFieldType',
+        'getID',
+        'setField',
+        'setID',
+        'toJson',
+        'toJsonEncoded'
+      ];
+
+  @override
+  MethodReflection<UserInfo, R>? method<R>(String methodName, [UserInfo? obj]) {
+    obj ??= object;
+
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'getfield':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'getField',
+            TypeReflection.tDynamic,
+            true,
+            (o) => o!.getField,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'getfieldtype':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'getFieldType',
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
+            true,
+            (o) => o!.getFieldType,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'getfieldentityannotations':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'getFieldEntityAnnotations',
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
+            true,
+            (o) => o!.getFieldEntityAnnotations,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'setfield':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'setField',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.setField,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null),
+              ParameterReflection(
+                  TypeReflection.tDynamic, 'value', true, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'tojson':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'toJson',
+            TypeReflection.tMapStringDynamic,
+            false,
+            (o) => o!.toJson,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            [override]);
+      case 'getid':
+        return MethodReflection<UserInfo, R>(
+            this,
+            Entity,
+            'getID',
+            TypeReflection.tDynamic,
+            true,
+            (o) => o!.getID,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'setid':
+        return MethodReflection<UserInfo, R>(
+            this,
+            Entity,
+            'setID',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.setID,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tDynamic, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'tojsonencoded':
+        return MethodReflection<UserInfo, R>(
+            this,
+            Entity,
+            'toJsonEncoded',
+            TypeReflection.tString,
+            false,
+            (o) => o!.toJsonEncoded,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<String> get staticMethodsNames => const <String>['fromMap'];
+
+  @override
+  MethodReflection<UserInfo, R>? staticMethod<R>(String methodName) {
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'frommap':
+        return MethodReflection<UserInfo, R>(
+            this,
+            UserInfo,
+            'fromMap',
+            TypeReflection<FutureOr<UserInfo>>(
+                FutureOr, <TypeReflection>[TypeReflection<UserInfo>(UserInfo)]),
+            false,
+            (o) => UserInfo.fromMap,
             null,
             true,
             const <ParameterReflection>[
@@ -1979,8 +2435,22 @@ extension User$reflectionExtension on User {
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
+extension UserInfo$reflectionExtension on UserInfo {
+  /// Returns a [ClassReflection] for type [UserInfo]. (Generated by [ReflectionFactory])
+  ClassReflection<UserInfo> get reflection => UserInfo$reflection(this);
+
+  /// Returns a JSON [Map] for type [UserInfo]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns a JSON for type [UserInfo] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
 List<Reflection> _listSiblingsReflection() => <Reflection>[
       User$reflection(),
+      UserInfo$reflection(),
       Store$reflection(),
       Address$reflection(),
       Role$reflection(),

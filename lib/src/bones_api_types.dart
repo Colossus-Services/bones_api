@@ -5,6 +5,8 @@ import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_entity.dart';
+
 /// Extension for entity [Type]s.
 extension APIEntityTypeExtension on Type {
   /// Returns `true` if `this` [Type] is an [int] or [String].
@@ -33,6 +35,23 @@ extension APIEntityObjectExtension on Object? {
     var self = this;
     return isEntityIDPrimitiveType || self is BigInt;
   }
+
+  /// Returns `true` if `this` object is an [EntityReference].
+  bool get isEntityReference {
+    var self = this;
+    return self is EntityReference;
+  }
+
+  /// Returns an entity instance.
+  /// - If it's an [EntityReference] returns [EntityReference.entity].
+  /// - If ![isEntityIDType] returns `this` object.
+  /// - Otherwise returns `null`.
+  Object? get resolveEntityInstance {
+    var self = this;
+    return self is EntityReference
+        ? self.entity
+        : (!isEntityIDType ? self : null);
+  }
 }
 
 extension ListOfStringExtension on List<String> {
@@ -53,7 +72,7 @@ class Time implements Comparable<Time> {
     if (_boot) return;
     _boot = true;
 
-    JsonDecoder.registerTypeDecoder(Time, (o) => Time.from(o));
+    JsonDecoder.registerTypeDecoder(Time, (o, d) => Time.from(o));
   }
 
   int hour;

@@ -1,3 +1,12 @@
+## 1.3.7
+
+- Added `EntityReference`:
+  An entity field wrapper that allows lazy load of sub-entities.
+- Added `EntityResolutionRules` to allow lazy or eager selects.
+- `EntityProvider`:
+  - `getEntityByID`: Added parameter `sync`.
+- reflection_factory: ^1.2.9
+
 ## 1.3.6
 
 - Added integration with `AsyncEvent`.

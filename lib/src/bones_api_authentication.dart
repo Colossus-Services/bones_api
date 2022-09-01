@@ -33,6 +33,14 @@ class APICredential {
   APICredential._(
       this.username, this.usernameEntity, this.password, this.token);
 
+  /// Returns a copy of this [APICredential].
+  APICredential copy(
+          {bool withUsernameEntity = true,
+          bool withPassword = true,
+          bool withToken = true}) =>
+      APICredential._(username, withUsernameEntity ? usernameEntity : null,
+          withPassword ? password : null, withToken ? token : null);
+
   /// Returns a copy of this [APICredential] with [username].
   APICredential withUsername(String username) =>
       APICredential._(username, usernameEntity, password, token);

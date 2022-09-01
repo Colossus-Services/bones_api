@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.6
+// BUILDER: reflection_factory/1.2.9
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -35,7 +35,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.6');
+  Version get reflectionFactoryVersion => Version.parse('1.2.9');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -88,8 +88,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             '',
             () => (APIRoot apiRoot) => UserModule(apiRoot),
             const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection(APIRoot), 'apiRoot', false, true, null, null)
+              ParameterReflection(TypeReflection<APIRoot>(APIRoot), 'apiRoot',
+                  false, true, null, null)
             ],
             null,
             null,
@@ -148,7 +148,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         return FieldReflection<UserModule, T>(
           this,
           APIModule,
-          TypeReflection(APIRoot),
+          TypeReflection<APIRoot>(APIRoot),
           'apiRoot',
           false,
           (o) => () => o!.apiRoot as T,
@@ -190,7 +190,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         return FieldReflection<UserModule, T>(
           this,
           APIModule,
-          TypeReflection(APIConfig),
+          TypeReflection<APIConfig>(APIConfig),
           'apiConfig',
           false,
           (o) => () => o!.apiConfig as T,
@@ -232,7 +232,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         return FieldReflection<UserModule, T>(
           this,
           APIModule,
-          TypeReflection(APIRouteBuilder, [APIModule]),
+          TypeReflection<APIRouteBuilder<APIModule>>(APIRouteBuilder,
+              <TypeReflection>[TypeReflection<APIModule>(APIModule)]),
           'routes',
           false,
           (o) => () => o!.routes as T,
@@ -260,7 +261,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         return FieldReflection<UserModule, T>(
           this,
           APIModule,
-          TypeReflection(APISecurity),
+          TypeReflection<APISecurity>(APISecurity),
           'security',
           true,
           (o) => () => o!.security as T,
@@ -288,7 +289,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
         return FieldReflection<UserModule, T>(
           this,
           Initializable,
-          TypeReflection(InitializationStatus),
+          TypeReflection<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
           (o) => () => o!.initializationStatus as T,
@@ -445,7 +446,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'getUser',
-            TypeReflection(APIResponse, [User]),
+            TypeReflection<APIResponse<User>>(
+                APIResponse, <TypeReflection>[TypeReflection<User>(User)]),
             false,
             (o) => o!.getUser,
             obj,
@@ -462,14 +464,15 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'echoUser',
-            TypeReflection(APIResponse, [User]),
+            TypeReflection<APIResponse<User>>(
+                APIResponse, <TypeReflection>[TypeReflection<User>(User)]),
             false,
             (o) => o!.echoUser,
             obj,
             false,
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection(User), 'user', false, true, null, null)
+                  TypeReflection<User>(User), 'user', false, true, null, null)
             ],
             null,
             null,
@@ -479,16 +482,24 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'echoListUser',
-            TypeReflection(APIResponse, [
-              TypeReflection(List, [User])
+            TypeReflection<APIResponse<List<User>>>(
+                APIResponse, <TypeReflection>[
+              TypeReflection<List<User>>(
+                  List, <TypeReflection>[TypeReflection<User>(User)])
             ]),
             false,
             (o) => o!.echoListUser,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(List, [User]), 'users', false,
-                  true, null, null)
+              ParameterReflection(
+                  TypeReflection<List<User>>(
+                      List, <TypeReflection>[TypeReflection<User>(User)]),
+                  'users',
+                  false,
+                  true,
+                  null,
+                  null)
             ],
             null,
             null,
@@ -498,8 +509,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'echoListUser2',
-            TypeReflection(APIResponse, [
-              TypeReflection(List, [User])
+            TypeReflection<APIResponse<List<User>>>(
+                APIResponse, <TypeReflection>[
+              TypeReflection<List<User>>(
+                  List, <TypeReflection>[TypeReflection<User>(User)])
             ]),
             false,
             (o) => o!.echoListUser2,
@@ -508,8 +521,14 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             const <ParameterReflection>[
               ParameterReflection(
                   TypeReflection.tString, 'msg', false, true, null, null),
-              ParameterReflection(TypeReflection(List, [User]), 'users', false,
-                  true, null, null)
+              ParameterReflection(
+                  TypeReflection<List<User>>(
+                      List, <TypeReflection>[TypeReflection<User>(User)]),
+                  'users',
+                  false,
+                  true,
+                  null,
+                  null)
             ],
             null,
             null,
@@ -519,7 +538,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'getDynamic',
-            TypeReflection(APIResponse, [dynamic]),
+            TypeReflection<APIResponse<dynamic>>(
+                APIResponse, <TypeReflection>[TypeReflection.tDynamic]),
             false,
             (o) => o!.getDynamic,
             obj,
@@ -536,8 +556,9 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'getUserAsync',
-            TypeReflection(Future, [
-              TypeReflection(APIResponse, [User])
+            TypeReflection<Future<APIResponse<User>>>(Future, <TypeReflection>[
+              TypeReflection<APIResponse<User>>(
+                  APIResponse, <TypeReflection>[TypeReflection<User>(User)])
             ]),
             false,
             (o) => o!.getUserAsync,
@@ -555,8 +576,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             UserModule,
             'geDynamicAsync',
-            TypeReflection(Future, [
-              TypeReflection(APIResponse, [dynamic])
+            TypeReflection<Future<APIResponse<dynamic>>>(
+                Future, <TypeReflection>[
+              TypeReflection<APIResponse<dynamic>>(
+                  APIResponse, <TypeReflection>[TypeReflection.tDynamic])
             ]),
             false,
             (o) => o!.geDynamicAsync,
@@ -605,7 +628,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'initialize',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.initialize,
             obj,
@@ -619,7 +645,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'getRoutesHandlersNames',
-            TypeReflection(Iterable, [String]),
+            TypeReflection<Iterable<String>>(
+                Iterable, <TypeReflection>[TypeReflection.tString]),
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
@@ -627,8 +654,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'method': ParameterReflection(TypeReflection(APIRequestMethod),
-                  'method', true, false, null, null)
+              'method': ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'addroute':
@@ -636,30 +668,49 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'addRoute',
-            TypeReflection(APIModule),
+            TypeReflection<APIModule>(APIModule),
             false,
             (o) => o!.addRoute,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequestMethod), 'method',
-                  true, true, null, null),
+              ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  true,
+                  null,
+                  null),
               ParameterReflection(
                   TypeReflection.tString, 'name', false, true, null, null),
-              ParameterReflection(TypeReflection(APIRouteFunction, [dynamic]),
-                  'function', false, true, null, null)
+              ParameterReflection(
+                  TypeReflection<APIRouteFunction<dynamic>>(APIRouteFunction,
+                      <TypeReflection>[TypeReflection.tDynamic]),
+                  'function',
+                  false,
+                  true,
+                  null,
+                  null)
             ],
             null,
             const <String, ParameterReflection>{
               'parameters': ParameterReflection(
-                  TypeReflection(Map, [String, TypeInfo]),
+                  TypeReflection<Map<String, TypeInfo<dynamic>>>(
+                      Map, <TypeReflection>[
+                    TypeReflection.tString,
+                    TypeReflection<TypeInfo<dynamic>>(
+                        TypeInfo, <TypeReflection>[TypeReflection.tDynamic])
+                  ]),
                   'parameters',
                   true,
                   false,
                   null,
                   null),
               'rules': ParameterReflection(
-                  TypeReflection(Iterable, [APIRouteRule]),
+                  TypeReflection<Iterable<APIRouteRule>>(
+                      Iterable, <TypeReflection>[
+                    TypeReflection<APIRouteRule>(APIRouteRule)
+                  ]),
                   'rules',
                   true,
                   false,
@@ -672,7 +723,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'getRouteHandler',
-            TypeReflection(APIRouteHandler, [dynamic]),
+            TypeReflection<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getRouteHandler,
             obj,
@@ -682,8 +734,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
                   TypeReflection.tString, 'name', false, true, null, null)
             ],
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequestMethod), 'method',
-                  true, false, null, null)
+              ParameterReflection(
+                  TypeReflection<APIRequestMethod>(APIRequestMethod),
+                  'method',
+                  true,
+                  false,
+                  null,
+                  null)
             ],
             null,
             null);
@@ -692,14 +749,15 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'getRouteHandlerByRequest',
-            TypeReflection(APIRouteHandler, [dynamic]),
+            TypeReflection<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -715,8 +773,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -726,16 +784,18 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'call',
-            TypeReflection(FutureOr, [
-              TypeReflection(APIResponse, [dynamic])
+            TypeReflection<FutureOr<APIResponse<dynamic>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<APIResponse<dynamic>>(
+                  APIResponse, <TypeReflection>[TypeReflection.tDynamic])
             ]),
             false,
             (o) => o!.call,
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'request', false,
-                  true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'request', false, true, null, null)
             ],
             null,
             null,
@@ -751,8 +811,8 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             obj,
             false,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
-                  false, true, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'apiRequest', false, true, null, null)
             ],
             null,
             null,
@@ -762,15 +822,15 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             APIModule,
             'apiInfo',
-            TypeReflection(APIModuleInfo),
+            TypeReflection<APIModuleInfo>(APIModuleInfo),
             false,
             (o) => o!.apiInfo,
             obj,
             false,
             null,
             const <ParameterReflection>[
-              ParameterReflection(TypeReflection(APIRequest), 'apiRequest',
-                  true, false, null, null)
+              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
+                  'apiRequest', true, false, null, null)
             ],
             null,
             null);
@@ -779,7 +839,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             Initializable,
             'ensureInitialized',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.ensureInitialized,
             obj,
@@ -787,8 +850,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'ensureinitializedasync':
@@ -796,7 +864,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             Initializable,
             'ensureInitializedAsync',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
@@ -804,8 +875,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'doinitialization':
@@ -813,7 +889,10 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             Initializable,
             'doInitialization',
-            TypeReflection(FutureOr, [InitializationResult]),
+            TypeReflection<FutureOr<InitializationResult>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<InitializationResult>(InitializationResult)
+            ]),
             false,
             (o) => o!.doInitialization,
             obj,
@@ -821,8 +900,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             null,
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       case 'initializedependencies':
@@ -830,8 +914,11 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             this,
             Initializable,
             'initializeDependencies',
-            TypeReflection(FutureOr, [
-              TypeReflection(List, [Initializable])
+            TypeReflection<FutureOr<List<Initializable>>>(
+                FutureOr, <TypeReflection>[
+              TypeReflection<List<Initializable>>(List, <TypeReflection>[
+                TypeReflection<Initializable>(Initializable)
+              ])
             ]),
             false,
             (o) => o!.initializeDependencies,
@@ -867,7 +954,9 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             false,
             const <ParameterReflection>[
               ParameterReflection(
-                  TypeReflection(ExecuteInitializedCallback, [dynamic]),
+                  TypeReflection<ExecuteInitializedCallback<dynamic>>(
+                      ExecuteInitializedCallback,
+                      <TypeReflection>[TypeReflection.tDynamic]),
                   'callback',
                   false,
                   true,
@@ -876,8 +965,13 @@ class UserModule$reflection extends ClassReflection<UserModule> {
             ],
             null,
             const <String, ParameterReflection>{
-              'parent': ParameterReflection(TypeReflection(Initializable),
-                  'parent', true, false, null, null)
+              'parent': ParameterReflection(
+                  TypeReflection<Initializable>(Initializable),
+                  'parent',
+                  true,
+                  false,
+                  null,
+                  null)
             },
             null);
       default:

@@ -30,7 +30,7 @@ class APIConsole {
 
   /// Processes an API [request].
   FutureOr<APIResponse> processRequest(APIRequest request) {
-    var apiResponse = apiRoot.call(request);
+    var apiResponse = apiRoot.call(request, externalCall: true);
     return apiResponse;
   }
 

@@ -71,6 +71,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
+          'object',
           1,
           3,
           const DBAdapterCapability(
@@ -706,7 +707,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =
-              getEntityRepositoryByType(listEntityType.type);
+              getEntityRepositoryByTypeInfo(listEntityType);
           if (fieldListEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
@@ -719,9 +720,10 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
                   ? fieldListEntityRepository.getEntityID(v)
                   : v)
               .toList();
-        } else if (!fieldType.isPrimitiveType &&
-            EntityHandler.isValidEntityType(fieldType.type)) {
-          var fieldEntityRepository = getEntityRepositoryByType(fieldType.type);
+        } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
+          var entityType = fieldType.entityType!;
+          var fieldEntityRepository = getEntityRepositoryByType(entityType);
+
           if (fieldEntityRepository == null) {
             throw StateError(
                 "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");

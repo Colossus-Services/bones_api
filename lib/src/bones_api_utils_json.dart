@@ -21,10 +21,18 @@ class Json {
 
     Time.boot();
 
-    JsonDecoder.registerTypeDecoder(Decimal, (o) => Decimal.from(o));
-    JsonDecoder.registerTypeDecoder(DynamicInt, (o) => DynamicInt.from(o));
+    JsonDecoder.registerTypeDecoder(Decimal, (o, d) => Decimal.from(o));
+
+    JsonDecoder.registerTypeDecoder(DynamicInt, (o, d) => DynamicInt.from(o));
+
     JsonDecoder.registerTypeDecoder(
-        DynamicNumber, (o) => DynamicNumber.from(o));
+        DynamicNumber, (o, d) => DynamicNumber.from(o));
+
+    JsonDecoder.registerTypeDecoder(EntityReference, (o, jsonDecoder) {
+      var entityCache = jsonDecoder?.entityCache;
+      var entityProvider = entityCache?.asEntityProvider;
+      return EntityReference.from(o, entityProvider: entityProvider);
+    });
   }
 
   /// A standard implementation of mask filed.
@@ -465,4 +473,21 @@ class Json {
 
     return null;
   }
+}
+
+extension JsonEntityCacheExtension on JsonEntityCache {
+  EntityProvider get asEntityProvider => _EntityProviderFromEntityCache(this);
+}
+
+class _EntityProviderFromEntityCache implements EntityProvider {
+  final JsonEntityCache entityCache;
+
+  _EntityProviderFromEntityCache(this.entityCache);
+
+  @override
+  FutureOr<O?> getEntityByID<O>(id, {Type? type, bool sync = false}) =>
+      entityCache.getCachedEntityByID(id, type: type);
+
+  @override
+  String toString() => 'EntityProvider@$entityCache';
 }

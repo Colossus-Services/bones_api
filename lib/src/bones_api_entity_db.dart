@@ -159,6 +159,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
               .toList()
             ..sort((a, b) => a.value.length.compareTo(b.value.length));
 
+  /// The name of the adapter.
+  final String name;
+
   /// The minimum number of connections in the pool of this adapter.
   final int minConnections;
 
@@ -181,7 +184,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   final int instanceID = ++_instanceIDCount;
 
-  DBAdapter(this.minConnections, this.maxConnections, this.capability,
+  DBAdapter(
+      this.name, this.minConnections, this.maxConnections, this.capability,
       {this.parentRepositoryProvider,
       Object? populateSource,
       String? workingPath})
@@ -308,11 +312,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
     if (id == null || type == null) return null;
 
     var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
+      if (sync) return null;
       return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
     }
 
@@ -657,6 +662,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
+  EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
+      TypeInfo typeInfo) {
+    var entityType = typeInfo.entityType;
+    if (entityType == null) return null;
+
+    return getEntityRepositoryByType(entityType);
+  }
+
+  @override
   EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
     if (isClosed) return null;
 
@@ -933,22 +947,25 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
       Transaction? transaction,
-      int? limit}) {
+      int? limit,
+      EntityResolutionRules? resolutionRules}) {
     if (matcher is ConditionID) {
-      return _selectByID(transaction, matcher, parameters ?? namedParameters)
+      return _selectByID(transaction, matcher, parameters ?? namedParameters,
+              resolutionRules)
           .resolveMapped((res) => res != null ? <O>[res] : <O>[]);
     }
 
     if (matcher is ConditionIdIN) {
-      return _selectByIDs(transaction, matcher, parameters ?? namedParameters);
+      return _selectByIDs(
+          transaction, matcher, parameters ?? namedParameters, resolutionRules);
     }
 
     throw UnsupportedError(
         "Relationship select not supported for: (${matcher.runtimeType}) $matcher");
   }
 
-  FutureOr<O?> _selectByID(
-      Transaction? transaction, ConditionID matcher, Object? parameters) {
+  FutureOr<O?> _selectByID(Transaction? transaction, ConditionID matcher,
+      Object? parameters, EntityResolutionRules? resolutionRules) {
     var id = matcher.idValue ?? matcher.getID(parameters);
 
     if (id == null && parameters != null) {
@@ -962,7 +979,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     try {
       return repositoryAdapter.doSelectByID<O?>(op, id, preFinish: (results) {
-        return resolveEntities(op.transaction, [results])
+        return resolveEntities(op.transaction, [results],
+                resolutionRules: resolutionRules)
             .resolveMapped((os) => os.firstOrNull);
       });
     } catch (e, s) {
@@ -976,7 +994,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<List<O>> _selectByIDs(
-      Transaction? transaction, ConditionIdIN matcher, Object? parameters) {
+      Transaction? transaction,
+      ConditionIdIN matcher,
+      Object? parameters,
+      EntityResolutionRules? resolutionRules) {
     var ids = matcher.idsValues.whereNotNull().toList();
     if (ids.isEmpty) return <O>[];
 
@@ -985,7 +1006,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     try {
       return repositoryAdapter.doSelectByIDs<O>(op, ids, preFinish: (results) {
-        return resolveEntities(op.transaction, results);
+        return resolveEntities(op.transaction, results,
+            resolutionRules: resolutionRules);
       });
     } catch (e, s) {
       var message = '_selectByIDs> '
@@ -998,8 +1020,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<Iterable<O>> selectAll({Transaction? transaction, int? limit}) =>
-      select(ConditionANY(), limit: limit);
+  FutureOr<Iterable<O>> selectAll(
+          {Transaction? transaction,
+          int? limit,
+          EntityResolutionRules? resolutionRules}) =>
+      select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
 
   FutureOr<List<O>> resolveEntities(
       Transaction transaction, Iterable<Map<String, dynamic>?>? results,
@@ -1100,7 +1125,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     var fieldsEntityRepositories = fieldsEntity.entries
         .map((e) {
-          var fieldEntityRepository = _resolveEntityRepository(e.value.type);
+          var fieldEntityRepository = _resolveEntityRepository(e.value);
           return fieldEntityRepository != null
               ? MapEntry(e.key, fieldEntityRepository)
               : null;
@@ -1113,7 +1138,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         var tableColumn = _resolveEntityFieldToTableColumn(field);
 
         var fieldValues = resultsList.map((e) => e[tableColumn]).toList();
-        var fieldValuesUniques = fieldValues.toSet().toList();
+        var fieldValuesUniques = fieldValues.whereNotNull().toSet().toList();
 
         var entities = repo
             .selectByIDs(fieldValuesUniques, transaction: transaction)
@@ -1352,18 +1377,22 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           Transaction? transaction}) =>
       <dynamic, Iterable<dynamic>>{};
 
-  EntityRepository<E>? _resolveEntityRepository<E extends Object>(Type type) {
-    var entityRepository = entityHandler.getEntityRepositoryByType(type,
+  EntityRepository<E>? _resolveEntityRepository<E extends Object>(
+      TypeInfo type) {
+    var entityRepository = entityHandler.getEntityRepositoryByTypeInfo(type,
         entityRepositoryProvider: provider,
         entityHandlerProvider: entityHandler.provider);
     if (entityRepository != null) {
       return entityRepository as EntityRepository<E>;
     }
 
-    var typeEntityHandler = entityHandler.getEntityHandler(type: type);
+    var entityType = type.entityType;
+    if (entityType == null) return null;
+
+    var typeEntityHandler = entityHandler.getEntityHandler(type: entityType);
 
     if (typeEntityHandler != null) {
-      entityRepository = typeEntityHandler.getEntityRepositoryByType(type,
+      entityRepository = typeEntityHandler.getEntityRepositoryByType(entityType,
           entityRepositoryProvider: provider,
           entityHandlerProvider: entityHandler.provider);
       if (entityRepository != null) {
