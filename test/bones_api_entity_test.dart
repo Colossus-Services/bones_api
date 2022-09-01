@@ -290,9 +290,35 @@ void main() {
         expect(ref.entityToJson(), equals({'id': 105, 'info': 'The info'}));
       }
 
-      var myEntityProvider = _MyEntityProvider();
+      var myEntityProvider = _MyEntityProvider(allowSync: false);
+      var myEntityProviderSync = _MyEntityProvider(allowSync: true);
 
       expect(myEntityProvider.status, equals(0));
+      expect(myEntityProviderSync.status, equals(0));
+
+      {
+        var ref = EntityReference<UserInfo>.fromID(1001,
+            entityProvider: myEntityProviderSync);
+
+        expect(ref.isIdSet, isTrue);
+        expect(ref.isEntitySet, isTrue);
+        expect(ref.entity, equals(UserInfo('The 1001 info#0', id: 1001)));
+        expect(ref.entityTime, isNotNull);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReference': 'UserInfo',
+              'id': 1001,
+              'entity': {'id': 1001, 'info': 'The 1001 info#0'}
+            }));
+        expect(ref.entityToJson(),
+            equals({'id': 1001, 'info': 'The 1001 info#0'}));
+
+        expect(ref.get(), equals(UserInfo('The 1001 info#0', id: 1001)));
+        expect(ref.getNotNull(), equals(UserInfo('The 1001 info#0', id: 1001)));
+      }
 
       {
         var ref = EntityReference<UserInfo>.fromID(1001,
@@ -1001,10 +1027,16 @@ void main() {
 }
 
 class _MyEntityProvider implements EntityProvider {
+  final bool allowSync;
+
+  _MyEntityProvider({required this.allowSync});
+
   int status = 0;
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
+    if (sync && !allowSync) return null;
+
     type ??= O;
 
     if (type == UserInfo) {
