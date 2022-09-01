@@ -420,7 +420,6 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         }
 
         {
-          print('!!!');
           var user = await userAPIRepository.selectByID(1,
               resolutionRules:
                   EntityResolutionRules.fetch(eagerEntityTypes: [UserInfo]));
