@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
 
 /// Helper to work with positional fields.
 class PositionalFields {

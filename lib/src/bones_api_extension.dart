@@ -5,6 +5,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_module.dart';
 

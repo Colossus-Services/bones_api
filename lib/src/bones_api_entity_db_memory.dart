@@ -11,6 +11,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db_sql.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
