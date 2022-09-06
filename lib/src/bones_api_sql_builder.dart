@@ -7,6 +7,7 @@ import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
@@ -979,7 +980,7 @@ abstract class SQLGenerator {
     var fieldsEntries = entityHandler
         .fieldsTypes()
         .entries
-        .where((e) => !e.value.isListEntity)
+        .where((e) => !e.value.isListEntityOrReference)
         .toList();
 
     if (sortColumns) {
@@ -1000,7 +1001,7 @@ abstract class SQLGenerator {
           .toList();
 
       var columnName = normalizeColumnName(fieldName);
-      var comment = '$fieldType $fieldName';
+      var comment = '${fieldType.toString(withT: false)} $fieldName';
 
       String? refTable;
       String? refColumn;
@@ -1107,12 +1108,12 @@ abstract class SQLGenerator {
     var relationshipEntries = entityHandler
         .fieldsTypes()
         .entries
-        .where((e) => e.value.isListEntity)
+        .where((e) => e.value.isListEntityOrReference)
         .toList();
 
     for (var e in relationshipEntries) {
       var fieldName = e.key;
-      var fieldType = e.value.listEntityType!;
+      var fieldType = e.value.arguments0!;
 
       var entityFieldAnnotations = entityHandler
           .getFieldEntityAnnotations(null, fieldName)
@@ -1149,7 +1150,8 @@ abstract class SQLGenerator {
                   referenceTable: table, referenceColumn: idColumnName)
             ]),
         SQLEntry('COLUMN', ' $q$dstFieldName$q $relDstTypeSQL NOT NULL',
-            comment: '${e.value} @ $relDstTable.$relDstTableId',
+            comment:
+                '${e.value.toString(withT: false)} @ $relDstTable.$relDstTableId',
             columns: [
               SQLColumn(relName, dstFieldName,
                   referenceTable: relDstTable, referenceColumn: relDstTableId)

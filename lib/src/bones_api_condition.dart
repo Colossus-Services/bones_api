@@ -930,8 +930,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       TypeInfo? objType, EntityHandler? objEntityHandler) {
     if (objType == null) return null;
 
-    if (objType.isListEntity) {
-      objType = objType.listEntityType!;
+    if (objType.isListEntityOrReference) {
+      objType = objType.arguments0!;
     }
 
     if (objEntityHandler != null) {

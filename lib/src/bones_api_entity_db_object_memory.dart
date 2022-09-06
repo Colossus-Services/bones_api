@@ -332,7 +332,12 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
     }
 
     var entityType =
-        fieldType.isListEntity ? fieldType.listEntityType : fieldType;
+        fieldType.isListEntityOrReference ? fieldType.arguments0! : fieldType;
+
+    if (!EntityHandler.isValidEntityType(entityType.type)) {
+      return null;
+    }
+
     return entityType;
   }
 
@@ -703,7 +708,46 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       var fieldType = entityHandler.getFieldType(null, key);
 
       if (fieldType != null) {
-        if (fieldType.isIterable && fieldType.isListEntity) {
+        if (fieldType.isEntityReferenceType) {
+          var entityType = fieldType.arguments0!.type;
+          var fieldEntityRepository = getEntityRepositoryByType(entityType);
+
+          if (fieldEntityRepository == null) {
+            throw StateError(
+                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+          }
+
+          if (value is EntityReference) {
+            if (value.isNull) {
+              value = null;
+            } else if (value.isIdSet) {
+              value = value.id;
+            } else if (value.isEntitySet) {
+              value = fieldEntityRepository.getEntityID(value.entity);
+            } else {
+              throw StateError("Invalid state: $value");
+            }
+          } else if (!value.isPrimitiveValue) {
+            value = fieldEntityRepository.getEntityID(value);
+          }
+        } else if (fieldType.isEntityReferenceListType) {
+          var listEntityType = fieldType.arguments0!;
+
+          var fieldListEntityRepository =
+              getEntityRepositoryByTypeInfo(listEntityType);
+          if (fieldListEntityRepository == null) {
+            throw StateError(
+                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+          }
+
+          var valIter = value is Iterable ? value : [value];
+
+          value = valIter
+              .map((v) => fieldListEntityRepository.isOfEntityType(v)
+                  ? fieldListEntityRepository.getEntityID(v)
+                  : v)
+              .toList();
+        } else if (fieldType.isIterable && fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =

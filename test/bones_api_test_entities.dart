@@ -63,9 +63,10 @@ class UserAPIRepository extends APIRepository<User> {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
 
-  FutureOr<Iterable<User>> selectByINAddressStates(List<String> states) {
+  FutureOr<Iterable<User>> selectByINAddressStates(List<String> states,
+      {EntityResolutionRules? resolutionRules}) {
     return selectByQuery(' address.state =~ ? ',
-        namedParameters: {'state': states});
+        namedParameters: {'state': states}, resolutionRules: resolutionRules);
   }
 
   FutureOr<Iterable<User>> selectByINAddressStatesSingleValue(String state) {
@@ -201,7 +202,8 @@ class User extends Entity {
       case 'wakeUpTime':
         return TypeInfo(Time);
       case 'userInfo':
-        return TypeInfo.fromType(EntityReference, [UserInfo]);
+        return TypeInfo<EntityReference<UserInfo>>.fromType(
+            EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
       case 'creationTime':
         return TypeInfo(DateTime);
       default:
@@ -501,12 +503,14 @@ class Address extends Entity {
   int number;
 
   List<Store> stores;
-  List<Store> closedStores;
+  EntityReferenceList<Store> closedStores;
 
   Address(this.state, this.city, this.street, this.number,
-      {this.id, List<Store>? stores, List<Store>? closedStores})
+      {this.id, List<Store>? stores, Object? closedStores})
       : stores = stores ?? <Store>[],
-        closedStores = closedStores ?? <Store>[];
+        closedStores = EntityReferenceList<Store>.from(
+            closedStores ?? <Store>[],
+            entityHandler: storeEntityHandler);
 
   Address.empty() : this('', '', '', 0);
 
@@ -514,7 +518,7 @@ class Address extends Entity {
       : this(map.getAsString('state')!, map.getAsString('city')!,
             map.getAsString('street')!, map.getAsInt('number')!,
             stores: map.getAsList<Store>('stores', def: <Store>[])!,
-            closedStores: map.getAsList<Store>('closedStores', def: <Store>[])!,
+            closedStores: map['closedStores'],
             id: map.getAsInt('id'));
 
   @override
@@ -589,7 +593,8 @@ class Address extends Entity {
       case 'stores':
         return TypeInfo(List, [Store]);
       case 'closedStores':
-        return TypeInfo(List, [Store]);
+        return TypeInfo<EntityReferenceList<Store>>.fromType(
+            EntityReferenceList, [TypeInfo<Store>.fromType(Store)]);
       default:
         return null;
     }
@@ -645,7 +650,7 @@ class Address extends Entity {
         }
       case 'closedStores':
         {
-          closedStores = value as List<Store>;
+          closedStores = EntityReferenceList<Store>.from(value);
           break;
         }
       default:
@@ -661,7 +666,7 @@ class Address extends Entity {
         'street': street,
         'number': number,
         'stores': stores.map((e) => e.toJson()).toList(),
-        'closedStores': closedStores.map((e) => e.toJson()).toList(),
+        'closedStores': closedStores.toJson(),
       };
 }
 

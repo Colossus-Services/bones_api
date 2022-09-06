@@ -634,7 +634,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
-      if ((results.affectedRows ?? 0) == 0) {
+      var affectedRows = results.affectedRows ?? 0;
+      if (affectedRows == 0) {
         var entry = sql.parametersByPlaceholder;
         if (!allowAutoInsert) {
           throw StateError(

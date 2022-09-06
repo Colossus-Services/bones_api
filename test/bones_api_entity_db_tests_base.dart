@@ -442,9 +442,16 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
             equals(['s11', 's12']));
 
         expect(
-            (await addressAPIRepository.selectByID(1))
+            (await addressAPIRepository.selectByID(1))?.closedStores.entities,
+            isNull);
+
+        expect(
+            (await addressAPIRepository.selectByID(1,
+                    resolutionRules: EntityResolutionRules.fetchEagerAll()))
                 ?.closedStores
-                .map((e) => e.name),
+                .entities
+                ?.map((e) => e?.name)
+                .toList(),
             equals(['s9']));
 
         expect((await userAPIRepository.selectByAddress(address)).single.email,
@@ -692,6 +699,9 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           expect(sel.map((e) => e.address.state),
               unorderedEquals(['NY', 'CA', 'CA']));
 
+          expect(sel.map((e) => e.userInfo.entity?.info),
+              equals([null, null, null]));
+
           var sel2 =
               await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
 
@@ -705,8 +715,42 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         print(transaction);
 
         expect(result!.length, equals(3));
-        expect(transaction.length, equals(10));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.isAborted, isFalse);
+        expect(transaction.length, equals(8));
+        expect(transaction.cachedEntitiesLength, equals(11));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel = await userAPIRepository.selectByINAddressStates(
+              ['NY', 'CA'],
+              resolutionRules: EntityResolutionRules.fetchEagerAll());
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              unorderedEquals(['The user joe', null, null]));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.isAborted, isFalse);
+        expect(transaction.length, equals(9));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -719,6 +763,9 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           expect(sel.length, equals(3));
           expect(sel.map((e) => e.address.state),
               unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              equals([null, null, null]));
 
           var user1 = sel.first;
 
@@ -740,8 +787,49 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         print(transaction);
 
         expect(result!.length, equals(3));
+        expect(transaction.isAborted, isFalse);
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.cachedEntitiesLength, equals(11));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel = await userAPIRepository.selectByINAddressStates(
+              ['NY', 'CA'],
+              resolutionRules: EntityResolutionRules.fetchEagerAll());
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              unorderedEquals(['The user joe', null, null]));
+
+          var user1 = sel.first;
+
+          user1.level = 123;
+
+          var storeId = await userAPIRepository.store(user1);
+          expect(storeId, equals(user1.id));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.isAborted, isFalse);
+        expect(transaction.length, greaterThanOrEqualTo(7));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -754,6 +842,9 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           expect(sel.length, equals(3));
           expect(sel.map((e) => e.address.state),
               unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              equals([null, null, null]));
 
           var user1 = sel.firstWhere((e) => e.address.state == 'NY');
 
@@ -780,7 +871,50 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.cachedEntitiesLength, equals(11));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
+          var sel = await userAPIRepository.selectByINAddressStates(
+              ['NY', 'CA'],
+              resolutionRules: EntityResolutionRules.fetchEagerAll());
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              unorderedEquals(['The user joe', null, null]));
+
+          var user1 = sel.firstWhere((e) => e.address.state == 'NY');
+
+          user1.address.city = 'Jersey City';
+
+          var storeId = await userAPIRepository.store(user1);
+          expect(storeId, equals(user1.id));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          var user2 = sel.firstWhere((e) => e.address.state == 'NY');
+
+          expect(user2.address.city, equals('Jersey City'));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.length, greaterThanOrEqualTo(8));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {

@@ -849,7 +849,7 @@ class APIModuleHttpProxy implements ClassProxyListener {
 
     var typeInfo = returnType.typeInfo;
     var mainType =
-        typeInfo.isFuture ? (typeInfo.argumentType(0) ?? typeInfo) : typeInfo;
+        typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
 
     return mainType.fromJson(json);
   }

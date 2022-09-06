@@ -9,6 +9,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db_relational.dart';
 import 'bones_api_entity_sql.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
 
@@ -1040,8 +1041,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       entries = results;
     }
 
-    var fieldsEntity = entityHandler.fieldsWithTypeEntity();
-    var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
+    var fieldsEntity = entityHandler.fieldsWithTypeEntityOrReference();
+    var fieldsListEntity = entityHandler.fieldsWithTypeListEntityOrReference();
 
     if (fieldsListEntity.isNotEmpty) {
       var retTableScheme = repositoryAdapter.getTableScheme();
@@ -1060,6 +1061,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             entries,
             relationshipFields,
             fieldsListEntity,
+            resolutionRules,
           );
 
           return resolveRelationshipsFields.resolveAllWith(() =>
@@ -1125,7 +1127,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     var fieldsEntityRepositories = fieldsEntity.entries
         .map((e) {
-          var fieldEntityRepository = _resolveEntityRepository(e.value);
+          var fieldType = e.value;
+          if (fieldType.isEntityReferenceType) {
+            var entityType = fieldType.arguments0!.type;
+            var eagerEntityType =
+                resolutionRules?.isEagerEntityType(entityType) ?? false;
+            if (!eagerEntityType) return null;
+          }
+          var fieldEntityRepository = _resolveEntityRepository(fieldType);
           return fieldEntityRepository != null
               ? MapEntry(e.key, fieldEntityRepository)
               : null;
@@ -1172,12 +1181,13 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     return _resolveEntitiesSimple(transaction, resolutionRules, results);
   }
 
-  Iterable<FutureOr<bool>> _resolveRelationshipFields(
+  List<FutureOr<bool>> _resolveRelationshipFields(
     Transaction transaction,
     TableScheme tableScheme,
     Iterable<Map<String, dynamic>> results,
     Map<String, TableRelationshipReference> relationshipFields,
     Map<String, TypeInfo> fieldsListEntity,
+    EntityResolutionRules? resolutionRules,
   ) {
     var idFieldName = tableScheme.idFieldName!;
     var ids = results.map((e) => e[idFieldName]).toList();
@@ -1201,6 +1211,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var retRelationships = relationshipsAsync.resolveMapped((relationships) {
         var allTargetIds =
             relationships.values.expand((e) => e).toSet().toList();
+
+        if (fieldType.isEntityReferenceListType &&
+            !(resolutionRules?.isEagerEntityType(fieldType.arguments0!.type) ??
+                false)) {
+          return relationships.map((key, value) => MapEntry(key, value.asList));
+        }
 
         var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
             transaction: transaction);
@@ -1231,7 +1247,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           r[fieldName] = values;
         }
       }).resolveWithValue(true);
-    });
+    }).toList(growable: false);
   }
 
   // ignore: unused_element
@@ -1268,7 +1284,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
       var entries = fieldsListEntity.entries.map((e) {
         var fieldName = e.key;
-        var targetType = e.value.listEntityType!.type;
+        var targetType = e.value.arguments0!.type;
         var targetRepositoryAdapter =
             databaseAdapter.getRepositoryAdapterByType(targetType);
         if (targetRepositoryAdapter == null) return null;

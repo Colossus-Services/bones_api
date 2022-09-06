@@ -1,67 +1,8 @@
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
-
-import 'bones_api_entity.dart';
-
-/// Extension for entity [Type]s.
-extension APIEntityTypeExtension on Type {
-  /// Returns `true` if `this` [Type] is an [int] or [String].
-  bool get isEntityIDPrimitiveType {
-    var self = this;
-    return self == int || self == String;
-  }
-
-  /// Returns `true` if `this` [Type] is an [int], [BigInt] or [String].
-  bool get isEntityIDType {
-    var self = this;
-    return isEntityIDPrimitiveType || self == BigInt;
-  }
-}
-
-/// Extension for entity [Object]s.
-extension APIEntityObjectExtension on Object? {
-  /// Returns `true` if `this` object is an [int] or [String].
-  bool get isEntityIDPrimitiveType {
-    var self = this;
-    return self is int || self is String;
-  }
-
-  /// Returns `true` if `this` object is an [int], [BigInt] or [String].
-  bool get isEntityIDType {
-    var self = this;
-    return isEntityIDPrimitiveType || self is BigInt;
-  }
-
-  /// Returns `true` if `this` object is an [EntityReference].
-  bool get isEntityReference {
-    var self = this;
-    return self is EntityReference;
-  }
-
-  /// Returns an entity instance.
-  /// - If it's an [EntityReference] returns [EntityReference.entity].
-  /// - If ![isEntityIDType] returns `this` object.
-  /// - Otherwise returns `null`.
-  Object? get resolveEntityInstance {
-    var self = this;
-    return self is EntityReference
-        ? self.entity
-        : (!isEntityIDType ? self : null);
-  }
-}
-
-extension ListOfStringExtension on List<String> {
-  bool containsIgnoreCase(String s) {
-    for (var e in this) {
-      if (equalsIgnoreAsciiCase(e, s)) return true;
-    }
-    return false;
-  }
-}
 
 /// A [Time] represents the time of the day,
 /// independently of the day of the year, timezone or [DateTime].

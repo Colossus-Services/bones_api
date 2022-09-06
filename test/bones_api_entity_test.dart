@@ -118,6 +118,15 @@ void main() {
 
     test('basic', () {
       {
+        expect(
+            () => EntityReference<EntityReference<UserInfo>>.asNull(),
+            throwsA(isA<StateError>().having(
+                (e) => e.message,
+                'pointing to another reference',
+                contains('pointing to another reference type'))));
+      }
+
+      {
         var ref = EntityReference<UserInfo>.asNull();
 
         expect(ref.isNull, isTrue);
@@ -414,6 +423,468 @@ void main() {
     });
   });
 
+  group('EntityReferenceList', () {
+    setUpAll(() {
+      userInfoEntityHandler.ensureRegistered();
+    });
+
+    test('basic', () {
+      {
+        expect(
+            () => EntityReferenceList<EntityReferenceList<UserInfo>>.asNull(),
+            throwsA(isA<StateError>().having(
+                (e) => e.message,
+                'pointing to another reference',
+                contains('pointing to another reference type'))));
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.asNull();
+
+        expect(ref.isNull, isTrue);
+        expect(ref.isIDsSet, isFalse);
+        expect(ref.isEntitiesSet, isFalse);
+
+        expect(ref.toJson(), isNull);
+        expect(ref.entitiesToJson(), isNull);
+
+        expect(ref.equalsEntitiesIDs(null), isTrue);
+        expect(ref.equalsEntitiesIDs(123), isNull);
+        expect(ref.equalsEntitiesIDs([123]), isFalse);
+
+        expect(ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.asNull()),
+            isTrue);
+        expect(
+            ref.equalsEntitiesIDs(
+                EntityReferenceList<UserInfo>.fromIDs([123, 456])),
+            isFalse);
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.from(null);
+
+        expect(ref.isNull, isTrue);
+        expect(ref.isIDsSet, isFalse);
+        expect(ref.isEntitiesSet, isFalse);
+
+        expect(ref.toJson(), isNull);
+        expect(ref.entitiesToJson(), isNull);
+
+        expect(ref.equalsEntitiesIDs(null), isTrue);
+        expect(ref.equalsEntitiesIDs(123), isNull);
+        expect(ref.equalsEntitiesIDs([123]), isFalse);
+
+        expect(ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.asNull()),
+            isTrue);
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.fromIDs([123])),
+            isFalse);
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromIDs([101, 102]);
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isNull, isFalse);
+        expect(ref.isEntitiesSet, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [101, 102]
+            }));
+        expect(ref.entitiesToJson(), isNull);
+
+        expect(ref.equalsEntitiesIDs([101, 102]), isTrue);
+        expect(ref.equalsEntitiesIDs(102), isNull);
+        expect(ref.equalsEntitiesIDs([102]), isFalse);
+        expect(ref.equalsEntitiesIDs(null), isFalse);
+
+        expect(
+            ref.equalsEntitiesIDs(
+                EntityReferenceList<UserInfo>.fromIDs([101, 102])),
+            isTrue);
+
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.fromIDs([102])),
+            isFalse);
+
+        expect(ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.asNull()),
+            isFalse);
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromEntities(
+            [UserInfo('The info 2', id: 102), UserInfo('The info 3', id: 103)]);
+
+        expect(ref.isEntitiesSet, isTrue);
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [102, 103],
+              'entities': [
+                {'id': 102, 'info': 'The info 2'},
+                {'id': 103, 'info': 'The info 3'}
+              ]
+            }));
+
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 102, 'info': 'The info 2'},
+              {'id': 103, 'info': 'The info 3'}
+            ]));
+
+        expect(ref.equalsEntitiesIDs([102, 103]), isTrue);
+        expect(ref.equalsEntitiesIDs([103]), isFalse);
+        expect(ref.equalsEntitiesIDs(103), isNull);
+        expect(ref.equalsEntitiesIDs(null), isFalse);
+
+        expect(
+            ref.equalsEntitiesIDs(
+                EntityReferenceList<UserInfo>.fromIDs([102, 103])),
+            isTrue);
+
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.fromIDs([103])),
+            isFalse);
+
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.fromEntities([
+              UserInfo('The info 2', id: 102),
+              UserInfo('The info 3', id: 103)
+            ])),
+            isTrue);
+
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.fromEntities(
+                [UserInfo('The info', id: 104)])),
+            isFalse);
+
+        expect(
+            ref.equalsEntitiesIDs([
+              UserInfo('The info 2', id: 102),
+              UserInfo('The info 3', id: 103)
+            ]),
+            isTrue);
+        expect(ref.equalsEntitiesIDs([UserInfo('The info', id: 104)]), isFalse);
+
+        expect(ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.asNull()),
+            isFalse);
+
+        expect(ref.equalsEntitiesIDs(ref), isTrue);
+
+        var entities = ref.entities!;
+
+        expect(ref.equalsEntitiesIDs(entities), isTrue);
+
+        expect(
+            ref.equalsEntitiesIDs(EntityReferenceList<UserInfo>.from(entities)),
+            isTrue);
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromEntitiesMaps([
+          {'id': 103, 'info': 'The info 3'},
+          {'id': 104, 'info': 'The info 4'}
+        ]);
+
+        expect(ref.isEntitiesSet, isTrue);
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [103, 104],
+              'entities': [
+                {'id': 103, 'info': 'The info 3'},
+                {'id': 104, 'info': 'The info 4'}
+              ]
+            }));
+
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 103, 'info': 'The info 3'},
+              {'id': 104, 'info': 'The info 4'}
+            ]));
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromJson(
+            {'id': 104, 'info': 'The info'});
+
+        expect(ref.isEntitiesSet, isTrue);
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [104],
+              'entities': [
+                {'id': 104, 'info': 'The info'}
+              ]
+            }));
+
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 104, 'info': 'The info'}
+            ]));
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromJson({
+          'EntityReferenceList': 'UserInfo',
+          'id': [105, 106],
+          'entities': [
+            {'id': 105, 'info': 'The info 5'},
+            {'id': 106, 'info': 'The info 6'}
+          ]
+        });
+
+        expect(ref.isEntitiesSet, isTrue);
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [105, 106],
+              'entities': [
+                {'id': 105, 'info': 'The info 5'},
+                {'id': 106, 'info': 'The info 6'}
+              ]
+            }));
+
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 105, 'info': 'The info 5'},
+              {'id': 106, 'info': 'The info 6'}
+            ]));
+      }
+
+      var myEntityProvider = _MyEntityProvider(allowSync: false);
+      var myEntityProviderSync = _MyEntityProvider(allowSync: true);
+
+      expect(myEntityProvider.status, equals(0));
+      expect(myEntityProviderSync.status, equals(0));
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromIDs([1001, 1002],
+            entityProvider: myEntityProviderSync);
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isEntitiesSet, isTrue);
+        expect(
+            ref.entities,
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+        expect(ref.entitiesTime, isNotNull);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [1001, 1002],
+              'entities': [
+                {'id': 1001, 'info': 'The 1001 info#0'},
+                {'id': 1002, 'info': 'The 1002 info#0'}
+              ]
+            }));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1001, 'info': 'The 1001 info#0'},
+              {'id': 1002, 'info': 'The 1002 info#0'}
+            ]));
+
+        expect(
+            ref.get(),
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+        expect(
+            ref.getNotNull(),
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+      }
+
+      {
+        var ref = EntityReferenceList<UserInfo>.fromIDs([1001, 1002],
+            entityProvider: myEntityProvider);
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isEntitiesSet, isFalse);
+        expect(ref.entities, isNull);
+        expect(ref.entitiesTime, isNull);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [1001, 1002]
+            }));
+        expect(ref.entitiesToJson(), isNull);
+
+        expect(
+            ref.get(),
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+        expect(
+            ref.getNotNull(),
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isEntitiesSet, isTrue);
+        expect(ref.entities, isNotNull);
+        expect(ref.entitiesTime, isNotNull);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.entities,
+            equals([
+              UserInfo('The 1001 info#0', id: 1001),
+              UserInfo('The 1002 info#0', id: 1002)
+            ]));
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [1001, 1002],
+              'entities': [
+                {'id': 1001, 'info': 'The 1001 info#0'},
+                {'id': 1002, 'info': 'The 1002 info#0'}
+              ]
+            }));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1001, 'info': 'The 1001 info#0'},
+              {'id': 1002, 'info': 'The 1002 info#0'}
+            ]));
+
+        myEntityProvider.status++;
+
+        expect(
+            ref.refresh(),
+            equals([
+              UserInfo('The 1001 info#1', id: 1001),
+              UserInfo('The 1002 info#1', id: 1002)
+            ]));
+        expect(
+            ref.entities,
+            equals([
+              UserInfo('The 1001 info#1', id: 1001),
+              UserInfo('The 1002 info#1', id: 1002)
+            ]));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1001, 'info': 'The 1001 info#1'},
+              {'id': 1002, 'info': 'The 1002 info#1'}
+            ]));
+
+        expect(
+            ref.toJson(),
+            equals({
+              'EntityReferenceList': 'UserInfo',
+              'ids': [1001, 1002],
+              'entities': [
+                {'id': 1001, 'info': 'The 1001 info#1'},
+                {'id': 1002, 'info': 'The 1002 info#1'}
+              ]
+            }));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1001, 'info': 'The 1001 info#1'},
+              {'id': 1002, 'info': 'The 1002 info#1'}
+            ]));
+
+        ref.disposeEntities();
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isEntitiesSet, isFalse);
+        expect(ref.isNull, isFalse);
+
+        expect(
+            ref.refresh(),
+            equals([
+              UserInfo('The 1001 info#1', id: 1001),
+              UserInfo('The 1002 info#1', id: 1002)
+            ]));
+        expect(
+            ref.entities,
+            equals([
+              UserInfo('The 1001 info#1', id: 1001),
+              UserInfo('The 1002 info#1', id: 1002)
+            ]));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1001, 'info': 'The 1001 info#1'},
+              {'id': 1002, 'info': 'The 1002 info#1'}
+            ]));
+
+        ref.setIDs([1002]);
+
+        expect(ref.isIDsSet, isTrue);
+        expect(ref.isEntitiesSet, isFalse);
+        expect(ref.isNull, isFalse);
+
+        expect(ref.refresh(), equals([UserInfo('The 1002 info#1', id: 1002)]));
+        expect(ref.entities, equals([UserInfo('The 1002 info#1', id: 1002)]));
+        expect(
+            ref.entitiesToJson(),
+            equals([
+              {'id': 1002, 'info': 'The 1002 info#1'}
+            ]));
+
+        ref.setIDs(null);
+
+        expect(ref.isNull, isTrue);
+        expect(ref.isIDsSet, isFalse);
+        expect(ref.isEntitiesSet, isFalse);
+
+        expect(ref.refresh(), isNull);
+        expect(ref.entities, isNull);
+        expect(ref.entitiesToJson(), isNull);
+        expect(ref.toJson(), isNull);
+      }
+
+      expect(() => EntityReferenceList<Object>.asNull(), throwsStateError);
+      expect(() => EntityReferenceList<List>.asNull(), throwsStateError);
+      expect(() => EntityReferenceList<Map>.asNull(), throwsStateError);
+      expect(() => EntityReferenceList<Set>.asNull(), throwsStateError);
+      expect(() => EntityReferenceList<Iterable>.asNull(), throwsStateError);
+    });
+  });
+
   group('Entity', () {
     late final SetEntityRepository<Store> storeRepository;
     late final SetEntityRepository<Address> addressRepository;
@@ -471,11 +942,11 @@ void main() {
           creationTime: DateTime.utc(2021, 10, 12, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101,"stores":[],"closedStores":[]},"roles":[{"enabled":true,"type":"admin"}],"level":10,"userInfo":{"EntityReference":"UserInfo","id":123,"entity":{"id":123,"info":"The user 1"}},"creationTime":"2020-10-11 12:13:14.000Z"}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101,"stores":[],"closedStores":{"EntityReferenceList":"Store"}},"roles":[{"enabled":true,"type":"admin"}],"level":10,"userInfo":{"EntityReference":"UserInfo","id":123,"entity":{"id":123,"info":"The user 1"}},"creationTime":"2020-10-11 12:13:14.000Z"}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404,"stores":[{"name":"s1","number":1}],"closedStores":[{"name":"s2","number":2}]},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","userInfo":null,"creationTime":"2021-10-11 12:13:14.000Z"}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store","entities":[{"name":"s2","number":2}]}},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","userInfo":null,"creationTime":"2021-10-11 12:13:14.000Z"}';
       var user3Json =
-          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101,"stores":[{"name":"s1","number":1}],"closedStores":[]},"roles":[],"wakeUpTime":"00:13:14.150","userInfo":null,"creationTime":"2021-10-12 12:13:14.000Z"}';
+          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store"}},"roles":[],"wakeUpTime":"00:13:14.150","userInfo":null,"creationTime":"2021-10-12 12:13:14.000Z"}';
 
       addressEntityHandler.inspectObject(user1.address);
       roleEntityHandler.inspectObject(user1.roles.first);
@@ -497,6 +968,64 @@ void main() {
 
       await userEntityHandler.setFieldsFromMap(user1b, user2.toJson());
       expect(user1b, equals(user2));
+    });
+
+    test('EntityHandler fieldsWithType...', () async {
+      expect(
+          userEntityHandler
+              .fieldsWithTypeEntity()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({'address': '<T:dynamic> Address'}));
+
+      expect(
+          userEntityHandler
+              .fieldsWithTypeEntityOrReference()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({
+            'address': '<T:dynamic> Address',
+            'userInfo':
+                '<T:EntityReference<UserInfo>> EntityReference<<T:UserInfo> UserInfo>'
+          }));
+
+      expect(
+          userEntityHandler
+              .fieldsWithTypeListEntity()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({'roles': '<T:dynamic> List<<T:dynamic> Role>'}));
+
+      expect(
+          userEntityHandler
+              .fieldsWithTypeListEntityOrReference()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({'roles': '<T:dynamic> List<<T:dynamic> Role>'}));
+
+      expect(
+          addressEntityHandler
+              .fieldsWithTypeEntity()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({}));
+
+      expect(
+          addressEntityHandler
+              .fieldsWithTypeEntityOrReference()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({}));
+
+      expect(
+          addressEntityHandler
+              .fieldsWithTypeListEntity()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({'stores': '<T:dynamic> List<<T:dynamic> Store>'}));
+
+      expect(
+          addressEntityHandler
+              .fieldsWithTypeListEntityOrReference()
+              .map((k, v) => MapEntry(k, '$v')),
+          equals({
+            'stores': '<T:dynamic> List<<T:dynamic> Store>',
+            'closedStores':
+                '<T:EntityReferenceList<Store>> EntityReferenceList<<T:Store> Store>'
+          }));
     });
 
     test('basic', () async {

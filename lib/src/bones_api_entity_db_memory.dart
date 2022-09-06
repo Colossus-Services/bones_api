@@ -22,9 +22,12 @@ class DBMemorySQLAdapterContext
     implements Comparable<DBMemorySQLAdapterContext> {
   final int id;
 
+  final DBMemorySQLAdapter sqlAdapter;
+
   final Map<String, int> tablesVersions;
 
-  DBMemorySQLAdapterContext(this.id, this.tablesVersions);
+  DBMemorySQLAdapterContext(this.id, this.sqlAdapter)
+      : tablesVersions = sqlAdapter.tablesVersions;
 
   bool _closed = false;
 
@@ -155,6 +158,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     if (!super.close()) return false;
 
     _tables.clear();
+    _onTablesModification();
+
     return true;
   }
 
@@ -167,9 +172,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   @override
   DBMemorySQLAdapterContext createConnection() {
     var id = ++_connectionCount;
-    var tablesVersions = this.tablesVersions;
-
-    return DBMemorySQLAdapterContext(id, tablesVersions);
+    return DBMemorySQLAdapterContext(id, this);
   }
 
   @override
@@ -181,8 +184,15 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   final Map<String, MapHistory<Object, Map<String, dynamic>>> _tables =
       <String, MapHistory<Object, Map<String, dynamic>>>{};
 
+  void _onTablesModification() {
+    _tablesVersions = null;
+  }
+
+  Map<String, int>? _tablesVersions;
+
   Map<String, int> get tablesVersions =>
-      _tables.map((key, value) => MapEntry(key, value.version));
+      _tablesVersions ??= UnmodifiableMapView(
+          _tables.map((key, value) => MapEntry(key, value.version)));
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
@@ -197,6 +207,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       }
 
       _tables[table] = map = MapHistory<Object, Map<String, dynamic>>();
+      _onTablesModification();
+
       return map;
     } else {
       return null;
@@ -379,6 +391,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     var id = nextID(table);
     map[id] = entry;
 
+    _onTablesModification();
+
     return id;
   }
 
@@ -400,6 +414,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     entry[idField] = id;
 
     map[id] = entry;
+
+    _onTablesModification();
 
     return id;
   }
@@ -434,12 +450,26 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
           if (id != null) {
             return MapEntry(key, id);
           } else if (value.isEntitySet) {
-            fieldType = TypeInfo.fromType(value.type);
+            fieldType = fieldType.arguments0!;
             value = value.entity;
           }
-        }
+        } else if (fieldType.isEntityReferenceListType &&
+            value is EntityReferenceList) {
+          if (value.isNull) {
+            return MapEntry(key, null);
+          }
 
-        if (fieldType.isIterable && fieldType.isListEntity) {
+          var ids = value.ids;
+
+          if (ids != null) {
+            return MapEntry(key, ids);
+          } else if (value.isEntitiesSet) {
+            var entityType = fieldType.arguments0!;
+            fieldType = entityType.callCasted(
+                <E>() => TypeInfo<List<E>>.fromType(List, [entityType]));
+            value = value.entities;
+          }
+        } else if (fieldType.isIterable && fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =
@@ -478,6 +508,18 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
           return MapEntry(key, id);
         } else if (value.isEntitySet) {
           value = value.entityToJson();
+        }
+      } else if (value is EntityReferenceList) {
+        if (value.isNull) {
+          return MapEntry(key, null);
+        }
+
+        var ids = value.ids;
+
+        if (ids != null) {
+          return MapEntry(key, ids);
+        } else if (value.isEntitiesSet) {
+          value = value.entitiesToJson()!;
         }
       }
 
@@ -520,6 +562,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
 
       map[id] = updated;
     }
+
+    _onTablesModification();
 
     return id;
   }
@@ -687,11 +731,15 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   List<Map<String, dynamic>> _removeEntries(
       List<MapEntry<Object, Map<String, dynamic>>> entries,
       Map<Object, Map<String, dynamic>> map) {
+    if (entries.isEmpty) return <Map<String, dynamic>>[];
+
     var del = entries.map((e) => e.value).toList();
 
     for (var e in entries) {
       map.remove(e.key);
     }
+
+    _onTablesModification();
 
     return del;
   }
@@ -720,11 +768,12 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       var fieldId = entityHandler.idFieldName();
       var id = obj2[fieldId];
 
-      var fieldsListEntity = entityHandler.fieldsWithTypeListEntity();
+      var fieldsListEntity =
+          entityHandler.fieldsWithTypeListEntityOrReference();
 
       for (var e in fieldsListEntity.entries) {
         var fieldKey = e.key;
-        var fieldType = e.value.listEntityType!;
+        var fieldType = e.value.arguments0!;
 
         var targetObjs = _resolveEntityFieldRelationshipTables(
             relationshipsTables, id, fieldType);
@@ -886,7 +935,9 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     var relationshipFields =
         Map<String, TypeInfo>.fromEntries(entityFieldsTypes.entries.where((e) {
       var fieldType = e.value;
-      if (fieldType.isCollection != onlyCollectionReferences) return false;
+      var isCollection =
+          fieldType.isCollection || fieldType.isEntityReferenceListType;
+      if (isCollection != onlyCollectionReferences) return false;
 
       var entityType = _resolveEntityType(fieldType);
       if (entityType == null || entityType.isBasicType) return false;
@@ -928,7 +979,13 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     }
 
     var entityType =
-        fieldType.isListEntity ? fieldType.listEntityType : fieldType;
+        fieldType.isListEntityOrReference ? fieldType.arguments0 : fieldType;
+
+    if (entityType == null ||
+        !EntityHandler.isValidEntityType(entityType.type)) {
+      return null;
+    }
+
     return entityType;
   }
 
@@ -1066,6 +1123,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   void _consolidateTable(String table, int targetVersion) {
     var tableMap = _tables[table];
     tableMap?.consolidate(targetVersion);
+    _onTablesModification();
   }
 
   void _rollbackTables(Map<String, int> tablesVersions) {
@@ -1079,6 +1137,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   void _rollbackTable(String table, int targetVersion) {
     var tableMap = _tables[table];
     tableMap?.rollback(targetVersion);
+    _onTablesModification();
   }
 
   @override

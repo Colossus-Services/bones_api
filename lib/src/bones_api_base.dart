@@ -891,6 +891,9 @@ class APIRequest extends APIPayload {
   /// The [DateTime] of this request.
   final DateTime time;
 
+  /// The [Duration] to parse this request (optional).
+  final Duration? parsingDuration;
+
   /// The payload/body of the request.
   @override
   final dynamic payload;
@@ -970,6 +973,7 @@ class APIRequest extends APIPayload {
       APIRequesterSource? requesterSource,
       String? requesterAddress,
       DateTime? time,
+      this.parsingDuration,
       Uri? requestedUri,
       this.originalRequest})
       : parameters = parameters ?? <String, dynamic>{},

@@ -1,3 +1,11 @@
+## 1.3.8
+
+- `/API-INFO`:
+  - Now accepts a selected module. Example: `/API-INFO/user`
+- Added `APIRequest.parsingDuration`.
+- Added `EntityReferenceList`: a version of `EntityReference` for entities lists.
+- Fix `EntityRepository._entitiesTracker`: now tracked fields values are isolated from tracked entity.
+
 ## 1.3.7
 
 - Added `EntityReference`:

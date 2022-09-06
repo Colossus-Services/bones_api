@@ -1,3 +1,4 @@
+import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
@@ -127,7 +128,7 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
     if (typeInfo.isOf(APIResponse) || typeInfo.isDynamic) return true;
 
     if (typeInfo.isFuture || typeInfo.isFutureOr) {
-      var arg = typeInfo.argumentType(0);
+      var arg = typeInfo.arguments0;
       if (arg == null) return false;
 
       if (arg.isOf(APIResponse) || arg.isDynamic) return true;
@@ -342,5 +343,487 @@ extension MapMultiValueExtension<K> on Map<K, Object> {
     if (prev is List) return prev.isEmpty ? null : prev.first.toString();
 
     return null;
+  }
+}
+
+/// Extension over [TypeReflection] for entity functionalities.
+extension TypeReflectionEntityExtension<T> on TypeReflection<T> {
+  /// The argument at index `0` (in [arguments]).
+  TypeReflection? get arguments0 {
+    final arguments = this.arguments;
+    return arguments.isNotEmpty ? arguments[0] : null;
+  }
+
+  /// Returns `true` if [isListEntity] OR [isEntityReferenceListType].
+  bool get isListEntityOrReference => isListEntity || isEntityReferenceListType;
+
+  /// Returns the entity [TypeInfo] if [isListEntityOrReference].
+  TypeReflection? get listEntityOrReferenceType =>
+      isListEntityOrReference ? arguments0 : null;
+
+  /// Returns `true` if [isListEntity] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
+  bool get isValidListEntityType =>
+      isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
+
+  /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
+  bool get isValidListEntityOrReferenceType => isListEntityOrReference
+      ? EntityHandler.isValidEntityType(arguments0!.type)
+      : false;
+
+  /// Returns `true` if [type] is equals to [EntityReference].
+  bool get isEntityReferenceType => type == EntityReference;
+
+  /// Returns `true` if [type] is equals to [EntityReferenceList].
+  bool get isEntityReferenceListType => type == EntityReferenceList;
+
+  /// Returns a valid entity [Type].
+  /// If this [TypeInfo] is an [EntityReference] it will return the [EntityReference.type].
+  /// See [EntityHandler.isValidEntityType].
+  Type? get entityType {
+    var type = this.type;
+
+    Type? entityType;
+    if (type.isEntityReferenceBaseType) {
+      var arguments = this.arguments;
+      entityType = arguments.isNotEmpty ? arguments0!.type : null;
+    } else {
+      entityType = type;
+    }
+
+    return EntityHandler.isValidEntityType(entityType) ? entityType : null;
+  }
+}
+
+/// Extension over [TypeInfo] for entity functionalities.
+extension TypeInfoEntityExtension<T> on TypeInfo<T> {
+  /// The argument at index `0` (in [arguments]).
+  TypeInfo? get arguments0 => argumentType(0);
+
+  /// Returns `true` if [isListEntity] OR [isEntityReferenceListType].
+  bool get isListEntityOrReference => isListEntity || isEntityReferenceListType;
+
+  /// Returns the entity [TypeInfo] if [isListEntityOrReference].
+  TypeInfo? get listEntityOrReferenceType =>
+      isListEntityOrReference ? arguments0 : null;
+
+  /// Returns `true` if [isListEntity] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
+  bool get isValidListEntityType =>
+      isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
+
+  /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
+  bool get isValidListEntityOrReferenceType => isListEntityOrReference
+      ? EntityHandler.isValidEntityType(arguments0!.type)
+      : false;
+
+  /// Returns `true` if [type] is equals to [EntityReference].
+  bool get isEntityReferenceType => type == EntityReference;
+
+  /// Returns `true` if [type] is equals to [EntityReferenceList].
+  bool get isEntityReferenceListType => type == EntityReferenceList;
+
+  /// Returns `true` if [type] is equals to [EntityReference] OR [EntityReferenceList].
+  bool get isEntityReferenceBaseType =>
+      type == EntityReference || type == EntityReferenceList;
+
+  /// Returns a valid entity [Type].
+  /// If this [TypeInfo] is an [EntityReference] it will return the [EntityReference.type].
+  /// See [EntityHandler.isValidEntityType].
+  Type? get entityType {
+    var type = this.type;
+
+    Type? entityType;
+    if (type.isEntityReferenceBaseType) {
+      entityType = arguments0?.type;
+    } else {
+      entityType = type;
+    }
+
+    return EntityHandler.isValidEntityType(entityType) ? entityType : null;
+  }
+
+  bool equalsEntityType(TypeInfo? other) {
+    if (other == null) return false;
+
+    var entityType1 = entityType;
+    if (entityType1 == null) return false;
+
+    var entityType2 = other.entityType;
+
+    var eq = entityType1 == entityType2;
+    return eq;
+  }
+
+  bool equalsTypeOrEntityType(TypeInfo? other) {
+    if (other == null) return false;
+    return equalsType(other) || equalsEntityType(other);
+  }
+
+  E? parseEntity<E>(Object? value) {
+    if (isEntityReferenceType) {
+      var entityType = arguments0;
+      if (entityType != null) {
+        return entityType.parse<E>(value);
+      }
+    } else if (isEntityReferenceListType) {
+      var entityType = arguments0;
+      if (entityType != null) {
+        return entityType.parse<E>(value);
+      }
+    }
+
+    return parse<E>(value);
+  }
+
+  V? resolveValue<V>(Object? value,
+      {EntityHandler<T>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityFetcher<T>? entityFetcher}) {
+    Object? resolvedValue = value;
+
+    var forceToEntityReference = false;
+    var forceToEntityReferenceList = false;
+
+    if (value is EntityReference) {
+      if (isEntityReferenceType) {
+        if (genericType != value.genericType &&
+            genericType != Object &&
+            genericType != dynamic) {
+          forceToEntityReference = true;
+        }
+      } else {
+        if (value.isNull) {
+          resolvedValue = null;
+        } else if (value.isEntitySet && value.entity is V) {
+          resolvedValue = value.entity;
+        } else if (value.isIdSet && value.id is V) {
+          resolvedValue = value.id;
+        }
+      }
+    } else if (value is EntityReferenceList) {
+      if (isEntityReferenceListType || isEntityReferenceType) {
+        if (genericType != value.genericType &&
+            genericType != Object &&
+            genericType != dynamic) {
+          forceToEntityReferenceList = true;
+        }
+      } else {
+        if (value.isNull) {
+          resolvedValue = null;
+        } else if (value.isEntitiesSet && value.entities is V) {
+          resolvedValue = value.entities;
+        } else if (value.isIDsSet && value.ids is V) {
+          resolvedValue = value.ids;
+        }
+      }
+    } else if (isEntityReferenceListType) {
+      forceToEntityReferenceList = true;
+    } else if (isEntityReferenceType) {
+      forceToEntityReference = true;
+    }
+
+    if (forceToEntityReferenceList) {
+      var t = isEntityReferenceListType ? arguments0! : this;
+
+      resolvedValue = t.toEntityReferenceList(value,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entityFetcher: entityFetcher);
+    } else if (forceToEntityReference) {
+      var t = isEntityReferenceType ? arguments0! : this;
+
+      resolvedValue = t.toEntityReference(value,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entityFetcher: entityFetcher);
+    }
+
+    return resolvedValue as V?;
+  }
+
+  EntityReference<T> toEntityReference(Object? o,
+      {Type? type,
+      String? typeName,
+      EntityHandler<T>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityFetcher<T>? entityFetcher}) {
+    if (isEntityReferenceType) {
+      var entityType = arguments0;
+
+      throw StateError(
+          "This `TypeInfo` is an `EntityReference` type! `toEntityReference` should be called in the type argument#0 of this `TypeInfo`: $entityType");
+    }
+
+    EntityReference<E> castCall<E>() {
+      EntityHandler<E>? oEntityHandler;
+      if (entityHandler != null) {
+        oEntityHandler = entityHandler is EntityHandler<E>
+            ? (entityHandler as EntityHandler<E>)
+            : entityHandler.getEntityHandler<E>(type: type);
+      }
+
+      return _toEntityReferenceImpl<E>(
+          o,
+          type,
+          typeName,
+          oEntityHandler,
+          entityProvider,
+          entityHandlerProvider,
+          entityFetcher as EntityFetcher<E>?);
+    }
+
+    return callCasted<EntityReference>(castCall) as EntityReference<T>;
+  }
+
+  EntityReference<E> _toEntityReferenceImpl<E>(
+      Object? o,
+      Type? type,
+      String? typeName,
+      EntityHandler<E>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityFetcher<E>? entityFetcher) {
+    type ??= this.type;
+
+    if (o == null) {
+      return EntityReference<E>.asNull(
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entityFetcher: entityFetcher);
+    } else if (o is EntityReference) {
+      return o as EntityReference<E>;
+    } else if (o.isEntityIDType) {
+      return EntityReference<E>.fromID(o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entityFetcher: entityFetcher);
+    } else if (o is Map<String, dynamic>) {
+      return EntityReference<E>.fromJson(o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entityFetcher: entityFetcher);
+    } else {
+      return EntityReference<E>.from(o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entityFetcher: entityFetcher);
+    }
+  }
+
+  EntityReferenceList<T> toEntityReferenceList(Object? o,
+      {Type? type,
+      String? typeName,
+      EntityHandler<T>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntitiesFetcher<T>? entitiesFetcher,
+      EntityFetcher<T>? entityFetcher}) {
+    if (isEntityReferenceListType) {
+      var entityType = arguments0;
+
+      throw StateError(
+          "This `TypeInfo` is an `EntityReferenceList` type! `toEntityReferenceList` should be called in the type argument#0 of this `TypeInfo`: $entityType");
+    }
+
+    if (entityFetcher != null && entitiesFetcher == null) {
+      entitiesFetcher = (ids, type) => ids
+          .map((id) => id == null ? null : entityFetcher(id, type))
+          .toList()
+          .resolveAll();
+    }
+
+    EntityReferenceList<E> castCall<E>() {
+      EntityHandler<E>? oEntityHandler;
+      if (entityHandler != null) {
+        oEntityHandler = entityHandler is EntityHandler<E>
+            ? (entityHandler as EntityHandler<E>)
+            : entityHandler.getEntityHandler<E>(type: type);
+      }
+
+      return _toEntityReferenceListImpl<E>(
+          o,
+          type,
+          typeName,
+          oEntityHandler,
+          entityProvider,
+          entityHandlerProvider,
+          entitiesFetcher as EntitiesFetcher<E>?);
+    }
+
+    return callCasted<EntityReferenceList>(castCall) as EntityReferenceList<T>;
+  }
+
+  EntityReferenceList<E> _toEntityReferenceListImpl<E>(
+      Object? o,
+      Type? type,
+      String? typeName,
+      EntityHandler<E>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntitiesFetcher<E>? entitiesFetcher) {
+    type ??= this.type;
+
+    if (o == null) {
+      return EntityReferenceList<E>.asNull(
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher);
+    } else if (o is EntityReferenceList) {
+      return o as EntityReferenceList<E>;
+    } else if (o.isEntityIDType) {
+      return EntityReferenceList<E>.fromIDs([o],
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher);
+    } else if (o is List) {
+      if (o is List<E> || o is List<E?>) {
+        return EntityReferenceList<E>.fromEntities(o as dynamic,
+            type: type,
+            typeName: typeName,
+            entityHandler: entityHandler,
+            entityHandlerProvider: entityHandlerProvider,
+            entityProvider: entityProvider,
+            entitiesFetcher: entitiesFetcher);
+      } else if (o is List<Map<String, dynamic>?> ||
+          o.every((Object? e) => e == null || e is Map<String, Object?>)) {
+        var entitiesMaps = o is List<Map<String, dynamic>?>
+            ? o
+            : o.cast<Map<String, dynamic>?>();
+        return EntityReferenceList<E>.fromEntitiesMaps(entitiesMaps,
+            type: type,
+            typeName: typeName,
+            entityHandler: entityHandler,
+            entityHandlerProvider: entityHandlerProvider,
+            entityProvider: entityProvider,
+            entitiesFetcher: entitiesFetcher);
+      } else if (o.every((Object? e) => e == null || e.isEntityIDType)) {
+        return EntityReferenceList<E>.fromIDs(o,
+            type: type,
+            typeName: typeName,
+            entityHandler: entityHandler,
+            entityHandlerProvider: entityHandlerProvider,
+            entityProvider: entityProvider,
+            entitiesFetcher: entitiesFetcher);
+      } else {
+        throw StateError(
+            "Can't resolve `EntityReferenceList` values: (${o.runtimeType} -> ${o.map((e) => '${e.runtimeType}')}) $o");
+      }
+    } else if (o is Map<String, dynamic>) {
+      return EntityReferenceList<E>.fromJson(o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher);
+    } else {
+      return EntityReferenceList<E>.from(o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher);
+    }
+  }
+}
+
+/// Extension for entity [Type]s.
+extension APIEntityTypeExtension on Type {
+  /// Returns `true` if `this` [Type] is an [int] or [String].
+  bool get isEntityIDPrimitiveType {
+    var self = this;
+    return self == int || self == String;
+  }
+
+  /// Returns `true` if `this` [Type] is an [int], [BigInt] or [String].
+  bool get isEntityIDType {
+    var self = this;
+    return isEntityIDPrimitiveType || self == BigInt;
+  }
+
+  /// Returns `true` if `this` [Type] is an [EntityReference] or [EntityReferenceList].
+  bool get isEntityReferenceBaseType {
+    var self = this;
+    return self == EntityReference || self == EntityReferenceList;
+  }
+}
+
+/// Extension for entity [Object]s.
+extension APIEntityObjectExtension on Object? {
+  /// Returns `true` if `this` object is an [int] or [String].
+  bool get isEntityIDPrimitiveType {
+    var self = this;
+    return self is int || self is String;
+  }
+
+  /// Returns `true` if `this` object is an [int], [BigInt] or [String].
+  bool get isEntityIDType {
+    var self = this;
+    return isEntityIDPrimitiveType || self is BigInt;
+  }
+
+  /// Returns `true` if `this` object is an [EntityReference].
+  bool get isEntityReference {
+    var self = this;
+    return self is EntityReference;
+  }
+
+  /// Returns `true` if `this` object is an [EntityReferenceList].
+  bool get isEntityReferenceList {
+    var self = this;
+    return self is EntityReferenceList;
+  }
+
+  /// Returns `true` if `this` object is an [EntityReference] OR [EntityReferenceList].
+  bool get isEntityReferenceBase {
+    var self = this;
+    return self is EntityReference || self is EntityReferenceList;
+  }
+
+  /// Returns an entity instance.
+  /// - If it's an [EntityReference] returns [EntityReference.entity].
+  /// - If ![isEntityIDType] returns `this` object.
+  /// - Otherwise returns `null`.
+  Object? get resolveEntityInstance {
+    var self = this;
+    if (self is EntityReference) {
+      return self.entity;
+    } else if (self is EntityReferenceList) {
+      return self.entities;
+    } else {
+      return (!isEntityIDType ? self : null);
+    }
+  }
+}
+
+/// Extension for [List] of [String]s.
+extension ListOfStringExtension on List<String> {
+  bool containsIgnoreCase(String s) {
+    for (var e in this) {
+      if (equalsIgnoreAsciiCase(e, s)) return true;
+    }
+    return false;
   }
 }

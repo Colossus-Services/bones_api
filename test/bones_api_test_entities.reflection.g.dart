@@ -113,9 +113,7 @@ class Address$reflection extends ClassReflection<Address> {
             Address,
             '',
             () => (String state, String city, String street, int number,
-                    {int? id,
-                    List<Store>? stores,
-                    List<Store>? closedStores}) =>
+                    {int? id, List<Store>? stores, Object? closedStores}) =>
                 Address(state, city, street, number,
                     id: id, stores: stores, closedStores: closedStores),
             const <ParameterReflection>[
@@ -130,14 +128,8 @@ class Address$reflection extends ClassReflection<Address> {
             ],
             null,
             const <String, ParameterReflection>{
-              'closedStores': ParameterReflection(
-                  TypeReflection<List<Store>>(
-                      List, <TypeReflection>[TypeReflection<Store>(Store)]),
-                  'closedStores',
-                  true,
-                  false,
-                  null,
-                  null),
+              'closedStores': ParameterReflection(TypeReflection.tObject,
+                  'closedStores', true, false, null, null),
               'id': ParameterReflection(
                   TypeReflection.tInt, 'id', true, false, null, null),
               'stores': ParameterReflection(
@@ -303,12 +295,12 @@ class Address$reflection extends ClassReflection<Address> {
         return FieldReflection<Address, T>(
           this,
           Address,
-          TypeReflection<List<Store>>(
-              List, <TypeReflection>[TypeReflection<Store>(Store)]),
+          TypeReflection<EntityReferenceList<Store>>(EntityReferenceList,
+              <TypeReflection>[TypeReflection<Store>(Store)]),
           'closedStores',
           false,
           (o) => () => o!.closedStores as T,
-          (o) => (T? v) => o!.closedStores = v as List<Store>,
+          (o) => (T? v) => o!.closedStores = v as EntityReferenceList<Store>,
           obj,
           false,
           false,
