@@ -2058,17 +2058,25 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 }
 
 extension _ListExtension<T> on List<T> {
-  List<T> mergeWith(List<T> other) =>
-      List<T>.generate(length, (i) => this[i] ?? other[i]);
+  List<T> mergeWith(List<T> other) => List<T>.generate(length, (i) {
+        T a = this[i];
+        if (a != null) return a;
+
+        T b = other[i];
+        return b;
+      });
 
   List<Object?> mergeWithOther<E>(List<E> other) {
-    if (E == T) {
+    if (other is List<T>) {
       return mergeWith(other as List<T>);
     }
 
-    return List<Object?>.generate(length, (i) {
-      Object? e = this[i] ?? other[i];
-      return e;
+    return List.generate(length, (i) {
+      Object? a = this[i];
+      if (a != null) return a;
+
+      Object? b = other[i];
+      return b;
     });
   }
 }
