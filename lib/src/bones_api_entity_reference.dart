@@ -2066,6 +2066,9 @@ extension _ListExtension<T> on List<T> {
       return mergeWith(other as List<T>);
     }
 
-    return List<Object?>.generate(length, (i) => this[i] ?? other[i]);
+    return List<Object?>.generate(length, (i) {
+      Object? e = this[i] ?? other[i];
+      return e;
+    });
   }
 }
