@@ -205,14 +205,14 @@ abstract class APIModule with Initializable {
     if (apiSecurity != null) {
       if (request.lastPathPart == authenticationRoute) {
         return apiSecurity.doRequestAuthentication(request);
-      } else {
+      } else if (request.authentication == null) {
         return apiSecurity.resumeAuthenticationByRequest(request).then((_) {
           return _callImpl<T>(request);
         });
       }
-    } else {
-      return _callImpl<T>(request);
     }
+
+    return _callImpl<T>(request);
   }
 
   static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;

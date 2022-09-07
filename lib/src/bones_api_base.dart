@@ -12,6 +12,7 @@ import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
@@ -375,13 +376,29 @@ abstract class APIRoot with Initializable, Closable {
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
     }
 
-    var ret = _ensureModulesLoaded();
+    var modulesLoadAsync = _ensureModulesLoaded();
 
-    if (ret is Future<InitializationResult>) {
-      return ret.then((_) => _preCall(request, externalCall));
+    if (modulesLoadAsync is Future<InitializationResult>) {
+      return modulesLoadAsync.then((_) => _callZoned<T>(request, externalCall));
     } else {
-      return _preCall(request, externalCall);
+      return _callZoned<T>(request, externalCall);
     }
+  }
+
+  /// Returns the current [APIRequest] of the current [call].
+  final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
+
+  FutureOr<APIResponse<T>> _callZoned<T>(
+      APIRequest request, bool externalCall) {
+    var callZone = currentAPIRequest.createContextZone();
+
+    return callZone.run(() {
+      currentAPIRequest.set(request, contextZone: callZone);
+      return _preCall<T>(request, externalCall);
+    }).resolveMapped((response) {
+      currentAPIRequest.remove(contextZone: callZone);
+      return response;
+    });
   }
 
   FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
@@ -875,6 +892,11 @@ extension APIRequesterSourceExtension on APIRequesterSource {
 /// Represents an API request.
 class APIRequest extends APIPayload {
   static final TypeInfo typeInfo = TypeInfo.from(APIRequest);
+
+  static int _idCount = 0;
+
+  /// The request ID (to help debugging and loggign).
+  final int id = ++_idCount;
 
   /// The request method.
   final APIRequestMethod method;
@@ -1517,7 +1539,7 @@ class APIRequest extends APIPayload {
         ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
         : '';
 
-    return 'APIRequest{ method: ${method.name}, '
+    return 'APIRequest#$id{ method: ${method.name}, '
         'path: $path, '
         'parameters: $parameters, '
         'requester: ${requesterAddress != null ? '$requesterAddress ' : ''}(${requesterSource.name}), '

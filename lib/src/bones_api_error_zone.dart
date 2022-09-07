@@ -134,6 +134,10 @@ class ZoneField<T extends Object> {
     return prev;
   }
 
+  /// Removes the value associated with the [contextZone].
+  /// See [set].
+  T? remove({Zone? contextZone}) => set(null, contextZone: contextZone);
+
   final List<Zone> _zones = <Zone>[];
 
   /// Creates a new [contextZone] to store values.

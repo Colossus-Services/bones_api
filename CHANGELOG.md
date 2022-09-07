@@ -1,10 +1,14 @@
 ## 1.3.8
 
+- Added `APIRequest.id`.
+- Added `APIRoot.currentAPIRequest`.
+  - Logging messages now show the current `APIRequest.id`.  
 - `/API-INFO`:
   - Now accepts a selected module. Example: `/API-INFO/user`
 - Added `APIRequest.parsingDuration`.
 - Added `EntityReferenceList`: a version of `EntityReference` for entities lists.
 - Fix `EntityRepository._entitiesTracker`: now tracked fields values are isolated from tracked entity.
+- Fix `APISecurity._resolveAuthentication`: avoid multiple parallel calls for user resolution. 
 
 ## 1.3.7
 
