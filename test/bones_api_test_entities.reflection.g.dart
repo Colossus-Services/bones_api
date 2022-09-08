@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.9
+// BUILDER: reflection_factory/1.2.10
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -62,7 +62,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -543,7 +543,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -964,7 +964,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -1028,7 +1028,7 @@ class Store$reflection extends ClassReflection<Store> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   Store$reflection withObject([Store? obj]) => Store$reflection(obj);
@@ -1441,7 +1441,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -1984,7 +1984,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.9');
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
 
   @override
   UserInfo$reflection withObject([UserInfo? obj]) => UserInfo$reflection(obj);

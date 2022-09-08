@@ -9,6 +9,7 @@
 - Added `EntityReferenceList`: a version of `EntityReference` for entities lists.
 - Fix `EntityRepository._entitiesTracker`: now tracked fields values are isolated from tracked entity.
 - Fix `APISecurity._resolveAuthentication`: avoid multiple parallel calls for user resolution. 
+- reflection_factory: ^1.2.10
 
 ## 1.3.7
 
