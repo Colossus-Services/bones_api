@@ -3526,7 +3526,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
               parameters: parameters,
               namedParameters: namedParameters,
               transaction: transaction,
-              limit: 1)
+              limit: 1,
+              resolutionRules: resolutionRules)
           .resolveMapped((result) => result.firstOrNull);
 
   @override

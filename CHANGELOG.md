@@ -1,3 +1,10 @@
+## 1.3.9
+
+- Improved `enumFromName`.
+- Added `IterableEnumExtension`.
+- Fix `EntityRepository.selectFirstByQuery`:
+  - `resolutionRules` wasn't being passed to sub calls.
+
 ## 1.3.8
 
 - Added `APIRequest.id`.
