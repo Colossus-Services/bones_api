@@ -541,6 +541,8 @@ class APIServer {
 
   /// Converts a [request] to an [APIRequest].
   FutureOr<APIRequest> toAPIRequest(Request request) {
+    var requestTime = DateTime.now();
+
     var method = parseAPIRequestMethod(request.method)!;
 
     var headers = Map.fromEntries(request.headersAll.entries.map((e) {
@@ -583,6 +585,8 @@ class APIServer {
 
     var credential = _resolveCredential(request);
 
+    var parsingDuration = DateTime.now().difference(requestTime);
+
     return _resolvePayload(request).resolveMapped((payloadResolved) {
       var mimeType = payloadResolved?.key;
       var payload = payloadResolved?.value;
@@ -614,7 +618,9 @@ class APIServer {
           requestedUri: request.requestedUri,
           originalRequest: request,
           payload: payload,
-          payloadMimeType: mimeType);
+          payloadMimeType: mimeType,
+          time: requestTime,
+          parsingDuration: parsingDuration);
 
       return req;
     });
@@ -887,6 +893,12 @@ class APIServer {
   FutureOr<Response> _sendResponse(Request request, APIRequest apiRequest,
       APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
     apiResponse.setMetric('API-call', apiRequest.elapsedTime);
+
+    var parsingDuration = apiRequest.parsingDuration;
+    if (parsingDuration != null) {
+      apiResponse.setMetric('API-request-parsing', parsingDuration);
+    }
+
     apiResponse.stopAllMetrics();
 
     var contentType = apiResponse.payloadMimeType;

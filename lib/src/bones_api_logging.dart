@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 
+import 'bones_api_base.dart';
+
 import 'bones_api_logging_generic.dart'
     if (dart.library.io) 'bones_api_logging_io.dart';
 
@@ -116,10 +118,21 @@ abstract class LoggerHandler {
       loggerName = loggerName.padRight(max);
     }
 
+    var apiRequestIDStr = '';
+
+    var apiRoot = APIRoot.get();
+
+    if (apiRoot != null) {
+      var apiRequest = apiRoot.currentAPIRequest.get(msg.zone);
+      if (apiRequest != null) {
+        apiRequestIDStr = '#${apiRequest.id}';
+      }
+    }
+
     var message = msg.message;
 
-    var logMsg =
-        StringBuffer('$time $levelName $debugName $loggerName > $message\n');
+    var logMsg = StringBuffer(
+        '$time $levelName $debugName $loggerName $apiRequestIDStr> $message\n');
 
     if (msg.error != null) {
       logMsg.write('[ERROR] ');

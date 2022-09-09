@@ -9,7 +9,19 @@ class TestAPIRoot extends APIRoot {
   TestAPIRoot() : super('Test', '1.0');
 
   @override
-  Set<APIModule> loadModules() => {UserModule(this)};
+  Set<APIModule> loadModules() => {AboutModule(this), UserModule(this)};
+}
+
+@EnableReflection()
+class AboutModule extends APIModule {
+  AboutModule(APIRoot apiRoot) : super(apiRoot, 'about');
+
+  @override
+  void configure() {
+    routes.anyFrom(reflection);
+  }
+
+  APIResponse<String> about() => APIResponse.ok('About...');
 }
 
 @EnableReflection()

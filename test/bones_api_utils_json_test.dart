@@ -71,6 +71,62 @@ void main() {
             'EntityReference': 'Role',
             'entity': {'enabled': true, 'type': 'admin'}
           }));
+
+      expect(
+          Json.toJson(EntityReferenceList.fromEntities(
+              [Role(RoleType.admin), Role(RoleType.guest)])),
+          equals({
+            'EntityReferenceList': 'Role',
+            'entities': [
+              {'enabled': true, 'type': 'admin'},
+              {'enabled': true, 'type': 'guest'}
+            ]
+          }));
+
+      expect(
+          Json.toJson({
+            'name': 'a',
+            'value': EntityReferenceList.fromEntities(
+                [Role(RoleType.admin), Role(RoleType.guest)])
+          }),
+          equals({
+            'name': 'a',
+            'value': {
+              'EntityReferenceList': 'Role',
+              'entities': [
+                {'enabled': true, 'type': 'admin'},
+                {'enabled': true, 'type': 'guest'}
+              ]
+            }
+          }));
+
+      expect(
+          Json.toJson({
+            'name': 'a',
+            'values': [
+              EntityReferenceList.fromEntities(
+                  [Role(RoleType.admin), Role(RoleType.guest)]),
+              EntityReferenceList.fromEntities([Role(RoleType.unknown)])
+            ]
+          }),
+          equals({
+            'name': 'a',
+            'values': [
+              {
+                'EntityReferenceList': 'Role',
+                'entities': [
+                  {'enabled': true, 'type': 'admin'},
+                  {'enabled': true, 'type': 'guest'}
+                ]
+              },
+              {
+                'EntityReferenceList': 'Role',
+                'entities': [
+                  {'enabled': true, 'type': 'unknown'}
+                ]
+              }
+            ]
+          }));
     });
 
     test('fromJson', () async {
@@ -182,6 +238,84 @@ void main() {
                 .having((e) => e.entity, 'equals entity', equals(role))));
 
         expect(entityReference3!.get(), isNotNull);
+      }
+
+      {
+        var role1 = Role(RoleType.admin, id: 11);
+        var role2 = Role(RoleType.guest, id: 12);
+
+        var entityReferenceList1 = Json.fromJson<EntityReferenceList>({
+          'EntityReferenceList': 'Role',
+          'entities': [
+            {'enabled': true, 'type': 'admin', 'id': 11},
+            {'enabled': true, 'type': 'guest', 'id': 12}
+          ]
+        });
+        expect(
+            entityReferenceList1,
+            allOf(isA<EntityReferenceList<Role>>().having(
+                (e) => e.entities, 'equals entity', equals([role1, role2]))));
+
+        var entityReferenceList2 = Json.fromJson<EntityReferenceList>({
+          'EntityReferenceList': 'Role',
+          'ids': [11, 12]
+        });
+        expect(
+            entityReferenceList2,
+            allOf(isA<EntityReferenceList<Role>>()
+                .having((e) => e.entities, 'null entity', isNull)));
+
+        expect(entityReferenceList2!.get(), isNull);
+        expect(
+            () => entityReferenceList2.getNotNull(),
+            throwsA(isA<StateError>().having(
+                (e) => e.message,
+                "Can't get entities message",
+                contains(
+                    "Can't `get` entities `Role` with IDs [<11>, <12>]"))));
+
+        var entityCache = JsonEntityCacheSimple();
+
+        entityCache.cacheEntity(role1);
+        entityCache.cacheEntity(role2);
+
+        var entityReferenceList3 = Json.fromJson<EntityReferenceList>({
+          'EntityReferenceList': 'Role',
+          'ids': [11, 12]
+        }, entityCache: entityCache, autoResetEntityCache: false);
+
+        expect(
+            entityReferenceList3,
+            allOf(isA<EntityReferenceList<Role>>().having(
+                (e) => e.entities, 'equals entities', equals([role1, role2]))));
+
+        expect(await entityReferenceList3!.get(), equals([role1, role2]));
+
+        var entityReferenceList4 = Json.fromJsonList<EntityReferenceList>([
+          {
+            'EntityReferenceList': 'Role',
+            'ids': [11, 12]
+          },
+          {
+            'EntityReferenceList': 'Role',
+            'ids': [11]
+          }
+        ], entityCache: entityCache, autoResetEntityCache: false);
+
+        expect(entityReferenceList4.length, equals(2));
+
+        expect(
+            entityReferenceList4[0],
+            allOf(isA<EntityReferenceList<Role>>().having(
+                (e) => e.entities, 'equals entities', equals([role1, role2]))));
+
+        expect(
+            entityReferenceList4[1],
+            allOf(isA<EntityReferenceList<Role>>().having(
+                (e) => e.entities, 'equals entities', equals([role1]))));
+
+        expect(await entityReferenceList4[0]?.get(), equals([role1, role2]));
+        expect(await entityReferenceList4[1]?.get(), equals([role1]));
       }
     });
 

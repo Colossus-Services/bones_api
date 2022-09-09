@@ -10,7 +10,7 @@ void main() {
     test('modules', () {
       var apiRoot = TestAPIRoot();
 
-      expect(apiRoot.modulesNames, equals(['user']));
+      expect(apiRoot.modulesNames, equals(['about', 'user']));
 
       var userModule = apiRoot.getModule('user');
       expect(userModule, isA<UserModule>());
@@ -26,25 +26,102 @@ void main() {
 
     test('routes', () async {
       var apiRoot = TestAPIRoot();
+      var aboutModule = apiRoot.getModule('about');
       var userModule = apiRoot.getModule('user');
       expect(userModule, isA<UserModule>());
 
+      aboutModule!.ensureConfigured();
       userModule!.ensureConfigured();
 
       print('DateTime.now: ${DateTime.now()}');
 
-      expect(
-          userModule.allRoutesNames,
-          equals({
-            'echoListUser',
-            'echoListUser2',
-            'echoUser',
-            'geDynamicAsync',
-            'geDynamicAsync2',
-            'getDynamic',
-            'getUser',
-            'getUserAsync'
-          }));
+      const aboutRoutes = ['about'];
+
+      const userRoutes = [
+        'echoListUser',
+        'echoListUser2',
+        'echoUser',
+        'geDynamicAsync',
+        'geDynamicAsync2',
+        'getDynamic',
+        'getUser',
+        'getUserAsync'
+      ];
+
+      expect(aboutModule.allRoutesNames, equals({...aboutRoutes}));
+
+      expect(userModule.allRoutesNames, equals({...userRoutes}));
+
+      {
+        var apiRootInfoJson =
+            (await apiRoot.call(APIRequest.get('/API-INFO'))).payload.toJson();
+
+        expect(Map.from(apiRootInfoJson)..remove('modules'),
+            equals({'name': 'Test', 'version': '1.0'}));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) => e['name'])
+                .toList(),
+            equals(['about', 'user']));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) =>
+                    List.from(e['routes']).map((e) => e['name']).toList())
+                .toList(),
+            equals([aboutRoutes, userRoutes]));
+      }
+
+      {
+        var apiRootInfoJson =
+            (await apiRoot.call(APIRequest.get('/API-INFO/about')))
+                .payload
+                .toJson();
+
+        expect(
+            Map.from(apiRootInfoJson)..remove('modules'),
+            equals(
+                {'name': 'Test', 'version': '1.0', 'selectedModule': 'about'}));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) => e['name'])
+                .toList(),
+            equals(aboutRoutes));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) =>
+                    List.from(e['routes']).map((e) => e['name']).toList())
+                .toList(),
+            equals([aboutRoutes]));
+      }
+
+      {
+        var apiRootInfoJson =
+            (await apiRoot.call(APIRequest.get('/API-INFO/user')))
+                .payload
+                .toJson();
+
+        expect(
+            Map.from(apiRootInfoJson)..remove('modules'),
+            equals(
+                {'name': 'Test', 'version': '1.0', 'selectedModule': 'user'}));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) => e['name'])
+                .toList(),
+            equals(['user']));
+
+        expect(
+            List.from(apiRootInfoJson['modules'])
+                .map((e) =>
+                    List.from(e['routes']).map((e) => e['name']).toList())
+                .toList(),
+            equals([userRoutes]));
+      }
 
       expect((await apiRoot.call(APIRequest.get('/not'))).toString(),
           equals('NOT FOUND: No route for path "/not"'));
@@ -63,7 +140,7 @@ void main() {
               'street': '',
               'number': 123,
               'stores': [],
-              'closedStores': []
+              'closedStores': {'EntityReferenceList': 'Store'},
             },
             'roles': [],
             'level': null,
@@ -176,7 +253,7 @@ Map<String, Object?> _buildTestUserJson(int id, String email, int n,
       'street': '',
       'number': n,
       'stores': [],
-      'closedStores': []
+      'closedStores': {'EntityReferenceList': 'Store'},
     },
     'roles': [],
     'level': null,

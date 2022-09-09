@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:bones_api/bones_api.dart';
+import 'package:crypto/crypto.dart';
 import 'package:statistics/statistics.dart';
 
 part 'bones_api_test_entities.reflection.g.dart';
@@ -12,6 +16,9 @@ final addressEntityHandler = GenericEntityHandler<Address>(
 
 final roleEntityHandler =
     GenericEntityHandler<Role>(instantiatorFromMap: Role.fromMap);
+
+final photoEntityHandler =
+    GenericEntityHandler<Photo>(instantiatorFromMap: Photo.from);
 
 final userInfoEntityHandler = GenericEntityHandler<UserInfo>(
     instantiatorDefault: UserInfo.empty, instantiatorFromMap: UserInfo.fromMap);
@@ -35,6 +42,11 @@ class AddressAPIRepository extends APIRepository<Address> {
 
 class RoleAPIRepository extends APIRepository<Role> {
   RoleAPIRepository(EntityRepositoryProvider provider)
+      : super(provider: provider);
+}
+
+class PhotoAPIRepository extends APIRepository<Photo> {
+  PhotoAPIRepository(EntityRepositoryProvider provider)
       : super(provider: provider);
 }
 
@@ -63,9 +75,10 @@ class UserAPIRepository extends APIRepository<User> {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
 
-  FutureOr<Iterable<User>> selectByINAddressStates(List<String> states) {
+  FutureOr<Iterable<User>> selectByINAddressStates(List<String> states,
+      {EntityResolutionRules? resolutionRules}) {
     return selectByQuery(' address.state =~ ? ',
-        namedParameters: {'state': states});
+        namedParameters: {'state': states}, resolutionRules: resolutionRules);
   }
 
   FutureOr<Iterable<User>> selectByINAddressStatesSingleValue(String state) {
@@ -107,6 +120,8 @@ class User extends Entity {
 
   EntityReference<UserInfo> userInfo;
 
+  Photo? photo;
+
   DateTime creationTime;
 
   User(this.email, this.password, this.address, this.roles,
@@ -114,9 +129,11 @@ class User extends Entity {
       this.level,
       this.wakeUpTime,
       Object? userInfo,
+      Object? photo,
       DateTime? creationTime})
       : userInfo = EntityReference<UserInfo>.from(userInfo,
             entityHandler: userInfoEntityHandler),
+        photo = photo != null ? Photo.from(photo) : null,
         creationTime = creationTime ?? DateTime.now();
 
   User.empty() : this('', '', Address.empty(), <Role>[]);
@@ -130,6 +147,7 @@ class User extends Entity {
       level: map['level'],
       wakeUpTime: map['wakeUpTime'],
       userInfo: map['userInfo'],
+      photo: map['photo'],
       creationTime: map['creationTime']);
 
   @override
@@ -154,6 +172,7 @@ class User extends Entity {
         'level',
         'wakeUpTime',
         'userInfo',
+        'photo',
         'creationTime'
       ];
 
@@ -176,6 +195,8 @@ class User extends Entity {
         return wakeUpTime as V?;
       case 'userInfo':
         return userInfo as V?;
+      case 'photo':
+        return photo as V?;
       case 'creationTime':
         return creationTime as V?;
       default:
@@ -193,17 +214,20 @@ class User extends Entity {
       case 'password':
         return TypeInfo.tString;
       case 'address':
-        return TypeInfo(Address);
+        return TypeInfo<Address>(Address);
       case 'roles':
-        return TypeInfo(List, [Role]);
+        return TypeInfo<List<Role>>(List, [TypeInfo<Role>(Role)]);
       case 'level':
         return TypeInfo.tInt;
       case 'wakeUpTime':
-        return TypeInfo(Time);
+        return TypeInfo<Time>(Time);
       case 'userInfo':
-        return TypeInfo.fromType(EntityReference, [UserInfo]);
+        return TypeInfo<EntityReference<UserInfo>>.fromType(
+            EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+      case 'photo':
+        return TypeInfo<Photo>(Photo);
       case 'creationTime':
-        return TypeInfo(DateTime);
+        return TypeInfo<DateTime>(DateTime);
       default:
         return null;
     }
@@ -266,6 +290,11 @@ class User extends Entity {
           userInfo = EntityReference<UserInfo>.from(value);
           break;
         }
+      case 'photo':
+        {
+          photo = value != null ? Photo.from(value) : null;
+          break;
+        }
       case 'creationTime':
         {
           creationTime = value as DateTime;
@@ -286,6 +315,7 @@ class User extends Entity {
         'level': level,
         'wakeUpTime': wakeUpTime,
         'userInfo': userInfo.toJson(),
+        if (photo != null) 'photo': photo?.toJson(),
         'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
       };
 }
@@ -379,6 +409,133 @@ class UserInfo extends Entity {
         if (id != null) 'id': id,
         'info': info,
       };
+}
+
+@EnableReflection()
+class Photo extends Entity {
+  static String computeID(Uint8List data) => sha256.convert(data).toString();
+
+  String id;
+
+  Uint8List? data;
+
+  Photo._(this.id, this.data);
+
+  Photo.fromID(this.id);
+
+  Photo.fromData(Uint8List data, {String? id})
+      : this._(id ?? computeID(data), data);
+
+  factory Photo.from(Object o, {String? id}) {
+    if (o is Photo) return o;
+
+    if (o is Uint8List) return Photo.fromData(o, id: id);
+
+    if (o is Map) {
+      var map = o is Map<String, Object?>
+          ? o
+          : o.map((key, value) => MapEntry('$key', value));
+      return Photo.fromMap(map);
+    }
+
+    if (o is String) {
+      try {
+        var data = base64.decode(o);
+        return Photo.fromData(data, id: id);
+      } catch (_) {
+        return Photo.fromID(o);
+      }
+    }
+
+    throw ArgumentError("Can't resolve `${o.runtimeType}`");
+  }
+
+  Photo.empty() : this.fromID('');
+
+  static Photo fromMap(Map<String, dynamic> map) {
+    var id = map['id'];
+    var data = map['data'];
+    return Photo.from(data!, id: id);
+  }
+
+  String? get dataUrl {
+    var data = this.data;
+    if (data == null || data.isEmpty) return null;
+    var encoded = base64.encode(data);
+    var mimeType =
+        jsonMimeTypeResolver.lookup('jpeg', headerBytes: data) ?? 'image/jpeg';
+
+    return 'data:$mimeType;base64,$encoded';
+  }
+
+  @override
+  String get idFieldName => 'id';
+
+  @JsonField.hidden()
+  @override
+  List<String> get fieldsNames => const <String>['id', 'data'];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'data':
+        return data as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tString;
+      case 'data':
+        return TypeInfo.tUint8List;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        {
+          id = value as String;
+          break;
+        }
+      case 'data':
+        {
+          data = value as Uint8List;
+          break;
+        }
+
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        if (data != null) 'data': base64.encode(data!),
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Photo && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'Photo{id: $id}';
+  }
 }
 
 @EnableReflection()
@@ -501,12 +658,14 @@ class Address extends Entity {
   int number;
 
   List<Store> stores;
-  List<Store> closedStores;
+  EntityReferenceList<Store> closedStores;
 
   Address(this.state, this.city, this.street, this.number,
-      {this.id, List<Store>? stores, List<Store>? closedStores})
+      {this.id, List<Store>? stores, Object? closedStores})
       : stores = stores ?? <Store>[],
-        closedStores = closedStores ?? <Store>[];
+        closedStores = EntityReferenceList<Store>.from(
+            closedStores ?? <Store>[],
+            entityHandler: storeEntityHandler);
 
   Address.empty() : this('', '', '', 0);
 
@@ -514,7 +673,7 @@ class Address extends Entity {
       : this(map.getAsString('state')!, map.getAsString('city')!,
             map.getAsString('street')!, map.getAsInt('number')!,
             stores: map.getAsList<Store>('stores', def: <Store>[])!,
-            closedStores: map.getAsList<Store>('closedStores', def: <Store>[])!,
+            closedStores: map['closedStores'],
             id: map.getAsInt('id'));
 
   @override
@@ -587,9 +746,10 @@ class Address extends Entity {
       case 'number':
         return TypeInfo.tInt;
       case 'stores':
-        return TypeInfo(List, [Store]);
+        return TypeInfo<List<Store>>(List, [TypeInfo<Store>(Store)]);
       case 'closedStores':
-        return TypeInfo(List, [Store]);
+        return TypeInfo<EntityReferenceList<Store>>.fromType(
+            EntityReferenceList, [TypeInfo<Store>.fromType(Store)]);
       default:
         return null;
     }
@@ -645,7 +805,7 @@ class Address extends Entity {
         }
       case 'closedStores':
         {
-          closedStores = value as List<Store>;
+          closedStores = EntityReferenceList<Store>.from(value);
           break;
         }
       default:
@@ -661,7 +821,7 @@ class Address extends Entity {
         'street': street,
         'number': number,
         'stores': stores.map((e) => e.toJson()).toList(),
-        'closedStores': closedStores.map((e) => e.toJson()).toList(),
+        'closedStores': closedStores.toJson(),
       };
 }
 
@@ -734,11 +894,11 @@ class Role extends Entity {
       case 'id':
         return TypeInfo.tInt;
       case 'type':
-        return TypeInfo(RoleType);
+        return TypeInfo<RoleType>(RoleType);
       case 'enabled':
         return TypeInfo.tBool;
       case 'value':
-        return TypeInfo(Decimal);
+        return TypeInfo<Decimal>(Decimal);
       default:
         return null;
     }

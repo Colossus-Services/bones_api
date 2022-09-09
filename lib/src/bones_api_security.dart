@@ -52,16 +52,23 @@ abstract class APISecurity {
   FutureOr<APICredential> prepareCredential(APICredential credential) =>
       credential;
 
-  FutureOr<APIAuthentication?> authenticate(APICredential? credential) {
+  FutureOr<APIAuthentication?> authenticate(APICredential? credential,
+      {APIRequest? request}) {
     if (credential == null) return null;
 
-    return prepareCredential(credential).resolveMapped(_authenticateImpl);
+    return prepareCredential(credential)
+        .resolveMapped((c) => _authenticateImpl(c, request: request));
   }
 
   FutureOr<APIAuthentication?> _authenticateImpl(APICredential credential,
-      [bool resume = false]) {
+      {bool resume = false, APIRequest? request}) {
+    var requestPath = '';
+    if (request != null) {
+      requestPath = ' path: ${request.path} >';
+    }
+
     _log.info(
-        "authenticate${resume ? '[resume]' : ''}> ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
+        "authenticate${resume ? '[resume]' : ''}>$requestPath ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
@@ -71,13 +78,12 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> _resolveAuthentication(
       APICredential credential, bool resumed) {
-    var permissionRet = getCredentialPermissions(credential);
-    var dataRet = getAuthenticationData(credential);
-
-    return permissionRet.resolveOther(
-        dataRet,
-        (permissions, data) => createAuthentication(credential, permissions,
-            data: data, resumed: resumed));
+    return getCredentialPermissions(credential).resolveMapped((permissions) {
+      return getAuthenticationData(credential).resolveMapped((data) {
+        return createAuthentication(credential, permissions,
+            data: data, resumed: resumed);
+      });
+    });
   }
 
   APIAuthentication createAuthentication(
@@ -95,18 +101,20 @@ abstract class APISecurity {
         permissions: permissions, data: data, resumed: resumed);
   }
 
-  FutureOr<APIAuthentication?> resumeAuthentication(APIToken? token) {
+  FutureOr<APIAuthentication?> resumeAuthentication(APIToken? token,
+      {APIRequest? request}) {
     if (token == null) return null;
 
     var credential = APICredential(token.username, token: token.token);
 
     return prepareCredential(credential)
-        .resolveMapped(_resumeAuthenticationImpl);
+        .resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
   }
 
   FutureOr<APIAuthentication?> _resumeAuthenticationImpl(
-          APICredential credential) =>
-      _authenticateImpl(credential, true);
+          APICredential credential,
+          {APIRequest? request}) =>
+      _authenticateImpl(credential, request: request, resume: true);
 
   APIToken? getValidToken(String username, {bool autoCreate = true}) {
     List<APIToken> tokens = getUsernameValidTokens(username);
@@ -225,7 +233,7 @@ abstract class APISecurity {
 
     request.credential = credential;
 
-    return authenticate(credential).then((authentication) {
+    return authenticate(credential, request: request).then((authentication) {
       resolveRequestAuthentication(request, authentication);
       return authentication;
     });
@@ -246,7 +254,7 @@ abstract class APISecurity {
       }
     }
 
-    return resumeAuthentication(token).then((authentication) {
+    return resumeAuthentication(token, request: request).then((authentication) {
       resolveRequestAuthentication(request, authentication);
       return authentication;
     });

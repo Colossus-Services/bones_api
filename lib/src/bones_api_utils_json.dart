@@ -6,6 +6,8 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
@@ -32,6 +34,12 @@ class Json {
       var entityCache = jsonDecoder?.entityCache;
       var entityProvider = entityCache?.asEntityProvider;
       return EntityReference.from(o, entityProvider: entityProvider);
+    });
+
+    JsonDecoder.registerTypeDecoder(EntityReferenceList, (o, jsonDecoder) {
+      var entityCache = jsonDecoder?.entityCache;
+      var entityProvider = entityCache?.asEntityProvider;
+      return EntityReferenceList.from(o, entityProvider: entityProvider);
     });
   }
 
@@ -462,7 +470,7 @@ class Json {
   static Object? _iterableCaster(Iterable value, TypeReflection type,
       EntityHandlerProvider? entityHandlerProvider) {
     if (entityHandlerProvider != null) {
-      var entityType = type.isListEntity ? type.listEntityType! : type;
+      var entityType = type.isListEntityOrReference ? type.arguments0! : type;
       var entityHandler =
           entityHandlerProvider.getEntityHandler(type: entityType.type);
 

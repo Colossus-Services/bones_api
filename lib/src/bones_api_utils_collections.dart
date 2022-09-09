@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
 import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
 
 /// Helper to work with positional fields.
 class PositionalFields {
@@ -77,6 +78,8 @@ bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
   if (o1 is List) {
     if (o2 is List) {
       return isEqualsListDeep(o1, o2, valueEquality: valueEquality);
+    } else if (o2 is EntityReferenceList) {
+      return isEqualsListDeep(o1, o2.entities, valueEquality: valueEquality);
     }
     return false;
   } else if (o1 is Map) {
@@ -92,6 +95,17 @@ bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
   } else if (o1 is Iterable) {
     if (o2 is Iterable) {
       return isEqualsIterableDeep(o1, o2, valueEquality: valueEquality);
+    } else if (o2 is EntityReferenceList) {
+      return isEqualsIterableDeep(o1, o2.entities,
+          valueEquality: valueEquality);
+    }
+    return false;
+  } else if (o1 is EntityReferenceList) {
+    if (o2 is EntityReferenceList) {
+      return o1 == o2;
+    } else if (o2 is Iterable) {
+      return isEqualsIterableDeep(o1.entities, o2,
+          valueEquality: valueEquality);
     }
     return false;
   }

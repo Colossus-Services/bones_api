@@ -2,11 +2,14 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
+import 'bones_api_entity_reference.dart';
+import 'bones_api_extension.dart';
 
 final _log = logging.Logger('DBRelationalAdapter');
 
@@ -258,12 +261,24 @@ class DBRelationalEntityRepository<O extends Object>
 
     var futures = fieldsNames
         .map((fieldName) {
-          var value = entityHandler.getField(o, fieldName);
-          if (value == null) return null;
+          var fieldValue = entityHandler.getField(o, fieldName) as Object?;
+          if (fieldValue == null) return null;
 
           var fieldType = entityHandler.getFieldType(o, fieldName)!;
 
-          if (value is List && fieldType.isList && fieldType.hasArguments) {
+          Object? value = fieldValue;
+
+          if (value is EntityReferenceList) {
+            if (value.isNull) {
+              return null;
+            } else {
+              value = value.entitiesOrIDs;
+            }
+          }
+
+          if (value is List &&
+              ((fieldType.isList && fieldType.hasArguments) ||
+                  fieldType.isEntityReferenceListType)) {
             var elementType = fieldType.arguments.first;
             if (!EntityHandler.isValidEntityType(elementType.type)) return null;
 
@@ -272,10 +287,17 @@ class DBRelationalEntityRepository<O extends Object>
             if (elementRepository == null) return null;
 
             var futures = value.map((e) {
+              if (!elementRepository.isOfEntityType(e)) return e;
               return elementRepository.ensureStored(e,
                   transaction: transaction);
             }).toList();
-            return futures.resolveAll();
+
+            return futures.resolveAll().resolveMapped((ids) {
+              if (fieldValue is EntityReferenceList) {
+                fieldValue.updateIDsFromEntities();
+              }
+              return ids;
+            });
           } else {
             var entityType = fieldType.entityType;
             if (entityType == null) return null;
@@ -283,16 +305,21 @@ class DBRelationalEntityRepository<O extends Object>
             var entity = value;
 
             if (value is EntityReference) {
-              if (!value.isEntitySet) return false;
-              entity = value.entity;
+              if (value.isNull) {
+                return null;
+              } else if (value.isEntitySet) {
+                entity = value.entity;
+              } else {
+                return value.id;
+              }
             }
 
             var repository =
                 provider.getEntityRepository(type: entityType, obj: entity);
             if (repository == null) return null;
 
-            var stored =
-                repository.ensureStored(entity, transaction: transaction);
+            var stored = repository.ensureStored(entity as dynamic,
+                transaction: transaction);
             return stored;
           }
         })
@@ -429,14 +456,21 @@ class DBRelationalEntityRepository<O extends Object>
   }
 
   FutureOr<bool> _ensureRelationshipsStored(O o, Transaction? transaction) {
-    var fieldsListEntity = entityHandler.fieldsWithTypeListEntity(o);
+    var fieldsListEntity = entityHandler.fieldsWithTypeListEntityOrReference(o);
     if (fieldsListEntity.isEmpty) return false;
 
     var ret = fieldsListEntity.entries.map((e) {
       var field = e.key;
       var fieldType = e.value;
       var values = entityHandler.getField(o, field);
-      return setRelationship(o, field, values,
+      if (values is EntityReferenceList) {
+        values = values.entitiesOrIDs;
+      }
+
+      var list = values is Iterable ? values.asList : [values];
+      var listNotNull = list.whereNotNull().toList();
+
+      return setRelationship(o, field, listNotNull as dynamic,
           fieldType: fieldType, transaction: transaction);
     }).resolveAll();
 
@@ -452,12 +486,17 @@ class DBRelationalEntityRepository<O extends Object>
     var op = TransactionOperationStoreRelationship(
         name, operationExecutor, o, values, transaction);
 
-    var valuesType = fieldType.listEntityType!.type;
+    var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
     var valuesEntityHandler = _resolveEntityHandler(valuesType);
 
     var oId = entityHandler.getID(o);
-    var othersIds = values.map((e) => valuesEntityHandler.getID(e)).toList();
+
+    var othersIds = values
+        .map((e) => valuesEntityHandler.isEntityInstance(e)
+            ? valuesEntityHandler.getID(e)
+            : e)
+        .toList();
 
     try {
       return repositoryAdapter.doInsertRelationship(
@@ -490,7 +529,7 @@ class DBRelationalEntityRepository<O extends Object>
     var op = TransactionOperationSelectRelationship(
         name, operationExecutor, o ?? oId, transaction);
 
-    var valuesType = fieldType.listEntityType!.type;
+    var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
 
     try {
@@ -516,19 +555,29 @@ class DBRelationalEntityRepository<O extends Object>
     var cachedEntity = transaction?.getCachedEntityByID(id, type: type);
     if (cachedEntity != null) {
       var fieldValue = entityHandler.getField(cachedEntity, field);
+
       if (fieldValue != null) {
         var fieldEntityHandler = entityHandler.getEntityHandler(
-            type: fieldType.isListEntity
-                ? fieldType.listEntityType!.type
+            type: fieldType.isListEntityOrReference
+                ? fieldType.listEntityOrReferenceType!.type
                 : fieldType.type);
+
+        if (fieldValue is EntityReferenceBase) {
+          fieldValue = fieldValue.currentValue;
+        }
 
         if (fieldEntityHandler != null) {
           if (fieldValue is Iterable) {
-            var fieldIds =
-                fieldValue.map((e) => fieldEntityHandler.getID(e)).toList();
+            var fieldIds = fieldValue
+                .map((Object? e) => fieldEntityHandler.isEntityInstance(e)
+                    ? fieldEntityHandler.getID(e)
+                    : (e.isEntityIDType ? e : null))
+                .toList();
             return fieldIds;
           } else {
-            var fieldId = fieldEntityHandler.getID(fieldValue);
+            var fieldId = fieldEntityHandler.isEntityInstance(fieldValue)
+                ? fieldEntityHandler.getID(fieldValue)
+                : (fieldValue.isEntityIDType ? fieldValue : null);
             return [fieldId];
           }
         }
@@ -550,8 +599,8 @@ class DBRelationalEntityRepository<O extends Object>
 
     if (cachedEntities != null && cachedEntities.isNotEmpty) {
       var fieldEntityHandler = entityHandler.getEntityHandler(
-          type: fieldType.isListEntity
-              ? fieldType.listEntityType!.type
+          type: fieldType.isListEntityOrReference
+              ? fieldType.arguments0!.type
               : fieldType.type);
 
       if (fieldEntityHandler == null) return null;
@@ -622,7 +671,7 @@ class DBRelationalEntityRepository<O extends Object>
     var op = TransactionOperationSelectRelationships(
         name, operationExecutor, os ?? oIds, transaction);
 
-    var valuesType = fieldType.listEntityType!.type;
+    var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
 
     try {

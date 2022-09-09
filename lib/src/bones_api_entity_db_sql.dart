@@ -11,6 +11,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_memory.dart';
 import 'bones_api_entity_db_relational.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_platform.dart';

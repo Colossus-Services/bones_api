@@ -1,3 +1,23 @@
+## 1.3.8
+
+- Added `APIRequest.id`.
+- Added `APIRoot.currentAPIRequest`.
+  - Logging messages now show the current `APIRequest.id`.  
+- `/API-INFO`:
+  - Now accepts a selected module. Example: `/API-INFO/user`
+- Added `APIRequest.parsingDuration`.
+- Added `APIRepository.count`.
+- Added `DBEntityRepositoryProvider.extraDependencies`.
+- Added `Transaction.parentTransaction`:
+  - `cacheEntity` now also propagates cache to `parentTransaction`.
+- `EntityHandler`:
+  - `Uint8List` resolution: now accepts `base64`, `HEX` and `Data URL`. 
+- Added `EntityReferenceList`: a version of `EntityReference` for entities lists.
+- Fix `EntityRepository._entitiesTracker`: now tracked fields values are isolated from tracked entity.
+- Fix `APISecurity._resolveAuthentication`: avoid multiple parallel calls for user resolution. 
+- Added tests for `DBMemoryObjectAdapter`.
+- reflection_factory: ^1.2.10
+
 ## 1.3.7
 
 - Added `EntityReference`:

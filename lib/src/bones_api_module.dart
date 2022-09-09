@@ -205,14 +205,14 @@ abstract class APIModule with Initializable {
     if (apiSecurity != null) {
       if (request.lastPathPart == authenticationRoute) {
         return apiSecurity.doRequestAuthentication(request);
-      } else {
+      } else if (request.authentication == null) {
         return apiSecurity.resumeAuthenticationByRequest(request).then((_) {
           return _callImpl<T>(request);
         });
       }
-    } else {
-      return _callImpl<T>(request);
     }
+
+    return _callImpl<T>(request);
   }
 
   static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;
@@ -586,14 +586,14 @@ class APIRouteBuilder<M extends APIModule> {
         var data = base64.decode(value);
         return data;
       } catch (_) {
-        // not a base64 data:
+        // not a Base64 data:
       }
 
       try {
         var data = hex.decode(value);
         return data;
       } catch (_) {
-        // not a base64 data:
+        // not a HEX data:
       }
     }
 
@@ -849,7 +849,7 @@ class APIModuleHttpProxy implements ClassProxyListener {
 
     var typeInfo = returnType.typeInfo;
     var mainType =
-        typeInfo.isFuture ? (typeInfo.argumentType(0) ?? typeInfo) : typeInfo;
+        typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
 
     return mainType.fromJson(json);
   }
