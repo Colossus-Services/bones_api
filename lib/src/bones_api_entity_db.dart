@@ -1500,15 +1500,24 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
       );
 
   @override
-  Future<InitializationResult> initialize() async {
-    var adapter = await this.adapter;
-    var repositories = buildRepositories(adapter);
+  FutureOr<InitializationResult> initialize() {
+    return adapter.resolveMapped((adapter) {
+      var repositories = buildRepositories(adapter);
 
-    return InitializationResult.ok(this,
-        dependencies: [adapter, ...repositories]);
+      return extraDependencies().resolveMapped((extraDependencies) {
+        return InitializationResult.ok(this,
+            dependencies: [adapter, ...repositories, ...extraDependencies]);
+      });
+    });
   }
 
+  /// Builds the [EntityRepository], called by [initialize].
+  /// See [extraDependencies].
   List<EntityRepository> buildRepositories(A adapter);
+
+  /// Some extra [Initializable] dependencies to be initialized after [initialize].
+  /// See [initializeDependencies].
+  FutureOr<List<Initializable>> extraDependencies() => <Initializable>[];
 
   @override
   bool close() {

@@ -975,29 +975,31 @@ void main() {
           userEntityHandler
               .fieldsWithTypeEntity()
               .map((k, v) => MapEntry(k, '$v')),
-          equals({'address': '<T:dynamic> Address'}));
+          equals(
+              {'address': '<T:Address> Address', 'photo': '<T:Photo> Photo'}));
 
       expect(
           userEntityHandler
               .fieldsWithTypeEntityOrReference()
               .map((k, v) => MapEntry(k, '$v')),
           equals({
-            'address': '<T:dynamic> Address',
+            'address': '<T:Address> Address',
             'userInfo':
-                '<T:EntityReference<UserInfo>> EntityReference<<T:UserInfo> UserInfo>'
+                '<T:EntityReference<UserInfo>> EntityReference<<T:UserInfo> UserInfo>',
+            'photo': '<T:Photo> Photo'
           }));
 
       expect(
           userEntityHandler
               .fieldsWithTypeListEntity()
               .map((k, v) => MapEntry(k, '$v')),
-          equals({'roles': '<T:dynamic> List<<T:dynamic> Role>'}));
+          equals({'roles': '<T:List<Role>> List<<T:Role> Role>'}));
 
       expect(
           userEntityHandler
               .fieldsWithTypeListEntityOrReference()
               .map((k, v) => MapEntry(k, '$v')),
-          equals({'roles': '<T:dynamic> List<<T:dynamic> Role>'}));
+          equals({'roles': '<T:List<Role>> List<<T:Role> Role>'}));
 
       expect(
           addressEntityHandler
@@ -1015,14 +1017,14 @@ void main() {
           addressEntityHandler
               .fieldsWithTypeListEntity()
               .map((k, v) => MapEntry(k, '$v')),
-          equals({'stores': '<T:dynamic> List<<T:dynamic> Store>'}));
+          equals({'stores': '<T:List<Store>> List<<T:Store> Store>'}));
 
       expect(
           addressEntityHandler
               .fieldsWithTypeListEntityOrReference()
               .map((k, v) => MapEntry(k, '$v')),
           equals({
-            'stores': '<T:dynamic> List<<T:dynamic> Store>',
+            'stores': '<T:List<Store>> List<<T:Store> Store>',
             'closedStores':
                 '<T:EntityReferenceList<Store>> EntityReferenceList<<T:Store> Store>'
           }));

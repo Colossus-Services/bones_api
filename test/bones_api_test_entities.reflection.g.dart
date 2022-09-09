@@ -18,6 +18,12 @@ Address Address$fromJson(Map<String, Object?> map) =>
 Address Address$fromJsonEncoded(String jsonEncoded) =>
     Address$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 // ignore: non_constant_identifier_names
+Photo Photo$fromJson(Map<String, Object?> map) =>
+    Photo$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+Photo Photo$fromJsonEncoded(String jsonEncoded) =>
+    Photo$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
 Role Role$fromJson(Map<String, Object?> map) =>
     Role$reflection.staticInstance.fromJson(map);
 // ignore: non_constant_identifier_names
@@ -523,6 +529,478 @@ class Address$reflection extends ClassReflection<Address> {
   @override
   MethodReflection<Address, R>? staticMethod<R>(String methodName) {
     return null;
+  }
+}
+
+class Photo$reflection extends ClassReflection<Photo> {
+  Photo$reflection([Photo? object]) : super(Photo, object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('2.17.0');
+
+  @override
+  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+
+  @override
+  Photo$reflection withObject([Photo? obj]) => Photo$reflection(obj);
+
+  static Photo$reflection? _withoutObjectInstance;
+  @override
+  Photo$reflection withoutObjectInstance() => _withoutObjectInstance ??=
+      super.withoutObjectInstance() as Photo$reflection;
+
+  static Photo$reflection get staticInstance =>
+      _withoutObjectInstance ??= Photo$reflection();
+
+  @override
+  Photo$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Photo$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => false;
+  @override
+  Photo? createInstanceWithDefaultConstructor() => null;
+
+  @override
+  bool get hasEmptyConstructor => true;
+  @override
+  Photo? createInstanceWithEmptyConstructor() => Photo.empty();
+  @override
+  bool get hasNoRequiredArgsConstructor => true;
+  @override
+  Photo? createInstanceWithNoRequiredArgsConstructor() => Photo.empty();
+
+  @override
+  List<String> get constructorsNames =>
+      const <String>['empty', 'from', 'fromData', 'fromID'];
+
+  @override
+  ConstructorReflection<Photo>? constructor<R>(String constructorName) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'fromid':
+        return ConstructorReflection<Photo>(
+            this,
+            Photo,
+            'fromID',
+            () => (String id) => Photo.fromID(id),
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'fromdata':
+        return ConstructorReflection<Photo>(
+            this,
+            Photo,
+            'fromData',
+            () =>
+                (Uint8List data, {String? id}) => Photo.fromData(data, id: id),
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection<Uint8List>(Uint8List), 'data',
+                  false, true, null, null)
+            ],
+            null,
+            const <String, ParameterReflection>{
+              'id': ParameterReflection(
+                  TypeReflection.tString, 'id', true, false, null, null)
+            },
+            null);
+      case 'from':
+        return ConstructorReflection<Photo>(
+            this,
+            Photo,
+            'from',
+            () => (Object o, {String? id}) => Photo.from(o, id: id),
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tObject, 'o', false, true, null, null)
+            ],
+            null,
+            const <String, ParameterReflection>{
+              'id': ParameterReflection(
+                  TypeReflection.tString, 'id', true, false, null, null)
+            },
+            null);
+      case 'empty':
+        return ConstructorReflection<Photo>(this, Photo, 'empty',
+            () => () => Photo.empty(), null, null, null, null);
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+
+  @override
+  List<ClassReflection> siblingsClassReflection() =>
+      _siblingsReflection().whereType<ClassReflection>().toList();
+
+  @override
+  List<Reflection> siblingsReflection() => _siblingsReflection();
+
+  @override
+  List<Type> get supperTypes => const <Type>[Entity];
+
+  @override
+  bool get hasMethodToJson => true;
+
+  @override
+  Object? callMethodToJson([Photo? obj]) {
+    obj ??= object;
+    return obj?.toJson();
+  }
+
+  @override
+  List<String> get fieldsNames => const <String>[
+        'data',
+        'dataUrl',
+        'fieldsNames',
+        'hashCode',
+        'id',
+        'idFieldName'
+      ];
+
+  @override
+  FieldReflection<Photo, T>? field<T>(String fieldName, [Photo? obj]) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'id':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection.tString,
+          'id',
+          false,
+          (o) => () => o!.id as T,
+          (o) => (T? v) => o!.id = v as String,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'data':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection<Uint8List>(Uint8List),
+          'data',
+          true,
+          (o) => () => o!.data as T,
+          (o) => (T? v) => o!.data = v as Uint8List?,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'dataurl':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection.tString,
+          'dataUrl',
+          true,
+          (o) => () => o!.dataUrl as T,
+          null,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'idfieldname':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection.tString,
+          'idFieldName',
+          false,
+          (o) => () => o!.idFieldName as T,
+          null,
+          obj,
+          false,
+          false,
+          [override],
+        );
+      case 'fieldsnames':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection.tListString,
+          'fieldsNames',
+          false,
+          (o) => () => o!.fieldsNames as T,
+          null,
+          obj,
+          false,
+          false,
+          [JsonField.hidden(), override],
+        );
+      case 'hashcode':
+        return FieldReflection<Photo, T>(
+          this,
+          Photo,
+          TypeReflection.tInt,
+          'hashCode',
+          false,
+          (o) => () => o!.hashCode as T,
+          null,
+          obj,
+          false,
+          false,
+          [override],
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<String> get staticFieldsNames => const <String>[];
+
+  @override
+  FieldReflection<Photo, T>? staticField<T>(String fieldName) {
+    return null;
+  }
+
+  @override
+  List<String> get methodsNames => const <String>[
+        'getField',
+        'getFieldEntityAnnotations',
+        'getFieldType',
+        'getID',
+        'setField',
+        'setID',
+        'toJson',
+        'toJsonEncoded',
+        'toString'
+      ];
+
+  @override
+  MethodReflection<Photo, R>? method<R>(String methodName, [Photo? obj]) {
+    obj ??= object;
+
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'getfield':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'getField',
+            TypeReflection.tDynamic,
+            true,
+            (o) => o!.getField,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'getfieldtype':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'getFieldType',
+            TypeReflection<TypeInfo<dynamic>>(
+                TypeInfo, <TypeReflection>[TypeReflection.tDynamic]),
+            true,
+            (o) => o!.getFieldType,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'setfield':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'setField',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.setField,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null),
+              ParameterReflection(
+                  TypeReflection.tDynamic, 'value', true, true, null, null)
+            ],
+            null,
+            null,
+            [override]);
+      case 'tojson':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'toJson',
+            TypeReflection.tMapStringDynamic,
+            false,
+            (o) => o!.toJson,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            [override]);
+      case 'tostring':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'toString',
+            TypeReflection.tString,
+            false,
+            (o) => o!.toString,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            [override]);
+      case 'getid':
+        return MethodReflection<Photo, R>(
+            this,
+            Entity,
+            'getID',
+            TypeReflection.tDynamic,
+            true,
+            (o) => o!.getID,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      case 'setid':
+        return MethodReflection<Photo, R>(
+            this,
+            Entity,
+            'setID',
+            TypeReflection.tVoid,
+            false,
+            (o) => o!.setID,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tDynamic, 'id', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'getfieldentityannotations':
+        return MethodReflection<Photo, R>(
+            this,
+            Entity,
+            'getFieldEntityAnnotations',
+            TypeReflection<List<EntityAnnotation>>(List, <TypeReflection>[
+              TypeReflection<EntityAnnotation>(EntityAnnotation)
+            ]),
+            true,
+            (o) => o!.getFieldEntityAnnotations,
+            obj,
+            false,
+            const <ParameterReflection>[
+              ParameterReflection(
+                  TypeReflection.tString, 'key', false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'tojsonencoded':
+        return MethodReflection<Photo, R>(
+            this,
+            Entity,
+            'toJsonEncoded',
+            TypeReflection.tString,
+            false,
+            (o) => o!.toJsonEncoded,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            null);
+      default:
+        return null;
+    }
+  }
+
+  @override
+  List<String> get staticMethodsNames => const <String>['computeID', 'fromMap'];
+
+  @override
+  MethodReflection<Photo, R>? staticMethod<R>(String methodName) {
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'computeid':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'computeID',
+            TypeReflection.tString,
+            false,
+            (o) => Photo.computeID,
+            null,
+            true,
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection<Uint8List>(Uint8List), 'data',
+                  false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      case 'frommap':
+        return MethodReflection<Photo, R>(
+            this,
+            Photo,
+            'fromMap',
+            TypeReflection<Photo>(Photo),
+            false,
+            (o) => Photo.fromMap,
+            null,
+            true,
+            const <ParameterReflection>[
+              ParameterReflection(TypeReflection.tMapStringDynamic, 'map',
+                  false, true, null, null)
+            ],
+            null,
+            null,
+            null);
+      default:
+        return null;
+    }
   }
 }
 
@@ -1497,12 +1975,14 @@ class User$reflection extends ClassReflection<User> {
                     int? level,
                     Time? wakeUpTime,
                     Object? userInfo,
+                    Object? photo,
                     DateTime? creationTime}) =>
                 User(email, password, address, roles,
                     id: id,
                     level: level,
                     wakeUpTime: wakeUpTime,
                     userInfo: userInfo,
+                    photo: photo,
                     creationTime: creationTime),
             const <ParameterReflection>[
               ParameterReflection(
@@ -1533,6 +2013,8 @@ class User$reflection extends ClassReflection<User> {
                   TypeReflection.tInt, 'id', true, false, null, null),
               'level': ParameterReflection(
                   TypeReflection.tInt, 'level', true, false, null, null),
+              'photo': ParameterReflection(
+                  TypeReflection.tObject, 'photo', true, false, null, null),
               'userInfo': ParameterReflection(
                   TypeReflection.tObject, 'userInfo', true, false, null, null),
               'wakeUpTime': ParameterReflection(TypeReflection<Time>(Time),
@@ -1580,6 +2062,7 @@ class User$reflection extends ClassReflection<User> {
         'idFieldName',
         'level',
         'password',
+        'photo',
         'roles',
         'userInfo',
         'wakeUpTime'
@@ -1705,6 +2188,20 @@ class User$reflection extends ClassReflection<User> {
           false,
           (o) => () => o!.userInfo as T,
           (o) => (T? v) => o!.userInfo = v as EntityReference<UserInfo>,
+          obj,
+          false,
+          false,
+          null,
+        );
+      case 'photo':
+        return FieldReflection<User, T>(
+          this,
+          User,
+          TypeReflection<Photo>(Photo),
+          'photo',
+          true,
+          (o) => () => o!.photo as T,
+          (o) => (T? v) => o!.photo = v as Photo?,
           obj,
           false,
           false,
@@ -2370,6 +2867,19 @@ extension Address$reflectionExtension on Address {
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
+extension Photo$reflectionExtension on Photo {
+  /// Returns a [ClassReflection] for type [Photo]. (Generated by [ReflectionFactory])
+  ClassReflection<Photo> get reflection => Photo$reflection(this);
+
+  /// Returns a JSON [Map] for type [Photo]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns a JSON for type [Photo] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
 extension Role$reflectionExtension on Role {
   /// Returns a [ClassReflection] for type [Role]. (Generated by [ReflectionFactory])
   ClassReflection<Role> get reflection => Role$reflection(this);
@@ -2443,6 +2953,7 @@ extension UserInfo$reflectionExtension on UserInfo {
 List<Reflection> _listSiblingsReflection() => <Reflection>[
       User$reflection(),
       UserInfo$reflection(),
+      Photo$reflection(),
       Store$reflection(),
       Address$reflection(),
       Role$reflection(),

@@ -60,6 +60,9 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   EventStream<O> get onDelete => entityRepository.onDelete;
 
+  FutureOr<int> count({Transaction? transaction}) =>
+      entityRepository.count(transaction: transaction);
+
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) =>
       entityRepository.existsID(id, transaction: transaction);
 

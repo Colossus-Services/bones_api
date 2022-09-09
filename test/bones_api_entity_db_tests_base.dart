@@ -1,4 +1,7 @@
 @Timeout(Duration(seconds: 180))
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:bones_api/bones_api_test_vm.dart';
 import 'package:collection/collection.dart';
@@ -10,11 +13,11 @@ import 'bones_api_test_entities.dart';
 
 final _log = logging.Logger('bones_api_test_adapter');
 
-typedef SQLAdapterCreator = DBSQLAdapter Function(
+typedef DBAdapterCreator<A extends DBAdapter> = A Function(
     EntityRepositoryProvider? parentRepositoryProvider, int dbPort);
 
 class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
-  final SQLAdapterCreator sqlAdapterCreator;
+  final DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator;
   final int dbPort;
 
   final EntityHandler<Store> storeEntityHandler;
@@ -22,8 +25,6 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final EntityHandler<Role> roleEntityHandler;
   final EntityHandler<UserInfo> userInfoEntityHandler;
   final EntityHandler<User> userEntityHandler;
-
-  late final DBSQLAdapter sqlAdapter;
 
   late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
@@ -38,13 +39,14 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
       this.userInfoEntityHandler,
       this.userEntityHandler,
       this.sqlAdapterCreator,
-      this.dbPort) {
-    sqlAdapter = adapter as DBSQLAdapter;
-    buildRepositories(sqlAdapter);
-  }
+      this.dbPort);
 
   @override
   Map<String, dynamic> get adapterConfig => {};
+
+  @override
+  FutureOr<DBSQLAdapter<Object>> buildAdapter() =>
+      sqlAdapterCreator(this, dbPort);
 
   List<DBSQLEntityRepository<Object>>? _repositories;
 
@@ -62,11 +64,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   }
 
   @override
-  FutureOr<DBSQLAdapter<Object>> buildAdapter() =>
-      sqlAdapterCreator(this, dbPort);
-
-  @override
-  FutureOr<List<Initializable>> initializeDependencies() => [
+  FutureOr<List<Initializable>> extraDependencies() => [
         storeAPIRepository = StoreAPIRepository(this),
         addressAPIRepository = AddressAPIRepository(this),
         roleAPIRepository = RoleAPIRepository(this),
@@ -75,9 +73,43 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
       ];
 }
 
+class TestEntityRepositoryProvider2 extends DBEntityRepositoryProvider {
+  final DBAdapterCreator<DBAdapter> objectAdapterCreator;
+  final int dbPort;
+
+  final EntityHandler<Photo> photoEntityHandler;
+
+  late final PhotoAPIRepository photoAPIRepository;
+
+  TestEntityRepositoryProvider2(
+      this.photoEntityHandler, this.objectAdapterCreator, this.dbPort);
+
+  @override
+  Map<String, dynamic> get adapterConfig => {};
+
+  @override
+  FutureOr<DBAdapter<Object>> buildAdapter() =>
+      objectAdapterCreator(this, dbPort);
+
+  List<DBEntityRepository<Object>>? _repositories;
+
+  @override
+  List<DBEntityRepository<Object>> buildRepositories(
+      DBAdapter<Object> adapter) {
+    return _repositories ??= [
+      DBEntityRepository<Photo>(adapter, 'photo', photoEntityHandler),
+    ].asUnmodifiableView;
+  }
+
+  @override
+  FutureOr<List<Initializable>> extraDependencies() => [
+        photoAPIRepository = PhotoAPIRepository(this),
+      ];
+}
+
 TestEntityRepositoryProvider createEntityRepositoryProvider(
         bool entityByReflection,
-        SQLAdapterCreator sqlAdapterCreator,
+        DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator,
         int dbPort) =>
     entityByReflection
         ? TestEntityRepositoryProvider(
@@ -99,10 +131,36 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
             dbPort,
           );
 
-Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
-    SQLAdapterCreator sqlAdapterCreator, String cmdQuote, String serialIntType,
-    {required bool entityByReflection,
-    TestEntityRepositoryProvider? defaultEntityRepositoryProvider}) async {
+TestEntityRepositoryProvider2 createEntityRepositoryProvider2(
+        bool entityByReflection,
+        DBAdapterCreator<DBAdapter> objectAdapterCreator,
+        int dbPort) =>
+    entityByReflection
+        ? TestEntityRepositoryProvider2(
+            Photo$reflection().entityHandler,
+            objectAdapterCreator,
+            dbPort,
+          )
+        : TestEntityRepositoryProvider2(
+            photoEntityHandler..inspectObject(Photo.empty()),
+            objectAdapterCreator,
+            dbPort,
+          );
+
+const String png1PixelBase64 =
+    'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+
+const String png1PixelSha256 =
+    'b1442e85b03bdcaf66dc58c7abb98745dd2687d86350be9a298a1d9382ac849b';
+
+Future<bool> runAdapterTests(
+    String dbName,
+    APITestConfigDB testConfigDB,
+    DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator,
+    DBAdapterCreator<DBAdapter> objectAdapterCreator,
+    String cmdQuote,
+    String serialIntType,
+    {required bool entityByReflection}) async {
   _log.handler.logToConsole();
 
   User$reflection.boot();
@@ -123,6 +181,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
   group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
     late final TestEntityRepositoryProvider entityRepositoryProvider;
+    late final TestEntityRepositoryProvider2 entityRepositoryProvider2;
 
     setUpAll(() async {
       testLog.info('[[[ setUpAll ]]]');
@@ -136,10 +195,13 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       testLog
           .info('Container start: $startOk > dbPort: $dbPort > $testConfigDB');
 
-      entityRepositoryProvider = defaultEntityRepositoryProvider ??
-          createEntityRepositoryProvider(
-              entityByReflection, sqlAdapterCreator, dbPort);
+      entityRepositoryProvider = createEntityRepositoryProvider(
+          entityByReflection, sqlAdapterCreator, dbPort);
 
+      entityRepositoryProvider2 = createEntityRepositoryProvider2(
+          entityByReflection, objectAdapterCreator, dbPort);
+
+      await entityRepositoryProvider2.ensureInitialized();
       await entityRepositoryProvider.ensureInitialized();
     });
 
@@ -149,12 +211,13 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       expect(configSupported, isTrue);
 
       entityRepositoryProvider.close();
+      entityRepositoryProvider2.close();
 
       await testConfigDB.stop();
     });
 
     test('generateFullCreateTableSQLs', () async {
-      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      var sqlAdapter = await entityRepositoryProvider.adapter;
       expect(sqlAdapter, isNotNull);
 
       var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
@@ -173,7 +236,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       expect(fullCreateTableSQLs, contains('-- Entity: Address @ address'));
 
       var q = sqlAdapter.dialect.elementQuote;
-      var reS = r'(?:\s+|--[^\n]+)+';
+      var reS = r'(?:\s+|--[^\n]+\n?)+';
       var reAnyType = r'\w+[^\n]*?';
       var reArg = r'(?:\([^ \t\(\)]+\))';
 
@@ -186,7 +249,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
               '${q}street$q VARCHAR$reArg?$reS'
               '\\)$reS;');
 
-      expect(fullCreateTableSQLs, contains(tableAddressRegexp));
+      expect(fullCreateTableSQLs, contains(tableAddressRegexp),
+          reason: "`address` table SQL");
 
       var tableRoleRegexp =
           RegExp('CREATE TABLE IF NOT EXISTS ${q}role$q \\($reS'
@@ -196,24 +260,36 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
               '${q}value$q DECIMAL$reArg?$reS'
               '\\)$reS;');
 
-      expect(fullCreateTableSQLs, contains(tableRoleRegexp));
+      expect(fullCreateTableSQLs, contains(tableRoleRegexp),
+          reason: "`role` table SQL");
 
       var tableUserRegexp =
-          RegExp('CREATE TABLE IF NOT EXISTS ${q}user$q \\($reS'
-              '${q}id$q $reAnyType PRIMARY KEY,$reS'
-              '${q}address$q BIGINT.*?,$reS'
-              '${q}creation_time$q TIMESTAMP,$reS'
-              '${q}email$q VARCHAR$reArg?,$reS'
-              '${q}level$q INT,$reS'
-              '${q}password$q VARCHAR$reArg?,$reS'
-              '${q}user_info$q BIGINT.*?,$reS'
-              '${q}wake_up_time$q TIME.*?,$reS'
+          RegExp('CREATE TABLE IF NOT EXISTS ${q}user$q \\(\\s*'
+              '${q}id$q $reAnyType PRIMARY KEY,\\s*'
+              '${q}address$q BIGINT[^,\\n]*?,\\s*'
+              '${q}creation_time$q TIMESTAMP,\\s*'
+              '${q}email$q VARCHAR$reArg?,\\s*'
+              '${q}level$q INT,\\s*'
+              '${q}password$q VARCHAR$reArg?,\\s*'
+              '${q}photo$q VARCHAR$reArg?,\\s*'
+              '${q}user_info$q BIGINT[^,\\n]*?,\\s*'
+              '${q}wake_up_time$q TIME[^,\\n]*?,\\s*'
               'CONSTRAINT');
+
+      print('-- Checking `user` table SQL...');
+
+      var fullCreateTableSQLsNoComments =
+          fullCreateTableSQLs.replaceAll(RegExp(r'--[^\n]+'), '');
+
+      expect(fullCreateTableSQLsNoComments, contains(tableUserRegexp),
+          reason: "`user` table SQL");
 
       var tableUserUniqueRegexp = RegExp('UNIQUE\\s\\(${q}email$q\\)');
 
-      expect(fullCreateTableSQLs,
-          allOf(contains(tableUserRegexp), contains(tableUserUniqueRegexp)));
+      expect(fullCreateTableSQLs, contains(tableUserUniqueRegexp),
+          reason: "`user.email` unique SQL");
+
+      print('-- Tables SQL OK');
     });
 
     test('sqlAdapter', () async {
@@ -221,7 +297,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
       expect(testConfigDB.isStarted, isTrue);
 
-      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      var sqlAdapter = await entityRepositoryProvider.adapter;
       expect(sqlAdapter, isNotNull);
 
       _log.info('SQLDialect: ${sqlAdapter.dialect}');
@@ -234,6 +310,28 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           DBAdapter.registeredAdaptersNames.contains(sqlAdapter.name), isTrue);
 
       expect(DBAdapter.registeredAdaptersTypes.contains(sqlAdapter.runtimeType),
+          isTrue);
+    });
+
+    test('objectAdapter', () async {
+      _log.info('APITestConfigDB: $testConfigDB');
+
+      expect(testConfigDB.isStarted, isTrue);
+
+      var objectAdapter = await entityRepositoryProvider2.adapter;
+      expect(objectAdapter, isNotNull);
+
+      _log.info('ObjectDialect: ${objectAdapter.dialect}');
+
+      expect(objectAdapter.capability.transactions, isTrue);
+      expect(objectAdapter.capability.transactionAbort, isTrue);
+      expect(objectAdapter.capability.fullTransaction, isTrue);
+
+      expect(DBAdapter.registeredAdaptersNames.contains(objectAdapter.name),
+          isTrue);
+
+      expect(
+          DBAdapter.registeredAdaptersTypes.contains(objectAdapter.runtimeType),
           isTrue);
     });
 
@@ -252,8 +350,8 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         print('----------------------------------------------');
       }
 
-      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
-      expect(sqlAdapter, isNotNull);
+      var sqlAdapter = await entityRepositoryProvider.adapter;
+      expect(sqlAdapter, isA<DBSQLAdapter>());
 
       var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
           title: 'Test Generated SQL', withDate: false);
@@ -296,6 +394,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
       var userInfoAPIRepository =
           entityRepositoryProvider.userInfoAPIRepository;
       var userAPIRepository = entityRepositoryProvider.userAPIRepository;
+      var photoAPIRepository = entityRepositoryProvider2.photoAPIRepository;
 
       expect(await userAPIRepository.length(), equals(0));
 
@@ -331,6 +430,12 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var address = Address('NY', 'New York', 'street A', 101,
             stores: [store1, store2], closedStores: [storeClosed]);
         var role = Role(RoleType.admin);
+
+        var photo = Photo.from(png1PixelBase64);
+
+        expect(photo.id, equals(png1PixelSha256));
+        expect(photo.data,
+            equals(Uint8List.fromList(base64.decode(png1PixelBase64))));
 
         {
           var invalidUser = User('joe at $testDomain', '123', address, [role],
@@ -378,9 +483,12 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect((await userInfoAPIRepository.selectAll()).length, equals(0));
         expect((await userAPIRepository.selectAll()).length, equals(0));
 
+        expect((await photoAPIRepository.count()), equals(0));
+
         var user = User('joe@$testDomain', '123', address, [role],
             level: 100,
             userInfo: UserInfo('The user joe'),
+            photo: photo,
             creationTime: user1CreationTime);
 
         expect(user.reflection.allFieldsValids(), isTrue);
@@ -394,21 +502,28 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(user.userInfo.id, equals(1));
         expect(address.id, equals(1));
         expect(role.id, equals(1));
+        expect(user.userInfo.id, equals(1));
+        expect(user.userInfo.entity?.id, equals(1));
 
         expect(user.address.isEntityReference, isFalse);
         expect(user.userInfo.isEntityReference, isTrue);
 
         expect(user.address.resolveEntityInstance, isA<Address>());
         expect(user.userInfo.resolveEntityInstance, isA<UserInfo>());
+        expect(user.photo.resolveEntityInstance, isA<Photo>());
 
         expect((await userInfoAPIRepository.selectAll()).length, equals(1));
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
         expect((await storeAPIRepository.selectAll()).length, equals(3));
 
+        expect((await photoAPIRepository.count()), equals(1));
+
         expect((await userInfoAPIRepository.existsID(1)), isTrue);
         expect((await userAPIRepository.existsID(1)), isTrue);
         expect((await addressAPIRepository.existsID(1)), isTrue);
+
+        expect((await photoAPIRepository.existsID(png1PixelSha256)), isTrue);
 
         {
           var user = await userAPIRepository.selectByID(1);
@@ -417,6 +532,9 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
           expect(user.userInfo.isNull, isFalse);
           expect(user.userInfo.id, equals(1));
           expect(user.userInfo.isEntitySet, isFalse);
+
+          expect(user.photo?.id, equals(png1PixelSha256));
+          expect(user.photo?.data, equals(base64.decode(png1PixelBase64)));
         }
 
         {
@@ -716,39 +834,6 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.isAborted, isFalse);
-        expect(transaction.length, equals(8));
-        expect(transaction.cachedEntitiesLength, equals(11));
-      }
-
-      {
-        var transaction = Transaction();
-
-        var result = await transaction.execute(() async {
-          var sel = await userAPIRepository.selectByINAddressStates(
-              ['NY', 'CA'],
-              resolutionRules: EntityResolutionRules.fetchEagerAll());
-
-          expect(sel.length, equals(3));
-          expect(sel.map((e) => e.address.state),
-              unorderedEquals(['NY', 'CA', 'CA']));
-
-          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
-              unorderedEquals(['The user joe', null, null]));
-
-          var sel2 =
-              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
-
-          expect(sel2.length, equals(3));
-          expect(sel2.map((e) => e.address.state),
-              unorderedEquals(['NY', 'CA', 'CA']));
-
-          return sel2;
-        });
-
-        print(transaction);
-
-        expect(result!.length, equals(3));
-        expect(transaction.isAborted, isFalse);
         expect(transaction.length, equals(9));
         expect(transaction.cachedEntitiesLength, equals(12));
       }
@@ -757,6 +842,39 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         var transaction = Transaction();
 
         var result = await transaction.execute(() async {
+          var sel = await userAPIRepository.selectByINAddressStates(
+              ['NY', 'CA'],
+              resolutionRules: EntityResolutionRules.fetchEagerAll());
+
+          expect(sel.length, equals(3));
+          expect(sel.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          expect(sel.map((e) => e.userInfo.entity?.info).toList(),
+              unorderedEquals(['The user joe', null, null]));
+
+          var sel2 =
+              await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
+
+          expect(sel2.length, equals(3));
+          expect(sel2.map((e) => e.address.state),
+              unorderedEquals(['NY', 'CA', 'CA']));
+
+          return sel2;
+        });
+
+        print(transaction);
+
+        expect(result!.length, equals(3));
+        expect(transaction.isAborted, isFalse);
+        expect(transaction.length, equals(10));
+        expect(transaction.cachedEntitiesLength, equals(13));
+      }
+
+      {
+        var transaction = Transaction();
+
+        var result = await transaction.execute(() async {
           var sel =
               await userAPIRepository.selectByINAddressStates(['NY', 'CA']);
 
@@ -789,7 +907,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(result!.length, equals(3));
         expect(transaction.isAborted, isFalse);
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(11));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -829,7 +947,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(result!.length, equals(3));
         expect(transaction.isAborted, isFalse);
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(12));
+        expect(transaction.cachedEntitiesLength, equals(13));
       }
 
       {
@@ -871,7 +989,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(11));
+        expect(transaction.cachedEntitiesLength, equals(12));
       }
 
       {
@@ -914,7 +1032,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(12));
+        expect(transaction.cachedEntitiesLength, equals(13));
       }
 
       {
@@ -1065,8 +1183,10 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         expect(transaction.abortedError, isNull);
       }
 
+      var sqlAdapter = await entityRepositoryProvider.adapter;
+
       // If `Transaction.abort` is supported:
-      if (entityRepositoryProvider.sqlAdapter.capability.transactionAbort) {
+      if (sqlAdapter.capability.transactionAbort) {
         var transaction = Transaction();
 
         var result = await transaction.execute(() async {
@@ -1281,7 +1401,7 @@ Future<bool> runAdapterTests(String dbName, APITestConfigDB testConfigDB,
         ]
       });
 
-      var sqlAdapter = entityRepositoryProvider.sqlAdapter;
+      var sqlAdapter = await entityRepositoryProvider.adapter;
 
       var information = sqlAdapter.information(extended: true);
 

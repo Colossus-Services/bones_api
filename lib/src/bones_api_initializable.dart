@@ -572,13 +572,17 @@ mixin Initializable {
   }
 
   /// Return a [List] of [Initializable] instances that need to be initialized
-  /// before initialize this instance.
+  /// BEFORE [initialize] this instance.
+  ///
+  /// See [doInitialization].
   FutureOr<List<Initializable>> initializeDependencies() => <Initializable>[];
 
   /// Initialization implementation. Do not call it directly, use [doInitialization].
   ///
   /// It can be a synchronous (returning a [bool]) or an asynchronous
   /// implementation (returning a [Future]<[bool]>).
+  ///
+  /// See [initializeDependencies].
   FutureOr<InitializationResult> initialize() => InitializationResult.ok(this);
 
   /// Checks if this instance is initialized.

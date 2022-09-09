@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:data_serializer/data_serializer.dart' show hex;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
@@ -13,7 +14,7 @@ import 'package:statistics/statistics.dart'
         IterableMapEntryExtension,
         NumericTypeExtension,
         IterableExtension;
-import 'package:swiss_knife/swiss_knife.dart' show EventStream;
+import 'package:swiss_knife/swiss_knife.dart' show EventStream, DataURLBase64;
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity_annotation.dart';
@@ -829,13 +830,18 @@ abstract class EntityHandler<O> with FieldsFromMap {
     var bytes = TypeParser.parseUInt8List(value);
     if (bytes != null) return bytes;
 
-    var allowReadFile = resolutionRules?.allowReadFile ?? false;
-    if (!allowReadFile) return null;
-
     if (value is String) {
       value = value.trim();
 
-      if (value.startsWith("url(") && value.endsWith(")")) {
+      if (value.isEmpty) {
+        return null;
+      } else if (value.startsWith("data:")) {
+        var dataURL = DataURLBase64.parse(value);
+        return dataURL?.payloadArrayBuffer;
+      } else if (value.startsWith("url(") && value.endsWith(")")) {
+        var allowReadFile = resolutionRules?.allowReadFile ?? false;
+        if (!allowReadFile) return null;
+
         var path = value.substring(4, value.length - 1);
         if ((path.startsWith('"') && path.endsWith('"')) ||
             (path.startsWith("'") && path.endsWith("'"))) {
@@ -848,6 +854,21 @@ abstract class EntityHandler<O> with FieldsFromMap {
         if (filePath != null) {
           var bytes = apiPlatform.readFileAsBytes(filePath);
           return bytes;
+        }
+      }
+
+      try {
+        var data = dart_convert.base64.decode(value);
+        return data;
+      } catch (_) {
+        // not a Base64 data:
+
+        try {
+          var data = hex.decode(value);
+          return data;
+        } catch (_) {
+          // not a HEX data:
+          return null;
         }
       }
     }
@@ -3665,9 +3686,13 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   bool _external;
 
+  final Transaction? parentTransaction;
+
   Transaction({bool autoCommit = false}) : this._(autoCommit, true);
 
-  Transaction._(this.autoCommit, [this._external = false]) : super() {
+  Transaction._(this.autoCommit,
+      [this._external = false, this.parentTransaction])
+      : super() {
     _transactionCompleter = _errorZone.createCompleter();
     _resultCompleter = _errorZone.createCompleter();
     _openCompleter = _errorZone.createCompleter<bool>();
@@ -4272,6 +4297,26 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       getCachedEntityByID(id, type: type);
 
   @override
+  void cacheEntity<O>(O entity, [Function(O o)? idGetter]) {
+    super.cacheEntity(entity, idGetter);
+
+    var parentTransaction = this.parentTransaction;
+    if (parentTransaction != null) {
+      parentTransaction.cacheEntity(entity, idGetter);
+    }
+  }
+
+  @override
+  void cacheEntities<O>(List<O> entities, [Function(O o)? idGetter]) {
+    super.cacheEntities(entities, idGetter);
+
+    var parentTransaction = this.parentTransaction;
+    if (parentTransaction != null) {
+      parentTransaction.cacheEntities(entities, idGetter);
+    }
+  }
+
+  @override
   String toString({bool compact = false}) {
     return [
       'Transaction[#$id]{\n',
@@ -4348,7 +4393,7 @@ abstract class TransactionOperation {
         operation != null &&
         operation.executor != transactionExecutor &&
         operation is! TransactionOperationSubTransaction) {
-      var subTransaction = Transaction._(true);
+      var subTransaction = Transaction._(true, false, transaction);
 
       var opSubTransaction = TransactionOperationSubTransaction(
           operation.repositoryName,

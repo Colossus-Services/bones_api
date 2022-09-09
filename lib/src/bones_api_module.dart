@@ -586,14 +586,14 @@ class APIRouteBuilder<M extends APIModule> {
         var data = base64.decode(value);
         return data;
       } catch (_) {
-        // not a base64 data:
+        // not a Base64 data:
       }
 
       try {
         var data = hex.decode(value);
         return data;
       } catch (_) {
-        // not a base64 data:
+        // not a HEX data:
       }
     }
 
