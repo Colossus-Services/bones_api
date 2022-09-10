@@ -2,7 +2,8 @@
 // - Generated with:
 //   ## remove the documentation canonicals from this file first.
 //   $> dart doc --dry-run 2>/tmp/dartdoc.txt
-//   $> cat /tmp/dartdoc.txt | grep "ambiguous reexport " |  awk '{ print $5 }' | sed 's/,//' | awk '{ print "/// {@canonicalFor " $0 "}" }'
+//   $> cat /tmp/dartdoc.txt | grep "ambiguous reexport " |  awk '{ print $5 }' | sed 's/,//' | awk '{ print "/// {@canonicalFor " $0 "}" }' > /tmp/dartdoc-canonicals.txt
+//   $> open /tmp/dartdoc-canonicals.txt
 //   ## then sort the documentation canonicals lines to have a deterministic list.
 //
 /// {@canonicalFor bones_api_authentication.APIAuthentication}
@@ -84,13 +85,11 @@
 /// {@canonicalFor bones_api_entity.ClassReflectionEntityHandler}
 /// {@canonicalFor bones_api_entity.EntityAccessor}
 /// {@canonicalFor bones_api_entity.EntityCache}
-/// {@canonicalFor bones_api_entity.EntityFetcher}
 /// {@canonicalFor bones_api_entity.EntityFieldAccessorGeneric}
 /// {@canonicalFor bones_api_entity.EntityFieldAccessor}
 /// {@canonicalFor bones_api_entity.EntityHandlerProvider}
 /// {@canonicalFor bones_api_entity.EntityHandler}
 /// {@canonicalFor bones_api_entity.EntityProvider}
-/// {@canonicalFor bones_api_entity.EntityReference}
 /// {@canonicalFor bones_api_entity.EntityRepositoryProviderExtension}
 /// {@canonicalFor bones_api_entity.EntityRepositoryProvider}
 /// {@canonicalFor bones_api_entity.EntityRepository}
@@ -123,7 +122,6 @@
 /// {@canonicalFor bones_api_entity.TransactionOperationUpdate}
 /// {@canonicalFor bones_api_entity.TransactionOperation}
 /// {@canonicalFor bones_api_entity.Transaction}
-/// {@canonicalFor bones_api_entity.TypeInfoEntityExtension}
 /// {@canonicalFor bones_api_entity_annotation.EntityAnnotation}
 /// {@canonicalFor bones_api_entity_annotation.EntityFieldInvalid}
 /// {@canonicalFor bones_api_entity_annotation.EntityField}
@@ -157,6 +155,11 @@
 /// {@canonicalFor bones_api_entity_db_sql.MultipleSQL}
 /// {@canonicalFor bones_api_entity_db_sql.SQLWrapper}
 /// {@canonicalFor bones_api_entity_db_sql.SQL}
+/// {@canonicalFor bones_api_entity_reference.EntitiesFetcher}
+/// {@canonicalFor bones_api_entity_reference.EntityFetcher}
+/// {@canonicalFor bones_api_entity_reference.EntityReferenceBase}
+/// {@canonicalFor bones_api_entity_reference.EntityReferenceList}
+/// {@canonicalFor bones_api_entity_reference.EntityReference}
 /// {@canonicalFor bones_api_entity_sql.DBSQLEntityRepositoryProvider}
 /// {@canonicalFor bones_api_entity_sql.DBSQLEntityRepository}
 /// {@canonicalFor bones_api_error_zone.ErrorZoneExtension}
@@ -165,11 +168,16 @@
 /// {@canonicalFor bones_api_error_zone.createErrorZone}
 /// {@canonicalFor bones_api_error_zone.printToZoneStderr}
 /// {@canonicalFor bones_api_error_zone.printZoneError}
+/// {@canonicalFor bones_api_extension.APIEntityObjectExtension}
+/// {@canonicalFor bones_api_extension.APIEntityTypeExtension}
 /// {@canonicalFor bones_api_extension.ClassReflectionExtension}
+/// {@canonicalFor bones_api_extension.ListOfStringExtension}
 /// {@canonicalFor bones_api_extension.MapGetterExtension}
 /// {@canonicalFor bones_api_extension.MapMultiValueExtension}
 /// {@canonicalFor bones_api_extension.MethodReflectionExtension}
 /// {@canonicalFor bones_api_extension.ReflectionFactoryExtension}
+/// {@canonicalFor bones_api_extension.TypeInfoEntityExtension}
+/// {@canonicalFor bones_api_extension.TypeReflectionEntityExtension}
 /// {@canonicalFor bones_api_initializable.ExecuteInitializedCallback}
 /// {@canonicalFor bones_api_initializable.InitializableListExtension}
 /// {@canonicalFor bones_api_initializable.Initializable}
@@ -217,9 +225,6 @@
 /// {@canonicalFor bones_api_test_utils.APITestConfigDocker}
 /// {@canonicalFor bones_api_test_utils.APITestConfigExtension}
 /// {@canonicalFor bones_api_test_utils.APITestConfig}
-/// {@canonicalFor bones_api_types.APIEntityObjectExtension}
-/// {@canonicalFor bones_api_types.APIEntityTypeExtension}
-/// {@canonicalFor bones_api_types.ListOfStringExtension}
 /// {@canonicalFor bones_api_types.Time}
 /// {@canonicalFor bones_api_utils.FieldNameMapper}
 /// {@canonicalFor bones_api_utils.KeyMapper}
@@ -227,6 +232,7 @@
 /// {@canonicalFor bones_api_utils.tryCallMapped}
 /// {@canonicalFor bones_api_utils.tryCall}
 /// {@canonicalFor bones_api_utils_arguments.Arguments}
+/// {@canonicalFor bones_api_utils_collections.IterableEnumExtension}
 /// {@canonicalFor bones_api_utils_collections.MapAsCacheExtension}
 /// {@canonicalFor bones_api_utils_collections.PositionalFields}
 /// {@canonicalFor bones_api_utils_collections.ValueEquality}
@@ -247,6 +253,7 @@
 /// {@canonicalFor bones_api_utils_httpclient.getURL}
 /// {@canonicalFor bones_api_utils_instance_tracker.InstanceInfoExtractor}
 /// {@canonicalFor bones_api_utils_instance_tracker.InstanceTracker}
+/// {@canonicalFor bones_api_utils_json.JsonEntityCacheExtension}
 /// {@canonicalFor bones_api_utils_json.Json}
 /// {@canonicalFor bones_api_utils_json.ToEncodable}
 /// {@canonicalFor bones_api_utils_timedmap.TimedMap}

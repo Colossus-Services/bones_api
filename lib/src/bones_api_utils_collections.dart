@@ -300,22 +300,28 @@ Map<K, V>? deepCopyMap<K, V>(Map<K, V>? map) {
 }
 
 /// Returns an [Enum] name.
-String enumToName(Enum enumValue) {
-  var s = enumValue.toString();
-  var idx = s.indexOf('.');
-  var name = s.substring(idx + 1);
-  return name;
-}
+String enumToName(Enum enumValue) => enumValue.name;
 
 /// Returns an [Enum] from [enumValues] that matches [name].
-Enum? enumFromName(String name, Iterable<Enum> enumValues) {
+E? enumFromName<E extends Enum>(String? name, Iterable<E> enumValues) {
+  if (name == null) return null;
+  name = name.trim();
+  if (name.isEmpty) return null;
+
   for (var e in enumValues) {
     var n = enumToName(e);
-    if (n == name) {
+
+    if (equalsIgnoreAsciiCase(n, name)) {
       return e;
     }
   }
+
   return null;
+}
+
+/// Extension on [Iterable] of [Enum].
+extension IterableEnumExtension<E extends Enum> on Iterable<E> {
+  E? parse(String? name) => enumFromName(name, this);
 }
 
 /// Extension that ads cached methods to a [Map].

@@ -65,6 +65,20 @@ void main() {
       expect(t8.hasArguments, isFalse);
     });
 
+    test('Type.tryParse', () async {
+      {
+        var t = DateTime;
+        var v = t.tryParse('2000-01-11');
+        expect(v, equals(DateTime(2000, 1, 11)));
+      }
+
+      {
+        var t = int;
+        var v = t.tryParse('1234');
+        expect(v, equals(1234));
+      }
+    });
+
     test('Time', () async {
       _testTime(Time(1, 2, 3), '01:02:03');
 
