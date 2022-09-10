@@ -2,6 +2,7 @@
 
 - Improved `enumFromName`.
 - Added `IterableEnumExtension`.
+- Added `Type.tryParse`.
 - `EntityReference` and `EntityReferenceList`:
   - improve `fromJson`.
 - Fix `EntityRepository.selectFirstByQuery`:

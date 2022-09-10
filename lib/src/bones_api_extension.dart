@@ -769,6 +769,12 @@ extension APIEntityTypeExtension on Type {
     var self = this;
     return self == EntityReference || self == EntityReferenceList;
   }
+
+  /// Returns this [type] as a [TypeInfo].
+  TypeInfo get typeInfo => TypeInfo.fromType(this);
+
+  /// Parses [value] using [TypeInfo.parse].
+  V? tryParse<V>(Object? value, [V? def]) => typeInfo.parse(value);
 }
 
 /// Extension for entity [Object]s.
