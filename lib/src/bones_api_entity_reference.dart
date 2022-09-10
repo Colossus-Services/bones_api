@@ -353,10 +353,18 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
       typeName ??= entityReferenceType;
       var id = json['id'];
-      var entityMap = json['entity'];
+      var entity = json['entity'];
 
-      if (entityMap != null) {
-        return EntityReference<T>.fromEntityMap(entityMap,
+      if (entity != null) {
+        var entityMap = entity is Map
+            ? entity
+            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+
+        var entityMapCast = entityMap is Map<String, dynamic>
+            ? entityMap
+            : entityMap.map((key, value) => MapEntry('$key', value));
+
+        return EntityReference<T>.fromEntityMap(entityMapCast,
                 type: type,
                 typeName: typeName,
                 entityHandler: entityHandler,
@@ -1066,9 +1074,20 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
       typeName ??= entityReferenceType;
       var ids = json['ids'];
-      var entitiesMaps = json['entities'];
+      var entities = json['entities'];
 
-      if (entitiesMaps != null && entitiesMaps is List<Map<String, dynamic>?>) {
+      if (entities != null && entities is List) {
+        var entitiesMaps = entities is List<Map<String, dynamic>>
+            ? entities
+            : entities.map((e) {
+                var m = e is Map
+                    ? e
+                    : TypeParser.parseMap(e) ?? <String, dynamic>{};
+                return m is Map<String, dynamic>
+                    ? m
+                    : m.map((key, value) => MapEntry('$key', value));
+              }).toList(growable: false);
+
         return EntityReferenceList<T>.fromEntitiesMaps(entitiesMaps,
                 type: type,
                 typeName: typeName,
@@ -1123,7 +1142,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             ._autoCast();
       }
 
-      return EntityReferenceList<T>.fromEntitiesMaps([json],
+      return EntityReferenceList<T>.fromEntitiesMaps(
+              <Map<String, dynamic>>[json],
               type: type,
               typeName: typeName,
               entityHandler: entityHandler,

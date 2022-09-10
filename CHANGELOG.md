@@ -2,6 +2,8 @@
 
 - Improved `enumFromName`.
 - Added `IterableEnumExtension`.
+- `EntityReference` and `EntityReferenceList`:
+  - improve `fromJson`.
 - Fix `EntityRepository.selectFirstByQuery`:
   - `resolutionRules` wasn't being passed to sub calls.
 
