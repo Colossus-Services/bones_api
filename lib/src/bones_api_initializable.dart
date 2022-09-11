@@ -133,11 +133,45 @@ class _InitializationChain {
 
   bool _isParent(Initializable o) {
     var parents = _parents;
-    if (parents == null) return false;
+    if (parents == null || parents.isEmpty) return false;
 
-    if (parents.containsIdentical(o)) return true;
+    var parents2 = <Initializable>{};
 
     for (var p in parents) {
+      if (identical(p, o)) return true;
+
+      parents2.addAll(p._chain.parents);
+    }
+
+    var parents3 = <Initializable>{};
+
+    for (var p in parents2) {
+      if (identical(p, o)) return true;
+
+      parents3.addAll(p._chain.parents);
+    }
+
+    var parents4 = <Initializable>{};
+
+    for (var p in parents3) {
+      if (identical(p, o)) return true;
+
+      parents4.addAll(p._chain.parents);
+    }
+
+    var parents5 = <Initializable>{};
+
+    for (var p in parents4) {
+      if (identical(p, o)) return true;
+
+      parents5.addAll(p._chain.parents);
+    }
+
+    for (var p in parents5) {
+      if (identical(p, o)) return true;
+    }
+
+    for (var p in parents5) {
       if (p._chain._isParent(o)) return true;
     }
 
