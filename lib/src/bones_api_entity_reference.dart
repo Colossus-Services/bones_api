@@ -278,7 +278,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   /// Creates an [EntityReference] with the entity [id] (without a loaded [entity] instance).
   /// See [id] and [isIdSet].
-  EntityReference.fromID(Object id,
+  EntityReference.fromID(Object? id,
       {Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,
@@ -292,7 +292,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReference] with the [entity] instance.
   /// The [id] is resolved through the [entity] instance.
   /// See [entity] and [isEntitySet].
-  EntityReference.fromEntity(T entity,
+  EntityReference.fromEntity(T? entity,
       {Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,
@@ -313,7 +313,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             checkGenericType);
 
   /// Creates an [EntityReference] with an [entity] instance from [entityMap].
-  EntityReference.fromEntityMap(Map<String, dynamic> entityMap,
+  EntityReference.fromEntityMap(Map<String, dynamic>? entityMap,
       {Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,

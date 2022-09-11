@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 
@@ -235,6 +237,10 @@ List<T>? deepCopyList<T>(List<T>? list) {
 
   if (list is List<String>) {
     return List<String>.from(list) as List<T>;
+  } else if (list is Uint8List) {
+    return Uint8List.fromList(list as Uint8List) as List<T>;
+  } else if (list is Int8List) {
+    return Int8List.fromList(list as Int8List) as List<T>;
   } else if (list is List<int>) {
     return List<int>.from(list) as List<T>;
   } else if (list is List<double>) {

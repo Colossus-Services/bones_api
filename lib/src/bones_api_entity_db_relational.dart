@@ -265,6 +265,7 @@ class DBRelationalEntityRepository<O extends Object>
           if (fieldValue == null) return null;
 
           var fieldType = entityHandler.getFieldType(o, fieldName)!;
+          if (fieldType.isPrimitiveType) return null;
 
           Object? value = fieldValue;
 

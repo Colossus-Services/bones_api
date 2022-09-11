@@ -1301,10 +1301,14 @@ abstract class EntityHandler<O> with FieldsFromMap {
     equals = equalsValuesEnum(value1, value2);
     if (equals != null) return equals;
 
-    var collection1 =
-        TypeParser.isCollectionValue(value1) || value1.isEntityReferenceList;
-    var collection2 =
-        TypeParser.isCollectionValue(value2) || value2.isEntityReferenceList;
+    var collection1 = TypeParser.isCollectionValue(value1) ||
+        value1.isEntityReferenceList ||
+        value1 is Uint8List ||
+        value1 is Int8List;
+    var collection2 = TypeParser.isCollectionValue(value2) ||
+        value2.isEntityReferenceList ||
+        value2 is Uint8List ||
+        value2 is Int8List;
 
     if (collection1 && collection2) {
       return isEqualsDeep(value1, value2, valueEquality: equalsValues);

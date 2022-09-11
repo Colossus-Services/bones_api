@@ -1,3 +1,10 @@
+## 1.3.10
+
+- `EntityReference.fromID`: accepts null ID (works like `asNull`).
+- `Initializable`:
+  - `InitializationChain._isParent`: improve speed of search in the parent tree.
+- Fix update of `Uint8List` fields. 
+
 ## 1.3.9
 
 - Improved `enumFromName`.
@@ -124,7 +131,7 @@
 
 - `bin/bones_api.dart`:
   - Fix parameter `--lib` when respawning for Hot Reload.
-- Added `SQLDialect` for better handling of syntax varaitions.
+- Added `SQLDialect` for better handling of syntax variations.
 - `SQLAdapter`:
   - Moved to `SQLDialect`:
     `sqlElementQuote`, `sqlAcceptsOutputSyntax`, `sqlAcceptsReturningSyntax`, `sqlAcceptsTemporaryTableForReturning`,
@@ -758,7 +765,7 @@
 ## 1.0.22
 
 - `Condition`:
-  - Improved sub-field match.
+  - Improved subfield match.
 - `SQL`:
   - Allow `Condition` with fields that are a relationship table. 
 - `MySQLAdapter`: 
@@ -932,7 +939,7 @@
 
 - CLI Hot Reload fixed:
   - Avoid reload of main Isolate (bones_api CLI),
-    since API is spawned in it's own Isolate.
+    since API is spawned in its own Isolate.
 - `DataEntity`:
   - Added `fieldsNames`.
 - `DataHandlerProvider`:
