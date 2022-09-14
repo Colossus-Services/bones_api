@@ -1,5 +1,7 @@
 ## 1.3.11
 
+- `DBAdapter`:
+  - Fix resolution of `EntityReferenceBase` field table. 
 - `DBMemorySQLAdapter`:
   - Fix resolution of relationship tables with multiple candidates.
 

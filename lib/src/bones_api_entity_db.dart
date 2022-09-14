@@ -349,10 +349,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   FutureOr<String?> getTableForType(TypeInfo type) {
     if (type.hasArguments) {
-      if (type.isMap) {
+      if (type.isEntityReferenceBaseType) {
+        type = type.arguments0!;
+      } else if (type.isMap) {
         type = type.arguments[1];
       } else if (type.isIterable || type.isList || type.isSet) {
-        type = type.arguments[0];
+        type = type.arguments0!;
       }
     }
 
