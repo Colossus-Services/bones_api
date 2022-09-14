@@ -146,7 +146,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
         .getTableScheme(tableName)
         .resolveMapped((tableScheme) {
       if (tableScheme == null) return fieldName;
-      return tableScheme.resolveTableFiledName(fieldName) ?? fieldName;
+      return tableScheme.resolveTableFieldName(fieldName) ?? fieldName;
     });
   }
 
@@ -220,7 +220,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var q = sqlElementQuote;
 
       var fieldName = key0.name;
-      var tableFieldName = tableScheme.resolveTableFiledName(fieldName);
+      var tableFieldName = tableScheme.resolveTableFieldName(fieldName);
       var tableFieldType = tableFieldName != null
           ? tableScheme.fieldsTypes[tableFieldName]
           : null;
@@ -303,7 +303,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
       }
 
       var fieldName = key0.name;
-      var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
+      var fieldRef = tableScheme.getFieldReferencedTable(fieldName);
 
       if (fieldRef != null) {
         context.fieldsReferencedTables.add(fieldRef);
@@ -325,7 +325,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
             var q = sqlElementQuote;
             var targetFieldName =
-                targetTableScheme.resolveTableFiledName(key1.name);
+                targetTableScheme.resolveTableFieldName(key1.name);
             var targetFieldType =
                 targetTableScheme.fieldsTypes[targetFieldName]!;
             return MapEntry(
@@ -384,7 +384,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
               var q = sqlElementQuote;
               var targetFieldName =
-                  targetTableScheme.resolveTableFiledName(key1.name);
+                  targetTableScheme.resolveTableFieldName(key1.name);
               var targetFieldType =
                   targetTableScheme.fieldsTypes[targetFieldName]!;
               return MapEntry(

@@ -374,12 +374,12 @@ class TableScheme with FieldsFromMap {
   }
 
   /// Returns a [TableFieldReference] from [_fieldsReferencedTables] with a resolved [fieldKey].
-  /// See [resolveTableFiledName].
-  TableFieldReference? getFieldsReferencedTables(String fieldKey) {
+  /// See [resolveTableFieldName].
+  TableFieldReference? getFieldReferencedTable(String fieldKey) {
     var ref = _fieldsReferencedTables[fieldKey];
     if (ref != null) return ref;
 
-    var resolvedName = resolveTableFiledName(fieldKey);
+    var resolvedName = resolveTableFieldName(fieldKey);
     if (resolvedName == null) return null;
 
     ref = _fieldsReferencedTables[resolvedName];
@@ -387,7 +387,7 @@ class TableScheme with FieldsFromMap {
   }
 
   /// Resolves [key] to a matching field in [fieldsNames].
-  String? resolveTableFiledName(String key) {
+  String? resolveTableFieldName(String key) {
     if (fieldsNames.contains(key)) {
       return key;
     }

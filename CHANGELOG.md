@@ -1,3 +1,8 @@
+## 1.3.11
+
+- `DBMemorySQLAdapter`:
+  - Fix resolution of relationship tables with multiple candidates.
+
 ## 1.3.10
 
 - `EntityReference.fromID`: accepts null ID (works like `asNull`).

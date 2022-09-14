@@ -422,11 +422,11 @@ Future<bool> runAdapterTests(
       var user1CreationTime = DateTime.utc(2021, 9, 20, 10, 11, 12, 0, 0);
       int user1Id;
 
-      {
-        var store1 = Store('s11', 11);
-        var store2 = Store('s12', 12);
-        var storeClosed = Store('s9', 9);
+      var store1 = Store('s11', 11);
+      var store2 = Store('s12', 12);
+      var storeClosed = Store('s9', 9);
 
+      {
         var address = Address('NY', 'New York', 'street A', 101,
             stores: [store1, store2], closedStores: [storeClosed]);
         var role = Role(RoleType.admin);
@@ -535,6 +535,27 @@ Future<bool> runAdapterTests(
 
           expect(user.photo?.id, equals(png1PixelSha256));
           expect(user.photo?.data, equals(base64.decode(png1PixelBase64)));
+        }
+
+        {
+          var sel1 = await addressAPIRepository.selectByStore(store1);
+
+          expect(sel1.length, equals(1));
+          expect(sel1.first.number, equals(101));
+
+          var sel2 = await addressAPIRepository.selectByStore(storeClosed);
+          expect(sel2, isEmpty);
+        }
+
+        {
+          var sel1 =
+              await addressAPIRepository.selectByClosedStore(storeClosed);
+
+          expect(sel1.length, equals(1));
+          expect(sel1.first.number, equals(101));
+
+          var sel2 = await addressAPIRepository.selectByClosedStore(store2);
+          expect(sel2, isEmpty);
         }
 
         {
@@ -669,6 +690,26 @@ Future<bool> runAdapterTests(
 
       expect(await addressAPIRepository.length(), equals(3));
       expect(await userAPIRepository.length(), equals(3));
+
+      {
+        var sel1 = await addressAPIRepository.selectByStore(store1);
+
+        expect(sel1.length, equals(1));
+        expect(sel1.first.number, equals(101));
+
+        var sel2 = await addressAPIRepository.selectByStore(storeClosed);
+        expect(sel2, isEmpty);
+      }
+
+      {
+        var sel1 = await addressAPIRepository.selectByClosedStore(storeClosed);
+
+        expect(sel1.length, equals(1));
+        expect(sel1.first.number, equals(101));
+
+        var sel2 = await addressAPIRepository.selectByClosedStore(store2);
+        expect(sel2, isEmpty);
+      }
 
       {
         var user = await userAPIRepository.selectByID(user1Id);

@@ -1265,7 +1265,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   String _resolveEntityFieldToTableColumn(String entityField) {
     var tableScheme = repositoryAdapter.getTableScheme() as TableScheme;
 
-    var tableField = tableScheme.resolveTableFiledName(entityField);
+    var tableField = tableScheme.resolveTableFieldName(entityField);
     if (tableField == null) {
       throw StateError(
           "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");

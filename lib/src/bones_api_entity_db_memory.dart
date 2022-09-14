@@ -748,7 +748,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   Map<String, dynamic> _resolveEntityMap(Map<String, dynamic> obj,
       EntityHandler<dynamic>? entityHandler, TableScheme tableScheme) {
     var obj2 = obj.map((key, value) {
-      var refField = tableScheme.getFieldsReferencedTables(key);
+      var refField = tableScheme.getFieldReferencedTable(key);
       if (refField != null) {
         value = _resolveEntityFieldReferencedTable(obj, key, refField);
       }
@@ -776,8 +776,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
         var fieldKey = e.key;
         var fieldType = e.value.arguments0!;
 
-        var targetObjs = _resolveEntityFieldRelationshipTables(
-            relationshipsTables, id, fieldType);
+        var targetObjs = _resolveEntityFieldRelationshipTable(
+            tableScheme, relationshipsTables, id, fieldType, fieldKey);
         if (targetObjs != null) {
           obj2[fieldKey] = targetObjs;
         }
@@ -806,10 +806,13 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     return fieldObj;
   }
 
-  List? _resolveEntityFieldRelationshipTables(
+  List? _resolveEntityFieldRelationshipTable(
+      TableScheme tableScheme,
       List<TableRelationshipReference> relationshipsTables,
       Object id,
-      TypeInfo fieldType) {
+      TypeInfo fieldType,
+      String fieldKey) {
+    var sourceTable = tableScheme.name;
     var targetTable = getTableForType(fieldType);
 
     if (targetTable == null) {
@@ -819,8 +822,15 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
           "Async response not supported when calling `getTableForType`");
     }
 
-    var relationshipTable =
-        relationshipsTables.firstWhere((t) => t.targetTable == targetTable);
+    var relationshipTable = tableScheme.getTableRelationshipReference(
+        sourceTable: sourceTable,
+        sourceField: fieldKey,
+        targetTable: targetTable);
+
+    if (relationshipTable == null) {
+      throw StateError(
+          "Can't find relationship table for `$sourceTable`.`$fieldKey` -> `$targetTable`. Relationships tables: ${relationshipsTables.map((e) => e.relationshipTable).toList()}");
+    }
 
     var relMap = _getTableMap(relationshipTable.relationshipTable, false,
         relationship: true);

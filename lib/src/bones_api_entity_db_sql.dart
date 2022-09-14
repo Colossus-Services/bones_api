@@ -615,7 +615,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (refEntityRepository == null) {
       return _getValueEntityID(refEntity) ?? valueToSQL(refEntity);
     } else {
-      var fieldRef = tableScheme.getFieldsReferencedTables(fieldName);
+      var fieldRef = tableScheme.getFieldReferencedTable(fieldName);
 
       var refEntityHandler = refEntityRepository.entityHandler;
 
