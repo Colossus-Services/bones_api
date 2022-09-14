@@ -38,6 +38,15 @@ class AddressAPIRepository extends APIRepository<Address> {
   FutureOr<Iterable<Address>> selectByState(String state) {
     return selectByQuery(' state == ? ', parameters: {'state': state});
   }
+
+  FutureOr<Iterable<Address>> selectByStore(Store store) {
+    return selectByQuery(' stores =~ ? ', parameters: {'stores': store});
+  }
+
+  FutureOr<Iterable<Address>> selectByClosedStore(Store store) {
+    return selectByQuery(' closedStores =~ ? ',
+        parameters: {'closedStores': store});
+  }
 }
 
 class RoleAPIRepository extends APIRepository<Role> {

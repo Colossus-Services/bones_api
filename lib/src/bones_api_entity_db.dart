@@ -349,10 +349,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   FutureOr<String?> getTableForType(TypeInfo type) {
     if (type.hasArguments) {
-      if (type.isMap) {
+      if (type.isEntityReferenceBaseType) {
+        type = type.arguments0!;
+      } else if (type.isMap) {
         type = type.arguments[1];
       } else if (type.isIterable || type.isList || type.isSet) {
-        type = type.arguments[0];
+        type = type.arguments0!;
       }
     }
 
@@ -1265,7 +1267,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   String _resolveEntityFieldToTableColumn(String entityField) {
     var tableScheme = repositoryAdapter.getTableScheme() as TableScheme;
 
-    var tableField = tableScheme.resolveTableFiledName(entityField);
+    var tableField = tableScheme.resolveTableFieldName(entityField);
     if (tableField == null) {
       throw StateError(
           "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");
