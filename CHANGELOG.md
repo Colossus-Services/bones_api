@@ -1,3 +1,9 @@
+## 1.3.12
+
+- Add `EntityHandler.typeName` to avoid minification issues with `Type`s name.
+- async_events: ^1.0.4
+- reflection_factory: ^1.2.12
+
 ## 1.3.11
 
 - `DBAdapter`:

@@ -8,7 +8,10 @@ import 'package:statistics/statistics.dart';
 part 'bones_api_test_entities.reflection.g.dart';
 
 final storeEntityHandler = GenericEntityHandler<Store>(
-    instantiatorDefault: Store.empty, instantiatorFromMap: Store.fromMap);
+    instantiatorDefault: Store.empty,
+    instantiatorFromMap: Store.fromMap,
+    type: Store,
+    typeName: 'Store');
 
 final addressEntityHandler = GenericEntityHandler<Address>(
     instantiatorDefault: Address.empty,

@@ -265,9 +265,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
   /// The entity [Type] handled by this instance.
   final Type type;
 
-  EntityHandler(EntityHandlerProvider? provider, {Type? type})
+  /// The entity [Type] name handled by this instance.
+  final String typeName;
+
+  EntityHandler(EntityHandlerProvider? provider, {Type? type, String? typeName})
       : provider = provider ?? EntityHandlerProvider.globalProvider,
-        type = type ?? O {
+        type = type ?? O,
+        typeName = typeName ?? (type ?? O).toString() {
     if (!isValidEntityType(this.type)) {
       throw StateError('Invalid EntityHandler type: $type (O: $O)');
     }
@@ -401,7 +405,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return this as EntityHandler<T>;
     }
 
-    if (typeName != null && this.type.toString() == typeName) {
+    if (typeName != null && this.typeName == typeName) {
       return this as EntityHandler<T>;
     }
 
@@ -1667,9 +1671,10 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
       {this.instantiatorDefault,
       this.instantiatorFromMap,
       Type? type,
+      String? typeName,
       O? sampleEntity,
       EntityHandlerProvider? provider})
-      : super(provider, type: type ?? O) {
+      : super(provider, type: type ?? O, typeName: typeName) {
     if (instantiatorDefault == null && instantiatorFromMap == null) {
       throw ArgumentError(
           "Null instantiators: `instantiatorDefault`, `instantiatorFromMap`");
@@ -1868,6 +1873,9 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       {EntityHandlerProvider? provider, ClassReflection<O>? reflection})
       : _reflection = reflection,
         super(provider, type: classType);
+
+  @override
+  String get typeName => reflection.className;
 
   ClassReflection<O> get reflection => _reflection ??=
       ReflectionFactory().getRegisterClassReflection<O>(classType)!;

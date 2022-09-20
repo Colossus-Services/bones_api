@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.10
+// BUILDER: reflection_factory/1.2.12
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -52,7 +52,7 @@ UserInfo UserInfo$fromJsonEncoded(String jsonEncoded) =>
     UserInfo$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
 class Address$reflection extends ClassReflection<Address> {
-  Address$reflection([Address? object]) : super(Address, object);
+  Address$reflection([Address? object]) : super(Address, 'Address', object);
 
   static bool _registered = false;
   @override
@@ -68,7 +68,7 @@ class Address$reflection extends ClassReflection<Address> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   Address$reflection withObject([Address? obj]) => Address$reflection(obj);
@@ -533,7 +533,7 @@ class Address$reflection extends ClassReflection<Address> {
 }
 
 class Photo$reflection extends ClassReflection<Photo> {
-  Photo$reflection([Photo? object]) : super(Photo, object);
+  Photo$reflection([Photo? object]) : super(Photo, 'Photo', object);
 
   static bool _registered = false;
   @override
@@ -549,7 +549,7 @@ class Photo$reflection extends ClassReflection<Photo> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   Photo$reflection withObject([Photo? obj]) => Photo$reflection(obj);
@@ -1005,7 +1005,7 @@ class Photo$reflection extends ClassReflection<Photo> {
 }
 
 class Role$reflection extends ClassReflection<Role> {
-  Role$reflection([Role? object]) : super(Role, object);
+  Role$reflection([Role? object]) : super(Role, 'Role', object);
 
   static bool _registered = false;
   @override
@@ -1021,7 +1021,7 @@ class Role$reflection extends ClassReflection<Role> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   Role$reflection withObject([Role? obj]) => Role$reflection(obj);
@@ -1426,7 +1426,7 @@ class Role$reflection extends ClassReflection<Role> {
 }
 
 class RoleType$reflection extends EnumReflection<RoleType> {
-  RoleType$reflection([RoleType? object]) : super(RoleType, object);
+  RoleType$reflection([RoleType? object]) : super(RoleType, 'RoleType', object);
 
   static bool _registered = false;
   @override
@@ -1442,7 +1442,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -1490,7 +1490,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
 }
 
 class Store$reflection extends ClassReflection<Store> {
-  Store$reflection([Store? object]) : super(Store, object);
+  Store$reflection([Store? object]) : super(Store, 'Store', object);
 
   static bool _registered = false;
   @override
@@ -1506,7 +1506,7 @@ class Store$reflection extends ClassReflection<Store> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   Store$reflection withObject([Store? obj]) => Store$reflection(obj);
@@ -1903,7 +1903,7 @@ class Store$reflection extends ClassReflection<Store> {
 }
 
 class User$reflection extends ClassReflection<User> {
-  User$reflection([User? object]) : super(User, object);
+  User$reflection([User? object]) : super(User, 'User', object);
 
   static bool _registered = false;
   @override
@@ -1919,7 +1919,7 @@ class User$reflection extends ClassReflection<User> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   User$reflection withObject([User? obj]) => User$reflection(obj);
@@ -2465,7 +2465,7 @@ class User$reflection extends ClassReflection<User> {
 }
 
 class UserInfo$reflection extends ClassReflection<UserInfo> {
-  UserInfo$reflection([UserInfo? object]) : super(UserInfo, object);
+  UserInfo$reflection([UserInfo? object]) : super(UserInfo, 'UserInfo', object);
 
   static bool _registered = false;
   @override
@@ -2481,7 +2481,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   UserInfo$reflection withObject([UserInfo? obj]) => UserInfo$reflection(obj);

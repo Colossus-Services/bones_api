@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.10
+// BUILDER: reflection_factory/1.2.12
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -25,7 +25,8 @@ UserModule UserModule$fromJsonEncoded(String jsonEncoded) =>
     UserModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
 class AboutModule$reflection extends ClassReflection<AboutModule> {
-  AboutModule$reflection([AboutModule? object]) : super(AboutModule, object);
+  AboutModule$reflection([AboutModule? object])
+      : super(AboutModule, 'AboutModule', object);
 
   static bool _registered = false;
   @override
@@ -41,7 +42,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
@@ -799,7 +800,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule> {
 }
 
 class UserModule$reflection extends ClassReflection<UserModule> {
-  UserModule$reflection([UserModule? object]) : super(UserModule, object);
+  UserModule$reflection([UserModule? object])
+      : super(UserModule, 'UserModule', object);
 
   static bool _registered = false;
   @override
@@ -815,7 +817,7 @@ class UserModule$reflection extends ClassReflection<UserModule> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>

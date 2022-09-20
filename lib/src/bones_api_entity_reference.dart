@@ -60,14 +60,20 @@ abstract class EntityReferenceBase<T> {
     return type;
   }
 
+  static final String _typeEntityReferenceStr = _getTypeName(EntityReference);
+
+  static final String _typeEntityReferenceListStr =
+      _getTypeName(EntityReferenceList);
+
+  static String _getTypeName(Type type) => '$type<';
+
   void _checkGenericType() {
     var typeStr = type.toString();
 
     if (type == EntityReference ||
         type == EntityReferenceList ||
-        (typeStr.startsWith('EntityReference') &&
-                typeStr.startsWith('EntityReference<') ||
-            (typeStr.startsWith('EntityReferenceList<')))) {
+        (typeStr.startsWith(_typeEntityReferenceStr) ||
+            typeStr.startsWith(_typeEntityReferenceListStr))) {
       throw StateError(
           "Can't have an entity reference (`$runtimeType`) pointing to another reference type (`$type`).");
     }
@@ -878,7 +884,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     }
 
     var id = _id;
-    var entity = this.entity;
+    var entity = _entity;
 
     if (id != null) {
       if (entity != null) {
@@ -1988,7 +1994,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     }
 
     var ids = _ids;
-    var entities = this.entities;
+    var entities = _entities;
 
     if (ids != null) {
       if (entities != null) {

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.10
+// BUILDER: reflection_factory/1.2.12
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -19,7 +19,8 @@ MyInfoModule MyInfoModule$fromJsonEncoded(String jsonEncoded) =>
     MyInfoModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
 class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
-  MyInfoModule$reflection([MyInfoModule? object]) : super(MyInfoModule, object);
+  MyInfoModule$reflection([MyInfoModule? object])
+      : super(MyInfoModule, 'MyInfoModule', object);
 
   static bool _registered = false;
   @override
@@ -35,7 +36,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   Version get languageVersion => Version.parse('2.17.0');
 
   @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.10');
+  Version get reflectionFactoryVersion => Version.parse('1.2.12');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
