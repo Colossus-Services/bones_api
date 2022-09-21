@@ -60,12 +60,19 @@ abstract class EntityReferenceBase<T> {
     return type;
   }
 
-  static final String _typeEntityReferenceStr = _getTypeName(EntityReference);
+  static final String _typeEntityReferenceStr =
+      _getTypeNamePrefix(EntityReference);
 
   static final String _typeEntityReferenceListStr =
-      _getTypeName(EntityReferenceList);
+      _getTypeNamePrefix(EntityReferenceList);
 
-  static String _getTypeName(Type type) => '$type<';
+  static String _getTypeNamePrefix(Type type) {
+    var s = '$type<';
+    var idx = s.indexOf('<');
+    assert(idx > 0);
+    var prefix = s.substring(0, idx + 1);
+    return prefix;
+  }
 
   void _checkGenericType() {
     var typeStr = type.toString();
