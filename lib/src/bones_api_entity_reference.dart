@@ -19,7 +19,7 @@ typedef EntitiesFetcher<T> = FutureOr<List<T?>?> Function(
 abstract class EntityReferenceBase<T> {
   Type? _type;
 
-  final String? _typeName;
+  String? _typeName;
 
   EntityHandler<T>? _entityHandler;
 
@@ -45,7 +45,7 @@ abstract class EntityReferenceBase<T> {
 
   EntityReferenceBase<E> cast<E>();
 
-  EntityReferenceBase<T> copy();
+  EntityReferenceBase<T> copy({bool withEntity = true});
 
   /// The entity [Type].
   Type get type => _type ??= _resolveType();
@@ -58,6 +58,24 @@ abstract class EntityReferenceBase<T> {
     _type = type!;
 
     return type;
+  }
+
+  /// The entity [Type] name.
+  String get typeName => _typeName ??= _resolveTypeName();
+
+  String _resolveTypeName() {
+    var entityHandler = this.entityHandler;
+    if (entityHandler != null) {
+      return entityHandler.typeName;
+    }
+
+    var classReflection = ReflectionFactory().getRegisterClassReflection(type);
+    if (classReflection != null) {
+      return classReflection.className;
+    }
+
+    var typeName = '$type';
+    return typeName;
   }
 
   static final String _typeEntityReferenceStr =
@@ -83,6 +101,12 @@ abstract class EntityReferenceBase<T> {
             typeStr.startsWith(_typeEntityReferenceListStr))) {
       throw StateError(
           "Can't have an entity reference (`$runtimeType`) pointing to another reference type (`$type`).");
+    }
+
+    var typeName = this.typeName;
+
+    if (typeName.isEmpty || typeName.startsWith("minify:")) {
+      throw StateError("Invalid `Type` name: $typeName");
     }
 
     if (T != type) {
@@ -565,12 +589,12 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   /// Returns a copy of `this` [EntityReference] instance.
   @override
-  EntityReference<T> copy() {
+  EntityReference<T> copy({bool withEntity = true}) {
     var cp = EntityReference<T>._(
         _type,
         _typeName,
         _id,
-        _entity,
+        withEntity ? _entity : null,
         null,
         _entityHandler,
         _entityProvider,
@@ -578,7 +602,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         _entityFetcher,
         false);
 
-    cp._entityTime = _entityTime;
+    if (withEntity) cp._entityTime = _entityTime;
 
     return cp;
   }
@@ -586,6 +610,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// The [entity] [Type].
   @override
   Type get type => super.type;
+
+  /// The [entity] [Type] name.
+  @override
+  String get typeName => super.typeName;
 
   /// The entity ID.
   Object? get id => _resolveID();
@@ -690,19 +718,19 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     if (isEntitySet) {
       var id = this.id;
       return <String, dynamic>{
-        'EntityReference': '$type',
+        'EntityReference': typeName,
         if (id != null) 'id': id,
         'entity': entityToJson(),
       };
     } else if (isIdSet) {
       var id = this.id!;
       return <String, dynamic>{
-        'EntityReference': '$type',
+        'EntityReference': typeName,
         'id': id,
       };
     } else {
       return <String, dynamic>{
-        'EntityReference': '$type',
+        'EntityReference': typeName,
       };
     }
   }
@@ -1331,12 +1359,12 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
   /// Returns a copy of `this` [EntityReference] instance.
   @override
-  EntityReferenceList<T> copy() {
+  EntityReferenceList<T> copy({bool withEntity = true}) {
     var cp = EntityReferenceList<T>._(
         _type,
         _typeName,
         _ids,
-        _entities,
+        withEntity ? _entities : null,
         null,
         _entityHandler,
         _entityProvider,
@@ -1344,7 +1372,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         _entitiesFetcher,
         false);
 
-    cp._entitiesTime = _entitiesTime;
+    if (withEntity) cp._entitiesTime = _entitiesTime;
 
     return cp;
   }
@@ -1374,6 +1402,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// The [entities] [Type].
   @override
   Type get type => super.type;
+
+  /// The [entities] [Type] name.
+  @override
+  String get typeName => super.typeName;
 
   List<Object?>? _getEntitiesIDs(List<T?>? os) {
     if (os == null) return null;
@@ -1594,7 +1626,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var hasAnyID = ids != null && ids.any((id) => id != null);
 
       return <String, dynamic>{
-        'EntityReferenceList': '$type',
+        'EntityReferenceList': typeName,
         if (hasAnyID) 'ids': ids,
         if (hasAnyEntity) 'entities': entitiesToJson(),
       };
@@ -1603,12 +1635,12 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var hasAnyID = ids.any((id) => id != null);
 
       return <String, dynamic>{
-        'EntityReferenceList': '$type',
+        'EntityReferenceList': typeName,
         if (hasAnyID) 'ids': ids,
       };
     } else {
       return <String, dynamic>{
-        'EntityReferenceList': '$type',
+        'EntityReferenceList': typeName,
       };
     }
   }

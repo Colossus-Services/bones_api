@@ -493,7 +493,10 @@ class _EntityProviderFromEntityCache implements EntityProvider {
   _EntityProviderFromEntityCache(this.entityCache);
 
   @override
-  FutureOr<O?> getEntityByID<O>(id, {Type? type, bool sync = false}) =>
+  FutureOr<O?> getEntityByID<O>(id,
+          {Type? type,
+          bool sync = false,
+          EntityResolutionRules? resolutionRules}) =>
       entityCache.getCachedEntityByID(id, type: type);
 
   @override

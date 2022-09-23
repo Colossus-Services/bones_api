@@ -266,6 +266,8 @@ export 'dart:async';
 export 'package:meta/meta_meta.dart';
 export 'package:reflection_factory/reflection_factory.dart';
 
+export 'package:swiss_knife/swiss_knife.dart' show MimeType, DataURLBase64;
+
 export 'src/bones_api_authentication.dart';
 export 'src/bones_api_base.dart';
 export 'src/bones_api_condition.dart';

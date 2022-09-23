@@ -1,3 +1,15 @@
+## 1.3.13
+
+- Ensure that parameter `EntityResolutionRules? resolutionRules` is
+  fully propagated while fetching and resolving entities.
+- Added `TransactionEntityProvider` to correctly resolve entities while
+  calling `entityHandler.createFromMap` inside a `Transaction`.
+- `EntityReferenceBase`:
+  - Added `typeName` for correct generation of JSON.
+  - Added parameter `withEntity` to `copy`.
+- Export `MimeType` and `DataURLBase64` from package `swiss_knife`.
+- reflection_factory: ^1.2.13
+
 ## 1.3.12
 
 - Add `EntityHandler.typeName` to avoid minification issues with `Type`s name.

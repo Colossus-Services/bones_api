@@ -136,7 +136,8 @@ class EntityHandlerProvider {
 
 /// Entity provider interface.
 abstract class EntityProvider {
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false});
+  FutureOr<O?> getEntityByID<O>(dynamic id,
+      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules});
 }
 
 typedef EntityCache = JsonEntityCache;
@@ -144,8 +145,13 @@ typedef EntityCache = JsonEntityCache;
 /// Rules to resolve entities.
 /// Used by [EntityHandler] and [DBEntityRepository].
 class EntityResolutionRules {
+  final bool? _allowEntityFetch;
+
   /// If `true` it will allow the use of on DB/repository to fetch an entity by an ID reference.
-  final bool allowEntityFetch;
+  bool get allowEntityFetch =>
+      _allowEntityFetch ??
+      allEager ??
+      (eagerEntityTypes != null && eagerEntityTypes!.isNotEmpty);
 
   /// If `true` it will allow calls to [APIPlatform.readFileAsString]
   /// and [APIPlatform.readFileAsBytes].
@@ -164,37 +170,38 @@ class EntityResolutionRules {
   final bool? allLazy;
 
   const EntityResolutionRules(
-      {this.allowEntityFetch = false,
+      {bool? allowEntityFetch,
       this.allowReadFile = false,
       this.lazyEntityTypes,
       this.eagerEntityTypes,
       this.allLazy,
-      this.allEager});
+      this.allEager})
+      : _allowEntityFetch = allowEntityFetch;
 
   const EntityResolutionRules.fetch(
       {this.lazyEntityTypes,
       this.eagerEntityTypes,
       this.allLazy,
       this.allEager})
-      : allowEntityFetch = true,
+      : _allowEntityFetch = true,
         allowReadFile = false;
 
   const EntityResolutionRules.fetchEager(this.eagerEntityTypes)
-      : allowEntityFetch = true,
+      : _allowEntityFetch = true,
         allowReadFile = false,
         lazyEntityTypes = null,
         allLazy = null,
         allEager = null;
 
   const EntityResolutionRules.fetchLazy(this.lazyEntityTypes)
-      : allowEntityFetch = true,
+      : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
         allLazy = null,
         allEager = null;
 
   const EntityResolutionRules.fetchEagerAll()
-      : allowEntityFetch = true,
+      : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
         lazyEntityTypes = null,
@@ -202,7 +209,7 @@ class EntityResolutionRules {
         allEager = true;
 
   const EntityResolutionRules.fetchLazyAll()
-      : allowEntityFetch = true,
+      : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
         lazyEntityTypes = null,
@@ -721,34 +728,40 @@ abstract class EntityHandler<O> with FieldsFromMap {
         return type.parseEntity<T>(value);
       }
     } else if (value != null && !type.isBasicType) {
-      if (value.isEntityIDType) {
-        var entity =
-            entityCache.getCachedEntityByID(value, type: type.entityType);
+      var entityType = type.entityType;
+
+      if (entityType != null && value.isEntityIDType) {
+        var entity = entityCache.getCachedEntityByID(value, type: entityType);
         if (entity != null) return entity as T;
       }
 
       var parsed = type.parseEntity<T>(value);
       if (parsed != null) return parsed;
 
-      if (entityProvider != null) {
-        var entityAsync =
-            entityProvider.getEntityByID(value, type: type.entityType);
+      if (entityProvider != null && entityType != null) {
+        var eagerEntityType =
+            resolutionRules?.isEagerEntityType(entityType) ?? false;
 
-        if (entityAsync != null) {
-          return entityAsync.resolveMapped<T?>((entity) {
-            if (entity != null) {
-              entityCache!.cacheEntity(entity);
-              return entity as T?;
-            }
-            return _resolveValueByEntityHandler<T>(
-                value,
-                type,
-                entityProvider,
-                entityCache!,
-                entityHandlerProvider,
-                entityRepositoryProvider,
-                resolutionRules);
-          });
+        if (eagerEntityType) {
+          var entityAsync = entityProvider.getEntityByID(value,
+              type: entityType, resolutionRules: resolutionRules);
+
+          if (entityAsync != null) {
+            return entityAsync.resolveMapped<T?>((entity) {
+              if (entity != null) {
+                entityCache!.cacheEntity(entity);
+                return entity as T?;
+              }
+              return _resolveValueByEntityHandler<T>(
+                  value,
+                  type,
+                  entityProvider,
+                  entityCache!,
+                  entityHandlerProvider,
+                  entityRepositoryProvider,
+                  resolutionRules);
+            });
+          }
         }
       }
 
@@ -918,8 +931,8 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
       if (entityRepository != null) {
         var transaction = entityProvider is Transaction ? entityProvider : null;
-        var retEntity =
-            entityRepository.selectByID(value, transaction: transaction);
+        var retEntity = entityRepository.selectByID(value,
+            transaction: transaction, resolutionRules: resolutionRules);
         return retEntity.resolveMapped((val) {
           return val as T?;
         });
@@ -2777,12 +2790,15 @@ class EntityRepositoryProvider
   }
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id,
+      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
     if (id == null || type == null) return null;
     var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
       if (sync) return null;
-      return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
+      return entityRepository
+          .selectByID(id, resolutionRules: resolutionRules)
+          .resolveMapped((o) => o as O?);
     }
 
     var enumReflection = ReflectionFactory().getRegisterEnumReflection(type);
@@ -3148,7 +3164,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     } else if (entityMap is num || entityMap is String) {
       var entityRepository = _resolveEntityRepository<E>(entityField,
           entityType, entityRepositoryProvider, entityHandlerProvider);
-      entity = entityRepository?.selectByID(entityMap);
+      entity = entityRepository?.selectByID(entityMap,
+          resolutionRules: resolutionRules);
     }
 
     if (entity == null && empty != null) {
@@ -3469,7 +3486,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         return <O>[cachedEntity];
       }
 
-      var ret = selectByID(id, transaction: transaction);
+      var ret = selectByID(id,
+          transaction: transaction, resolutionRules: resolutionRules);
       return ret.resolveMapped((o) => _idsToUniqueEntityList(ids, o));
     }
 
@@ -4306,7 +4324,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   @override
-  FutureOr<O?> getEntityByID<O>(id, {Type? type, bool sync = false}) =>
+  FutureOr<O?> getEntityByID<O>(id,
+          {Type? type,
+          bool sync = false,
+          EntityResolutionRules? resolutionRules}) =>
       getCachedEntityByID(id, type: type);
 
   @override
@@ -4623,6 +4644,46 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
       default:
         throw ArgumentError("Unknown: $this");
     }
+  }
+}
+
+class TransactionEntityProvider implements EntityProvider {
+  final Transaction transaction;
+
+  final EntityRepositoryProvider entityRepositoryProvider;
+
+  final EntityResolutionRules? resolutionRules;
+
+  TransactionEntityProvider(
+      this.transaction, this.entityRepositoryProvider, this.resolutionRules);
+
+  @override
+  FutureOr<O?> getEntityByID<O>(id,
+      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
+    var oAsync = transaction.getEntityByID<O>(id, type: type, sync: sync);
+    return oAsync.resolveMapped((o) {
+      if (o != null || sync) return o;
+
+      var t = type ?? O;
+      if (!EntityHandler.isValidEntityType(t)) {
+        return null;
+      }
+
+      resolutionRules ??= this.resolutionRules;
+
+      var allowEntityFetch = resolutionRules?.allowEntityFetch ?? false;
+
+      if (!allowEntityFetch) {
+        return null;
+      }
+
+      var entityRepository =
+          entityRepositoryProvider.getEntityRepository(type: t);
+      if (entityRepository == null) return null;
+
+      var sel = entityRepository.selectByID(id);
+      return sel.resolveMapped((o) => o as O?);
+    });
   }
 }
 

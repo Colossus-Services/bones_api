@@ -1565,7 +1565,8 @@ class _MyEntityProvider implements EntityProvider {
   int status = 0;
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id,
+      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
     if (sync && !allowSync) return null;
 
     type ??= O;

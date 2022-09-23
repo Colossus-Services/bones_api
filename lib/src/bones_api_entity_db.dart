@@ -313,13 +313,16 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id, {Type? type, bool sync = false}) {
+  FutureOr<O?> getEntityByID<O>(dynamic id,
+      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
     if (id == null || type == null) return null;
 
     var entityRepository = getEntityRepositoryByType(type);
     if (entityRepository != null) {
       if (sync) return null;
-      return entityRepository.selectByID(id).resolveMapped((o) => o as O?);
+      return entityRepository
+          .selectByID(id, resolutionRules: resolutionRules)
+          .resolveMapped((o) => o as O?);
     }
 
     var enumReflection = ReflectionFactory().getRegisterEnumReflection(type);
@@ -1102,8 +1105,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       EntityResolutionRules? resolutionRules,
       Iterable<Map<String, dynamic>> results) {
     return results.map((e) {
+      var entityProvider =
+          TransactionEntityProvider(transaction, provider, resolutionRules);
+
       return entityHandler.createFromMap(e,
-          entityProvider: transaction,
+          entityProvider: entityProvider,
           entityCache: transaction,
           entityRepositoryProvider: provider,
           entityHandlerProvider: entityHandler.provider,
@@ -1221,7 +1227,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         }
 
         var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
-            transaction: transaction);
+            transaction: transaction, resolutionRules: resolutionRules);
 
         return targetsAsync.resolveMapped((targets) {
           var allTargetsById = Map.fromEntries(targets
