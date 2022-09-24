@@ -390,7 +390,7 @@ class _MyAPISecurity extends APISecurity {
 
   @override
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential) {
+      APICredential credential, List<APIPermission>? previousPermissions) {
     return [
       APIPermission('basic'),
       if (credential.username.startsWith('admin')) APIPermission('admin'),
@@ -408,7 +408,7 @@ class _MyAPISecurity2 extends APISecurity {
 
   @override
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential) {
+      APICredential credential, List<APIPermission>? previousPermissions) {
     return [
       APIPermission('basic'),
       if (credential.username.startsWith('admin')) APIPermission('admin'),

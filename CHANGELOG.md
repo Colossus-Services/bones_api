@@ -1,3 +1,10 @@
+## 1.3.14
+
+- `APISecurity`:
+  - `getCredentialPermissions`: Added parameter `previousPermissions`.
+  - `getAuthenticationData`: Added parameter `previousData`.
+- async_events: ^1.0.5
+
 ## 1.3.13
 
 - Ensure that parameter `EntityResolutionRules? resolutionRules` is

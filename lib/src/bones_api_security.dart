@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -76,10 +77,61 @@ abstract class APISecurity {
     });
   }
 
+  final Map<String, MapEntry<Object?, List<APIPermission>>> _tokensInfo =
+      <String, MapEntry<Object?, List<APIPermission>>>{};
+
+  void _storeTokeInfo(
+      String token, Object? data, List<APIPermission> permissions) {
+    permissions = permissions is UnmodifiableListView<APIPermission>
+        ? permissions
+        : UnmodifiableListView<APIPermission>(permissions);
+
+    if (data is List) {
+      if (data is! UnmodifiableListView) {
+        data = UnmodifiableListView(data);
+      }
+    } else if (data is Map) {
+      if (data is! UnmodifiableMapView) {
+        if (data is Map<String, Object?>) {
+          data = UnmodifiableMapView<String, Object?>(data);
+        } else if (data is Map<String, Object>) {
+          data = UnmodifiableMapView<String, Object>(data);
+        } else {
+          data = UnmodifiableMapView(data);
+        }
+      }
+    } else if (data is Set) {
+      if (data is! UnmodifiableSetView) {
+        data = UnmodifiableSetView(data);
+      }
+    }
+
+    _tokensInfo[token] = MapEntry(data, permissions);
+  }
+
   FutureOr<APIAuthentication?> _resolveAuthentication(
       APICredential credential, bool resumed) {
-    return getCredentialPermissions(credential).resolveMapped((permissions) {
-      return getAuthenticationData(credential).resolveMapped((data) {
+    var token = credential.token;
+
+    Object? prevData;
+    List<APIPermission>? prevPermissions;
+
+    if (token != null) {
+      var prevInfo = _tokensInfo[token];
+
+      if (prevInfo != null) {
+        prevData = prevInfo.key;
+        prevPermissions = prevInfo.value;
+      }
+    }
+
+    return getCredentialPermissions(credential, prevPermissions)
+        .resolveMapped((permissions) {
+      return getAuthenticationData(credential, prevData).resolveMapped((data) {
+        if (token != null) {
+          _storeTokeInfo(token, data, permissions);
+        }
+
         return createAuthentication(credential, permissions,
             data: data, resumed: resumed);
       });
@@ -169,8 +221,7 @@ abstract class APISecurity {
 
   List<APIToken> getUsernameValidTokens(String username) {
     var tokens = _usersTokens.putIfAbsent(username, () => <APIToken>[]);
-    var now = DateTime.now();
-    tokens.removeWhere((t) => t.isExpired(now: now));
+    tokens.removeExpiredTokens();
     return tokens;
   }
 
@@ -197,9 +248,18 @@ abstract class APISecurity {
 
   void validateAllTokens([DateTime? now]) {
     now ??= DateTime.now();
+
     for (var tokens in _usersTokens.values) {
-      tokens.removeWhere((t) => t.isExpired(now: now));
+      var expired = tokens.removeExpiredTokens(now: now);
+
+      for (var t in expired) {
+        _onExpireToken(t);
+      }
     }
+  }
+
+  void _onExpireToken(APIToken apiToken) {
+    _tokensInfo.remove(apiToken.token);
   }
 
   FutureOr<bool> checkCredential(APICredential credential) {
@@ -219,9 +279,11 @@ abstract class APISecurity {
   FutureOr<bool> checkCredentialPassword(APICredential credential);
 
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential);
+      APICredential credential, List<APIPermission>? previousPermissions);
 
-  FutureOr<Object?> getAuthenticationData(APICredential credential) => null;
+  FutureOr<Object?> getAuthenticationData(
+          APICredential credential, Object? previousData) =>
+      null;
 
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request) {
     var credential = resolveRequestCredential(request);

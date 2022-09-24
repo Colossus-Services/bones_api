@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_security.dart';
 import 'bones_api_utils_json.dart';
@@ -417,6 +418,19 @@ class APIToken implements Comparable<APIToken> {
         issueTime: TypeParser.parseDateTime(json['issueTime']),
         duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
       );
+}
+
+extension APITokenExtension on List<APIToken> {
+  List<APIToken> expiredTokens({DateTime? now}) {
+    now ??= DateTime.now();
+    return where((t) => t.isExpired(now: now)).toList();
+  }
+
+  List<APIToken> removeExpiredTokens({DateTime? now}) {
+    var expired = expiredTokens(now: now);
+    removeAll(expired);
+    return expired;
+  }
 }
 
 class APIPermission {
