@@ -1,3 +1,7 @@
+## 1.3.15
+
+- `DBSQLAdapter.generateCreateTableSQLs`: fix CREATE TABLE SQLs order when a field is referencing to another DB. 
+
 ## 1.3.14
 
 - `APISecurity`:

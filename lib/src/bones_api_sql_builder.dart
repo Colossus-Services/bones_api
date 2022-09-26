@@ -521,6 +521,16 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     return null;
   }
 
+  List<String> _referenceTablesInList(List<String>? refTables) {
+    return refTables == null || refTables.isEmpty
+        ? <String>[]
+        : refTables.where((r) => _indexOfTable(r, 0) != null).toList();
+  }
+
+  Map<SQLBuilder, List<String>> _entriesRefsInList() =>
+      map((e) => MapEntry(e, _referenceTablesInList(e.referenceTables)))
+          .toMapFromEntries();
+
   /// Sorts the SQLs by table name.
   void sorteByName() {
     sort((a, b) {
@@ -608,7 +618,8 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
       for (var i = 0; i < list.length; ++i) {
         var e = list[i];
         var refs = refsGetter(e);
-        var idx = _indexWithAllReferenceTables(refs, 0);
+        var refsInList = _referenceTablesInList(refs);
+        var idx = _indexWithAllReferenceTables(refsInList, 0);
 
         if (idx != null) {
           add(e);
@@ -620,7 +631,8 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
       for (var i = list.length - 1; i >= 0; --i) {
         var e = list[i];
         var refs = refsGetter(e);
-        var idx = _indexWithAllReferenceTables(refs, 0);
+        var refsInList = _referenceTablesInList(refs);
+        var idx = _indexWithAllReferenceTables(refsInList, 0);
 
         if (idx != null) {
           ++idx;
@@ -635,28 +647,30 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   }
 
   void _bestOrderLoop() {
+    var entriesRefsInList = _entriesRefsInList();
+
     while (true) {
-      if (!_bestOrderImpl()) {
+      if (!_bestOrderImpl(entriesRefsInList)) {
         break;
       }
     }
   }
 
-  bool _bestOrderImpl() {
+  bool _bestOrderImpl(Map<SQLBuilder, List<String>> entriesRefsInList) {
     final length = this.length;
 
     var moved = false;
 
     for (var i = 0; i < length;) {
       var e = this[i];
-      var refs = e.referenceTables;
-      if (refs == null || refs.isEmpty) {
+      var refsInList = entriesRefsInList[e]!;
+      if (refsInList.isEmpty) {
         ++i;
         continue;
       }
 
-      if (!_headContainsReferenceTable(refs, i)) {
-        var idx = _indexWithAllReferenceTables(refs, 0);
+      if (!_headContainsReferenceTable(refsInList, i)) {
+        var idx = _indexWithAllReferenceTables(refsInList, 0);
 
         if (idx != null && idx > i) {
           moved = true;

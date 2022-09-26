@@ -543,9 +543,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       generateEntityRepositoresCreateTableSQLs(
               ifNotExists: ifNotExists, sortColumns: sortColumns)
           .resolveMapped((sqls) {
-        List<SQLBuilder> allSQLs =
-            sqls.values.expand((e) => e.allSQLBuilders).toList();
-
+        var allSQLs = sqls.values.expand((e) => e.allSQLBuilders).toList();
         allSQLs.bestOrder();
         return allSQLs;
       });
