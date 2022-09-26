@@ -13,6 +13,7 @@
 /// {@canonicalFor bones_api_authentication.APIPasswordSHA256}
 /// {@canonicalFor bones_api_authentication.APIPassword}
 /// {@canonicalFor bones_api_authentication.APIPermission}
+/// {@canonicalFor bones_api_authentication.APITokenExtension}
 /// {@canonicalFor bones_api_authentication.APIToken}
 /// {@canonicalFor bones_api_base.APILogger}
 /// {@canonicalFor bones_api_base.APIPayload}
@@ -107,6 +108,7 @@
 /// {@canonicalFor bones_api_entity.JsonToEncodable}
 /// {@canonicalFor bones_api_entity.SetEntityRepository}
 /// {@canonicalFor bones_api_entity.TransactionAbortedError}
+/// {@canonicalFor bones_api_entity.TransactionEntityProvider}
 /// {@canonicalFor bones_api_entity.TransactionExecution}
 /// {@canonicalFor bones_api_entity.TransactionOperationConstrainRelationship}
 /// {@canonicalFor bones_api_entity.TransactionOperationCount}
