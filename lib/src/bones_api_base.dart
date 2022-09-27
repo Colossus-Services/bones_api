@@ -5,8 +5,11 @@ import 'dart:typed_data';
 import 'package:async_events/async_events.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:crypto/crypto.dart' show sha256, sha384, sha512;
+import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
@@ -36,7 +39,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.16';
+  static const String VERSION = '1.3.17';
 
   static bool _boot = false;
 
@@ -1557,6 +1560,8 @@ enum APIResponseStatus {
   // ignore: constant_identifier_names
   NOT_FOUND,
   // ignore: constant_identifier_names
+  NOT_MODIFIED,
+  // ignore: constant_identifier_names
   UNAUTHORIZED,
   // ignore: constant_identifier_names
   BAD_REQUEST,
@@ -1577,6 +1582,8 @@ APIResponseStatus? parseAPIResponseStatus(Object o) {
       case 205:
       case 206:
         return APIResponseStatus.OK;
+      case 304:
+        return APIResponseStatus.NOT_MODIFIED;
       case 400:
         return APIResponseStatus.BAD_REQUEST;
       case 401:
@@ -1611,6 +1618,10 @@ APIResponseStatus? parseAPIResponseStatus(Object o) {
     case 'not found':
     case 'not_found':
       return APIResponseStatus.NOT_FOUND;
+    case 'notmodified':
+    case 'not modified':
+    case 'not_modified':
+      return APIResponseStatus.NOT_MODIFIED;
     case 'unauthorized':
       return APIResponseStatus.UNAUTHORIZED;
     case 'badrequest':
@@ -1620,6 +1631,338 @@ APIResponseStatus? parseAPIResponseStatus(Object o) {
     default:
       return null;
   }
+}
+
+/// A `Etag` of a file/payload identification.
+/// See [WeakEtag] and [StrongEtag].
+abstract class Etag {
+  factory Etag.parse(String s) {
+    if (s.isEmpty) return WeakEtag([]);
+
+    s = s.trim();
+
+    if (s.startsWith('W/')) {
+      return WeakEtag.parse(s);
+    } else {
+      return StrongEtag.parse(s);
+    }
+  }
+
+  Etag();
+
+  String get tag;
+
+  bool get isEmpty;
+
+  bool equals(Object? other);
+
+  @override
+  String toString();
+}
+
+/// A strong [Etag], that fully identifies the file/payload bytes.
+/// - Strong [Etag] requests can be cached (including range requests).
+/// - See [WeakEtag].
+class StrongEtag extends Etag {
+  @override
+  final String tag;
+
+  @override
+  bool get isEmpty => tag.isEmpty;
+
+  StrongEtag(this.tag);
+
+  factory StrongEtag.parse(String s) {
+    if (s.isEmpty) return StrongEtag('');
+
+    s = s.trim();
+
+    if (s.startsWith('"') && s.endsWith('"')) {
+      s = s.substring(1, s.length - 1);
+    }
+
+    if (s.isEmpty) return StrongEtag('');
+
+    return StrongEtag(s);
+  }
+
+  factory StrongEtag.sha256(List<int> bytes) {
+    if (bytes.isEmpty) return StrongEtag('');
+    return StrongEtag(sha256.convert(bytes).toString());
+  }
+
+  factory StrongEtag.sha384(List<int> bytes) {
+    if (bytes.isEmpty) return StrongEtag('');
+    return StrongEtag(sha384.convert(bytes).toString());
+  }
+
+  factory StrongEtag.sha512(List<int> bytes) {
+    if (bytes.isEmpty) return StrongEtag('');
+    return StrongEtag(sha512.convert(bytes).toString());
+  }
+
+  @override
+  bool equals(Object? other) {
+    if (identical(this, other)) return true;
+
+    if (other is StrongEtag) {
+      return tag == other.tag;
+    } else if (other is String) {
+      return tag == StrongEtag.parse(other).tag;
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) => equals(other);
+
+  @override
+  int get hashCode => tag.hashCode;
+
+  String? _str;
+
+  @override
+  String toString() => _str ??= '"$tag"';
+}
+
+/// A weak [Etag], that identifies the file/payload allowing tag collisions,
+/// but easy to generate.
+/// - Weak [Etag] requests can be cached, but prevents range requests caching.
+/// - See [StrongEtag].
+class WeakEtag extends Etag {
+  final List<String> values;
+  final String delimiter;
+
+  WeakEtag(List<String> values, {this.delimiter = ','})
+      : values = values.asUnmodifiableView;
+
+  factory WeakEtag.parse(String s, {String delimiter = ','}) {
+    if (s.isEmpty) return WeakEtag([]);
+
+    s = s.trim();
+
+    if (s.startsWith('W/')) {
+      s = s.substring(2);
+    }
+
+    if (s.startsWith('"') && s.endsWith('"')) {
+      s = s.substring(1, s.length - 1);
+    }
+
+    if (s.isEmpty) return WeakEtag([]);
+
+    var values = s.split(delimiter);
+
+    return WeakEtag(values, delimiter: delimiter);
+  }
+
+  factory WeakEtag.adler32(List<int> bytes) {
+    if (bytes.isEmpty) return WeakEtag([]);
+
+    return WeakEtag(<String>[
+      bytes.length.toString(),
+      Adler32().convert(bytes).toString(),
+      _computeFragments(bytes),
+    ]);
+  }
+
+  factory WeakEtag.crc32(List<int> bytes) {
+    if (bytes.isEmpty) return WeakEtag([]);
+
+    return WeakEtag(<String>[
+      bytes.length.toString(),
+      Crc32().convert(bytes).toString(),
+      _computeFragments(bytes),
+    ]);
+  }
+
+  static String _computeFragments(List<int> bytes) {
+    var length = bytes.length;
+
+    switch (length) {
+      case 0:
+        {
+          return '0';
+        }
+      case 1:
+        {
+          return bytes[0].toHex8();
+        }
+      case 2:
+        {
+          return bytes[0].toHex8() + bytes[1].toHex8();
+        }
+      case 3:
+        {
+          return bytes[0].toHex8() + bytes[1].toHex8() + bytes[2].toHex8();
+        }
+      default:
+        {
+          var center = length ~/ 2;
+          return bytes[0].toHex8() +
+              bytes[center - 1].toHex8() +
+              bytes[center].toHex8() +
+              bytes.last.toHex8();
+        }
+    }
+  }
+
+  @override
+  bool get isEmpty => values.isEmpty;
+
+  String? _tag;
+
+  @override
+  String get tag => _tag ??= values.join(delimiter);
+
+  static final ListEquality<String> _valuesEquality = ListEquality<String>();
+
+  @override
+  bool equals(Object? other) {
+    if (identical(this, other)) return true;
+
+    if (other is WeakEtag) {
+      return _valuesEquality.equals(values, other.values);
+    } else if (other is String) {
+      return _valuesEquality.equals(values, WeakEtag.parse(other).values);
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) => equals(other);
+
+  @override
+  int get hashCode => tag.hashCode;
+
+  String? _str;
+
+  @override
+  String toString() => _str ??= 'W/"$tag"';
+}
+
+/// A [CacheControl] directive.
+///
+/// See:
+/// - [CacheControl]
+/// - [HTTP Header - Cache-Control](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control)
+enum CacheControlDirective {
+  private,
+  public,
+  noCache,
+  noStore,
+  noTransform,
+  mustRevalidate,
+  staleWhileRevalidate,
+  staleIfError,
+}
+
+/// A cache control response.
+///
+/// See:
+/// - [CacheControlDirective]
+/// - [HTTP Header - Cache-Control](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control)
+///
+class CacheControl {
+  static const CacheControl defaultCacheControl = CacheControl();
+
+  final List<CacheControlDirective> directives;
+
+  final Duration maxAge;
+  final Duration staleAge;
+  final Duration staleIfErrorAge;
+
+  const CacheControl({
+    this.directives = const <CacheControlDirective>[
+      CacheControlDirective.private,
+      CacheControlDirective.noTransform,
+      CacheControlDirective.mustRevalidate,
+      CacheControlDirective.staleWhileRevalidate,
+      CacheControlDirective.staleIfError,
+    ],
+    this.maxAge = const Duration(seconds: 10),
+    this.staleAge = const Duration(minutes: 5),
+    this.staleIfErrorAge = const Duration(minutes: 10),
+  });
+
+  bool hasDirective(CacheControlDirective directive) =>
+      directives.contains(directive);
+
+  static final ListEquality<Enum> _listEqualityEnum = ListEquality<Enum>();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CacheControl &&
+          runtimeType == other.runtimeType &&
+          _listEqualityEnum.equals(directives, other.directives) &&
+          maxAge == other.maxAge;
+
+  @override
+  int get hashCode => _listEqualityEnum.hash(directives) ^ maxAge.hashCode;
+
+  @override
+  String toString() {
+    List<String> values;
+
+    if (hasDirective(CacheControlDirective.noCache)) {
+      values = <String>[
+        'no-cache',
+        if (hasDirective(CacheControlDirective.noStore)) 'no-store',
+        if (hasDirective(CacheControlDirective.noTransform)) 'no-transform',
+        'max-age=0',
+      ];
+    } else {
+      values = <String>[];
+
+      if (hasDirective(CacheControlDirective.private)) {
+        values.add('private');
+      } else if (hasDirective(CacheControlDirective.public)) {
+        values.add('public');
+      }
+
+      if (hasDirective(CacheControlDirective.noStore)) {
+        values.add('no-store');
+      }
+
+      if (hasDirective(CacheControlDirective.noTransform)) {
+        values.add('no-transform');
+      }
+
+      if (hasDirective(CacheControlDirective.mustRevalidate)) {
+        values.add('must-revalidate');
+      }
+
+      var maxAgeSecs = maxAge.inSeconds;
+      values.add('max-age=$maxAgeSecs');
+
+      var staleAgeSecs = staleAge.inSeconds;
+      if (staleAgeSecs < maxAgeSecs) {
+        staleAgeSecs = maxAgeSecs;
+      }
+
+      var staleIfErrorAgeSecs = staleIfErrorAge.inSeconds;
+      if (staleIfErrorAgeSecs < maxAgeSecs) {
+        staleIfErrorAgeSecs = maxAgeSecs;
+      }
+
+      if (hasDirective(CacheControlDirective.staleWhileRevalidate)) {
+        values.add('stale-while-revalidate=$staleAgeSecs');
+      }
+
+      if (hasDirective(CacheControlDirective.staleIfError)) {
+        values.add('stale-if-error=$staleIfErrorAgeSecs');
+      }
+    }
+
+    return values.join(', ');
+  }
+}
+
+extension _IntExtension on int {
+  String toHex8() => toRadixString(16).padLeft(2, '0');
 }
 
 /// Represents an API response.
@@ -1651,6 +1994,12 @@ class APIResponse<T> extends APIPayload {
   String? payloadFileExtension;
 
   bool _requiresAuthentication = false;
+
+  /// The [Etag] of the [payload].
+  Etag? payloadETag;
+
+  /// The response [CacheControl].
+  CacheControl? cacheControl;
 
   /// If `true` this response should require `Authentication`.
   /// See [authenticationType] and [authenticationRealm].
@@ -1731,6 +2080,21 @@ class APIResponse<T> extends APIPayload {
       Object? mimeType,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadDynamic: payloadDynamic,
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Creates a response of status `NOT_FOUND`.
+  factory APIResponse.notModified(
+      {Map<String, dynamic>? headers,
+      T? payload,
+      Object? payloadDynamic,
+      Object? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse(APIResponseStatus.NOT_MODIFIED,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadDynamic: payloadDynamic,
@@ -1883,6 +2247,9 @@ class APIResponse<T> extends APIPayload {
 
   /// Returns `true` if [status] is a [APIResponseStatus.NOT_FOUND].
   bool get isNotFound => status == APIResponseStatus.NOT_FOUND;
+
+  /// Returns `true` if [status] is a [APIResponseStatus.NOT_MODIFIED].
+  bool get isNotModified => status == APIResponseStatus.NOT_MODIFIED;
 
   /// Returns `true` if [status] is a [APIResponseStatus.UNAUTHORIZED].
   bool get isUnauthorized => status == APIResponseStatus.UNAUTHORIZED;

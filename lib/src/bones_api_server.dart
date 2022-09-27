@@ -906,6 +906,16 @@ class APIServer {
       headers['content-type'] = contentType.toString();
     }
 
+    var etag = apiResponse.payloadETag;
+    if (etag != null) {
+      headers['etag'] = etag.toString();
+    }
+
+    var cacheControl = apiResponse.cacheControl;
+    if (cacheControl != null) {
+      headers['cache-control'] = cacheControl.toString();
+    }
+
     headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
 
     switch (apiResponse.status) {
@@ -913,6 +923,11 @@ class APIServer {
         return Response.ok(payload, headers: headers);
       case APIResponseStatus.NOT_FOUND:
         return Response.notFound(payload, headers: headers);
+      case APIResponseStatus.NOT_MODIFIED:
+        {
+          headers.remove('content-length');
+          return Response.notModified(headers: headers);
+        }
       case APIResponseStatus.UNAUTHORIZED:
         {
           var wwwAuthenticate =

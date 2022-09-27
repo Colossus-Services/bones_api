@@ -1,3 +1,12 @@
+## 1.3.17
+
+- Added `Etag`: `WeakEtag` and `StrongEtag`.
+- Added `CacheControlDirective` and `CacheControl`.
+- `APIResponse`:
+  - Added `payloadETag` and `cacheControl`.
+  - Added `APIResponse.notModified`.
+- archive: ^3.3.1
+
 ## 1.3.16
 
 - `APISecurity`:
