@@ -128,12 +128,10 @@ abstract class APISecurity {
     return getCredentialPermissions(credential, prevPermissions)
         .resolveMapped((permissions) {
       return getAuthenticationData(credential, prevData).resolveMapped((data) {
-        if (token != null) {
-          _storeTokeInfo(token, data, permissions);
-        }
-
-        return createAuthentication(credential, permissions,
+        var authentication = createAuthentication(credential, permissions,
             data: data, resumed: resumed);
+        _storeTokeInfo(authentication.tokenKey, data, permissions);
+        return authentication;
       });
     });
   }

@@ -1,6 +1,13 @@
+## 1.3.16
+
+- `APISecurity`:
+  - Adjust `_storeTokeInfo`.
+- async_events: ^1.0.6
+
 ## 1.3.15
 
-- `DBSQLAdapter.generateCreateTableSQLs`: fix CREATE TABLE SQLs order when a field is referencing to another DB. 
+- `DBSQLAdapter.generateCreateTableSQLs`:
+  - Fix CREATE TABLE SQLs order when a field is referencing to another DB. 
 
 ## 1.3.14
 
