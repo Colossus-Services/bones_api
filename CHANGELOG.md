@@ -1,3 +1,11 @@
+## 1.3.18
+
+- `APIRoot.resolveModule`: defaults to path part `#0`.
+- `APIModule.resolveRoute`: defaults to path part `#1 ?? #0`.
+  - Ensure that any route resolution passes through `resolveRoute` method (allowing personalization).
+- `APIRouteBuilder`: allow path parts as parameter value by `parameterIndex`.
+- reflection_factory: ^1.2.14
+
 ## 1.3.17
 
 - Added `Etag`: `WeakEtag` and `StrongEtag`.

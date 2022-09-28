@@ -281,7 +281,7 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Resolves the module name of a [request].
   String resolveModule(APIRequest request) {
-    var moduleName = request.pathPartReversed(1);
+    var moduleName = request.pathPart(0);
     return moduleName;
   }
 
@@ -447,10 +447,11 @@ abstract class APIRoot with Initializable, Closable {
 
     var module = getModuleByRequest(apiRequest);
 
-    if (module == null &&
-        apiSecurity != null &&
-        apiRequest.lastPathPart == authenticationRoute) {
-      return apiSecurity.doRequestAuthentication(apiRequest);
+    if (module == null && apiSecurity != null) {
+      if (apiRequest.pathPartAt(0) == authenticationRoute ||
+          apiRequest.pathPartAt(1) == authenticationRoute) {
+        return apiSecurity.doRequestAuthentication(apiRequest);
+      }
     }
 
     return _callModule<T>(module, apiRequest);
@@ -2028,6 +2029,8 @@ class APIResponse<T> extends APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? payloadMimeType,
+      this.payloadETag,
+      this.cacheControl,
       this.payloadFileExtension,
       this.error,
       this.stackTrace,
@@ -2042,17 +2045,68 @@ class APIResponse<T> extends APIPayload {
           ? payloadDynamic as T
           : null);
 
+  /// Copy this response casting the [payload] it to [E].
+  APIResponse<E> cast<E>({E? payload}) {
+    return APIResponse<E>(status,
+        payload: payload ?? (this.payload as E?),
+        payloadMimeType: payloadMimeType,
+        payloadFileExtension: payloadFileExtension,
+        payloadETag: payloadETag,
+        cacheControl: cacheControl,
+        headers: headers,
+        error: error,
+        stackTrace: stackTrace,
+        metrics: _metrics)
+      .._copyStartedMetrics(this);
+  }
+
+  /// Copy this response.
+  APIResponse<T> copy(
+      {APIResponseStatus? status,
+      T? payload,
+      Object? payloadDynamic,
+      bool nullPayload = false,
+      Etag? payloadETag,
+      String? payloadFileExtension,
+      CacheControl? cacheControl,
+      Map<String, dynamic>? headers,
+      Object? mimeType,
+      Object? error,
+      StackTrace? stackTrace,
+      Map<String, Duration>? metrics}) {
+    return APIResponse(status ?? this.status,
+        payload: nullPayload
+            ? null
+            : (payload ?? (payloadDynamic == null ? this.payload : null)),
+        payloadDynamic: nullPayload ? null : payloadDynamic,
+        payloadMimeType: mimeType ?? payloadMimeType,
+        payloadFileExtension: payloadFileExtension,
+        payloadETag: payloadETag ?? this.payloadETag,
+        cacheControl: cacheControl ?? this.cacheControl,
+        headers: headers ?? this.headers,
+        error: error,
+        stackTrace: stackTrace,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
+  }
+
   /// Creates a response of status `OK`.
   factory APIResponse.ok(T? payload,
       {Object? payloadDynamic,
+      Etag? payloadETag,
+      CacheControl? cacheControl,
       Map<String, dynamic>? headers,
       Object? mimeType,
+      String? fileExtension,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
+        payloadFileExtension: fileExtension,
+        payloadETag: payloadETag,
+        cacheControl: cacheControl,
         metrics: metrics);
   }
 
@@ -2062,12 +2116,18 @@ class APIResponse<T> extends APIPayload {
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
       Object? mimeType,
+      String? fileExtension,
+      Etag? eTag,
+      CacheControl? cacheControl,
       Map<String, Duration>? metrics}) {
     return APIResponse.ok(
         payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
+        fileExtension: fileExtension ?? payloadFileExtension,
+        payloadETag: eTag ?? payloadETag,
+        cacheControl: cacheControl ?? this.cacheControl,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }
@@ -2087,21 +2147,6 @@ class APIResponse<T> extends APIPayload {
         metrics: metrics);
   }
 
-  /// Creates a response of status `NOT_FOUND`.
-  factory APIResponse.notModified(
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? mimeType,
-      Map<String, Duration>? metrics}) {
-    return APIResponse(APIResponseStatus.NOT_MODIFIED,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        metrics: metrics);
-  }
-
   /// Transform this response to a `NOT_FOUND` response.
   APIResponse<T> asNotFound(
       {T? payload,
@@ -2114,6 +2159,45 @@ class APIResponse<T> extends APIPayload {
         payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
+  }
+
+  /// Creates a response of status `NOT_FOUND`.
+  factory APIResponse.notModified(
+      {Map<String, dynamic>? headers,
+      T? payload,
+      Object? payloadDynamic,
+      Object? mimeType,
+      Etag? eTag,
+      CacheControl? cacheControl,
+      Map<String, Duration>? metrics}) {
+    return APIResponse(APIResponseStatus.NOT_MODIFIED,
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
+        payloadDynamic: payloadDynamic,
+        payloadMimeType: mimeType,
+        payloadETag: eTag,
+        cacheControl: cacheControl,
+        metrics: metrics);
+  }
+
+  /// Transform this response to a `NOT_MODIFIED` response.
+  APIResponse<T> asNotModified(
+      {T? payload,
+      Object? payloadDynamic,
+      Map<String, dynamic>? headers,
+      Object? mimeType,
+      Etag? eTag,
+      CacheControl? cacheControl,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.notModified(
+        payload: payload ?? (payloadDynamic == null ? this.payload : null),
+        payloadDynamic: payloadDynamic,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        eTag: eTag ?? payloadETag,
+        cacheControl: cacheControl ?? this.cacheControl,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }
@@ -2211,6 +2295,12 @@ class APIResponse<T> extends APIPayload {
   factory APIResponse.from(dynamic o) {
     if (o == null) {
       return APIResponse.notFound();
+    } else if (o is APIResponse) {
+      if (o is APIResponse<T>) {
+        return o;
+      } else {
+        return o.cast<T>();
+      }
     } else if (o is Error) {
       return APIResponse.error(error: o, stackTrace: o.stackTrace);
     } else if (o is Exception) {

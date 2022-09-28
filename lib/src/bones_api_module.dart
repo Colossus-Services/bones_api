@@ -183,16 +183,17 @@ abstract class APIModule with Initializable {
   /// Returns a route handler for [request].
   ///
   /// Calls [resolveRoute] to determine the route name of the [request].
-  APIRouteHandler<T>? getRouteHandlerByRequest<T>(APIRequest request) {
+  APIRouteHandler<T>? getRouteHandlerByRequest<T>(APIRequest request,
+      [String? routeName]) {
     ensureConfigured();
 
-    var route = resolveRoute(request);
-    return getRouteHandler(route, request.method);
+    routeName ??= resolveRoute(request);
+    return getRouteHandler(routeName, request.method);
   }
 
   /// Resolves the route name of the [request].
   String resolveRoute(APIRequest request) {
-    var routeName = request.lastPathPart;
+    var routeName = request.pathPartAt(1) ?? request.pathPartAt(0) ?? '';
     return routeName;
   }
 
@@ -200,32 +201,33 @@ abstract class APIModule with Initializable {
   FutureOr<APIResponse<T>> call<T>(APIRequest request) {
     ensureConfigured();
 
+    var routeName = resolveRoute(request);
+
     var apiSecurity = security;
 
     if (apiSecurity != null) {
-      if (request.lastPathPart == authenticationRoute) {
+      if (routeName == authenticationRoute) {
         return apiSecurity.doRequestAuthentication(request);
       } else if (request.authentication == null) {
         return apiSecurity.resumeAuthenticationByRequest(request).then((_) {
-          return _callImpl<T>(request);
+          return _callImpl<T>(request, routeName);
         });
       }
     }
 
-    return _callImpl<T>(request);
+    return _callImpl<T>(request, routeName);
   }
 
   static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;
 
-  FutureOr<APIResponse<T>> _callImpl<T>(APIRequest apiRequest) {
-    var routeName = apiRequest.lastPathPart;
-
+  FutureOr<APIResponse<T>> _callImpl<T>(
+      APIRequest apiRequest, String routeName) {
     if (routeName == 'API-INFO') {
       var info = apiInfo(apiRequest);
       return APIResponse.ok(info as T, mimeType: _mimeTypeJson);
     }
 
-    var handler = getRouteHandlerByRequest<T>(apiRequest);
+    var handler = getRouteHandlerByRequest<T>(apiRequest, routeName);
 
     if (handler == null) {
       return apiRoot.onNoRouteForPath(apiRequest);
@@ -246,12 +248,12 @@ abstract class APIModule with Initializable {
 
   /// Returns `true` if [apiRequest] is an accepted route/call for this module.
   bool acceptsRequest(APIRequest apiRequest) {
-    var routeName = apiRequest.lastPathPart;
+    var routeName = resolveRoute(apiRequest);
 
     if (routeName == 'API-INFO') {
       return true;
     } else {
-      var handler = getRouteHandlerByRequest(apiRequest);
+      var handler = getRouteHandlerByRequest(apiRequest, routeName);
       return handler != null;
     }
   }
@@ -436,36 +438,62 @@ class APIRouteBuilder<M extends APIModule> {
 
     if (returnsAPIResponse && receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: APIRequest.typeInfo};
+      var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
-      add(requestMethod, apiMethod.name, (req) {
-        return apiMethod.invoke([req]);
-      }, parameters: parameters, rules: rules);
+      add(
+        requestMethod,
+        apiMethod.name,
+        (req) => _apiMethodStandard(apiMethod, req),
+        parameters: parameters,
+        rules: rules,
+      );
     } else if (receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
-      var parameters = {paramName: APIRequest.typeInfo};
+      var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
-      add(requestMethod, apiMethod.name, (req) {
-        var ret = apiMethod.invoke([req]);
-        return APIResponse.from(ret);
-      }, parameters: parameters, rules: rules);
+      add(
+        requestMethod,
+        apiMethod.name,
+        (req) => _apiMethodStandard(apiMethod, req),
+        parameters: parameters,
+        rules: rules,
+      );
     } else if (returnsAPIResponse) {
       var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
           .map((p) => MapEntry(p.name, TypeInfo.from(p))));
 
-      add(requestMethod, apiMethod.name, (req) {
-        var methodInvocation = _resolveMethodInvocation(apiMethod, req);
-        return methodInvocation.invoke(apiMethod.method);
-      }, parameters: parameters, rules: rules);
+      add(
+        requestMethod,
+        apiMethod.name,
+        (req) => _apiMethodInvocation(apiMethod, req),
+        parameters: parameters,
+        rules: rules,
+      );
     }
+  }
+
+  FutureOr<APIResponse> _apiMethodStandard(
+      MethodReflection apiMethod, APIRequest request) {
+    var ret = apiMethod.invoke([request]);
+    if (ret is Future) {
+      return ret.then((r) => APIResponse.from(r));
+    } else {
+      return APIResponse.from(ret);
+    }
+  }
+
+  FutureOr<APIResponse> _apiMethodInvocation(
+      MethodReflection apiMethod, APIRequest request) {
+    var methodInvocation = _resolveMethodInvocation(apiMethod, request);
+    return methodInvocation.invoke(apiMethod.method);
   }
 
   MethodInvocation _resolveMethodInvocation(
       MethodReflection method, APIRequest request) {
     var payloadIsParametersMap = _isPayloadParametersMap(method, request);
 
-    var methodInvocation = method.methodInvocation(
-        (p) => _resolveRequestParameter(request, p, payloadIsParametersMap));
+    var methodInvocation = method.methodInvocation((p, i) =>
+        _resolveRequestParameter(request, p, i, payloadIsParametersMap));
 
     return methodInvocation;
   }
@@ -491,8 +519,11 @@ class APIRouteBuilder<M extends APIModule> {
 
   static final TypeInfo _typeInfoTime = TypeInfo.fromType(Time);
 
-  Object? _resolveRequestParameter(APIRequest request,
-      ParameterReflection parameter, bool payloadIsParametersMap,
+  Object? _resolveRequestParameter(
+      APIRequest request,
+      ParameterReflection parameter,
+      int? parameterIndex,
+      bool payloadIsParametersMap,
       {EntityResolutionRules? resolutionRules}) {
     var parameterTypeInfo = parameter.type.typeInfo;
 
@@ -504,31 +535,38 @@ class APIRouteBuilder<M extends APIModule> {
 
     Object? value = request.getParameterIgnoreCase(parameter.name);
 
-    if (value == null && request.hasPayload) {
-      if (payloadIsParametersMap) {
-        var map = request.payload as Map<String, Object?>;
-        value = map.getIgnoreCase(parameter.name);
-      } else {
-        if (parameterTypeInfo.isUInt8List) {
-          return request.payloadAsBytes;
-        }
+    if (value == null) {
+      if (request.hasPayload) {
+        if (payloadIsParametersMap) {
+          var map = request.payload as Map<String, Object?>;
+          value = map.getIgnoreCase(parameter.name);
+        } else {
+          if (parameterTypeInfo.isUInt8List) {
+            return request.payloadAsBytes;
+          }
 
-        var payload = request.payload;
-        var payloadTypeInfo = TypeInfo.from(payload);
+          var payload = request.payload;
+          var payloadTypeInfo = TypeInfo.from(payload);
 
-        if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
-          return payload;
-        } else if (payload is Map &&
-            EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
-          return _resolveValueAsEntity(parameterTypeInfo, payload,
-              resolutionRules: resolutionRules);
-        } else if (payload is List &&
-            parameterTypeInfo.isListEntity &&
-            EntityHandler.isValidEntityType(
-                parameterTypeInfo.listEntityType!.type)) {
-          return _resolveValueAsEntity(parameterTypeInfo, payload,
-              resolutionRules: resolutionRules);
+          if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
+            return payload;
+          } else if (payload is Map &&
+              EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
+            return _resolveValueAsEntity(parameterTypeInfo, payload,
+                resolutionRules: resolutionRules);
+          } else if (payload is List &&
+              parameterTypeInfo.isListEntity &&
+              EntityHandler.isValidEntityType(
+                  parameterTypeInfo.listEntityType!.type)) {
+            return _resolveValueAsEntity(parameterTypeInfo, payload,
+                resolutionRules: resolutionRules);
+          }
         }
+      }
+
+      if (value == null && parameterIndex != null) {
+        var pathPart = request.pathPartAt(2 + parameterIndex);
+        value = pathPart;
       }
     }
 
