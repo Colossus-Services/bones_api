@@ -33,9 +33,9 @@ void main() {
     });
 
     test('foo[GET]', () async {
-      var apiRequest = APIRequest.get('/service/base/foo');
+      var apiRequest = APIRequest.get('/base/foo');
 
-      expect(apiRequest.pathParts, equals(['service', 'base', 'foo']));
+      expect(apiRequest.pathParts, equals(['base', 'foo']));
 
       var res = await api.call(apiRequest);
       expect(res.toString(), equals('Hi[GET]!'));
@@ -48,13 +48,13 @@ void main() {
     });
 
     test('foo[GET]', () async {
-      var apiRequest = APIRequest.get('/service/base/foo');
-      expect(apiRequest.pathParts, equals(['service', 'base', 'foo']));
+      var apiRequest = APIRequest.get('/base/foo');
+      expect(apiRequest.pathParts, equals(['base', 'foo']));
 
       var res = await api.call(apiRequest);
       expect(res.toString(), equals('Hi[GET]!'));
 
-      var res2 = await api.doCall(APIRequestMethod.GET, '/service/base/foo');
+      var res2 = await api.doCall(APIRequestMethod.GET, '/base/foo');
 
       expect(res2.toString(), equals(res.toString()));
     });
@@ -90,13 +90,13 @@ void main() {
     });
 
     test('foo[POST]', () async {
-      var res = await api
-          .call(APIRequest.post('/service/base/foo', parameters: {'a': 1}));
+      var res =
+          await api.call(APIRequest.post('/base/foo', parameters: {'a': 1}));
       expect(res.toString(), equals('Hi[POST]! {a: 1}'));
     });
 
     test('time', () async {
-      var res = await api.call(APIRequest.post('/service/base/time'));
+      var res = await api.call(APIRequest.post('/base/time'));
       expect(res.toString(),
           matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
 
@@ -115,32 +115,32 @@ void main() {
     });
 
     test('404 route', () async {
-      var res = await api.call(APIRequest.get('/service/base/bar'));
-      expect(res.toString(), equals('404: /service/base/bar'));
+      var res = await api.call(APIRequest.get('/base/bar'));
+      expect(res.toString(), equals('404: /base/bar'));
     });
 
     test('unauthorized', () async {
-      var res = await api.call(APIRequest.get('/service/base/auth'));
+      var res = await api.call(APIRequest.get('/base/auth'));
       expect(res.toString(), equals('APIResponseStatus.UNAUTHORIZED'));
     });
 
     test('error', () async {
-      var res = await api.call(APIRequest.get('/service/base/err'));
+      var res = await api.call(APIRequest.get('/base/err'));
       expect(res.toString(), contains('Bad state: Error!'));
     });
 
     test('put', () async {
-      var res = await api.call(APIRequest.put('/service/base/put'));
+      var res = await api.call(APIRequest.put('/base/put'));
       expect(res.toString(), equals('PUT'));
     });
 
     test('delete', () async {
-      var res = await api.call(APIRequest.delete('/service/base/delete'));
+      var res = await api.call(APIRequest.delete('/base/delete'));
       expect(res.toString(), equals('DELETE'));
     });
 
     test('patch', () async {
-      var res = await api.call(APIRequest.patch('/service/base/patch'));
+      var res = await api.call(APIRequest.patch('/base/patch'));
       expect(res.toString(), equals('PATCH'));
     });
   });
@@ -159,7 +159,7 @@ void main() {
       var api = starter.apiRoot;
       expect(api, isNotNull);
 
-      var apiRequest = APIRequest.get('/service/base/foo');
+      var apiRequest = APIRequest.get('/base/foo');
 
       var res = await api!.call(apiRequest);
       expect(res.payload, equals('Hi[GET]!'));
@@ -195,7 +195,7 @@ void main() {
       var api = starter.apiRoot;
       expect(api, isNotNull);
 
-      var apiRequest = APIRequest.get('/service/base/foo');
+      var apiRequest = APIRequest.get('/base/foo');
 
       var res = await api!.call(apiRequest);
       expect(res.payload, equals('Hi[GET]!'));
@@ -249,74 +249,74 @@ void main() {
     });
 
     test('foo[GET] /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/foo');
+      var res = await _getURL('${apiServer.url}base/foo');
       expect(res.toString(), equals('Hi[GET]!'));
     });
 
     test('foo[POST] /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/foo',
+      var res = await _getURL('${apiServer.url}base/foo',
           method: APIRequestMethod.POST, parameters: {'a': 1});
       expect(res.toString(), equals('Hi[POST]! {a: 1}'));
     });
 
     test('time /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/time',
+      var res = await _getURL('${apiServer.url}base/time',
           method: APIRequestMethod.POST, expectedContentType: 'text/plain');
       expect(res.toString(),
           matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
     });
 
     test('404 module /base', () async {
-      var res = await _getURL('${apiServer.url}service/baseX/foo',
+      var res = await _getURL('${apiServer.url}baseX/foo',
           method: APIRequestMethod.GET);
-      expect(res.toString(),
-          equals('NOT FOUND: No route for path "/service/baseX/foo"'));
+      expect(
+          res.toString(), equals('NOT FOUND: No route for path "/baseX/foo"'));
     });
 
     test('404 route /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/bar',
+      var res = await _getURL('${apiServer.url}base/bar',
           method: APIRequestMethod.GET);
-      expect(res.toString(), equals('404: /service/base/bar'));
+      expect(res.toString(), equals('404: /base/bar'));
     });
 
     test('unauthorized /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/auth',
+      var res = await _getURL('${apiServer.url}base/auth',
           method: APIRequestMethod.GET);
       expect(res.toString(), equals('Forbidden'));
     });
 
     test('error /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/err',
+      var res = await _getURL('${apiServer.url}base/err',
           method: APIRequestMethod.GET);
       expect(res.toString(), contains('Bad state: Error!'));
     });
 
     test('put /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/put',
+      var res = await _getURL('${apiServer.url}base/put',
           method: APIRequestMethod.PUT);
       expect(res.toString(), equals('PUT'));
     });
 
     test('delete /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/delete',
+      var res = await _getURL('${apiServer.url}base/delete',
           method: APIRequestMethod.DELETE);
       expect(res.toString(), equals('DELETE'));
     });
 
     test('patch /base', () async {
-      var res = await _getURL('${apiServer.url}service/base/patch',
+      var res = await _getURL('${apiServer.url}base/patch',
           method: APIRequestMethod.PATCH);
       expect(res.toString(), equals('PATCH'));
     });
 
     test('get /info', () async {
-      var res = await _getURL('${apiServer.url}service/info/echo',
+      var res = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
 
       expect(res.toString(),
           equals('[method: GET ; msg: HELLO! ; agent: BonesAPI/Test]'));
 
-      var res2 = await _getURL('${apiServer.url}service/info/echo',
+      var res2 = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.POST, parameters: {'msg': 'Hello!'});
 
       expect(res2.toString(),
@@ -324,8 +324,8 @@ void main() {
     });
 
     test('proxy: toUpperCase', () async {
-      var infoProxy = MyInfoModuleProxy(mercury_client.HttpClient(
-          '${apiServer.url}service', _MyHttpClientRequester()));
+      var infoProxy = MyInfoModuleProxy(
+          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
 
       expect(await infoProxy.toUpperCase('abc'), equals('Upper case: ABC'));
 
@@ -430,7 +430,7 @@ void main() {
     });
 
     test('foo[GET]', () async {
-      var res = await _getURL('${apiServer.url}service/base/foo');
+      var res = await _getURL('${apiServer.url}base/foo');
       expect(res.toString(), equals('Hi[GET]!'));
     });
 
