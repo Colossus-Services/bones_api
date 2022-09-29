@@ -38,6 +38,118 @@ void main() {
       expect(ref4.id, equals(12));
       expect(ref4.entity, equals(UserInfo('info 2', id: 12)));
     });
+
+    test('fromJson', () {
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user =
+            User('joe@mail.com', '123', address, [], userInfo: UserInfo('ABC'));
+
+        var json = user.toJson();
+
+        var user2 = User$fromJson(json);
+
+        expect(user2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, [],
+            userInfo: UserInfo('ABC').reflection.toEntityReference());
+
+        var json = user.toJson();
+
+        var user2 = User$fromJson(json);
+
+        expect(user2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+
+        var json = user.toJson();
+
+        var user2 = User$fromJson(json);
+
+        expect(user2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+
+        var json = user.toJson();
+
+        var user2 = TypeInfo<User>(User).fromJson(json) as User;
+
+        expect(user2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+        var account = Account(user, userInfo: UserInfo('ABC'));
+
+        var json = account.toJson();
+
+        var account2 = Account$fromJson(json);
+
+        expect(account2.userInfo.isNull, isFalse);
+        expect(account2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+        var account = Account(user);
+
+        var json = account.toJson();
+
+        var account2 = Account$fromJson(json);
+
+        expect(account2.userInfo.isNull, isTrue);
+        expect(account2.toJson(), equals(json));
+      }
+
+      Object? fieldValueResolver(String f, Object? v, TypeReflection t) {
+        if (t.isIterableType && v is Iterable) {
+          return t.typeInfo.castIterable(v);
+        } else {
+          return Json.fromJson(v, typeInfo: t.typeInfo);
+        }
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+        var account = Account(user, userInfo: UserInfo('ABC'));
+
+        var json = account.toJson();
+
+        var account2 = Account$reflection.staticInstance
+            .createInstanceWithConstructorByName('entityReference', json,
+                fieldValueResolver: fieldValueResolver)!;
+
+        expect(account2.userInfo.isNull, isFalse);
+        expect(account2.toJson(), equals(json));
+      }
+
+      {
+        var address = Address('NY', 'New York', 'Street 1', 123);
+        var user = User('joe@mail.com', '123', address, []);
+        var account = Account(user);
+
+        var json = account.toJson();
+
+        var account2 = Account$reflection.staticInstance
+            .createInstanceWithConstructorByName('entityReference', json,
+                fieldValueResolver: fieldValueResolver)!;
+
+        expect(account2.userInfo.isNull, isTrue);
+        expect(account2.toJson(), equals(json));
+      }
+    });
   });
 
   group('EntityReferenceList', () {

@@ -13,7 +13,7 @@ class Time implements Comparable<Time> {
     if (_boot) return;
     _boot = true;
 
-    JsonDecoder.registerTypeDecoder(Time, (o, d) => Time.from(o));
+    JsonDecoder.registerTypeDecoder(Time, (o, d, t) => Time.from(o));
   }
 
   int hour;

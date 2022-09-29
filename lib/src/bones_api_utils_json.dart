@@ -23,23 +23,34 @@ class Json {
 
     Time.boot();
 
-    JsonDecoder.registerTypeDecoder(Decimal, (o, d) => Decimal.from(o));
-
-    JsonDecoder.registerTypeDecoder(DynamicInt, (o, d) => DynamicInt.from(o));
+    JsonDecoder.registerTypeDecoder(Decimal, (o, d, t) => Decimal.from(o));
 
     JsonDecoder.registerTypeDecoder(
-        DynamicNumber, (o, d) => DynamicNumber.from(o));
+        DynamicInt, (o, d, t) => DynamicInt.from(o));
 
-    JsonDecoder.registerTypeDecoder(EntityReference, (o, jsonDecoder) {
+    JsonDecoder.registerTypeDecoder(
+        DynamicNumber, (o, d, t) => DynamicNumber.from(o));
+
+    JsonDecoder.registerTypeDecoder(EntityReference, (o, jsonDecoder, t) {
       var entityCache = jsonDecoder?.entityCache;
       var entityProvider = entityCache?.asEntityProvider;
-      return EntityReference.from(o, entityProvider: entityProvider);
+      if (t.isValidEntityReferenceType) {
+        return t.arguments0!
+            .toEntityReference(o, entityProvider: entityProvider);
+      } else {
+        return EntityReference.from(o, entityProvider: entityProvider);
+      }
     });
 
-    JsonDecoder.registerTypeDecoder(EntityReferenceList, (o, jsonDecoder) {
+    JsonDecoder.registerTypeDecoder(EntityReferenceList, (o, jsonDecoder, t) {
       var entityCache = jsonDecoder?.entityCache;
       var entityProvider = entityCache?.asEntityProvider;
-      return EntityReferenceList.from(o, entityProvider: entityProvider);
+      if (t.isValidEntityReferenceListType) {
+        return t.arguments0!
+            .toEntityReferenceList(o, entityProvider: entityProvider);
+      } else {
+        return EntityReferenceList.from(o, entityProvider: entityProvider);
+      }
     });
   }
 
@@ -181,6 +192,7 @@ class Json {
   /// Converts [o] to [type].
   static T? fromJson<T>(Object? o,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -189,12 +201,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJson<T>(o,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to [type] allowing async calls ([Future] and [FutureOr]).
   static FutureOr<T?> fromJsonAsync<T>(Object? o,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -203,12 +218,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJsonAsync<T>(o,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to as [List] of [type].
   static List<T?> fromJsonList<T>(Iterable o,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -217,12 +235,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJsonList<T>(o,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [o] to as [List] of [type] allowing async calls ([Future] and [FutureOr]).
   static FutureOr<List<T?>> fromJsonListAsync<T>(FutureOr<Iterable> o,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -231,12 +252,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJsonListAsync<T>(o,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [map] to [type].
   static T fromJsonMap<T>(Map<String, Object?> map,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -245,12 +269,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJsonMap<T>(map,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Converts [map] to [type] allowing async calls ([Future] and [FutureOr]).
   static FutureOr<T> fromJsonMapAsync<T>(FutureOr<Map<String, Object?>> map,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -259,12 +286,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.fromJsonMapAsync<T>(map,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Decodes [encodedJson] to a JSON collection/data.
   static T decode<T>(String encodedJson,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -273,12 +303,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.decode(encodedJson,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Sames as [decode] but from a [Uint8List].
   static T decodeFromBytes<T>(Uint8List encodedJsonBytes,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -287,12 +320,15 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.decodeFromBytes(encodedJsonBytes,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Decodes [encodedJson] to a JSON collection/data accepting async values.
   static FutureOr<T> decodeAsync<T>(FutureOr<String> encodedJson,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -301,13 +337,16 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.decodeAsync(encodedJson,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   /// Sames as [decodeAsync] but from a [Uint8List].
   static FutureOr<T> decodeFromBytesAsync<T>(
       FutureOr<Uint8List> encodedJsonBytes,
       {Type? type,
+      TypeInfo? typeInfo,
       JsomMapDecoder? jsomMapDecoder,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
@@ -316,7 +355,9 @@ class Json {
         _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
 
     return jsonDecoder.decodeFromBytesAsync(encodedJsonBytes,
-        type: type, autoResetEntityCache: autoResetEntityCache);
+        type: type,
+        typeInfo: typeInfo,
+        autoResetEntityCache: autoResetEntityCache);
   }
 
   static final JsonDecoder defaultDecoder = JsonDecoder(

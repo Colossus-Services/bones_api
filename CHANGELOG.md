@@ -1,3 +1,17 @@
+## 1.3.19
+
+- `ClassReflectionExtension`:
+  - Added: `toEntityReference`, `toEntityReferenceList` and `toList`.
+- `TypeInfoEntityExtension`:
+  - Added `isValidEntityReferenceType` and `isValidEntityReferenceListType`.
+- `JsonDecoder.registerTypeDecoder` for `EntityReference` and `EntityReferenceList`:
+  -  Allow decoding of `null` values as `EntityReference.asNull` and `EntityReferenceList.asNull`.
+- reflection_factory: ^1.2.15
+- shelf: ^1.4.0
+- postgres: ^2.5.2
+- build_runner: ^2.2.1
+- test: ^1.21.6
+
 ## 1.3.18
 
 - `APIRoot.resolveModule`: defaults to path part `#0`.

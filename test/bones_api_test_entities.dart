@@ -112,6 +112,99 @@ class UserAPIRepository extends APIRepository<User> {
 }
 
 @EnableReflection()
+class Account extends Entity {
+  int? id;
+
+  User user;
+  EntityReference<UserInfo> userInfo;
+
+  Account.entityReference(this.user, {required this.userInfo});
+
+  Account(this.user, {Object? userInfo})
+      : userInfo = EntityReference<UserInfo>.from(userInfo);
+
+  Account.empty() : this(User.empty());
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is User && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String get idFieldName => 'id';
+
+  @JsonField.hidden()
+  @override
+  List<String> get fieldsNames => const <String>[
+        'id',
+        'user',
+        'userInfo',
+      ];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'user':
+        return user as V?;
+      case 'userInfo':
+        return userInfo as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tInt;
+      case 'user':
+        return TypeInfo<User>(Address);
+      case 'userInfo':
+        return TypeInfo<EntityReference<UserInfo>>.fromType(
+            EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        {
+          id = value as int?;
+          break;
+        }
+      case 'user':
+        {
+          user = value as User;
+          break;
+        }
+      case 'userInfo':
+        {
+          userInfo = EntityReference<UserInfo>.from(value);
+          break;
+        }
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        'user': user.toJson(),
+        'userInfo': userInfo.toJson(),
+      };
+}
+
+@EnableReflection()
 class User extends Entity {
   int? id;
 

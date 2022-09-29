@@ -64,6 +64,14 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
     });
   }
 
+  List<O> toList([O? obj]) => [object ?? obj!];
+
+  EntityReference<O> toEntityReference([O? obj]) =>
+      EntityReference<O>.fromEntity(object ?? obj);
+
+  EntityReferenceList<O> toEntityReferenceList(List<O> entities) =>
+      EntityReferenceList<O>.fromEntities(entities);
+
   bool isValidFieldValue<V>(String key,
           {O? obj, V? value, bool nullValue = false}) =>
       entityHandler.isValidFieldValue(obj ?? object!, key,
@@ -421,6 +429,16 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
   /// Returns `true` if [type] is equals to [EntityReferenceList].
   bool get isEntityReferenceListType => type == EntityReferenceList;
+
+  /// Returns `true` if [isEntityReferenceType] and [arguments0] is a valid entity type.
+  bool get isValidEntityReferenceType =>
+      isEntityReferenceType &&
+      EntityHandler.isValidEntityType(arguments0?.type);
+
+  /// Returns `true` if [isEntityReferenceListType] and [arguments0] is a valid entity type.
+  bool get isValidEntityReferenceListType =>
+      isEntityReferenceListType &&
+      EntityHandler.isValidEntityType(arguments0?.type);
 
   /// Returns `true` if [type] is equals to [EntityReference] OR [EntityReferenceList].
   bool get isEntityReferenceBaseType =>
