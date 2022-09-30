@@ -1,3 +1,7 @@
+## 1.3.20
+
+- reflection_factory: ^1.2.16
+
 ## 1.3.19
 
 - `ClassReflectionExtension`:

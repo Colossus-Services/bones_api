@@ -80,7 +80,7 @@ abstract class APISecurity {
   final Map<String, MapEntry<Object?, List<APIPermission>>> _tokensInfo =
       <String, MapEntry<Object?, List<APIPermission>>>{};
 
-  void _storeTokeInfo(
+  void _storeTokenInfo(
       String token, Object? data, List<APIPermission> permissions) {
     permissions = permissions is UnmodifiableListView<APIPermission>
         ? permissions
@@ -130,7 +130,7 @@ abstract class APISecurity {
       return getAuthenticationData(credential, prevData).resolveMapped((data) {
         var authentication = createAuthentication(credential, permissions,
             data: data, resumed: resumed);
-        _storeTokeInfo(authentication.tokenKey, data, permissions);
+        _storeTokenInfo(authentication.tokenKey, data, permissions);
         return authentication;
       });
     });
