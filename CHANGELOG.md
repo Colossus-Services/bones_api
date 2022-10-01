@@ -1,3 +1,8 @@
+## 1.3.22
+
+- reflection_factory: ^1.2.17
+- async_events: ^1.0.7
+
 ## 1.3.21
 
 - `APIServer`:
