@@ -902,6 +902,9 @@ class APIRequest extends APIPayload {
   /// The request ID (to help debugging and loggign).
   final int id = ++_idCount;
 
+  /// The request protocol.
+  final String? protocol;
+
   /// The request method.
   final APIRequestMethod method;
 
@@ -913,6 +916,9 @@ class APIRequest extends APIPayload {
 
   /// The headers of the request.
   final Map<String, dynamic> headers;
+
+  /// If `true` the client accepts `Keep-Alive` connections.
+  final bool keepAlive;
 
   /// The [DateTime] of this request.
   final DateTime time;
@@ -987,7 +993,8 @@ class APIRequest extends APIPayload {
   late final List<String> _pathParts;
 
   APIRequest(this.method, this.path,
-      {Map<String, dynamic>? parameters,
+      {this.protocol,
+      Map<String, dynamic>? parameters,
       Map<String, dynamic>? headers,
       this.payload,
       Object? payloadMimeType,
@@ -998,6 +1005,7 @@ class APIRequest extends APIPayload {
       String? scheme,
       APIRequesterSource? requesterSource,
       String? requesterAddress,
+      this.keepAlive = false,
       DateTime? time,
       this.parsingDuration,
       Uri? requestedUri,
@@ -2002,6 +2010,12 @@ class APIResponse<T> extends APIPayload {
   /// The response [CacheControl].
   CacheControl? cacheControl;
 
+  /// The `Keep-Alive` timeout. Default: `10s`
+  Duration keepAliveTimeout;
+
+  /// The `Keep-Alive` maximum number of requests. Default: `1000`
+  int keepAliveMaxRequests;
+
   /// If `true` this response should require `Authentication`.
   /// See [authenticationType] and [authenticationRealm].
   bool get requiresAuthentication => _requiresAuthentication;
@@ -2032,11 +2046,15 @@ class APIResponse<T> extends APIPayload {
       this.payloadETag,
       this.cacheControl,
       this.payloadFileExtension,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       this.error,
       this.stackTrace,
       Map<String, Duration>? metrics})
       : payload = _resolvePayload(payload, payloadDynamic),
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
+        keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
+        keepAliveMaxRequests = keepAliveMaxRequests ?? 1000,
         _metrics = metrics;
 
   static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) =>
@@ -2045,7 +2063,7 @@ class APIResponse<T> extends APIPayload {
           ? payloadDynamic as T
           : null);
 
-  /// Copy this response casting the [payload] it to [E].
+  /// Copy this response casting the [payload] to [E].
   APIResponse<E> cast<E>({E? payload}) {
     return APIResponse<E>(status,
         payload: payload ?? (this.payload as E?),
@@ -2054,6 +2072,8 @@ class APIResponse<T> extends APIPayload {
         payloadETag: payloadETag,
         cacheControl: cacheControl,
         headers: headers,
+        keepAliveTimeout: keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests,
         error: error,
         stackTrace: stackTrace,
         metrics: _metrics)
@@ -2071,6 +2091,8 @@ class APIResponse<T> extends APIPayload {
       CacheControl? cacheControl,
       Map<String, dynamic>? headers,
       Object? mimeType,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Object? error,
       StackTrace? stackTrace,
       Map<String, Duration>? metrics}) {
@@ -2084,6 +2106,8 @@ class APIResponse<T> extends APIPayload {
         payloadETag: payloadETag ?? this.payloadETag,
         cacheControl: cacheControl ?? this.cacheControl,
         headers: headers ?? this.headers,
+        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
         error: error,
         stackTrace: stackTrace,
         metrics: metrics ?? _metrics)
@@ -2098,6 +2122,8 @@ class APIResponse<T> extends APIPayload {
       Map<String, dynamic>? headers,
       Object? mimeType,
       String? fileExtension,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
@@ -2107,6 +2133,8 @@ class APIResponse<T> extends APIPayload {
         payloadFileExtension: fileExtension,
         payloadETag: payloadETag,
         cacheControl: cacheControl,
+        keepAliveTimeout: keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests,
         metrics: metrics);
   }
 
@@ -2119,6 +2147,8 @@ class APIResponse<T> extends APIPayload {
       String? fileExtension,
       Etag? eTag,
       CacheControl? cacheControl,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse.ok(
         payload ?? (payloadDynamic == null ? this.payload : null),
@@ -2128,6 +2158,8 @@ class APIResponse<T> extends APIPayload {
         fileExtension: fileExtension ?? payloadFileExtension,
         payloadETag: eTag ?? payloadETag,
         cacheControl: cacheControl ?? this.cacheControl,
+        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }
@@ -2138,12 +2170,16 @@ class APIResponse<T> extends APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? mimeType,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
+        keepAliveTimeout: keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests,
         metrics: metrics);
   }
 
@@ -2153,12 +2189,16 @@ class APIResponse<T> extends APIPayload {
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
       Object? mimeType,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse.notFound(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
+        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }
@@ -2171,6 +2211,8 @@ class APIResponse<T> extends APIPayload {
       Object? mimeType,
       Etag? eTag,
       CacheControl? cacheControl,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_MODIFIED,
         headers: headers ?? <String, dynamic>{},
@@ -2179,6 +2221,8 @@ class APIResponse<T> extends APIPayload {
         payloadMimeType: mimeType,
         payloadETag: eTag,
         cacheControl: cacheControl,
+        keepAliveTimeout: keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests,
         metrics: metrics);
   }
 
@@ -2190,6 +2234,8 @@ class APIResponse<T> extends APIPayload {
       Object? mimeType,
       Etag? eTag,
       CacheControl? cacheControl,
+      Duration? keepAliveTimeout,
+      int? keepAliveMaxRequests,
       Map<String, Duration>? metrics}) {
     return APIResponse.notModified(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
@@ -2198,6 +2244,8 @@ class APIResponse<T> extends APIPayload {
         mimeType: mimeType ?? payloadMimeType,
         eTag: eTag ?? payloadETag,
         cacheControl: cacheControl ?? this.cacheControl,
+        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
         metrics: metrics ?? _metrics)
       .._copyStartedMetrics(this);
   }

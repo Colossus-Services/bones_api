@@ -1,3 +1,14 @@
+## 1.3.21
+
+- `APIServer`:
+  - Added `useSessionID` to enable/disable the `SESSIONID` cookie.
+  - Added option `cookieless` for a server that blocks all cookies.
+  - Added support for `Keep-Alive`.
+- `APIRequest`:
+  - Added `protocol` and `keepAlive`.
+- `APIResponse`:
+  - Added `keepAliveTimeout` and `keepAliveMaxRequests`.
+
 ## 1.3.20
 
 - reflection_factory: ^1.2.16

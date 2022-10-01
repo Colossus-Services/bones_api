@@ -74,6 +74,16 @@ class APIServer {
   /// Returns a list of domains at [domainsRoots] keys (non [RegExp] entries).
   List<String> get domains => domainsRoots.keys.whereType<String>().toList();
 
+  /// If `true` the server will use/generate a `SESSIONID` for each request.
+  /// If `false` will ignore any `SESSIONID` cookie (useful to comply with cookieless servers).
+  /// - If [cookieless] is `true` `SESSIONID` is disabled.
+  final bool useSessionID;
+
+  /// If `true` will remove any `Set-Cookie` or `Cookie` header.
+  ///
+  /// See [useSessionID].
+  final bool cookieless;
+
   /// If `true` log messages to [stdout] (console).
   final bool logToConsole;
 
@@ -89,8 +99,11 @@ class APIServer {
     this.version = BonesAPI.VERSION,
     this.hotReload = false,
     Object? domains,
+    bool useSessionID = true,
+    this.cookieless = false,
     this.logToConsole = true,
-  })  : securePort = letsEncrypt
+  })  : useSessionID = useSessionID && !cookieless,
+        securePort = letsEncrypt
             ? (securePort != null && securePort > 10 ? securePort : 443)
             : (securePort ?? -1),
         letsEncryptDirectory = resolveLetsEncryptDirectory(
@@ -316,14 +329,24 @@ class APIServer {
   /// The `server` header value.
   String get serverName => '$name/$version';
 
+  String get urlHost {
+    switch (address) {
+      case '0.0.0.0':
+      case '127.0.0.1':
+        return 'localhost';
+      default:
+        return address;
+    }
+  }
+
   /// The local URL of this server.
   String get url {
-    return 'http://$address:$port/';
+    return 'http://$urlHost:$port/';
   }
 
   /// The local `API-INFO` URL of this server.
   String get apiInfoURL {
-    return 'http://$address:$port/API-INFO';
+    return 'http://$urlHost:$port/API-INFO';
   }
 
   /// Returns `true` if the basic conditions for Let's Encrypt are configured.
@@ -361,9 +384,15 @@ class APIServer {
       await APIHotReload.get().enable();
     }
 
-    _log.info('Started HTTP server: $address:$port');
+    if (cookieless) {
+      _log.info('Cookieless Server: all cookies disabled! (NO `SESSIONID`)');
+    } else if (useSessionID) {
+      _log.info('Using `SESSIONID` cookies.');
+    }
 
-    _log.info('Initializing ${apiRoot.name}...');
+    _log.info('Started HTTP Server at: $address:$port');
+
+    _log.info('Initializing APIRoot `${apiRoot.name}`...');
 
     return apiRoot.ensureInitialized().then((result) {
       var modules = apiRoot.modules;
@@ -550,6 +579,10 @@ class APIServer {
       return MapEntry(e.key, values.length == 1 ? values[0] : values);
     }));
 
+    if (cookieless) {
+      headers.remove('cookie');
+    }
+
     var requestedUri = request.requestedUri;
 
     var path = requestedUri.path;
@@ -573,14 +606,25 @@ class APIServer {
     String? sessionID;
     bool newSession = false;
 
-    var cookies = _parseCookies(request);
-    if (cookies != null && cookies.isNotEmpty) {
-      sessionID = cookies['SESSIONID'] ?? cookies['SESSION_ID'];
+    if (useSessionID && !cookieless) {
+      var cookies = _parseCookies(request);
+      if (cookies != null && cookies.isNotEmpty) {
+        sessionID = cookies['SESSIONID'] ?? cookies['SESSION_ID'];
+      }
+
+      if (sessionID == null) {
+        sessionID = APISession.generateSessionID();
+        newSession = true;
+      }
     }
 
-    if (sessionID == null) {
-      sessionID = APISession.generateSessionID();
-      newSession = true;
+    var keepAlive = false;
+
+    if (request.protocolVersion == '1.1') {
+      var headerConnection = headers['connection'];
+      if (headerConnection != null) {
+        keepAlive = equalsIgnoreAsciiCase('$headerConnection', 'Keep-Alive');
+      }
     }
 
     var credential = _resolveCredential(request);
@@ -607,6 +651,8 @@ class APIServer {
       }
 
       var req = APIRequest(method, path,
+          protocol: 'HTTP/${request.protocolVersion}',
+          keepAlive: keepAlive,
           parameters: parametersResolved,
           requesterSource: requesterSource,
           requesterAddress: requesterAddress,
@@ -775,7 +821,7 @@ class APIServer {
 
     headers['server'] ??= serverName;
 
-    if (apiRequest.newSession) {
+    if (apiRequest.newSession && !cookieless) {
       var setSessionID = 'SESSIONID=${apiRequest.sessionID}';
       headers.setMultiValue('Set-Cookie', setSessionID, ignoreCase: true);
     }
@@ -916,7 +962,20 @@ class APIServer {
       headers['cache-control'] = cacheControl.toString();
     }
 
+    if (apiRequest.keepAlive && !apiResponse.isBadRequest) {
+      var timeout = apiResponse.keepAliveTimeout.inSeconds.clamp(0, 3600);
+      var max = apiResponse.keepAliveMaxRequests.clamp(0, 1000000);
+
+      headers['connection'] = 'Keep-Alive';
+      headers['keep-alive'] = 'timeout=$timeout, max=$max';
+    }
+
     headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
+
+    if (cookieless) {
+      headers.remove('Set-Cookie');
+      headers['X-Cookieless-Server'] = 'Blocking all cookies';
+    }
 
     switch (apiResponse.status) {
       case APIResponseStatus.OK:
@@ -1046,7 +1105,7 @@ class APIServer {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot, address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeType}), address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].
