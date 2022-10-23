@@ -1,3 +1,9 @@
+## 1.3.23
+
+- `APISecurity`:
+  - Added `logout` and `invalidateToken`.
+- Fixed `OPTIONS` method for `authenticationRoute` (`/authenticate`).
+
 ## 1.3.22
 
 - reflection_factory: ^1.2.17

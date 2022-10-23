@@ -250,7 +250,7 @@ abstract class APIModule with Initializable {
   bool acceptsRequest(APIRequest apiRequest) {
     var routeName = resolveRoute(apiRequest);
 
-    if (routeName == 'API-INFO') {
+    if (routeName == 'API-INFO' || routeName == authenticationRoute) {
       return true;
     } else {
       var handler = getRouteHandlerByRequest(apiRequest, routeName);

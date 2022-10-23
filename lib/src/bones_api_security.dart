@@ -8,6 +8,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_session.dart';
 
 final _log = logging.Logger('APISecurity');
@@ -52,6 +53,28 @@ abstract class APISecurity {
 
   FutureOr<APICredential> prepareCredential(APICredential credential) =>
       credential;
+
+  FutureOr<bool> logout(APICredential? credential,
+      {bool allTokens = false, APIRequest? request}) {
+    if (credential == null) return false;
+
+    if (!allTokens) {
+      if (credential.token == null) return false;
+    }
+
+    return checkCredential(credential).then((ok) {
+      if (!ok) return false;
+
+      if (allTokens) {
+        return invalidateUserTokens(credential.username);
+      }
+
+      var apiToken = getTokenByKey(credential.token);
+      if (apiToken == null) return false;
+
+      return invalidateToken(apiToken);
+    });
+  }
 
   FutureOr<APIAuthentication?> authenticate(APICredential? credential,
       {APIRequest? request}) {
@@ -203,8 +226,8 @@ abstract class APISecurity {
 
   final Map<String, List<APIToken>> _usersTokens = <String, List<APIToken>>{};
 
-  APIToken? getTokenByKey(String tokenKey) {
-    if (tokenKey.isEmpty) return null;
+  APIToken? getTokenByKey(String? tokenKey) {
+    if (tokenKey == null || tokenKey.isEmpty) return null;
 
     for (var l in _usersTokens.values) {
       for (var t in l) {
@@ -247,17 +270,64 @@ abstract class APISecurity {
   void validateAllTokens([DateTime? now]) {
     now ??= DateTime.now();
 
-    for (var tokens in _usersTokens.values) {
+    var emptyUsers = <String>[];
+
+    for (var e in _usersTokens.entries) {
+      var user = e.key;
+      var tokens = e.value;
+
       var expired = tokens.removeExpiredTokens(now: now);
 
-      for (var t in expired) {
-        _onExpireToken(t);
+      _onInvalidateTokens(expired);
+
+      if (tokens.isEmpty) {
+        emptyUsers.add(user);
       }
+    }
+
+    _usersTokens.removeKeys(emptyUsers);
+  }
+
+  void _onInvalidateTokens(List<APIToken> tokens) {
+    for (var t in tokens) {
+      _onInvalidateToken(t);
     }
   }
 
-  void _onExpireToken(APIToken apiToken) {
+  void _onInvalidateToken(APIToken apiToken) {
     _tokensInfo.remove(apiToken.token);
+  }
+
+  bool invalidateUserTokens(String username) {
+    var userTokens = _usersTokens[username];
+    if (userTokens == null || userTokens.isEmpty) return false;
+
+    var tokens = userTokens.toList();
+
+    userTokens.clear();
+    _usersTokens.remove(username);
+
+    _onInvalidateTokens(tokens);
+
+    return true;
+  }
+
+  bool invalidateToken(APIToken apiToken) {
+    var username = apiToken.username;
+
+    var userTokens = _usersTokens[username];
+    if (userTokens == null || userTokens.isEmpty) return false;
+
+    if (userTokens.remove(apiToken)) {
+      if (userTokens.isEmpty) {
+        _usersTokens.remove(username);
+      }
+
+      _onInvalidateToken(apiToken);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   FutureOr<bool> checkCredential(APICredential credential) {
@@ -283,12 +353,35 @@ abstract class APISecurity {
           APICredential credential, Object? previousData) =>
       null;
 
-  FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request) {
+  FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
+      {bool allowLogout = false}) {
     var credential = resolveRequestCredential(request);
     credential ??= resolveSessionCredential(request);
 
     if (credential == null) {
       return null;
+    }
+
+    var logout = allowLogout &&
+        (request.parameters.getAsBool('logout') ??
+            request.parameters.getAsBool('logoff') ??
+            false);
+
+    if (logout) {
+      var allTokens = allowLogout &&
+          (request.parameters.getAsBool('all') ??
+              request.parameters.getAsBool('allTokens', ignoreCase: true) ??
+              false);
+
+      return this
+          .logout(credential, allTokens: allTokens, request: request)
+          .resolveMapped((ok) {
+        if (ok) {
+          request.credential = null;
+        }
+
+        return null;
+      });
     }
 
     request.credential = credential;
@@ -401,7 +494,8 @@ abstract class APISecurity {
     var response = APIResponse<T>.unauthorized(payloadDynamic: 'UNAUTHORIZED');
     response.startMetric('authentication');
 
-    return authenticateByRequest(request).then((authentication) {
+    return authenticateByRequest(request, allowLogout: true)
+        .then((authentication) {
       response.stopMetric('authentication');
 
       if (authentication == null) {

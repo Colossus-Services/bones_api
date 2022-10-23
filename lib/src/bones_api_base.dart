@@ -39,7 +39,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.22';
+  static const String VERSION = '1.3.23';
 
   static bool _boot = false;
 
@@ -477,7 +477,14 @@ abstract class APIRoot with Initializable, Closable {
       }
     }
 
-    if (module == null) return false;
+    if (module == null) {
+      if (apiRequest.pathPartAt(0) == authenticationRoute ||
+          apiRequest.pathPartAt(1) == authenticationRoute) {
+        return true;
+      }
+
+      return false;
+    }
 
     return module.acceptsRequest(apiRequest);
   }
