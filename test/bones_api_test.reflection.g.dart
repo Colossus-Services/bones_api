@@ -33,7 +33,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');

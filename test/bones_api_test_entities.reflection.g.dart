@@ -71,7 +71,7 @@ class Account$reflection extends ClassReflection<Account> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -484,7 +484,7 @@ class Address$reflection extends ClassReflection<Address> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -965,7 +965,7 @@ class Photo$reflection extends ClassReflection<Photo> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -1437,7 +1437,7 @@ class Role$reflection extends ClassReflection<Role> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -1858,7 +1858,7 @@ class RoleType$reflection extends EnumReflection<RoleType> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -1922,7 +1922,7 @@ class Store$reflection extends ClassReflection<Store> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -2335,7 +2335,7 @@ class User$reflection extends ClassReflection<User> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
@@ -2897,7 +2897,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo> {
   }
 
   @override
-  Version get languageVersion => Version.parse('2.17.0');
+  Version get languageVersion => Version.parse('2.18.0');
 
   @override
   Version get reflectionFactoryVersion => Version.parse('1.2.17');
