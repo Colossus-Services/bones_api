@@ -590,7 +590,7 @@ void main() {
           await tryCallMapped(
               () => Future.delayed(Duration(milliseconds: 1),
                   () => throw StateError('test async error')),
-              onSuccess: (v) => 456 * 2,
+              onSuccess: (v) => (456 * 2).toString(),
               onError: (e, s) => e.toString()),
           contains('test async error'));
     });

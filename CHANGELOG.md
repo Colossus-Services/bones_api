@@ -3,6 +3,8 @@
 - `APISecurity`:
   - Added `logout` and `invalidateToken`.
 - Fixed `OPTIONS` method for `authenticationRoute` (`/authenticate`).
+- sdk: '>=2.18.0 <3.0.0'
+- petitparser: ^5.1.0
 
 ## 1.3.22
 

@@ -45,10 +45,10 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       char('[').trim() & ref0(elements2).optional() & char(']').trim();
 
   Parser<List> elements() =>
-      ref0(jsonValue).separatedBy(char(','), includeSeparators: false);
+      ref0(jsonValue).plusSeparated(char(',')).map((l) => l.elements);
 
   Parser<List> elements2() =>
-      ref0(jsonValue2).separatedBy(char(','), includeSeparators: false);
+      ref0(jsonValue2).plusSeparated(char(',')).map((l) => l.elements);
 
   Parser<List> object() =>
       char('{').trim() & ref0(members).optional() & char('}').trim();
@@ -57,10 +57,10 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       char('{').trim() & ref0(members2).optional() & char('}').trim();
 
   Parser<List> members() =>
-      ref0(pair).separatedBy(char(','), includeSeparators: false);
+      ref0(pair).plusSeparated(char(',')).map((l) => l.elements);
 
   Parser<List> members2() =>
-      ref0(pair2).separatedBy(char(','), includeSeparators: false);
+      ref0(pair2).plusSeparated(char(',')).map((l) => l.elements);
 
   Parser<List> pair() => keyToken() & char(':').trim() & ref0(jsonValue);
 
