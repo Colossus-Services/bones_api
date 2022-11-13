@@ -674,6 +674,9 @@ Future<String> _getURL(String url,
 
 class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
   @override
+  bool setupUserAgent(String? userAgent) => true;
+
+  @override
   Future<mercury_client.HttpResponse> doHttpRequest(
       mercury_client.HttpClient client,
       mercury_client.HttpRequest request,

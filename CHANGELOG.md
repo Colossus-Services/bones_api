@@ -1,4 +1,5 @@
 ## 1.3.24
+
 - `APIResponse`:
   - Fix constructor parameter `headers` to ensure that it's always modifiable.
 - `APIServer`:
