@@ -1,3 +1,19 @@
+## 1.3.24
+- `APIResponse`:
+  - Fix constructor parameter `headers` to ensure that it's always modifiable.
+- `APIServer`:
+  - Static files:
+    - Added `gzip` encoding.
+    - Added `cache-control` response header.
+- logging: ^1.1.0
+- collection: ^1.17.0
+- mercury_client: ^2.1.7
+- async_events: ^1.0.8
+- archive: ^3.3.4
+- lints: ^2.0.1
+- build_runner: ^2.3.2
+- test: ^1.22.0
+
 ## 1.3.23
 
 - `APISecurity`:

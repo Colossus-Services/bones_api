@@ -39,7 +39,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.23';
+  static const String VERSION = '1.3.24';
 
   static bool _boot = false;
 
@@ -2046,7 +2046,7 @@ class APIResponse<T> extends APIPayload {
   ///
   /// - [payloadDynamic] is only used if [payload] is `null` and [T] accepts the [payloadDynamic] value.
   APIResponse(this.status,
-      {this.headers = const <String, dynamic>{},
+      {Map<String, dynamic>? headers,
       T? payload,
       Object? payloadDynamic,
       Object? payloadMimeType,
@@ -2058,7 +2058,8 @@ class APIResponse<T> extends APIPayload {
       this.error,
       this.stackTrace,
       Map<String, Duration>? metrics})
-      : payload = _resolvePayload(payload, payloadDynamic),
+      : headers = headers ?? <String, dynamic>{},
+        payload = _resolvePayload(payload, payloadDynamic),
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
         keepAliveMaxRequests = keepAliveMaxRequests ?? 1000,

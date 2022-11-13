@@ -314,16 +314,49 @@ class APIServer {
       APIRequest apiRequest, Directory rootDirectory) {
     var staticHandler = _getDirectoryStaticHandler(rootDirectory);
 
-    return staticHandler(apiRequest.toRequest()).resolveMapped((response) {
-      return _APIResponseStaticFile<T>(response);
-    });
+    return staticHandler(apiRequest.toRequest())
+        .resolveMapped((response) => _APIResponseStaticFile<T>(response));
   }
 
   final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
 
-  Handler _getDirectoryStaticHandler(Directory rootDirectory) {
-    return _directoriesStaticHandlers.putIfAbsent(
-        rootDirectory.path, () => createStaticHandler(rootDirectory.path));
+  Handler _getDirectoryStaticHandler(Directory rootDirectory) =>
+      _directoriesStaticHandlers.putIfAbsent(
+          rootDirectory.path, () => _createDirectoryHandler(rootDirectory));
+
+  Handler _createDirectoryHandler(Directory rootDirectory) {
+    rootDirectory = rootDirectory.absolute;
+
+    var pipeline = const Pipeline()
+        .addMiddleware(gzipMiddleware)
+        .addMiddleware(_headersMiddleware);
+
+    var handler = pipeline.addHandler(
+        createStaticHandler(rootDirectory.path, defaultDocument: 'index.html'));
+    return handler;
+  }
+
+  Handler _headersMiddleware(Handler innerHandler) => (request) {
+        return Future.sync(() => innerHandler(request))
+            .then((response) => _configureHeaders(request, response));
+      };
+
+  Response _configureHeaders(Request request, Response response,
+      {Map<String, String>? headers}) {
+    headers ??= <String, String>{};
+
+    var statusCode = response.statusCode;
+    if (statusCode < 200 || statusCode > 299) {
+      return response.change(headers: headers);
+    }
+
+    {
+      var cacheControl =
+          'private, must-revalidate, max-age=1, stale-while-revalidate=60';
+      headers[HttpHeaders.cacheControlHeader] = cacheControl;
+    }
+
+    return response.change(headers: headers);
   }
 
   /// The `server` header value.
@@ -1095,7 +1128,12 @@ class APIServer {
   @override
   String toString() {
     var domainsStr = domainsRoots.isNotEmpty
-        ? ', domains: ${domainsRoots.entries.map((e) => '${e.key}=${e.value}').join(';')}'
+        ? ', domains: [${domainsRoots.entries.map((e) {
+            var key = e.key;
+            var val = e.value;
+
+            return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
+          }).join(' ; ')}]'
         : '';
 
     var secureStr = securePort < 10
