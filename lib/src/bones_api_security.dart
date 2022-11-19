@@ -353,6 +353,22 @@ abstract class APISecurity {
           APICredential credential, Object? previousData) =>
       null;
 
+  bool disposeAuthenticationData(APICredential credential) {
+    var disposeUsernameEntity = credential.usernameEntity != null;
+    credential.usernameEntity = null;
+
+    var disposeTokenInfo = false;
+
+    var token = credential.token;
+
+    if (token != null) {
+      var prevInfo = _tokensInfo.remove(token);
+      disposeTokenInfo = prevInfo != null;
+    }
+
+    return disposeUsernameEntity || disposeTokenInfo;
+  }
+
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
       {bool allowLogout = false}) {
     var credential = resolveRequestCredential(request);

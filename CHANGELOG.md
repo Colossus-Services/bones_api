@@ -1,3 +1,11 @@
+## 1.3.25
+
+- `APISecurity`:
+  - Added `disposeAuthenticationData`.
+- swiss_knife: ^3.1.2
+- pubspec: ^2.3.0
+- coverage: ^1.6.1
+
 ## 1.3.24
 
 - `APIResponse`:
