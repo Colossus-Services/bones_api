@@ -39,7 +39,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.25';
+  static const String VERSION = '1.3.26';
 
   static bool _boot = false;
 
@@ -395,9 +395,22 @@ abstract class APIRoot with Initializable, Closable {
       APIRequest request, bool externalCall) {
     var callZone = currentAPIRequest.createContextZone();
 
-    return callZone.run(() {
+    return callZone.run<FutureOr<APIResponse<T>>>(() {
       currentAPIRequest.set(request, contextZone: callZone);
-      return _preCall<T>(request, externalCall);
+      try {
+        var ret = _preCall<T>(request, externalCall);
+        if (ret is Future<APIResponse<T>>) {
+          return ret.then((r) {
+            return r;
+          }, onError: (e, s) {
+            return APIResponse<T>.error(error: e, stackTrace: s);
+          });
+        } else {
+          return ret;
+        }
+      } catch (e, s) {
+        return APIResponse<T>.error(error: e, stackTrace: s);
+      }
     }).resolveMapped((response) {
       currentAPIRequest.remove(contextZone: callZone);
       return response;

@@ -290,6 +290,7 @@ export 'src/bones_api_error_zone.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_initializable.dart';
 export 'src/bones_api_module.dart';
+export 'src/bones_api_db_module.dart';
 export 'src/bones_api_platform.dart';
 export 'src/bones_api_repository.dart';
 export 'src/bones_api_root_starter.dart';

@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'dart:convert' as dart_convert;
 
 import 'package:collection/collection.dart';
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
@@ -19,9 +19,15 @@ class APIConfig {
 
   String? _source;
 
+  /// If `true` indicates development environment.
+  late final bool development;
+
   APIConfig([Map<String, dynamic> properties = const <String, dynamic>{}]) {
     BonesAPI.boot();
     _properties.addAll(properties);
+
+    var dev = _properties['development'];
+    development = TypeParser.parseBool(dev, false)!;
   }
 
   /// The source of this configuration.

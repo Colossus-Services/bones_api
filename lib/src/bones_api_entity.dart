@@ -2940,6 +2940,30 @@ extension IterableEntityRepositoryProviderExtension
       return null;
     }
   }
+
+  Map<Type, EntityRepository> allRepositories(
+      {Map<Type, EntityRepository>? allRepositories,
+      Set<EntityRepositoryProvider>? traversedProviders}) {
+    var length = this.length;
+    if (length == 0) {
+      return <Type, EntityRepository>{};
+    } else if (length == 1) {
+      return first.allRepositories(
+          allRepositories: allRepositories,
+          traversedProviders: traversedProviders);
+    }
+
+    allRepositories ??= <Type, EntityRepository>{};
+    traversedProviders ??= <EntityRepositoryProvider>{};
+
+    for (var e in this) {
+      e.allRepositories(
+          allRepositories: allRepositories,
+          traversedProviders: traversedProviders);
+    }
+
+    return allRepositories;
+  }
 }
 
 extension EntityRepositoryProviderExtension on EntityRepositoryProvider {

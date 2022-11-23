@@ -531,6 +531,8 @@ class APIRouteBuilder<M extends APIModule> {
       return request;
     } else if (parameterTypeInfo.isOf(APICredential)) {
       return request.credential;
+    } else if (parameterTypeInfo.isOf(APIAuthentication)) {
+      return request.authentication;
     }
 
     Object? value = request.getParameterIgnoreCase(parameter.name);
@@ -758,6 +760,7 @@ class APIModuleProxy extends ClassProxy {
             ignoreParametersTypes: const {
               APIRequest,
               APICredential,
+              APIAuthentication,
             });
 }
 

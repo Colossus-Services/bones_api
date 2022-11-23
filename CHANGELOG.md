@@ -1,3 +1,11 @@
+## 1.3.26
+
+- `APIModule`:
+  - Allow method routes with parameter `APIAuthentication`.
+- `APIRoot._callZoned`: ensure that is catching `Future` errors.
+- Added `APIConfig.development` to inform development environment. 
+- Added `APIDBModule`: a development module only to show DB entities.
+
 ## 1.3.25
 
 - `APISecurity`:
