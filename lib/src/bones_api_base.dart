@@ -397,22 +397,32 @@ abstract class APIRoot with Initializable, Closable {
 
     return callZone.run<FutureOr<APIResponse<T>>>(() {
       currentAPIRequest.set(request, contextZone: callZone);
+
       try {
-        var ret = _preCall<T>(request, externalCall);
-        if (ret is Future<APIResponse<T>>) {
-          return ret.then((r) {
-            return r;
-          }, onError: (e, s) {
-            return APIResponse<T>.error(error: e, stackTrace: s);
-          });
+        var response = _preCall<T>(request, externalCall);
+
+        // Any throwed error won't be passed to the previous `Zone`.
+        // Then the erros will be wrapped into a `APIResponse.error`,
+        // to be rethrown by the previous `Zone`.
+
+        if (response is Future<APIResponse<T>>) {
+          return response.then((r) => r,
+              onError: (e, s) => APIResponse.error(
+                  error: e, stackTrace: s, headers: {'callZone': true}));
         } else {
-          return ret;
+          return response;
         }
       } catch (e, s) {
-        return APIResponse<T>.error(error: e, stackTrace: s);
+        return APIResponse.error(
+            error: e, stackTrace: s, headers: {'callZone': true});
       }
     }).resolveMapped((response) {
       currentAPIRequest.remove(contextZone: callZone);
+
+      if (response.isError && response.headers['callZone'] == true) {
+        throw response.error;
+      }
+
       return response;
     });
   }

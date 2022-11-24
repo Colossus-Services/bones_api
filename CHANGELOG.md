@@ -1,3 +1,7 @@
+## 1.3.28
+
+- `APIRoot._callZoned`: fix error handling.
+
 ## 1.3.27
 
 - `APIDBModule`:

@@ -812,7 +812,19 @@ class APIServer {
   }
 
   FutureOr<Response> _processCall(Request request, APIRequest apiRequest) {
-    var apiResponse = apiRoot.call(apiRequest);
+    FutureOr<APIResponse> apiResponse;
+
+    try {
+      apiResponse = apiRoot.call(apiRequest);
+      if (apiResponse is Future<APIResponse>) {
+        apiResponse = apiResponse.catchError((e, s) {
+          return APIResponse.error(error: e, stackTrace: s);
+        });
+      }
+    } catch (e, s) {
+      apiResponse = APIResponse.error(error: e, stackTrace: s);
+    }
+
     return apiResponse
         .resolveMapped((res) => _processAPIResponse(request, apiRequest, res));
   }
