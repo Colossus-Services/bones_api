@@ -1,3 +1,10 @@
+## 1.3.27
+
+- `APIDBModule`:
+  - Added constructor parameter `name` and `onlyOnDevelopment`.
+- `APISecurity`:
+  - Allow call to `authenticate` with `request` parameter from an `APIModule`.
+
 ## 1.3.26
 
 - `APIModule`:

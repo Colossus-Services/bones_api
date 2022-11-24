@@ -5,7 +5,11 @@ import 'package:logging/logging.dart' as logging;
 final _log = logging.Logger('APIDBModule');
 
 class APIDBModule extends APIModule {
-  APIDBModule(APIRoot apiRoot) : super(apiRoot, 'db');
+  final bool onlyOnDevelopment;
+
+  APIDBModule(APIRoot apiRoot,
+      {String name = 'db', this.onlyOnDevelopment = true})
+      : super(apiRoot, name);
 
   bool get development => apiConfig.development;
 
@@ -14,6 +18,8 @@ class APIDBModule extends APIModule {
 
   @override
   void configure() {
+    if (onlyOnDevelopment && !development) return;
+
     routes.add(null, 'tables', (request) => tables());
 
     routes.add(null, 'select', (request) {
@@ -44,7 +50,7 @@ class APIDBModule extends APIModule {
           as List<EntityRepositoryProvider>;
 
   Future<APIResponse<Map<String, String>>> tables() async {
-    if (!development) {
+    if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 
@@ -58,7 +64,7 @@ class APIDBModule extends APIModule {
 
   Future<APIResponse<List>> select(String selectTable, APIRequest apiRequest,
       {bool? eager}) async {
-    if (!development) {
+    if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 

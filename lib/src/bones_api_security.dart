@@ -96,7 +96,13 @@ abstract class APISecurity {
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
-      return _resolveAuthentication(credential, resume);
+      return _resolveAuthentication(credential, resume)
+          .resolveMapped((authentication) {
+        if (request != null) {
+          resolveRequestAuthentication(request, authentication);
+        }
+        return authentication;
+      });
     });
   }
 
@@ -402,10 +408,7 @@ abstract class APISecurity {
 
     request.credential = credential;
 
-    return authenticate(credential, request: request).then((authentication) {
-      resolveRequestAuthentication(request, authentication);
-      return authentication;
-    });
+    return authenticate(credential, request: request);
   }
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
@@ -423,10 +426,7 @@ abstract class APISecurity {
       }
     }
 
-    return resumeAuthentication(token, request: request).then((authentication) {
-      resolveRequestAuthentication(request, authentication);
-      return authentication;
-    });
+    return resumeAuthentication(token, request: request);
   }
 
   APICredential? resolveSessionCredential(APIRequest request) {
