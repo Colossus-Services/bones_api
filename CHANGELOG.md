@@ -1,3 +1,19 @@
+## 1.3.29
+
+- `DBAdapter` and `DBRepositoryAdapter`:
+  - Added `doSelectAll`
+- `DBMemoryObjectAdapter`:
+  - Added support for `doSelectAll`.
+- `APIDBModule`:
+  - Added `dump` route.
+  - JSON output compact: compatible with DB populate source samples.
+- mime: ^1.0.3  
+- path: ^1.8.3
+- yaml_writer: ^1.0.3
+- build_runner: ^2.3.3
+- build_verify: ^3.1.0
+- test: ^1.22.1
+
 ## 1.3.28
 
 - `APIRoot._callZoned`: fix error handling.

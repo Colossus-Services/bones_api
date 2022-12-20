@@ -1729,6 +1729,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   @override
+  FutureOr<List<R>> doSelectAll<R>(
+      TransactionOperation op, String entityName, String table,
+      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
+          preFinish}) {
+    return generateSelectSQL(op.transaction, entityName, table, ConditionANY())
+        .resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+    });
+  }
+
+  @override
   FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
       String table, EntityMatcher matcher,
       {Object? parameters,
