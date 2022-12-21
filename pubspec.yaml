@@ -29,7 +29,7 @@ dependencies:
   mysql1: ^0.20.0
   yaml: ^3.1.1
   yaml_writer: ^1.0.3
-  mercury_client: ^2.1.7
+  mercury_client: ^2.1.8
   project_template: ^1.0.2
   resource_portable: ^3.0.1
   crypto: ^3.0.2
