@@ -3,7 +3,7 @@
 [![pub package](https://img.shields.io/pub/v/bones_api.svg?logo=dart&logoColor=00b9fc)](https://pub.dartlang.org/packages/bones_api)
 [![Null Safety](https://img.shields.io/badge/null-safety-brightgreen)](https://dart.dev/null-safety)
 [![Codecov](https://img.shields.io/codecov/c/github/Colossus-Services/bones_api)](https://app.codecov.io/gh/Colossus-Services/bones_api)
-[![CI](https://img.shields.io/github/workflow/status/Colossus-Services/bones_api/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/Colossus-Services/bones_api/actions)
+[![Dart CI](https://github.com/Colossus-Services/bones_api/actions/workflows/dart.yml/badge.svg?branch=master)](https://github.com/Colossus-Services/bones_api/actions/workflows/dart.yml)
 [![GitHub Tag](https://img.shields.io/github/v/tag/Colossus-Services/bones_api?logo=git&logoColor=white)](https://github.com/Colossus-Services/bones_api/releases)
 [![New Commits](https://img.shields.io/github/commits-since/Colossus-Services/bones_api/latest?logo=git&logoColor=white)](https://github.com/Colossus-Services/bones_api/network)
 [![Last Commits](https://img.shields.io/github/last-commit/Colossus-Services/bones_api?logo=git&logoColor=white)](https://github.com/Colossus-Services/bones_api/commits/master)

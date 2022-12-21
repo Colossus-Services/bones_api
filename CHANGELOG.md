@@ -1,3 +1,11 @@
+## 1.3.30
+
+- statistics: ^1.0.24
+- resource_portable: ^3.0.1
+- swiss_knife: ^3.1.3
+- archive: ^3.3.5
+- mercury_client: ^2.1.8
+
 ## 1.3.29
 
 - `DBAdapter` and `DBRepositoryAdapter`:
