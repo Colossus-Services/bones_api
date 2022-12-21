@@ -461,6 +461,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
           preFinish});
 
+  FutureOr<List<R>> doSelectAll<R>(
+      TransactionOperation op, String entityName, String table,
+      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
+          preFinish});
+
   FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
       String table, O o, Map<String, dynamic> fields,
       {String? idFieldName, PreFinishDBOperation<dynamic, dynamic>? preFinish});
@@ -803,6 +808,11 @@ class DBRepositoryAdapter<O> with Initializable {
       databaseAdapter.doSelectByIDs<R>(op, name, tableName, ids,
           preFinish: preFinish);
 
+  FutureOr<List<R>> doSelectAll<R>(TransactionOperation op,
+          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
+              preFinish}) =>
+      databaseAdapter.doSelectAll<R>(op, name, tableName, preFinish: preFinish);
+
   FutureOr<dynamic> doInsert(
           TransactionOperation op, O o, Map<String, dynamic> fields,
           {String? idFieldName,
@@ -948,7 +958,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<List<O>> select(EntityMatcher matcher,
+  FutureOr<Iterable<O>> select(EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
@@ -966,8 +976,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           transaction, matcher, parameters ?? namedParameters, resolutionRules);
     }
 
+    if (matcher is ConditionANY) {
+      return _selectAll(transaction, matcher, resolutionRules);
+    }
+
     throw UnsupportedError(
-        "Relationship select not supported for: (${matcher.runtimeType}) $matcher");
+        "Relationship select not supported for: (${matcher.runtimeType}) $matcher @ $tableName ($this)");
   }
 
   FutureOr<O?> _selectByID(Transaction? transaction, ConditionID matcher,
@@ -1019,6 +1033,25 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var message = '_selectByIDs> '
           'matcher: $matcher ; '
           'id: $ids ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
+  }
+
+  FutureOr<List<O>> _selectAll(Transaction? transaction, ConditionANY matcher,
+      EntityResolutionRules? resolutionRules) {
+    var op = TransactionOperationSelect(
+        name, operationExecutor, matcher, transaction);
+
+    try {
+      return repositoryAdapter.doSelectAll<O>(op, preFinish: (results) {
+        return resolveEntities(op.transaction, results,
+            resolutionRules: resolutionRules);
+      });
+    } catch (e, s) {
+      var message = '_selectAll> '
+          'matcher: $matcher ; '
           'op: $op';
       _log.severe(message, e, s);
       rethrow;

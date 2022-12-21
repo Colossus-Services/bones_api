@@ -586,6 +586,25 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
   }
 
   @override
+  FutureOr<List<R>> doSelectAll<R>(
+          TransactionOperation op, String entityName, String table,
+          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
+              preFinish}) =>
+      executeTransactionOperation<List<R>>(
+          op,
+          (conn) => _doSelectAllImpl<R>(table, entityName)
+              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+
+  FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
+      String table, String entityName) {
+    var map = _getTableMap(table, false);
+    if (map == null) return [];
+
+    var entries = map.values.toList();
+    return entries;
+  }
+
+  @override
   FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
           String table, EntityMatcher matcher,
           {Object? parameters,
