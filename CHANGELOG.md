@@ -1,3 +1,10 @@
+## 1.3.31
+
+- `APIServer`:
+  - Optimize headers.
+  - Added fields: `apiCacheControl` and `staticFilesCacheControl`.
+  - Better `cache-control` default values.
+
 ## 1.3.30
 
 - statistics: ^1.0.24

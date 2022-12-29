@@ -84,6 +84,20 @@ class APIServer {
   /// See [useSessionID].
   final bool cookieless;
 
+  /// The `cache-control` header for API responses.
+  final String apiCacheControl;
+
+  /// The default value for [apiCacheControl].
+  static const String defaultApiCacheControl =
+      'private, must-revalidate, max-age=0, no-store, no-cache';
+
+  /// The `cache-control` header for static files.
+  final String staticFilesCacheControl;
+
+  /// The default value for [staticFilesCacheControl].
+  static const String defaultStaticFilesCacheControl =
+      'private, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
+
   /// If `true` log messages to [stdout] (console).
   final bool logToConsole;
 
@@ -101,8 +115,14 @@ class APIServer {
     Object? domains,
     bool useSessionID = true,
     this.cookieless = false,
+    String? apiCacheControl,
+    String? staticFilesCacheControl,
     this.logToConsole = true,
   })  : useSessionID = useSessionID && !cookieless,
+        apiCacheControl =
+            _normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
+        staticFilesCacheControl = _normalizeHeaderValue(
+            staticFilesCacheControl, defaultStaticFilesCacheControl),
         securePort = letsEncrypt
             ? (securePort != null && securePort > 10 ? securePort : 443)
             : (securePort ?? -1),
@@ -111,6 +131,12 @@ class APIServer {
         address = _normalizeAddress(address),
         domainsRoots = parseDomains(domains) ?? <Pattern, Directory>{} {
     _configureAPIRoot(apiRoot);
+  }
+
+  static String _normalizeHeaderValue(String? header, String def) {
+    if (header == null) return def;
+    header = header.trim();
+    return header.isNotEmpty ? header : def;
   }
 
   static Directory? resolveLetsEncryptDirectory(
@@ -329,19 +355,19 @@ class APIServer {
 
     var pipeline = const Pipeline()
         .addMiddleware(gzipMiddleware)
-        .addMiddleware(_headersMiddleware);
+        .addMiddleware(_staticFilesHeadersMiddleware);
 
     var handler = pipeline.addHandler(
         createStaticHandler(rootDirectory.path, defaultDocument: 'index.html'));
     return handler;
   }
 
-  Handler _headersMiddleware(Handler innerHandler) => (request) {
-        return Future.sync(() => innerHandler(request))
-            .then((response) => _configureHeaders(request, response));
+  Handler _staticFilesHeadersMiddleware(Handler innerHandler) => (request) {
+        return Future.sync(() => innerHandler(request)).then(
+            (response) => _configureStaticFilesHeaders(request, response));
       };
 
-  Response _configureHeaders(Request request, Response response,
+  Response _configureStaticFilesHeaders(Request request, Response response,
       {Map<String, String>? headers}) {
     headers ??= <String, String>{};
 
@@ -350,11 +376,9 @@ class APIServer {
       return response.change(headers: headers);
     }
 
-    {
-      var cacheControl =
-          'private, must-revalidate, max-age=1, stale-while-revalidate=60';
-      headers[HttpHeaders.cacheControlHeader] = cacheControl;
-    }
+    headers[HttpHeaders.cacheControlHeader] = staticFilesCacheControl;
+
+    headers[HttpHeaders.serverHeader] ??= serverName;
 
     return response.change(headers: headers);
   }
@@ -654,7 +678,7 @@ class APIServer {
     var keepAlive = false;
 
     if (request.protocolVersion == '1.1') {
-      var headerConnection = headers['connection'];
+      var headerConnection = headers[HttpHeaders.connectionHeader];
       if (headerConnection != null) {
         keepAlive = equalsIgnoreAsciiCase('$headerConnection', 'Keep-Alive');
       }
@@ -730,7 +754,7 @@ class APIServer {
 
   Future<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
     var contentLength = request.contentLength;
-    var contentType = request.headers['content-type'];
+    var contentType = request.headers[HttpHeaders.contentTypeHeader];
 
     if (contentLength == null && contentType == null) return Future.value(null);
 
@@ -854,7 +878,7 @@ class APIServer {
         realm = 'API';
       }
 
-      headers['WWW-Authenticate'] = '$type realm="$realm"';
+      headers[HttpHeaders.wwwAuthenticateHeader] = '$type realm="$realm"';
     }
 
     for (var e in apiResponse.headers.entries) {
@@ -864,11 +888,12 @@ class APIServer {
       }
     }
 
-    headers['server'] ??= serverName;
+    headers[HttpHeaders.serverHeader] ??= serverName;
 
     if (apiRequest.newSession && !cookieless) {
       var setSessionID = 'SESSIONID=${apiRequest.sessionID}';
-      headers.setMultiValue('Set-Cookie', setSessionID, ignoreCase: true);
+      headers.setMultiValue(HttpHeaders.setCookieHeader, setSessionID,
+          ignoreCase: true);
     }
 
     var authentication = apiRequest.authentication;
@@ -881,6 +906,8 @@ class APIServer {
       }
     }
 
+    headers[HttpHeaders.cacheControlHeader] = apiCacheControl;
+
     var retPayload = resolveBody(apiResponse.payload, apiResponse);
 
     return retPayload.resolveMapped((payload) {
@@ -888,13 +915,13 @@ class APIServer {
         var apiResponse2 = payload;
         return resolveBody(apiResponse2.payload, apiResponse2)
             .resolveMapped((payload2) {
-          var response = _sendResponse(
+          var response = _sendAPIResponse(
               request, apiRequest, apiResponse2, headers, payload2);
           return _applyGzipEncoding(request, response);
         });
       } else {
-        var response =
-            _sendResponse(request, apiRequest, apiResponse, headers, payload);
+        var response = _sendAPIResponse(
+            request, apiRequest, apiResponse, headers, payload);
         return _applyGzipEncoding(request, response);
       }
     });
@@ -939,9 +966,9 @@ class APIServer {
     var localhost = false;
 
     if (origin.isEmpty) {
-      response.headers["Access-Control-Allow-Origin"] = "*";
+      response.headers[HttpHeaders.accessControlAllowOriginHeader] = "*";
     } else {
-      response.headers["Access-Control-Allow-Origin"] = origin;
+      response.headers[HttpHeaders.accessControlAllowOriginHeader] = origin;
 
       if (origin.contains("://localhost:") ||
           origin.contains("://127.0.0.1:") ||
@@ -950,26 +977,28 @@ class APIServer {
       }
     }
 
-    response.headers["Access-Control-Allow-Methods"] =
+    response.headers[HttpHeaders.accessControlAllowMethodsHeader] =
         "GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS";
-    response.headers["Access-Control-Allow-Credentials"] = "true";
+
+    response.headers[HttpHeaders.accessControlAllowCredentialsHeader] = "true";
 
     if (localhost) {
-      response.headers["Access-Control-Allow-Headers"] =
+      response.headers[HttpHeaders.accessControlAllowHeadersHeader] =
           "Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt";
     } else {
-      response.headers["Access-Control-Allow-Headers"] =
+      response.headers[HttpHeaders.accessControlAllowHeadersHeader] =
           "Content-Type, Access-Control-Allow-Headers, Authorization";
     }
 
-    response.headers["Access-Control-Expose-Headers"] = exposeHeaders;
+    response.headers[HttpHeaders.accessControlExposeHeadersHeader] =
+        exposeHeaders;
   }
 
   String getOrigin(APIRequest request) {
     var origin = request.headers['origin'];
     if (origin != null) return origin;
 
-    var host = request.headers['host'];
+    var host = request.headers[HttpHeaders.hostHeader];
     if (host != null) {
       var scheme = request.requestedUri.scheme;
 
@@ -981,7 +1010,7 @@ class APIServer {
     return origin;
   }
 
-  FutureOr<Response> _sendResponse(Request request, APIRequest apiRequest,
+  FutureOr<Response> _sendAPIResponse(Request request, APIRequest apiRequest,
       APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
     apiResponse.setMetric('API-call', apiRequest.elapsedTime);
 
@@ -994,31 +1023,31 @@ class APIServer {
 
     var contentType = apiResponse.payloadMimeType;
     if (contentType != null) {
-      headers['content-type'] = contentType.toString();
+      headers[HttpHeaders.contentTypeHeader] = contentType.toString();
     }
 
     var etag = apiResponse.payloadETag;
     if (etag != null) {
-      headers['etag'] = etag.toString();
+      headers[HttpHeaders.etagHeader] = etag.toString();
     }
 
     var cacheControl = apiResponse.cacheControl;
     if (cacheControl != null) {
-      headers['cache-control'] = cacheControl.toString();
+      headers[HttpHeaders.cacheControlHeader] = cacheControl.toString();
     }
 
     if (apiRequest.keepAlive && !apiResponse.isBadRequest) {
       var timeout = apiResponse.keepAliveTimeout.inSeconds.clamp(0, 3600);
       var max = apiResponse.keepAliveMaxRequests.clamp(0, 1000000);
 
-      headers['connection'] = 'Keep-Alive';
+      headers[HttpHeaders.connectionHeader] = 'Keep-Alive';
       headers['keep-alive'] = 'timeout=$timeout, max=$max';
     }
 
     headers['server-timing'] = resolveServerTiming(apiResponse.metrics);
 
     if (cookieless) {
-      headers.remove('Set-Cookie');
+      headers.remove(HttpHeaders.setCookieHeader);
       headers['X-Cookieless-Server'] = 'Blocking all cookies';
     }
 
