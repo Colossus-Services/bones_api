@@ -470,7 +470,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
                 <E>() => TypeInfo<List<E>>.fromType(List, [entityType]));
             value = value.entities;
           }
-        } else if (fieldType.isIterable && fieldType.isListEntity) {
+        } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =

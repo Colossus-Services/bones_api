@@ -1,15 +1,28 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.17
+// BUILDER: reflection_factory/1.2.18
 // BUILD COMMAND: dart run build_runner build
 //
 
 // coverage:ignore-file
+// ignore_for_file: unused_element
 // ignore_for_file: unnecessary_const
 // ignore_for_file: unnecessary_cast
 // ignore_for_file: unnecessary_type_check
 
 part of 'bones_api_test_utils_test.dart';
+
+typedef __TR<T> = TypeReflection<T>;
+typedef __TI<T> = TypeInfo<T>;
+typedef __PR = ParameterReflection;
+
+mixin __ReflectionMixin {
+  static final Version _version = Version.parse('1.2.18');
+
+  Version get reflectionFactoryVersion => _version;
+
+  List<Reflection> siblingsReflection() => _siblingsReflection();
+}
 
 // ignore: non_constant_identifier_names
 MyInfoModule MyInfoModule$fromJson(Map<String, Object?> map) =>
@@ -18,7 +31,8 @@ MyInfoModule MyInfoModule$fromJson(Map<String, Object?> map) =>
 MyInfoModule MyInfoModule$fromJsonEncoded(String jsonEncoded) =>
     MyInfoModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 
-class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
+class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
+    with __ReflectionMixin {
   MyInfoModule$reflection([MyInfoModule? object])
       : super(MyInfoModule, 'MyInfoModule', object);
 
@@ -34,9 +48,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
 
   @override
   Version get languageVersion => Version.parse('2.18.0');
-
-  @override
-  Version get reflectionFactoryVersion => Version.parse('1.2.17');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -88,10 +99,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             MyInfoModule,
             '',
             () => (APIRoot apiRoot) => MyInfoModule(apiRoot),
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRoot>(APIRoot), 'apiRoot',
-                  false, true, null, null)
-            ],
+            const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
             null,
             null,
             null);
@@ -102,13 +110,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
 
   @override
   List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
-
-  @override
-  List<ClassReflection> siblingsClassReflection() =>
-      _siblingsReflection().whereType<ClassReflection>().toList();
-
-  @override
-  List<Reflection> siblingsReflection() => _siblingsReflection();
 
   @override
   List<Type> get supperTypes => const <Type>[APIModule, Initializable];
@@ -149,7 +150,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection<APIRoot>(APIRoot),
+          __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
           (o) => () => o!.apiRoot as T,
@@ -157,13 +158,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           true,
-          null,
         );
       case 'name':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tString,
+          __TR.tString,
           'name',
           false,
           (o) => () => o!.name as T,
@@ -171,13 +171,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           true,
-          null,
         );
       case 'version':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tString,
+          __TR.tString,
           'version',
           true,
           (o) => () => o!.version as T,
@@ -185,13 +184,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           true,
-          null,
         );
       case 'apiconfig':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection<APIConfig>(APIConfig),
+          __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
           (o) => () => o!.apiConfig as T,
@@ -199,13 +197,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'defaultroutename':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tString,
+          __TR.tString,
           'defaultRouteName',
           true,
           (o) => () => o!.defaultRouteName as T,
@@ -213,13 +210,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'allroutesnames':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tSetString,
+          __TR.tSetString,
           'allRoutesNames',
           false,
           (o) => () => o!.allRoutesNames as T,
@@ -227,14 +223,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'routes':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection<APIRouteBuilder<APIModule>>(APIRouteBuilder,
-              <TypeReflection>[TypeReflection<APIModule>(APIModule)]),
+          __TR<APIRouteBuilder<APIModule>>(
+              APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
           'routes',
           false,
           (o) => () => o!.routes as T,
@@ -242,13 +237,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'authenticationroute':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tString,
+          __TR.tString,
           'authenticationRoute',
           false,
           (o) => () => o!.authenticationRoute as T,
@@ -256,13 +250,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'security':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection<APISecurity>(APISecurity),
+          __TR<APISecurity>(APISecurity),
           'security',
           true,
           (o) => () => o!.security as T,
@@ -270,13 +263,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'hashcode':
         return FieldReflection<MyInfoModule, T>(
           this,
           APIModule,
-          TypeReflection.tInt,
+          __TR.tInt,
           'hashCode',
           false,
           (o) => () => o!.hashCode as T,
@@ -290,7 +282,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection<InitializationStatus>(InitializationStatus),
+          __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
           (o) => () => o!.initializationStatus as T,
@@ -298,13 +290,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'isinitialized':
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection.tBool,
+          __TR.tBool,
           'isInitialized',
           false,
           (o) => () => o!.isInitialized as T,
@@ -312,13 +303,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'isinitializing':
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection.tBool,
+          __TR.tBool,
           'isInitializing',
           false,
           (o) => () => o!.isInitializing as T,
@@ -326,13 +316,12 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       case 'isasyncinitialization':
         return FieldReflection<MyInfoModule, T>(
           this,
           Initializable,
-          TypeReflection.tBool,
+          __TR.tBool,
           'isAsyncInitialization',
           false,
           (o) => () => o!.isAsyncInitialization as T,
@@ -340,7 +329,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
           obj,
           false,
           false,
-          null,
         );
       default:
         return null;
@@ -391,7 +379,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'configure',
-            TypeReflection.tVoid,
+            __TR.tVoid,
             false,
             (o) => o!.configure,
             obj,
@@ -405,20 +393,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'echo',
-            TypeReflection<FutureOr<APIResponse<String>>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<APIResponse<String>>(
-                  APIResponse, <TypeReflection>[TypeReflection.tString])
+            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
             ]),
             false,
             (o) => o!.echo,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection.tString, 'msg', false, true, null, null),
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'request', false, true, null, null)
+            const <__PR>[
+              __PR(__TR.tString, 'msg', false, true),
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
             null,
             null,
@@ -428,19 +412,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             MyInfoModule,
             'toUpperCase',
-            TypeReflection<FutureOr<APIResponse<String>>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<APIResponse<String>>(
-                  APIResponse, <TypeReflection>[TypeReflection.tString])
+            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
             ]),
             false,
             (o) => o!.toUpperCase,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection.tString, 'msg', false, true, null, null)
-            ],
+            const <__PR>[__PR(__TR.tString, 'msg', false, true)],
             null,
             null,
             null);
@@ -449,7 +428,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'ensureConfigured',
-            TypeReflection.tVoid,
+            __TR.tVoid,
             false,
             (o) => o!.ensureConfigured,
             obj,
@@ -463,10 +442,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'initialize',
-            TypeReflection<FutureOr<InitializationResult>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<InitializationResult>(InitializationResult)
-            ]),
+            __TR<FutureOr<InitializationResult>>(FutureOr,
+                <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.initialize,
             obj,
@@ -480,22 +457,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRoutesHandlersNames',
-            TypeReflection<Iterable<String>>(
-                Iterable, <TypeReflection>[TypeReflection.tString]),
+            __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
             false,
             null,
             null,
-            const <String, ParameterReflection>{
-              'method': ParameterReflection(
-                  TypeReflection<APIRequestMethod>(APIRequestMethod),
-                  'method',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <String, __PR>{
+              'method': __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method',
+                  true, false)
             },
             null);
       case 'addroute':
@@ -503,54 +474,38 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'addRoute',
-            TypeReflection<APIModule>(APIModule),
+            __TR<APIModule>(APIModule),
             false,
             (o) => o!.addRoute,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection<APIRequestMethod>(APIRequestMethod),
-                  'method',
-                  true,
-                  true,
-                  null,
-                  null),
-              ParameterReflection(
-                  TypeReflection.tString, 'name', false, true, null, null),
-              ParameterReflection(
-                  TypeReflection<APIRouteFunction<dynamic>>(APIRouteFunction,
-                      <TypeReflection>[TypeReflection.tDynamic]),
+            const <__PR>[
+              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
+                  true),
+              __PR(__TR.tString, 'name', false, true),
+              __PR(
+                  __TR<APIRouteFunction<dynamic>>(
+                      APIRouteFunction, <__TR>[__TR.tDynamic]),
                   'function',
                   false,
-                  true,
-                  null,
-                  null)
+                  true)
             ],
             null,
-            const <String, ParameterReflection>{
-              'parameters': ParameterReflection(
-                  TypeReflection<Map<String, TypeInfo<dynamic>>>(
-                      Map, <TypeReflection>[
-                    TypeReflection.tString,
-                    TypeReflection<TypeInfo<dynamic>>(
-                        TypeInfo, <TypeReflection>[TypeReflection.tDynamic])
+            const <String, __PR>{
+              'parameters': __PR(
+                  __TR<Map<String, TypeInfo<dynamic>>>(Map, <__TR>[
+                    __TR.tString,
+                    __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic])
                   ]),
                   'parameters',
                   true,
-                  false,
-                  null,
-                  null),
-              'rules': ParameterReflection(
-                  TypeReflection<Iterable<APIRouteRule>>(
-                      Iterable, <TypeReflection>[
-                    TypeReflection<APIRouteRule>(APIRouteRule)
-                  ]),
+                  false),
+              'rules': __PR(
+                  __TR<Iterable<APIRouteRule>>(
+                      Iterable, <__TR>[__TR<APIRouteRule>(APIRouteRule)]),
                   'rules',
                   true,
-                  false,
-                  null,
-                  null)
+                  false)
             },
             null);
       case 'getroutehandler':
@@ -558,24 +513,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRouteHandler',
-            TypeReflection<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
+            __TR<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getRouteHandler,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection.tString, 'name', false, true, null, null)
-            ],
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection<APIRequestMethod>(APIRequestMethod),
-                  'method',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <__PR>[__PR(__TR.tString, 'name', false, true)],
+            const <__PR>[
+              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
+                  false)
             ],
             null,
             null);
@@ -584,20 +531,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'getRouteHandlerByRequest',
-            TypeReflection<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <TypeReflection>[TypeReflection.tDynamic]),
+            __TR<APIRouteHandler<dynamic>>(
+                APIRouteHandler, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'request', false, true, null, null)
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection.tString, 'routeName', true, false, null, null)
-            ],
+            const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
             null,
             null);
       case 'resolveroute':
@@ -605,14 +548,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'resolveRoute',
-            TypeReflection.tString,
+            __TR.tString,
             false,
             (o) => o!.resolveRoute,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'request', false, true, null, null)
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
             null,
             null,
@@ -622,18 +564,15 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'call',
-            TypeReflection<FutureOr<APIResponse<dynamic>>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<APIResponse<dynamic>>(
-                  APIResponse, <TypeReflection>[TypeReflection.tDynamic])
+            __TR<FutureOr<APIResponse<dynamic>>>(FutureOr, <__TR>[
+              __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
             ]),
             false,
             (o) => o!.call,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'request', false, true, null, null)
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
             null,
             null,
@@ -643,14 +582,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'acceptsRequest',
-            TypeReflection.tBool,
+            __TR.tBool,
             false,
             (o) => o!.acceptsRequest,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'apiRequest', false, true, null, null)
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
             ],
             null,
             null,
@@ -660,15 +598,14 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             APIModule,
             'apiInfo',
-            TypeReflection<APIModuleInfo>(APIModuleInfo),
+            __TR<APIModuleInfo>(APIModuleInfo),
             false,
             (o) => o!.apiInfo,
             obj,
             false,
             null,
-            const <ParameterReflection>[
-              ParameterReflection(TypeReflection<APIRequest>(APIRequest),
-                  'apiRequest', true, false, null, null)
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
             ],
             null,
             null);
@@ -677,24 +614,17 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'ensureInitialized',
-            TypeReflection<FutureOr<InitializationResult>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<InitializationResult>(InitializationResult)
-            ]),
+            __TR<FutureOr<InitializationResult>>(FutureOr,
+                <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.ensureInitialized,
             obj,
             false,
             null,
             null,
-            const <String, ParameterReflection>{
-              'parent': ParameterReflection(
-                  TypeReflection<Initializable>(Initializable),
-                  'parent',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <String, __PR>{
+              'parent': __PR(
+                  __TR<Initializable>(Initializable), 'parent', true, false)
             },
             null);
       case 'ensureinitializedasync':
@@ -702,24 +632,17 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'ensureInitializedAsync',
-            TypeReflection<FutureOr<InitializationResult>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<InitializationResult>(InitializationResult)
-            ]),
+            __TR<FutureOr<InitializationResult>>(FutureOr,
+                <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
             false,
             null,
             null,
-            const <String, ParameterReflection>{
-              'parent': ParameterReflection(
-                  TypeReflection<Initializable>(Initializable),
-                  'parent',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <String, __PR>{
+              'parent': __PR(
+                  __TR<Initializable>(Initializable), 'parent', true, false)
             },
             null);
       case 'doinitialization':
@@ -727,24 +650,17 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'doInitialization',
-            TypeReflection<FutureOr<InitializationResult>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<InitializationResult>(InitializationResult)
-            ]),
+            __TR<FutureOr<InitializationResult>>(FutureOr,
+                <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.doInitialization,
             obj,
             false,
             null,
             null,
-            const <String, ParameterReflection>{
-              'parent': ParameterReflection(
-                  TypeReflection<Initializable>(Initializable),
-                  'parent',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <String, __PR>{
+              'parent': __PR(
+                  __TR<Initializable>(Initializable), 'parent', true, false)
             },
             null);
       case 'initializedependencies':
@@ -752,11 +668,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'initializeDependencies',
-            TypeReflection<FutureOr<List<Initializable>>>(
-                FutureOr, <TypeReflection>[
-              TypeReflection<List<Initializable>>(List, <TypeReflection>[
-                TypeReflection<Initializable>(Initializable)
-              ])
+            __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
+              __TR<List<Initializable>>(
+                  List, <__TR>[__TR<Initializable>(Initializable)])
             ]),
             false,
             (o) => o!.initializeDependencies,
@@ -771,7 +685,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'checkInitialized',
-            TypeReflection.tVoid,
+            __TR.tVoid,
             false,
             (o) => o!.checkInitialized,
             obj,
@@ -785,31 +699,23 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule> {
             this,
             Initializable,
             'executeInitialized',
-            TypeReflection.tFutureOrDynamic,
+            __TR.tFutureOrDynamic,
             false,
             (o) => o!.executeInitialized,
             obj,
             false,
-            const <ParameterReflection>[
-              ParameterReflection(
-                  TypeReflection<ExecuteInitializedCallback<dynamic>>(
-                      ExecuteInitializedCallback,
-                      <TypeReflection>[TypeReflection.tDynamic]),
+            const <__PR>[
+              __PR(
+                  __TR<ExecuteInitializedCallback<dynamic>>(
+                      ExecuteInitializedCallback, <__TR>[__TR.tDynamic]),
                   'callback',
                   false,
-                  true,
-                  null,
-                  null)
+                  true)
             ],
             null,
-            const <String, ParameterReflection>{
-              'parent': ParameterReflection(
-                  TypeReflection<Initializable>(Initializable),
-                  'parent',
-                  true,
-                  false,
-                  null,
-                  null)
+            const <String, __PR>{
+              'parent': __PR(
+                  __TR<Initializable>(Initializable), 'parent', true, false)
             },
             null);
       default:

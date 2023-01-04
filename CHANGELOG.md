@@ -1,3 +1,10 @@
+## 1.3.32
+
+- `APIServer`:
+  - `defaultApiCacheControl` and `defaultStaticFilesCacheControl`:
+    - Added `no-transform` directive.
+- reflection_factory: ^1.2.18
+
 ## 1.3.31
 
 - `APIServer`:
