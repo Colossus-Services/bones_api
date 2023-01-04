@@ -767,7 +767,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
                   ? fieldListEntityRepository.getEntityID(v)
                   : v)
               .toList();
-        } else if (fieldType.isIterable && fieldType.isListEntity) {
+        } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
           var fieldListEntityRepository =

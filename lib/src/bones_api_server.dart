@@ -89,14 +89,14 @@ class APIServer {
 
   /// The default value for [apiCacheControl].
   static const String defaultApiCacheControl =
-      'private, must-revalidate, max-age=0, no-store, no-cache';
+      'private, no-transform, must-revalidate, max-age=0, no-store, no-cache';
 
   /// The `cache-control` header for static files.
   final String staticFilesCacheControl;
 
   /// The default value for [staticFilesCacheControl].
   static const String defaultStaticFilesCacheControl =
-      'private, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
+      'private, no-transform, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
 
   /// If `true` log messages to [stdout] (console).
   final bool logToConsole;
