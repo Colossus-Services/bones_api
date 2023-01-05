@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.19
+// BUILDER: reflection_factory/1.2.20
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('1.2.19');
+  static final Version _version = Version.parse('1.2.20');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -112,7 +112,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
+  List<Type> get supperTypes => const <Type>[APIModule];
 
   @override
   bool get hasMethodToJson => false;
@@ -128,10 +128,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         'authenticationRoute',
         'defaultRouteName',
         'hashCode',
-        'initializationStatus',
-        'isAsyncInitialization',
-        'isInitialized',
-        'isInitializing',
         'name',
         'routes',
         'security',
@@ -278,58 +274,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
           [override],
         );
-      case 'initializationstatus':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          __TR<InitializationStatus>(InitializationStatus),
-          'initializationStatus',
-          false,
-          (o) => () => o!.initializationStatus as T,
-          null,
-          obj,
-          false,
-          false,
-        );
-      case 'isinitialized':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          __TR.tBool,
-          'isInitialized',
-          false,
-          (o) => () => o!.isInitialized as T,
-          null,
-          obj,
-          false,
-          false,
-        );
-      case 'isinitializing':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          __TR.tBool,
-          'isInitializing',
-          false,
-          (o) => () => o!.isInitializing as T,
-          null,
-          obj,
-          false,
-          false,
-        );
-      case 'isasyncinitialization':
-        return FieldReflection<MyInfoModule, T>(
-          this,
-          Initializable,
-          __TR.tBool,
-          'isAsyncInitialization',
-          false,
-          (o) => () => o!.isAsyncInitialization as T,
-          null,
-          obj,
-          false,
-          false,
-        );
       default:
         return null;
     }
@@ -349,19 +293,13 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         'addRoute',
         'apiInfo',
         'call',
-        'checkInitialized',
         'configure',
-        'doInitialization',
         'echo',
         'ensureConfigured',
-        'ensureInitialized',
-        'ensureInitializedAsync',
-        'executeInitialized',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'getRoutesHandlersNames',
         'initialize',
-        'initializeDependencies',
         'resolveRoute',
         'toUpperCase'
       ];
@@ -608,115 +546,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
             ],
             null,
-            null);
-      case 'ensureinitialized':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'ensureInitialized',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitialized,
-            obj,
-            false,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
-      case 'ensureinitializedasync':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'ensureInitializedAsync',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitializedAsync,
-            obj,
-            false,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
-      case 'doinitialization':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'doInitialization',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.doInitialization,
-            obj,
-            false,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
-      case 'initializedependencies':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'initializeDependencies',
-            __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
-              __TR<List<Initializable>>(
-                  List, <__TR>[__TR<Initializable>(Initializable)])
-            ]),
-            false,
-            (o) => o!.initializeDependencies,
-            obj,
-            false,
-            null,
-            null,
-            null,
-            null);
-      case 'checkinitialized':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'checkInitialized',
-            __TR.tVoid,
-            false,
-            (o) => o!.checkInitialized,
-            obj,
-            false,
-            null,
-            null,
-            null,
-            null);
-      case 'executeinitialized':
-        return MethodReflection<MyInfoModule, R>(
-            this,
-            Initializable,
-            'executeInitialized',
-            __TR.tFutureOrDynamic,
-            false,
-            (o) => o!.executeInitialized,
-            obj,
-            false,
-            const <__PR>[
-              __PR(
-                  __TR<ExecuteInitializedCallback<dynamic>>(
-                      ExecuteInitializedCallback, <__TR>[__TR.tDynamic]),
-                  'callback',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
             null);
       default:
         return null;
