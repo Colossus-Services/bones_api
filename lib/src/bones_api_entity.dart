@@ -2432,7 +2432,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
     var fieldsTypes = entityHandler
         .getFieldsTypes(o)
         .entries
-        .where((e) => !e.value.isPrimitiveType);
+        .where((e) => !e.value.isPrimitiveOrDynamicOrObjectType);
 
     var preDeleteCalls = <Future<bool> Function()>[];
     var posDeleteCalls = <Future<bool> Function()>[];

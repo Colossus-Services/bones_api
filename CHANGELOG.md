@@ -1,3 +1,7 @@
+## 1.3.33
+
+- reflection_factory: ^1.2.19
+
 ## 1.3.32
 
 - `APIServer`:
