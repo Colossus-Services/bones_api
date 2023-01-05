@@ -1,6 +1,6 @@
 ## 1.3.34
 
-- reflection_factory: ^1.2.20
+- reflection_factory: ^1.2.21
 
 ## 1.3.33
 
