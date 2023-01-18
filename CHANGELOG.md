@@ -1,6 +1,7 @@
 ## 1.3.35
 
 - New `testAPIServer` tool.
+- Updated `bones_api_template.tar.gz`.
 - shelf_gzip: ^4.0.1
 - mime: ^1.0.4
 - stream_channel: ^2.1.1

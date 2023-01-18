@@ -240,7 +240,8 @@ mixin APITestConfigDBMixin {
   String get dbUser => dbConfig['username'] ?? dbConfig['user'];
 
   /// The [dbConfig] `password`.
-  String get dbPass => dbConfig['password'] ?? dbConfig['pass'];
+  String get dbPass =>
+      (dbConfig['password'] ?? dbConfig['pass'] ?? '').toString();
 
   /// The [dbConfig] `database` name.
   String get dbName => dbConfig['database'] ?? dbConfig['db'];

@@ -125,7 +125,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
     String? database = config?['database'] ?? config?['db'] ?? defaultDatabase;
     String? username =
         config?['username'] ?? config?['user'] ?? defaultUsername;
-    String? password = config?['password'] ?? config?['pass'];
+    String? password = (config?['password'] ?? config?['pass'])?.toString();
 
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
