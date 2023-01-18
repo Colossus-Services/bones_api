@@ -1,3 +1,12 @@
+## 1.3.35
+
+- New `testAPIServer` tool.
+- shelf_gzip: ^4.0.1
+- mime: ^1.0.4
+- stream_channel: ^2.1.1
+- test: ^1.22.2
+- coverage: ^1.6.2
+
 ## 1.3.34
 
 - reflection_factory: ^1.2.21

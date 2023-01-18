@@ -2,7 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 
 import 'bones_api_entity_db_postgres.dart';
-import 'bones_api_test_utils.dart';
+import 'bones_api_test_utils_config.dart';
 import 'bones_api_test_utils_freeport.dart' as freeport;
 
 /// A [APITestConfigDockerDB] for `PostgreSQL`.
