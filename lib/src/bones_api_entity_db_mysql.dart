@@ -390,6 +390,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
           var refToTables = e.values
               .where((r) => r.targetTable == table)
               .toList(growable: false);
+
           var otherRefs = e.values
               .where((r) => r.targetTable != table)
               .toList(growable: false);

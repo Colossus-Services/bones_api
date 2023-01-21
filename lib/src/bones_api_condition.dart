@@ -188,19 +188,39 @@ class ConditionParameter extends ConditionElement {
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
 
-    for (var value in values) {
-      var otherValue = value is ConditionParameter
-          ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters)
-          : value;
+    if (myValue is List) {
+      for (var v1 in myValue) {
+        for (var v2 in values) {
+          var otherValue = v2 is ConditionParameter
+              ? v2.getValue(
+                  parameters: parameters,
+                  positionalParameters: positionalParameters,
+                  namedParameters: namedParameters)
+              : v2;
 
-      var match = myValue == otherValue;
-      if (match) return true;
+          var match = EntityHandler.equalsValuesBasic(v1, otherValue,
+              entityHandler: entityHandler);
+          if (match) return true;
+        }
+      }
+
+      return false;
+    } else {
+      for (var v2 in values) {
+        var otherValue = v2 is ConditionParameter
+            ? v2.getValue(
+                parameters: parameters,
+                positionalParameters: positionalParameters,
+                namedParameters: namedParameters)
+            : v2;
+
+        var match = EntityHandler.equalsValuesBasic(myValue, otherValue,
+            entityHandler: entityHandler);
+        if (match) return true;
+      }
+
+      return false;
     }
-
-    return false;
   }
 
   @override
@@ -331,7 +351,9 @@ abstract class Condition<O> extends ConditionElement
           namedParameters: namedParameters,
           entityHandler: keyEntityHandler);
     } else {
-      return value1 == value2;
+      var match = EntityHandler.equalsValuesBasic(value1, value2,
+          entityHandler: keyEntityHandler);
+      return match;
     }
   }
 
@@ -346,22 +368,43 @@ abstract class Condition<O> extends ConditionElement
           positionalParameters: positionalParameters,
           namedParameters: namedParameters,
           entityHandler: entityHandler);
-    }
-
-    for (var v2 in value2) {
-      if (v2 is ConditionParameter) {
-        var match = v2.matches(value1,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-            entityHandler: entityHandler);
-        if (match) return true;
-      } else {
-        if (value1 == v2) return true;
+    } else if (value1 is List) {
+      for (var v2 in value2) {
+        if (v2 is ConditionParameter) {
+          var match = v2.matchesIn(value1,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+              entityHandler: entityHandler);
+          if (match) return true;
+        } else {
+          for (var v1 in value1) {
+            var match = EntityHandler.equalsValuesBasic(v1, v2,
+                entityHandler: entityHandler);
+            if (match) return true;
+          }
+        }
       }
-    }
 
-    return false;
+      return false;
+    } else {
+      for (var v2 in value2) {
+        if (v2 is ConditionParameter) {
+          var match = v2.matches(value1,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+              entityHandler: entityHandler);
+          if (match) return true;
+        } else {
+          var match = EntityHandler.equalsValuesBasic(value1, v2,
+              entityHandler: entityHandler);
+          if (match) return true;
+        }
+      }
+
+      return false;
+    }
   }
 
   Condition<T> cast<T>();

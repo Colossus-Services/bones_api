@@ -123,8 +123,7 @@ bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
 bool isEqualsListDeep(List? l1, List? l2, {ValueEquality? valueEquality}) {
   if (identical(l1, l2)) return true;
 
-  if (l1 == null) return false;
-  if (l2 == null) return false;
+  if (l1 == null || l2 == null) return false;
 
   var length = l1.length;
   if (length != l2.length) return false;
@@ -144,8 +143,7 @@ bool isEqualsIterableDeep(Iterable? it1, Iterable? it2,
     {ValueEquality? valueEquality}) {
   if (identical(it1, it2)) return true;
 
-  if (it1 == null) return false;
-  if (it2 == null) return false;
+  if (it1 == null || it2 == null) return false;
 
   var length = it1.length;
   if (length != it2.length) return false;
@@ -164,8 +162,7 @@ bool isEqualsIterableDeep(Iterable? it1, Iterable? it2,
 bool isEqualsSetDeep(Set? set1, Set? set2, {ValueEquality? valueEquality}) {
   if (identical(set1, set2)) return true;
 
-  if (set1 == null) return false;
-  if (set2 == null) return false;
+  if (set1 == null || set2 == null) return false;
 
   var length = set1.length;
   if (length != set2.length) return false;
@@ -183,8 +180,7 @@ bool isEqualsSetDeep(Set? set1, Set? set2, {ValueEquality? valueEquality}) {
 bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
   if (identical(m1, m2)) return true;
 
-  if (m1 == null) return false;
-  if (m2 == null) return false;
+  if (m1 == null || m2 == null) return false;
 
   if (m1.length != m2.length) return false;
 
@@ -204,6 +200,28 @@ bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
   }
 
   return true;
+}
+
+bool intersectsIterableDeep(Iterable? it1, Iterable? it2,
+    {ValueEquality? valueEquality}) {
+  if (identical(it1, it2)) return true;
+
+  if (it1 == null || it2 == null) return false;
+  if (it1.isEmpty || it2.isEmpty) return false;
+
+  var length1 = it1.length;
+  var length2 = it2.length;
+
+  for (var i = 0; i < length1; i++) {
+    var v1 = it1.elementAt(i);
+
+    for (var j = 0; j < length2; ++j) {
+      var v2 = it2.elementAt(j);
+      if (isEqualsDeep(v1, v2, valueEquality: valueEquality)) return true;
+    }
+  }
+
+  return false;
 }
 
 /// Deeply copies [o].

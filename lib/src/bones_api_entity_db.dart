@@ -1461,8 +1461,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<Iterable<dynamic>> storeAll(Iterable<O> os,
-      {Transaction? transaction}) {
+  FutureOr<List<dynamic>> storeAll(Iterable<O> os, {Transaction? transaction}) {
     checkNotClosed();
 
     return Transaction.executeBlock((transaction) {

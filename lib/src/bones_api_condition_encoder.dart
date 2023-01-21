@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
@@ -83,6 +84,9 @@ class TableRelationshipReference {
   /// The target relationship field name, int the [relationshipTable].
   final String targetRelationshipField;
 
+  /// The virtual/entity relationship field name.
+  final String? relationshipField;
+
   TableRelationshipReference(
       this.relationshipTable,
       this.sourceTable,
@@ -92,7 +96,8 @@ class TableRelationshipReference {
       this.targetTable,
       this.targetField,
       this.targetFieldType,
-      this.targetRelationshipField);
+      this.targetRelationshipField,
+      {this.relationshipField});
 
   @override
   bool operator ==(Object other) =>
@@ -925,9 +930,28 @@ abstract class ConditionEncoder {
       return null;
     }
 
-    var parsedValue = TypeParser.parseValueForType(valueType, value);
-    if (parsedValue != null) {
-      return parsedValue;
+    var valueTypeInfo = TypeInfo.from(valueType);
+
+    var valueParser = TypeParser.parserFor(typeInfo: valueTypeInfo);
+    if (valueParser != null) {
+      if (value is Iterable && valueTypeInfo.isPrimitiveType) {
+        var list = value.asList;
+        var listLength = list.length;
+
+        if (listLength == 0) {
+          return null;
+        } else if (listLength == 1) {
+          value == list.first;
+        } else {
+          throw ArgumentError(
+              "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value");
+        }
+      }
+
+      var parsedValue = valueParser(value);
+      if (parsedValue != null) {
+        return parsedValue;
+      }
     }
 
     var schemeProvider = this.schemeProvider;

@@ -453,6 +453,8 @@ Future<bool> runAdapterTests(
           expect(error, isNotNull);
           expect(error.toString(),
               contains('Invalid entity(User) field(email)> reason: regexp'));
+
+          expect(address.id, isNull);
         }
 
         {
@@ -845,6 +847,80 @@ Future<bool> runAdapterTests(
         expect(user3.roles.map((e) => e.id), unorderedEquals([1, 3]));
         expect(user3.roles.map((e) => e.type),
             unorderedEquals([RoleType.admin, RoleType.unknown]));
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [3]
+          });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [1]
+          });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [1, 3]
+          });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [1, 2]
+          });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [2, 5]
+          });
+
+          expect(user4?.id, allOf(isNotNull, isNot(equals(user3.id))));
+        }
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {
+            'roles': [2001, 20002]
+          });
+
+          expect(user4, isNull);
+        }
+
+        /*
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles == ?", parameters: {
+            'roles': [3]
+          });
+
+          expect(user4?.id, equals(user3.id));
+        }
+         */
+
+        {
+          var user4 = await userAPIRepository
+              .selectFirstByQuery("roles == ?", parameters: {
+            'roles': [2000]
+          });
+
+          expect(user4, isNull);
+        }
       }
 
       {
@@ -1407,6 +1483,36 @@ Future<bool> runAdapterTests(
 
         var address2 = await addressAPIRepository.selectByID(address1.id);
         expect(address2!.toJsonEncoded(), equals(address1.toJsonEncoded()));
+      }
+
+      {
+        var address1 = Address('EX', 'Extra', 'Street Double', 201);
+        var address2 = Address('EX', 'Extra', 'Street Double', 202);
+
+        var addressesIDs =
+            await addressAPIRepository.storeAll([address1, address2]);
+
+        expect(addressesIDs.length, equals(2));
+
+        var address1Id = addressesIDs[0];
+        var address2Id = addressesIDs[1];
+
+        expect(address1Id, isNotNull);
+        expect(address2Id, isNotNull);
+
+        expect(address1.number, 201);
+        expect(address2.number, 202);
+
+        var sel =
+            await addressAPIRepository.selectByIDs([address1Id, address2Id]);
+
+        expect(sel.length, equals(2));
+
+        expect(sel[0]?.id, equals(address1.id));
+        expect(sel[1]?.id, equals(address2.id));
+
+        expect(sel[0]?.number, equals(201));
+        expect(sel[1]?.number, equals(202));
       }
     });
 

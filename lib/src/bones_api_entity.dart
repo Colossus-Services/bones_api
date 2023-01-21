@@ -2301,7 +2301,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
   FutureOr<dynamic> store(O o, {Transaction? transaction});
 
-  FutureOr<Iterable> storeAll(Iterable<O> o, {Transaction? transaction});
+  FutureOr<List> storeAll(Iterable<O> o, {Transaction? transaction});
 
   FutureOr<bool> setRelationship<E extends Object>(
       O o, String field, List<E> values,
@@ -4871,8 +4871,7 @@ abstract class IterableEntityRepository<O extends Object>
       });
 
   @override
-  FutureOr<Iterable<dynamic>> storeAll(Iterable<O> os,
-      {Transaction? transaction}) {
+  FutureOr<List<dynamic>> storeAll(Iterable<O> os, {Transaction? transaction}) {
     checkNotClosed();
 
     return Transaction.executeBlock((transaction) {

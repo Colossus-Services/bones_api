@@ -436,7 +436,8 @@ class DBRelationalEntityRepository<O extends Object>
       var changedFields = getEntityChangedFields(o);
       if (changedFields != null) {
         if (changedFields.isEmpty) {
-          return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+          return _ensureRelationshipsStored(o, op.transaction, changedFields)
+              .resolveWith(() {
             trackEntity(o);
             return op.finish(id);
           });
@@ -448,7 +449,8 @@ class DBRelationalEntityRepository<O extends Object>
       return repositoryAdapter.doUpdate(op, o, id, fields,
           idFieldName: idFieldsName,
           allowAutoInsert: allowAutoInsert, preFinish: (id) {
-        return _ensureRelationshipsStored(o, op.transaction).resolveWith(() {
+        return _ensureRelationshipsStored(o, op.transaction, changedFields)
+            .resolveWith(() {
           trackEntity(o);
           return id; // pre-finish
         });
@@ -456,9 +458,15 @@ class DBRelationalEntityRepository<O extends Object>
     });
   }
 
-  FutureOr<bool> _ensureRelationshipsStored(O o, Transaction? transaction) {
+  FutureOr<bool> _ensureRelationshipsStored(O o, Transaction? transaction,
+      [List<String>? changedFields]) {
     var fieldsListEntity = entityHandler.fieldsWithTypeListEntityOrReference(o);
     if (fieldsListEntity.isEmpty) return false;
+
+    if (changedFields != null) {
+      fieldsListEntity = Map<String, TypeInfo>.fromEntries(
+          fieldsListEntity.entries.where((e) => changedFields.contains(e.key)));
+    }
 
     var ret = fieldsListEntity.entries.map((e) {
       var field = e.key;

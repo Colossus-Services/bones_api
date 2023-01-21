@@ -266,6 +266,9 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
 
     var relationshipTables = _findRelationshipTables(table);
 
+    fieldsTypes.removeWhere((key, value) =>
+        relationshipTables.any((r) => r.relationshipField == key));
+
     tableScheme = TableScheme(table,
         relationship: relationship != null,
         idFieldName: idFieldName,
@@ -389,6 +392,7 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
           ref.targetField,
           ref.targetFieldType,
           relTargetField,
+          relationshipField: sourceField,
         );
       });
     }).toList();

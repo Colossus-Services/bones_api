@@ -1,3 +1,12 @@
+## 1.3.36
+
+- `DBRelationalEntityRepository`:
+  - `_ensureRelationshipsStored`: avoid store of relationship fields if not in `changedFields`.
+- `DBMemorySQLAdapter` and `DBMemoryObjectAdapter`:
+  - Construct `TableScheme` without relationship fields duplicated in the main fields.
+- args: ^2.3.2
+- reflection_factory: ^1.2.22
+
 ## 1.3.35
 
 - New `testAPIServer` tool.

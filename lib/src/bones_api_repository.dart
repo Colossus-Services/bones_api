@@ -171,6 +171,9 @@ abstract class APIRepository<O extends Object> with Initializable {
   FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
       entityRepository.store(o, transaction: transaction);
 
+  FutureOr<List> storeAll(Iterable<O> os, {Transaction? transaction}) =>
+      entityRepository.storeAll(os, transaction: transaction);
+
   FutureOr<O> storeFromJson(Map<String, dynamic> json,
           {Transaction? transaction, EntityResolutionRules? resolutionRules}) =>
       entityRepository.storeFromJson(json,
