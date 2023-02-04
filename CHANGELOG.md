@@ -1,3 +1,9 @@
+## 1.3.37
+
+- `TransactionEntityProvider`:
+  - Fix `getEntityByID` implementation: wasn't passing parameter `resolutionRules` to sub-calls.
+- reflection_factory: ^1.2.25
+
 ## 1.3.36
 
 - `DBRelationalEntityRepository`:
