@@ -4705,7 +4705,8 @@ class TransactionEntityProvider implements EntityProvider {
           entityRepositoryProvider.getEntityRepository(type: t);
       if (entityRepository == null) return null;
 
-      var sel = entityRepository.selectByID(id);
+      var sel =
+          entityRepository.selectByID(id, resolutionRules: resolutionRules);
       return sel.resolveMapped((o) => o as O?);
     });
   }
