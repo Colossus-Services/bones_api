@@ -1,3 +1,10 @@
+## 1.3.38
+
+- `SQLGenerator`:
+  - Remove unecessary `UPDATE CASCADE` for `id` (auto increment) references.
+- reflection_factory: ^2.0.0
+- async_events: ^1.0.9
+
 ## 1.3.37
 
 - `TransactionEntityProvider`:
