@@ -1971,7 +1971,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       var resolvedValue =
           fieldType.typeInfo.resolveValue<V>(value, entityHandler: this);
 
-      field.set(resolvedValue);
+      field.setNullable(resolvedValue);
     } catch (e, s) {
       var message =
           "Error setting `$type` field using reflection[$reflection]: $key = $value";
@@ -1994,7 +1994,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
     if (resolvedValue == null) {
       if (field.nullable) {
-        field.set(null);
+        field.setNullable(null);
         return true;
       } else {
         return false;

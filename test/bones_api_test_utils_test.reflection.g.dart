@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/1.2.25
+// BUILDER: reflection_factory/2.0.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('1.2.25');
+  static final Version _version = Version.parse('2.0.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -88,8 +88,21 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   @override
   List<String> get constructorsNames => const <String>[''];
 
+  static final Map<String, ConstructorReflection<MyInfoModule>> _constructors =
+      <String, ConstructorReflection<MyInfoModule>>{};
+
   @override
-  ConstructorReflection<MyInfoModule>? constructor<R>(String constructorName) {
+  ConstructorReflection<MyInfoModule>? constructor(String constructorName) {
+    var c = _constructors[constructorName];
+    if (c != null) return c;
+    c = _constructorImpl(constructorName);
+    if (c == null) return null;
+    _constructors[constructorName] = c;
+    return c;
+  }
+
+  ConstructorReflection<MyInfoModule>? _constructorImpl(
+      String constructorName) {
     var lc = constructorName.trim().toLowerCase();
 
     switch (lc) {
@@ -138,140 +151,183 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         'version'
       ];
 
+  static final Map<String, FieldReflection<MyInfoModule, dynamic>>
+      _fieldsNoObject = <String, FieldReflection<MyInfoModule, dynamic>>{};
+
+  final Map<String, FieldReflection<MyInfoModule, dynamic>> _fieldsObject =
+      <String, FieldReflection<MyInfoModule, dynamic>>{};
+
   @override
   FieldReflection<MyInfoModule, T>? field<T>(String fieldName,
       [MyInfoModule? obj]) {
+    if (obj == null) {
+      if (object != null) {
+        return _fieldObjectImpl<T>(fieldName);
+      } else {
+        return _fieldNoObjectImpl<T>(fieldName);
+      }
+    } else if (identical(obj, object)) {
+      return _fieldObjectImpl<T>(fieldName);
+    }
+    return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
+  }
+
+  FieldReflection<MyInfoModule, T>? _fieldNoObjectImpl<T>(String fieldName) {
+    final f = _fieldsNoObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<MyInfoModule, T>;
+    }
+    final f2 = _fieldImpl(fieldName, null);
+    if (f2 == null) return null;
+    _fieldsNoObject[fieldName] = f2;
+    return f2 as FieldReflection<MyInfoModule, T>;
+  }
+
+  FieldReflection<MyInfoModule, T>? _fieldObjectImpl<T>(String fieldName) {
+    final f = _fieldsObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<MyInfoModule, T>;
+    }
+    var f2 = _fieldNoObjectImpl<T>(fieldName);
+    if (f2 == null) return null;
+    f2 = f2.withObject(object!);
+    _fieldsObject[fieldName] = f2;
+    return f2;
+  }
+
+  FieldReflection<MyInfoModule, dynamic>? _fieldImpl(
+      String fieldName, MyInfoModule? obj) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
 
     switch (lc) {
       case 'apiroot':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, APIRoot>(
           this,
           APIModule,
           __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
-          (o) => () => o!.apiRoot as T,
+          (o) => () => o!.apiRoot,
           null,
           obj,
           false,
           true,
         );
       case 'name':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, String>(
           this,
           APIModule,
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name as T,
+          (o) => () => o!.name,
           null,
           obj,
           false,
           true,
         );
       case 'version':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, String?>(
           this,
           APIModule,
           __TR.tString,
           'version',
           true,
-          (o) => () => o!.version as T,
+          (o) => () => o!.version,
           null,
           obj,
           false,
           true,
         );
       case 'apiconfig':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, APIConfig>(
           this,
           APIModule,
           __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
-          (o) => () => o!.apiConfig as T,
+          (o) => () => o!.apiConfig,
           null,
           obj,
           false,
           false,
         );
       case 'defaultroutename':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, String?>(
           this,
           APIModule,
           __TR.tString,
           'defaultRouteName',
           true,
-          (o) => () => o!.defaultRouteName as T,
+          (o) => () => o!.defaultRouteName,
           null,
           obj,
           false,
           false,
         );
       case 'allroutesnames':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, Set<String>>(
           this,
           APIModule,
           __TR.tSetString,
           'allRoutesNames',
           false,
-          (o) => () => o!.allRoutesNames as T,
+          (o) => () => o!.allRoutesNames,
           null,
           obj,
           false,
           false,
         );
       case 'routes':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, APIRouteBuilder<APIModule>>(
           this,
           APIModule,
           __TR<APIRouteBuilder<APIModule>>(
               APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
           'routes',
           false,
-          (o) => () => o!.routes as T,
+          (o) => () => o!.routes,
           null,
           obj,
           false,
           false,
         );
       case 'authenticationroute':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, String>(
           this,
           APIModule,
           __TR.tString,
           'authenticationRoute',
           false,
-          (o) => () => o!.authenticationRoute as T,
+          (o) => () => o!.authenticationRoute,
           null,
           obj,
           false,
           false,
         );
       case 'security':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, APISecurity?>(
           this,
           APIModule,
           __TR<APISecurity>(APISecurity),
           'security',
           true,
-          (o) => () => o!.security as T,
+          (o) => () => o!.security,
           null,
           obj,
           false,
           false,
         );
       case 'hashcode':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, int>(
           this,
           APIModule,
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode as T,
+          (o) => () => o!.hashCode,
           null,
           obj,
           false,
@@ -279,52 +335,52 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           [override],
         );
       case 'initializationstatus':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, InitializationStatus>(
           this,
           Initializable,
           __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
-          (o) => () => o!.initializationStatus as T,
+          (o) => () => o!.initializationStatus,
           null,
           obj,
           false,
           false,
         );
       case 'isinitialized':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, bool>(
           this,
           Initializable,
           __TR.tBool,
           'isInitialized',
           false,
-          (o) => () => o!.isInitialized as T,
+          (o) => () => o!.isInitialized,
           null,
           obj,
           false,
           false,
         );
       case 'isinitializing':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, bool>(
           this,
           Initializable,
           __TR.tBool,
           'isInitializing',
           false,
-          (o) => () => o!.isInitializing as T,
+          (o) => () => o!.isInitializing,
           null,
           obj,
           false,
           false,
         );
       case 'isasyncinitialization':
-        return FieldReflection<MyInfoModule, T>(
+        return FieldReflection<MyInfoModule, bool>(
           this,
           Initializable,
           __TR.tBool,
           'isAsyncInitialization',
           false,
-          (o) => () => o!.isAsyncInitialization as T,
+          (o) => () => o!.isAsyncInitialization,
           null,
           obj,
           false,
@@ -339,9 +395,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticFieldsNames => const <String>[];
 
   @override
-  FieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) {
-    return null;
-  }
+  FieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) => null;
 
   @override
   List<String> get methodsNames => const <String>[
@@ -366,16 +420,59 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         'toUpperCase'
       ];
 
+  static final Map<String, MethodReflection<MyInfoModule, dynamic>>
+      _methodsNoObject = <String, MethodReflection<MyInfoModule, dynamic>>{};
+
+  final Map<String, MethodReflection<MyInfoModule, dynamic>> _methodsObject =
+      <String, MethodReflection<MyInfoModule, dynamic>>{};
+
   @override
   MethodReflection<MyInfoModule, R>? method<R>(String methodName,
       [MyInfoModule? obj]) {
+    if (obj == null) {
+      if (object != null) {
+        return _methodObjectImpl<R>(methodName);
+      } else {
+        return _methodNoObjectImpl<R>(methodName);
+      }
+    } else if (identical(obj, object)) {
+      return _methodObjectImpl<R>(methodName);
+    }
+    return _methodNoObjectImpl<R>(methodName)?.withObject(obj);
+  }
+
+  MethodReflection<MyInfoModule, R>? _methodNoObjectImpl<R>(String methodName) {
+    final m = _methodsNoObject[methodName];
+    if (m != null) {
+      return m as MethodReflection<MyInfoModule, R>;
+    }
+    final m2 = _methodImpl(methodName, null);
+    if (m2 == null) return null;
+    _methodsNoObject[methodName] = m2;
+    return m2 as MethodReflection<MyInfoModule, R>;
+  }
+
+  MethodReflection<MyInfoModule, R>? _methodObjectImpl<R>(String methodName) {
+    final m = _methodsObject[methodName];
+    if (m != null) {
+      return m as MethodReflection<MyInfoModule, R>;
+    }
+    var m2 = _methodNoObjectImpl<R>(methodName);
+    if (m2 == null) return null;
+    m2 = m2.withObject(object!);
+    _methodsObject[methodName] = m2;
+    return m2;
+  }
+
+  MethodReflection<MyInfoModule, dynamic>? _methodImpl(
+      String methodName, MyInfoModule? obj) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
 
     switch (lc) {
       case 'configure':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, void>(
             this,
             MyInfoModule,
             'configure',
@@ -389,7 +486,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             [override]);
       case 'echo':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
             this,
             MyInfoModule,
             'echo',
@@ -408,7 +505,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'touppercase':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
             this,
             MyInfoModule,
             'toUpperCase',
@@ -424,7 +521,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'ensureconfigured':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, void>(
             this,
             APIModule,
             'ensureConfigured',
@@ -438,7 +535,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'initialize':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
             this,
             APIModule,
             'initialize',
@@ -453,7 +550,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             [override]);
       case 'getrouteshandlersnames':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, Iterable<String>>(
             this,
             APIModule,
             'getRoutesHandlersNames',
@@ -470,7 +567,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             },
             null);
       case 'addroute':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, APIModule>(
             this,
             APIModule,
             'addRoute',
@@ -509,7 +606,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             },
             null);
       case 'getroutehandler':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
             this,
             APIModule,
             'getRouteHandler',
@@ -527,7 +624,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'getroutehandlerbyrequest':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
             this,
             APIModule,
             'getRouteHandlerByRequest',
@@ -544,7 +641,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'resolveroute':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, String>(
             this,
             APIModule,
             'resolveRoute',
@@ -560,7 +657,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'call':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<dynamic>>>(
             this,
             APIModule,
             'call',
@@ -578,7 +675,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'acceptsrequest':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, bool>(
             this,
             APIModule,
             'acceptsRequest',
@@ -594,7 +691,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'apiinfo':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, APIModuleInfo>(
             this,
             APIModule,
             'apiInfo',
@@ -610,7 +707,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'ensureinitialized':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
             this,
             Initializable,
             'ensureInitialized',
@@ -628,7 +725,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             },
             null);
       case 'ensureinitializedasync':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
             this,
             Initializable,
             'ensureInitializedAsync',
@@ -646,7 +743,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             },
             null);
       case 'doinitialization':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
             this,
             Initializable,
             'doInitialization',
@@ -664,7 +761,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             },
             null);
       case 'initializedependencies':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<List<Initializable>>>(
             this,
             Initializable,
             'initializeDependencies',
@@ -681,7 +778,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'checkinitialized':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, void>(
             this,
             Initializable,
             'checkInitialized',
@@ -695,7 +792,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null);
       case 'executeinitialized':
-        return MethodReflection<MyInfoModule, R>(
+        return MethodReflection<MyInfoModule, FutureOr<dynamic>>(
             this,
             Initializable,
             'executeInitialized',
@@ -727,9 +824,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticMethodsNames => const <String>[];
 
   @override
-  MethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) {
-    return null;
-  }
+  MethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) => null;
 }
 
 extension MyInfoModule$reflectionExtension on MyInfoModule {

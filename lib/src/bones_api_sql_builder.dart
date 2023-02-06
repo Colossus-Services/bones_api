@@ -1095,7 +1095,7 @@ abstract class SQLGenerator {
       var constrainName = '${table}__${columnName}__fkey';
 
       sqlEntries.add(SQLEntry('CONSTRAINT',
-          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q) ON UPDATE CASCADE',
+          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
           comment: '$fieldName @ $refTableName.$refField',
           columns: [
             SQLColumn(table, columnName,
@@ -1177,14 +1177,14 @@ abstract class SQLGenerator {
               SQLColumn(relName, dstFieldName)
             ]),
         SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON UPDATE CASCADE ON DELETE CASCADE',
+            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON DELETE CASCADE',
             comment: ' $srcFieldName @ $table.$idColumnName',
             columns: [
               SQLColumn(relName, srcFieldName,
                   referenceTable: table, referenceColumn: idColumnName)
             ]),
         SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON UPDATE CASCADE ON DELETE CASCADE',
+            ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON DELETE CASCADE',
             comment: ' $dstFieldName @ $relDstTable.$relDstTableId',
             columns: [
               SQLColumn(relName, dstFieldName,
