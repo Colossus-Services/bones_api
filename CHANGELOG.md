@@ -1,3 +1,12 @@
+## 1.3.40
+
+- `EntityResolutionRules`:
+  - Added `innocuous` const instance.
+  - Added: `isInnocuous`, `isValid`, `validate`.
+  - Added: `copyWith` and `merge`.
+  - Added `ValidateEntityResolutionRulesError` and `MergeEntityResolutionRulesError`.
+- Added `EntityRulesResolver`.
+
 ## 1.3.39
 
 - `APIRoot._callZoned`:

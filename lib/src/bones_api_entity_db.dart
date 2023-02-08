@@ -1072,6 +1072,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (results is List && results.isEmpty) return <O>[];
 
+    final resolutionRulesF =
+        resolutionRules = resolveEntityResolutionRules(resolutionRules);
+
     Iterable<Map<String, dynamic>> entries;
     if (results is! Iterable<Map<String, dynamic>>) {
       entries = results.whereNotNull();
@@ -1098,22 +1101,22 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             entries,
             relationshipFields,
             fieldsListEntity,
-            resolutionRules,
+            resolutionRulesF,
           );
 
           return resolveRelationshipsFields.resolveAllWith(() =>
               _resolveEntitiesSubEntities(
-                  transaction, resolutionRules, entries));
+                  transaction, resolutionRulesF, entries));
         } else {
           return _resolveEntitiesSubEntities(
-              transaction, resolutionRules, entries);
+              transaction, resolutionRulesF, entries);
         }
       });
 
       return _resolveEntitiesFutures(transaction, ret);
     } else {
       var ret =
-          _resolveEntitiesSubEntities(transaction, resolutionRules, entries);
+          _resolveEntitiesSubEntities(transaction, resolutionRulesF, entries);
       return _resolveEntitiesFutures(transaction, ret);
     }
   }
@@ -1151,7 +1154,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
       Transaction transaction,
-      EntityResolutionRules? resolutionRules,
+      EntityResolutionRules resolutionRules,
       Iterable<Map<String, dynamic>> results) {
     if (_fieldsEntity.isEmpty) {
       return _resolveEntitiesSimple(transaction, resolutionRules, results);
@@ -1239,7 +1242,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           .toMapFromEntries();
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
-      EntityResolutionRules? resolutionRules) {
+      EntityResolutionRules resolutionRules) {
     final fieldsEntity = this._fieldsEntity;
 
     return _fieldsEntityRepositoriesAll()
@@ -1248,8 +1251,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           var fieldType = fieldsEntity[e.key]!;
           if (fieldType.isEntityReferenceType) {
             var entityType = fieldType.arguments0!.type;
-            var eagerEntityType =
-                resolutionRules?.isEagerEntityType(entityType) ?? false;
+            var eagerEntityType = resolutionRules.isEagerEntityType(entityType);
             if (!eagerEntityType) return null;
           }
           return e;
@@ -1264,7 +1266,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Iterable<Map<String, dynamic>> results,
     Map<String, TableRelationshipReference> relationshipFields,
     Map<String, TypeInfo> fieldsListEntity,
-    EntityResolutionRules? resolutionRules,
+    EntityResolutionRules resolutionRules,
   ) {
     var idFieldName = tableScheme.idFieldName!;
     var ids = results.map((e) => e[idFieldName]).toList();
@@ -1290,8 +1292,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             relationships.values.expand((e) => e).toSet().toList();
 
         if (fieldType.isEntityReferenceListType &&
-            !(resolutionRules?.isEagerEntityType(fieldType.arguments0!.type) ??
-                false)) {
+            !resolutionRules.isEagerEntityType(fieldType.arguments0!.type)) {
           return relationships.map((key, value) => MapEntry(key, value.asList));
         }
 
