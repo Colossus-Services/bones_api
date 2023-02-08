@@ -1,3 +1,17 @@
+## 1.3.39
+
+- `APIRoot._callZoned`:
+  - Better handling of errors: throwing with `StackTrace`. 
+- `EntityResolutionRules`:
+  - Added `isEagerEntityTypeInfo` and `isLazyEntityTypeInfo`.
+- `DBEntityRepository`:
+  - Optimize: `resolveEntities` and `_resolveEntitiesSubEntities`.
+- `APIServer`:
+  - `_sendAPIResponse`: better handling of error response.
+- `Time.parse`:
+  - Fix issue parsing input `String` as bytes.  
+- coverage: ^1.6.3
+
 ## 1.3.38
 
 - `SQLGenerator`:

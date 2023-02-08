@@ -39,7 +39,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.38';
+  static const String VERSION = '1.3.39';
 
   static bool _boot = false;
 
@@ -391,6 +391,8 @@ abstract class APIRoot with Initializable, Closable {
   /// Returns the current [APIRequest] of the current [call].
   final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
 
+  static const _callZonedErrorHeader = '__callZoned__';
+
   FutureOr<APIResponse<T>> _callZoned<T>(
       APIRequest request, bool externalCall) {
     var callZone = currentAPIRequest.createContextZone();
@@ -406,21 +408,29 @@ abstract class APIRoot with Initializable, Closable {
         // to be rethrown by the previous `Zone`.
 
         if (response is Future<APIResponse<T>>) {
-          return response.then((r) => r,
-              onError: (e, s) => APIResponse.error(
-                  error: e, stackTrace: s, headers: {'callZone': true}));
+          return response.then((r) => r, onError: (e, s) {
+            return APIResponse.error(
+                error: e,
+                stackTrace: s,
+                headers: {_callZonedErrorHeader: true});
+          });
         } else {
           return response;
         }
       } catch (e, s) {
         return APIResponse.error(
-            error: e, stackTrace: s, headers: {'callZone': true});
+            error: e, stackTrace: s, headers: {_callZonedErrorHeader: true});
       }
     }).resolveMapped((response) {
       currentAPIRequest.remove(contextZone: callZone);
 
-      if (response.isError && response.headers['callZone'] == true) {
-        throw response.error;
+      if (response.isError && response.headers[_callZonedErrorHeader] == true) {
+        var stackTrace = response.stackTrace;
+        if (stackTrace != null) {
+          Error.throwWithStackTrace(response.error, stackTrace);
+        } else {
+          throw response.error;
+        }
       }
 
       return response;
