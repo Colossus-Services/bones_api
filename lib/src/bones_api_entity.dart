@@ -258,6 +258,18 @@ class EntityResolutionRules {
     return def;
   }
 
+  /// Alias to [isEagerEntityType] with a [TypeInfo] parameter.
+  bool isEagerEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) {
+    var entityType = entityTypeInfo.entityType;
+    return entityType != null ? isEagerEntityType(entityType, def) : false;
+  }
+
+  /// Alias to [isLazyEntityType] with a [TypeInfo] parameter.
+  bool isLazyEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) {
+    var entityType = entityTypeInfo.entityType;
+    return entityType != null ? isLazyEntityType(entityType, def) : false;
+  }
+
   @override
   String toString() {
     return 'EntityResolutionRules{allowEntityFetch: $allowEntityFetch, allowReadFile: $allowReadFile, lazyEntityTypes: $lazyEntityTypes, eagerEntityTypes: $eagerEntityTypes}';

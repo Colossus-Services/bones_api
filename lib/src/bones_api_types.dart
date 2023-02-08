@@ -177,12 +177,8 @@ class Time implements Comparable<Time> {
 
     if (idx1 != 2 || (idx2 > 0 && idx2 < idx1)) {
       if (allowFromBytes) {
-        try {
-          var bs = dart_convert.latin1.encode(s);
-          return Time.fromBytes(bs, allowParseString: false);
-        } catch (_) {
-          throw FormatException('Invalid string or bytes format: $s');
-        }
+        var bs = _string2bytes(s);
+        return Time.fromBytes(bs, allowParseString: false);
       }
 
       throw FormatException('Invalid `Time` format: $s');
@@ -221,6 +217,18 @@ class Time implements Comparable<Time> {
     var sec = int.parse(secStr);
 
     return Time(h, m, sec, ms, mic);
+  }
+
+  static Uint8List _string2bytes(String s) {
+    try {
+      return dart_convert.utf8.encode(s).asUint8List;
+    } catch (_) {
+      try {
+        return dart_convert.latin1.encode(s);
+      } catch (_) {
+        return s.codeUnits.asUint8List;
+      }
+    }
   }
 
   static Time? from(Object? o) {

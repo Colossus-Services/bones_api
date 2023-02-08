@@ -1082,6 +1082,8 @@ class APIServer {
 
           var retError = resolveBody(errorContent, apiResponse);
 
+          headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
+
           return retError.resolveMapped((error) {
             return Response.internalServerError(body: error, headers: headers);
           });

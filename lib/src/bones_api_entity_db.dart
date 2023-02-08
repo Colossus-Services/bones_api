@@ -1079,7 +1079,6 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       entries = results;
     }
 
-    var fieldsEntity = entityHandler.fieldsWithTypeEntityOrReference();
     var fieldsListEntity = entityHandler.fieldsWithTypeListEntityOrReference();
 
     if (fieldsListEntity.isNotEmpty) {
@@ -1104,17 +1103,17 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
           return resolveRelationshipsFields.resolveAllWith(() =>
               _resolveEntitiesSubEntities(
-                  transaction, resolutionRules, entries, fieldsEntity));
+                  transaction, resolutionRules, entries));
         } else {
           return _resolveEntitiesSubEntities(
-              transaction, resolutionRules, entries, fieldsEntity);
+              transaction, resolutionRules, entries);
         }
       });
 
       return _resolveEntitiesFutures(transaction, ret);
     } else {
-      var ret = _resolveEntitiesSubEntities(
-          transaction, resolutionRules, entries, fieldsEntity);
+      var ret =
+          _resolveEntitiesSubEntities(transaction, resolutionRules, entries);
       return _resolveEntitiesFutures(transaction, ret);
     }
   }
@@ -1153,9 +1152,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
       Transaction transaction,
       EntityResolutionRules? resolutionRules,
-      Iterable<Map<String, dynamic>> results,
-      Map<String, TypeInfo> fieldsEntity) {
-    if (fieldsEntity.isEmpty) {
+      Iterable<Map<String, dynamic>> results) {
+    if (_fieldsEntity.isEmpty) {
       return _resolveEntitiesSimple(transaction, resolutionRules, results);
     }
 
@@ -1166,38 +1164,27 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       return _resolveEntitiesSimple(transaction, resolutionRules, resultsList);
     }
 
-    var fieldsEntityRepositories = fieldsEntity.entries
-        .map((e) {
-          var fieldType = e.value;
-          if (fieldType.isEntityReferenceType) {
-            var entityType = fieldType.arguments0!.type;
-            var eagerEntityType =
-                resolutionRules?.isEagerEntityType(entityType) ?? false;
-            if (!eagerEntityType) return null;
-          }
-          var fieldEntityRepository = _resolveEntityRepository(fieldType);
-          return fieldEntityRepository != null
-              ? MapEntry(e.key, fieldEntityRepository)
-              : null;
-        })
-        .whereNotNull()
-        .toMapFromEntries();
+    var fieldsEntityRepositories =
+        _resolveFieldsEntityRepositories(resolutionRules);
 
     if (fieldsEntityRepositories.isNotEmpty) {
-      var fieldsEntitiesAsync = fieldsEntityRepositories.map((field, repo) {
-        var tableColumn = _resolveEntityFieldToTableColumn(field);
+      var fieldsEntitiesAsync =
+          _fieldsColumnsAll().resolveMapped((fieldsColumns) {
+        return fieldsEntityRepositories.map((field, repo) {
+          var tableColumn = fieldsColumns[field]!;
 
-        var fieldValues = resultsList.map((e) => e[tableColumn]).toList();
-        var fieldValuesUniques = fieldValues.whereNotNull().toSet().toList();
+          var ids = resultsList.map((e) => e[tableColumn]).toList();
+          var idsUniques = ids.whereNotNull().toSet().toList();
 
-        var entities = repo
-            .selectByIDs(fieldValuesUniques, transaction: transaction)
-            .resolveMapped((entities) => fieldValuesUniques
-                .mapIndexed((i, val) => MapEntry(val, entities[i]))
-                .toList());
+          var entities = repo
+              .selectByIDs(idsUniques, transaction: transaction)
+              .resolveMapped((entities) => idsUniques
+                  .mapIndexed((i, id) => MapEntry(id, entities[i]))
+                  .toList());
 
-        return MapEntry(tableColumn, entities);
-      }).resolveAllValues();
+          return MapEntry(tableColumn, entities);
+        }).resolveAllValues();
+      });
 
       return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
         for (var e in fieldsEntities.entries) {
@@ -1220,6 +1207,55 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     return _resolveEntitiesSimple(transaction, resolutionRules, results);
+  }
+
+  Map<String, String>? _fieldsColumns;
+
+  FutureOr<Map<String, String>> _fieldsColumnsAll() {
+    var fieldsColumns = _fieldsColumns;
+    if (fieldsColumns != null) return fieldsColumns;
+
+    return _fieldsEntityRepositoriesAll()
+        .map((f, _) => MapEntry(f, _resolveEntityFieldToTableColumn(f)))
+        .resolveAllValues()
+        .resolveMapped((fieldsColumns) {
+      _fieldsColumns = fieldsColumns;
+      return fieldsColumns;
+    });
+  }
+
+  Map<String, TypeInfo> get _fieldsEntity =>
+      entityHandler.fieldsWithTypeEntityOrReference();
+
+  Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
+
+  Map<String, EntityRepository<Object>> _fieldsEntityRepositoriesAll() =>
+      _fieldsEntityRepositories ??= _fieldsEntity.entries
+          .map((e) {
+            var repo = _resolveEntityRepository(e.value);
+            return repo != null ? MapEntry(e.key, repo) : null;
+          })
+          .whereNotNull()
+          .toMapFromEntries();
+
+  Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
+      EntityResolutionRules? resolutionRules) {
+    final fieldsEntity = this._fieldsEntity;
+
+    return _fieldsEntityRepositoriesAll()
+        .entries
+        .map((e) {
+          var fieldType = fieldsEntity[e.key]!;
+          if (fieldType.isEntityReferenceType) {
+            var entityType = fieldType.arguments0!.type;
+            var eagerEntityType =
+                resolutionRules?.isEagerEntityType(entityType) ?? false;
+            if (!eagerEntityType) return null;
+          }
+          return e;
+        })
+        .whereNotNull()
+        .toMapFromEntries();
   }
 
   List<FutureOr<bool>> _resolveRelationshipFields(
@@ -1303,17 +1339,15 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     return entityFieldName;
   }
 
-  String _resolveEntityFieldToTableColumn(String entityField) {
-    var tableScheme = repositoryAdapter.getTableScheme() as TableScheme;
-
-    var tableField = tableScheme.resolveTableFieldName(entityField);
-    if (tableField == null) {
-      throw StateError(
-          "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");
-    }
-
-    return tableField;
-  }
+  FutureOr<String> _resolveEntityFieldToTableColumn(String entityField) =>
+      repositoryAdapter.getTableScheme().resolveMapped((tableScheme) {
+        var tableField = tableScheme.resolveTableFieldName(entityField);
+        if (tableField == null) {
+          throw StateError(
+              "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");
+        }
+        return tableField;
+      });
 
   FutureOr<Map<String, TableRelationshipReference>> _getRelationshipFields(
       Map<String, TypeInfo> fieldsListEntity,
