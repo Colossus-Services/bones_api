@@ -1073,8 +1073,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (results is List && results.isEmpty) return <O>[];
 
-    final resolutionRulesF =
-        resolutionRules = resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
 
     Iterable<Map<String, dynamic>> entries;
     if (results is! Iterable<Map<String, dynamic>>) {
@@ -1102,22 +1102,22 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             entries,
             relationshipFields,
             fieldsListEntity,
-            resolutionRulesF,
+            resolutionRulesResolved,
           );
 
           return resolveRelationshipsFields.resolveAllWith(() =>
               _resolveEntitiesSubEntities(
-                  transaction, resolutionRulesF, entries));
+                  transaction, resolutionRulesResolved, entries));
         } else {
           return _resolveEntitiesSubEntities(
-              transaction, resolutionRulesF, entries);
+              transaction, resolutionRulesResolved, entries);
         }
       });
 
       return _resolveEntitiesFutures(transaction, ret);
     } else {
-      var ret =
-          _resolveEntitiesSubEntities(transaction, resolutionRulesF, entries);
+      var ret = _resolveEntitiesSubEntities(
+          transaction, resolutionRulesResolved, entries);
       return _resolveEntitiesFutures(transaction, ret);
     }
   }
@@ -1138,38 +1138,40 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   List<FutureOr<O>> _resolveEntitiesSimple(
       Transaction transaction,
-      EntityResolutionRules? resolutionRules,
+      EntityResolutionRulesResolved resolutionRulesResolved,
       Iterable<Map<String, dynamic>> results) {
     return results.map((e) {
-      var entityProvider =
-          TransactionEntityProvider(transaction, provider, resolutionRules);
+      var entityProvider = TransactionEntityProvider(
+          transaction, provider, resolutionRulesResolved);
 
       return entityHandler.createFromMap(e,
           entityProvider: entityProvider,
           entityCache: transaction,
           entityRepositoryProvider: provider,
           entityHandlerProvider: entityHandler.provider,
-          resolutionRules: resolutionRules);
+          resolutionRules: resolutionRulesResolved);
     }).toList();
   }
 
   FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
       Transaction transaction,
-      EntityResolutionRules resolutionRules,
+      EntityResolutionRulesResolved resolutionRulesResolved,
       Iterable<Map<String, dynamic>> results) {
     if (_fieldsEntity.isEmpty) {
-      return _resolveEntitiesSimple(transaction, resolutionRules, results);
+      return _resolveEntitiesSimple(
+          transaction, resolutionRulesResolved, results);
     }
 
     var resultsList =
         results is List<Map<String, dynamic>> ? results : results.toList();
 
     if (resultsList.length == 1) {
-      return _resolveEntitiesSimple(transaction, resolutionRules, resultsList);
+      return _resolveEntitiesSimple(
+          transaction, resolutionRulesResolved, resultsList);
     }
 
     var fieldsEntityRepositories =
-        _resolveFieldsEntityRepositories(resolutionRules);
+        _resolveFieldsEntityRepositories(resolutionRulesResolved);
 
     if (fieldsEntityRepositories.isNotEmpty) {
       var fieldsEntitiesAsync =
@@ -1206,11 +1208,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         }
 
         return _resolveEntitiesSimple(
-            transaction, resolutionRules, resultsList);
+            transaction, resolutionRulesResolved, resultsList);
       });
     }
 
-    return _resolveEntitiesSimple(transaction, resolutionRules, results);
+    return _resolveEntitiesSimple(
+        transaction, resolutionRulesResolved, results);
   }
 
   Map<String, String>? _fieldsColumns;
@@ -1243,7 +1246,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           .toMapFromEntries();
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
-      EntityResolutionRules resolutionRules) {
+      EntityResolutionRulesResolved resolutionRulesResolved) {
     final fieldsEntity = this._fieldsEntity;
 
     return _fieldsEntityRepositoriesAll()
@@ -1252,7 +1255,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           var fieldType = fieldsEntity[e.key]!;
           if (fieldType.isEntityReferenceType) {
             var entityType = fieldType.arguments0!.type;
-            var eagerEntityType = resolutionRules.isEagerEntityType(entityType);
+            var eagerEntityType =
+                resolutionRulesResolved.isEagerEntityType(entityType);
             if (!eagerEntityType) return null;
           }
           return e;
@@ -1267,7 +1271,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Iterable<Map<String, dynamic>> results,
     Map<String, TableRelationshipReference> relationshipFields,
     Map<String, TypeInfo> fieldsListEntity,
-    EntityResolutionRules resolutionRules,
+    EntityResolutionRulesResolved resolutionRulesResolved,
   ) {
     var idFieldName = tableScheme.idFieldName!;
     var ids = results.map((e) => e[idFieldName]).toList();
@@ -1293,12 +1297,13 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             relationships.values.expand((e) => e).toSet().toList();
 
         if (fieldType.isEntityReferenceListType &&
-            !resolutionRules.isEagerEntityType(fieldType.arguments0!.type)) {
+            !resolutionRulesResolved
+                .isEagerEntityType(fieldType.arguments0!.type)) {
           return relationships.map((key, value) => MapEntry(key, value.asList));
         }
 
         var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
-            transaction: transaction, resolutionRules: resolutionRules);
+            transaction: transaction, resolutionRules: resolutionRulesResolved);
 
         return targetsAsync.resolveMapped((targets) {
           var allTargetsById = Map.fromEntries(targets

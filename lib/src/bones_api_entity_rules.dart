@@ -9,6 +9,8 @@ class EntityResolutionRules {
   static const EntityResolutionRules innocuous =
       _EntityResolutionRulesInnocuous();
 
+  final bool? _innocuous;
+
   final bool? _allowEntityFetch;
 
   /// If `true` it will allow the use of on DB/repository to fetch an entity by an ID reference.
@@ -40,7 +42,15 @@ class EntityResolutionRules {
       this.eagerEntityTypes,
       this.allLazy,
       this.allEager})
-      : _allowEntityFetch = allowEntityFetch;
+      : _allowEntityFetch = allowEntityFetch,
+        _innocuous = (allowEntityFetch != null ||
+                allEager != null ||
+                allLazy != null ||
+                allowReadFile)
+            ? false
+            : (lazyEntityTypes == null && eagerEntityTypes == null)
+                ? true
+                : null;
 
   const EntityResolutionRules.fetch(
       {this.lazyEntityTypes,
@@ -48,21 +58,24 @@ class EntityResolutionRules {
       this.allLazy,
       this.allEager})
       : _allowEntityFetch = true,
-        allowReadFile = false;
+        allowReadFile = false,
+        _innocuous = false;
 
   const EntityResolutionRules.fetchEager(this.eagerEntityTypes)
       : _allowEntityFetch = true,
         allowReadFile = false,
         lazyEntityTypes = null,
         allLazy = null,
-        allEager = null;
+        allEager = null,
+        _innocuous = false;
 
   const EntityResolutionRules.fetchLazy(this.lazyEntityTypes)
       : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
         allLazy = null,
-        allEager = null;
+        allEager = null,
+        _innocuous = false;
 
   const EntityResolutionRules.fetchEagerAll()
       : _allowEntityFetch = true,
@@ -70,7 +83,8 @@ class EntityResolutionRules {
         eagerEntityTypes = null,
         lazyEntityTypes = null,
         allLazy = null,
-        allEager = true;
+        allEager = true,
+        _innocuous = false;
 
   const EntityResolutionRules.fetchLazyAll()
       : _allowEntityFetch = true,
@@ -78,16 +92,27 @@ class EntityResolutionRules {
         eagerEntityTypes = null,
         lazyEntityTypes = null,
         allLazy = true,
-        allEager = false;
+        allEager = false,
+        _innocuous = false;
 
   /// Returns `true` if this instance is equivalent to [innocuous] instance (no resolution rules to apply).
-  bool get isInnocuous =>
-      _allowEntityFetch == null &&
-      !allowReadFile &&
-      (eagerEntityTypes == null || eagerEntityTypes!.isEmpty) &&
-      (lazyEntityTypes == null || lazyEntityTypes!.isEmpty) &&
-      allLazy == null &&
-      allEager == null;
+  bool get isInnocuous {
+    var innocuous = _innocuous;
+    if (innocuous != null) return innocuous;
+
+    if (_allowEntityFetch != null ||
+        allEager != null ||
+        allLazy != null ||
+        allowReadFile) {
+      return false;
+    }
+
+    final eagerEntityTypes = this.eagerEntityTypes;
+    final lazyEntityTypes = this.lazyEntityTypes;
+
+    return (eagerEntityTypes == null || eagerEntityTypes.isEmpty) &&
+        (lazyEntityTypes == null || lazyEntityTypes.isEmpty);
+  }
 
   bool get isValid => _validateImpl() == null;
 
@@ -192,7 +217,7 @@ class EntityResolutionRules {
 
   /// Merges this instances with [other].
   EntityResolutionRules merge(EntityResolutionRules? other) {
-    if (other == null || other.isInnocuous) {
+    if (other == null || other.isInnocuous || identical(this, other)) {
       return isInnocuous ? innocuous : this;
     } else if (isInnocuous) {
       return other;
@@ -301,11 +326,103 @@ class MergeEntityResolutionRulesError extends Error {
       "Can't merge `EntityResolutionRules`! Conflict: $conflict >> $a <!> $b";
 }
 
+class EntityResolutionRulesResolved implements EntityResolutionRules {
+  static const _innocuousResolved = EntityResolutionRulesResolved(
+      EntityResolutionRules.innocuous,
+      contextRules: null,
+      rules: EntityResolutionRules.innocuous);
+
+  final EntityResolutionRules resolved;
+  final EntityResolutionRules? contextRules;
+  final EntityResolutionRules? rules;
+
+  const EntityResolutionRulesResolved(this.resolved,
+      {required this.contextRules, required this.rules});
+
+  @override
+  bool get isInnocuous => resolved.isInnocuous;
+
+  @override
+  bool? get _innocuous => resolved._innocuous;
+
+  @override
+  bool get isValid => resolved.isValid;
+
+  @override
+  void validate() => resolved.validate();
+
+  @override
+  String? _validateImpl() => resolved._validateImpl();
+
+  @override
+  bool? get _allowEntityFetch => resolved._allowEntityFetch;
+
+  @override
+  bool get allowEntityFetch => resolved.allowEntityFetch;
+
+  @override
+  bool get allowReadFile => resolved.allowReadFile;
+
+  @override
+  bool? get allEager => resolved.allEager;
+
+  @override
+  bool? get allLazy => resolved.allLazy;
+
+  @override
+  List<Type>? get eagerEntityTypes => resolved.eagerEntityTypes;
+
+  @override
+  List<Type>? get lazyEntityTypes => resolved.lazyEntityTypes;
+
+  @override
+  bool isEagerEntityType(Type entityType, [bool def = false]) =>
+      resolved.isEagerEntityType(entityType, def);
+
+  @override
+  bool isEagerEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) =>
+      resolved.isEagerEntityTypeInfo(entityTypeInfo, def);
+
+  @override
+  bool isLazyEntityType(Type entityType, [bool def = false]) =>
+      resolved.isLazyEntityType(entityType, def);
+
+  @override
+  bool isLazyEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) =>
+      resolved.isLazyEntityTypeInfo(entityTypeInfo, def);
+
+  @override
+  EntityResolutionRules copyWith(
+          {bool? allowEntityFetch,
+          bool? allowReadFile,
+          List<Type>? lazyEntityTypes,
+          List<Type>? eagerEntityTypes,
+          bool? allLazy,
+          bool? allEager}) =>
+      resolved.copyWith(
+          allowEntityFetch: allowEntityFetch,
+          allowReadFile: allowReadFile,
+          lazyEntityTypes: lazyEntityTypes,
+          eagerEntityTypes: eagerEntityTypes,
+          allLazy: allLazy,
+          allEager: allEager);
+
+  @override
+  EntityResolutionRules merge(EntityResolutionRules? other) =>
+      resolved.merge(other);
+
+  @override
+  String toString() => '$resolved[resolved]';
+}
+
 class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
   const _EntityResolutionRulesInnocuous();
 
   @override
   bool get isInnocuous => true;
+
+  @override
+  bool? get _innocuous => true;
 
   @override
   bool get isValid => true;
@@ -392,15 +509,62 @@ mixin EntityRulesResolver {
   /// [EntityResolutionRules] context if needed.
   ///
   /// See [getContextEntityResolutionRules] and [EntityResolutionRules.merge].
-  EntityResolutionRules resolveEntityResolutionRules(
+  EntityResolutionRulesResolved resolveEntityResolutionRules(
       EntityResolutionRules? resolutionRules) {
     var context = getContextEntityResolutionRules();
 
-    if (resolutionRules == null || resolutionRules.isInnocuous) {
-      return context ?? EntityResolutionRules.innocuous;
+    if (context == null || context.isInnocuous) {
+      if (resolutionRules is EntityResolutionRulesResolved) {
+        if (resolutionRules.contextRules == null) {
+          return resolutionRules;
+        } else {
+          resolutionRules = resolutionRules.resolved;
+        }
+      }
+
+      return _resolveEntityResolutionRulesNoContext(resolutionRules);
+    }
+
+    if (context is EntityResolutionRulesResolved) {
+      context = context.resolved;
+    }
+
+    if (resolutionRules is EntityResolutionRulesResolved) {
+      if (identical(resolutionRules.contextRules, context)) {
+        return resolutionRules;
+      } else {
+        resolutionRules = resolutionRules.resolved;
+      }
+    }
+
+    return _resolveEntityResolutionRulesWithContext(context, resolutionRules);
+  }
+
+  EntityResolutionRulesResolved _resolveEntityResolutionRulesNoContext(
+      EntityResolutionRules? rules) {
+    if (rules == null || rules.isInnocuous) {
+      return EntityResolutionRulesResolved._innocuousResolved;
     } else {
-      var merge = resolutionRules.merge(context);
-      return merge;
+      return EntityResolutionRulesResolved(rules,
+          contextRules: null, rules: rules);
+    }
+  }
+
+  EntityResolutionRulesResolved _resolveEntityResolutionRulesWithContext(
+      EntityResolutionRules context, EntityResolutionRules? rules) {
+    if (rules == null) {
+      return EntityResolutionRulesResolved(context,
+          contextRules: context, rules: null);
+    } else if (rules.isInnocuous) {
+      return EntityResolutionRulesResolved(context,
+          contextRules: context, rules: EntityResolutionRules.innocuous);
+    } else {
+      var merge = rules.merge(context);
+
+      return identical(merge, EntityResolutionRules.innocuous)
+          ? EntityResolutionRulesResolved._innocuousResolved
+          : EntityResolutionRulesResolved(merge,
+              contextRules: context, rules: rules);
     }
   }
 }

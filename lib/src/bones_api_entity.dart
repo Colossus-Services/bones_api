@@ -430,8 +430,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityResolutionRules? resolutionRules}) {
     entityCache ??= JsonEntityCacheSimple();
 
-    final resolutionRulesF =
-        resolutionRules = resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
 
     var fieldsTypes = this.fieldsTypes(o);
 
@@ -442,7 +442,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityCache: entityCache,
           entityHandlerProvider: entityHandlerProvider,
           entityRepositoryProvider: entityRepositoryProvider,
-          resolutionRules: resolutionRulesF);
+          resolutionRules: resolutionRulesResolved);
 
       if (t != null) {
         if (t.isEntityReferenceType) {
@@ -533,8 +533,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return value as T?;
     }
 
-    final resolutionRulesF =
-        resolutionRules = resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
 
     var tType = TypeInfo.from(T);
     var valueType = value != null ? TypeInfo.from(value) : null;
@@ -552,7 +552,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     } else if (type.equalsType(_typeInfoDynamicInt)) {
       return DynamicInt.from(value) as T?;
     } else if (type.equalsType(_typeInfoUint8List)) {
-      return _resolveValueAsUInt8List(value, resolutionRulesF) as T?;
+      return _resolveValueAsUInt8List(value, resolutionRulesResolved) as T?;
     }
 
     entityCache ??= JsonEntityCacheSimple();
@@ -579,7 +579,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
               ? valEntityHandler.createFromMap(value,
                   entityProvider: entityProvider,
                   entityCache: entityCache,
-                  resolutionRules: resolutionRulesF)
+                  resolutionRules: resolutionRulesResolved)
               : value;
         }
 
@@ -592,7 +592,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             elementType, entityHandlerProvider, entityRepositoryProvider);
 
         return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRulesF);
+            entityProvider, entityCache, resolutionRulesResolved);
       } else if (type.isEntityReferenceListType) {
         var elementType = type.arguments.first;
 
@@ -600,7 +600,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             elementType, entityHandlerProvider, entityRepositoryProvider);
 
         var eagerEntityType =
-            resolutionRulesF.isEagerEntityType(elementType.type);
+            resolutionRulesResolved.isEagerEntityType(elementType.type);
         if (!eagerEntityType) {
           return elementType.toEntityReferenceList(value,
               entityProvider: entityProvider,
@@ -608,7 +608,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         }
 
         return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRulesF);
+            entityProvider, entityCache, resolutionRulesResolved);
       } else {
         return type.parseEntity<T>(value);
       }
@@ -624,11 +624,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       if (parsed != null) return parsed;
 
       if (entityProvider != null && entityType != null) {
-        var eagerEntityType = resolutionRulesF.isEagerEntityType(entityType);
+        var eagerEntityType =
+            resolutionRulesResolved.isEagerEntityType(entityType);
 
         if (eagerEntityType) {
           var entityAsync = entityProvider.getEntityByID(value,
-              type: entityType, resolutionRules: resolutionRulesF);
+              type: entityType, resolutionRules: resolutionRulesResolved);
 
           if (entityAsync != null) {
             return entityAsync.resolveMapped<T?>((entity) {
@@ -643,7 +644,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
                   entityCache!,
                   entityHandlerProvider,
                   entityRepositoryProvider,
-                  resolutionRulesF);
+                  resolutionRulesResolved);
             });
           }
         }
@@ -656,7 +657,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityCache,
           entityHandlerProvider,
           entityRepositoryProvider,
-          resolutionRulesF);
+          resolutionRulesResolved);
     } else {
       return type.parseEntity<T>(value);
     }
@@ -668,7 +669,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       TypeInfo elementType,
       EntityProvider? entityProvider,
       EntityCache? entityCache,
-      EntityResolutionRules resolutionRules) {
+      EntityResolutionRulesResolved resolutionRulesResolved) {
     if (!elementType.isBasicType) {
       var totalEntitiesToResolve = 0;
       var totalResolvedEntities = 0;
@@ -706,7 +707,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
               elementType, e,
               entityProvider: entityProvider,
               entityCache: entityCache,
-              resolutionRules: resolutionRules));
+              resolutionRules: resolutionRulesResolved));
 
       if (listFutures == null) return null;
 
@@ -718,7 +719,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           elementParser: (e) => resolveValueByType(elementType, e,
               entityProvider: entityProvider,
               entityCache: entityCache,
-              resolutionRules: resolutionRules));
+              resolutionRules: resolutionRulesResolved));
 
       if (listFutures == null) return null;
       return listFutures.resolveAll().resolveMapped((l) => l as T);
@@ -726,7 +727,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   }
 
   FutureOr<Uint8List?> _resolveValueAsUInt8List(
-      Object? value, EntityResolutionRules resolutionRules) {
+      Object? value, EntityResolutionRulesResolved resolutionRulesResolved) {
     if (value == null) return null;
     var bytes = TypeParser.parseUInt8List(value);
     if (bytes != null) return bytes;
@@ -740,7 +741,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         var dataURL = DataURLBase64.parse(value);
         return dataURL?.payloadArrayBuffer;
       } else if (value.startsWith("url(") && value.endsWith(")")) {
-        var allowReadFile = resolutionRules.allowReadFile;
+        var allowReadFile = resolutionRulesResolved.allowReadFile;
         if (!allowReadFile) return null;
 
         var path = value.substring(4, value.length - 1);
@@ -784,7 +785,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityCache entityCache,
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityResolutionRules resolutionRules) {
+      EntityResolutionRulesResolved resolutionRulesResolved) {
     var valEntityHandler = _resolveEntityHandler(
         type, entityHandlerProvider, entityRepositoryProvider);
 
@@ -796,13 +797,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       }
     }
 
-    var allowEntityFetch =
-        resolutionRules.allowEntityFetch || entityCache.allowEntityFetch;
+    var allowEntityFetch = resolutionRulesResolved.allowEntityFetch ||
+        entityCache.allowEntityFetch;
 
     if (allowEntityFetch && type.isEntityReferenceBaseType) {
       var entityType = type.entityType;
-      var eager =
-          entityType != null && resolutionRules.isEagerEntityType(entityType);
+      var eager = entityType != null &&
+          resolutionRulesResolved.isEagerEntityType(entityType);
       allowEntityFetch = eager;
     }
 
@@ -815,7 +816,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       if (entityRepository != null) {
         var transaction = entityProvider is Transaction ? entityProvider : null;
         var retEntity = entityRepository.selectByID(value,
-            transaction: transaction, resolutionRules: resolutionRules);
+            transaction: transaction, resolutionRules: resolutionRulesResolved);
         return retEntity.resolveMapped((val) {
           return val as T?;
         });
@@ -4567,6 +4568,12 @@ class TransactionEntityProvider
       this.transaction, this.entityRepositoryProvider, this.resolutionRules);
 
   @override
+  EntityResolutionRules? getContextEntityResolutionRules() {
+    var context = super.getContextEntityResolutionRules();
+    return context ?? resolutionRules;
+  }
+
+  @override
   FutureOr<O?> getEntityByID<O>(id,
       {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
     var oAsync = transaction.getEntityByID<O>(id, type: type, sync: sync);
@@ -4578,10 +4585,10 @@ class TransactionEntityProvider
         return null;
       }
 
-      final resolutionRulesF = resolutionRules =
+      final resolutionRulesResolved =
           resolveEntityResolutionRules(resolutionRules ?? this.resolutionRules);
 
-      var allowEntityFetch = resolutionRulesF.allowEntityFetch;
+      var allowEntityFetch = resolutionRulesResolved.allowEntityFetch;
 
       if (!allowEntityFetch) {
         return null;
@@ -4591,8 +4598,8 @@ class TransactionEntityProvider
           entityRepositoryProvider.getEntityRepository(type: t);
       if (entityRepository == null) return null;
 
-      var sel =
-          entityRepository.selectByID(id, resolutionRules: resolutionRulesF);
+      var sel = entityRepository.selectByID(id,
+          resolutionRules: resolutionRulesResolved);
       return sel.resolveMapped((o) => o as O?);
     });
   }
