@@ -24,6 +24,7 @@ class AboutModule extends APIModule {
   APIResponse<String> about() => APIResponse.ok('About...');
 }
 
+@APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
 @EnableReflection()
 class UserModule extends APIModule {
   UserModule(APIRoot apiRoot) : super(apiRoot, 'user');
@@ -62,4 +63,12 @@ class UserModule extends APIModule {
 
   Future<dynamic> geDynamicAsync2(int id) async => APIResponse.ok(
       User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+
+  Future<APIResponse<Map>> getContext() async {
+    var cotextProvider = EntityRulesResolver.cotextProviders.first;
+
+    var resolutionRules = cotextProvider.getContextEntityResolutionRules();
+
+    return APIResponse.ok({'context': resolutionRules?.toJson()});
+  }
 }

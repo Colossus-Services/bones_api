@@ -9,6 +9,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_reference.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 
 final _log = logging.Logger('DBRelationalAdapter');

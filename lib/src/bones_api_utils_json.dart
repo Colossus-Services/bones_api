@@ -7,6 +7,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_entity.dart';
 import 'bones_api_entity_reference.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';

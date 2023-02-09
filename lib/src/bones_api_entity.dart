@@ -19,6 +19,7 @@ import 'package:swiss_knife/swiss_knife.dart' show EventStream, DataURLBase64;
 import 'bones_api_condition.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_reference.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
@@ -142,142 +143,8 @@ abstract class EntityProvider {
 
 typedef EntityCache = JsonEntityCache;
 
-/// Rules to resolve entities.
-/// Used by [EntityHandler] and [DBEntityRepository].
-class EntityResolutionRules {
-  final bool? _allowEntityFetch;
-
-  /// If `true` it will allow the use of on DB/repository to fetch an entity by an ID reference.
-  bool get allowEntityFetch =>
-      _allowEntityFetch ??
-      allEager ??
-      (eagerEntityTypes != null && eagerEntityTypes!.isNotEmpty);
-
-  /// If `true` it will allow calls to [APIPlatform.readFileAsString]
-  /// and [APIPlatform.readFileAsBytes].
-  final bool allowReadFile;
-
-  /// Entities [Type] with lazy load.
-  final List<Type>? lazyEntityTypes;
-
-  /// Entities [Type] with eager load.
-  final List<Type>? eagerEntityTypes;
-
-  /// If `true` all types will be eager loaded.
-  final bool? allEager;
-
-  /// If `true` all types will be lazy loaded.
-  final bool? allLazy;
-
-  const EntityResolutionRules(
-      {bool? allowEntityFetch,
-      this.allowReadFile = false,
-      this.lazyEntityTypes,
-      this.eagerEntityTypes,
-      this.allLazy,
-      this.allEager})
-      : _allowEntityFetch = allowEntityFetch;
-
-  const EntityResolutionRules.fetch(
-      {this.lazyEntityTypes,
-      this.eagerEntityTypes,
-      this.allLazy,
-      this.allEager})
-      : _allowEntityFetch = true,
-        allowReadFile = false;
-
-  const EntityResolutionRules.fetchEager(this.eagerEntityTypes)
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        lazyEntityTypes = null,
-        allLazy = null,
-        allEager = null;
-
-  const EntityResolutionRules.fetchLazy(this.lazyEntityTypes)
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        allLazy = null,
-        allEager = null;
-
-  const EntityResolutionRules.fetchEagerAll()
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        lazyEntityTypes = null,
-        allLazy = null,
-        allEager = true;
-
-  const EntityResolutionRules.fetchLazyAll()
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        lazyEntityTypes = null,
-        allLazy = true,
-        allEager = false;
-
-  /// Returns `true` if [entityType] load is eager.
-  /// - [def] is returned in case there's not rule for [entityType].
-  bool isEagerEntityType(Type entityType, [bool def = false]) {
-    var allEager = this.allEager;
-    if (allEager != null && allEager && !isLazyEntityType(entityType)) {
-      return true;
-    }
-
-    var eagerEntityTypes = this.eagerEntityTypes;
-    if (eagerEntityTypes != null && eagerEntityTypes.contains(entityType)) {
-      return true;
-    }
-
-    var lazyEntityTypes = this.lazyEntityTypes;
-    if (lazyEntityTypes != null && lazyEntityTypes.contains(entityType)) {
-      return false;
-    }
-
-    return def;
-  }
-
-  /// Returns `true` if [entityType] load is lazy.
-  /// - [def] is returned in case there's not rule for [entityType].
-  bool isLazyEntityType(Type entityType, [bool def = false]) {
-    var allLazy = this.allLazy;
-    if (allLazy != null && allLazy && !isEagerEntityType(entityType)) {
-      return true;
-    }
-
-    var lazyEntityTypes = this.lazyEntityTypes;
-    if (lazyEntityTypes != null && lazyEntityTypes.contains(entityType)) {
-      return true;
-    }
-
-    var eagerEntityTypes = this.eagerEntityTypes;
-    if (eagerEntityTypes != null && eagerEntityTypes.contains(entityType)) {
-      return false;
-    }
-
-    return def;
-  }
-
-  /// Alias to [isEagerEntityType] with a [TypeInfo] parameter.
-  bool isEagerEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) {
-    var entityType = entityTypeInfo.entityType;
-    return entityType != null ? isEagerEntityType(entityType, def) : false;
-  }
-
-  /// Alias to [isLazyEntityType] with a [TypeInfo] parameter.
-  bool isLazyEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) {
-    var entityType = entityTypeInfo.entityType;
-    return entityType != null ? isLazyEntityType(entityType, def) : false;
-  }
-
-  @override
-  String toString() {
-    return 'EntityResolutionRules{allowEntityFetch: $allowEntityFetch, allowReadFile: $allowReadFile, lazyEntityTypes: $lazyEntityTypes, eagerEntityTypes: $eagerEntityTypes}';
-  }
-}
-
 /// Base class to implement entities handlers.
-abstract class EntityHandler<O> with FieldsFromMap {
+abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   /// The provider of [EntityHandler] instances for different [Type]s.
   final EntityHandlerProvider provider;
 
@@ -563,6 +430,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
       EntityResolutionRules? resolutionRules}) {
     entityCache ??= JsonEntityCacheSimple();
 
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
     var fieldsTypes = this.fieldsTypes(o);
 
     var resolved = fields.map((f, v) {
@@ -572,7 +442,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
           entityCache: entityCache,
           entityHandlerProvider: entityHandlerProvider,
           entityRepositoryProvider: entityRepositoryProvider,
-          resolutionRules: resolutionRules);
+          resolutionRules: resolutionRulesResolved);
 
       if (t != null) {
         if (t.isEntityReferenceType) {
@@ -663,6 +533,9 @@ abstract class EntityHandler<O> with FieldsFromMap {
       return value as T?;
     }
 
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
     var tType = TypeInfo.from(T);
     var valueType = value != null ? TypeInfo.from(value) : null;
 
@@ -679,7 +552,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
     } else if (type.equalsType(_typeInfoDynamicInt)) {
       return DynamicInt.from(value) as T?;
     } else if (type.equalsType(_typeInfoUint8List)) {
-      return _resolveValueAsUInt8List(value, resolutionRules) as T?;
+      return _resolveValueAsUInt8List(value, resolutionRulesResolved) as T?;
     }
 
     entityCache ??= JsonEntityCacheSimple();
@@ -706,7 +579,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
               ? valEntityHandler.createFromMap(value,
                   entityProvider: entityProvider,
                   entityCache: entityCache,
-                  resolutionRules: resolutionRules)
+                  resolutionRules: resolutionRulesResolved)
               : value;
         }
 
@@ -719,7 +592,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
             elementType, entityHandlerProvider, entityRepositoryProvider);
 
         return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRules);
+            entityProvider, entityCache, resolutionRulesResolved);
       } else if (type.isEntityReferenceListType) {
         var elementType = type.arguments.first;
 
@@ -727,7 +600,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
             elementType, entityHandlerProvider, entityRepositoryProvider);
 
         var eagerEntityType =
-            resolutionRules?.isEagerEntityType(elementType.type) ?? false;
+            resolutionRulesResolved.isEagerEntityType(elementType.type);
         if (!eagerEntityType) {
           return elementType.toEntityReferenceList(value,
               entityProvider: entityProvider,
@@ -735,7 +608,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
         }
 
         return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRules);
+            entityProvider, entityCache, resolutionRulesResolved);
       } else {
         return type.parseEntity<T>(value);
       }
@@ -752,11 +625,11 @@ abstract class EntityHandler<O> with FieldsFromMap {
 
       if (entityProvider != null && entityType != null) {
         var eagerEntityType =
-            resolutionRules?.isEagerEntityType(entityType) ?? false;
+            resolutionRulesResolved.isEagerEntityType(entityType);
 
         if (eagerEntityType) {
           var entityAsync = entityProvider.getEntityByID(value,
-              type: entityType, resolutionRules: resolutionRules);
+              type: entityType, resolutionRules: resolutionRulesResolved);
 
           if (entityAsync != null) {
             return entityAsync.resolveMapped<T?>((entity) {
@@ -771,7 +644,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
                   entityCache!,
                   entityHandlerProvider,
                   entityRepositoryProvider,
-                  resolutionRules);
+                  resolutionRulesResolved);
             });
           }
         }
@@ -784,7 +657,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
           entityCache,
           entityHandlerProvider,
           entityRepositoryProvider,
-          resolutionRules);
+          resolutionRulesResolved);
     } else {
       return type.parseEntity<T>(value);
     }
@@ -796,7 +669,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       TypeInfo elementType,
       EntityProvider? entityProvider,
       EntityCache? entityCache,
-      EntityResolutionRules? resolutionRules) {
+      EntityResolutionRulesResolved resolutionRulesResolved) {
     if (!elementType.isBasicType) {
       var totalEntitiesToResolve = 0;
       var totalResolvedEntities = 0;
@@ -834,7 +707,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
               elementType, e,
               entityProvider: entityProvider,
               entityCache: entityCache,
-              resolutionRules: resolutionRules));
+              resolutionRules: resolutionRulesResolved));
 
       if (listFutures == null) return null;
 
@@ -846,7 +719,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
           elementParser: (e) => resolveValueByType(elementType, e,
               entityProvider: entityProvider,
               entityCache: entityCache,
-              resolutionRules: resolutionRules));
+              resolutionRules: resolutionRulesResolved));
 
       if (listFutures == null) return null;
       return listFutures.resolveAll().resolveMapped((l) => l as T);
@@ -854,7 +727,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
   }
 
   FutureOr<Uint8List?> _resolveValueAsUInt8List(
-      Object? value, EntityResolutionRules? resolutionRules) {
+      Object? value, EntityResolutionRulesResolved resolutionRulesResolved) {
     if (value == null) return null;
     var bytes = TypeParser.parseUInt8List(value);
     if (bytes != null) return bytes;
@@ -868,7 +741,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
         var dataURL = DataURLBase64.parse(value);
         return dataURL?.payloadArrayBuffer;
       } else if (value.startsWith("url(") && value.endsWith(")")) {
-        var allowReadFile = resolutionRules?.allowReadFile ?? false;
+        var allowReadFile = resolutionRulesResolved.allowReadFile;
         if (!allowReadFile) return null;
 
         var path = value.substring(4, value.length - 1);
@@ -912,7 +785,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       EntityCache entityCache,
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityResolutionRules? resolutionRules) {
+      EntityResolutionRulesResolved resolutionRulesResolved) {
     var valEntityHandler = _resolveEntityHandler(
         type, entityHandlerProvider, entityRepositoryProvider);
 
@@ -924,14 +797,13 @@ abstract class EntityHandler<O> with FieldsFromMap {
       }
     }
 
-    var allowEntityFetch = (resolutionRules?.allowEntityFetch ?? false) ||
+    var allowEntityFetch = resolutionRulesResolved.allowEntityFetch ||
         entityCache.allowEntityFetch;
 
     if (allowEntityFetch && type.isEntityReferenceBaseType) {
       var entityType = type.entityType;
       var eager = entityType != null &&
-          resolutionRules != null &&
-          resolutionRules.isEagerEntityType(entityType);
+          resolutionRulesResolved.isEagerEntityType(entityType);
       allowEntityFetch = eager;
     }
 
@@ -944,7 +816,7 @@ abstract class EntityHandler<O> with FieldsFromMap {
       if (entityRepository != null) {
         var transaction = entityProvider is Transaction ? entityProvider : null;
         var retEntity = entityRepository.selectByID(value,
-            transaction: transaction, resolutionRules: resolutionRules);
+            transaction: transaction, resolutionRules: resolutionRulesResolved);
         return retEntity.resolveMapped((val) {
           return val as T?;
         });
@@ -3099,7 +2971,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
 }
 
 abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
-    with Initializable, Closable
+    with Initializable, Closable, EntityRulesResolver
     implements EntitySource<O>, EntityStorage<O> {
   static FutureOr<Map<String, dynamic>> resolveSubEntitiesFields(
       Map<String, dynamic> fields, Map<String, Type> subEntitiesFields,
@@ -4683,7 +4555,9 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
   }
 }
 
-class TransactionEntityProvider implements EntityProvider {
+class TransactionEntityProvider
+    with EntityRulesResolver
+    implements EntityProvider {
   final Transaction transaction;
 
   final EntityRepositoryProvider entityRepositoryProvider;
@@ -4692,6 +4566,12 @@ class TransactionEntityProvider implements EntityProvider {
 
   TransactionEntityProvider(
       this.transaction, this.entityRepositoryProvider, this.resolutionRules);
+
+  @override
+  EntityResolutionRules? getContextEntityResolutionRules() {
+    var context = super.getContextEntityResolutionRules();
+    return context ?? resolutionRules;
+  }
 
   @override
   FutureOr<O?> getEntityByID<O>(id,
@@ -4705,9 +4585,10 @@ class TransactionEntityProvider implements EntityProvider {
         return null;
       }
 
-      resolutionRules ??= this.resolutionRules;
+      final resolutionRulesResolved =
+          resolveEntityResolutionRules(resolutionRules ?? this.resolutionRules);
 
-      var allowEntityFetch = resolutionRules?.allowEntityFetch ?? false;
+      var allowEntityFetch = resolutionRulesResolved.allowEntityFetch;
 
       if (!allowEntityFetch) {
         return null;
@@ -4717,8 +4598,8 @@ class TransactionEntityProvider implements EntityProvider {
           entityRepositoryProvider.getEntityRepository(type: t);
       if (entityRepository == null) return null;
 
-      var sel =
-          entityRepository.selectByID(id, resolutionRules: resolutionRules);
+      var sel = entityRepository.selectByID(id,
+          resolutionRules: resolutionRulesResolved);
       return sel.resolveMapped((o) => o as O?);
     });
   }

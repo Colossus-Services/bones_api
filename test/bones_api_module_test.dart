@@ -43,6 +43,7 @@ void main() {
         'echoUser',
         'geDynamicAsync',
         'geDynamicAsync2',
+        'getContext',
         'getDynamic',
         'getUser',
         'getUserAsync'
@@ -228,6 +229,15 @@ void main() {
             _buildTestUserJson(
                 10004, 'jsmith4@email.com.echo[1]{the-msg}', 104),
           ]));
+
+      expect(
+          (await apiRoot.call(APIRequest.post('/user/getContext'))).payload,
+          equals({
+            'context': {
+              'allowEntityFetch': true,
+              'eagerEntityTypes': ['User']
+            }
+          }));
 
       apiRoot.close();
     });

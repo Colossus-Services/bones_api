@@ -278,6 +278,7 @@ export 'src/bones_api_condition_parser.dart';
 export 'src/bones_api_condition_sql.dart';
 export 'src/bones_api_config.dart';
 export 'src/bones_api_entity.dart';
+export 'src/bones_api_entity_rules.dart';
 export 'src/bones_api_entity_annotation.dart';
 export 'src/bones_api_entity_db.dart';
 export 'src/bones_api_entity_db_memory.dart';
