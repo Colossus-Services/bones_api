@@ -8,6 +8,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db_relational.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';

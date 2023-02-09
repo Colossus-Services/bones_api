@@ -6,6 +6,7 @@
   - Added: `copyWith` and `merge`.
   - Added `ValidateEntityResolutionRulesError` and `MergeEntityResolutionRulesError`.
 - Added `EntityRulesResolver`.
+- Moved entity rules classes to `bones_api_entity_rules.dart`.
 
 ## 1.3.39
 
