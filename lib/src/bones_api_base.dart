@@ -15,6 +15,7 @@ import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
@@ -211,6 +212,8 @@ abstract class APIRoot with Initializable, Closable {
   bool close() {
     if (!(super.close() as bool)) return false;
 
+    EntityRulesResolver.unregisterContextProvider(_entityRulesContextProvider);
+
     tryCallMapped(() => onClose());
 
     _instances.remove(this);
@@ -235,6 +238,9 @@ abstract class APIRoot with Initializable, Closable {
     return _modules!.values.toSet();
   }
 
+  late final _APIRootEntityRulesContextProvider _entityRulesContextProvider =
+      _APIRootEntityRulesContextProvider(this);
+
   Future<InitializationResult>? _modulesLoading;
 
   FutureOr<InitializationResult> _ensureModulesLoaded() {
@@ -246,6 +252,8 @@ abstract class APIRoot with Initializable, Closable {
     if (modulesLoading != null) {
       return modulesLoading;
     }
+
+    EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
 
     var ret = loadModules().resolveMapped((modules) {
       _modules ??= Map.fromEntries(modules.map((e) => MapEntry(e.name, e)));
@@ -610,6 +618,27 @@ abstract class APIRoot with Initializable, Closable {
   }
 }
 
+class _APIRootEntityRulesContextProvider implements EntityRulesContextProvider {
+  final APIRoot apiRoot;
+  final ZoneField<APIRequest> currentAPIRequest;
+
+  _APIRootEntityRulesContextProvider(this.apiRoot)
+      : currentAPIRequest = apiRoot.currentAPIRequest;
+
+  @override
+  EntityResolutionRules? getContextEntityResolutionRules(
+      {Zone? contextZone, Object? contextIdentifier}) {
+    var request = currentAPIRequest.get(contextZone) ?? currentAPIRequest.get();
+    if (request == null) return null;
+
+    var routeHandler = request.routeHandler;
+    if (routeHandler == null) return null;
+
+    var entityResolutionRules = routeHandler.entityResolutionRules;
+    return entityResolutionRules.isInnocuous ? null : entityResolutionRules;
+  }
+}
+
 /// The [APIRoot] information.
 ///
 /// Returned by `API-INFO`.
@@ -681,8 +710,32 @@ class APIRouteHandler<T> {
       this.function, this.parameters, Iterable<APIRouteRule>? rules)
       : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]);
 
+  EntityResolutionRules? _entityResolutionRules;
+
+  EntityResolutionRules get entityResolutionRules =>
+      _entityResolutionRules ??= _entityResolutionRulesIml();
+
+  EntityResolutionRules _entityResolutionRulesIml() {
+    var resolutionRules = rules.whereType<APIEntityResolutionRules>().toList();
+    if (resolutionRules.isEmpty) return EntityResolutionRules.innocuous;
+
+    EntityResolutionRules? allRules;
+
+    for (var r in resolutionRules) {
+      if (allRules == null) {
+        allRules = r.resolutionRules;
+      } else {
+        allRules = allRules.merge(r.resolutionRules);
+      }
+    }
+
+    return allRules ?? EntityResolutionRules.innocuous;
+  }
+
   /// Calls this route.
   FutureOr<APIResponse<T>> call(APIRequest request) {
+    request._routeHandler = this;
+
     if (!checkRules(request)) {
       _log.warning(
           "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules");
@@ -1031,6 +1084,11 @@ class APIRequest extends APIPayload {
   final Object? originalRequest;
 
   late final List<String> _pathParts;
+
+  APIRouteHandler? _routeHandler;
+
+  /// The [APIRouteHandler] used to call the route for this [APIRequest].
+  APIRouteHandler? get routeHandler => _routeHandler;
 
   APIRequest(this.method, this.path,
       {this.protocol,

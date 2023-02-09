@@ -899,8 +899,13 @@ class UserModule$reflection extends ClassReflection<UserModule>
     }
   }
 
+  static const List<Object> _classAnnotations = [
+    APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
+  ];
+
   @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  List<Object> get classAnnotations =>
+      List<Object>.unmodifiable(_classAnnotations);
 
   @override
   List<Type> get supperTypes => const <Type>[APIModule, Initializable];
@@ -1193,6 +1198,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
         'executeInitialized',
         'geDynamicAsync',
         'geDynamicAsync2',
+        'getContext',
         'getDynamic',
         'getRouteHandler',
         'getRouteHandlerByRequest',
@@ -1423,6 +1429,26 @@ class UserModule$reflection extends ClassReflection<UserModule>
             obj,
             false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+            null,
+            null,
+            null);
+      case 'getcontext':
+        return MethodReflection<UserModule,
+                Future<APIResponse<Map<dynamic, dynamic>>>>(
+            this,
+            UserModule,
+            'getContext',
+            __TR<Future<APIResponse<Map<dynamic, dynamic>>>>(Future, <__TR>[
+              __TR<APIResponse<Map<dynamic, dynamic>>>(APIResponse, <__TR>[
+                __TR<Map<dynamic, dynamic>>(
+                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
+              ])
+            ]),
+            false,
+            (o) => o!.getContext,
+            obj,
+            false,
+            null,
             null,
             null,
             null);

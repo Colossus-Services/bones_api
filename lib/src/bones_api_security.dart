@@ -8,6 +8,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_session.dart';
 
@@ -720,6 +721,25 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   @override
   Map<String, Object> toJson() =>
       {'rule': 'permission', 'types': requiredPermissionTypes.toList()};
+}
+
+/// Defines an [EntityResolutionRules] for a route.
+class APIEntityResolutionRules extends APIRouteRule {
+  final EntityResolutionRules resolutionRules;
+
+  const APIEntityResolutionRules(this.resolutionRules);
+
+  @override
+  bool validate(APIRequest request) => true;
+
+  @override
+  String toString() {
+    return 'APIEntityResolutionRules@$resolutionRules';
+  }
+
+  @override
+  Map<String, Object> toJson() =>
+      <String, Object>{'resolutionRules': resolutionRules.toJson()};
 }
 
 class SecureRandom implements Random {

@@ -299,6 +299,21 @@ class EntityResolutionRules {
           ].join(', ')}'
             '}';
   }
+
+  Map<String, Object?> toJson() => isInnocuous
+      ? <String, Object?>{}
+      : <String, Object?>{
+          if (allLazy != null) 'allLazy': allLazy,
+          if (allEager != null) 'allEager': allEager,
+          if (allowEntityFetch) 'allowEntityFetch': true,
+          if (allowReadFile) 'allowReadFile': true,
+          if (lazyEntityTypes != null && lazyEntityTypes!.isNotEmpty)
+            'lazyEntityTypes':
+                lazyEntityTypes!.map((e) => e.toString()).toList(),
+          if (eagerEntityTypes != null && eagerEntityTypes!.isNotEmpty)
+            'eagerEntityTypes':
+                eagerEntityTypes!.map((e) => e.toString()).toList(),
+        };
 }
 
 class ValidateEntityResolutionRulesError extends Error {
@@ -413,6 +428,9 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
 
   @override
   String toString() => '$resolved[resolved]';
+
+  @override
+  Map<String, Object?> toJson() => resolved.toJson();
 }
 
 class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
@@ -496,13 +514,77 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
 
   @override
   String toString() => 'EntityResolutionRules{innocuous}';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+/// An entity rules context provider.
+abstract class EntityRulesContextProvider {
+  /// Returns the [EntityResolutionRules] for the current context.
+  EntityResolutionRules? getContextEntityResolutionRules(
+      {Zone? contextZone, Object? contextIdentifier});
 }
 
 /// Mixin to resolve the [EntityResolutionRules] to apply.
 mixin EntityRulesResolver {
+  static final Set<EntityRulesContextProvider> _cotextProviders =
+      <EntityRulesContextProvider>{};
+
+  static EntityRulesContextProvider? _singleContextProvider;
+
+  static void _updateSingleContextProvider() => _singleContextProvider =
+      _cotextProviders.length == 1 ? _cotextProviders.first : null;
+
+  /// Returns the current [EntityRulesContextProvider]s.
+  static List<EntityRulesContextProvider> get cotextProviders =>
+      _cotextProviders.toList();
+
+  /// Register an [EntityRulesContextProvider].
+  static bool registerContextProvider(
+      EntityRulesContextProvider contextProvider) {
+    var added = _cotextProviders.add(contextProvider);
+    _updateSingleContextProvider();
+    return added;
+  }
+
+  /// Unregister an [EntityRulesContextProvider].
+  static bool unregisterContextProvider(
+      EntityRulesContextProvider contextProvider) {
+    var removed = _cotextProviders.remove(contextProvider);
+    _updateSingleContextProvider();
+    return removed;
+  }
+
   /// The current [EntityResolutionRules] of the current context.
   EntityResolutionRules? getContextEntityResolutionRules() {
-    return null;
+    var singleContextProvider = _singleContextProvider;
+
+    if (singleContextProvider != null) {
+      var resolutionRules = singleContextProvider
+          .getContextEntityResolutionRules(contextZone: Zone.current);
+      return resolutionRules;
+    } else if (_cotextProviders.isEmpty) {
+      return null;
+    }
+
+    var zone = Zone.current;
+
+    EntityResolutionRules? contextRule;
+
+    for (var c in _cotextProviders) {
+      var resolutionRules =
+          c.getContextEntityResolutionRules(contextZone: zone);
+      if (resolutionRules != null) {
+        if (contextRule != null) {
+          contextRule = contextRule.merge(resolutionRules);
+        } else {
+          contextRule = resolutionRules;
+        }
+      }
+    }
+
+    return contextRule;
   }
 
   /// Resolves the [resolutionRules] to apply. Merges with the current
