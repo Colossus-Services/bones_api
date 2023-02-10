@@ -1,3 +1,10 @@
+## 1.3.41
+
+- `EntityResolutionRules`:
+  - Added `mergeTolerant`.
+  - `copyWith`: added `conflictingEntityTypes`.
+  - `merge`: allowing conflicting merge when `mergeTolerant` is present.
+
 ## 1.3.40
 
 - `EntityResolutionRules`:
