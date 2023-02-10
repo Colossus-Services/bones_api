@@ -35,18 +35,23 @@ class EntityResolutionRules {
   /// If `true` all types will be lazy loaded.
   final bool? allLazy;
 
+  /// If `true` it will be ignored on a conflicting merge.
+  final bool mergeTolerant;
+
   const EntityResolutionRules(
       {bool? allowEntityFetch,
       this.allowReadFile = false,
       this.lazyEntityTypes,
       this.eagerEntityTypes,
       this.allLazy,
-      this.allEager})
+      this.allEager,
+      this.mergeTolerant = false})
       : _allowEntityFetch = allowEntityFetch,
         _innocuous = (allowEntityFetch != null ||
                 allEager != null ||
                 allLazy != null ||
-                allowReadFile)
+                allowReadFile ||
+                mergeTolerant)
             ? false
             : (lazyEntityTypes == null && eagerEntityTypes == null)
                 ? true
@@ -56,12 +61,14 @@ class EntityResolutionRules {
       {this.lazyEntityTypes,
       this.eagerEntityTypes,
       this.allLazy,
-      this.allEager})
+      this.allEager,
+      this.mergeTolerant = false})
       : _allowEntityFetch = true,
         allowReadFile = false,
         _innocuous = false;
 
-  const EntityResolutionRules.fetchEager(this.eagerEntityTypes)
+  const EntityResolutionRules.fetchEager(this.eagerEntityTypes,
+      {this.mergeTolerant = false})
       : _allowEntityFetch = true,
         allowReadFile = false,
         lazyEntityTypes = null,
@@ -69,7 +76,8 @@ class EntityResolutionRules {
         allEager = null,
         _innocuous = false;
 
-  const EntityResolutionRules.fetchLazy(this.lazyEntityTypes)
+  const EntityResolutionRules.fetchLazy(this.lazyEntityTypes,
+      {this.mergeTolerant = false})
       : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
@@ -77,7 +85,7 @@ class EntityResolutionRules {
         allEager = null,
         _innocuous = false;
 
-  const EntityResolutionRules.fetchEagerAll()
+  const EntityResolutionRules.fetchEagerAll({this.mergeTolerant = false})
       : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
@@ -86,7 +94,7 @@ class EntityResolutionRules {
         allEager = true,
         _innocuous = false;
 
-  const EntityResolutionRules.fetchLazyAll()
+  const EntityResolutionRules.fetchLazyAll({this.mergeTolerant = false})
       : _allowEntityFetch = true,
         allowReadFile = false,
         eagerEntityTypes = null,
@@ -103,7 +111,8 @@ class EntityResolutionRules {
     if (_allowEntityFetch != null ||
         allEager != null ||
         allLazy != null ||
-        allowReadFile) {
+        allowReadFile ||
+        mergeTolerant) {
       return false;
     }
 
@@ -124,6 +133,14 @@ class EntityResolutionRules {
   }
 
   String? _validateImpl() {
+    var conflict = _hasConflictingEntityTypes();
+    if (conflict != null) {
+      return "Conflicting `eagerEntityTypes` and `lazyEntityTypes`: $conflict";
+    }
+    return null;
+  }
+
+  List<Type>? _hasConflictingEntityTypes() {
     var eagerEntityTypes = this.eagerEntityTypes;
     var lazyEntityTypes = this.lazyEntityTypes;
 
@@ -134,8 +151,7 @@ class EntityResolutionRules {
       if (eagerEntityTypes.any((t) => lazyEntityTypes.contains(t))) {
         var conflict =
             eagerEntityTypes.where((t) => lazyEntityTypes.contains(t)).toList();
-
-        return "Conflicting `eagerEntityTypes` and `lazyEntityTypes`: $conflict";
+        return conflict;
       }
     }
 
@@ -197,21 +213,38 @@ class EntityResolutionRules {
   }
 
   /// Copies this instance, allowing fields overwrite.
-  EntityResolutionRules copyWith(
-      {bool? allowEntityFetch,
-      bool? allowReadFile,
-      List<Type>? lazyEntityTypes,
-      List<Type>? eagerEntityTypes,
-      bool? allLazy,
-      bool? allEager}) {
+  /// - [conflictingEntityTypes] informs the [Type]s to remove from [lazyEntityTypes] and [eagerEntityTypes].
+  EntityResolutionRules copyWith({
+    bool? allowEntityFetch,
+    bool? allowReadFile,
+    List<Type>? lazyEntityTypes,
+    List<Type>? eagerEntityTypes,
+    bool? allLazy,
+    bool? allEager,
+    bool? mergeTolerant,
+    List<Type>? conflictingEntityTypes,
+  }) {
+    lazyEntityTypes ??= this.lazyEntityTypes;
+    eagerEntityTypes ??= this.eagerEntityTypes;
+
+    if (conflictingEntityTypes != null && conflictingEntityTypes.isNotEmpty) {
+      lazyEntityTypes = lazyEntityTypes.without(conflictingEntityTypes);
+      eagerEntityTypes = eagerEntityTypes.without(conflictingEntityTypes);
+    }
+
+    lazyEntityTypes = lazyEntityTypes.nullIfEmpty();
+    eagerEntityTypes = eagerEntityTypes.nullIfEmpty();
+
     var resolutionRules = EntityResolutionRules(
       allowEntityFetch: allowEntityFetch ?? _allowEntityFetch,
       allowReadFile: allowReadFile ?? this.allowReadFile,
-      lazyEntityTypes: lazyEntityTypes ?? this.lazyEntityTypes,
-      eagerEntityTypes: eagerEntityTypes ?? this.eagerEntityTypes,
+      lazyEntityTypes: lazyEntityTypes,
+      eagerEntityTypes: eagerEntityTypes,
       allLazy: allLazy ?? this.allLazy,
       allEager: allEager ?? this.allEager,
+      mergeTolerant: mergeTolerant ?? this.mergeTolerant,
     );
+
     return resolutionRules.isInnocuous ? innocuous : resolutionRules;
   }
 
@@ -223,12 +256,21 @@ class EntityResolutionRules {
       return other;
     }
 
+    var bothMergeTolerant = mergeTolerant && other.mergeTolerant;
+
     var allowEntityFetch = _allowEntityFetch;
     if (other._allowEntityFetch != null) {
       if (allowEntityFetch == null) {
         allowEntityFetch = other._allowEntityFetch;
       } else if (allowEntityFetch != other._allowEntityFetch) {
-        throw MergeEntityResolutionRulesError(this, other, 'allowEntityFetch');
+        if (bothMergeTolerant) {
+          allowEntityFetch = null;
+        } else if (mergeTolerant) {
+          allowEntityFetch = other._allowEntityFetch;
+        } else if (!other.mergeTolerant) {
+          throw MergeEntityResolutionRulesError(
+              this, other, 'allowEntityFetch');
+        }
       }
     }
 
@@ -239,7 +281,13 @@ class EntityResolutionRules {
       if (allLazy == null) {
         allLazy = other.allLazy;
       } else if (allLazy != other.allLazy) {
-        throw MergeEntityResolutionRulesError(this, other, 'allLazy');
+        if (bothMergeTolerant) {
+          allLazy = null;
+        } else if (mergeTolerant) {
+          allLazy = other.allLazy;
+        } else if (!other.mergeTolerant) {
+          throw MergeEntityResolutionRulesError(this, other, 'allLazy');
+        }
       }
     }
 
@@ -248,23 +296,21 @@ class EntityResolutionRules {
       if (allEager == null) {
         allEager = other.allEager;
       } else if (allEager != other.allEager) {
-        throw MergeEntityResolutionRulesError(this, other, 'allEager');
+        if (bothMergeTolerant) {
+          allEager = null;
+        } else if (mergeTolerant) {
+          allEager = other.allEager;
+        } else if (!other.mergeTolerant) {
+          throw MergeEntityResolutionRulesError(this, other, 'allEager');
+        }
       }
     }
 
-    var lazyEntityTypes = this.lazyEntityTypes;
+    var lazyEntityTypes =
+        this.lazyEntityTypes.merge(other.lazyEntityTypes).nullIfEmpty();
 
-    var otherLazyEntityTypes = other.lazyEntityTypes;
-    if (otherLazyEntityTypes != null && otherLazyEntityTypes.isNotEmpty) {
-      lazyEntityTypes = [...?lazyEntityTypes, ...otherLazyEntityTypes];
-    }
-
-    var eagerEntityTypes = this.eagerEntityTypes;
-
-    var otherEagerEntityTypes = other.eagerEntityTypes;
-    if (otherEagerEntityTypes != null && otherEagerEntityTypes.isNotEmpty) {
-      eagerEntityTypes = [...?eagerEntityTypes, ...otherEagerEntityTypes];
-    }
+    var eagerEntityTypes =
+        this.eagerEntityTypes.merge(other.eagerEntityTypes).nullIfEmpty();
 
     var merge = EntityResolutionRules(
       allowEntityFetch: allowEntityFetch,
@@ -273,7 +319,50 @@ class EntityResolutionRules {
       eagerEntityTypes: eagerEntityTypes,
       allLazy: allLazy,
       allEager: allEager,
+      mergeTolerant: bothMergeTolerant,
     );
+
+    if ((mergeTolerant || other.mergeTolerant)) {
+      var conflict = merge._hasConflictingEntityTypes();
+
+      if (conflict != null) {
+        if (bothMergeTolerant) {
+          merge = merge.copyWith(conflictingEntityTypes: conflict);
+        } else {
+          List<Type>? lazyEntityTypes;
+          List<Type>? eagerEntityTypes;
+
+          if (mergeTolerant) {
+            lazyEntityTypes = this
+                .lazyEntityTypes
+                .without(conflict)
+                .merge(other.lazyEntityTypes);
+
+            eagerEntityTypes = this
+                .eagerEntityTypes
+                .without(conflict)
+                .merge(other.eagerEntityTypes);
+          } else if (other.mergeTolerant) {
+            lazyEntityTypes = other.lazyEntityTypes
+                .without(conflict)
+                .merge(this.lazyEntityTypes);
+
+            eagerEntityTypes = other.eagerEntityTypes
+                .without(conflict)
+                .merge(this.eagerEntityTypes);
+          }
+
+          merge = EntityResolutionRules(
+            allowEntityFetch: allowEntityFetch,
+            allowReadFile: allowReadFile,
+            lazyEntityTypes: lazyEntityTypes.nullIfEmpty(),
+            eagerEntityTypes: eagerEntityTypes.nullIfEmpty(),
+            allLazy: allLazy,
+            allEager: allEager,
+          );
+        }
+      }
+    }
 
     merge.validate();
 
@@ -314,6 +403,29 @@ class EntityResolutionRules {
             'eagerEntityTypes':
                 eagerEntityTypes!.map((e) => e.toString()).toList(),
         };
+}
+
+extension _ListTypeExtension on List<Type>? {
+  List<Type>? nullIfEmpty() {
+    var self = this;
+    return self == null || self.isEmpty ? null : self;
+  }
+
+  List<Type>? without(List<Type>? conflict) {
+    var self = this;
+    if (self == null) return null;
+    if (conflict == null || conflict.isEmpty) return self;
+    return self.where((t) => !conflict.contains(t)).toList();
+  }
+
+  List<Type>? merge(List<Type>? other) {
+    var self = this;
+    if (other != null && other.isNotEmpty) {
+      return [...?self, ...other];
+    } else {
+      return self;
+    }
+  }
 }
 
 class ValidateEntityResolutionRulesError extends Error {
@@ -379,6 +491,9 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
   bool get allowReadFile => resolved.allowReadFile;
 
   @override
+  bool get mergeTolerant => resolved.mergeTolerant;
+
+  @override
   bool? get allEager => resolved.allEager;
 
   @override
@@ -389,6 +504,10 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
 
   @override
   List<Type>? get lazyEntityTypes => resolved.lazyEntityTypes;
+
+  @override
+  List<Type>? _hasConflictingEntityTypes() =>
+      resolved._hasConflictingEntityTypes();
 
   @override
   bool isEagerEntityType(Type entityType, [bool def = false]) =>
@@ -413,14 +532,18 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
           List<Type>? lazyEntityTypes,
           List<Type>? eagerEntityTypes,
           bool? allLazy,
-          bool? allEager}) =>
+          bool? allEager,
+          bool? mergeTolerant,
+          List<Type>? conflictingEntityTypes}) =>
       resolved.copyWith(
           allowEntityFetch: allowEntityFetch,
           allowReadFile: allowReadFile,
           lazyEntityTypes: lazyEntityTypes,
           eagerEntityTypes: eagerEntityTypes,
           allLazy: allLazy,
-          allEager: allEager);
+          allEager: allEager,
+          mergeTolerant: mergeTolerant,
+          conflictingEntityTypes: conflictingEntityTypes);
 
   @override
   EntityResolutionRules merge(EntityResolutionRules? other) =>
@@ -467,10 +590,16 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
   bool get allowReadFile => false;
 
   @override
+  bool get mergeTolerant => false;
+
+  @override
   List<Type>? get eagerEntityTypes => null;
 
   @override
   List<Type>? get lazyEntityTypes => null;
+
+  @override
+  List<Type>? _hasConflictingEntityTypes() => null;
 
   @override
   bool isEagerEntityType(Type entityType, [bool def = false]) => false;
@@ -488,20 +617,32 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
 
   @override
   EntityResolutionRules copyWith(
-          {bool? allowEntityFetch,
-          bool? allowReadFile,
-          List<Type>? lazyEntityTypes,
-          List<Type>? eagerEntityTypes,
-          bool? allLazy,
-          bool? allEager}) =>
-      EntityResolutionRules(
-        allowEntityFetch: allowEntityFetch,
-        allowReadFile: allowReadFile ?? false,
-        lazyEntityTypes: lazyEntityTypes,
-        eagerEntityTypes: eagerEntityTypes,
-        allLazy: allLazy,
-        allEager: allEager,
-      );
+      {bool? allowEntityFetch,
+      bool? allowReadFile,
+      List<Type>? lazyEntityTypes,
+      List<Type>? eagerEntityTypes,
+      bool? allLazy,
+      bool? allEager,
+      bool? mergeTolerant,
+      List<Type>? conflictingEntityTypes}) {
+    if (conflictingEntityTypes != null && conflictingEntityTypes.isNotEmpty) {
+      lazyEntityTypes = lazyEntityTypes.without(conflictingEntityTypes);
+      eagerEntityTypes = eagerEntityTypes.without(conflictingEntityTypes);
+    }
+
+    lazyEntityTypes = lazyEntityTypes.nullIfEmpty();
+    eagerEntityTypes = eagerEntityTypes.nullIfEmpty();
+
+    return EntityResolutionRules(
+      allowEntityFetch: allowEntityFetch,
+      allowReadFile: allowReadFile ?? false,
+      lazyEntityTypes: lazyEntityTypes,
+      eagerEntityTypes: eagerEntityTypes,
+      allLazy: allLazy,
+      allEager: allEager,
+      mergeTolerant: mergeTolerant ?? false,
+    );
+  }
 
   @override
   EntityResolutionRules merge(EntityResolutionRules? other) {
