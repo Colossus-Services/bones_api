@@ -15,9 +15,13 @@ void main() {
       expect(r1.eagerEntityTypes, anyOf(isNull, isEmpty));
       expect(r1.lazyEntityTypes, anyOf(isNull, isEmpty));
       r1.validate();
+      expect(r1.toString(), equals('EntityResolutionRules{innocuous}'));
 
       expect(r1.isLazyEntityType(User), isFalse);
       expect(r1.isEagerEntityType(User), isFalse);
+
+      expect(r1.isLazyEntityTypeInfo(TypeInfo.from(User)), isFalse);
+      expect(r1.isEagerEntityTypeInfo(TypeInfo.from(User)), isFalse);
 
       expect(r1.merge(EntityResolutionRules.innocuous).isInnocuous, isTrue);
       expect(r1.copyWith().isInnocuous, isTrue);
@@ -28,6 +32,8 @@ void main() {
       expect(r2.allLazy, isNull);
       expect(r2.allowEntityFetch, isTrue);
       expect(r2.allowReadFile, isFalse);
+      expect(r2.toString(),
+          equals('EntityResolutionRules{allEager: true, allowEntityFetch}'));
 
       var r3 = r1.merge(r2);
       expect(r3.isInnocuous, isFalse);
@@ -104,6 +110,12 @@ void main() {
       expect(r2.isLazyEntityType(User), isFalse);
       expect(r2.isLazyEntityType(Account), isFalse);
 
+      expect(r2.isEagerEntityTypeInfo(TypeInfo.from(User)), isTrue);
+      expect(r2.isEagerEntityTypeInfo(TypeInfo.from(Account)), isTrue);
+
+      expect(r2.isLazyEntityTypeInfo(TypeInfo.from(User)), isFalse);
+      expect(r2.isLazyEntityTypeInfo(TypeInfo.from(Account)), isFalse);
+
       var r3 = r1.merge(EntityResolutionRules.fetchLazy([Account]));
 
       expect(r3.isInnocuous, isFalse);
@@ -141,6 +153,12 @@ void main() {
 
       expect(r1.isLazyEntityType(User), isTrue);
       expect(r1.isLazyEntityType(Account), isTrue);
+
+      expect(r1.isEagerEntityTypeInfo(TypeInfo.from(User)), isFalse);
+      expect(r1.isEagerEntityTypeInfo(TypeInfo.from(Account)), isFalse);
+
+      expect(r1.isLazyEntityTypeInfo(TypeInfo.from(User)), isTrue);
+      expect(r1.isLazyEntityTypeInfo(TypeInfo.from(Account)), isTrue);
 
       var r2 = r1.merge(EntityResolutionRules.fetchEager([Account]));
 
@@ -318,7 +336,8 @@ void main() {
       var r1 = EntityResolutionRules(allowReadFile: true);
       var r2 = EntityResolutionRules(allowReadFile: false);
 
-      expect(r1.merge(r2), isNotNull);
+      expect(r1.merge(r2).allowReadFile, isTrue);
+      expect(r2.merge(r1).allowReadFile, isTrue);
     });
 
     test('merge: allowReadFile 2', () {
@@ -326,7 +345,8 @@ void main() {
       var r2 =
           EntityResolutionRules(allowReadFile: false, eagerEntityTypes: [User]);
 
-      expect(r1.merge(r2), isNotNull);
+      expect(r1.merge(r2).allowReadFile, isTrue);
+      expect(r2.merge(r1).allowReadFile, isTrue);
     });
 
     test('merge error 1', () {
@@ -334,6 +354,9 @@ void main() {
       var r2 = EntityResolutionRules.fetchLazy([User]);
 
       expect(() => r1.merge(r2),
+          throwsA(isA<ValidateEntityResolutionRulesError>()));
+
+      expect(() => r2.merge(r1),
           throwsA(isA<ValidateEntityResolutionRulesError>()));
     });
 
@@ -343,6 +366,11 @@ void main() {
 
       expect(
           () => r1.merge(r2),
+          throwsA(isA<MergeEntityResolutionRulesError>()
+              .having((e) => e.conflict, 'conflict', contains('allEager'))));
+
+      expect(
+          () => r2.merge(r1),
           throwsA(isA<MergeEntityResolutionRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allEager'))));
     });
@@ -355,6 +383,183 @@ void main() {
           () => r1.merge(r2),
           throwsA(isA<MergeEntityResolutionRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allLazy'))));
+
+      expect(
+          () => r2.merge(r1),
+          throwsA(isA<MergeEntityResolutionRulesError>()
+              .having((e) => e.conflict, 'conflict', contains('allLazy'))));
+    });
+
+    test('merge error: conflict allowEntityFetch', () {
+      var r1 = EntityResolutionRules(allowEntityFetch: true);
+      var r2 = EntityResolutionRules(allowEntityFetch: false);
+
+      expect(
+          () => r1.merge(r2),
+          throwsA(isA<MergeEntityResolutionRulesError>().having(
+              (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
+
+      expect(
+          () => r2.merge(r1),
+          throwsA(isA<MergeEntityResolutionRulesError>().having(
+              (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
+    });
+
+    test('merge mergeTolerant: conflict allLazy', () {
+      {
+        var r1 = EntityResolutionRules(allLazy: true, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allLazy: false);
+
+        expect(r1.merge(r2).allLazy, isFalse);
+        expect(r2.merge(r1).allLazy, isFalse);
+      }
+      {
+        var r1 = EntityResolutionRules(allLazy: false, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allLazy: true);
+
+        expect(r1.merge(r2).allLazy, isTrue);
+        expect(r2.merge(r1).allLazy, isTrue);
+      }
+      {
+        var r1 = EntityResolutionRules(allLazy: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allLazy: false);
+
+        expect(r1.merge(r2).allLazy, isFalse);
+        expect(r2.merge(r1).allLazy, isFalse);
+      }
+      {
+        var r1 = EntityResolutionRules(allLazy: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allLazy: true);
+
+        expect(r1.merge(r2).allLazy, isTrue);
+        expect(r2.merge(r1).allLazy, isTrue);
+      }
+      {
+        var r1 = EntityResolutionRules(allLazy: false, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allLazy: true, mergeTolerant: true);
+
+        expect(r1.merge(r2).allLazy, isNull);
+        expect(r2.merge(r1).allLazy, isNull);
+      }
+    });
+
+    test('merge mergeTolerant: conflict allEager', () {
+      {
+        var r1 = EntityResolutionRules(allEager: true, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allEager: false);
+
+        expect(r1.merge(r2).allEager, isFalse);
+        expect(r2.merge(r1).allEager, isFalse);
+      }
+      {
+        var r1 = EntityResolutionRules(allEager: false, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allEager: true);
+
+        expect(r1.merge(r2).allEager, isTrue);
+        expect(r2.merge(r1).allEager, isTrue);
+      }
+      {
+        var r1 = EntityResolutionRules(allEager: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allEager: false);
+
+        expect(r1.merge(r2).allEager, isFalse);
+        expect(r2.merge(r1).allEager, isFalse);
+      }
+      {
+        var r1 = EntityResolutionRules(allEager: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allEager: true);
+
+        expect(r1.merge(r2).allEager, isTrue);
+        expect(r2.merge(r1).allEager, isTrue);
+      }
+      {
+        var r1 = EntityResolutionRules(allEager: false, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allEager: true, mergeTolerant: true);
+
+        expect(r1.merge(r2).allEager, isNull);
+        expect(r2.merge(r1).allEager, isNull);
+      }
+    });
+
+    test('merge mergeTolerant: conflict allowEntityFetch', () {
+      {
+        var r1 =
+            EntityResolutionRules(allowEntityFetch: true, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allowEntityFetch: false);
+
+        expect(r1.merge(r2).allowEntityFetch, isFalse);
+        expect(r2.merge(r1).allowEntityFetch, isFalse);
+      }
+      {
+        var r1 =
+            EntityResolutionRules(allowEntityFetch: false, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allowEntityFetch: true);
+
+        expect(r1.merge(r2).allowEntityFetch, isTrue);
+        expect(r2.merge(r1).allowEntityFetch, isTrue);
+      }
+      {
+        var r1 =
+            EntityResolutionRules(allowEntityFetch: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allowEntityFetch: false);
+
+        expect(r1.merge(r2).allowEntityFetch, isFalse);
+        expect(r2.merge(r1).allowEntityFetch, isFalse);
+      }
+      {
+        var r1 =
+            EntityResolutionRules(allowEntityFetch: null, mergeTolerant: true);
+        var r2 = EntityResolutionRules(allowEntityFetch: true);
+
+        expect(r1.merge(r2).allowEntityFetch, isTrue);
+        expect(r2.merge(r1).allowEntityFetch, isTrue);
+      }
+      {
+        var r1 =
+            EntityResolutionRules(allowEntityFetch: false, mergeTolerant: true);
+        var r2 =
+            EntityResolutionRules(allowEntityFetch: true, mergeTolerant: true);
+
+        expect(r1.merge(r2).allowEntityFetch, isFalse);
+        expect(r2.merge(r1).allowEntityFetch, isFalse);
+      }
+    });
+
+    test('merge mergeTolerant: conflict eagerEntityTypes/lazyEntityTypes', () {
+      {
+        var r1 = EntityResolutionRules(
+            eagerEntityTypes: [User], mergeTolerant: true);
+        var r2 = EntityResolutionRules(lazyEntityTypes: [User]);
+
+        expect(r1.merge(r2).eagerEntityTypes, isNull);
+        expect(r1.merge(r2).lazyEntityTypes, equals([User]));
+
+        expect(r2.merge(r1).eagerEntityTypes, isNull);
+        expect(r2.merge(r1).lazyEntityTypes, equals([User]));
+      }
+      {
+        var r1 =
+            EntityResolutionRules(lazyEntityTypes: [User], mergeTolerant: true);
+        var r2 = EntityResolutionRules(eagerEntityTypes: [User]);
+
+        expect(r1.merge(r2).lazyEntityTypes, isNull);
+        expect(r1.merge(r2).eagerEntityTypes, equals([User]));
+
+        expect(r2.merge(r1).lazyEntityTypes, isNull);
+        expect(r2.merge(r1).eagerEntityTypes, equals([User]));
+      }
+      {
+        var r1 =
+            EntityResolutionRules(lazyEntityTypes: [User], mergeTolerant: true);
+        var r2 = EntityResolutionRules(
+            eagerEntityTypes: [User], mergeTolerant: true);
+
+        expect(r1.merge(r2).lazyEntityTypes, isNull);
+        expect(r1.merge(r2).eagerEntityTypes, isNull);
+
+        expect(r2.merge(r1).lazyEntityTypes, isNull);
+        expect(r2.merge(r1).eagerEntityTypes, isNull);
+      }
     });
   });
 }
