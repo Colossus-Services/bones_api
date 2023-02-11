@@ -24,6 +24,11 @@ class AboutModule extends APIModule {
   APIResponse<String> about() => APIResponse.ok('About...');
 }
 
+bool _blockUserEmailCondition(EntityAccessRulesContext? c) =>
+    c?.objectAs<User>()?.email.contains('secret') ?? false;
+
+@APIEntityAccessRules(EntityAccessRules.blockFields(User, ['email'],
+    condition: _blockUserEmailCondition))
 @APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
 @EnableReflection()
 class UserModule extends APIModule {
@@ -64,11 +69,24 @@ class UserModule extends APIModule {
   Future<dynamic> geDynamicAsync2(int id) async => APIResponse.ok(
       User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
 
-  Future<APIResponse<Map>> getContext() async {
+  Future<APIResponse<Map>> getContextEntityResolutionRules() async {
     var cotextProvider = EntityRulesResolver.cotextProviders.first;
-
     var resolutionRules = cotextProvider.getContextEntityResolutionRules();
+    return APIResponse.ok(
+        {'context.resolutionRules': resolutionRules?.toJson()});
+  }
 
-    return APIResponse.ok({'context': resolutionRules?.toJson()});
+  Future<APIResponse<Map>> getRequestEntityResolutionRules(
+      APIRequest request) async {
+    var routeHandler = request.routeHandler;
+    var resolutionRules = routeHandler?.entityResolutionRules;
+    return APIResponse.ok({'resolutionRules': resolutionRules?.toJson()});
+  }
+
+  Future<APIResponse<Map>> getRequestEntityAccessRules(
+      APIRequest request) async {
+    var routeHandler = request.routeHandler;
+    var accessRules = routeHandler?.entityAccessRules;
+    return APIResponse.ok({'accessRules': accessRules?.toJson()});
   }
 }

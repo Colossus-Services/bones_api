@@ -900,6 +900,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   static const List<Object> _classAnnotations = [
+    APIEntityAccessRules(EntityAccessRules.blockFields(User, ['email'],
+        condition: _blockUserEmailCondition)),
     APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
   ];
 
@@ -1198,8 +1200,10 @@ class UserModule$reflection extends ClassReflection<UserModule>
         'executeInitialized',
         'geDynamicAsync',
         'geDynamicAsync2',
-        'getContext',
+        'getContextEntityResolutionRules',
         'getDynamic',
+        'getRequestEntityAccessRules',
+        'getRequestEntityResolutionRules',
         'getRouteHandler',
         'getRouteHandlerByRequest',
         'getRoutesHandlersNames',
@@ -1432,12 +1436,12 @@ class UserModule$reflection extends ClassReflection<UserModule>
             null,
             null,
             null);
-      case 'getcontext':
+      case 'getcontextentityresolutionrules':
         return MethodReflection<UserModule,
                 Future<APIResponse<Map<dynamic, dynamic>>>>(
             this,
             UserModule,
-            'getContext',
+            'getContextEntityResolutionRules',
             __TR<Future<APIResponse<Map<dynamic, dynamic>>>>(Future, <__TR>[
               __TR<APIResponse<Map<dynamic, dynamic>>>(APIResponse, <__TR>[
                 __TR<Map<dynamic, dynamic>>(
@@ -1445,10 +1449,54 @@ class UserModule$reflection extends ClassReflection<UserModule>
               ])
             ]),
             false,
-            (o) => o!.getContext,
+            (o) => o!.getContextEntityResolutionRules,
             obj,
             false,
             null,
+            null,
+            null,
+            null);
+      case 'getrequestentityresolutionrules':
+        return MethodReflection<UserModule,
+                Future<APIResponse<Map<dynamic, dynamic>>>>(
+            this,
+            UserModule,
+            'getRequestEntityResolutionRules',
+            __TR<Future<APIResponse<Map<dynamic, dynamic>>>>(Future, <__TR>[
+              __TR<APIResponse<Map<dynamic, dynamic>>>(APIResponse, <__TR>[
+                __TR<Map<dynamic, dynamic>>(
+                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
+              ])
+            ]),
+            false,
+            (o) => o!.getRequestEntityResolutionRules,
+            obj,
+            false,
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
+            ],
+            null,
+            null,
+            null);
+      case 'getrequestentityaccessrules':
+        return MethodReflection<UserModule,
+                Future<APIResponse<Map<dynamic, dynamic>>>>(
+            this,
+            UserModule,
+            'getRequestEntityAccessRules',
+            __TR<Future<APIResponse<Map<dynamic, dynamic>>>>(Future, <__TR>[
+              __TR<APIResponse<Map<dynamic, dynamic>>>(APIResponse, <__TR>[
+                __TR<Map<dynamic, dynamic>>(
+                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
+              ])
+            ]),
+            false,
+            (o) => o!.getRequestEntityAccessRules,
+            obj,
+            false,
+            const <__PR>[
+              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
+            ],
             null,
             null,
             null);

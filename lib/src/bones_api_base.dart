@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.41';
+  static const String VERSION = '1.3.42';
 
   static bool _boot = false;
 
@@ -441,6 +441,8 @@ abstract class APIRoot with Initializable, Closable {
         }
       }
 
+      response._apiRequest = request;
+
       return response;
     });
   }
@@ -712,6 +714,7 @@ class APIRouteHandler<T> {
 
   EntityResolutionRules? _entityResolutionRules;
 
+  /// Returns the [EntityResolutionRules] defined by [APIEntityResolutionRules] annotations.
   EntityResolutionRules get entityResolutionRules =>
       _entityResolutionRules ??= _entityResolutionRulesIml();
 
@@ -719,17 +722,34 @@ class APIRouteHandler<T> {
     var resolutionRules = rules.whereType<APIEntityResolutionRules>().toList();
     if (resolutionRules.isEmpty) return EntityResolutionRules.innocuous;
 
-    EntityResolutionRules? allRules;
+    var allRules = resolutionRules
+        .map((e) => e.resolutionRules)
+        .reduce((r, e) => r.merge(e));
 
-    for (var r in resolutionRules) {
-      if (allRules == null) {
-        allRules = r.resolutionRules;
-      } else {
-        allRules = allRules.merge(r.resolutionRules);
-      }
-    }
+    return allRules;
+  }
 
-    return allRules ?? EntityResolutionRules.innocuous;
+  static final Map<EntityAccessRules, EntityAccessRulesCached>
+      _entityAccessRulesCached = {};
+
+  EntityAccessRules? _entityAccessRules;
+
+  /// Returns the [EntityAccessRules] defined by [APIEntityAccessRules] annotations.
+  EntityAccessRules get entityAccessRules =>
+      _entityAccessRules ??= _entityAccessRulesImpl();
+
+  EntityAccessRules _entityAccessRulesImpl() {
+    var accessRules = rules.whereType<APIEntityAccessRules>().toList();
+    if (accessRules.isEmpty) return EntityAccessRules.innocuous;
+
+    var allRules =
+        accessRules.map((e) => e.accessRules).reduce((r, e) => r.merge(e));
+
+    allRules = allRules.simplified();
+    if (allRules.isInnocuous) return EntityAccessRules.innocuous;
+
+    return _entityAccessRulesCached.putIfAbsent(
+        allRules, () => EntityAccessRulesCached(allRules));
   }
 
   /// Calls this route.
@@ -2132,6 +2152,12 @@ class APIResponse<T> extends APIPayload {
   final dynamic error;
 
   final StackTrace? stackTrace;
+
+  APIRequest? _apiRequest;
+
+  /// Returns the [APIRequest] of this response.
+  /// - Defined only at the end of an [APIRoot.call].
+  APIRequest? get apiRequest => _apiRequest;
 
   /// Constructs an [APIResponse].
   ///

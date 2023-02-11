@@ -79,12 +79,20 @@ class Json {
       String maskText = '***',
       JsonFieldMatcher? removeField,
       bool removeNullFields = false,
+      ToEncodableJsonProvider? toEncodableProvider,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
       bool? autoResetEntityCache}) {
-    var jsonCodec = _buildJsonEncoder(maskField, maskText, removeField,
-        removeNullFields, toEncodable, entityHandlerProvider, entityCache);
+    var jsonCodec = _buildJsonEncoder(
+        maskField,
+        maskText,
+        removeField,
+        removeNullFields,
+        toEncodableProvider,
+        toEncodable,
+        entityHandlerProvider,
+        entityCache);
 
     return jsonCodec.toJson(o, autoResetEntityCache: autoResetEntityCache);
   }
@@ -99,12 +107,20 @@ class Json {
       String maskText = '***',
       JsonFieldMatcher? removeField,
       bool removeNullFields = false,
+      ToEncodableJsonProvider? toEncodableProvider,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
       bool? autoResetEntityCache}) {
-    var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
-        removeNullFields, toEncodable, entityHandlerProvider, entityCache);
+    var jsonEncoder = _buildJsonEncoder(
+        maskField,
+        maskText,
+        removeField,
+        removeNullFields,
+        toEncodableProvider,
+        toEncodable,
+        entityHandlerProvider,
+        entityCache);
 
     return jsonEncoder.encode(o,
         pretty: pretty, autoResetEntityCache: autoResetEntityCache);
@@ -117,12 +133,20 @@ class Json {
       String maskText = '***',
       JsonFieldMatcher? removeField,
       bool removeNullFields = false,
+      ToEncodableJsonProvider? toEncodableProvider,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache,
       bool? autoResetEntityCache}) {
-    var jsonEncoder = _buildJsonEncoder(maskField, maskText, removeField,
-        removeNullFields, toEncodable, entityHandlerProvider, entityCache);
+    var jsonEncoder = _buildJsonEncoder(
+        maskField,
+        maskText,
+        removeField,
+        removeNullFields,
+        toEncodableProvider,
+        toEncodable,
+        entityHandlerProvider,
+        entityCache);
 
     return jsonEncoder.encodeToBytes(o,
         pretty: pretty, autoResetEntityCache: autoResetEntityCache);
@@ -138,10 +162,12 @@ class Json {
       String maskText,
       JsonFieldMatcher? removeField,
       bool removeNullFields,
+      ToEncodableJsonProvider? toEncodableProvider,
       ToEncodable? toEncodable,
       EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache) {
     if (entityHandlerProvider == null &&
+        toEncodableProvider == null &&
         toEncodable == null &&
         !removeNullFields &&
         removeField == null &&
@@ -156,18 +182,27 @@ class Json {
         removeField: removeField,
         removeNullFields: removeNullFields,
         toEncodable: toEncodable == null ? null : (o, j) => toEncodable(o),
-        toEncodableProvider: (o) =>
-            _jsonEncodableProvider(o, entityHandlerProvider),
+        toEncodableProvider: toEncodableProvider != null
+            ? (o) =>
+                toEncodableProvider(o) ??
+                _jsonEncodableProvider(o, entityHandlerProvider)
+            : (o) => _jsonEncodableProvider(o, entityHandlerProvider),
         entityCache: entityCache,
         forceDuplicatedEntitiesAsID: true);
   }
 
+  static ToEncodableJsonProvider defaultToEncodableJsonProvider(
+          [EntityHandlerProvider? entityHandlerProvider]) =>
+      (o) => _jsonEncodableProvider(o, entityHandlerProvider);
+
   static ToEncodableJson? _jsonEncodableProvider(
       Object object, EntityHandlerProvider? entityHandlerProvider) {
     if (object is Time) {
-      return (o, j) => object.toString();
+      return (o, j) => o.toString();
     } else if (object is DynamicNumber) {
-      return (o, j) => object.toStringStandard();
+      return (o, j) => (o as DynamicNumber).toStringStandard();
+    } else if (object is EntityReferenceBase) {
+      return (o, j) => (o as EntityReferenceBase).toJson(j);
     }
 
     var oType = object.runtimeType;

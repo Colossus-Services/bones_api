@@ -606,7 +606,9 @@ abstract class APISecurity {
 
 /// A route rule.
 abstract class APIRouteRule {
-  const APIRouteRule();
+  final bool mandatoryClassRule;
+
+  const APIRouteRule({this.mandatoryClassRule = false});
 
   /// Returns `true` if the [request] is valid by this rule.
   bool validate(APIRequest request);
@@ -740,6 +742,26 @@ class APIEntityResolutionRules extends APIRouteRule {
   @override
   Map<String, Object> toJson() =>
       <String, Object>{'resolutionRules': resolutionRules.toJson()};
+}
+
+/// Defines an [EntityAccessRules] for a route.
+class APIEntityAccessRules extends APIRouteRule {
+  final EntityAccessRules accessRules;
+
+  const APIEntityAccessRules(this.accessRules)
+      : super(mandatoryClassRule: true);
+
+  @override
+  bool validate(APIRequest request) => true;
+
+  @override
+  String toString() {
+    return 'APIEntityAccessRules@$accessRules';
+  }
+
+  @override
+  Map<String, Object> toJson() =>
+      <String, Object>{'accessRules': accessRules.toJson()};
 }
 
 class SecureRandom implements Random {

@@ -43,8 +43,10 @@ void main() {
         'echoUser',
         'geDynamicAsync',
         'geDynamicAsync2',
-        'getContext',
+        'getContextEntityResolutionRules',
         'getDynamic',
+        'getRequestEntityAccessRules',
+        'getRequestEntityResolutionRules',
         'getUser',
         'getUserAsync'
       ];
@@ -231,11 +233,36 @@ void main() {
           ]));
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/getContext'))).payload,
+          (await apiRoot.call(
+                  APIRequest.post('/user/getContextEntityResolutionRules')))
+              .payload,
           equals({
-            'context': {
+            'context.resolutionRules': {
               'allowEntityFetch': true,
               'eagerEntityTypes': ['User']
+            }
+          }));
+
+      expect(
+          (await apiRoot.call(
+                  APIRequest.post('/user/getRequestEntityResolutionRules')))
+              .payload,
+          equals({
+            'resolutionRules': {
+              'allowEntityFetch': true,
+              'eagerEntityTypes': ['User']
+            }
+          }));
+
+      expect(
+          (await apiRoot
+                  .call(APIRequest.post('/user/getRequestEntityAccessRules')))
+              .payload,
+          equals({
+            'accessRules': {
+              'ruleType': 'block',
+              'entityType': 'User',
+              'entityFields': ['email']
             }
           }));
 
