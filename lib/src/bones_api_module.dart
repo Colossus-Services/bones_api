@@ -429,12 +429,20 @@ class APIRouteBuilder<M extends APIModule> {
       [APIRequestMethod? requestMethod]) {
     var returnsAPIResponse = apiMethod.returnsAPIResponse;
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
-    var rules = apiMethod.annotations.whereType<APIRouteRule>().toList();
 
-    if (rules.isEmpty) {
-      rules = apiMethod.classReflection.classAnnotations
-          .whereType<APIRouteRule>()
-          .toList();
+    var methodRules = apiMethod.annotations.whereType<APIRouteRule>().toList();
+    var classRules = apiMethod.classReflection.classAnnotations
+        .whereType<APIRouteRule>()
+        .toList();
+
+    List<APIRouteRule> rules;
+    if (methodRules.isEmpty) {
+      rules = classRules;
+    } else {
+      rules = [
+        ...methodRules,
+        ...classRules.where((r) => r.mandatoryClassRule),
+      ];
     }
 
     if (returnsAPIResponse && receivesAPIRequest) {

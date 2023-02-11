@@ -263,7 +263,7 @@ abstract class EntityReferenceBase<T> {
   }
 
   /// Encodes to JSON.
-  Map<String, dynamic>? toJson();
+  Map<String, dynamic>? toJson([JsonEncoder? jsonEncoder]);
 
   Map<String, dynamic>? _entityToJsonDefault(Object? entity) {
     if (entity == null) return null;
@@ -679,9 +679,13 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   DateTime? get entityTime => _entityTime;
 
   /// Returns [entity] as a JSON [Map].
-  Map<String, dynamic>? entityToJson() {
+  Map<String, dynamic>? entityToJson([JsonEncoder? jsonEncoder]) {
     var entity = this.entity;
     if (entity == null) return null;
+
+    if (jsonEncoder != null) {
+      return jsonEncoder.toJson(entity);
+    }
 
     var entityHandler = this.entityHandler;
 
@@ -712,7 +716,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// - `id`: the entity ID (if [isIdSet]).
   /// - `entity`: the entity as JSON (if [isEntitySet]). See [entityToJson].
   @override
-  Map<String, dynamic>? toJson() {
+  Map<String, dynamic>? toJson([JsonEncoder? jsonEncoder]) {
     if (isNull) return null;
 
     if (isEntitySet) {
@@ -720,7 +724,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       return <String, dynamic>{
         'EntityReference': typeName,
         if (id != null) 'id': id,
-        'entity': entityToJson(),
+        'entity': entityToJson(jsonEncoder),
       };
     } else if (isIdSet) {
       var id = this.id!;
@@ -1573,9 +1577,18 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   DateTime? get entitiesTime => _entitiesTime;
 
   /// Returns [entities] as a JSON [List] of entities [Map].
-  List<Map<String, dynamic>?>? entitiesToJson() {
+  List<Map<String, dynamic>?>? entitiesToJson([JsonEncoder? jsonEncoder]) {
     var entities = this.entities;
     if (entities == null) return null;
+
+    if (jsonEncoder != null) {
+      var jsonList = entities
+          .map((e) => e == null
+              ? null
+              : (jsonEncoder.toJson(e) as Map<String, dynamic>?))
+          .toList();
+      return jsonList;
+    }
 
     var entityHandler = this.entityHandler;
 
@@ -1613,7 +1626,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// - `ids`: the entities IDs (if [isIDsSet]).
   /// - `entities`: the entities as JSON (if [isEntitiesSet]). See [entitiesToJson].
   @override
-  Map<String, dynamic>? toJson() {
+  Map<String, dynamic>? toJson([JsonEncoder? jsonEncoder]) {
     if (isNull) {
       return null;
     }
@@ -1628,7 +1641,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       return <String, dynamic>{
         'EntityReferenceList': typeName,
         if (hasAnyID) 'ids': ids,
-        if (hasAnyEntity) 'entities': entitiesToJson(),
+        if (hasAnyEntity) 'entities': entitiesToJson(jsonEncoder),
       };
     } else if (isIDsSet) {
       var ids = this.ids!;

@@ -4,6 +4,295 @@ import 'package:test/test.dart';
 import 'bones_api_test_entities.dart';
 
 void main() {
+  group('EntityAccessRules', () {
+    testInnocuous(EntityAccessRules r1) {
+      expect(r1.isInnocuous, isTrue);
+      expect(r1.isValid, isTrue);
+      expect(r1.ruleType, isNull);
+      expect(r1.entityType, isNull);
+      expect(r1.entityFields, anyOf(isNull, isEmpty));
+      expect(r1.rules, anyOf(isNull, isEmpty));
+      expect(r1.condition, isNull);
+      r1.validate();
+      expect(r1.toString(), equals('EntityAccessRules{innocuous}'));
+
+      expect(r1.isAllowedEntityType(User), isNull);
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isNull);
+      expect(r1.simplified(), equals(EntityAccessRules.innocuous));
+      expect(r1.simplified().isInnocuous, isTrue);
+
+      expect(r1.hasRuleForEntityTypeField(User), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+
+      expect(r1.toJson(), equals({}));
+
+      expect(r1.merge(EntityAccessRules.innocuous).isInnocuous, isTrue);
+      expect(r1.copyWith().isInnocuous, isTrue);
+
+      var r2 = r1.copyWith(entityType: User);
+      expect(r2.isInnocuous, isFalse);
+      expect(r2.entityType, equals(User));
+      expect(r1.entityFields, anyOf(isNull, isEmpty));
+      expect(r1.rules, anyOf(isNull, isEmpty));
+      expect(r1.condition, isNull);
+
+      expect(r2.toString(), equals('EntityAccessRules{entityType: User}'));
+
+      var r3 = r1.merge(r2);
+      expect(r3.isInnocuous, isFalse);
+      expect(r3.entityType, equals(User));
+      expect(r3.entityFields, anyOf(isNull, isEmpty));
+      expect(r3.rules, anyOf(isNull, isEmpty));
+      expect(r3.condition, isNull);
+
+      var r4 = r2.merge(r1);
+      expect(r4.entityType, equals(User));
+      expect(r4.entityFields, anyOf(isNull, isEmpty));
+      expect(r4.rules, anyOf(isNull, isEmpty));
+      expect(r4.condition, isNull);
+    }
+
+    test('empty', () => testInnocuous(EntityAccessRules()));
+
+    test('innocuous', () => testInnocuous(EntityAccessRules.innocuous));
+
+    test('isInnocuous', () {
+      expect(EntityAccessRules().isInnocuous, isTrue);
+
+      expect(EntityAccessRules.block(User).isInnocuous, isFalse);
+      expect(EntityAccessRules.allow(User).isInnocuous, isFalse);
+      expect(
+          EntityAccessRules.group([
+            EntityAccessRules.block(User),
+            EntityAccessRules.block(Account)
+          ]).isInnocuous,
+          isFalse);
+
+      expect(EntityAccessRules.group([]).simplified().isInnocuous, isTrue);
+    });
+
+    test('block', () {
+      var r1 = EntityAccessRules.block(User);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.block));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, anyOf(isNull, isEmpty));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isFalse);
+      expect(r1.isAllowedEntityType(Account), isNull);
+    });
+
+    test('allow', () {
+      var r1 = EntityAccessRules.allow(User);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.allow));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, anyOf(isNull, isEmpty));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+    });
+
+    test('blockFields', () {
+      var r1 = EntityAccessRules.blockFields(User, ['email', 'password']);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.block));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, equals(['email', 'password']));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Address), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isNull);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+    });
+
+    test('allowFields', () {
+      var r1 = EntityAccessRules.allowFields(User, ['email', 'password']);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.allow));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, equals(['email', 'password']));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Address), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isTrue);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isTrue);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isNull);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+    });
+
+    test('group: blockFields', () {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['email', 'password']),
+        EntityAccessRules.blockFields(Account, ['user'])
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, isNull);
+      expect(r1.entityType, isNull);
+      expect(r1.entityFields, isNull);
+      expect(r1.rules?.length, equals(2));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isTrue);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isTrue);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isTrue);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isFalse);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+    });
+
+    test('group: allowFields', () {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.allowFields(User, ['email', 'password']),
+        EntityAccessRules.allowFields(Account, ['user'])
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, isNull);
+      expect(r1.entityType, isNull);
+      expect(r1.entityFields, isNull);
+      expect(r1.rules?.length, equals(2));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isTrue);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isTrue);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isTrue);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isTrue);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isTrue);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isTrue);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+    });
+
+    test('group -> simplified', () {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['email', 'password']),
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, isNull);
+      expect(r1.entityType, isNull);
+      expect(r1.entityFields, isNull);
+      expect(r1.rules?.length, equals(1));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isFalse);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isNull);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+
+      {
+        var r2 = r1.simplified();
+        expect(r2.isInnocuous, isFalse);
+        expect(r2.ruleType, equals(EntityAccessRuleType.block));
+        expect(r2.entityType, equals(User));
+        expect(r2.entityFields, equals(['email', 'password']));
+        expect(r2.rules, isNull);
+
+        expect(r2.hasRuleForEntityType(User), isTrue);
+        expect(r2.hasRuleForEntityType(Account), isFalse);
+        expect(r2.hasRuleForEntityType(Address), isFalse);
+
+        expect(r2.hasRuleForEntityTypeField(User), isTrue);
+        expect(r2.hasRuleForEntityTypeField(Account), isFalse);
+
+        expect(r2.isAllowedEntityType(User), isTrue);
+        expect(r2.isAllowedEntityType(Account), isNull);
+
+        expect(r2.isAllowedEntityTypeField(User, 'email'), isFalse);
+        expect(r2.isAllowedEntityTypeField(User, 'password'), isFalse);
+        expect(r2.isAllowedEntityTypeField(User, 'address'), isNull);
+
+        expect(r2.isAllowedEntityTypeField(Account, 'user'), isNull);
+        expect(r2.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+      }
+    });
+
+    test('merge', () {
+      var r1 = EntityAccessRules.blockFields(User, ['email', 'password']);
+      var r2 = EntityAccessRules.allowFields(Account, ['user']);
+
+      var r3 = r1.merge(r2);
+
+      expect(r3.isInnocuous, isFalse);
+      expect(r3.ruleType, isNull);
+      expect(r3.entityType, isNull);
+      expect(r3.entityFields, isNull);
+      expect(r3.rules?.length, equals(2));
+
+      expect(r3.rules?[0].ruleType, equals(EntityAccessRuleType.block));
+      expect(r3.rules?[1].ruleType, equals(EntityAccessRuleType.allow));
+    });
+  });
+
   group('EntityResolutionRules', () {
     testInnocuous(EntityResolutionRules r1) {
       expect(r1.isInnocuous, isTrue);
@@ -353,11 +642,17 @@ void main() {
       var r1 = EntityResolutionRules.fetchEager([User]);
       var r2 = EntityResolutionRules.fetchLazy([User]);
 
-      expect(() => r1.merge(r2),
-          throwsA(isA<ValidateEntityResolutionRulesError>()));
+      expect(
+          () => r1.merge(r2),
+          throwsA(isA<ValidateEntityRulesError>().having(
+              (e) => e.toString(),
+              'toString',
+              allOf(
+                contains('EntityResolutionRules'),
+                contains('Conflicting'),
+              ))));
 
-      expect(() => r2.merge(r1),
-          throwsA(isA<ValidateEntityResolutionRulesError>()));
+      expect(() => r2.merge(r1), throwsA(isA<ValidateEntityRulesError>()));
     });
 
     test('merge error: conflict allEager', () {
@@ -366,12 +661,12 @@ void main() {
 
       expect(
           () => r1.merge(r2),
-          throwsA(isA<MergeEntityResolutionRulesError>()
+          throwsA(isA<MergeEntityRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allEager'))));
 
       expect(
           () => r2.merge(r1),
-          throwsA(isA<MergeEntityResolutionRulesError>()
+          throwsA(isA<MergeEntityRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allEager'))));
     });
 
@@ -381,12 +676,12 @@ void main() {
 
       expect(
           () => r1.merge(r2),
-          throwsA(isA<MergeEntityResolutionRulesError>()
+          throwsA(isA<MergeEntityRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allLazy'))));
 
       expect(
           () => r2.merge(r1),
-          throwsA(isA<MergeEntityResolutionRulesError>()
+          throwsA(isA<MergeEntityRulesError>()
               .having((e) => e.conflict, 'conflict', contains('allLazy'))));
     });
 
@@ -396,12 +691,12 @@ void main() {
 
       expect(
           () => r1.merge(r2),
-          throwsA(isA<MergeEntityResolutionRulesError>().having(
+          throwsA(isA<MergeEntityRulesError>().having(
               (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
 
       expect(
           () => r2.merge(r1),
-          throwsA(isA<MergeEntityResolutionRulesError>().having(
+          throwsA(isA<MergeEntityRulesError>().having(
               (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
     });
 

@@ -69,12 +69,38 @@ void main() {
           Json.toJson(EntityReference.fromEntity(Role(RoleType.admin))),
           equals({
             'EntityReference': 'Role',
+            'entity': {
+              'enabled': true,
+              'id': null,
+              'type': 'admin',
+              'value': null
+            }
+          }));
+
+      expect(
+          Json.toJson(EntityReference.fromEntity(Role(RoleType.admin)),
+              removeNullFields: true),
+          equals({
+            'EntityReference': 'Role',
             'entity': {'enabled': true, 'type': 'admin'}
           }));
 
       expect(
           Json.toJson(EntityReferenceList.fromEntities(
               [Role(RoleType.admin), Role(RoleType.guest)])),
+          equals({
+            'EntityReferenceList': 'Role',
+            'entities': [
+              {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
+              {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+            ]
+          }));
+
+      expect(
+          Json.toJson(
+              EntityReferenceList.fromEntities(
+                  [Role(RoleType.admin), Role(RoleType.guest)]),
+              removeNullFields: true),
           equals({
             'EntityReferenceList': 'Role',
             'entities': [
@@ -89,6 +115,23 @@ void main() {
             'value': EntityReferenceList.fromEntities(
                 [Role(RoleType.admin), Role(RoleType.guest)])
           }),
+          equals({
+            'name': 'a',
+            'value': {
+              'EntityReferenceList': 'Role',
+              'entities': [
+                {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
+                {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+              ]
+            }
+          }));
+
+      expect(
+          Json.toJson({
+            'name': 'a',
+            'value': EntityReferenceList.fromEntities(
+                [Role(RoleType.admin), Role(RoleType.guest)])
+          }, removeNullFields: true),
           equals({
             'name': 'a',
             'value': {
@@ -109,6 +152,39 @@ void main() {
               EntityReferenceList.fromEntities([Role(RoleType.unknown)])
             ]
           }),
+          equals({
+            'name': 'a',
+            'values': [
+              {
+                'EntityReferenceList': 'Role',
+                'entities': [
+                  {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
+                  {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+                ]
+              },
+              {
+                'EntityReferenceList': 'Role',
+                'entities': [
+                  {
+                    'enabled': true,
+                    'id': null,
+                    'type': 'unknown',
+                    'value': null
+                  }
+                ]
+              }
+            ]
+          }));
+
+      expect(
+          Json.toJson({
+            'name': 'a',
+            'values': [
+              EntityReferenceList.fromEntities(
+                  [Role(RoleType.admin), Role(RoleType.guest)]),
+              EntityReferenceList.fromEntities([Role(RoleType.unknown)])
+            ]
+          }, removeNullFields: true),
           equals({
             'name': 'a',
             'values': [

@@ -13,11 +13,14 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_gzip/shelf_gzip.dart';
 import 'package:shelf_letsencrypt/shelf_letsencrypt.dart';
 import 'package:shelf_static/shelf_static.dart';
+import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
+import 'bones_api_entity_reference.dart';
+import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
@@ -1137,8 +1140,7 @@ class APIServer {
     }
 
     try {
-      var s =
-          Json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
+      var s = _jsonEncodePayload(apiResponse, payload);
       apiResponse.payloadMimeType ??= 'application/json';
       return s;
     } catch (e) {
@@ -1147,6 +1149,80 @@ class APIServer {
           resolveBestTextMimeType(s, apiResponse.payloadFileExtension);
       return s;
     }
+  }
+
+  static String _jsonEncodePayload(APIResponse<dynamic> apiResponse, payload) {
+    final apiRequest = apiResponse.apiRequest;
+
+    if (apiRequest != null) {
+      final routeHandler = apiRequest.routeHandler;
+
+      if (routeHandler != null) {
+        var accessRules = routeHandler.entityAccessRules;
+
+        if (!accessRules.isInnocuous) {
+          return Json.encode(payload,
+              toEncodableProvider: (o) => _toJsonEncodableAccessRules(
+                  apiRequest,
+                  accessRules,
+                  Json.defaultToEncodableJsonProvider(),
+                  o));
+        }
+      }
+    }
+
+    return Json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
+  }
+
+  static ToEncodableJson? _toJsonEncodableAccessRules(
+      APIRequest apiRequest,
+      EntityAccessRules accessRules,
+      ToEncodableJsonProvider encodableJsonProvider,
+      Object o) {
+    if (o is EntityReferenceList ||
+        o is DateTime ||
+        o is Time ||
+        o is Decimal ||
+        o is DynamicNumber) {
+      return null;
+    }
+
+    var t = o is EntityReference ? o.type : o.runtimeType;
+
+    if (accessRules.hasRuleForEntityType(t)) {
+      var allowType = accessRules.isAllowedEntityType(t);
+      if (allowType != null && !allowType) {
+        return (o, j) => <String, Object>{};
+      }
+
+      if (!accessRules.hasRuleForEntityTypeField(t)) {
+        return null;
+      }
+
+      return (o, j) {
+        if (o == null) return null;
+
+        var enc = encodableJsonProvider(o);
+        if (enc == null) return null;
+
+        var map = enc(o, j);
+        if (map is! Map) return map;
+
+        var t = o.runtimeType;
+
+        var c = EntityAccessRulesContext(accessRules, o, context: apiRequest);
+
+        map.removeWhere((key, _) {
+          var allowed =
+              accessRules.isAllowedEntityTypeField(t, key, context: c);
+          return allowed != null && !allowed;
+        });
+
+        return map;
+      };
+    }
+
+    return null;
   }
 
   static final RegExp _htmlTag = RegExp(r'<\w+.*?>');

@@ -1,3 +1,24 @@
+## 1.3.42
+
+- New `APIEntityAccessRules`, `EntityAccessRules`, `EntityAccessRulesCached` and `EntityAccessRulesContext`:
+- Renamed `MergeEntityResolutionRulesError` to `MergeEntityRulesError`.
+- Renamed `ValidateEntityResolutionRulesError` to `ValidateEntityRulesError`.
+- `EntityAccessRules` and `EntityResolutionRules` now extends `EntityRules`.
+- `APIRouteHandler`:
+  - Added `entityAccessRules`.
+  - Optimize `entityResolutionRules`.
+- `APIResponse`:
+  - Added field `apiRequest`.
+- `EntityReferenceBase`:
+  - `toJson`: added parameter `jsonEncoder`.
+    - Fixes some to JSON issues, preserving the parent `jsonEncoder`. 
+- `Json`:
+  - `toJson`: expose parameter `toEncodableProvider`.
+- `APIServer`:
+  - `resolveBody`:
+    - When converting to JSON respect the `EntityAccessRules` of the context.
+- test: ^1.23.1
+
 ## 1.3.41
 
 - `EntityResolutionRules`:
