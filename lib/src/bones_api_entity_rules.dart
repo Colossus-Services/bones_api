@@ -421,6 +421,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
           if (entityType != null) 'entityType': '$entityType',
           if (entityFields != null && entityFields!.isNotEmpty)
             'entityFields': entityFields,
+          if (rules != null && rules!.isNotEmpty)
+            'rules': rules!.map((e) => e.toJson()).toList(),
         };
 }
 

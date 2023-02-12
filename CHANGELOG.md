@@ -1,3 +1,7 @@
+## 1.3.43
+
+- Added `APIEntityRules`.
+
 ## 1.3.42
 
 - New `APIEntityAccessRules`, `EntityAccessRules`, `EntityAccessRulesCached` and `EntityAccessRulesContext`:
