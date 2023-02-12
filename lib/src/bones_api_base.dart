@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.42';
+  static const String VERSION = '1.3.43';
 
   static bool _boot = false;
 
@@ -719,13 +719,23 @@ class APIRouteHandler<T> {
       _entityResolutionRules ??= _entityResolutionRulesIml();
 
   EntityResolutionRules _entityResolutionRulesIml() {
-    var resolutionRules = rules.whereType<APIEntityResolutionRules>().toList();
-    if (resolutionRules.isEmpty) return EntityResolutionRules.innocuous;
-
-    var allRules = resolutionRules
+    var resolutionRules1 = rules
+        .whereType<APIEntityResolutionRules>()
         .map((e) => e.resolutionRules)
-        .reduce((r, e) => r.merge(e));
+        .toList();
 
+    var resolutionRules2 = rules
+        .whereType<APIEntityRules>()
+        .expand((e) => e.entityResolutionRules)
+        .toList();
+
+    if (resolutionRules1.isEmpty || resolutionRules2.isEmpty) {
+      return EntityResolutionRules.innocuous;
+    }
+
+    var resolutionRules = [...resolutionRules1, ...resolutionRules2];
+
+    var allRules = resolutionRules.reduce((r, e) => r.merge(e));
     return allRules;
   }
 
@@ -739,11 +749,23 @@ class APIRouteHandler<T> {
       _entityAccessRules ??= _entityAccessRulesImpl();
 
   EntityAccessRules _entityAccessRulesImpl() {
-    var accessRules = rules.whereType<APIEntityAccessRules>().toList();
-    if (accessRules.isEmpty) return EntityAccessRules.innocuous;
+    var accessRules1 = rules
+        .whereType<APIEntityAccessRules>()
+        .map((e) => e.accessRules)
+        .toList();
 
-    var allRules =
-        accessRules.map((e) => e.accessRules).reduce((r, e) => r.merge(e));
+    var accessRules2 = rules
+        .whereType<APIEntityRules>()
+        .expand((e) => e.entityAccessRules)
+        .toList();
+
+    if (accessRules1.isEmpty && accessRules2.isEmpty) {
+      return EntityAccessRules.innocuous;
+    }
+
+    var accessRules = [...accessRules1, ...accessRules2];
+
+    var allRules = accessRules.reduce((r, e) => r.merge(e));
 
     allRules = allRules.simplified();
     if (allRules.isInnocuous) return EntityAccessRules.innocuous;

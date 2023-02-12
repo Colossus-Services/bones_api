@@ -764,6 +764,31 @@ class APIEntityAccessRules extends APIRouteRule {
       <String, Object>{'accessRules': accessRules.toJson()};
 }
 
+/// Defines an [EntityResolutionRules] for a route.
+class APIEntityRules extends APIRouteRule {
+  final List<EntityRules> rules;
+
+  const APIEntityRules(this.rules);
+
+  List<EntityResolutionRules> get entityResolutionRules =>
+      rules.whereType<EntityResolutionRules>().toList();
+
+  List<EntityAccessRules> get entityAccessRules =>
+      rules.whereType<EntityAccessRules>().toList();
+
+  @override
+  bool validate(APIRequest request) => true;
+
+  @override
+  String toString() {
+    return 'APIEntityRules@$rules';
+  }
+
+  @override
+  Map<String, Object> toJson() =>
+      <String, Object>{'rules': rules.map((e) => e.toJson()).toList()};
+}
+
 class SecureRandom implements Random {
   static final Random _globalRandom1 = Random()
     ..advance(maxSteps: 211, random: Random());
