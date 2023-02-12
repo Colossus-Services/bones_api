@@ -729,7 +729,7 @@ class APIRouteHandler<T> {
         .expand((e) => e.entityResolutionRules)
         .toList();
 
-    if (resolutionRules1.isEmpty || resolutionRules2.isEmpty) {
+    if (resolutionRules1.isEmpty && resolutionRules2.isEmpty) {
       return EntityResolutionRules.innocuous;
     }
 
