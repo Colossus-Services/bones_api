@@ -1,3 +1,10 @@
+## 1.3.44
+
+- `APIRouteRule`:
+  - Adde properties `globalRules` and `noGlobalRules`.
+- archive: ^3.3.6
+- args: ^2.4.0
+
 ## 1.3.43
 
 - Added `APIEntityRules`.

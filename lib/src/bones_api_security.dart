@@ -606,9 +606,16 @@ abstract class APISecurity {
 
 /// A route rule.
 abstract class APIRouteRule {
-  final bool mandatoryClassRule;
+  /// If `true` apply this [APIRouteRule] declaration to all routes/methods.
+  /// If `false` this instance will be applied only to routes/methods without
+  /// any [APIRouteRule] declaration.
+  final bool globalRules;
 
-  const APIRouteRule({this.mandatoryClassRule = false});
+  /// If `true` blocks [APIRouteRule] with [globalRules] to be applied to
+  /// the route/method with this declaration.
+  final bool noGlobalRules;
+
+  const APIRouteRule({this.globalRules = false, this.noGlobalRules = false});
 
   /// Returns `true` if the [request] is valid by this rule.
   bool validate(APIRequest request);
@@ -729,7 +736,8 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
 class APIEntityResolutionRules extends APIRouteRule {
   final EntityResolutionRules resolutionRules;
 
-  const APIEntityResolutionRules(this.resolutionRules);
+  const APIEntityResolutionRules(this.resolutionRules,
+      {super.globalRules, super.noGlobalRules});
 
   @override
   bool validate(APIRequest request) => true;
@@ -748,8 +756,8 @@ class APIEntityResolutionRules extends APIRouteRule {
 class APIEntityAccessRules extends APIRouteRule {
   final EntityAccessRules accessRules;
 
-  const APIEntityAccessRules(this.accessRules)
-      : super(mandatoryClassRule: true);
+  const APIEntityAccessRules(this.accessRules,
+      {super.globalRules, super.noGlobalRules});
 
   @override
   bool validate(APIRequest request) => true;
@@ -768,7 +776,7 @@ class APIEntityAccessRules extends APIRouteRule {
 class APIEntityRules extends APIRouteRule {
   final List<EntityRules> rules;
 
-  const APIEntityRules(this.rules);
+  const APIEntityRules(this.rules, {super.globalRules, super.noGlobalRules});
 
   List<EntityResolutionRules> get entityResolutionRules =>
       rules.whereType<EntityResolutionRules>().toList();

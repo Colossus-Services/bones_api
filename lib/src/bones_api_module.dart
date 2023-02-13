@@ -439,10 +439,14 @@ class APIRouteBuilder<M extends APIModule> {
     if (methodRules.isEmpty) {
       rules = classRules;
     } else {
-      rules = [
-        ...methodRules,
-        ...classRules.where((r) => r.mandatoryClassRule),
-      ];
+      var noGlobalRules = methodRules.any((r) => r.noGlobalRules);
+
+      rules = noGlobalRules
+          ? methodRules
+          : [
+              ...methodRules,
+              ...classRules.where((r) => r.globalRules),
+            ];
     }
 
     if (returnsAPIResponse && receivesAPIRequest) {
