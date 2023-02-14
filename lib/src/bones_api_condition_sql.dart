@@ -123,6 +123,30 @@ class ConditionSQLEncoder extends ConditionEncoder {
     return encodeKeyConditionOperator(c, context, 'IN', valueAsList: true);
   }
 
+  @override
+  FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
+      KeyConditionGreaterThan c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, '>');
+  }
+
+  @override
+  FutureOr<EncodingContext> encodeKeyConditionGreaterThanOrEqual(
+      KeyConditionGreaterThanOrEqual c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, '>=');
+  }
+
+  @override
+  FutureOr<EncodingContext> encodeKeyConditionLessThan(
+      KeyConditionLessThan c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, '<');
+  }
+
+  @override
+  FutureOr<EncodingContext> encodeKeyConditionLessThanOrEqual(
+      KeyConditionLessThanOrEqual c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, '<=');
+  }
+
   FutureOr<EncodingContext> encodeKeyConditionOperator(
       KeyCondition c, EncodingContext context, String operator,
       {bool valueAsList = false}) {

@@ -540,7 +540,7 @@ class Json {
     if (type.isListEntity && value is Iterable) {
       return _iterableCaster(value, type, entityHandlerProvider);
     } else {
-      return jsonDecoder.fromJson(value, type: type.type);
+      return jsonDecoder.fromJson(value, typeInfo: type.typeInfo);
     }
   }
 

@@ -276,6 +276,14 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
             return KeyConditionNotEQ(keys, value);
           case '=~':
             return KeyConditionIN(keys, value);
+          case '>':
+            return KeyConditionGreaterThan(keys, value);
+          case '>=':
+            return KeyConditionGreaterThanOrEqual(keys, value);
+          case '<':
+            return KeyConditionLessThan(keys, value);
+          case '<=':
+            return KeyConditionLessThanOrEqual(keys, value);
           default:
             throw FormatException('Unknown operator: $keys $op $value');
         }
@@ -318,8 +326,15 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
         return ConditionID(value);
       });
 
-  Parser<String> conditionOperator() =>
-      (string('==') | string('!=') | string('=~')).flatten().trim();
+  Parser<String> conditionOperator() => (string('==') |
+          string('!=') |
+          string('=~') |
+          string('>=') |
+          string('<=') |
+          string('>') |
+          string('<'))
+      .flatten()
+      .trim();
 
   Parser conditionValue() => (jsonValue2() | conditionParameter());
 

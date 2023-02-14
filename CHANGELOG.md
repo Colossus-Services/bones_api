@@ -1,3 +1,10 @@
+## 1.3.45
+
+- `KeyCondition`: added support to `>`, `>=`, `<` and `<=` operators. 
+  - `KeyConditionGreaterThan`, `KeyConditionGreaterThanOrEqual`.
+  - `KeyConditionLessThan`, `KeyConditionLessThanOrEqual`.
+- `EntityHandler.createFromMap`: added parameter `jsonDecoder`.
+
 ## 1.3.44
 
 - `APIRouteRule`:

@@ -1248,6 +1248,54 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return false;
   }
 
+  static DynamicNumber valueToDynamicNumber(Object? value,
+      {DynamicNumber? def}) {
+    DynamicNumber? n;
+
+    if (value == null) {
+      n = def;
+    } else if (value is DynamicNumber) {
+      n = value;
+    } else {
+      n = Decimal.from(value.toString().trim()) ?? def;
+    }
+
+    if (n == null) {
+      throw ArgumentError(
+          "Can't convert `${value.runtimeType}` to `DynamicNumber`: $value");
+    }
+
+    return n;
+  }
+
+  static bool graterThanValue(Object? value1, Object? value2,
+      {EntityHandler? entityHandler}) {
+    var n1 = valueToDynamicNumber(value1);
+    var n2 = valueToDynamicNumber(value2);
+    return n1 > n2;
+  }
+
+  static bool graterThanOrEqualValue(Object? value1, Object? value2,
+      {EntityHandler? entityHandler}) {
+    var n1 = valueToDynamicNumber(value1);
+    var n2 = valueToDynamicNumber(value2);
+    return n1 >= n2;
+  }
+
+  static bool lessThanValue(Object? value1, Object? value2,
+      {EntityHandler? entityHandler}) {
+    var n1 = valueToDynamicNumber(value1);
+    var n2 = valueToDynamicNumber(value2);
+    return n1 < n2;
+  }
+
+  static bool lessThanOrEqualValue(Object? value1, Object? value2,
+      {EntityHandler? entityHandler}) {
+    var n1 = valueToDynamicNumber(value1);
+    var n2 = valueToDynamicNumber(value2);
+    return n1 <= n2;
+  }
+
   static bool equalsValuesBasic(Object? value1, Object? value2,
       {EntityHandler? entityHandler}) {
     if (value1 == null) return value2 == null;
@@ -1408,8 +1456,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityCache? entityCache,
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityResolutionRules? resolutionRules}) {
+      EntityResolutionRules? resolutionRules,
+      JsonDecoder? jsonDecoder}) {
     entityCache ??= JsonEntityCacheSimple();
+    jsonDecoder ??= Json.defaultDecoder;
 
     var returnFieldsUsedKeys = <String>[];
 
@@ -1431,7 +1481,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         resolvedFields.addEntries(fieldsUnusedKeys
             .map((f) => MapEntry<String, Object?>(f, fields[f])));
 
-        return instantiateFromMapImpl(resolvedFields).resolveMapped((o) {
+        return instantiateFromMapImpl(resolvedFields, jsonDecoder: jsonDecoder)
+            .resolveMapped((o) {
           if (o != null) {
             entityCache!.cacheEntity(o, getID);
             return o;
@@ -1473,7 +1524,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     });
   }
 
-  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields);
+  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields,
+      {JsonDecoder? jsonDecoder});
 
   FutureOr<O> setFieldsFromMap(O o, Map<String, dynamic> fields,
       {EntityProvider? entityProvider,
@@ -1749,7 +1801,8 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
-  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields) {
+  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields,
+      {JsonDecoder? jsonDecoder}) {
     var instantiatorFromMap = this.instantiatorFromMap;
     if (instantiatorFromMap == null) return null;
     return instantiatorFromMap(fields);
@@ -1994,9 +2047,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   FutureOr<O?> createDefault() => reflection.createInstance();
 
   @override
-  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields) =>
-      reflection.createInstanceFromMap(fields,
-          fieldNameResolver: (f, m) => m.containsKey(f) ? f : null);
+  FutureOr<O?> instantiateFromMapImpl(Map<String, dynamic> fields,
+      {JsonDecoder? jsonDecoder}) {
+    jsonDecoder ??= Json.defaultDecoder;
+
+    return reflection.createInstanceFromMap(fields,
+        fieldNameResolver: Json.defaultFieldNameResolver,
+        fieldValueResolver: (f, v, t) =>
+            Json.defaultFieldValueResolver(f, v, t, jsonDecoder!, provider));
+  }
 
   @override
   T? decodeJson<T>(String json) {
