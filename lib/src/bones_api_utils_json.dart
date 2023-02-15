@@ -540,7 +540,18 @@ class Json {
     if (type.isListEntity && value is Iterable) {
       return _iterableCaster(value, type, entityHandlerProvider);
     } else {
-      return jsonDecoder.fromJson(value, type: type.type);
+      if (type.isEntityReferenceType && value is EntityReference) {
+        if (type.arguments0?.type == value.type) {
+          return value;
+        }
+      } else if (type.isEntityReferenceListType &&
+          value is EntityReferenceList) {
+        if (type.arguments0?.type == value.type) {
+          return value;
+        }
+      }
+
+      return jsonDecoder.fromJson(value, typeInfo: type.typeInfo);
     }
   }
 

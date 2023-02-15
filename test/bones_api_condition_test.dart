@@ -258,9 +258,74 @@ void main() {
 
       var c1 = conditionParser.parse(' #ID == 123 ') as ConditionID;
       expect(c1.idValue, equals(123));
+      expect(c1.matchesEntityMap({'id': 123}, positionalParameters: [123]),
+          isTrue);
+      expect(c1.matchesEntityMap({'id': 123}, positionalParameters: [456]),
+          isTrue);
+      expect(c1.matchesEntityMap({'id': 456}, positionalParameters: [456]),
+          isFalse);
 
       var c2 = conditionParser.parse(' #ID == ? ') as ConditionID;
       expect(c2.idValue.toString(), equals('?'));
+
+      expect(c2.matchesEntityMap({'id': 123}, positionalParameters: [123]),
+          isTrue);
+      expect(c2.matchesEntityMap({'id': 123}, positionalParameters: [456]),
+          isFalse);
+      expect(c2.matchesEntityMap({'id': 456}, positionalParameters: [456]),
+          isTrue);
+    });
+
+    test('group complex', () async {
+      var conditionParser = ConditionParser();
+
+      var c1 = conditionParser.parse(
+              ' address.countryCode == ? && address.state == ? && address.latitude > ?:lat1 && address.latitude < ?:lat2 && address.longitude >= ?:long1 && address.longitude <= ?:long2 ')
+          as GroupConditionAND;
+
+      expect(c1.conditions.length, equals(6));
+      expect(c1.conditions[0], isA<KeyConditionEQ>());
+      expect(c1.conditions[1], isA<KeyConditionEQ>());
+      expect(c1.conditions[2], isA<KeyConditionGreaterThan>());
+      expect(c1.conditions[3], isA<KeyConditionLessThan>());
+      expect(c1.conditions[4], isA<KeyConditionGreaterThanOrEqual>());
+      expect(c1.conditions[5], isA<KeyConditionLessThanOrEqual>());
+
+      var m1 = c1.matchesEntityMap({
+        'address': {
+          'countryCode': 'BR',
+          'state': 'SP',
+          'latitude': 20.01,
+          'longitude': 30.01,
+        },
+      }, namedParameters: {
+        'countryCode': 'BR',
+        'state': 'SP',
+        'lat1': 20.01 - 1,
+        'lat2': 20.01 + 1,
+        'long1': 30.01 - 1,
+        'long2': 30.01 + 1,
+      });
+
+      expect(m1, isTrue);
+
+      var m2 = c1.matchesEntityMap({
+        'address': {
+          'countryCode': 'BR',
+          'state': 'SP',
+          'latitude': 20.01,
+          'longitude': 30.01,
+        },
+      }, namedParameters: {
+        'countryCode': 'BR',
+        'state': 'SP',
+        'lat1': 20.01 + 1,
+        'lat2': 20.01 + 2,
+        'long1': 30.01 - 1,
+        'long2': 30.01 + 1,
+      });
+
+      expect(m2, isFalse);
     });
   });
 

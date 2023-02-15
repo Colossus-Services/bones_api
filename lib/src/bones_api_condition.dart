@@ -178,6 +178,90 @@ class ConditionParameter extends ConditionElement {
         entityHandler: entityHandler);
   }
 
+  bool greaterThan(Object? value,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
+    var myValue = getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        : value;
+
+    return EntityHandler.graterThanValue(myValue, otherValue,
+        entityHandler: entityHandler);
+  }
+
+  bool greaterThanOrEqual(Object? value,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
+    var myValue = getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        : value;
+
+    return EntityHandler.graterThanOrEqualValue(myValue, otherValue,
+        entityHandler: entityHandler);
+  }
+
+  bool lessThan(Object? value,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
+    var myValue = getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        : value;
+
+    return EntityHandler.lessThanValue(myValue, otherValue,
+        entityHandler: entityHandler);
+  }
+
+  bool lessThanOrEqual(Object? value,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      EntityHandler? entityHandler}) {
+    var myValue = getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters)
+        : value;
+
+    return EntityHandler.lessThanOrEqualValue(myValue, otherValue,
+        entityHandler: entityHandler);
+  }
+
   bool matchesIn(List values,
       {Object? parameters,
       List? positionalParameters,
@@ -329,6 +413,106 @@ abstract class Condition<O> extends ConditionElement
       return o.toJson();
     } else {
       return o;
+    }
+  }
+
+  bool greaterThanConditionValue(Object? value1, Object? value2,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      TypeInfo? keyType,
+      EntityHandler? keyEntityHandler}) {
+    if (value1 is ConditionParameter) {
+      return value1.greaterThan(value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else if (value2 is ConditionParameter) {
+      return value2.lessThan(value1,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else {
+      var match = EntityHandler.graterThanValue(value1, value2,
+          entityHandler: keyEntityHandler);
+      return match;
+    }
+  }
+
+  bool greaterThanOrEqualConditionValue(Object? value1, Object? value2,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      TypeInfo? keyType,
+      EntityHandler? keyEntityHandler}) {
+    if (value1 is ConditionParameter) {
+      return value1.greaterThanOrEqual(value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else if (value2 is ConditionParameter) {
+      return value2.lessThanOrEqual(value1,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else {
+      var match = EntityHandler.graterThanOrEqualValue(value1, value2,
+          entityHandler: keyEntityHandler);
+      return match;
+    }
+  }
+
+  bool lessThanConditionValue(Object? value1, Object? value2,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      TypeInfo? keyType,
+      EntityHandler? keyEntityHandler}) {
+    if (value1 is ConditionParameter) {
+      return value1.lessThan(value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else if (value2 is ConditionParameter) {
+      return value2.greaterThan(value1,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else {
+      var match = EntityHandler.lessThanValue(value1, value2,
+          entityHandler: keyEntityHandler);
+      return match;
+    }
+  }
+
+  bool lessThanOrEqualConditionValue(Object? value1, Object? value2,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      TypeInfo? keyType,
+      EntityHandler? keyEntityHandler}) {
+    if (value1 is ConditionParameter) {
+      return value1.lessThanOrEqual(value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else if (value2 is ConditionParameter) {
+      return value2.greaterThanOrEqual(value1,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          entityHandler: keyEntityHandler);
+    } else {
+      var match = EntityHandler.lessThanOrEqualValue(value1, value2,
+          entityHandler: keyEntityHandler);
+      return match;
     }
   }
 
@@ -1040,7 +1224,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return equalsConditionValue(value, keyValue,
+    return equalsConditionValue(keyValue, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
@@ -1054,7 +1238,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return equalsConditionValue(value, keyValue?.value,
+    return equalsConditionValue(keyValue?.value, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
@@ -1086,7 +1270,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(value, keyValue,
+    return !equalsConditionValue(keyValue, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters);
@@ -1100,7 +1284,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
       Map<String, Object?>? namedParameters}) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(value, keyValue?.value,
+    return !equalsConditionValue(keyValue?.value, value,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
@@ -1112,6 +1296,192 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
 
   @override
   String encode() => '$encodeKey != $encodeValue';
+}
+
+class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
+  KeyConditionGreaterThan(List<ConditionKey> keys, dynamic value)
+      : super(keys, value);
+
+  @override
+  KeyConditionGreaterThan<T> cast<T>() => this is KeyConditionGreaterThan<T>
+      ? this as KeyConditionGreaterThan<T>
+      : KeyConditionGreaterThan<T>(keys, value)
+    .._markResolved(resolved);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return greaterThanConditionValue(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return greaterThanConditionValue(keyValue?.value, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey > $encodeValue';
+}
+
+class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
+  KeyConditionGreaterThanOrEqual(List<ConditionKey> keys, dynamic value)
+      : super(keys, value);
+
+  @override
+  KeyConditionGreaterThanOrEqual<T> cast<T>() =>
+      this is KeyConditionGreaterThanOrEqual<T>
+          ? this as KeyConditionGreaterThanOrEqual<T>
+          : KeyConditionGreaterThanOrEqual<T>(keys, value)
+        .._markResolved(resolved);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return greaterThanOrEqualConditionValue(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return greaterThanOrEqualConditionValue(keyValue?.value, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey >= $encodeValue';
+}
+
+class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
+  KeyConditionLessThan(List<ConditionKey> keys, dynamic value)
+      : super(keys, value);
+
+  @override
+  KeyConditionLessThan<T> cast<T>() => this is KeyConditionLessThan<T>
+      ? this as KeyConditionLessThan<T>
+      : KeyConditionLessThan<T>(keys, value)
+    .._markResolved(resolved);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return lessThanConditionValue(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return lessThanConditionValue(keyValue?.value, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey < $encodeValue';
+}
+
+class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
+  KeyConditionLessThanOrEqual(List<ConditionKey> keys, dynamic value)
+      : super(keys, value);
+
+  @override
+  KeyConditionLessThanOrEqual<T> cast<T>() =>
+      this is KeyConditionLessThanOrEqual<T>
+          ? this as KeyConditionLessThanOrEqual<T>
+          : KeyConditionLessThanOrEqual<T>(keys, value)
+        .._markResolved(resolved);
+
+  @override
+  bool matchesEntity(O o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return lessThanOrEqualConditionValue(keyValue, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters);
+  }
+
+  @override
+  bool matchesEntityMap(Map<String, dynamic> o,
+      {EntityHandler<O>? entityHandler,
+      Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters}) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return lessThanOrEqualConditionValue(keyValue?.value, value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler);
+  }
+
+  String get encodeValue => Condition.encodeConditionValue(value);
+
+  @override
+  String encode() => '$encodeKey <= $encodeValue';
 }
 
 abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {

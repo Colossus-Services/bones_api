@@ -833,6 +833,14 @@ abstract class ConditionEncoder {
       return encodeKeyConditionNotEQ(c, context);
     } else if (c is KeyConditionIN) {
       return encodeKeyConditionIN(c, context);
+    } else if (c is KeyConditionGreaterThan) {
+      return encodeKeyConditionGreaterThan(c, context);
+    } else if (c is KeyConditionGreaterThanOrEqual) {
+      return encodeKeyConditionGreaterThanOrEqual(c, context);
+    } else if (c is KeyConditionLessThan) {
+      return encodeKeyConditionLessThan(c, context);
+    } else if (c is KeyConditionLessThanOrEqual) {
+      return encodeKeyConditionLessThanOrEqual(c, context);
     } else {
       throw ConditionEncodingError("$c");
     }
@@ -846,6 +854,18 @@ abstract class ConditionEncoder {
 
   FutureOr<EncodingContext> encodeKeyConditionIN(
       KeyConditionIN c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
+      KeyConditionGreaterThan c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeKeyConditionGreaterThanOrEqual(
+      KeyConditionGreaterThanOrEqual c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeKeyConditionLessThan(
+      KeyConditionLessThan c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeKeyConditionLessThanOrEqual(
+      KeyConditionLessThanOrEqual c, EncodingContext context);
 
   FutureOr<EncodingValue<String, Object?>> resolveParameterValue(
       String valueKey,
