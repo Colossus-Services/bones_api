@@ -1493,7 +1493,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         });
       } catch (e, s) {
         _log.warning(
-            "Error creating from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
+            "Error creating `$type` from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
             e,
             s);
         return _createFromMapDefaultImpl(
@@ -2953,11 +2953,17 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
             "Can't find `EntityRepository` for type name: $typeName");
       }
 
-      var os = await entityRepository.storeAllFromJson(typeEntries,
-          resolutionRules: resolutionRules);
-      results[typeName] = os;
+      try {
+        var os = await entityRepository.storeAllFromJson(typeEntries,
+            resolutionRules: resolutionRules);
+        results[typeName] = os;
 
-      _log.info('Populated `$typeName` entries: ${os.length}$_logSectionClose');
+        _log.info(
+            'Populated `$typeName` entries: ${os.length}$_logSectionClose');
+      } catch (e, s) {
+        _log.severe('Error population `$typeName` entries.', e, s);
+        rethrow;
+      }
     }
 
     return results;

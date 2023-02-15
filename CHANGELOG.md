@@ -1,3 +1,9 @@
+## 1.3.46
+
+- `Json.defaultFieldValueResolver`:
+  - Improve resolution of `EntityReference` and ``.
+- reflection_factory: ^2.0.1
+
 ## 1.3.45
 
 - `KeyCondition`: added support to `>`, `>=`, `<` and `<=` operators. 
