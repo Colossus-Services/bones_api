@@ -905,6 +905,11 @@ class APIModuleHttpProxy implements ClassProxyListener {
     var mainType =
         typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
 
-    return mainType.fromJson(json);
+    //var debugJsonPretty = Json.encode(json, pretty: true);
+
+    var jsonDecoder = Json.decoder(
+        entityHandlerProvider: EntityHandlerProvider.globalProvider);
+
+    return mainType.fromJson(json, jsonDecoder: jsonDecoder);
   }
 }

@@ -498,7 +498,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       {EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher}) {
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache}) {
     Object? resolvedValue = value;
 
     var forceToEntityReference = false;
@@ -549,7 +550,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityProvider: entityProvider,
           entityHandlerProvider: entityHandlerProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     } else if (forceToEntityReference) {
       var t = isEntityReferenceType ? arguments0! : this;
 
@@ -557,7 +559,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityProvider: entityProvider,
           entityHandlerProvider: entityHandlerProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     }
 
     return resolvedValue as V?;
@@ -569,7 +572,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher}) {
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache}) {
     if (isEntityReferenceType) {
       var entityType = arguments0;
 
@@ -592,7 +596,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           oEntityHandler,
           entityProvider,
           entityHandlerProvider,
-          entityFetcher as EntityFetcher<E>?);
+          entityFetcher as EntityFetcher<E>?,
+          entityCache);
     }
 
     return callCasted<EntityReference>(castCall) as EntityReference<T>;
@@ -605,7 +610,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       EntityHandler<E>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<E>? entityFetcher) {
+      EntityFetcher<E>? entityFetcher,
+      EntityCache? entityCache) {
     type ??= this.type;
 
     if (o == null) {
@@ -615,7 +621,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     } else if (o is EntityReference) {
       return o as EntityReference<E>;
     } else if (o.isEntityIDType) {
@@ -625,7 +632,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     } else if (o is Map<String, dynamic>) {
       return EntityReference<E>.fromJson(o,
           type: type,
@@ -633,7 +641,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     } else {
       return EntityReference<E>.from(o,
           type: type,
@@ -641,7 +650,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     }
   }
 
@@ -652,7 +662,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
-      EntityFetcher<T>? entityFetcher}) {
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache}) {
     if (isEntityReferenceListType) {
       var entityType = arguments0;
 
@@ -682,7 +693,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           oEntityHandler,
           entityProvider,
           entityHandlerProvider,
-          entitiesFetcher as EntitiesFetcher<E>?);
+          entitiesFetcher as EntitiesFetcher<E>?,
+          entityCache);
     }
 
     return callCasted<EntityReferenceList>(castCall) as EntityReferenceList<T>;
@@ -695,7 +707,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       EntityHandler<E>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<E>? entitiesFetcher) {
+      EntitiesFetcher<E>? entitiesFetcher,
+      EntityCache? entityCache) {
     type ??= this.type;
 
     if (o == null) {
@@ -705,7 +718,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher);
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache);
     } else if (o is EntityReferenceList) {
       return o as EntityReferenceList<E>;
     } else if (o.isEntityIDType) {
@@ -715,7 +729,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher);
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache);
     } else if (o is List) {
       if (o is List<E> || o is List<E?>) {
         return EntityReferenceList<E>.fromEntities(o as dynamic,
@@ -724,7 +739,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
             entityHandler: entityHandler,
             entityHandlerProvider: entityHandlerProvider,
             entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher);
+            entitiesFetcher: entitiesFetcher,
+            entityCache: entityCache);
       } else if (o is List<Map<String, dynamic>?> ||
           o.every((Object? e) => e == null || e is Map<String, Object?>)) {
         var entitiesMaps = o is List<Map<String, dynamic>?>
@@ -736,7 +752,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
             entityHandler: entityHandler,
             entityHandlerProvider: entityHandlerProvider,
             entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher);
+            entitiesFetcher: entitiesFetcher,
+            entityCache: entityCache);
       } else if (o.every((Object? e) => e == null || e.isEntityIDType)) {
         return EntityReferenceList<E>.fromIDs(o,
             type: type,
@@ -744,7 +761,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
             entityHandler: entityHandler,
             entityHandlerProvider: entityHandlerProvider,
             entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher);
+            entitiesFetcher: entitiesFetcher,
+            entityCache: entityCache);
       } else {
         throw StateError(
             "Can't resolve `EntityReferenceList` values: (${o.runtimeType} -> ${o.map((e) => '${e.runtimeType}')}) $o");
@@ -756,7 +774,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher);
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache);
     } else {
       return EntityReferenceList<E>.from(o,
           type: type,
@@ -764,7 +783,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityHandler: entityHandler,
           entityHandlerProvider: entityHandlerProvider,
           entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher);
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache);
     }
   }
 }

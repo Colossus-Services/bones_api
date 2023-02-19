@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.1
+// BUILDER: reflection_factory/2.0.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.1');
+  static final Version _version = Version.parse('2.0.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -72,7 +72,14 @@ UserInfo UserInfo$fromJsonEncoded(String jsonEncoded) =>
 
 class Account$reflection extends ClassReflection<Account>
     with __ReflectionMixin {
-  Account$reflection([Account? object]) : super(Account, 'Account', object);
+  static final Expando<Account$reflection> _objectReflections = Expando();
+
+  factory Account$reflection([Account? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Account$reflection._(object);
+  }
+
+  Account$reflection._([Account? object]) : super(Account, 'Account', object);
 
   static bool _registered = false;
   @override
@@ -96,7 +103,7 @@ class Account$reflection extends ClassReflection<Account>
       super.withoutObjectInstance() as Account$reflection;
 
   static Account$reflection get staticInstance =>
-      _withoutObjectInstance ??= Account$reflection();
+      _withoutObjectInstance ??= Account$reflection._();
 
   @override
   Account$reflection getStaticInstance() => staticInstance;
@@ -542,7 +549,14 @@ class Account$reflection extends ClassReflection<Account>
 
 class Address$reflection extends ClassReflection<Address>
     with __ReflectionMixin {
-  Address$reflection([Address? object]) : super(Address, 'Address', object);
+  static final Expando<Address$reflection> _objectReflections = Expando();
+
+  factory Address$reflection([Address? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Address$reflection._(object);
+  }
+
+  Address$reflection._([Address? object]) : super(Address, 'Address', object);
 
   static bool _registered = false;
   @override
@@ -566,7 +580,7 @@ class Address$reflection extends ClassReflection<Address>
       super.withoutObjectInstance() as Address$reflection;
 
   static Address$reflection get staticInstance =>
-      _withoutObjectInstance ??= Address$reflection();
+      _withoutObjectInstance ??= Address$reflection._();
 
   @override
   Address$reflection getStaticInstance() => staticInstance;
@@ -1074,7 +1088,14 @@ class Address$reflection extends ClassReflection<Address>
 }
 
 class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
-  Photo$reflection([Photo? object]) : super(Photo, 'Photo', object);
+  static final Expando<Photo$reflection> _objectReflections = Expando();
+
+  factory Photo$reflection([Photo? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Photo$reflection._(object);
+  }
+
+  Photo$reflection._([Photo? object]) : super(Photo, 'Photo', object);
 
   static bool _registered = false;
   @override
@@ -1098,7 +1119,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
       super.withoutObjectInstance() as Photo$reflection;
 
   static Photo$reflection get staticInstance =>
-      _withoutObjectInstance ??= Photo$reflection();
+      _withoutObjectInstance ??= Photo$reflection._();
 
   @override
   Photo$reflection getStaticInstance() => staticInstance;
@@ -1604,7 +1625,14 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
 }
 
 class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
-  Role$reflection([Role? object]) : super(Role, 'Role', object);
+  static final Expando<Role$reflection> _objectReflections = Expando();
+
+  factory Role$reflection([Role? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Role$reflection._(object);
+  }
+
+  Role$reflection._([Role? object]) : super(Role, 'Role', object);
 
   static bool _registered = false;
   @override
@@ -1628,7 +1656,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
       super.withoutObjectInstance() as Role$reflection;
 
   static Role$reflection get staticInstance =>
-      _withoutObjectInstance ??= Role$reflection();
+      _withoutObjectInstance ??= Role$reflection._();
 
   @override
   Role$reflection getStaticInstance() => staticInstance;
@@ -2079,7 +2107,15 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
 
 class RoleType$reflection extends EnumReflection<RoleType>
     with __ReflectionMixin {
-  RoleType$reflection([RoleType? object]) : super(RoleType, 'RoleType', object);
+  static final Expando<RoleType$reflection> _objectReflections = Expando();
+
+  factory RoleType$reflection([RoleType? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= RoleType$reflection._(object);
+  }
+
+  RoleType$reflection._([RoleType? object])
+      : super(RoleType, 'RoleType', object);
 
   static bool _registered = false;
   @override
@@ -2103,7 +2139,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
       super.withoutObjectInstance() as RoleType$reflection;
 
   static RoleType$reflection get staticInstance =>
-      _withoutObjectInstance ??= RoleType$reflection();
+      _withoutObjectInstance ??= RoleType$reflection._();
 
   @override
   RoleType$reflection getStaticInstance() => staticInstance;
@@ -2133,7 +2169,14 @@ class RoleType$reflection extends EnumReflection<RoleType>
 }
 
 class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
-  Store$reflection([Store? object]) : super(Store, 'Store', object);
+  static final Expando<Store$reflection> _objectReflections = Expando();
+
+  factory Store$reflection([Store? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Store$reflection._(object);
+  }
+
+  Store$reflection._([Store? object]) : super(Store, 'Store', object);
 
   static bool _registered = false;
   @override
@@ -2157,7 +2200,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
       super.withoutObjectInstance() as Store$reflection;
 
   static Store$reflection get staticInstance =>
-      _withoutObjectInstance ??= Store$reflection();
+      _withoutObjectInstance ??= Store$reflection._();
 
   @override
   Store$reflection getStaticInstance() => staticInstance;
@@ -2617,7 +2660,14 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
 }
 
 class User$reflection extends ClassReflection<User> with __ReflectionMixin {
-  User$reflection([User? object]) : super(User, 'User', object);
+  static final Expando<User$reflection> _objectReflections = Expando();
+
+  factory User$reflection([User? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= User$reflection._(object);
+  }
+
+  User$reflection._([User? object]) : super(User, 'User', object);
 
   static bool _registered = false;
   @override
@@ -2641,7 +2691,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
       super.withoutObjectInstance() as User$reflection;
 
   static User$reflection get staticInstance =>
-      _withoutObjectInstance ??= User$reflection();
+      _withoutObjectInstance ??= User$reflection._();
 
   @override
   User$reflection getStaticInstance() => staticInstance;
@@ -3229,7 +3279,15 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
 
 class UserInfo$reflection extends ClassReflection<UserInfo>
     with __ReflectionMixin {
-  UserInfo$reflection([UserInfo? object]) : super(UserInfo, 'UserInfo', object);
+  static final Expando<UserInfo$reflection> _objectReflections = Expando();
+
+  factory UserInfo$reflection([UserInfo? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= UserInfo$reflection._(object);
+  }
+
+  UserInfo$reflection._([UserInfo? object])
+      : super(UserInfo, 'UserInfo', object);
 
   static bool _registered = false;
   @override
@@ -3253,7 +3311,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
       super.withoutObjectInstance() as UserInfo$reflection;
 
   static UserInfo$reflection get staticInstance =>
-      _withoutObjectInstance ??= UserInfo$reflection();
+      _withoutObjectInstance ??= UserInfo$reflection._();
 
   @override
   UserInfo$reflection getStaticInstance() => staticInstance;

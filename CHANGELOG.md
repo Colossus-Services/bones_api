@@ -1,3 +1,15 @@
+## 1.3.47
+
+- Improve internal use of `EntityCache`.
+- `EntityReferenceBase`:
+  - Added `_entityCache`.
+- Optimize `_InitializationChain._isParent`.
+- `APIModuleHttpProxy`:
+  - `onCall`: using `Json.decoder` with `EntityHandlerProvider.globalProvider`.
+- `Json`:
+  - Added `decoder`.
+- reflection_factory: ^2.0.3
+
 ## 1.3.46
 
 - `Json.defaultFieldValueResolver`:

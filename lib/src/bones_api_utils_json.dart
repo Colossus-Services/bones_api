@@ -36,10 +36,11 @@ class Json {
       var entityCache = jsonDecoder?.entityCache;
       var entityProvider = entityCache?.asEntityProvider;
       if (t.isValidEntityReferenceType) {
-        return t.arguments0!
-            .toEntityReference(o, entityProvider: entityProvider);
+        return t.arguments0!.toEntityReference(o,
+            entityProvider: entityProvider, entityCache: entityCache);
       } else {
-        return EntityReference.from(o, entityProvider: entityProvider);
+        return EntityReference.from(o,
+            entityProvider: entityProvider, entityCache: entityCache);
       }
     });
 
@@ -47,10 +48,11 @@ class Json {
       var entityCache = jsonDecoder?.entityCache;
       var entityProvider = entityCache?.asEntityProvider;
       if (t.isValidEntityReferenceListType) {
-        return t.arguments0!
-            .toEntityReferenceList(o, entityProvider: entityProvider);
+        return t.arguments0!.toEntityReferenceList(o,
+            entityProvider: entityProvider, entityCache: entityCache);
       } else {
-        return EntityReferenceList.from(o, entityProvider: entityProvider);
+        return EntityReferenceList.from(o,
+            entityProvider: entityProvider, entityCache: entityCache);
       }
     });
   }
@@ -226,6 +228,16 @@ class Json {
   }
 
   /// Converts [o] to [type].
+  static JsonDecoder decoder(
+      {JsomMapDecoder? jsomMapDecoder,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityCache? entityCache}) {
+    var jsonDecoder =
+        _buildJsonDecoder(jsomMapDecoder, entityHandlerProvider, entityCache);
+    return jsonDecoder;
+  }
+
+  /// Converts [o] to [type].
   static T? fromJson<T>(Object? o,
       {Type? type,
       TypeInfo? typeInfo,
@@ -398,8 +410,9 @@ class Json {
 
   static final JsonDecoder defaultDecoder = JsonDecoder(
       jsonValueDecoderProvider: _jsonValueDecoderProvider,
-      jsomMapDecoderAsyncProvider: (type, map) =>
-          _jsomMapDecoderAsyncProvider(type, null, null),
+      jsomMapDecoderAsyncProvider: (t, m, j) =>
+          _jsomMapDecoderAsyncProvider(t, j, null, null),
+      jsomMapDecoderProvider: (t, m, j) => _jsomMapDecoderProvider(t, j, null),
       entityCache: JsonEntityCacheSimple(),
       forceDuplicatedEntitiesAsID: true);
 
@@ -412,19 +425,21 @@ class Json {
     }
 
     return JsonDecoder(
-        jsonValueDecoderProvider: (t, v) =>
-            _jsonValueDecoderProvider(t, v, entityHandlerProvider, entityCache),
+        jsonValueDecoderProvider: (t, v, j) => _jsonValueDecoderProvider(
+            t, v, j, entityHandlerProvider, entityCache),
         jsomMapDecoder: jsomMapDecoder,
-        jsomMapDecoderAsyncProvider: (type, map) =>
-            _jsomMapDecoderAsyncProvider(
-                type, entityHandlerProvider, entityCache),
-        iterableCaster: (v, t) => _iterableCaster(v, t, entityHandlerProvider),
+        jsomMapDecoderAsyncProvider: (t, m, j) => _jsomMapDecoderAsyncProvider(
+            t, j, entityHandlerProvider, entityCache),
+        jsomMapDecoderProvider: (t, m, j) =>
+            _jsomMapDecoderProvider(t, j, entityHandlerProvider),
+        iterableCaster: (v, t, j) =>
+            _iterableCaster(v, t, j, entityHandlerProvider),
         entityCache: entityCache,
         forceDuplicatedEntitiesAsID: true);
   }
 
   static JsonValueDecoder<O>? _jsonValueDecoderProvider<O>(
-      Type type, Object? value,
+      Type type, Object? value, JsonDecoder jsonDecoder,
       [EntityHandlerProvider? entityHandlerProvider,
       EntityCache? entityCache]) {
     if (type == Time) {
@@ -469,8 +484,11 @@ class Json {
     return null;
   }
 
-  static JsomMapDecoderAsync? _jsomMapDecoderAsyncProvider(Type type,
-      EntityHandlerProvider? entityHandlerProvider, EntityCache? entityCache) {
+  static JsomMapDecoderAsync? _jsomMapDecoderAsyncProvider(
+      Type type,
+      JsonDecoder jsonDecoder,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityCache? entityCache) {
     if (entityHandlerProvider != null) {
       var entityHandler = entityHandlerProvider.getEntityHandler(type: type);
 
@@ -502,7 +520,21 @@ class Json {
     return null;
   }
 
-  static String defaultFieldNameResolver(
+  static JsomMapDecoder? _jsomMapDecoderProvider(Type type,
+      JsonDecoder jsonDecoder, EntityHandlerProvider? entityHandlerProvider) {
+    var classReflection = ReflectionFactory().getRegisterClassReflection(type);
+
+    if (classReflection != null) {
+      return (m, j) => classReflection.createInstanceFromMap(m,
+          fieldNameResolver: defaultFieldNameResolver,
+          fieldValueResolver: (f, v, t) =>
+              defaultFieldValueResolver(f, v, t, j, entityHandlerProvider));
+    }
+
+    return null;
+  }
+
+  static String? defaultFieldNameResolver(
       String field, Map<String, Object?> map) {
     if (map.containsKey(field)) {
       return field;
@@ -528,7 +560,8 @@ class Json {
       }
     }
 
-    return field;
+    // Non matching fields should return `null` (not present):
+    return null;
   }
 
   static Object? defaultFieldValueResolver(
@@ -538,9 +571,13 @@ class Json {
       JsonDecoder jsonDecoder,
       EntityHandlerProvider? entityHandlerProvider) {
     if (type.isListEntity && value is Iterable) {
-      return _iterableCaster(value, type, entityHandlerProvider);
+      return _iterableCaster(value, type, jsonDecoder, entityHandlerProvider);
     } else {
-      if (type.isEntityReferenceType && value is EntityReference) {
+      if (value == null) {
+        return null;
+      } else if (type.type == value.runtimeType) {
+        return value;
+      } else if (type.isEntityReferenceType && value is EntityReference) {
         if (type.arguments0?.type == value.type) {
           return value;
         }
@@ -551,20 +588,68 @@ class Json {
         }
       }
 
-      return jsonDecoder.fromJson(value, typeInfo: type.typeInfo);
+      return jsonDecoder.fromJson(value,
+          typeInfo: type.typeInfo, autoResetEntityCache: false);
     }
   }
 
   static Object? _iterableCaster(Iterable value, TypeReflection type,
-      EntityHandlerProvider? entityHandlerProvider) {
-    if (entityHandlerProvider != null) {
-      var entityType = type.isListEntityOrReference ? type.arguments0! : type;
-      var entityHandler =
-          entityHandlerProvider.getEntityHandler(type: entityType.type);
+      JsonDecoder jsonDecoder, EntityHandlerProvider? entityHandlerProvider) {
+    final entityTypeReflection =
+        type.isListEntityOrReference ? type.arguments0! : type;
+    final entityType = entityTypeReflection.type;
 
-      if (entityHandler != null) {
-        return entityHandler.castIterable(value, entityType.type);
+    EntityHandler? entityHandler;
+    if (entityHandlerProvider != null) {
+      entityHandler = entityHandlerProvider.getEntityHandler(type: entityType);
+    }
+
+    if (entityHandler == null) {
+      var classReflection =
+          ReflectionFactory().getRegisterClassReflection(entityType);
+
+      entityHandler = classReflection?.entityHandler;
+    }
+
+    if (entityHandler != null) {
+      final entityCache = jsonDecoder.entityCache;
+      var classification = entityHandler.classifyIterableElements(value);
+
+      Iterable list = value;
+
+      if (classification.isAllObj) {
+        list = value;
+      } else if (classification.isAllMap) {
+        list = value
+            .map((m) => m is Map<String, dynamic>
+                ? entityHandler!.createFromMap(m, entityCache: entityCache)
+                : null)
+            .toList();
+      } else if (classification.isAllID) {
+        list = value.map((id) {
+          if (id == null) return null;
+          var o = entityCache.getCachedEntityByID(id, type: entityType);
+          return o;
+        }).toList();
+      } else if (classification.isAllNullOrEmpty) {
+        list = value;
+      } else {
+        list = value.map((e) {
+          if (e == null) {
+            return null;
+          } else if (e is Map<String, dynamic>) {
+            return entityHandler!.createFromMap(e, entityCache: entityCache);
+          } else if ((e as Object).isEntityIDPrimitiveType) {
+            return entityCache.getCachedEntityByID(e, type: entityType);
+          } else {
+            return e;
+          }
+        }).toList();
       }
+
+      return classification.hasNull
+          ? entityHandler.castIterableNullable(list, entityType)
+          : entityHandler.castIterable(list, entityType);
     }
 
     return null;
