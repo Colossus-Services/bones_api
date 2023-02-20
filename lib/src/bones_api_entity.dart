@@ -451,14 +451,16 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           v2 = v2.resolveMapped((val) => entityType.toEntityReference(val,
               type: entityType.type,
               entityProvider: entityProvider,
-              entityHandlerProvider: entityHandlerProvider));
+              entityHandlerProvider: entityHandlerProvider,
+              entityCache: entityCache));
         } else if (t.isEntityReferenceListType) {
           var entityType = t.arguments0 ?? TypeInfo.tObject;
 
           v2 = v2.resolveMapped((val) => entityType.toEntityReferenceList(val,
               type: entityType.type,
               entityProvider: entityProvider,
-              entityHandlerProvider: entityHandlerProvider));
+              entityHandlerProvider: entityHandlerProvider,
+              entityCache: entityCache));
         }
       }
 
@@ -569,11 +571,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         if (type.isEntityReferenceType) {
           resolved = type.arguments0!.toEntityReference(value,
               entityHandler: valEntityHandler,
-              entityHandlerProvider: entityHandlerProvider);
+              entityHandlerProvider: entityHandlerProvider,
+              entityCache: entityCache);
         } else if (type.isEntityReferenceListType) {
           resolved = type.arguments0!.toEntityReferenceList(value,
               entityHandler: valEntityHandler,
-              entityHandlerProvider: entityHandlerProvider);
+              entityHandlerProvider: entityHandlerProvider,
+              entityCache: entityCache);
         } else {
           resolved = valEntityHandler != null
               ? valEntityHandler.createFromMap(value,
@@ -604,7 +608,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         if (!eagerEntityType) {
           return elementType.toEntityReferenceList(value,
               entityProvider: entityProvider,
-              entityHandler: valEntityHandler) as T;
+              entityHandler: valEntityHandler,
+              entityCache: entityCache) as T;
         }
 
         return _resolveListValueByType<T>(valEntityHandler, value, elementType,
@@ -668,7 +673,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       List<Object?> value,
       TypeInfo elementType,
       EntityProvider? entityProvider,
-      EntityCache? entityCache,
+      EntityCache entityCache,
       EntityResolutionRulesResolved resolutionRulesResolved) {
     if (!elementType.isBasicType) {
       var totalEntitiesToResolve = 0;
@@ -678,7 +683,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         if (e.isEntityIDType) {
           totalEntitiesToResolve++;
           var entity =
-              entityCache!.getCachedEntityByID(e, type: elementType.type);
+              entityCache.getCachedEntityByID(e, type: elementType.type);
 
           if (entity != null) {
             totalResolvedEntities++;
@@ -830,7 +835,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
         var entityReference = entityType.toEntityReference(value,
             entityHandler: valEntityHandler,
-            entityHandlerProvider: entityHandlerProvider ?? provider);
+            entityHandlerProvider: entityHandlerProvider ?? provider,
+            entityCache: entityCache);
 
         return entityReference as T;
       } else if (type.isEntityReferenceListType) {
@@ -838,7 +844,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
         var entityReferenceList = entityType.toEntityReferenceList(value,
             entityHandler: valEntityHandler,
-            entityHandlerProvider: entityHandlerProvider ?? provider);
+            entityHandlerProvider: entityHandlerProvider ?? provider,
+            entityCache: entityCache);
 
         return entityReferenceList as T;
       } else {
@@ -891,6 +898,49 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return itr.cast<O?>();
     }
     return null;
+  }
+
+  bool canCastIterable(Iterable itr, Type type) {
+    if (type == this.type) {
+      return itr.every((e) => e is O);
+    }
+    return false;
+  }
+
+  bool canCastIterableNullable(Iterable itr, Type type) {
+    if (type == this.type) {
+      return itr.every((e) => e is O?);
+    }
+    return false;
+  }
+
+  IterableClassification classifyIterableElements(Iterable<Object?> itr) {
+    var hasNull = false;
+    var hasObj = false;
+    var hasMap = false;
+    var hasId = false;
+    var hasOther = false;
+
+    for (var e in itr) {
+      if (e == null) {
+        hasNull = true;
+      } else if (e is O) {
+        hasObj = true;
+      } else if (e is Map) {
+        hasMap = true;
+      } else if (e.isEntityIDPrimitiveType) {
+        hasId = true;
+      } else {
+        hasOther = true;
+      }
+    }
+
+    return IterableClassification(
+        hasNull: hasNull,
+        hasObj: hasObj,
+        hasMap: hasMap,
+        hasId: hasId,
+        hasOther: hasOther);
   }
 
   EntityHandler? _resolveEntityHandler(
@@ -1102,11 +1152,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .map((key) => MapEntry<String, dynamic>(key, getField(o, key))));
   }
 
-  void setField<V>(O o, String key, V? value, {bool log = true});
+  void setField<V>(O o, String key, V? value,
+      {bool log = true, EntityCache? entityCache});
 
-  bool trySetField<V>(O o, String key, V? value) {
+  bool trySetField<V>(O o, String key, V? value, {EntityCache? entityCache}) {
     try {
-      setField<V>(o, key, value, log: false);
+      setField<V>(o, key, value, log: false, entityCache: entityCache);
       return true;
     } catch (e) {
       return false;
@@ -1488,16 +1539,19 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             return o;
           } else {
             return _createFromMapDefaultImpl(
-                resolvedFields, entityProvider, entityCache, resolutionRules);
+                resolvedFields, entityProvider, entityCache!, resolutionRules);
           }
         });
       } catch (e, s) {
-        _log.warning(
-            "Error creating `$type` from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
-            e,
-            s);
+        if (e is! UnresolvedParameterError) {
+          _log.warning(
+              "Error creating `$type` from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
+              e,
+              s);
+        }
+
         return _createFromMapDefaultImpl(
-            fields, entityProvider, entityCache, resolutionRules);
+            fields, entityProvider, entityCache!, resolutionRules);
       }
     });
   }
@@ -1505,7 +1559,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   FutureOr<O> _createFromMapDefaultImpl(
       Map<String, dynamic> fields,
       EntityProvider? entityProvider,
-      EntityCache? entityCache,
+      EntityCache entityCache,
       EntityResolutionRules? resolutionRules) {
     return createDefault().resolveMapped((o) {
       if (o == null) {
@@ -1518,7 +1572,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
               entityCache: entityCache,
               resolutionRules: resolutionRules)
           .resolveMapped((o) {
-        entityCache!.cacheEntity(o, getID);
+        entityCache.cacheEntity(o, getID);
         return o;
       });
     });
@@ -1560,7 +1614,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         entityCache: entityCache,
         resolutionRules: resolutionRules);
     return retValue2.resolveMapped((value2) {
-      setField<dynamic>(o, key, value2);
+      setField<dynamic>(o, key, value2, entityCache: entityCache);
       return value2;
     });
   }
@@ -1604,6 +1658,40 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return getEntityRepositoryByType<T>(entityType,
         entityHandlerProvider: entityHandlerProvider,
         entityRepositoryProvider: entityRepositoryProvider);
+  }
+}
+
+/// Iterable elements classification.
+/// See [EntityHandler.classifyIterableElements]
+class IterableClassification {
+  final bool hasNull;
+  final bool hasObj;
+  final bool hasMap;
+  final bool hasId;
+  final bool hasOther;
+
+  const IterableClassification(
+      {this.hasNull = false,
+      this.hasObj = false,
+      this.hasMap = false,
+      this.hasId = false,
+      this.hasOther = false});
+
+  bool get isEmpty => !hasNull && !hasObj && !hasMap && !hasId && !hasOther;
+
+  bool get isAllNull => hasNull && !hasObj && !hasMap && !hasId && !hasOther;
+
+  bool get isAllNullOrEmpty => !hasObj && !hasMap && !hasId && !hasOther;
+
+  bool get isAllObj => hasObj && !hasMap && !hasId && !hasOther;
+
+  bool get isAllID => hasId && !hasObj && !hasMap && !hasOther;
+
+  bool get isAllMap => hasMap && !hasObj && !hasId && !hasOther;
+
+  @override
+  String toString() {
+    return 'CollectionClassification{hasNull: $hasNull, hasObj: $hasObj, hasMap: $hasMap, hasId: $hasId, hasOther: $hasOther}';
   }
 }
 
@@ -1770,7 +1858,8 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
-  void setField<V>(O o, String key, V? value, {bool log = true}) {
+  void setField<V>(O o, String key, V? value,
+      {bool log = true, EntityCache? entityCache}) {
     inspectObject(o);
     try {
       return o.setField<V>(key, value);
@@ -1898,15 +1987,16 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       getFieldAnnotations(o, key)?.whereType<EntityAnnotation>().toList();
 
   @override
-  void setField<V>(O o, String key, V? value, {bool log = true}) {
+  void setField<V>(O o, String key, V? value,
+      {bool log = true, EntityCache? entityCache}) {
     try {
       var field = reflection.field<V>(key, o);
       if (field == null) return;
 
       var fieldType = field.type;
 
-      var resolvedValue =
-          fieldType.typeInfo.resolveValue<V>(value, entityHandler: this);
+      var resolvedValue = fieldType.typeInfo.resolveValue<V>(value,
+          entityHandler: this, entityCache: entityCache);
 
       field.setNullable(resolvedValue);
     } catch (e, s) {
@@ -1920,14 +2010,14 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }
 
   @override
-  bool trySetField<V>(O o, String key, V? value) {
+  bool trySetField<V>(O o, String key, V? value, {EntityCache? entityCache}) {
     var field = reflection.field<V>(key, o);
     if (field == null) return false;
 
     var fieldType = field.type;
 
-    var resolvedValue =
-        fieldType.typeInfo.resolveValue<V>(value, entityHandler: this);
+    var resolvedValue = fieldType.typeInfo
+        .resolveValue<V>(value, entityHandler: this, entityCache: entityCache);
 
     if (resolvedValue == null) {
       if (field.nullable) {
@@ -2110,11 +2200,11 @@ mixin EntityFieldAccessor<O> {
   }
 
   void setField(O o, String key, Object? value,
-      {EntityHandler<O>? entityHandler}) {
+      {EntityHandler<O>? entityHandler, EntityCache? entityCache}) {
     if (o is Entity) {
       o.setField(key, value);
     } else if (entityHandler != null) {
-      entityHandler.setField(o, key, value);
+      entityHandler.setField(o, key, value, entityCache: entityCache);
     } else if (o is Map) {
       o[key] = value;
     } else {
@@ -2470,7 +2560,8 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         }
 
         var fieldValuesEmpty = fieldValues.toList()..clear();
-        entityHandler.setField<dynamic>(o, e.key, fieldValuesEmpty);
+        entityHandler.setField<dynamic>(o, e.key, fieldValuesEmpty,
+            entityCache: transaction);
         changed = true;
       } else if (t.isCollection || EntityHandler.isReflectedEnumType(t.type)) {
         continue;
@@ -2557,7 +2648,8 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
     var changed = false;
 
     if (entityHandler.trySetField<dynamic>(
-        parentEntity, parentEntityFieldName, null)) {
+        parentEntity, parentEntityFieldName, null,
+        entityCache: transaction)) {
       preDeleteCalls.add(call);
       changed = true;
     } else {

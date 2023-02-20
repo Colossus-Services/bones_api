@@ -27,17 +27,21 @@ abstract class EntityReferenceBase<T> {
 
   EntityProvider? _entityProvider;
 
+  final EntityCache? _entityCache;
+
   EntityReferenceBase._(
       Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider)
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityCache? entityCache)
       : _type = type,
         _typeName = typeName,
         _entityHandler = entityHandler,
         _entityHandlerProvider = entityHandlerProvider,
-        _entityProvider = entityProvider {
+        _entityProvider = entityProvider,
+        _entityCache = entityCache {
     _resolveType();
     _resolveEntityHandler();
     _resolveEntityProvider();
@@ -309,9 +313,20 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
-      : this._(type, typeName, null, null, null, entityHandler, entityProvider,
-            entityHandlerProvider, entityFetcher, checkGenericType);
+      : this._(
+            type,
+            typeName,
+            null,
+            null,
+            null,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entityFetcher,
+            entityCache,
+            checkGenericType);
 
   /// Creates an [EntityReference] with the entity [id] (without a loaded [entity] instance).
   /// See [id] and [isIdSet].
@@ -322,9 +337,20 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
-      : this._(type, typeName, id, null, null, entityHandler, entityProvider,
-            entityHandlerProvider, entityFetcher, checkGenericType);
+      : this._(
+            type,
+            typeName,
+            id,
+            null,
+            null,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entityFetcher,
+            entityCache,
+            checkGenericType);
 
   /// Creates an [EntityReference] with the [entity] instance.
   /// The [id] is resolved through the [entity] instance.
@@ -336,6 +362,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
       : this._(
             type,
@@ -347,6 +374,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             entityProvider,
             entityHandlerProvider,
             entityFetcher,
+            entityCache,
             checkGenericType);
 
   /// Creates an [EntityReference] with an [entity] instance from [entityMap].
@@ -357,6 +385,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
       : this._(
             type,
@@ -368,6 +397,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             entityProvider,
             entityHandlerProvider,
             entityFetcher,
+            entityCache,
             checkGenericType);
 
   /// Creates an [EntityReference] from a JSON [Map].
@@ -380,7 +410,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher}) {
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache}) {
     var entityReferenceType = json['EntityReference'];
 
     if (entityReferenceType != null) {
@@ -408,6 +439,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entityFetcher: entityFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       } else if (id != null) {
@@ -418,6 +450,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entityFetcher: entityFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       } else {
@@ -428,6 +461,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entityFetcher: entityFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       }
@@ -439,6 +473,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               entityProvider: entityProvider,
               entityHandlerProvider: entityHandlerProvider,
               entityFetcher: entityFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     }
@@ -451,7 +486,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher}) {
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache}) {
     if (o == null) {
       return EntityReference<T>.asNull(
               type: type,
@@ -459,6 +495,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entityFetcher: entityFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     } else if (o is EntityReference) {
@@ -470,6 +507,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entityFetcher: entityFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     } else if (o is Map<String, dynamic>) {
@@ -478,7 +516,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
           typeName: typeName,
           entityHandler: entityHandler,
           entityProvider: entityProvider,
-          entityFetcher: entityFetcher);
+          entityFetcher: entityFetcher,
+          entityCache: entityCache);
     } else if (o is T) {
       return EntityReference<T>.fromEntity(o as T,
               type: type,
@@ -486,6 +525,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entityFetcher: entityFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     }
@@ -508,12 +548,13 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
       bool checkGenericType)
       : _id = id,
         _entity = entity,
         _entityFetcher = entityFetcher,
         super._(type, typeName, entityHandler, entityProvider,
-            entityHandlerProvider) {
+            entityHandlerProvider, entityCache) {
     if (entityMap != null) {
       // _id == null && _entity == null
       var entityHandler = this.entityHandler;
@@ -521,7 +562,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       if (entityHandler != null) {
         _id = entityHandler.resolveIDFromMap(entityMap);
 
-        entityHandler.createFromMap(entityMap).resolveMapped((o) {
+        entityHandler
+            .createFromMap(entityMap, entityCache: entityCache)
+            .resolveMapped((o) {
           set(o);
         });
       } else {
@@ -579,6 +622,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
           o._entityProvider,
           o._entityHandlerProvider,
           o._entityFetcher as EntityFetcher<E>?,
+          o._entityCache,
           checkGenericType);
 
       entityReference._entityTime = o._entityTime;
@@ -600,6 +644,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         _entityProvider,
         _entityHandlerProvider,
         _entityFetcher,
+        _entityCache,
         false);
 
     if (withEntity) cp._entityTime = _entityTime;
@@ -959,6 +1004,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         entityProvider,
         _entityHandlerProvider,
         fetcher,
+        _entityCache,
         false);
   }
 
@@ -1016,9 +1062,20 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
-      : this._(type, typeName, null, null, null, entityHandler, entityProvider,
-            entityHandlerProvider, entitiesFetcher, checkGenericType);
+      : this._(
+            type,
+            typeName,
+            null,
+            null,
+            null,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entitiesFetcher,
+            entityCache,
+            checkGenericType);
 
   /// Creates an empty [EntityReferenceList] (like an empty list).
   /// See [isEmpty], [ids] and [isIDsSet].
@@ -1029,6 +1086,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
       : this._(
             type,
@@ -1040,6 +1098,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             entityProvider,
             entityHandlerProvider,
             entitiesFetcher,
+            entityCache,
             checkGenericType);
 
   /// Creates an [EntityReferenceList] with the entities [ids] (without a loaded [entities] list).
@@ -1051,9 +1110,20 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
-      : this._(type, typeName, ids, null, null, entityHandler, entityProvider,
-            entityHandlerProvider, entitiesFetcher, checkGenericType);
+      : this._(
+            type,
+            typeName,
+            ids,
+            null,
+            null,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entitiesFetcher,
+            entityCache,
+            checkGenericType);
 
   /// Creates an [EntityReferenceList] with the [entities] instances list.
   /// The [ids] is resolved through the [entities] instance list.
@@ -1065,6 +1135,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
       : this._(
             type,
@@ -1076,6 +1147,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             entityProvider,
             entityHandlerProvider,
             entitiesFetcher,
+            entityCache,
             checkGenericType);
 
   /// Creates an [EntityReferenceList] with an [entities] instance list from [entitiesMaps].
@@ -1086,6 +1158,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType = true})
       : this._(
             type,
@@ -1097,6 +1170,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             entityProvider,
             entityHandlerProvider,
             entitiesFetcher,
+            entityCache,
             checkGenericType);
 
   /// Creates an [EntityReference] from a JSON [Map].
@@ -1109,7 +1183,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher}) {
+      EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache}) {
     var entityReferenceType = json['EntityReferenceList'];
 
     if (entityReferenceType != null) {
@@ -1140,6 +1215,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entitiesFetcher: entitiesFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       } else if (ids != null && ids is List<Object?>) {
@@ -1150,6 +1226,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entitiesFetcher: entitiesFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       } else {
@@ -1160,6 +1237,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
                 entityProvider: entityProvider,
                 entityHandlerProvider: entityHandlerProvider,
                 entitiesFetcher: entitiesFetcher,
+                entityCache: entityCache,
                 checkGenericType: false)
             ._autoCast();
       }
@@ -1167,7 +1245,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityReferenceType = json['EntityReference'];
 
       if (entityReferenceType != null) {
-        var entityReference = EntityReference<T>.fromJson(json);
+        var entityReference =
+            EntityReference<T>.fromJson(json, entityCache: entityCache);
 
         var isNull = entityReference.isNull;
         var id = entityReference.id;
@@ -1183,6 +1262,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
                 entityReference.entityProvider,
                 entityReference._entityHandlerProvider,
                 null,
+                entityCache,
                 false)
             ._autoCast();
       }
@@ -1195,6 +1275,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
               entityProvider: entityProvider,
               entityHandlerProvider: entityHandlerProvider,
               entitiesFetcher: entitiesFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     }
@@ -1207,6 +1288,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
+      EntityCache? entityCache,
       EntitiesFetcher<T>? entitiesFetcher}) {
     if (o == null) {
       return EntityReferenceList<T>.asNull(
@@ -1215,6 +1297,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entitiesFetcher: entitiesFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     } else if (o is EntityReferenceList) {
@@ -1227,6 +1310,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entitiesFetcher: entitiesFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     } else if (o is Map<String, dynamic>) {
@@ -1235,7 +1319,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
           typeName: typeName,
           entityHandler: entityHandler,
           entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher);
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache);
     } else if (o is List<T?>) {
       return EntityReferenceList<T>.fromEntities(o,
               type: type,
@@ -1243,6 +1328,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entitiesFetcher: entitiesFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     } else if (o is T) {
@@ -1252,6 +1338,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
               entityHandler: entityHandler,
               entityProvider: entityProvider,
               entitiesFetcher: entitiesFetcher,
+              entityCache: entityCache,
               checkGenericType: false)
           ._autoCast();
     }
@@ -1274,12 +1361,13 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntitiesFetcher<T>? entitiesFetcher,
+      EntityCache? entityCache,
       bool checkGenericType)
       : _ids = ids,
         _entities = entities,
         _entitiesFetcher = entitiesFetcher,
         super._(type, typeName, entityHandler, entityProvider,
-            entityHandlerProvider) {
+            entityHandlerProvider, entityCache) {
     if (entitiesMaps != null) {
       // _id == null && _entity == null
       var entityHandler = this.entityHandler;
@@ -1290,8 +1378,12 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
                 map == null ? null : entityHandler.resolveIDFromMap(map))
             .toList();
 
+        entityCache ??= JsonEntityCacheSimple();
+
         List<FutureOr<T?>> lAsync = entitiesMaps
-            .map((map) => map == null ? null : entityHandler.createFromMap(map))
+            .map((map) => map == null
+                ? null
+                : entityHandler.createFromMap(map, entityCache: entityCache))
             .toList(growable: false);
 
         lAsync.resolveAllNullable().resolveMapped((os) {
@@ -1353,6 +1445,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
           o._entityProvider,
           o._entityHandlerProvider,
           o._entitiesFetcher as EntitiesFetcher<E>?,
+          o._entityCache,
           false);
 
       entityReferenceList._entitiesTime = o._entitiesTime;
@@ -1374,6 +1467,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         _entityProvider,
         _entityHandlerProvider,
         _entitiesFetcher,
+        _entityCache,
         false);
 
     if (withEntity) cp._entitiesTime = _entitiesTime;
@@ -2088,7 +2182,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     }
 
     return EntityReference<T>._(type, null, id, entity, null, entityHandler,
-        entityProvider, _entityHandlerProvider, fetcher, false);
+        entityProvider, _entityHandlerProvider, fetcher, _entityCache, false);
   }
 
   @override

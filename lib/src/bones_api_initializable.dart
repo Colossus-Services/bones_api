@@ -135,12 +135,14 @@ class _InitializationChain {
     var parents = _parents;
     if (parents == null || parents.isEmpty) return false;
 
+    var allParents = <Initializable>{};
+
     var parents2 = <Initializable>{};
 
     for (var p in parents) {
       if (identical(p, o)) return true;
 
-      parents2.addAll(p._chain.parents);
+      parents2.addAllNew(p._chain.parents, allParents);
     }
 
     var parents3 = <Initializable>{};
@@ -148,7 +150,7 @@ class _InitializationChain {
     for (var p in parents2) {
       if (identical(p, o)) return true;
 
-      parents3.addAll(p._chain.parents);
+      parents3.addAllNew(p._chain.parents, allParents);
     }
 
     var parents4 = <Initializable>{};
@@ -156,7 +158,7 @@ class _InitializationChain {
     for (var p in parents3) {
       if (identical(p, o)) return true;
 
-      parents4.addAll(p._chain.parents);
+      parents4.addAllNew(p._chain.parents, allParents);
     }
 
     var parents5 = <Initializable>{};
@@ -164,7 +166,7 @@ class _InitializationChain {
     for (var p in parents4) {
       if (identical(p, o)) return true;
 
-      parents5.addAll(p._chain.parents);
+      parents5.addAllNew(p._chain.parents, allParents);
     }
 
     for (var p in parents5) {
@@ -709,6 +711,22 @@ extension _ListExtension<T> on List<T> {
     var l = <T>[];
     l.addAllUnique(this);
     return l;
+  }
+}
+
+extension _SetExtension<T> on Set<T> {
+  void addAllNew(Iterable<T> elems, Set<T> seen) {
+    for (var e in elems) {
+      addNew(e, seen);
+    }
+  }
+
+  bool addNew(T elem, Set<T> seen) {
+    if (seen.add(elem)) {
+      add(elem);
+      return true;
+    }
+    return false;
   }
 }
 

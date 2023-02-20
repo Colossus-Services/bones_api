@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.1
+// BUILDER: reflection_factory/2.0.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.1');
+  static final Version _version = Version.parse('2.0.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -39,7 +39,14 @@ UserModule UserModule$fromJsonEncoded(String jsonEncoded) =>
 
 class AboutModule$reflection extends ClassReflection<AboutModule>
     with __ReflectionMixin {
-  AboutModule$reflection([AboutModule? object])
+  static final Expando<AboutModule$reflection> _objectReflections = Expando();
+
+  factory AboutModule$reflection([AboutModule? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= AboutModule$reflection._(object);
+  }
+
+  AboutModule$reflection._([AboutModule? object])
       : super(AboutModule, 'AboutModule', object);
 
   static bool _registered = false;
@@ -65,7 +72,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
       super.withoutObjectInstance() as AboutModule$reflection;
 
   static AboutModule$reflection get staticInstance =>
-      _withoutObjectInstance ??= AboutModule$reflection();
+      _withoutObjectInstance ??= AboutModule$reflection._();
 
   @override
   AboutModule$reflection getStaticInstance() => staticInstance;
@@ -812,7 +819,14 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
 
 class UserModule$reflection extends ClassReflection<UserModule>
     with __ReflectionMixin {
-  UserModule$reflection([UserModule? object])
+  static final Expando<UserModule$reflection> _objectReflections = Expando();
+
+  factory UserModule$reflection([UserModule? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= UserModule$reflection._(object);
+  }
+
+  UserModule$reflection._([UserModule? object])
       : super(UserModule, 'UserModule', object);
 
   static bool _registered = false;
@@ -838,7 +852,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
       super.withoutObjectInstance() as UserModule$reflection;
 
   static UserModule$reflection get staticInstance =>
-      _withoutObjectInstance ??= UserModule$reflection();
+      _withoutObjectInstance ??= UserModule$reflection._();
 
   @override
   UserModule$reflection getStaticInstance() => staticInstance;
