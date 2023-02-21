@@ -829,7 +829,7 @@ class APIModuleHttpProxy implements ClassProxyListener {
     var needsJsonRequest = false;
 
     parameters = parameters.map((key, value) {
-      var val = value;
+      Object? val = value;
       if ((!value.isPrimitiveValue &&
               !value.isPrimitiveList &&
               !value.isPrimitiveMap) ||

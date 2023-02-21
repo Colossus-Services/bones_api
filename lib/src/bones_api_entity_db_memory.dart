@@ -15,6 +15,7 @@ import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('DBMemorySQLAdapter');
@@ -45,7 +46,11 @@ class DBMemorySQLAdapterContext
 /// A [DBSQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
+class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
+    implements WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemorySQLAdapter';
+
   static bool _boot = false;
 
   static void boot() {
@@ -288,7 +293,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       var tableMap = _getTableMap(t, false);
 
       if (tableMap != null) {
-        info['tables'][t] = {'ids': tableMap.keys.toList()};
+        var tables = info['tables'] as Map;
+        tables[t] = {'ids': tableMap.keys.toList()};
       }
     }
 
@@ -1166,6 +1172,9 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
 
 /// Error thrown by [DBMemorySQLAdapter] operations.
 class DBMemorySQLAdapterException extends DBSQLAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemorySQLAdapterException';
+
   DBMemorySQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,

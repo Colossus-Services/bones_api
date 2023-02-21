@@ -13,6 +13,7 @@ import 'bones_api_entity_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('DBAdapter');
 
@@ -32,7 +33,7 @@ class DBDialect {
 
   @override
   String toString() {
-    return '$runtimeType{name: $name}';
+    return '$runtimeTypeNameUnsafe{name: $name}';
   }
 }
 
@@ -982,7 +983,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     throw UnsupportedError(
-        "Relationship select not supported for: (${matcher.runtimeType}) $matcher @ $tableName ($this)");
+        "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)");
   }
 
   FutureOr<O?> _selectByID(Transaction? transaction, ConditionID matcher,
@@ -1552,7 +1553,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 
@@ -1612,7 +1613,10 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
 }
 
 /// A [DBAdapter] [Exception].
-class DBAdapterException implements Exception {
+class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBAdapterException';
+
   /// The type of the exception.
   final String type;
 
@@ -1630,9 +1634,10 @@ class DBAdapterException implements Exception {
 
   @override
   String toString() {
-    var s = '$runtimeType[$type]: $message';
+    var s = '$runtimeTypeNameSafe[$type]: $message';
     if (parentError != null) {
-      s += '\n  -- Parent ERROR>> [${parentError.runtimeType}] $parentError';
+      s +=
+          '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError';
     }
     return s;
   }

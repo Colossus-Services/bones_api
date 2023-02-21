@@ -1944,6 +1944,9 @@ class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
 
 /// A [SQLAdapter] [Exception].
 class DBSQLAdapterException extends DBAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBSQLAdapterException';
+
   DBSQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,

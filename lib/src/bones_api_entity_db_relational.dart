@@ -11,6 +11,7 @@ import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('DBRelationalAdapter');
 
@@ -587,7 +588,7 @@ class DBRelationalEntityRepository<O extends Object>
           } else {
             var fieldId = fieldEntityHandler.isEntityInstance(fieldValue)
                 ? fieldEntityHandler.getID(fieldValue)
-                : (fieldValue.isEntityIDType ? fieldValue : null);
+                : ((fieldValue as Object?).isEntityIDType ? fieldValue : null);
             return [fieldId];
           }
         }
@@ -740,7 +741,7 @@ class DBRelationalEntityRepository<O extends Object>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'bones_api_base.dart';
+import 'bones_api_utils.dart';
 
 /// API Console
 class APIConsole {
@@ -87,6 +88,6 @@ class APIConsole {
 
   @override
   String toString() {
-    return 'APIConsole{ apiType: ${apiRoot.runtimeType}, apiRoot: $apiRoot }';
+    return 'APIConsole{ apiType: ${apiRoot.runtimeTypeNameUnsafe}, apiRoot: $apiRoot }';
   }
 }

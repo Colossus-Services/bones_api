@@ -289,7 +289,6 @@ export 'dart:async';
 
 export 'package:meta/meta_meta.dart';
 export 'package:reflection_factory/reflection_factory.dart';
-
 export 'package:swiss_knife/swiss_knife.dart' show MimeType, DataURLBase64;
 
 export 'src/bones_api_authentication.dart';
@@ -299,8 +298,8 @@ export 'src/bones_api_condition_encoder.dart';
 export 'src/bones_api_condition_parser.dart';
 export 'src/bones_api_condition_sql.dart';
 export 'src/bones_api_config.dart';
+export 'src/bones_api_db_module.dart';
 export 'src/bones_api_entity.dart';
-export 'src/bones_api_entity_rules.dart';
 export 'src/bones_api_entity_annotation.dart';
 export 'src/bones_api_entity_db.dart';
 export 'src/bones_api_entity_db_memory.dart';
@@ -308,12 +307,12 @@ export 'src/bones_api_entity_db_object_memory.dart';
 export 'src/bones_api_entity_db_relational.dart';
 export 'src/bones_api_entity_db_sql.dart';
 export 'src/bones_api_entity_reference.dart';
+export 'src/bones_api_entity_rules.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_error_zone.dart';
 export 'src/bones_api_extension.dart';
 export 'src/bones_api_initializable.dart';
 export 'src/bones_api_module.dart';
-export 'src/bones_api_db_module.dart';
 export 'src/bones_api_platform.dart';
 export 'src/bones_api_repository.dart';
 export 'src/bones_api_root_starter.dart';

@@ -12,6 +12,9 @@ final dbPass = 'mypass';
 final dbName = 'mydb';
 
 class MySQLTestConfig extends APITestConfigDockerMySQL {
+  @override
+  String get runtimeTypeNameSafe => 'MySQLTestConfig';
+
   MySQLTestConfig()
       : super({
           'db': {

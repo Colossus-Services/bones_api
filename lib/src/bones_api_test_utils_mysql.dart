@@ -2,12 +2,16 @@ import 'package:async_extension/async_extension.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 
 import 'bones_api_entity_db_mysql.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_test_utils_config.dart';
 import 'bones_api_test_utils_freeport.dart' as freeport;
 
 /// A [APITestConfigDockerDB] for `MySQL`.
 class APITestConfigDockerMySQL
     extends APITestConfigDockerDBSQL<MySQLContainer> {
+  @override
+  String get runtimeTypeNameSafe => 'APITestConfigDockerMySQL';
+
   final bool forceNativePasswordAuthentication;
 
   APITestConfigDockerMySQL(Map<String, dynamic> apiConfig,
@@ -20,7 +24,8 @@ class APITestConfigDockerMySQL
   }
 
   @override
-  Map<String, dynamic> get dbConfig => apiConfigMap['db']['mysql'];
+  Map<String, dynamic> get dbConfig =>
+      apiConfigMap.getAsMap('db')?['mysql'] ?? <String, dynamic>{};
 
   @override
   MySQLContainerConfig createDBContainerConfig(int dbPort) =>

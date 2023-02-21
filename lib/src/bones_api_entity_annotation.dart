@@ -2,6 +2,8 @@ import 'package:collection/collection.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_utils.dart';
+
 abstract class EntityAnnotation {
   const EntityAnnotation();
 }
@@ -105,7 +107,7 @@ class EntityField extends EntityAnnotation {
         } else if (value is Iterable) {
           if (value.length > maximum) {
             invalid = true;
-            valueStr = '${value.runtimeType}{length: ${value.length}';
+            valueStr = '${value.runtimeTypeNameUnsafe}{length: ${value.length}';
           }
         }
 
@@ -132,7 +134,7 @@ class EntityField extends EntityAnnotation {
         } else if (value is Iterable) {
           if (value.length < minimum) {
             invalid = true;
-            valueStr = '${value.runtimeType}{length: ${value.length}';
+            valueStr = '${value.runtimeTypeNameUnsafe}{length: ${value.length}';
           }
         }
 
@@ -276,7 +278,7 @@ class EntityFieldInvalid extends Error {
         fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
 
     var parentStr = parentError != null
-        ? '\n  -- Parent ERROR>> [${parentError.runtimeType}] $parentError'
+        ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
         : '';
 
     return 'Invalid entity$entityStr field$fieldStr> $message$parentStr';

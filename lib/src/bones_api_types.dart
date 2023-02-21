@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_utils.dart';
+
 /// A [Time] represents the time of the day,
 /// independently of the day of the year, timezone or [DateTime].
 class Time implements Comparable<Time> {
@@ -157,12 +159,12 @@ class Time implements Comparable<Time> {
         return Time.parse(s, allowFromBytes: false);
       } catch (_) {
         throw FormatException(
-            'Invalid bytes or string format: ${bytes.runtimeType}:${bytes.toList()}');
+            'Invalid bytes or string format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}');
       }
     }
 
     throw FormatException(
-        'Invalid bytes format: ${bytes.runtimeType}:${bytes.toList()}');
+        'Invalid bytes format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}');
   }
 
   /// Parses [s] to [Time].

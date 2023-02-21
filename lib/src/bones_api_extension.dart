@@ -9,6 +9,7 @@ import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_module.dart';
+import 'bones_api_utils.dart';
 
 /// [ReflectionFactory] extension.
 extension ReflectionFactoryExtension on ReflectionFactory {
@@ -765,7 +766,7 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
             entityCache: entityCache);
       } else {
         throw StateError(
-            "Can't resolve `EntityReferenceList` values: (${o.runtimeType} -> ${o.map((e) => '${e.runtimeType}')}) $o");
+            "Can't resolve `EntityReferenceList` values: (${o.runtimeTypeNameUnsafe} -> ${o.map((e) => (e as Object?).runtimeTypeNameUnsafe)}) $o");
       }
     } else if (o is Map<String, dynamic>) {
       return EntityReferenceList<E>.fromJson(o,

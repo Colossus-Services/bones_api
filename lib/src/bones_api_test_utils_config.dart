@@ -8,8 +8,10 @@ import 'bones_api_config.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db_memory.dart';
 import 'bones_api_entity_db_sql.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_root_starter.dart';
 import 'bones_api_utils_collections.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('APITestConfig');
 
@@ -51,7 +53,7 @@ class APITestConfig {
   FutureOr<bool> stop() => true;
 
   @override
-  String toString() => '$runtimeType$apiConfigMap';
+  String toString() => '$runtimeTypeNameUnsafe$apiConfigMap';
 
   /// Creates an [APIRootStarter] using this [APITestConfig] as pre-initialization and stopper.
   APIRootStarter<A> createAPIRootStarter<A extends APIRoot>(
@@ -310,7 +312,7 @@ class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
       : super('memory', apiConfig);
 
   @override
-  Map<String, dynamic> get dbConfig => apiConfigMap['db']['memory'];
+  Map<String, dynamic> get dbConfig => apiConfigMap.getAsMap('db')?['memory'];
 
   @override
   FutureOr<int> resolveFreePort(int port) => 5000;
@@ -404,7 +406,7 @@ abstract class APITestConfigDBSQL extends APITestConfigDB {
 abstract class APITestConfigDockerDB<C extends DockerContainer>
     extends APITestConfigDocker<C>
     with APITestConfigDBMixin
-    implements APITestConfigDB {
+    implements APITestConfigDB, WithRuntimeTypeNameSafe {
   /// The DB type/name.
   @override
   final String dbType;
@@ -443,7 +445,7 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
 abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
     extends APITestConfigDockerDB<C>
     with APITestConfigDBSQLMixin
-    implements APITestConfigDBSQL {
+    implements APITestConfigDBSQL, WithRuntimeTypeNameSafe {
   APITestConfigDockerDBSQL(
       DockerHost dockerHost, String dbType, Map<String, dynamic> apiConfig,
       {String? containerNamePrefix})

@@ -33,12 +33,13 @@ class MyBTCModule extends APIModule {
       return APIResponse.notFound();
     }
 
+    // ignore: avoid_dynamic_calls
     var btcUsd = response.json['bpi']['USD']['rate_float'] as num?;
     return btcUsd != null ? APIResponse.ok(btcUsd) : APIResponse.notFound();
   }
 
   /// Not found route (`404`):
-  FutureOr<APIResponse> notFound(request) {
+  FutureOr<APIResponse> notFound(APIRequest request) {
     // The requested path:
     var path = request.path;
 

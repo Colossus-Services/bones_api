@@ -4,6 +4,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
 
@@ -1059,7 +1060,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
           value = obj.elementAt(index);
         } else {
           throw StateError(
-              "Can't access index[$index] of type: ${obj.runtimeType}");
+              "Can't access index[$index] of type: ${(obj as Object?).runtimeTypeNameUnsafe}");
         }
       }
 
@@ -1109,7 +1110,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
           }).toList();
         } else {
           throw StateError(
-              "Can't access key[$keyName] for type: ${value.runtimeType}");
+              "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}");
         }
 
         keyType =
@@ -1127,7 +1128,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
               _resolveValueEntityHandler(keyType, valueEntityHandler);
         } else {
           throw StateError(
-              "Can't access index[$index] for type: ${value.runtimeType}");
+              "Can't access index[$index] for type: ${(value as Object?).runtimeTypeNameUnsafe}");
         }
       }
 

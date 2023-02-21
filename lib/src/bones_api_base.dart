@@ -2,11 +2,11 @@ import 'dart:collection';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:async_events/async_events.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' show sha256, sha384, sha512;
-import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.47';
+  static const String VERSION = '1.3.48';
 
   static bool _boot = false;
 
@@ -987,6 +987,7 @@ abstract class APIPayload {
 
   /// Returns the [payload] length.
   int get payloadLength {
+    final payload = this.payload;
     if (payload == null) {
       return -1;
     } else if (payload is String) {
@@ -2127,6 +2128,15 @@ class APIResponse<T> extends APIPayload {
   /// The response payload/body/
   @override
   final T? payload;
+
+  /// Returns [payload] cast to [E].
+  E payloadAs<E>() {
+    final payload = this.payload;
+    if (payload is! E) {
+      throw StateError("Can't cast `payload` to `$E`! payload: $payload");
+    }
+    return payload;
+  }
 
   MimeType? _payloadMimeType;
 

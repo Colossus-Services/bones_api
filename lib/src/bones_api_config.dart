@@ -84,6 +84,7 @@ class APIConfig {
   /// [properties] key setter.
   operator []=(String key, dynamic value) => _properties[key] = value;
 
+  /// [properties] key getter.
   dynamic get(String key, {Object? defaultValue, bool caseSensitive = false}) {
     return caseSensitive
         ? _getImpl(key, defaultValue)
@@ -147,6 +148,72 @@ class APIConfig {
     }
 
     return null;
+  }
+
+  /// Returns the final value from a path of keys as [E].
+  E? getPath<E>(String k0, [Object? k1, Object? k2, Object? k3, Object? k4]) {
+    Object? val = get(k0);
+    if (val == null) return null;
+
+    if (k1 != null) {
+      val = val is Map ? val[k1] : (k1 is int && val is List ? val[k1] : null);
+      if (val == null) return null;
+    }
+
+    if (k2 != null) {
+      val = val is Map ? val[k2] : (k2 is int && val is List ? val[k2] : null);
+      if (val == null) return null;
+    }
+
+    if (k3 != null) {
+      val = val is Map ? val[k3] : (k3 is int && val is List ? val[k3] : null);
+      if (val == null) return null;
+    }
+
+    if (k4 != null) {
+      val = val is Map ? val[k4] : (k4 is int && val is List ? val[k4] : null);
+      if (val == null) return null;
+    }
+
+    if (val is! E) {
+      var keyPath = [k0, k1, k2, k3, k4].whereNotNull().join('/');
+      throw StateError("Can't return key `$keyPath` as `$E`: $val");
+    }
+
+    return val as E;
+  }
+
+  /// Alias to [get] returning a [Map].
+  Map<String, V>? getAsMap<V>(String key,
+      {Map<String, V>? defaultValue, bool caseSensitive = false}) {
+    var m = get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
+    if (m == null) return null;
+    if (m is! Map) {
+      throw StateError("Can't return key `$key` as `Map`: $m");
+    }
+    return m.cast<String, V>();
+  }
+
+  /// Alias to [get] returning a [List].
+  List<E>? getAsList<E>(String key,
+      {List<E>? defaultValue, bool caseSensitive = false}) {
+    var l = get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
+    if (l == null) return null;
+    if (l is! List) {
+      throw StateError("Can't return key `$key` as `List`: $l");
+    }
+    return l is List<E> ? l : l.cast<E>();
+  }
+
+  /// Alias to [get] returning a [List].
+  T? getAs<T>(String key, {T? defaultValue, bool caseSensitive = false}) {
+    var val =
+        get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
+    if (val == null) return null;
+    if (val is! T) {
+      throw StateError("Can't return key `$key` as `$T`: $val");
+    }
+    return val;
   }
 
   /// Constructs an [APIConfig] instance from [o], returning [def] if [o] is invalid.

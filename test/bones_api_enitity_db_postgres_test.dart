@@ -12,6 +12,9 @@ final dbPass = '123456';
 final dbName = 'postgres';
 
 class PostgresTestConfig extends APITestConfigDockerPostgreSQL {
+  @override
+  String get runtimeTypeNameSafe => 'PostgresTestConfig';
+
   PostgresTestConfig()
       : super({
           'db': {

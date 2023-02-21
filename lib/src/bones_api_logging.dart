@@ -4,7 +4,6 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_base.dart';
-
 import 'bones_api_logging_generic.dart'
     if (dart.library.io) 'bones_api_logging_io.dart';
 

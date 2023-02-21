@@ -1,6 +1,8 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
 
+import 'bones_api_utils.dart';
+
 final _log = logging.Logger('Initializable');
 
 typedef ExecuteInitializedCallback<R> = FutureOr<R> Function();
@@ -75,7 +77,7 @@ class InitializationStatus {
   String toString() {
     var id = this.id;
     var idStr = id > 0 ? '#$id' : '';
-    return '${initializable.runtimeType}$idStr:$status';
+    return '${initializable.runtimeTypeNameUnsafe}$idStr:$status';
   }
 }
 
@@ -306,7 +308,7 @@ class _InitializationChain {
 
       if (completer != null && !completer.isCompleted) {
         _log.warning(
-            '[$runtimeType] Not waiting self reference `${dependency.initializationStatus}` '
+            '[$runtimeTypeNameUnsafe] Not waiting self reference `${dependency.initializationStatus}` '
             'in async initialization graph of `${initializable.initializationStatus}`.');
 
         completer.complete(dependency._resultOk());
@@ -319,7 +321,7 @@ class _InitializationChain {
           var completer = e.value;
 
           _log.warning(
-              '[$runtimeType] Not waiting indirect self reference `${dependency.initializationStatus}` '
+              '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
               'in async initialization graph of `${initializable.initializationStatus}`.');
 
           completer.complete(dependency._resultOk());
@@ -368,8 +370,8 @@ class _InitializationChain {
     var subDepsInitializing =
         depsInitializingAsync._subDependenciesInitialized();
 
-    //print('!!! depsInitializingAsync: $runtimeType >> ${depsInitializingAsync.toInitializationStatus()}');
-    //print('!!! subDepsInitializing: $runtimeType >> ${subDepsInitializing.toInitializationStatus()}');
+    //print('!!! depsInitializingAsync: $runtimeTypeNameUnsafe >> ${depsInitializingAsync.toInitializationStatus()}');
+    //print('!!! subDepsInitializing: $runtimeTypeNameUnsafe >> ${subDepsInitializing.toInitializationStatus()}');
 
     if (subDepsInitializing.containsIdentical(initializable)) {
       var callChain = <Initializable>[];
@@ -383,7 +385,7 @@ class _InitializationChain {
 
       if (completed) {
         _log.warning(
-            '[${initializable.runtimeType}] Found self reference in async initialization graph: ${initializable.initializationStatus} -> '
+            '[${initializable.runtimeTypeNameUnsafe}] Found self reference in async initialization graph: ${initializable.initializationStatus} -> '
             '${depsInitializingAsync.length <= 3 ? '${depsInitializingAsync.toInitializationStatus()}' : '${depsInitializingAsync.length}'} ->> '
             '${subDepsInitializing.length <= 3 ? '${subDepsInitializing.toInitializationStatus()}' : '${subDepsInitializing.length}'}');
       }
@@ -480,7 +482,7 @@ mixin Initializable {
     status._setInitializing();
 
     _log.info(
-        '[$runtimeType#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...');
+        '[$runtimeTypeNameUnsafe#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...');
 
     var initDepsCall = initializeDependencies();
 
@@ -572,7 +574,8 @@ mixin Initializable {
   FutureOr<InitializationResult> _finalizeInitialization(
       InitializationResult result) {
     if (!result.ok) {
-      _log.info('[$runtimeType] Initialized #$_initializationID: ERROR');
+      _log.info(
+          '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR');
       throw StateError("Error initializing (async): $this");
     }
 
@@ -590,7 +593,7 @@ mixin Initializable {
         _checkAllDependenciesOk(depsResults);
 
         _log.info(
-            '[$runtimeType#$_initializationID] Initialized: OK (result dependencies: ${depsResults.length})');
+            '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.length})');
 
         _status._setInitialized();
         _initializeAsync = null;
@@ -598,7 +601,7 @@ mixin Initializable {
         return result;
       });
     } else {
-      _log.info('[$runtimeType#$_initializationID] Initialized: OK');
+      _log.info('[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK');
 
       _status._setInitialized();
       _initializeAsync = null;

@@ -344,3 +344,26 @@ FutureOr<R?> tryCallMapped<T, R>(FutureOr<T?> Function() call,
     return onErrorValue ?? defaultValue;
   }
 }
+
+/// Interface for classes that need a safe [runtimeType] as [String].
+abstract class WithRuntimeTypeNameSafe {
+  /// Returns the [runtimeType] as [String] in safe way.
+  String get runtimeTypeNameSafe;
+}
+
+extension ExtensionRuntimeTypeNameUnsafe on Object? {
+  /// Returns the [runtimeType] as [String].
+  /// - This is an unsafe method and should be used only for debugging.
+  /// - If the instance is a [WithRuntimeTypeNameSafe] will use [runtimeTypeNameSafe].
+  String get runtimeTypeNameUnsafe {
+    final self = this;
+    if (self == null) {
+      return 'Null';
+    } else if (self is WithRuntimeTypeNameSafe) {
+      return self.runtimeTypeNameSafe;
+    } else {
+      // ignore: no_runtimeType_toString
+      return '${self.runtimeType}';
+    }
+  }
+}

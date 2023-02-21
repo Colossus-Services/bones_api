@@ -1313,7 +1313,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     if (n == null) {
       throw ArgumentError(
-          "Can't convert `${value.runtimeType}` to `DynamicNumber`: $value");
+          "Can't convert `${value.runtimeTypeNameUnsafe}` to `DynamicNumber`: $value");
     }
 
     return n;
@@ -2410,7 +2410,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
     if (entityHandler == null) {
       throw ArgumentError(
-          "EntityHandler not provided for type: ${o.runtimeType}");
+          "EntityHandler not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     var deleted = <Object>[];
@@ -2451,12 +2451,12 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       List<Object> deleted) async {
     if (entityHandler == null) {
       throw ArgumentError(
-          "EntityHandler not provided for type: ${o.runtimeType}");
+          "EntityHandler not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     if (entityRepository == null) {
       throw ArgumentError(
-          "EntityRepository not provided for type: ${o.runtimeType}");
+          "EntityRepository not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     var id = entityRepository.getEntityID(o);
@@ -2872,7 +2872,7 @@ class EntityRepositoryProvider
 
   @override
   String toString() {
-    return '$runtimeType${_entityRepositories.keys.toList()}';
+    return '$runtimeTypeNameUnsafe${_entityRepositories.keys.toList()}';
   }
 }
 
@@ -3700,7 +3700,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$type:$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$type:$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 

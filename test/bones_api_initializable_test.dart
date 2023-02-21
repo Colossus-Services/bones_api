@@ -126,7 +126,7 @@ class _Init with Initializable {
 
   @override
   String toString() {
-    return '$runtimeType{${initDate?.millisecondsSinceEpoch}, $initializationStatus}';
+    return '$runtimeTypeNameUnsafe{${initDate?.millisecondsSinceEpoch}, $initializationStatus}';
   }
 }
 

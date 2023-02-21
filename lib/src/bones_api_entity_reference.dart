@@ -6,6 +6,7 @@ import 'package:statistics/statistics.dart' show IterableExtension;
 
 import 'bones_api_entity.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('EntityReference');
@@ -262,7 +263,7 @@ abstract class EntityReferenceBase<T> {
     if (_isInvalidEntity(entity)) {
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${entity.runtimeType}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+          "Invalid entity instance (${(entity as Object?).runtimeTypeNameUnsafe}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
     }
   }
 
@@ -274,6 +275,7 @@ abstract class EntityReferenceBase<T> {
 
     try {
       var o = entity as dynamic;
+      // ignore: avoid_dynamic_calls
       return o.toJson();
     } catch (_) {
       return null;
@@ -577,7 +579,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var id = _id;
     if (id != null && !id.isEntityIDType) {
-      throw ArgumentError("Invalid ID type: ${id.runtimeType} <$id>");
+      throw ArgumentError("Invalid ID type: ${id.runtimeTypeNameUnsafe} <$id>");
     }
 
     _resolveEntity();
@@ -1400,7 +1402,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     var ids = _ids;
     if (ids != null && ids.any((id) => id != null && !id.isEntityIDType)) {
       throw ArgumentError(
-          "Invalid IDs type: ${ids.runtimeType} ${ids.map((id) => '<$id>')}");
+          "Invalid IDs type: ${ids.runtimeTypeNameUnsafe} ${ids.map((id) => '<$id>')}");
     }
 
     _resolveEntities();
@@ -1524,7 +1526,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entity = entities[invalidIdx];
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${entity.runtimeType}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+          "Invalid entity instance (${entity.runtimeTypeNameUnsafe}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
     }
   }
 

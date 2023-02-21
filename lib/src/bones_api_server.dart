@@ -26,6 +26,7 @@ import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_session.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_httpclient.dart';
 import 'bones_api_utils_json.dart';
 
@@ -1262,7 +1263,7 @@ class APIServer {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeType}), address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].

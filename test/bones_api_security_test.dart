@@ -157,7 +157,9 @@ void main() {
         expect(response.status, equals(APIResponseStatus.OK));
 
         var json = response.payload as Map;
+        // ignore: avoid_dynamic_calls
         json['token']['issueTime'] = '...';
+        // ignore: avoid_dynamic_calls
         json['token']['expireTime'] = '...';
 
         expect(

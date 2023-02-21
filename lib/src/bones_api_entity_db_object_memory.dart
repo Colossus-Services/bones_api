@@ -204,7 +204,8 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       var tableMap = _getTableMap(t, false);
 
       if (tableMap != null) {
-        info['tables'][t] = {'ids': tableMap.keys.toList()};
+        var tables = info['tables'] as Map;
+        tables[t] = {'ids': tableMap.keys.toList()};
       }
     }
 
@@ -856,6 +857,9 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
 
 /// Error thrown by [DBMemoryObjectAdapter] operations.
 class DBMemoryObjectAdapterException extends DBAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemoryObjectAdapterException';
+
   DBMemoryObjectAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
