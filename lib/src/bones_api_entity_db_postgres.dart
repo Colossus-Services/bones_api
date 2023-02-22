@@ -20,7 +20,11 @@ import 'bones_api_utils_timedmap.dart';
 final _log = logging.Logger('DBPostgreSQLAdapter');
 
 /// A PostgreSQL adapter.
-class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
+class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
+    implements WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBPostgreSQLAdapter';
+
   static bool _boot = false;
 
   static void boot() {
@@ -826,8 +830,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
   }
 
   @override
-  FutureOr<PostgreSQLExecutionContext> openTransaction(
-      Transaction transaction) {
+  Future<PostgreSQLExecutionContext> openTransaction(Transaction transaction) {
     var contextCompleter = Completer<PostgreSQLExecutionContext>();
 
     var result = executeWithPool(
@@ -877,6 +880,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext> {
 
 /// Exception thrown by [DBPostgreSQLAdapter] operations.
 class DBPostgreSQLAdapterException extends DBSQLAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBPostgreSQLAdapterException';
+
   DBPostgreSQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,

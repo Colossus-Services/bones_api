@@ -204,7 +204,8 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       var tableMap = _getTableMap(t, false);
 
       if (tableMap != null) {
-        info['tables'][t] = {'ids': tableMap.keys.toList()};
+        var tables = info['tables'] as Map;
+        tables[t] = {'ids': tableMap.keys.toList()};
       }
     }
 
@@ -412,17 +413,18 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       <DBMemoryObjectAdapterContext, DateTime>{};
 
   @override
-  FutureOr<DBMemoryObjectAdapterContext> openTransaction(
-      Transaction transaction) {
-    return createConnection().resolveMapped((conn) {
-      _openTransactionsContexts[conn] = DateTime.now();
+  DBMemoryObjectAdapterContext openTransaction(Transaction transaction) {
+    var conn = createConnection();
 
-      transaction.transactionFuture.catchError((e, s) {
-        cancelTransaction(transaction, conn, e, s);
-        throw e;
-      });
-      return conn;
+    _openTransactionsContexts[conn] = DateTime.now();
+
+    // ignore: discarded_futures
+    transaction.transactionFuture.catchError((e, s) {
+      cancelTransaction(transaction, conn, e, s);
+      throw e;
     });
+
+    return conn;
   }
 
   @override
@@ -856,6 +858,9 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
 
 /// Error thrown by [DBMemoryObjectAdapter] operations.
 class DBMemoryObjectAdapterException extends DBAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemoryObjectAdapterException';
+
   DBMemoryObjectAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,

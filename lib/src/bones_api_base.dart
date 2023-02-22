@@ -2,11 +2,11 @@ import 'dart:collection';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:async_events/async_events.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' show sha256, sha384, sha512;
-import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.47';
+  static const String VERSION = '1.3.48';
 
   static bool _boot = false;
 
@@ -210,11 +210,12 @@ abstract class APIRoot with Initializable, Closable {
 
   @override
   bool close() {
+    // ignore: discarded_futures
     if (!(super.close() as bool)) return false;
 
     EntityRulesResolver.unregisterContextProvider(_entityRulesContextProvider);
 
-    tryCallMapped(() => onClose());
+    tryCallSync(() => onClose());
 
     _instances.remove(this);
 
@@ -228,13 +229,13 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns the names of the modules of this API.
   Set<String> get modulesNames {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('modulesNames');
     return _modules!.keys.toSet();
   }
 
   /// Returns the modules of this API.
   Set<APIModule> get modules {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('modules');
     return _modules!.values.toSet();
   }
 
@@ -268,9 +269,22 @@ abstract class APIRoot with Initializable, Closable {
     return ret;
   }
 
+  void _ensureModulesLoadedSync(String caller) {
+    // ignore: discarded_futures
+    var ret = _ensureModulesLoaded();
+    if (ret is Future) {
+      _log.warning(
+          "Accessing `$caller` before fully load modules! "
+          "Ensure that `initialize` is completed before acces the list of modules. "
+          "`APIRoot`: $this",
+          null,
+          StackTrace.current);
+    }
+  }
+
   /// Returns a module with [name].
   APIModule? getModule(String name) {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('getModule');
     var module = _modules![name];
     if (module != null) {
       module.ensureConfigured();
@@ -282,7 +296,7 @@ abstract class APIRoot with Initializable, Closable {
   ///
   /// Calls [resolveModule] to determine the module name.
   APIModule? getModuleByRequest(APIRequest request) {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('getModuleByRequest');
     var moduleName = resolveModule(request);
     return _modules![moduleName];
   }
@@ -987,6 +1001,7 @@ abstract class APIPayload {
 
   /// Returns the [payload] length.
   int get payloadLength {
+    final payload = this.payload;
     if (payload == null) {
       return -1;
     } else if (payload is String) {
@@ -2127,6 +2142,15 @@ class APIResponse<T> extends APIPayload {
   /// The response payload/body/
   @override
   final T? payload;
+
+  /// Returns [payload] cast to [E].
+  E payloadAs<E>() {
+    final payload = this.payload;
+    if (payload is! E) {
+      throw StateError("Can't cast `payload` to `$E`! payload: $payload");
+    }
+    return payload;
+  }
 
   MimeType? _payloadMimeType;
 

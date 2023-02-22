@@ -56,22 +56,27 @@ void main() {
       expect(userModule.allRoutesNames, equals({...userRoutes}));
 
       {
-        var apiRootInfoJson =
-            (await apiRoot.call(APIRequest.get('/API-INFO'))).payload.toJson();
+        var apiRootInfoJson = (await apiRoot.call(APIRequest.get('/API-INFO')))
+            .payloadAs<APIRootInfo>()
+            .toJson();
 
         expect(Map.from(apiRootInfoJson)..remove('modules'),
             equals({'name': 'Test', 'version': '1.0'}));
 
         expect(
             List.from(apiRootInfoJson['modules'])
+                .cast<Map>()
                 .map((e) => e['name'])
                 .toList(),
             equals(['about', 'user']));
 
         expect(
             List.from(apiRootInfoJson['modules'])
-                .map((e) =>
-                    List.from(e['routes']).map((e) => e['name']).toList())
+                .cast<Map>()
+                .map((e) => List.from(e['routes'])
+                    .cast<Map>()
+                    .map((e) => e['name'])
+                    .toList())
                 .toList(),
             equals([aboutRoutes, userRoutes]));
       }
@@ -79,7 +84,7 @@ void main() {
       {
         var apiRootInfoJson =
             (await apiRoot.call(APIRequest.get('/API-INFO/about')))
-                .payload
+                .payloadAs<APIRootInfo>()
                 .toJson();
 
         expect(
@@ -89,14 +94,18 @@ void main() {
 
         expect(
             List.from(apiRootInfoJson['modules'])
+                .cast<Map>()
                 .map((e) => e['name'])
                 .toList(),
             equals(aboutRoutes));
 
         expect(
             List.from(apiRootInfoJson['modules'])
-                .map((e) =>
-                    List.from(e['routes']).map((e) => e['name']).toList())
+                .cast<Map>()
+                .map((e) => List.from(e['routes'])
+                    .cast<Map>()
+                    .map((e) => e['name'])
+                    .toList())
                 .toList(),
             equals([aboutRoutes]));
       }
@@ -104,7 +113,7 @@ void main() {
       {
         var apiRootInfoJson =
             (await apiRoot.call(APIRequest.get('/API-INFO/user')))
-                .payload
+                .payloadAs<APIRootInfo>()
                 .toJson();
 
         expect(
@@ -114,14 +123,18 @@ void main() {
 
         expect(
             List.from(apiRootInfoJson['modules'])
+                .cast<Map>()
                 .map((e) => e['name'])
                 .toList(),
             equals(['user']));
 
         expect(
             List.from(apiRootInfoJson['modules'])
-                .map((e) =>
-                    List.from(e['routes']).map((e) => e['name']).toList())
+                .cast<Map>()
+                .map((e) => List.from(e['routes'])
+                    .cast<Map>()
+                    .map((e) => e['name'])
+                    .toList())
                 .toList(),
             equals([userRoutes]));
       }
@@ -132,7 +145,7 @@ void main() {
       expect(
           (await apiRoot.call(
                   APIRequest.get('/user/getUser', parameters: {'id': 11})))
-              .payload
+              .payloadAs<User>()
               .toJson(),
           equals({
             'email': 'joe@email.com',
@@ -157,7 +170,7 @@ void main() {
             '/user/echoUser',
             payload: _buildTestUser(),
           )))
-              .payload
+              .payloadAs<User>()
               .toJson(),
           equals(_buildTestUserJson(10001, 'smith@email.com.echo', 101)));
 
@@ -165,7 +178,7 @@ void main() {
           (await apiRoot.call(APIRequest.post('/user/echoUser',
                   payload: _buildTestUserJson(10002, 'jsmith@email.com', 102),
                   payloadMimeType: 'json')))
-              .payload
+              .payloadAs<User>()
               .toJson(),
           equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102)));
 
@@ -174,7 +187,7 @@ void main() {
                   payload: _buildTestUserJson(10002, 'jsmith@email.com', 102,
                       userInfo: 'the info', userInfoId: 1002),
                   payloadMimeType: 'json')))
-              .payload
+              .payloadAs<User>()
               .toJson(),
           equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102,
               userInfo: 'the info', userInfoId: 1002, userInfoRef: true)));
@@ -186,7 +199,7 @@ void main() {
                     _buildTestUserJson(10004, 'jsmith4@email.com', 104),
                   ],
                   payloadMimeType: 'json')))
-              .payload
+              .payloadAs<List<User>>()
               .map((e) => e.toJson())
               .toList(),
           equals([
@@ -202,7 +215,7 @@ void main() {
                     _buildTestUserJson(10004, 'jsmith4@email.com', 104),
                   ],
                   payloadMimeType: 'json')))
-              .payload
+              .payloadAs<List<User>>()
               .map((e) => e.toJson())
               .toList(),
           equals([
@@ -222,7 +235,7 @@ void main() {
                     ]
                   },
                   payloadMimeType: 'json')))
-              .payload
+              .payloadAs<List<User>>()
               .map((e) => e.toJson())
               .toList(),
           equals([
@@ -235,7 +248,7 @@ void main() {
       expect(
           (await apiRoot.call(
                   APIRequest.post('/user/getContextEntityResolutionRules')))
-              .payload,
+              .payloadAs<Map>(),
           equals({
             'context.resolutionRules': {
               'allowEntityFetch': true,
@@ -246,7 +259,7 @@ void main() {
       expect(
           (await apiRoot.call(
                   APIRequest.post('/user/getRequestEntityResolutionRules')))
-              .payload,
+              .payloadAs<Map>(),
           equals({
             'resolutionRules': {
               'allowEntityFetch': true,

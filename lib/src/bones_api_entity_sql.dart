@@ -6,6 +6,7 @@ import 'bones_api_entity_db_relational.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
+import 'bones_api_utils.dart';
 
 class DBSQLEntityRepository<O extends Object>
     extends DBRelationalEntityRepository<O> {
@@ -58,7 +59,7 @@ class DBSQLEntityRepository<O extends Object>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 

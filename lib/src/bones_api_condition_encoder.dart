@@ -506,8 +506,7 @@ abstract class SchemeProvider {
       _tablesSchemes.remove(table);
 
   /// Returns the table name for [entityRepository].
-  FutureOr<String> getTableForEntityRepository(
-      EntityRepository entityRepository) {
+  String getTableForEntityRepository(EntityRepository entityRepository) {
     if (entityRepository is DBSQLEntityRepository) {
       return entityRepository.tableName;
     } else {
@@ -517,9 +516,10 @@ abstract class SchemeProvider {
 
   /// Returns a [TableScheme] for [entityRepository].
   FutureOr<TableScheme?> getTableSchemeForEntityRepository(
-          EntityRepository entityRepository) =>
-      getTableForEntityRepository(entityRepository)
-          .resolveMapped((table) => getTableScheme(table));
+      EntityRepository entityRepository) {
+    var table = getTableForEntityRepository(entityRepository);
+    return getTableScheme(table);
+  }
 
   /// Returns the table name for [type].
   FutureOr<String?> getTableForType(TypeInfo type);
@@ -537,7 +537,7 @@ abstract class SchemeProvider {
       {String? entityName, String? tableName});
 
   /// Returns the [entity] ID for [entityName], [tableName] or [entityType].
-  FutureOr<Object?> getEntityID(Object entity,
+  Object? getEntityID(Object entity,
       {String? entityName,
       String? tableName,
       Type? entityType,

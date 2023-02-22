@@ -6,6 +6,7 @@ import 'package:statistics/statistics.dart' show IterableExtension;
 
 import 'bones_api_entity.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('EntityReference');
@@ -262,7 +263,7 @@ abstract class EntityReferenceBase<T> {
     if (_isInvalidEntity(entity)) {
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${entity.runtimeType}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+          "Invalid entity instance (${(entity as Object?).runtimeTypeNameUnsafe}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
     }
   }
 
@@ -274,6 +275,7 @@ abstract class EntityReferenceBase<T> {
 
     try {
       var o = entity as dynamic;
+      // ignore: avoid_dynamic_calls
       return o.toJson();
     } catch (_) {
       return null;
@@ -563,7 +565,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         _id = entityHandler.resolveIDFromMap(entityMap);
 
         entityHandler
+            // ignore: discarded_futures
             .createFromMap(entityMap, entityCache: entityCache)
+            // ignore: discarded_futures
             .resolveMapped((o) {
           set(o);
         });
@@ -577,7 +581,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var id = _id;
     if (id != null && !id.isEntityIDType) {
-      throw ArgumentError("Invalid ID type: ${id.runtimeType} <$id>");
+      throw ArgumentError("Invalid ID type: ${id.runtimeTypeNameUnsafe} <$id>");
     }
 
     _resolveEntity();
@@ -688,8 +692,14 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
 
       if (id != null && entityProvider != null) {
-        _entity = entity =
-            entityProvider.getEntityByID<T>(id, type: type, sync: true) as T?;
+        var entityByID =
+            // ignore: discarded_futures
+            entityProvider.getEntityByID<T>(id, type: type, sync: true);
+        if (entityByID is Future) {
+          throw StateError(
+              "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
+        }
+        _entity = entity = entityByID;
       }
     }
 
@@ -990,8 +1000,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var entityFetcher = _entityFetcher;
     if (entityFetcher != null) {
-      fetcher = (ids, type) =>
-          ids.map((id) => entityFetcher(id, type)).toList().resolveAll();
+      fetcher = (ids, type) => ids
+          .map((id) => entityFetcher(id, type)) // ignore: discarded_futures
+          .toList()
+          .resolveAll(); // ignore: discarded_futures
     }
 
     return EntityReferenceList<T>._(
@@ -1383,9 +1395,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         List<FutureOr<T?>> lAsync = entitiesMaps
             .map((map) => map == null
                 ? null
+                // ignore: discarded_futures
                 : entityHandler.createFromMap(map, entityCache: entityCache))
             .toList(growable: false);
 
+        // ignore: discarded_futures
         lAsync.resolveAllNullable().resolveMapped((os) {
           set(os);
         });
@@ -1400,7 +1414,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     var ids = _ids;
     if (ids != null && ids.any((id) => id != null && !id.isEntityIDType)) {
       throw ArgumentError(
-          "Invalid IDs type: ${ids.runtimeType} ${ids.map((id) => '<$id>')}");
+          "Invalid IDs type: ${ids.runtimeTypeNameUnsafe} ${ids.map((id) => '<$id>')}");
     }
 
     _resolveEntities();
@@ -1524,7 +1538,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entity = entities[invalidIdx];
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${entity.runtimeType}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+          "Invalid entity instance (${entity.runtimeTypeNameUnsafe}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
     }
   }
 
@@ -1615,8 +1629,14 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
       if (ids != null && entityProvider != null) {
         entities = ids.map((id) {
-          return entityProvider.getEntityByID<T>(id, type: type, sync: true)
-              as T?;
+          var entityByID =
+              // ignore: discarded_futures
+              entityProvider.getEntityByID<T>(id, type: type, sync: true);
+          if (entityByID is Future) {
+            throw StateError(
+                "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
+          }
+          return entityByID;
         }).toList();
 
         if (entities.every((e) => e == null)) {
@@ -2178,6 +2198,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     final entitiesFetcher = _entitiesFetcher;
     if (entitiesFetcher != null) {
       fetcher = (id, type) =>
+          // ignore: discarded_futures
           entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }
 

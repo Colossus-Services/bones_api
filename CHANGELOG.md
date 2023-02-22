@@ -1,3 +1,17 @@
+## 1.3.48
+
+- `APIConfig`:
+  - Added `getAsMap`, `getAsList`, `getAs`.
+- Added `WithRuntimeTypeNameSafe`.
+- Added `ExtensionRuntimeTypeNameUnsafe`:
+  - `runtimeTypeNameUnsafe`
+- Added linter rules:
+  - `avoid_dynamic_calls`.
+  - `avoid_type_to_string`.
+  - `no_runtimeType_toString`.
+  - `discarded_futures`.
+  - `no_adjacent_strings_in_list`.
+
 ## 1.3.47
 
 - Improve internal use of `EntityCache`.

@@ -13,6 +13,7 @@ import 'bones_api_entity_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
+import 'bones_api_utils.dart';
 
 final _log = logging.Logger('DBAdapter');
 
@@ -32,7 +33,7 @@ class DBDialect {
 
   @override
   String toString() {
-    return '$runtimeType{name: $name}';
+    return '$runtimeTypeNameUnsafe{name: $name}';
   }
 }
 
@@ -275,8 +276,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   @override
   bool close() {
+    // ignore: discarded_futures
     if (!(super.close() as bool)) return false;
 
+    // ignore: discarded_futures
     clearPool();
     return true;
   }
@@ -345,13 +348,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>
       entityRepositories
-          .map((r) => MapEntry<EntityRepository, FutureOr<String>>(
+          .map((r) => MapEntry<EntityRepository, String>(
               r, getTableForEntityRepository(r)))
-          .toMapFromEntries()
-          .resolveAllValues();
+          .toMapFromEntries();
 
   @override
-  FutureOr<String?> getTableForType(TypeInfo type) {
+  String? getTableForType(TypeInfo type) {
     if (type.hasArguments) {
       if (type.isEntityReferenceBaseType) {
         type = type.arguments0!;
@@ -409,7 +411,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<Object?> getEntityID(Object entity,
+  Object? getEntityID(Object entity,
       {String? entityName,
       String? tableName,
       Type? entityType,
@@ -982,7 +984,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     throw UnsupportedError(
-        "Relationship select not supported for: (${matcher.runtimeType}) $matcher @ $tableName ($this)");
+        "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)");
   }
 
   FutureOr<O?> _selectByID(Transaction? transaction, ConditionID matcher,
@@ -1144,6 +1146,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var entityProvider = TransactionEntityProvider(
           transaction, provider, resolutionRulesResolved);
 
+      // ignore: discarded_futures
       return entityHandler.createFromMap(e,
           entityProvider: entityProvider,
           entityCache: transaction,
@@ -1289,9 +1292,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var targetEntityRepository =
           provider.getEntityRepositoryByType(targetType)!;
 
+      // ignore: discarded_futures
       var relationshipsAsync = selectRelationships(null, fieldName,
           oIds: ids, fieldType: fieldType, transaction: transaction);
 
+      // ignore: discarded_futures
       var retRelationships = relationshipsAsync.resolveMapped((relationships) {
         var allTargetIds =
             relationships.values.expand((e) => e).toSet().toList();
@@ -1302,9 +1307,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           return relationships.map((key, value) => MapEntry(key, value.asList));
         }
 
+        // ignore: discarded_futures
         var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
             transaction: transaction, resolutionRules: resolutionRulesResolved);
 
+        // ignore: discarded_futures
         return targetsAsync.resolveMapped((targets) {
           var allTargetsById = Map.fromEntries(targets
               .whereNotNull()
@@ -1318,10 +1325,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             var targetEntitiesCast = targetEntityRepository.entityHandler
                 .castList(targetEntities, targetType)!;
             return MapEntry(id, targetEntitiesCast);
-          }).resolveAllValues();
+          }).resolveAllValues(); // ignore: discarded_futures
         });
       });
 
+      // ignore: discarded_futures
       return retRelationships.resolveMapped((relationships) {
         for (var r in results) {
           var id = r[idFieldName];
@@ -1330,7 +1338,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
               .castList(<dynamic>[], targetType)!;
           r[fieldName] = values;
         }
-      }).resolveWithValue(true);
+      }).resolveWithValue(true); // ignore: discarded_futures
     }).toList(growable: false);
   }
 
@@ -1552,7 +1560,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 
@@ -1612,7 +1620,10 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
 }
 
 /// A [DBAdapter] [Exception].
-class DBAdapterException implements Exception {
+class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBAdapterException';
+
   /// The type of the exception.
   final String type;
 
@@ -1630,9 +1641,10 @@ class DBAdapterException implements Exception {
 
   @override
   String toString() {
-    var s = '$runtimeType[$type]: $message';
+    var s = '$runtimeTypeNameSafe[$type]: $message';
     if (parentError != null) {
-      s += '\n  -- Parent ERROR>> [${parentError.runtimeType}] $parentError';
+      s +=
+          '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError';
     }
     return s;
   }

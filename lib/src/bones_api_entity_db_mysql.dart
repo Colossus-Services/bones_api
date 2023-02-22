@@ -14,12 +14,17 @@ import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBMySQLAdapter');
 
 /// A MySQL adapter.
-class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
+class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
+    implements WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBMySQLAdapter';
+
   static bool _boot = false;
 
   static void boot() {
@@ -729,7 +734,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper> {
   }
 
   @override
-  FutureOr<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
+  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
     var contextCompleter = Completer<DBMySqlConnectionWrapper>();
 
     var result = executeWithPool(
@@ -820,6 +825,9 @@ class _DBMySqlConnectionTransaction implements DBMySqlConnectionWrapper {
 
 /// Exception thrown by [DBMySQLAdapter] operations.
 class DBMySQLAdapterException extends DBSQLAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBMySQLAdapterException';
+
   DBMySQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,

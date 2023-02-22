@@ -1191,7 +1191,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
 
     if (value is Map<String, dynamic>) {
-      return createFromMap(value,
+      return createFromMapSync(value,
           entityProvider: EntityRepositoryProvider.globalProvider);
     }
 
@@ -1313,7 +1313,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     if (n == null) {
       throw ArgumentError(
-          "Can't convert `${value.runtimeType}` to `DynamicNumber`: $value");
+          "Can't convert `${value.runtimeTypeNameUnsafe}` to `DynamicNumber`: $value");
     }
 
     return n;
@@ -1502,6 +1502,30 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   FutureOr<O?> createDefault();
 
+  /// Synchronous version of [createFromMap].
+  O createFromMapSync(Map<String, dynamic> fields,
+      {EntityProvider? entityProvider,
+      EntityCache? entityCache,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      EntityResolutionRules? resolutionRules,
+      JsonDecoder? jsonDecoder}) {
+    // ignore: discarded_futures
+    var o = createFromMap(fields,
+        entityProvider: entityProvider,
+        entityCache: entityCache,
+        entityHandlerProvider: entityHandlerProvider,
+        entityRepositoryProvider: entityRepositoryProvider,
+        resolutionRules: resolutionRules,
+        jsonDecoder: jsonDecoder);
+    if (o is Future) {
+      throw StateError(
+          "createFromMapSync> sub-call to `createFromMap` returned a `Future` for: $fields");
+    }
+    return o;
+  }
+
+  /// Creates an entity [O] with [fields].
   FutureOr<O> createFromMap(Map<String, dynamic> fields,
       {EntityProvider? entityProvider,
       EntityCache? entityCache,
@@ -1784,6 +1808,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   @override
   void inspectObject(O? o) {
     if (o == null) {
+      // ignore: discarded_futures
       var obj = createDefault();
       if (obj is O) {
         o = obj;
@@ -2410,7 +2435,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
     if (entityHandler == null) {
       throw ArgumentError(
-          "EntityHandler not provided for type: ${o.runtimeType}");
+          "EntityHandler not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     var deleted = <Object>[];
@@ -2451,12 +2476,12 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       List<Object> deleted) async {
     if (entityHandler == null) {
       throw ArgumentError(
-          "EntityHandler not provided for type: ${o.runtimeType}");
+          "EntityHandler not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     if (entityRepository == null) {
       throw ArgumentError(
-          "EntityRepository not provided for type: ${o.runtimeType}");
+          "EntityRepository not provided for type: ${o.runtimeTypeNameUnsafe}");
     }
 
     var id = entityRepository.getEntityID(o);
@@ -2622,8 +2647,8 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       Object entity,
       Transaction transaction,
       List<Object> deleted,
-      List<Function> preDeleteCalls,
-      List<Function> posDeleteCalls) {
+      List<Future<bool> Function()> preDeleteCalls,
+      List<Future<bool> Function()> posDeleteCalls) {
     var tEntityRepository = _resolveRepositoryProvider(
         entityHandler, entityRepository, repositoryProvider,
         obj: entity, type: entityType);
@@ -2641,8 +2666,8 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
       throw StateError("Can't resolve `EntityHandler` for type `$entityType`.");
     }
 
-    // ignore: prefer_function_declarations_over_variables
-    var call = () => _deleteCascadeGenericImpl<Object>(entity, transaction,
+    // ignore: discarded_futures
+    call() => _deleteCascadeGenericImpl<Object>(entity, transaction,
         tEntityHandler, tEntityRepository, repositoryProvider, deleted);
 
     var changed = false;
@@ -2685,6 +2710,7 @@ class EntityRepositoryProvider
   FutureOr<InitializationResult> initialize() => InitializationResult.ok(this);
 
   @override
+  // ignore: discarded_futures
   bool close() => super.close() as bool;
 
   void registerEntityRepository<O extends Object>(
@@ -2872,7 +2898,7 @@ class EntityRepositoryProvider
 
   @override
   String toString() {
-    return '$runtimeType${_entityRepositories.keys.toList()}';
+    return '$runtimeTypeNameUnsafe${_entityRepositories.keys.toList()}';
   }
 }
 
@@ -3312,6 +3338,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }
 
   @override
+  // ignore: discarded_futures
   bool close() => super.close() as bool;
 
   bool isOfEntityType(Object? o) {
@@ -3700,7 +3727,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   @override
   String toString() {
     var info = information();
-    return '$runtimeType[$type:$name]@${provider.runtimeType}$info';
+    return '$runtimeTypeNameUnsafe[$type:$name]@${provider.runtimeTypeNameUnsafe}$info';
   }
 }
 
@@ -3920,22 +3947,22 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   FutureOr<void> Function()? _transactionCloser;
 
-  void open(
+  FutureOr<Object?> open(
       FutureOr<Object> Function() opener, FutureOr<void> Function()? closer) {
     if (_opening) {
-      throw StateError("Transaction already opening.");
+      throw StateError("Transaction already opening:\n$this");
     } else if (_open) {
-      throw StateError("Transaction already open.");
+      throw StateError("Transaction already open:\n$this");
     }
 
     _opening = true;
     _transactionCloser = closer;
 
-    asyncTry(opener, then: (c) {
+    return asyncTry(opener, then: (c) {
       _setContext(c!);
       return c;
     }, onError: (e, s) {
-      _logTransaction.severe("Error opening transaction: $this", e, s);
+      _logTransaction.severe("Error opening transaction:\n$this", e, s);
     });
   }
 
@@ -3993,8 +4020,16 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   FutureOr<R> finishOperation<R>(TransactionOperation op, R result,
       {bool allowAutoCommit = true}) {
-    _markOperationExecuted(op, result, allowAutoCommit);
+    var autoCommitRet = _markOperationExecuted(op, result, allowAutoCommit);
 
+    if (autoCommitRet is Future) {
+      return autoCommitRet.then((_) => _finishOperationReturn(op, result));
+    } else {
+      return _finishOperationReturn(op, result);
+    }
+  }
+
+  FutureOr<R> _finishOperationReturn<R>(TransactionOperation op, R result) {
     if (op.transactionRoot && !op.externalTransaction && length > 1) {
       return resultFuture.then((_) => result);
     } else if (_commitCalled) {
@@ -4006,6 +4041,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   void finishOperationVoid<R>(TransactionOperation op, R result,
       {bool allowAutoCommit = true}) {
+    // ignore: discarded_futures
     _markOperationExecuted(op, result, allowAutoCommit);
   }
 
@@ -4013,7 +4049,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Object? _lastResult;
 
-  void _markOperationExecuted(
+  /// If returns something will be from [_doAutoCommit].
+  FutureOr<Object?> _markOperationExecuted(
       TransactionOperation op, Object? result, bool allowAutoCommit) {
     if (_executedOperations.contains(op)) {
       throw StateError("Operation already executed in transaction: $op");
@@ -4037,8 +4074,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     if (allowAutoCommit) {
-      _doAutoCommit();
+      return _doAutoCommit();
     }
+
+    return null;
   }
 
   FutureOr<bool> waitAllExecuted() {
@@ -4056,10 +4095,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     return true;
   }
 
-  void _doAutoCommit() {
+  FutureOr<Object?> _doAutoCommit() {
     if (autoCommit && _executedOperations.length == _operations.length) {
-      commit();
+      return commit();
     }
+    return null;
   }
 
   bool get isFinished => _committed || _aborted;
@@ -4318,6 +4358,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
       {Object? Function(Object error, StackTrace stackTrace)? errorResolver,
       String? Function()? debugInfo}) {
+    if (isFinished) {
+      throw StateError("Transaction already finished:\n$this");
+    }
+
     if (_executionsFutures.isEmpty) {
       var ret = _executeSafe(exec, errorResolver, debugInfo);
       _executionsFutures.add(ret);
@@ -4500,7 +4544,9 @@ abstract class TransactionOperation {
           transaction,
           subTransaction);
 
+      // ignore: discarded_futures
       subTransaction.transactionFuture.then((result) {
+        // ignore: discarded_futures
         opSubTransaction.finish(result);
       });
 
@@ -4866,7 +4912,7 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
-  dynamic store(O o, {Transaction? transaction}) {
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) {
     checkNotClosed();
 
     checkEntityFields(o);
@@ -5153,11 +5199,16 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
-  Map<String, dynamic> information({bool extended = false}) => {
-        'name': name,
-        'length': length(),
-        'nextID': nextID(),
-      };
+  Map<String, dynamic> information({bool extended = false}) {
+    // ignore: discarded_futures
+    var lengthRet = length();
+
+    return {
+      'name': name,
+      'length': lengthRet is Future ? '? <async>' : lengthRet,
+      'nextID': nextID(),
+    };
+  }
 }
 
 class SetEntityRepository<O extends Object>

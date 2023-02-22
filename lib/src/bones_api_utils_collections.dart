@@ -240,6 +240,7 @@ T? deepCopy<T>(T? o) {
       EntityHandlerProvider.globalProvider.getEntityHandler(obj: o);
 
   if (entityHandler != null) {
+    // ignore: discarded_futures
     var o2 = entityHandler.copy(o);
     if (o2 is! Future) {
       return o2 ?? o;

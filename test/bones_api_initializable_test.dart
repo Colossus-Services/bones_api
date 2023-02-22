@@ -1,4 +1,5 @@
 @Timeout(Duration(seconds: 180))
+// ignore_for_file: discarded_futures
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:logging/logging.dart' as logging;
@@ -126,7 +127,7 @@ class _Init with Initializable {
 
   @override
   String toString() {
-    return '$runtimeType{${initDate?.millisecondsSinceEpoch}, $initializationStatus}';
+    return '$runtimeTypeNameUnsafe{${initDate?.millisecondsSinceEpoch}, $initializationStatus}';
   }
 }
 

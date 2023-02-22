@@ -1,3 +1,4 @@
+// ignore_for_file: discarded_futures
 import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';
@@ -157,7 +158,9 @@ void main() {
         expect(response.status, equals(APIResponseStatus.OK));
 
         var json = response.payload as Map;
+        // ignore: avoid_dynamic_calls
         json['token']['issueTime'] = '...';
+        // ignore: avoid_dynamic_calls
         json['token']['expireTime'] = '...';
 
         expect(

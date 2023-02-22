@@ -1,4 +1,6 @@
 @Tags(['entities'])
+// ignore_for_file: discarded_futures
+
 import 'package:bones_api/bones_api.dart';
 import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';

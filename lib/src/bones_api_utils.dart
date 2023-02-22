@@ -316,6 +316,20 @@ FutureOr<T?> tryCall<T>(FutureOr<T?> Function() call,
   }
 }
 
+/// Tries to performa a [call] synchronously.
+/// - If [onSuccessValue] is defined it overwrites the [call] returned value.
+/// - If [onErrorValue] is defined it will be returned in case of error.
+/// - Returns [defaultValue] if [call] returns `null` and [onSuccessValue] or [onErrorValue] are `null`.
+T? tryCallSync<T>(T? Function() call,
+    {T? defaultValue, T? onSuccessValue, T? onErrorValue}) {
+  try {
+    var ret = call();
+    return onSuccessValue ?? ret ?? defaultValue;
+  } catch (_) {
+    return onErrorValue ?? defaultValue;
+  }
+}
+
 /// Tries to performa a [call].
 /// See [tryCall].
 FutureOr<R?> tryCallMapped<T, R>(FutureOr<T?> Function() call,
@@ -342,5 +356,28 @@ FutureOr<R?> tryCallMapped<T, R>(FutureOr<T?> Function() call,
       return onError(e, s) ?? onErrorValue ?? defaultValue;
     }
     return onErrorValue ?? defaultValue;
+  }
+}
+
+/// Interface for classes that need a safe [runtimeType] as [String].
+abstract class WithRuntimeTypeNameSafe {
+  /// Returns the [runtimeType] as [String] in safe way.
+  String get runtimeTypeNameSafe;
+}
+
+extension ExtensionRuntimeTypeNameUnsafe on Object? {
+  /// Returns the [runtimeType] as [String].
+  /// - This is an unsafe method and should be used only for debugging.
+  /// - If the instance is a [WithRuntimeTypeNameSafe] will use [runtimeTypeNameSafe].
+  String get runtimeTypeNameUnsafe {
+    final self = this;
+    if (self == null) {
+      return 'Null';
+    } else if (self is WithRuntimeTypeNameSafe) {
+      return self.runtimeTypeNameSafe;
+    } else {
+      // ignore: no_runtimeType_toString
+      return '${self.runtimeType}';
+    }
   }
 }

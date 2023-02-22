@@ -109,7 +109,9 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       string('\\u') & pattern('0-9A-Fa-f').times(4);
 
   Parser<String> characterUnicodeValue() => characterUnicode().map((each) {
-        final charCode = int.parse(each[1].join(), radix: 16);
+        Object each_1 = each[1] ?? '';
+        var s = each_1 is List ? each_1.join() : each_1.toString();
+        final charCode = int.parse(s, radix: 16);
         return String.fromCharCode(charCode);
       });
 
@@ -173,7 +175,10 @@ class JsonGrammarDefinition extends JsonGrammarLexer {
   Parser<List<dynamic>> arrayValue2() => _mapArrayValue(array2());
 
   Parser<List<dynamic>> _mapArrayValue(Parser<dynamic> ar) {
-    return ar.map((each) => each[1] ?? []);
+    return ar.map((each) {
+      if (each is! List) return [];
+      return each[1] ?? [];
+    });
   }
 
   Parser<Map<String, dynamic>> objectValue() => _mapObjectValue(object());
@@ -183,11 +188,14 @@ class JsonGrammarDefinition extends JsonGrammarLexer {
   Parser<Map<String, dynamic>> _mapObjectValue(Parser<dynamic> obj) {
     return obj.map((each) {
       final result = <String, dynamic>{};
-      if (each[1] != null) {
-        for (final element in each[1]) {
-          var key = element[0];
-          var value = element[2];
-          result[key] = value;
+      if (each is List) {
+        var l_1 = each[1];
+        if (l_1 is Iterable) {
+          for (final elem in l_1.whereType<List>()) {
+            var key = elem[0];
+            var value = elem[2];
+            result[key] = value;
+          }
         }
       }
       return result;
@@ -201,11 +209,16 @@ class JsonGrammarDefinition extends JsonGrammarLexer {
   // ignore: prefer_void_to_null
   Parser<Null> nullValue() => nullToken().map((each) => null);
 
-  Parser<String> stringValue() =>
-      stringPrimitive().map<String>((l) => l[1].join()).trim();
+  Parser<String> stringValue() => stringPrimitive().map<String>((l) {
+        var l_1 = l[1];
+        if (l_1 is! List) return l_1?.toString() ?? '';
+        return l_1.join();
+      }).trim();
 
   Parser<String> stringValue2() => stringPrimitive2().map<String>((l) {
-        return l[1].join();
+        var l_1 = l[1];
+        if (l_1 is! List) return l_1?.toString() ?? '';
+        return l_1.join();
       }).trim();
 
   Parser<num> numberValue() => numberToken().map((each) => num.parse(each));

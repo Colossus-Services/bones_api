@@ -249,7 +249,7 @@ void main() {
         var user = User('joe@mail.com', '123', address, [role1, role2],
             id: 1001, creationTime: creationTime);
 
-        var json = Json.toJson(user);
+        var json = Json.toJson(user) as Map;
 
         print(json);
 
@@ -262,7 +262,9 @@ void main() {
         var jsonRoles = json['roles'] as List;
 
         expect(jsonRoles.length, equals(2));
+        // ignore: avoid_dynamic_calls
         expect(jsonRoles[0]['id'], equals(10));
+        // ignore: avoid_dynamic_calls
         expect(jsonRoles[1]['id'], equals(101));
 
         jsonRoles.add(10);

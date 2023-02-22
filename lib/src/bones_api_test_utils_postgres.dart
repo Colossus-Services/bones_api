@@ -2,12 +2,16 @@ import 'package:async_extension/async_extension.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 
 import 'bones_api_entity_db_postgres.dart';
+import 'bones_api_extension.dart';
 import 'bones_api_test_utils_config.dart';
 import 'bones_api_test_utils_freeport.dart' as freeport;
 
 /// A [APITestConfigDockerDB] for `PostgreSQL`.
 class APITestConfigDockerPostgreSQL
     extends APITestConfigDockerDBSQL<PostgreSQLContainer> {
+  @override
+  String get runtimeTypeNameSafe => 'APITestConfigDockerPostgreSQL';
+
   APITestConfigDockerPostgreSQL(Map<String, dynamic> apiConfig,
       {DockerHost? dockerHost, String? containerNamePrefix})
       : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig,
@@ -16,7 +20,8 @@ class APITestConfigDockerPostgreSQL
   }
 
   @override
-  Map<String, dynamic> get dbConfig => apiConfigMap['db']['postgres'];
+  Map<String, dynamic> get dbConfig =>
+      apiConfigMap.getAsMap('db')?['postgres'] ?? <String, dynamic>{};
 
   @override
   PostgreSQLContainerConfig createDBContainerConfig(int dbPort) =>

@@ -1,6 +1,5 @@
 import 'dart:collection';
 
-import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:map_history/map_history.dart';
@@ -15,6 +14,7 @@ import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('DBMemorySQLAdapter');
@@ -45,7 +45,11 @@ class DBMemorySQLAdapterContext
 /// A [DBSQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
+class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
+    implements WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemorySQLAdapter';
+
   static bool _boot = false;
 
   static void boot() {
@@ -241,7 +245,10 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       String table, String referencedTable, Object? id) {
     if (id == null) return null;
 
-    var tableScheme = getTableScheme(table) as TableScheme;
+    var tableScheme = getTableScheme(table);
+    if (tableScheme == null) {
+      throw StateError("Can't find `TableScheme` for table: `$table`");
+    }
 
     var fieldsReferencedTables = tableScheme.fieldsReferencedTables;
     if (fieldsReferencedTables.isEmpty) return null;
@@ -288,7 +295,8 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       var tableMap = _getTableMap(t, false);
 
       if (tableMap != null) {
-        info['tables'][t] = {'ids': tableMap.keys.toList()};
+        var tables = info['tables'] as Map;
+        tables[t] = {'ids': tableMap.keys.toList()};
       }
     }
 
@@ -609,8 +617,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       return <Map<String, dynamic>>[];
     }
 
-    var tableScheme =
-        getTableScheme(table, relationship: sql.relationship) as TableScheme?;
+    var tableScheme = getTableScheme(table, relationship: sql.relationship);
 
     var entityHandler = getEntityHandler(tableName: table);
 
@@ -677,8 +684,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       return <Map<String, dynamic>>[];
     }
 
-    var tableScheme =
-        getTableScheme(table, relationship: sql.relationship) as TableScheme?;
+    var tableScheme = getTableScheme(table, relationship: sql.relationship);
 
     var entityHandler = getEntityHandler(tableName: table);
 
@@ -795,7 +801,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
     var fieldObj = _getByID(refField.targetTable, id);
 
     if (fieldObj != null) {
-      var tableScheme2 = getTableScheme(refField.targetTable) as TableScheme?;
+      var tableScheme2 = getTableScheme(refField.targetTable);
 
       if (tableScheme2 != null && tableScheme2.hasTableReferences) {
         var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
@@ -846,9 +852,9 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
         .toList();
 
     var targetObjs =
-        targetIds.map((tId) => _getByID(targetTable!, tId) ?? tId).toList();
+        targetIds.map((tId) => _getByID(targetTable, tId) ?? tId).toList();
 
-    var tableScheme2 = getTableScheme(targetTable!) as TableScheme?;
+    var tableScheme2 = getTableScheme(targetTable);
 
     if (tableScheme2 != null && tableScheme2.hasTableReferences) {
       var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
@@ -875,6 +881,19 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
   }
 
   bool _hasTableScheme(String table) => tablesSchemes.containsKey(table);
+
+  @override
+  TableScheme? getTableScheme(String table,
+      {TableRelationshipReference? relationship}) {
+    // ignore: discarded_futures
+    var ret = super.getTableScheme(table, relationship: relationship);
+
+    if (ret is Future) {
+      throw StateError("Expected sync return from `super.getTableScheme`");
+    }
+
+    return ret;
+  }
 
   @override
   TableScheme? getTableSchemeImpl(
@@ -1070,16 +1089,18 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
       <DBMemorySQLAdapterContext, DateTime>{};
 
   @override
-  FutureOr<DBMemorySQLAdapterContext> openTransaction(Transaction transaction) {
-    return createConnection().resolveMapped((conn) {
-      _openTransactionsContexts[conn] = DateTime.now();
+  DBMemorySQLAdapterContext openTransaction(Transaction transaction) {
+    var conn = createConnection();
 
-      transaction.transactionFuture.catchError((e, s) {
-        cancelTransaction(transaction, conn, e, s);
-        throw e;
-      });
-      return conn;
+    _openTransactionsContexts[conn] = DateTime.now();
+
+    // ignore: discarded_futures
+    transaction.transactionFuture.catchError((e, s) {
+      cancelTransaction(transaction, conn, e, s);
+      throw e;
     });
+
+    return conn;
   }
 
   @override
@@ -1166,6 +1187,9 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext> {
 
 /// Error thrown by [DBMemorySQLAdapter] operations.
 class DBMemorySQLAdapterException extends DBSQLAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBMemorySQLAdapterException';
+
   DBMemorySQLAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
