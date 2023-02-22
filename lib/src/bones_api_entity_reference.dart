@@ -565,7 +565,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         _id = entityHandler.resolveIDFromMap(entityMap);
 
         entityHandler
+            // ignore: discarded_futures
             .createFromMap(entityMap, entityCache: entityCache)
+            // ignore: discarded_futures
             .resolveMapped((o) {
           set(o);
         });
@@ -690,8 +692,14 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
 
       if (id != null && entityProvider != null) {
-        _entity = entity =
-            entityProvider.getEntityByID<T>(id, type: type, sync: true) as T?;
+        var entityByID =
+            // ignore: discarded_futures
+            entityProvider.getEntityByID<T>(id, type: type, sync: true);
+        if (entityByID is Future) {
+          throw StateError(
+              "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
+        }
+        _entity = entity = entityByID;
       }
     }
 
@@ -992,8 +1000,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var entityFetcher = _entityFetcher;
     if (entityFetcher != null) {
-      fetcher = (ids, type) =>
-          ids.map((id) => entityFetcher(id, type)).toList().resolveAll();
+      fetcher = (ids, type) => ids
+          .map((id) => entityFetcher(id, type)) // ignore: discarded_futures
+          .toList()
+          .resolveAll(); // ignore: discarded_futures
     }
 
     return EntityReferenceList<T>._(
@@ -1385,9 +1395,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         List<FutureOr<T?>> lAsync = entitiesMaps
             .map((map) => map == null
                 ? null
+                // ignore: discarded_futures
                 : entityHandler.createFromMap(map, entityCache: entityCache))
             .toList(growable: false);
 
+        // ignore: discarded_futures
         lAsync.resolveAllNullable().resolveMapped((os) {
           set(os);
         });
@@ -1617,8 +1629,14 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
       if (ids != null && entityProvider != null) {
         entities = ids.map((id) {
-          return entityProvider.getEntityByID<T>(id, type: type, sync: true)
-              as T?;
+          var entityByID =
+              // ignore: discarded_futures
+              entityProvider.getEntityByID<T>(id, type: type, sync: true);
+          if (entityByID is Future) {
+            throw StateError(
+                "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
+          }
+          return entityByID;
         }).toList();
 
         if (entities.every((e) => e == null)) {
@@ -2180,6 +2198,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     final entitiesFetcher = _entitiesFetcher;
     if (entitiesFetcher != null) {
       fetcher = (id, type) =>
+          // ignore: discarded_futures
           entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }
 

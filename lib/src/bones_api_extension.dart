@@ -100,13 +100,28 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
 
   /// Creates an instance [O] from [map].
   FutureOr<O> createFromMap(Map<String, dynamic> map,
+          {EntityProvider? entityProvider,
+          EntityCache? entityCache,
+          EntityResolutionRules? resolutionRules}) =>
+      entityHandler.createFromMap(map,
+          entityProvider: entityProvider,
+          entityCache: entityCache,
+          resolutionRules: resolutionRules);
+
+  O createFromMapSync(Map<String, dynamic> map,
       {EntityProvider? entityProvider,
       EntityCache? entityCache,
       EntityResolutionRules? resolutionRules}) {
-    return entityHandler.createFromMap(map,
+    // ignore: discarded_futures
+    var o = createFromMap(map,
         entityProvider: entityProvider,
         entityCache: entityCache,
         resolutionRules: resolutionRules);
+    if (o is Future) {
+      throw StateError(
+          "createFromMapSync> sub-call to `createFromMap` returned a `Future` for: $map");
+    }
+    return o;
   }
 
   /// Lists the API methods of this reflected class.
@@ -674,8 +689,10 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
     if (entityFetcher != null && entitiesFetcher == null) {
       entitiesFetcher = (ids, type) => ids
+          // ignore: discarded_futures
           .map((id) => id == null ? null : entityFetcher(id, type))
           .toList()
+          // ignore: discarded_futures
           .resolveAll();
     }
 

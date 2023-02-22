@@ -48,7 +48,11 @@ mixin Pool<O> {
 
     while (amount > 0 && _pool.isNotEmpty) {
       var o = _pool.removeFirst();
+
+      // It won't wait for elements to close:
+      // ignore: discarded_futures
       closePoolElement(o);
+
       --amount;
       rm++;
     }
@@ -86,12 +90,10 @@ mixin Pool<O> {
   FutureOr<bool> clearPool() {
     var pool = _pool.toList();
 
-    for (var e in pool) {
-      disposePoolElement(e);
-    }
-
-    _pool.clear();
-    return true;
+    return pool.map(disposePoolElement).resolveAll().resolveMapped((l) {
+      _pool.clear();
+      return true;
+    });
   }
 
   int get poolSize => _pool.length;

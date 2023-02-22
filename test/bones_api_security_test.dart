@@ -1,3 +1,4 @@
+// ignore_for_file: discarded_futures
 import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';

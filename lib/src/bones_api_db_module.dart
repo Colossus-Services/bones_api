@@ -25,9 +25,9 @@ class APIDBModule extends APIModule {
   void configure() {
     if (onlyOnDevelopment && !development) return;
 
-    routes.add(null, 'tables', (request) => tables());
+    routes.add(null, 'tables', (request) async => tables());
 
-    routes.add(null, 'select', (request) {
+    routes.add(null, 'select', (request) async {
       var pathParts = request.pathParts;
 
       var idx = pathParts.indexOf('select');
@@ -46,7 +46,7 @@ class APIDBModule extends APIModule {
       return select(table, request, eager: eager);
     });
 
-    routes.add(null, 'dump', (request) {
+    routes.add(null, 'dump', (request) async {
       var pathParts = request.pathParts;
 
       var idx = pathParts.indexOf('dump');
@@ -64,9 +64,9 @@ class APIDBModule extends APIModule {
 
   List<EntityRepositoryProvider>? _entityRepositoryProviders;
 
-  List<EntityRepositoryProvider> get entityRepositoryProviders =>
-      _entityRepositoryProviders ??= apiRoot.loadEntityRepositoryProviders()
-          as List<EntityRepositoryProvider>;
+  Future<List<EntityRepositoryProvider>> get entityRepositoryProviders async =>
+      _entityRepositoryProviders ??=
+          await apiRoot.loadEntityRepositoryProviders();
 
   Future<APIResponse<Map<String, String>>> tables() async {
     if (onlyOnDevelopment && !development) {
@@ -75,9 +75,9 @@ class APIDBModule extends APIModule {
 
     _log.info("APIDBModule[REQUEST]> tables");
 
-    var map = entityRepositoryProviders
-        .allRepositories()
-        .map((type, repo) => MapEntry('$type', repo.name));
+    var allRepositories = (await entityRepositoryProviders).allRepositories();
+
+    var map = allRepositories.map((type, repo) => MapEntry('$type', repo.name));
     return APIResponse.ok(map, mimeType: 'json');
   }
 
@@ -89,8 +89,8 @@ class APIDBModule extends APIModule {
 
     var requestedUri = apiRequest.requestedUri;
 
-    var entityRepository =
-        entityRepositoryProviders.getEntityRepository(name: selectTable);
+    var entityRepository = (await entityRepositoryProviders)
+        .getEntityRepository(name: selectTable);
 
     if (entityRepository == null) {
       return APIResponse.error(error: "Can't find table: $selectTable");
@@ -138,7 +138,7 @@ class APIDBModule extends APIModule {
 
     _log.info("APIDBModule[REQUEST]> dump");
 
-    var allRepositories = entityRepositoryProviders.allRepositories();
+    var allRepositories = (await entityRepositoryProviders).allRepositories();
 
     var dump = await allRepositories.values
         .map((repo) => MapEntry(repo.name, repo.selectAll()))

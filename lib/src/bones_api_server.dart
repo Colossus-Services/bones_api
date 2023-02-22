@@ -183,7 +183,7 @@ class APIServer {
 
     if (letsEncrypt && userDir != null) {
       var dir = Directory(pack_path.join(userDir.path, '.letsencrypt'));
-      dir.create();
+      dir.createSync();
       return dir;
     }
 

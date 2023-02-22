@@ -42,6 +42,7 @@ void cancelLogToConsole() => _cancelLogToConsole();
 void _cancelLogToConsole() {
   var listen = _loggingListenSubscription;
   if (listen != null) {
+    // ignore: discarded_futures
     listen.cancel();
     _loggingListenSubscription = null;
   }

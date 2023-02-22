@@ -413,17 +413,18 @@ class DBMemoryObjectAdapter extends DBAdapter<DBMemoryObjectAdapterContext> {
       <DBMemoryObjectAdapterContext, DateTime>{};
 
   @override
-  FutureOr<DBMemoryObjectAdapterContext> openTransaction(
-      Transaction transaction) {
-    return createConnection().resolveMapped((conn) {
-      _openTransactionsContexts[conn] = DateTime.now();
+  DBMemoryObjectAdapterContext openTransaction(Transaction transaction) {
+    var conn = createConnection();
 
-      transaction.transactionFuture.catchError((e, s) {
-        cancelTransaction(transaction, conn, e, s);
-        throw e;
-      });
-      return conn;
+    _openTransactionsContexts[conn] = DateTime.now();
+
+    // ignore: discarded_futures
+    transaction.transactionFuture.catchError((e, s) {
+      cancelTransaction(transaction, conn, e, s);
+      throw e;
     });
+
+    return conn;
   }
 
   @override

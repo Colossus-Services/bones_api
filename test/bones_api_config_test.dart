@@ -148,6 +148,37 @@ y=zzz
             r'\}',
           )));
     });
+
+    test('YAML', () async {
+      var testDir = resolveTestDir();
+      print('Test dir: $testDir');
+
+      var apiConfig1 = APIConfig.fromSync('$testDir/api-test.yaml');
+      expect(
+          apiConfig1!.toJson(),
+          equals({
+            'db': {
+              'postgres': {'username': 'postgres', 'password': '123456'}
+            }
+          }));
+
+      expect(
+          apiConfig1.get('db'),
+          equals({
+            'postgres': {'username': 'postgres', 'password': '123456'}
+          }));
+
+      expect(
+          apiConfig1.getAsMap('db'),
+          equals({
+            'postgres': {'username': 'postgres', 'password': '123456'}
+          }));
+
+      expect(
+          () => apiConfig1.getAsList('db'),
+          throwsA(isA<StateError>().having((e) => e.message, 'message',
+              contains("Can't return key `db` as `List`"))));
+    });
   });
 }
 

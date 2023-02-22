@@ -61,8 +61,8 @@ class APITestConfig {
     return APIRootStarter.fromInstantiator(
       apiRootInstantiator,
       apiConfig: () => APIConfig(apiConfigMap),
-      preInitializer: () => start(),
-      stopper: () => stop(),
+      preInitializer: () => start(), // ignore: discarded_futures
+      stopper: () => stop(), // ignore: discarded_futures
     );
   }
 }

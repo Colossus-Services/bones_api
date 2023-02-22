@@ -734,7 +734,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  FutureOr<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
+  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
     var contextCompleter = Completer<DBMySqlConnectionWrapper>();
 
     var result = executeWithPool(

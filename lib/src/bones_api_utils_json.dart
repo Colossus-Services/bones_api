@@ -477,7 +477,7 @@ class Json {
 
     if (entityHandlerProvider != null && value is Map<String, Object?>) {
       var entityHandler = entityHandlerProvider.getEntityHandler(type: type);
-      var entity = entityHandler?.createFromMap(value);
+      var entity = entityHandler?.createFromMapSync(value);
       if (entity != null) return entity as O;
     }
 
@@ -611,48 +611,46 @@ class Json {
       entityHandler = classReflection?.entityHandler;
     }
 
-    if (entityHandler != null) {
-      final entityCache = jsonDecoder.entityCache;
-      var classification = entityHandler.classifyIterableElements(value);
+    if (entityHandler == null) return null;
 
-      Iterable list = value;
+    final entityCache = jsonDecoder.entityCache;
+    var classification = entityHandler.classifyIterableElements(value);
 
-      if (classification.isAllObj) {
-        list = value;
-      } else if (classification.isAllMap) {
-        list = value
-            .map((m) => m is Map<String, dynamic>
-                ? entityHandler!.createFromMap(m, entityCache: entityCache)
-                : null)
-            .toList();
-      } else if (classification.isAllID) {
-        list = value.map((id) {
-          if (id == null) return null;
-          var o = entityCache.getCachedEntityByID(id, type: entityType);
-          return o;
-        }).toList();
-      } else if (classification.isAllNullOrEmpty) {
-        list = value;
-      } else {
-        list = value.map((e) {
-          if (e == null) {
-            return null;
-          } else if (e is Map<String, dynamic>) {
-            return entityHandler!.createFromMap(e, entityCache: entityCache);
-          } else if ((e as Object).isEntityIDPrimitiveType) {
-            return entityCache.getCachedEntityByID(e, type: entityType);
-          } else {
-            return e;
-          }
-        }).toList();
-      }
+    Iterable list = value;
 
-      return classification.hasNull
-          ? entityHandler.castIterableNullable(list, entityType)
-          : entityHandler.castIterable(list, entityType);
+    if (classification.isAllObj) {
+      list = value;
+    } else if (classification.isAllMap) {
+      list = value
+          .map((m) => m is Map<String, dynamic>
+              ? entityHandler!.createFromMapSync(m, entityCache: entityCache)
+              : null)
+          .toList();
+    } else if (classification.isAllID) {
+      list = value.map((id) {
+        if (id == null) return null;
+        var o = entityCache.getCachedEntityByID(id, type: entityType);
+        return o;
+      }).toList();
+    } else if (classification.isAllNullOrEmpty) {
+      list = value;
+    } else {
+      list = value.map((e) {
+        if (e == null) {
+          return null;
+        } else if (e is Map<String, dynamic>) {
+          return entityHandler!.createFromMapSync(e, entityCache: entityCache);
+        } else if ((e as Object).isEntityIDPrimitiveType) {
+          return entityCache.getCachedEntityByID(e, type: entityType);
+        } else {
+          return e;
+        }
+      }).toList();
     }
 
-    return null;
+    return classification.hasNull
+        ? entityHandler.castIterableNullable(list, entityType)
+        : entityHandler.castIterable(list, entityType);
   }
 }
 

@@ -316,6 +316,20 @@ FutureOr<T?> tryCall<T>(FutureOr<T?> Function() call,
   }
 }
 
+/// Tries to performa a [call] synchronously.
+/// - If [onSuccessValue] is defined it overwrites the [call] returned value.
+/// - If [onErrorValue] is defined it will be returned in case of error.
+/// - Returns [defaultValue] if [call] returns `null` and [onSuccessValue] or [onErrorValue] are `null`.
+T? tryCallSync<T>(T? Function() call,
+    {T? defaultValue, T? onSuccessValue, T? onErrorValue}) {
+  try {
+    var ret = call();
+    return onSuccessValue ?? ret ?? defaultValue;
+  } catch (_) {
+    return onErrorValue ?? defaultValue;
+  }
+}
+
 /// Tries to performa a [call].
 /// See [tryCall].
 FutureOr<R?> tryCallMapped<T, R>(FutureOr<T?> Function() call,

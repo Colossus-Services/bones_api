@@ -37,6 +37,7 @@ abstract class APIRepository<O extends Object> with Initializable {
             provider: provider,
             type: type ?? O,
             required: true)! {
+    // ignore: discarded_futures
     this.entityRepository.ensureInitialized(parent: this);
   }
 

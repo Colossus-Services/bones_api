@@ -248,7 +248,7 @@ void main() {
       expect(
           (await apiRoot.call(
                   APIRequest.post('/user/getContextEntityResolutionRules')))
-              .payload,
+              .payloadAs<Map>(),
           equals({
             'context.resolutionRules': {
               'allowEntityFetch': true,
@@ -259,7 +259,7 @@ void main() {
       expect(
           (await apiRoot.call(
                   APIRequest.post('/user/getRequestEntityResolutionRules')))
-              .payload,
+              .payloadAs<Map>(),
           equals({
             'resolutionRules': {
               'allowEntityFetch': true,

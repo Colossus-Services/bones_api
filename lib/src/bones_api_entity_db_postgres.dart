@@ -830,8 +830,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  FutureOr<PostgreSQLExecutionContext> openTransaction(
-      Transaction transaction) {
+  Future<PostgreSQLExecutionContext> openTransaction(Transaction transaction) {
     var contextCompleter = Completer<PostgreSQLExecutionContext>();
 
     var result = executeWithPool(

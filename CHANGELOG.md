@@ -9,6 +9,8 @@
   - `avoid_dynamic_calls`.
   - `avoid_type_to_string`.
   - `no_runtimeType_toString`.
+  - `discarded_futures`.
+  - `no_adjacent_strings_in_list`.
 
 ## 1.3.47
 

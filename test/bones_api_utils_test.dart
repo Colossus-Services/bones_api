@@ -1,3 +1,4 @@
+// ignore_for_file: discarded_futures
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:test/test.dart';
@@ -503,8 +504,8 @@ void main() {
     });
   });
 
-  group('tryCall', () {
-    test('basic', () {
+  group('tryCall/Sync', () {
+    test('tryCall', () {
       expect(tryCall(() => 123), equals(123));
 
       expect(tryCall(() => null, defaultValue: 123), equals(123));
@@ -514,6 +515,20 @@ void main() {
 
       expect(
           tryCall(() => throw StateError('test'),
+              onSuccessValue: 456, onErrorValue: -456),
+          equals(-456));
+    });
+
+    test('tryCallSync', () {
+      expect(tryCallSync(() => 123), equals(123));
+
+      expect(tryCallSync(() => null, defaultValue: 123), equals(123));
+
+      expect(tryCallSync(() => 123, onSuccessValue: 456, onErrorValue: -456),
+          equals(456));
+
+      expect(
+          tryCallSync(() => throw StateError('test'),
               onSuccessValue: 456, onErrorValue: -456),
           equals(-456));
     });

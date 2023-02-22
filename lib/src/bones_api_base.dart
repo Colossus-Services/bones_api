@@ -210,11 +210,12 @@ abstract class APIRoot with Initializable, Closable {
 
   @override
   bool close() {
+    // ignore: discarded_futures
     if (!(super.close() as bool)) return false;
 
     EntityRulesResolver.unregisterContextProvider(_entityRulesContextProvider);
 
-    tryCallMapped(() => onClose());
+    tryCallSync(() => onClose());
 
     _instances.remove(this);
 
@@ -228,13 +229,13 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns the names of the modules of this API.
   Set<String> get modulesNames {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('modulesNames');
     return _modules!.keys.toSet();
   }
 
   /// Returns the modules of this API.
   Set<APIModule> get modules {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('modules');
     return _modules!.values.toSet();
   }
 
@@ -268,9 +269,22 @@ abstract class APIRoot with Initializable, Closable {
     return ret;
   }
 
+  void _ensureModulesLoadedSync(String caller) {
+    // ignore: discarded_futures
+    var ret = _ensureModulesLoaded();
+    if (ret is Future) {
+      _log.warning(
+          "Accessing `$caller` before fully load modules! "
+          "Ensure that `initialize` is completed before acces the list of modules. "
+          "`APIRoot`: $this",
+          null,
+          StackTrace.current);
+    }
+  }
+
   /// Returns a module with [name].
   APIModule? getModule(String name) {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('getModule');
     var module = _modules![name];
     if (module != null) {
       module.ensureConfigured();
@@ -282,7 +296,7 @@ abstract class APIRoot with Initializable, Closable {
   ///
   /// Calls [resolveModule] to determine the module name.
   APIModule? getModuleByRequest(APIRequest request) {
-    _ensureModulesLoaded();
+    _ensureModulesLoadedSync('getModuleByRequest');
     var moduleName = resolveModule(request);
     return _modules![moduleName];
   }

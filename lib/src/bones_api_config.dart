@@ -224,8 +224,12 @@ class APIConfig {
 
   /// Constructs an [APIConfig] instance from [o], returning [def] if [o] is invalid.
   /// (Sync mode).
-  static APIConfig? fromSync(dynamic o, [dynamic def]) =>
-      _fromImpl(o, allowAsync: false, def: def) as APIConfig?;
+  static APIConfig? fromSync(dynamic o, [dynamic def]) {
+    // ignore: discarded_futures
+    var ret = _fromImpl(o, allowAsync: false, def: def);
+    if (ret is Future) return null;
+    return ret;
+  }
 
   /// Constructs an [APIConfig] instance from [o], returning [def] if [o] is invalid.
   /// (Async mode, allows async calls like URL resolution).

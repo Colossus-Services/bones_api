@@ -16,7 +16,7 @@ class MyBTCModule extends APIModule {
 
   @override
   void configure() {
-    routes.get('usd', (request) => fetchBtcUsd());
+    routes.get('usd', (request) async => fetchBtcUsd());
 
     routes.any('time', (request) => APIResponse.ok(DateTime.now()));
 

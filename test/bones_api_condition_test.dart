@@ -503,7 +503,7 @@ class _TestSchemeProvider extends SchemeProvider {
   }
 
   @override
-  FutureOr<String?> getTableForType(TypeInfo type) {
+  String? getTableForType(TypeInfo type) {
     var typeName = type.toString().toLowerCase();
 
     if (typeName.contains('address')) {
@@ -530,7 +530,7 @@ class _TestSchemeProvider extends SchemeProvider {
   }
 
   @override
-  FutureOr<Object?> getEntityID(Object entity,
+  Object? getEntityID(Object entity,
       {String? entityName,
       String? tableName,
       Type? entityType,

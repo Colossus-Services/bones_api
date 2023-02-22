@@ -632,6 +632,7 @@ mixin Initializable {
     if (!isInitialized) {
       if (isInitializing) return;
 
+      // ignore: discarded_futures
       var ret = _doInitializationImpl();
       if (ret is Future<InitializationResult>) {
         throw StateError(
@@ -736,6 +737,7 @@ extension _SetExtension<T> on Set<T> {
 extension _FutureExtension<T> on Future<T> {
   Completer<T> toCompleter() {
     var completer = Completer<T>();
+    // ignore: discarded_futures
     then((val) {
       if (!completer.isCompleted) {
         completer.complete(val);

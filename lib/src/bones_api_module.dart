@@ -456,6 +456,7 @@ class APIRouteBuilder<M extends APIModule> {
       add(
         requestMethod,
         apiMethod.name,
+        // ignore: discarded_futures
         (req) => _apiMethodStandard(apiMethod, req),
         parameters: parameters,
         rules: rules,
@@ -467,6 +468,7 @@ class APIRouteBuilder<M extends APIModule> {
       add(
         requestMethod,
         apiMethod.name,
+        // ignore: discarded_futures
         (req) => _apiMethodStandard(apiMethod, req),
         parameters: parameters,
         rules: rules,
@@ -478,6 +480,7 @@ class APIRouteBuilder<M extends APIModule> {
       add(
         requestMethod,
         apiMethod.name,
+        // ignore: discarded_futures
         (req) => _apiMethodInvocation(apiMethod, req),
         parameters: parameters,
         rules: rules,
@@ -694,8 +697,7 @@ class APIRouteBuilder<M extends APIModule> {
           var map = value is Map<String, Object?>
               ? value
               : value.map((k, v) => MapEntry(k.toString(), v));
-
-          var o = classReflection.createFromMap(map,
+          var o = classReflection.createFromMapSync(map,
               entityCache: entityCache, resolutionRules: resolutionRules);
           if (o != null) {
             return o;
