@@ -14,7 +14,7 @@ class PositionalFields {
 
   PositionalFields(Iterable<String> fields) {
     var list = fields.toList();
-    _fields = Set<String>.unmodifiable(list.toSet());
+    _fields = UnmodifiableSetView<String>(list.toSet());
 
     if (list.length != _fields.length) {
       throw ArgumentError("fields not uniques: $fields");

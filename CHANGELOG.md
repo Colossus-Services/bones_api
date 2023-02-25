@@ -1,3 +1,13 @@
+## 1.3.49
+
+- `EntityHandler`:
+  - Optimize `isValidEntityType`.
+- `APIToken`:
+  - Optimize `generateToken`.
+- `IterableEntityRepositoryProviderExtension`:
+  - `getEntityRepository`: added parameter `removeClosedProviders`.
+- reflection_factory: ^2.0.4
+
 ## 1.3.48
 
 - `APIConfig`:

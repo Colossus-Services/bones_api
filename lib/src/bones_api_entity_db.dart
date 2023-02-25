@@ -672,7 +672,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     return _knownEntityRepositoryProviders.getEntityRepository<O>(
-        obj: obj, type: type, name: name, entityRepositoryProvider: this);
+        obj: obj,
+        type: type,
+        name: name,
+        entityRepositoryProvider: this,
+        removeClosedProviders: true);
   }
 
   @override
@@ -717,7 +721,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(type,
-        entityRepositoryProvider: this);
+        entityRepositoryProvider: this, removeClosedProviders: true);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =

@@ -37,7 +37,7 @@ class PoolTimeoutError extends Error {
 mixin Pool<O> {
   final ListQueue<O> _pool = ListQueue(8);
 
-  Iterable<O> get poolElements => List<O>.unmodifiable(_pool);
+  Iterable<O> get poolElements => UnmodifiableListView<O>(_pool);
 
   bool removeFromPool(O o) {
     return _pool.remove(o);

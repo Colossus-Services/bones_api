@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.3
+// BUILDER: reflection_factory/2.0.4
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.3');
+  static final Version _version = Version.parse('2.0.4');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -58,12 +58,11 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
-      MyInfoModule$reflection(obj);
+      MyInfoModule$reflection(obj)..setupInternalsWith(this);
 
   static MyInfoModule$reflection? _withoutObjectInstance;
   @override
-  MyInfoModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as MyInfoModule$reflection;
+  MyInfoModule$reflection withoutObjectInstance() => staticInstance;
 
   static MyInfoModule$reflection get staticInstance =>
       _withoutObjectInstance ??= MyInfoModule$reflection._();
@@ -92,8 +91,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   @override
   MyInfoModule? createInstanceWithNoRequiredArgsConstructor() => null;
 
+  static const List<String> _constructorsNames = const <String>[''];
+
   @override
-  List<String> get constructorsNames => const <String>[''];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<MyInfoModule>> _constructors =
       <String, ConstructorReflection<MyInfoModule>>{};
@@ -128,11 +129,15 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[APIModule, Initializable];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => false;
@@ -140,23 +145,25 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   @override
   Object? callMethodToJson([MyInfoModule? obj]) => null;
 
+  static const List<String> _fieldsNames = const <String>[
+    'allRoutesNames',
+    'apiConfig',
+    'apiRoot',
+    'authenticationRoute',
+    'defaultRouteName',
+    'hashCode',
+    'initializationStatus',
+    'isAsyncInitialization',
+    'isInitialized',
+    'isInitializing',
+    'name',
+    'routes',
+    'security',
+    'version'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'allRoutesNames',
-        'apiConfig',
-        'apiRoot',
-        'authenticationRoute',
-        'defaultRouteName',
-        'hashCode',
-        'initializationStatus',
-        'isAsyncInitialization',
-        'isInitialized',
-        'isInitializing',
-        'name',
-        'routes',
-        'security',
-        'version'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<MyInfoModule, dynamic>>
       _fieldsNoObject = <String, FieldReflection<MyInfoModule, dynamic>>{};
@@ -339,7 +346,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'initializationstatus':
         return FieldReflection<MyInfoModule, InitializationStatus>(
@@ -398,34 +405,38 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'acceptsRequest',
+    'addRoute',
+    'apiInfo',
+    'call',
+    'checkInitialized',
+    'configure',
+    'doInitialization',
+    'echo',
+    'ensureConfigured',
+    'ensureInitialized',
+    'ensureInitializedAsync',
+    'executeInitialized',
+    'getRouteHandler',
+    'getRouteHandlerByRequest',
+    'getRoutesHandlersNames',
+    'initialize',
+    'initializeDependencies',
+    'resolveRoute',
+    'toUpperCase'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'acceptsRequest',
-        'addRoute',
-        'apiInfo',
-        'call',
-        'checkInitialized',
-        'configure',
-        'doInitialization',
-        'echo',
-        'ensureConfigured',
-        'ensureInitialized',
-        'ensureInitializedAsync',
-        'executeInitialized',
-        'getRouteHandler',
-        'getRouteHandlerByRequest',
-        'getRoutesHandlersNames',
-        'initialize',
-        'initializeDependencies',
-        'resolveRoute',
-        'toUpperCase'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<MyInfoModule, dynamic>>
       _methodsNoObject = <String, MethodReflection<MyInfoModule, dynamic>>{};
@@ -491,7 +502,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'echo':
         return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
             this,
@@ -555,7 +566,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getrouteshandlersnames':
         return MethodReflection<MyInfoModule, Iterable<String>>(
             this,
@@ -827,8 +838,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) => null;

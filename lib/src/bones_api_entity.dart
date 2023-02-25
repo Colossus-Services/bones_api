@@ -190,8 +190,20 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return null;
   }
 
+  static final Map<Type, bool> _isValidEntityType = {};
+
   static bool isValidEntityType<T>([Type? type]) {
     type ??= T;
+
+    var valid = _isValidEntityType[type];
+    if (valid == null) {
+      _isValidEntityType[type] = valid = _isValidEntityTypeImpl(type);
+    }
+
+    return valid;
+  }
+
+  static bool _isValidEntityTypeImpl(Type type) {
     return type != Object &&
         type != dynamic &&
         !isBasicType(type) &&
@@ -1663,14 +1675,16 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           type: type,
           name: name,
           entityHandlerProvider: entityHandlerProvider ?? provider,
-          entityRepositoryProvider: entityRepositoryProvider);
+          entityRepositoryProvider: entityRepositoryProvider,
+          removeClosedProviders: true);
 
   EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
           {EntityHandlerProvider? entityHandlerProvider,
           EntityRepositoryProvider? entityRepositoryProvider}) =>
       _knownEntityRepositoryProviders.getEntityRepositoryByType<T>(type,
           entityHandlerProvider: entityHandlerProvider ?? provider,
-          entityRepositoryProvider: entityRepositoryProvider);
+          entityRepositoryProvider: entityRepositoryProvider,
+          removeClosedProviders: true);
 
   EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
       TypeInfo typeInfo,
@@ -2152,7 +2166,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
         return MapEntry(f, type);
       });
 
-      _fieldsTypes = Map<String, TypeInfo>.unmodifiable(
+      _fieldsTypes = UnmodifiableMapView<String, TypeInfo>(
           Map<String, TypeInfo>.fromEntries(types.whereNotNull()));
     }
     return _fieldsTypes!;
@@ -2765,14 +2779,19 @@ class EntityRepositoryProvider
         return entityRepository as EntityRepository<O>;
       }
 
+      Type? objType;
+
       if (obj != null) {
-        entityRepository = _entityRepositories[obj.runtimeType];
-        if (entityRepository != null && !entityRepository.isClosed) {
-          return entityRepository as EntityRepository<O>;
+        objType = obj.runtimeType;
+        if (objType != O) {
+          entityRepository = _entityRepositories[objType];
+          if (entityRepository != null && !entityRepository.isClosed) {
+            return entityRepository as EntityRepository<O>;
+          }
         }
       }
 
-      if (type != null) {
+      if (type != null && type != O && type != objType) {
         entityRepository = _entityRepositories[type];
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
@@ -2793,7 +2812,11 @@ class EntityRepositoryProvider
     }
 
     return _knownEntityRepositoryProviders.getEntityRepository<O>(
-        obj: obj, type: type, name: name, entityRepositoryProvider: this);
+        obj: obj,
+        type: type,
+        name: name,
+        entityRepositoryProvider: this,
+        removeClosedProviders: true);
   }
 
   EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
@@ -2838,7 +2861,7 @@ class EntityRepositoryProvider
     }
 
     return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(type,
-        entityRepositoryProvider: this);
+        entityRepositoryProvider: this, removeClosedProviders: true);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -2909,46 +2932,90 @@ extension IterableEntityRepositoryProviderExtension
       Type? type,
       String? name,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityHandlerProvider? entityHandlerProvider}) {
-    var length = this.length;
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
+    var self = this;
+    if (self is! List<EntityRepositoryProvider> &&
+        self is! Set<EntityRepositoryProvider>) {
+      self = self.toList(growable: false);
+    }
+
+    var length = self.length;
     if (length == 0) {
       return null;
     } else if (length == 1) {
-      return first.getEntityRepository<T>(obj: obj, type: type, name: name);
+      return self.first
+          .getEntityRepository<T>(obj: obj, type: type, name: name);
     }
 
-    var entityRepositories =
-        map((e) => e.getEntityRepository<T>(obj: obj, type: type, name: name))
-            .whereNotNull()
-            .toList();
+    var notClosed = _whereNotClosed(self, length, removeClosedProviders);
+
+    var entityRepositories = notClosed
+        .map((e) => e.getEntityRepository<T>(obj: obj, type: type, name: name))
+        .whereNotNull()
+        .toList(growable: false);
 
     return _resolveEntityRepository<T>(entityRepositories, type,
         entityRepositoryProvider, entityHandlerProvider);
   }
 
+  Iterable<EntityRepositoryProvider> _whereNotClosed(
+      Iterable<EntityRepositoryProvider> self,
+      int length,
+      bool removeClosedProviders) {
+    var notClosed = self.where((e) => !e.isClosed);
+
+    if (removeClosedProviders) {
+      notClosed = notClosed.toList(growable: false);
+
+      if (notClosed.length != length) {
+        var itr = this;
+        if (itr is List<EntityRepositoryProvider>) {
+          itr.removeWhere((e) => e.isClosed);
+        } else if (itr is Set<EntityRepositoryProvider>) {
+          itr.removeWhere((e) => e.isClosed);
+        }
+      }
+    }
+
+    return notClosed;
+  }
+
   EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
       TypeInfo typeInfo,
       {EntityRepositoryProvider? entityRepositoryProvider,
-      EntityHandlerProvider? entityHandlerProvider}) {
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
     var entityType = typeInfo.entityType;
     if (entityType == null) return null;
 
     return getEntityRepositoryByType(entityType,
         entityRepositoryProvider: entityRepositoryProvider,
-        entityHandlerProvider: entityHandlerProvider);
+        entityHandlerProvider: entityHandlerProvider,
+        removeClosedProviders: removeClosedProviders);
   }
 
   EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
       {EntityRepositoryProvider? entityRepositoryProvider,
-      EntityHandlerProvider? entityHandlerProvider}) {
-    var length = this.length;
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
+    var self = this;
+    if (self is! List<EntityRepositoryProvider> &&
+        self is! Set<EntityRepositoryProvider>) {
+      self = self.toList(growable: false);
+    }
+
+    var length = self.length;
     if (length == 0) {
       return null;
     } else if (length == 1) {
-      return first.getEntityRepositoryByType<T>(type);
+      return self.first.getEntityRepositoryByType<T>(type);
     }
 
-    var entityRepositories = map((e) => e.getEntityRepositoryByType<T>(type))
+    var notClosed = _whereNotClosed(self, length, removeClosedProviders);
+
+    var entityRepositories = notClosed
+        .map((e) => e.getEntityRepositoryByType<T>(type))
         .whereNotNull()
         .toList();
 
@@ -3005,11 +3072,17 @@ extension IterableEntityRepositoryProviderExtension
   Map<Type, EntityRepository> allRepositories(
       {Map<Type, EntityRepository>? allRepositories,
       Set<EntityRepositoryProvider>? traversedProviders}) {
-    var length = this.length;
+    var self = this;
+    if (self is! List<EntityRepositoryProvider> &&
+        self is! Set<EntityRepositoryProvider>) {
+      self = self.toList(growable: false);
+    }
+
+    var length = self.length;
     if (length == 0) {
       return <Type, EntityRepository>{};
     } else if (length == 1) {
-      return first.allRepositories(
+      return self.first.allRepositories(
           allRepositories: allRepositories,
           traversedProviders: traversedProviders);
     }
@@ -3017,7 +3090,7 @@ extension IterableEntityRepositoryProviderExtension
     allRepositories ??= <Type, EntityRepository>{};
     traversedProviders ??= <EntityRepositoryProvider>{};
 
-    for (var e in this) {
+    for (var e in self) {
       e.allRepositories(
           allRepositories: allRepositories,
           traversedProviders: traversedProviders);
