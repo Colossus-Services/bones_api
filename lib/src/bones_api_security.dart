@@ -112,9 +112,7 @@ abstract class APISecurity {
 
   void _storeTokenInfo(
       String token, Object? data, List<APIPermission> permissions) {
-    permissions = permissions is UnmodifiableListView<APIPermission>
-        ? permissions
-        : UnmodifiableListView<APIPermission>(permissions);
+    permissions = permissions.asUnmodifiableView;
 
     if (data is List) {
       if (data is! UnmodifiableListView) {

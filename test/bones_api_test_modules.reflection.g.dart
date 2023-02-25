@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.3
+// BUILDER: reflection_factory/2.0.4
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.3');
+  static final Version _version = Version.parse('2.0.4');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -64,12 +64,11 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
-      AboutModule$reflection(obj);
+      AboutModule$reflection(obj)..setupInternalsWith(this);
 
   static AboutModule$reflection? _withoutObjectInstance;
   @override
-  AboutModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as AboutModule$reflection;
+  AboutModule$reflection withoutObjectInstance() => staticInstance;
 
   static AboutModule$reflection get staticInstance =>
       _withoutObjectInstance ??= AboutModule$reflection._();
@@ -98,8 +97,10 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   @override
   AboutModule? createInstanceWithNoRequiredArgsConstructor() => null;
 
+  static const List<String> _constructorsNames = const <String>[''];
+
   @override
-  List<String> get constructorsNames => const <String>[''];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<AboutModule>> _constructors =
       <String, ConstructorReflection<AboutModule>>{};
@@ -133,11 +134,15 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[APIModule, Initializable];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => false;
@@ -145,23 +150,25 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   @override
   Object? callMethodToJson([AboutModule? obj]) => null;
 
+  static const List<String> _fieldsNames = const <String>[
+    'allRoutesNames',
+    'apiConfig',
+    'apiRoot',
+    'authenticationRoute',
+    'defaultRouteName',
+    'hashCode',
+    'initializationStatus',
+    'isAsyncInitialization',
+    'isInitialized',
+    'isInitializing',
+    'name',
+    'routes',
+    'security',
+    'version'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'allRoutesNames',
-        'apiConfig',
-        'apiRoot',
-        'authenticationRoute',
-        'defaultRouteName',
-        'hashCode',
-        'initializationStatus',
-        'isAsyncInitialization',
-        'isInitialized',
-        'isInitializing',
-        'name',
-        'routes',
-        'security',
-        'version'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<AboutModule, dynamic>>
       _fieldsNoObject = <String, FieldReflection<AboutModule, dynamic>>{};
@@ -344,7 +351,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'initializationstatus':
         return FieldReflection<AboutModule, InitializationStatus>(
@@ -403,33 +410,37 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<AboutModule, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'about',
+    'acceptsRequest',
+    'addRoute',
+    'apiInfo',
+    'call',
+    'checkInitialized',
+    'configure',
+    'doInitialization',
+    'ensureConfigured',
+    'ensureInitialized',
+    'ensureInitializedAsync',
+    'executeInitialized',
+    'getRouteHandler',
+    'getRouteHandlerByRequest',
+    'getRoutesHandlersNames',
+    'initialize',
+    'initializeDependencies',
+    'resolveRoute'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'about',
-        'acceptsRequest',
-        'addRoute',
-        'apiInfo',
-        'call',
-        'checkInitialized',
-        'configure',
-        'doInitialization',
-        'ensureConfigured',
-        'ensureInitialized',
-        'ensureInitializedAsync',
-        'executeInitialized',
-        'getRouteHandler',
-        'getRouteHandlerByRequest',
-        'getRoutesHandlersNames',
-        'initialize',
-        'initializeDependencies',
-        'resolveRoute'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<AboutModule, dynamic>>
       _methodsNoObject = <String, MethodReflection<AboutModule, dynamic>>{};
@@ -495,7 +506,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'about':
         return MethodReflection<AboutModule, APIResponse<String>>(
             this,
@@ -538,7 +549,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getrouteshandlersnames':
         return MethodReflection<AboutModule, Iterable<String>>(
             this,
@@ -810,8 +821,10 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<AboutModule, R>? staticMethod<R>(String methodName) => null;
@@ -844,12 +857,11 @@ class UserModule$reflection extends ClassReflection<UserModule>
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
-      UserModule$reflection(obj);
+      UserModule$reflection(obj)..setupInternalsWith(this);
 
   static UserModule$reflection? _withoutObjectInstance;
   @override
-  UserModule$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as UserModule$reflection;
+  UserModule$reflection withoutObjectInstance() => staticInstance;
 
   static UserModule$reflection get staticInstance =>
       _withoutObjectInstance ??= UserModule$reflection._();
@@ -878,8 +890,10 @@ class UserModule$reflection extends ClassReflection<UserModule>
   @override
   UserModule? createInstanceWithNoRequiredArgsConstructor() => null;
 
+  static const List<String> _constructorsNames = const <String>[''];
+
   @override
-  List<String> get constructorsNames => const <String>[''];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<UserModule>> _constructors =
       <String, ConstructorReflection<UserModule>>{};
@@ -913,18 +927,19 @@ class UserModule$reflection extends ClassReflection<UserModule>
     }
   }
 
-  static const List<Object> _classAnnotations = [
+  static const List<Object> _classAnnotations = const [
     APIEntityAccessRules(EntityAccessRules.blockFields(User, ['email'],
         condition: _blockUserEmailCondition)),
     APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
   ];
 
   @override
-  List<Object> get classAnnotations =>
-      List<Object>.unmodifiable(_classAnnotations);
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[APIModule, Initializable];
 
   @override
-  List<Type> get supperTypes => const <Type>[APIModule, Initializable];
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => false;
@@ -932,23 +947,25 @@ class UserModule$reflection extends ClassReflection<UserModule>
   @override
   Object? callMethodToJson([UserModule? obj]) => null;
 
+  static const List<String> _fieldsNames = const <String>[
+    'allRoutesNames',
+    'apiConfig',
+    'apiRoot',
+    'authenticationRoute',
+    'defaultRouteName',
+    'hashCode',
+    'initializationStatus',
+    'isAsyncInitialization',
+    'isInitialized',
+    'isInitializing',
+    'name',
+    'routes',
+    'security',
+    'version'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'allRoutesNames',
-        'apiConfig',
-        'apiRoot',
-        'authenticationRoute',
-        'defaultRouteName',
-        'hashCode',
-        'initializationStatus',
-        'isAsyncInitialization',
-        'isInitialized',
-        'isInitializing',
-        'name',
-        'routes',
-        'security',
-        'version'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<UserModule, dynamic>>
       _fieldsNoObject = <String, FieldReflection<UserModule, dynamic>>{};
@@ -1131,7 +1148,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'initializationstatus':
         return FieldReflection<UserModule, InitializationStatus>(
@@ -1190,45 +1207,49 @@ class UserModule$reflection extends ClassReflection<UserModule>
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<UserModule, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'acceptsRequest',
+    'addRoute',
+    'apiInfo',
+    'call',
+    'checkInitialized',
+    'configure',
+    'doInitialization',
+    'echoListUser',
+    'echoListUser2',
+    'echoUser',
+    'ensureConfigured',
+    'ensureInitialized',
+    'ensureInitializedAsync',
+    'executeInitialized',
+    'geDynamicAsync',
+    'geDynamicAsync2',
+    'getContextEntityResolutionRules',
+    'getDynamic',
+    'getRequestEntityAccessRules',
+    'getRequestEntityResolutionRules',
+    'getRouteHandler',
+    'getRouteHandlerByRequest',
+    'getRoutesHandlersNames',
+    'getUser',
+    'getUserAsync',
+    'initialize',
+    'initializeDependencies',
+    'notARoute',
+    'notARouteAsync',
+    'resolveRoute'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'acceptsRequest',
-        'addRoute',
-        'apiInfo',
-        'call',
-        'checkInitialized',
-        'configure',
-        'doInitialization',
-        'echoListUser',
-        'echoListUser2',
-        'echoUser',
-        'ensureConfigured',
-        'ensureInitialized',
-        'ensureInitializedAsync',
-        'executeInitialized',
-        'geDynamicAsync',
-        'geDynamicAsync2',
-        'getContextEntityResolutionRules',
-        'getDynamic',
-        'getRequestEntityAccessRules',
-        'getRequestEntityResolutionRules',
-        'getRouteHandler',
-        'getRouteHandlerByRequest',
-        'getRoutesHandlersNames',
-        'getUser',
-        'getUserAsync',
-        'initialize',
-        'initializeDependencies',
-        'notARoute',
-        'notARouteAsync',
-        'resolveRoute'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<UserModule, dynamic>>
       _methodsNoObject = <String, MethodReflection<UserModule, dynamic>>{};
@@ -1294,7 +1315,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'notaroute':
         return MethodReflection<UserModule, String>(
             this,
@@ -1542,7 +1563,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getrouteshandlersnames':
         return MethodReflection<UserModule, Iterable<String>>(
             this,
@@ -1814,8 +1835,10 @@ class UserModule$reflection extends ClassReflection<UserModule>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<UserModule, R>? staticMethod<R>(String methodName) => null;

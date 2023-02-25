@@ -323,6 +323,12 @@ class APIToken implements Comparable<APIToken> {
     'Z',
   ];
 
+  static List<String> tokenDefaultAlphabetPairsRandom = UnmodifiableListView(
+      tokenDefaultAlphabet
+          .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
+          .toList()
+        ..shuffle());
+
   static final SecureRandom _advanceRandom = SecureRandom();
 
   static String generateToken(int length,
@@ -343,15 +349,15 @@ class APIToken implements Comparable<APIToken> {
     var token = StringBuffer();
 
     while (token.length < halfLength) {
-      var c = tokenDefaultAlphabet[random.nextInt(alphabetLength)];
-      token.write(c);
+      var p = tokenDefaultAlphabetPairsRandom[random.nextInt(alphabetLength)];
+      token.write(p);
     }
 
     random.advance(maxSteps: 11, random: _advanceRandom);
 
     while (token.length < length) {
-      var c = tokenDefaultAlphabet[random.nextInt(alphabetLength)];
-      token.write(c);
+      var p = tokenDefaultAlphabetPairsRandom[random.nextInt(alphabetLength)];
+      token.write(p);
     }
 
     var fullToken = prefix.trim() + token.toString();

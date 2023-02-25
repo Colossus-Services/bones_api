@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.3
+// BUILDER: reflection_factory/2.0.4
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.3');
+  static final Version _version = Version.parse('2.0.4');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -95,12 +95,12 @@ class Account$reflection extends ClassReflection<Account>
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  Account$reflection withObject([Account? obj]) => Account$reflection(obj);
+  Account$reflection withObject([Account? obj]) =>
+      Account$reflection(obj)..setupInternalsWith(this);
 
   static Account$reflection? _withoutObjectInstance;
   @override
-  Account$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as Account$reflection;
+  Account$reflection withoutObjectInstance() => staticInstance;
 
   static Account$reflection get staticInstance =>
       _withoutObjectInstance ??= Account$reflection._();
@@ -129,9 +129,14 @@ class Account$reflection extends ClassReflection<Account>
   @override
   Account? createInstanceWithNoRequiredArgsConstructor() => Account.empty();
 
+  static const List<String> _constructorsNames = const <String>[
+    '',
+    'empty',
+    'entityReference'
+  ];
+
   @override
-  List<String> get constructorsNames =>
-      const <String>['', 'empty', 'entityReference'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<Account>> _constructors =
       <String, ConstructorReflection<Account>>{};
@@ -189,11 +194,15 @@ class Account$reflection extends ClassReflection<Account>
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -204,15 +213,17 @@ class Account$reflection extends ClassReflection<Account>
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'user',
+    'userInfo'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName',
-        'user',
-        'userInfo'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<Account, dynamic>> _fieldsNoObject =
       <String, FieldReflection<Account, dynamic>>{};
@@ -316,7 +327,7 @@ class Account$reflection extends ClassReflection<Account>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<Account, String>(
@@ -330,7 +341,7 @@ class Account$reflection extends ClassReflection<Account>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<Account, List<String>>(
@@ -344,30 +355,34 @@ class Account$reflection extends ClassReflection<Account>
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<Account, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Account, dynamic>>
       _methodsNoObject = <String, MethodReflection<Account, dynamic>>{};
@@ -432,7 +447,7 @@ class Account$reflection extends ClassReflection<Account>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<Account, TypeInfo<dynamic>?>(
             this,
@@ -446,7 +461,7 @@ class Account$reflection extends ClassReflection<Account>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<Account, void>(
             this,
@@ -463,7 +478,7 @@ class Account$reflection extends ClassReflection<Account>
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<Account, Map<String, dynamic>>(
             this,
@@ -477,7 +492,7 @@ class Account$reflection extends ClassReflection<Account>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<Account, dynamic>(
             this,
@@ -540,8 +555,10 @@ class Account$reflection extends ClassReflection<Account>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<Account, R>? staticMethod<R>(String methodName) => null;
@@ -572,12 +589,12 @@ class Address$reflection extends ClassReflection<Address>
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  Address$reflection withObject([Address? obj]) => Address$reflection(obj);
+  Address$reflection withObject([Address? obj]) =>
+      Address$reflection(obj)..setupInternalsWith(this);
 
   static Address$reflection? _withoutObjectInstance;
   @override
-  Address$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as Address$reflection;
+  Address$reflection withoutObjectInstance() => staticInstance;
 
   static Address$reflection get staticInstance =>
       _withoutObjectInstance ??= Address$reflection._();
@@ -606,8 +623,14 @@ class Address$reflection extends ClassReflection<Address>
   @override
   Address? createInstanceWithNoRequiredArgsConstructor() => Address.empty();
 
+  static const List<String> _constructorsNames = const <String>[
+    '',
+    'empty',
+    'fromMap'
+  ];
+
   @override
-  List<String> get constructorsNames => const <String>['', 'empty', 'fromMap'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<Address>> _constructors =
       <String, ConstructorReflection<Address>>{};
@@ -670,11 +693,15 @@ class Address$reflection extends ClassReflection<Address>
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -685,19 +712,21 @@ class Address$reflection extends ClassReflection<Address>
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'city',
+    'closedStores',
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'number',
+    'state',
+    'stores',
+    'street'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'city',
-        'closedStores',
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName',
-        'number',
-        'state',
-        'stores',
-        'street'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<Address, dynamic>> _fieldsNoObject =
       <String, FieldReflection<Address, dynamic>>{};
@@ -774,7 +803,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [EntityField.maximum(3)],
+          const [EntityField.maximum(3)],
         );
       case 'city':
         return FieldReflection<Address, String>(
@@ -788,7 +817,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [EntityField.maximum(100)],
+          const [EntityField.maximum(100)],
         );
       case 'street':
         return FieldReflection<Address, String>(
@@ -802,7 +831,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [EntityField.maximum(200)],
+          const [EntityField.maximum(200)],
         );
       case 'number':
         return FieldReflection<Address, int>(
@@ -856,7 +885,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<Address, String>(
@@ -870,7 +899,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<Address, List<String>>(
@@ -884,30 +913,34 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<Address, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Address, dynamic>>
       _methodsNoObject = <String, MethodReflection<Address, dynamic>>{};
@@ -972,7 +1005,7 @@ class Address$reflection extends ClassReflection<Address>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<Address, TypeInfo<dynamic>?>(
             this,
@@ -986,7 +1019,7 @@ class Address$reflection extends ClassReflection<Address>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldentityannotations':
         return MethodReflection<Address, List<EntityAnnotation>?>(
             this,
@@ -1001,7 +1034,7 @@ class Address$reflection extends ClassReflection<Address>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<Address, void>(
             this,
@@ -1018,7 +1051,7 @@ class Address$reflection extends ClassReflection<Address>
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<Address, Map<String, dynamic>>(
             this,
@@ -1032,7 +1065,7 @@ class Address$reflection extends ClassReflection<Address>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<Address, dynamic>(
             this,
@@ -1080,8 +1113,10 @@ class Address$reflection extends ClassReflection<Address>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<Address, R>? staticMethod<R>(String methodName) => null;
@@ -1111,12 +1146,12 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  Photo$reflection withObject([Photo? obj]) => Photo$reflection(obj);
+  Photo$reflection withObject([Photo? obj]) =>
+      Photo$reflection(obj)..setupInternalsWith(this);
 
   static Photo$reflection? _withoutObjectInstance;
   @override
-  Photo$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as Photo$reflection;
+  Photo$reflection withoutObjectInstance() => staticInstance;
 
   static Photo$reflection get staticInstance =>
       _withoutObjectInstance ??= Photo$reflection._();
@@ -1145,9 +1180,15 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   @override
   Photo? createInstanceWithNoRequiredArgsConstructor() => Photo.empty();
 
+  static const List<String> _constructorsNames = const <String>[
+    'empty',
+    'from',
+    'fromData',
+    'fromID'
+  ];
+
   @override
-  List<String> get constructorsNames =>
-      const <String>['empty', 'from', 'fromData', 'fromID'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<Photo>> _constructors =
       <String, ConstructorReflection<Photo>>{};
@@ -1205,11 +1246,15 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -1220,15 +1265,17 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'data',
+    'dataUrl',
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'data',
-        'dataUrl',
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<Photo, dynamic>> _fieldsNoObject =
       <String, FieldReflection<Photo, dynamic>>{};
@@ -1330,7 +1377,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<Photo, List<String>>(
@@ -1344,7 +1391,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       case 'hashcode':
         return FieldReflection<Photo, int>(
@@ -1358,31 +1405,35 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<Photo, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded',
+    'toString'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded',
-        'toString'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Photo, dynamic>> _methodsNoObject =
       <String, MethodReflection<Photo, dynamic>>{};
@@ -1446,7 +1497,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<Photo, TypeInfo<dynamic>?>(
             this,
@@ -1460,7 +1511,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<Photo, void>(
             this,
@@ -1477,7 +1528,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<Photo, Map<String, dynamic>>(
             this,
@@ -1491,7 +1542,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'tostring':
         return MethodReflection<Photo, String>(
             this,
@@ -1505,7 +1556,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<Photo, dynamic>(
             this,
@@ -1568,8 +1619,13 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[
+    'computeID',
+    'fromMap'
+  ];
+
   @override
-  List<String> get staticMethodsNames => const <String>['computeID', 'fromMap'];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, MethodReflection<Photo, dynamic>> _staticMethods =
       <String, MethodReflection<Photo, dynamic>>{};
@@ -1648,12 +1704,12 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  Role$reflection withObject([Role? obj]) => Role$reflection(obj);
+  Role$reflection withObject([Role? obj]) =>
+      Role$reflection(obj)..setupInternalsWith(this);
 
   static Role$reflection? _withoutObjectInstance;
   @override
-  Role$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as Role$reflection;
+  Role$reflection withoutObjectInstance() => staticInstance;
 
   static Role$reflection get staticInstance =>
       _withoutObjectInstance ??= Role$reflection._();
@@ -1682,8 +1738,14 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   @override
   Role? createInstanceWithNoRequiredArgsConstructor() => Role.empty();
 
+  static const List<String> _constructorsNames = const <String>[
+    '',
+    'empty',
+    'fromMap'
+  ];
+
   @override
-  List<String> get constructorsNames => const <String>['', 'empty', 'fromMap'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<Role>> _constructors =
       <String, ConstructorReflection<Role>>{};
@@ -1736,11 +1798,15 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -1751,16 +1817,18 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'enabled',
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'type',
+    'value'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'enabled',
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName',
-        'type',
-        'value'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<Role, dynamic>> _fieldsNoObject =
       <String, FieldReflection<Role, dynamic>>{};
@@ -1875,7 +1943,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<Role, String>(
@@ -1889,7 +1957,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<Role, List<String>>(
@@ -1903,30 +1971,34 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<Role, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Role, dynamic>> _methodsNoObject =
       <String, MethodReflection<Role, dynamic>>{};
@@ -1990,7 +2062,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<Role, TypeInfo<dynamic>?>(
             this,
@@ -2004,7 +2076,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<Role, void>(
             this,
@@ -2021,7 +2093,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<Role, Map<String, dynamic>>(
             this,
@@ -2035,7 +2107,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<Role, dynamic>(
             this,
@@ -2098,8 +2170,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>[];
+
   @override
-  List<String> get staticMethodsNames => const <String>[];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
   MethodReflection<Role, R>? staticMethod<R>(String methodName) => null;
@@ -2135,8 +2209,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
 
   static RoleType$reflection? _withoutObjectInstance;
   @override
-  RoleType$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as RoleType$reflection;
+  RoleType$reflection withoutObjectInstance() => staticInstance;
 
   static RoleType$reflection get staticInstance =>
       _withoutObjectInstance ??= RoleType$reflection._();
@@ -2151,19 +2224,28 @@ class RoleType$reflection extends EnumReflection<RoleType>
     RoleType$reflection.staticInstance;
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<String> get fieldsNames => const <String>['admin', 'guest', 'unknown'];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<String> _fieldsNames = const <String>[
+    'admin',
+    'guest',
+    'unknown'
+  ];
 
   @override
-  Map<String, RoleType> get valuesByName => const <String, RoleType>{
-        'admin': RoleType.admin,
-        'guest': RoleType.guest,
-        'unknown': RoleType.unknown,
-      };
+  List<String> get fieldsNames => _fieldsNames;
 
+  static const Map<String, RoleType> _valuesByName = const <String, RoleType>{
+    'admin': RoleType.admin,
+    'guest': RoleType.guest,
+    'unknown': RoleType.unknown,
+  };
+
+  @override
+  Map<String, RoleType> get valuesByName => _valuesByName;
   @override
   List<RoleType> get values => RoleType.values;
 }
@@ -2192,12 +2274,12 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  Store$reflection withObject([Store? obj]) => Store$reflection(obj);
+  Store$reflection withObject([Store? obj]) =>
+      Store$reflection(obj)..setupInternalsWith(this);
 
   static Store$reflection? _withoutObjectInstance;
   @override
-  Store$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as Store$reflection;
+  Store$reflection withoutObjectInstance() => staticInstance;
 
   static Store$reflection get staticInstance =>
       _withoutObjectInstance ??= Store$reflection._();
@@ -2226,8 +2308,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   @override
   Store? createInstanceWithNoRequiredArgsConstructor() => Store.empty();
 
+  static const List<String> _constructorsNames = const <String>['', 'empty'];
+
   @override
-  List<String> get constructorsNames => const <String>['', 'empty'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<Store>> _constructors =
       <String, ConstructorReflection<Store>>{};
@@ -2268,11 +2352,15 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -2283,15 +2371,17 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'name',
+    'number'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName',
-        'name',
-        'number'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<Store, dynamic>> _fieldsNoObject =
       <String, FieldReflection<Store, dynamic>>{};
@@ -2367,7 +2457,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           obj,
           false,
           false,
-          [EntityField.maximum(100)],
+          const [EntityField.maximum(100)],
         );
       case 'number':
         return FieldReflection<Store, int?>(
@@ -2394,7 +2484,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<Store, String>(
@@ -2408,7 +2498,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<Store, List<String>>(
@@ -2422,30 +2512,34 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<Store, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Store, dynamic>> _methodsNoObject =
       <String, MethodReflection<Store, dynamic>>{};
@@ -2509,7 +2603,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<Store, TypeInfo<dynamic>?>(
             this,
@@ -2523,7 +2617,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldentityannotations':
         return MethodReflection<Store, List<EntityAnnotation>?>(
             this,
@@ -2538,7 +2632,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<Store, void>(
             this,
@@ -2555,7 +2649,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<Store, Map<String, dynamic>>(
             this,
@@ -2569,7 +2663,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<Store, dynamic>(
             this,
@@ -2617,8 +2711,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>['fromMap'];
+
   @override
-  List<String> get staticMethodsNames => const <String>['fromMap'];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, MethodReflection<Store, dynamic>> _staticMethods =
       <String, MethodReflection<Store, dynamic>>{};
@@ -2683,12 +2779,12 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  User$reflection withObject([User? obj]) => User$reflection(obj);
+  User$reflection withObject([User? obj]) =>
+      User$reflection(obj)..setupInternalsWith(this);
 
   static User$reflection? _withoutObjectInstance;
   @override
-  User$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as User$reflection;
+  User$reflection withoutObjectInstance() => staticInstance;
 
   static User$reflection get staticInstance =>
       _withoutObjectInstance ??= User$reflection._();
@@ -2717,8 +2813,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   @override
   User? createInstanceWithNoRequiredArgsConstructor() => User.empty();
 
+  static const List<String> _constructorsNames = const <String>['', 'empty'];
+
   @override
-  List<String> get constructorsNames => const <String>['', 'empty'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<User>> _constructors =
       <String, ConstructorReflection<User>>{};
@@ -2783,11 +2881,15 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -2798,22 +2900,24 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'address',
+    'creationTime',
+    'email',
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'level',
+    'password',
+    'photo',
+    'roles',
+    'userInfo',
+    'wakeUpTime'
+  ];
+
   @override
-  List<String> get fieldsNames => const <String>[
-        'address',
-        'creationTime',
-        'email',
-        'fieldsNames',
-        'hashCode',
-        'id',
-        'idFieldName',
-        'level',
-        'password',
-        'photo',
-        'roles',
-        'userInfo',
-        'wakeUpTime'
-      ];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<User, dynamic>> _fieldsNoObject =
       <String, FieldReflection<User, dynamic>>{};
@@ -2889,7 +2993,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           obj,
           false,
           false,
-          [
+          const [
             EntityField.unique(),
             EntityField.maximum(100),
             EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*')
@@ -3012,7 +3116,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<User, String>(
@@ -3026,7 +3130,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<User, List<String>>(
@@ -3040,30 +3144,34 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<User, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<User, dynamic>> _methodsNoObject =
       <String, MethodReflection<User, dynamic>>{};
@@ -3127,7 +3235,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<User, TypeInfo<dynamic>?>(
             this,
@@ -3141,7 +3249,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldentityannotations':
         return MethodReflection<User, List<EntityAnnotation>?>(
             this,
@@ -3156,7 +3264,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<User, void>(
             this,
@@ -3173,7 +3281,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<User, Map<String, dynamic>>(
             this,
@@ -3187,7 +3295,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<User, dynamic>(
             this,
@@ -3235,8 +3343,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>['fromMap'];
+
   @override
-  List<String> get staticMethodsNames => const <String>['fromMap'];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, MethodReflection<User, dynamic>> _staticMethods =
       <String, MethodReflection<User, dynamic>>{};
@@ -3303,12 +3413,12 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   Version get languageVersion => Version.parse('2.18.0');
 
   @override
-  UserInfo$reflection withObject([UserInfo? obj]) => UserInfo$reflection(obj);
+  UserInfo$reflection withObject([UserInfo? obj]) =>
+      UserInfo$reflection(obj)..setupInternalsWith(this);
 
   static UserInfo$reflection? _withoutObjectInstance;
   @override
-  UserInfo$reflection withoutObjectInstance() => _withoutObjectInstance ??=
-      super.withoutObjectInstance() as UserInfo$reflection;
+  UserInfo$reflection withoutObjectInstance() => staticInstance;
 
   static UserInfo$reflection get staticInstance =>
       _withoutObjectInstance ??= UserInfo$reflection._();
@@ -3337,8 +3447,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   @override
   UserInfo? createInstanceWithNoRequiredArgsConstructor() => UserInfo.empty();
 
+  static const List<String> _constructorsNames = const <String>['', 'empty'];
+
   @override
-  List<String> get constructorsNames => const <String>['', 'empty'];
+  List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<UserInfo>> _constructors =
       <String, ConstructorReflection<UserInfo>>{};
@@ -3375,11 +3487,15 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     }
   }
 
-  @override
-  List<Object> get classAnnotations => List<Object>.unmodifiable(<Object>[]);
+  static const List<Object> _classAnnotations = <Object>[];
 
   @override
-  List<Type> get supperTypes => const <Type>[Entity];
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
 
   @override
   bool get hasMethodToJson => true;
@@ -3390,9 +3506,16 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     return obj?.toJson();
   }
 
+  static const List<String> _fieldsNames = const <String>[
+    'fieldsNames',
+    'hashCode',
+    'id',
+    'idFieldName',
+    'info'
+  ];
+
   @override
-  List<String> get fieldsNames =>
-      const <String>['fieldsNames', 'hashCode', 'id', 'idFieldName', 'info'];
+  List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<UserInfo, dynamic>> _fieldsNoObject =
       <String, FieldReflection<UserInfo, dynamic>>{};
@@ -3469,7 +3592,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           obj,
           false,
           false,
-          [EntityField.maximum(1000)],
+          const [EntityField.maximum(1000)],
         );
       case 'hashcode':
         return FieldReflection<UserInfo, int>(
@@ -3483,7 +3606,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'idfieldname':
         return FieldReflection<UserInfo, String>(
@@ -3497,7 +3620,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           obj,
           false,
           false,
-          [override],
+          const [override],
         );
       case 'fieldsnames':
         return FieldReflection<UserInfo, List<String>>(
@@ -3511,30 +3634,34 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           obj,
           false,
           false,
-          [JsonField.hidden(), override],
+          const [JsonField.hidden(), override],
         );
       default:
         return null;
     }
   }
 
+  static const List<String> _staticFieldsNames = const <String>[];
+
   @override
-  List<String> get staticFieldsNames => const <String>[];
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
   FieldReflection<UserInfo, T>? staticField<T>(String fieldName) => null;
 
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded'
+  ];
+
   @override
-  List<String> get methodsNames => const <String>[
-        'getField',
-        'getFieldEntityAnnotations',
-        'getFieldType',
-        'getID',
-        'setField',
-        'setID',
-        'toJson',
-        'toJsonEncoded'
-      ];
+  List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<UserInfo, dynamic>>
       _methodsNoObject = <String, MethodReflection<UserInfo, dynamic>>{};
@@ -3599,7 +3726,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldtype':
         return MethodReflection<UserInfo, TypeInfo<dynamic>?>(
             this,
@@ -3613,7 +3740,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'getfieldentityannotations':
         return MethodReflection<UserInfo, List<EntityAnnotation>?>(
             this,
@@ -3628,7 +3755,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             const <__PR>[__PR(__TR.tString, 'key', false, true)],
             null,
             null,
-            [override]);
+            const [override]);
       case 'setfield':
         return MethodReflection<UserInfo, void>(
             this,
@@ -3645,7 +3772,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             ],
             null,
             null,
-            [override]);
+            const [override]);
       case 'tojson':
         return MethodReflection<UserInfo, Map<String, dynamic>>(
             this,
@@ -3659,7 +3786,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             null,
             null,
             null,
-            [override]);
+            const [override]);
       case 'getid':
         return MethodReflection<UserInfo, dynamic>(
             this,
@@ -3707,8 +3834,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     }
   }
 
+  static const List<String> _staticMethodsNames = const <String>['fromMap'];
+
   @override
-  List<String> get staticMethodsNames => const <String>['fromMap'];
+  List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, MethodReflection<UserInfo, dynamic>> _staticMethods =
       <String, MethodReflection<UserInfo, dynamic>>{};
