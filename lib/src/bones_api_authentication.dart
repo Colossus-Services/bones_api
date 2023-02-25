@@ -323,10 +323,11 @@ class APIToken implements Comparable<APIToken> {
     'Z',
   ];
 
-  static List<String> tokenDefaultAlphabetPairsRandom = tokenDefaultAlphabet
-      .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
-      .toList()
-    ..shuffle();
+  static List<String> tokenDefaultAlphabetPairsRandom = UnmodifiableListView(
+      tokenDefaultAlphabet
+          .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
+          .toList()
+        ..shuffle());
 
   static final SecureRandom _advanceRandom = SecureRandom();
 
