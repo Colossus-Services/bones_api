@@ -2,7 +2,7 @@
 
 - `APIServer`:
   - Added `allowRequestLetsEncryptCertificate`.
-- shelf_letsencrypt: ^1.1.0
+- shelf_letsencrypt: ^1.1.1
 
 ## 1.3.49
 
