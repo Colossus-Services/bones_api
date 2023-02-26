@@ -59,6 +59,9 @@ class APIServer {
   /// If `true` runs Let's Encrypt in production mode.
   final bool letsEncryptProduction;
 
+  /// If `true` allows the request of Let's Encrypt certificates.
+  final bool allowRequestLetsEncryptCertificate;
+
   /// The name of this server.
   ///
   /// This is used for the `server` header.
@@ -112,6 +115,7 @@ class APIServer {
     int? securePort,
     this.letsEncrypt = false,
     this.letsEncryptProduction = false,
+    this.allowRequestLetsEncryptCertificate = true,
     Object? letsEncryptDirectory,
     this.name = 'Bones_API',
     this.version = BonesAPI.VERSION,
@@ -489,6 +493,8 @@ class APIServer {
           "Let's Encrypt directory doesn't exists: $letsEncryptDirectory");
     }
 
+    _log.info("Let's Encrypt directory: ${letsEncryptDirectory.path}");
+
     final certificatesHandler = CertificatesHandlerIO(letsEncryptDirectory);
 
     final LetsEncrypt letsEncrypt =
@@ -503,13 +509,19 @@ class APIServer {
     var domain = domains.first;
     var domainEmail = 'contact@$domain';
 
+    _log.info("Let's Encrypt domain: $domain");
+
+    if (!allowRequestLetsEncryptCertificate) {
+      _log.warning("NOT allowed to request Let's Encrypt certificates!");
+    }
+
     var servers = await letsEncrypt.startSecureServer(
       handler,
-      domain,
-      domainEmail,
+      {domain: domainEmail},
       port: port,
       securePort: securePort,
       bindingAddress: address,
+      requestCertificate: allowRequestLetsEncryptCertificate,
     );
 
     var server = servers[0]; // HTTP Server.

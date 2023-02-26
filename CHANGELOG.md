@@ -1,3 +1,9 @@
+## 1.3.50
+
+- `APIServer`:
+  - Added `allowRequestLetsEncryptCertificate`.
+- shelf_letsencrypt: ^1.1.1
+
 ## 1.3.49
 
 - `EntityHandler`:
