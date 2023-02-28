@@ -28,7 +28,7 @@ Future<bool> _runTest(bool useReflection) => runAdapterTests(
         parentRepositoryProvider: provider,
       ),
       (provider, dbPort) =>
-          DBMemoryObjectAdapter(parentRepositoryProvider: provider),
+          DBObjectMemoryAdapter(parentRepositoryProvider: provider),
       '"',
       'int',
       entityByReflection: useReflection,

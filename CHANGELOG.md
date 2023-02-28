@@ -1,3 +1,7 @@
+## 1.3.51
+
+- Rename `DBMemoryObjectAdapter` to `DBObjectMemoryAdapter`.
+
 ## 1.3.50
 
 - `APIServer`:

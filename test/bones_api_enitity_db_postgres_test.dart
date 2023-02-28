@@ -44,7 +44,7 @@ Future<bool> _runTest(bool useReflection) => runAdapterTests(
         parentRepositoryProvider: provider,
       ),
       (provider, dbPort) =>
-          DBMemoryObjectAdapter(parentRepositoryProvider: provider),
+          DBObjectMemoryAdapter(parentRepositoryProvider: provider),
       '"',
       'bigint',
       entityByReflection: useReflection,
