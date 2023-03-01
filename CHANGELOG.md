@@ -1,3 +1,8 @@
+## 1.3.53 
+
+- petitparser: ^5.2.0
+- postgres: ^2.6.1
+
 ## 1.3.52
 
 - Renamed `DBMemorySQLAdapter` to `DBSQLMemoryAdapter`.

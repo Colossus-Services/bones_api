@@ -19,6 +19,8 @@ jobs:
           uname -a
       - name: Install dependencies
         run: dart pub get
+      - name: Upgrade dependencies
+        run: dart pub upgrade
       - name: dart format
         run: dart format -o none --set-exit-if-changed .
       - name: dart analyze
