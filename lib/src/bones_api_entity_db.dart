@@ -274,6 +274,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   FutureOr<InitializationResult> initialize() => populateImpl();
 
+  final StreamController<DBAdapter<C>> _onCloseControler = StreamController();
+
+  /// On [close] events.
+  late final Stream<DBAdapter<C>> onClose = _onCloseControler.stream;
+
   @override
   bool close() {
     // ignore: discarded_futures
@@ -281,6 +286,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     // ignore: discarded_futures
     clearPool();
+
+    _onCloseControler.add(this);
+
     return true;
   }
 
@@ -1146,10 +1154,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       Transaction transaction,
       EntityResolutionRulesResolved resolutionRulesResolved,
       Iterable<Map<String, dynamic>> results) {
-    return results.map((e) {
-      var entityProvider = TransactionEntityProvider(
-          transaction, provider, resolutionRulesResolved);
+    final entityProvider = TransactionEntityProvider(
+        transaction, provider, resolutionRulesResolved);
 
+    return results.map((e) {
       // ignore: discarded_futures
       return entityHandler.createFromMap(e,
           entityProvider: entityProvider,

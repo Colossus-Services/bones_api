@@ -13,7 +13,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
 
   factory APIEntityRepositoryProvider() => _instance;
 
-  late final DBMemorySQLAdapter sqlAdapter;
+  late final DBSQLMemoryAdapter sqlAdapter;
 
   late final DBSQLEntityRepository<Store> storeSQLRepository;
   late final DBSQLEntityRepository<Address> addressSQLRepository;
@@ -25,7 +25,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   late final UserAPIRepository userAPIRepository;
 
   APIEntityRepositoryProvider._() {
-    sqlAdapter = DBMemorySQLAdapter(parentRepositoryProvider: this)
+    sqlAdapter = DBSQLMemoryAdapter(parentRepositoryProvider: this)
       ..addTableSchemes([
         TableScheme('user_info', idFieldName: 'id', fieldsTypes: {
           'id': int,

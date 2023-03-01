@@ -1,6 +1,21 @@
+## 1.3.52
+
+- Renamed `DBMemorySQLAdapter` to `DBSQLMemoryAdapter`.
+  - Renamed `DBMemorySQLAdapterException` to `DBSQLMemoryAdapterException`.
+- `DBSQLMemoryAdapter`: `name` changed to "sql.memory".
+- `DBObjectMemoryAdapter`: `name` changed to "object.memory".
+- `DBMySQLAdapter`: added alias "sql.mysql".
+- `DBPostgreSQLAdapter`: added alias "sql.postgresql".
+- New `DBObjectDirectoryAdapter`.
+- `EntityHandler`:
+  - Fix `_resolveValueByEntityHandler` for when `entityRepositoryProvider` is `null`.
+- `DBAdapter`:
+  - Added `onClose`.
+
 ## 1.3.51
 
-- Rename `DBMemoryObjectAdapter` to `DBObjectMemoryAdapter`.
+- Renamed `DBMemoryObjectAdapter` to `DBObjectMemoryAdapter`.
+  - Renamed `DBMemoryObjectAdapterException` to `DBObjectMemoryAdapterException`.
 
 ## 1.3.50
 

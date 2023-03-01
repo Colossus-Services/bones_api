@@ -312,8 +312,10 @@ extension MapGetterExtension<K, V> on Map<K, V> {
     if (parser != null) {
       var val2 = parser(value);
       return val2 ?? defaultValue;
+    } else if (value is T?) {
+      return value ?? defaultValue;
     } else {
-      return (value as T?) ?? defaultValue;
+      throw ArgumentError("Can't parse key('$key') value as `$T`: $value");
     }
   }
 }

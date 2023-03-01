@@ -623,7 +623,7 @@ Future<bool> runAdapterTests(
         expect(
           error.toString(),
           matches(RegExp(
-              r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@\w+\.com.*?>.*',
+              r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
               dotAll: true)),
         );
       }

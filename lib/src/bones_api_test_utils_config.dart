@@ -303,28 +303,32 @@ abstract class APITestConfigDB extends APITestConfig with APITestConfigDBMixin {
       : super(apiConfig);
 }
 
+@Deprecated("Renamed to 'APITestConfigDBSQLMemory'")
+typedef APITestConfigDBMemory = APITestConfigDBSQLMemory;
+
 /// A [APITestConfig] with in-memory database.
-class APITestConfigDBMemory extends APITestConfigDB with APITestConfigBase {
+class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
   final EntityRepositoryProvider? parentRepositoryProvider;
 
-  APITestConfigDBMemory(Map<String, dynamic> apiConfig,
+  APITestConfigDBSQLMemory(Map<String, dynamic> apiConfig,
       {this.parentRepositoryProvider})
       : super('memory', apiConfig);
 
   @override
-  Map<String, dynamic> get dbConfig => apiConfigMap.getAsMap('db')?['memory'];
+  Map<String, dynamic> get dbConfig =>
+      apiConfigMap.getAsMap('db')?['sql.memory'];
 
   @override
   FutureOr<int> resolveFreePort(int port) => 5000;
 
-  DBMemorySQLAdapter? sqlAdapter;
+  DBSQLMemoryAdapter? sqlAdapter;
 
   @override
   FutureOr<bool> startImpl() {
     _started = false;
 
     sqlAdapter =
-        DBMemorySQLAdapter(parentRepositoryProvider: parentRepositoryProvider);
+        DBSQLMemoryAdapter(parentRepositoryProvider: parentRepositoryProvider);
 
     _log.info('** STARTED> $this');
 

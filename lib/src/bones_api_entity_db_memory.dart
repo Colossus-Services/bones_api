@@ -17,17 +17,17 @@ import 'bones_api_sql_builder.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
-final _log = logging.Logger('DBMemorySQLAdapter');
+final _log = logging.Logger('DBSQLMemoryAdapter');
 
-class DBMemorySQLAdapterContext
-    implements Comparable<DBMemorySQLAdapterContext> {
+class DBSQLMemoryAdapterContext
+    implements Comparable<DBSQLMemoryAdapterContext> {
   final int id;
 
-  final DBMemorySQLAdapter sqlAdapter;
+  final DBSQLMemoryAdapter sqlAdapter;
 
   final Map<String, int> tablesVersions;
 
-  DBMemorySQLAdapterContext(this.id, this.sqlAdapter)
+  DBSQLMemoryAdapterContext(this.id, this.sqlAdapter)
       : tablesVersions = sqlAdapter.tablesVersions;
 
   bool _closed = false;
@@ -39,16 +39,19 @@ class DBMemorySQLAdapterContext
   }
 
   @override
-  int compareTo(DBMemorySQLAdapterContext other) => id.compareTo(other.id);
+  int compareTo(DBSQLMemoryAdapterContext other) => id.compareTo(other.id);
 }
+
+@Deprecated("Renamed to 'DBSQLMemoryAdapter'")
+typedef DBMemorySQLAdapter = DBSQLMemoryAdapter;
 
 /// A [DBSQLAdapter] that stores tables data in memory.
 ///
-/// Simulates a SQL Database adapter. Useful for tests.
-class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
+/// Simulates a SQL Database adapter. Useful for tests and development.
+class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     implements WithRuntimeTypeNameSafe {
   @override
-  String get runtimeTypeNameSafe => 'DBMemorySQLAdapter';
+  String get runtimeTypeNameSafe => 'DBSQLMemoryAdapter';
 
   static bool _boot = false;
 
@@ -56,17 +59,19 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
     if (_boot) return;
     _boot = true;
 
-    DBSQLAdapter.registerAdapter(
-        ['memory', 'mem'], DBMemorySQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter([
+      'sql.memory',
+      'sql.mem',
+    ], DBSQLMemoryAdapter, _instantiate);
   }
 
-  static FutureOr<DBMemorySQLAdapter?> _instantiate(config,
+  static FutureOr<DBSQLMemoryAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return DBMemorySQLAdapter.fromConfig(config,
+      return DBSQLMemoryAdapter.fromConfig(config,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -75,14 +80,14 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
     }
   }
 
-  DBMemorySQLAdapter(
+  DBSQLMemoryAdapter(
       {bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
-          'memory',
+          'sql.memory',
           1,
           3,
           const DBSQLAdapterCapability(
@@ -105,7 +110,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<DBMemorySQLAdapter> fromConfig(Map<String, dynamic>? config,
+  static FutureOr<DBSQLMemoryAdapter> fromConfig(Map<String, dynamic>? config,
       {EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     boot();
@@ -126,7 +131,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
       populateSource = populate['source'];
     }
 
-    var adapter = DBMemorySQLAdapter(
+    var adapter = DBSQLMemoryAdapter(
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -142,11 +147,11 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   Object resolveError(Object error, StackTrace stackTrace) {
-    if (error is DBMemorySQLAdapterException) {
+    if (error is DBSQLMemoryAdapterException) {
       return error;
     }
 
-    return DBMemorySQLAdapterException('error', '$error',
+    return DBSQLMemoryAdapterException('error', '$error',
         parentError: error, parentStackTrace: stackTrace);
   }
 
@@ -169,19 +174,19 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
   }
 
   @override
-  String getConnectionURL(DBMemorySQLAdapterContext connection) =>
-      'memory://${connection.id}';
+  String getConnectionURL(DBSQLMemoryAdapterContext connection) =>
+      'sql.memory://${connection.id}';
 
   int _connectionCount = 0;
 
   @override
-  DBMemorySQLAdapterContext createConnection() {
+  DBSQLMemoryAdapterContext createConnection() {
     var id = ++_connectionCount;
-    return DBMemorySQLAdapterContext(id, this);
+    return DBSQLMemoryAdapterContext(id, this);
   }
 
   @override
-  FutureOr<bool> closeConnection(DBMemorySQLAdapterContext connection) {
+  FutureOr<bool> closeConnection(DBSQLMemoryAdapterContext connection) {
     connection.close();
     return true;
   }
@@ -365,7 +370,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBMemorySQLAdapterContext connection) {
+      Transaction transaction, DBSQLMemoryAdapterContext connection) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -381,7 +386,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   FutureOr doInsertRelationshipSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBMemorySQLAdapterContext connection) {
+      Transaction transaction, DBSQLMemoryAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var entry = _normalizeEntityJSON(
@@ -407,7 +412,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   FutureOr doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBMemorySQLAdapterContext connection) {
+      Transaction transaction, DBSQLMemoryAdapterContext connection) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
@@ -540,7 +545,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, DBMemorySQLAdapterContext connection,
+      Transaction transaction, DBSQLMemoryAdapterContext connection,
       {bool allowAutoInsert = false}) {
     if (sql.isDummy) return id;
 
@@ -601,7 +606,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
       String table,
       SQL sql,
       Transaction transaction,
-      DBMemorySQLAdapterContext connection) {
+      DBSQLMemoryAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var sel = _selectEntries(table, sql);
@@ -676,7 +681,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
       String table,
       SQL sql,
       Transaction transaction,
-      DBMemorySQLAdapterContext connection) {
+      DBSQLMemoryAdapterContext connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var map = _getTableMap(table, false);
@@ -729,7 +734,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
         var refId = ref.value.key;
         var refFieldName = ref.value.value.key;
         var refFieldValue = ref.value.value.value;
-        throw DBMemorySQLAdapterException("delete.constraint",
+        throw DBSQLMemoryAdapterException("delete.constraint",
             "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
       }
     }
@@ -1085,11 +1090,11 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
-  final Map<DBMemorySQLAdapterContext, DateTime> _openTransactionsContexts =
-      <DBMemorySQLAdapterContext, DateTime>{};
+  final Map<DBSQLMemoryAdapterContext, DateTime> _openTransactionsContexts =
+      <DBSQLMemoryAdapterContext, DateTime>{};
 
   @override
-  DBMemorySQLAdapterContext openTransaction(Transaction transaction) {
+  DBSQLMemoryAdapterContext openTransaction(Transaction transaction) {
     var conn = createConnection();
 
     _openTransactionsContexts[conn] = DateTime.now();
@@ -1106,7 +1111,7 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBMemorySQLAdapterContext connection,
+      DBSQLMemoryAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -1119,16 +1124,16 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBMemorySQLAdapterContext? connection) {
+      Transaction transaction, DBSQLMemoryAdapterContext? connection) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
   }
 
-  final ListQueue<DBMemorySQLAdapterContext> _consolidateContextQueue =
-      ListQueue<DBMemorySQLAdapterContext>();
+  final ListQueue<DBSQLMemoryAdapterContext> _consolidateContextQueue =
+      ListQueue<DBSQLMemoryAdapterContext>();
 
-  void _consolidateTransactionContext(DBMemorySQLAdapterContext context) {
+  void _consolidateTransactionContext(DBSQLMemoryAdapterContext context) {
     _openTransactionsContexts.remove(context);
 
     if (_openTransactionsContexts.isNotEmpty) {
@@ -1181,16 +1186,19 @@ class DBMemorySQLAdapter extends DBSQLAdapter<DBMemorySQLAdapterContext>
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'DBMemorySQLAdapter#$instanceID{id: $instanceID$tablesStr$closedStr}';
+    return 'DBSQLMemoryAdapter#$instanceID{id: $instanceID$tablesStr$closedStr}';
   }
 }
 
-/// Error thrown by [DBMemorySQLAdapter] operations.
-class DBMemorySQLAdapterException extends DBSQLAdapterException {
-  @override
-  String get runtimeTypeNameSafe => 'DBMemorySQLAdapterException';
+@Deprecated("Renamed to 'DBSQLMemoryAdapterException'")
+typedef DBMemorySQLAdapterException = DBSQLMemoryAdapterException;
 
-  DBMemorySQLAdapterException(String type, String message,
+/// Error thrown by [DBSQLMemoryAdapter] operations.
+class DBSQLMemoryAdapterException extends DBSQLAdapterException {
+  @override
+  String get runtimeTypeNameSafe => 'DBSQLMemoryAdapterException';
+
+  DBSQLMemoryAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);
