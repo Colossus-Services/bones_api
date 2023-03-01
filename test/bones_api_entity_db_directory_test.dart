@@ -32,7 +32,7 @@ Future<bool> _runTest(bool useReflection) {
       Directory.systemTemp.createTempSync("bones_api_tests_object_dir");
 
   return runAdapterTests(
-    'DBSQLMemory+DBObjectDirectory',
+    'DBSQLMemory+obj.dir',
     MemoryTestConfig(),
     (provider, dbPort) => DBSQLMemoryAdapter(
       parentRepositoryProvider: provider,
