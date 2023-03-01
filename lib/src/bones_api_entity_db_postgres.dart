@@ -33,8 +33,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
     Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
 
-    DBSQLAdapter.registerAdapter(['postgres', 'postgre', 'postgresql'],
-        DBPostgreSQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter([
+      'sql.postgres',
+      'sql.postgre',
+      'sql.postgresql',
+      'postgres',
+      'postgre',
+      'postgresql',
+    ], DBPostgreSQLAdapter, _instantiate);
   }
 
   static FutureOr<DBPostgreSQLAdapter?> _instantiate(config,

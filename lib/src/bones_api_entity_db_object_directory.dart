@@ -1,10 +1,14 @@
 import 'dart:collection';
+import 'dart:convert' as dart_convert;
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:map_history/map_history.dart';
+import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -14,15 +18,15 @@ import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 
-final _log = logging.Logger('DBObjectMemoryAdapter');
+final _log = logging.Logger('DBObjectDirectoryAdapter');
 
-class DBObjectMemoryAdapterContext
-    implements Comparable<DBObjectMemoryAdapterContext> {
+class DBObjectDirectoryAdapterContext
+    implements Comparable<DBObjectDirectoryAdapterContext> {
   final int id;
 
   final Map<String, int> tablesVersions;
 
-  DBObjectMemoryAdapterContext(this.id, this.tablesVersions);
+  DBObjectDirectoryAdapterContext(this.id, this.tablesVersions);
 
   bool _closed = false;
 
@@ -33,16 +37,15 @@ class DBObjectMemoryAdapterContext
   }
 
   @override
-  int compareTo(DBObjectMemoryAdapterContext other) => id.compareTo(other.id);
+  int compareTo(DBObjectDirectoryAdapterContext other) =>
+      id.compareTo(other.id);
 }
-
-@Deprecated("Renamed to 'DBObjectMemoryAdapter'")
-typedef DBMemoryObjectAdapter = DBObjectMemoryAdapter;
 
 /// A [SQLAdapter] that stores tables data in memory.
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
-class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
+class DBObjectDirectoryAdapter
+    extends DBAdapter<DBObjectDirectoryAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
@@ -50,18 +53,18 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
     _boot = true;
 
     DBAdapter.registerAdapter([
-      'object.memory',
-      'obj.memory',
-    ], DBObjectMemoryAdapter, _instantiate);
+      'object.directory',
+      'obj.dir',
+    ], DBObjectDirectoryAdapter, _instantiate);
   }
 
-  static FutureOr<DBObjectMemoryAdapter?> _instantiate(config,
+  static FutureOr<DBObjectDirectoryAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return DBObjectMemoryAdapter.fromConfig(config,
+      return DBObjectDirectoryAdapter.fromConfig(config,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -70,14 +73,16 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
     }
   }
 
-  DBObjectMemoryAdapter(
+  final Directory directory;
+
+  DBObjectDirectoryAdapter(this.directory,
       {bool generateTables = false,
       Object? populateTables,
       Object? populateSource,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath})
       : super(
-          'object.memory',
+          'object.directory',
           1,
           3,
           const DBAdapterCapability(
@@ -90,14 +95,29 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
         ) {
     boot();
 
+    if (!directory.existsSync()) {
+      throw ArgumentError("Directory doesn't exists: $directory");
+    }
+
+    var modeString = directory.statSync().modeString();
+    if (!modeString.contains('rw')) {
+      throw StateError("Can't read+write the directory: $directory");
+    }
+
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<DBObjectMemoryAdapter> fromConfig(
+  static FutureOr<DBObjectDirectoryAdapter> fromConfig(
       Map<String, dynamic>? config,
       {EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     boot();
+
+    var directoryPath = config?['path'] ?? config?['directory'];
+
+    if (directoryPath == null) {
+      throw ArgumentError("Config without `path` entry!");
+    }
 
     var populate = config?['populate'];
 
@@ -115,7 +135,10 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       populateSource = populate['source'];
     }
 
-    var adapter = DBObjectMemoryAdapter(
+    var directory = Directory(directoryPath);
+
+    var adapter = DBObjectDirectoryAdapter(
+      directory,
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -143,21 +166,21 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   }
 
   @override
-  String getConnectionURL(DBObjectMemoryAdapterContext connection) =>
-      'object.memory://${connection.id}';
+  String getConnectionURL(DBObjectDirectoryAdapterContext connection) =>
+      'object.directory://${connection.id}';
 
   int _connectionCount = 0;
 
   @override
-  DBObjectMemoryAdapterContext createConnection() {
+  DBObjectDirectoryAdapterContext createConnection() {
     var id = ++_connectionCount;
     var tablesVersions = this.tablesVersions;
 
-    return DBObjectMemoryAdapterContext(id, tablesVersions);
+    return DBObjectDirectoryAdapterContext(id, tablesVersions);
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectMemoryAdapterContext connection) {
+  FutureOr<bool> closeConnection(DBObjectDirectoryAdapterContext connection) {
     connection.close();
     return true;
   }
@@ -168,52 +191,10 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   Map<String, int> get tablesVersions =>
       _tables.map((key, value) => MapEntry(key, value.version));
 
-  Map<Object, Map<String, dynamic>>? _getTableMap(String table, bool autoCreate,
-      {bool relationship = false}) {
-    var map = _tables[table];
-    if (map != null) {
-      return map;
-    } else if (autoCreate) {
-      if (!relationship && !_tableExists(table)) {
-        throw StateError("Table doesn't exists: $table");
-      }
-
-      _tables[table] = map = MapHistory<Object, Map<String, dynamic>>();
-      return map;
-    } else {
-      return null;
-    }
-  }
-
-  bool _tableExists(String table) =>
-      _hasTableScheme(table) || getEntityHandler(tableName: table) != null;
-
   @override
   Map<String, dynamic> information({bool extended = false, String? table}) {
     var info = <String, dynamic>{};
-
-    var tables = <String>{};
-    if (table != null) {
-      tables.add(table);
-    }
-
-    if (extended && tables.isEmpty) {
-      tables = _tables.keys.toSet();
-    }
-
-    if (tables.isNotEmpty) {
-      info['tables'] = <String, dynamic>{};
-    }
-
-    for (var t in tables) {
-      var tableMap = _getTableMap(t, false);
-
-      if (tableMap != null) {
-        var tables = info['tables'] as Map;
-        tables[t] = {'ids': tableMap.keys.toList()};
-      }
-    }
-
+    info['tables'] = _listTablesNames();
     return info;
   }
 
@@ -224,8 +205,6 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       this.tablesSchemes[s.name] = s;
     }
   }
-
-  bool _hasTableScheme(String table) => tablesSchemes.containsKey(table);
 
   @override
   TableScheme? getTableSchemeImpl(
@@ -414,11 +393,11 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
-  final Map<DBObjectMemoryAdapterContext, DateTime> _openTransactionsContexts =
-      <DBObjectMemoryAdapterContext, DateTime>{};
+  final Map<DBObjectDirectoryAdapterContext, DateTime>
+      _openTransactionsContexts = <DBObjectDirectoryAdapterContext, DateTime>{};
 
   @override
-  DBObjectMemoryAdapterContext openTransaction(Transaction transaction) {
+  DBObjectDirectoryAdapterContext openTransaction(Transaction transaction) {
     var conn = createConnection();
 
     _openTransactionsContexts[conn] = DateTime.now();
@@ -435,7 +414,7 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectMemoryAdapterContext connection,
+      DBObjectDirectoryAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -448,16 +427,16 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBObjectMemoryAdapterContext? connection) {
+      Transaction transaction, DBObjectDirectoryAdapterContext? connection) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
   }
 
-  final ListQueue<DBObjectMemoryAdapterContext> _consolidateContextQueue =
-      ListQueue<DBObjectMemoryAdapterContext>();
+  final ListQueue<DBObjectDirectoryAdapterContext> _consolidateContextQueue =
+      ListQueue<DBObjectDirectoryAdapterContext>();
 
-  void _consolidateTransactionContext(DBObjectMemoryAdapterContext context) {
+  void _consolidateTransactionContext(DBObjectDirectoryAdapterContext context) {
     _openTransactionsContexts.remove(context);
 
     if (_openTransactionsContexts.isNotEmpty) {
@@ -508,7 +487,7 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
     var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'DBObjectMemoryAdapter#$instanceID{$tablesStr$closedStr}';
+    return 'DBObjectDirectoryAdapter#$instanceID{$tablesStr$closedStr}';
   }
 
   @override
@@ -527,20 +506,39 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
 
   int _doCountImpl(TransactionOperation op, String table,
       EntityMatcher? matcher, Object? parameters) {
-    var map = _getTableMap(table, false);
-    if (map == null) return 0;
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return 0;
 
     if (matcher != null) {
       if (matcher is ConditionID) {
         var id = matcher.idValue ?? matcher.getID(parameters);
-        return map.containsKey(id) ? 1 : 0;
+
+        var objFile = _resolveObjectFile(table, id);
+        return objFile.existsSync() ? 1 : 0;
       }
 
       throw UnsupportedError("Relationship count not supported for: $matcher");
     }
 
-    return map.length;
+    var list = _listTableFiles(tableDir);
+    return list.length;
   }
+
+  List<File> _listTableFiles(Directory tableDir) {
+    var list = tableDir.listSync(recursive: false).whereType<File>().where((e) {
+      var path = e.path;
+      return path.endsWith('.json') && !path.startsWith('.');
+    }).toList();
+    return list;
+  }
+
+  List<Directory> _listTablesDirs() {
+    var dirs = directory.listSync().whereType<Directory>().toList();
+    return dirs;
+  }
+
+  List<String> _listTablesNames() =>
+      _listTablesDirs().map((d) => pack_path.split(d.path).last).toList();
 
   @override
   FutureOr<R?> doSelectByID<R>(
@@ -552,16 +550,11 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
               .resolveMapped((res) => _finishOperation(op, res, preFinish)));
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
-      String table, Object id, String entityName) {
-    var map = _getTableMap(table, false);
-    if (map == null) return null;
+      String table, Object id, String entityName) async {
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return null;
 
-    var entry = map[id];
-
-    if (entry == null) {
-      return null;
-    }
-
+    var entry = await _readObject(table, id);
     return entry;
   }
 
@@ -576,22 +569,12 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
               .resolveMapped((res) => _finishOperation(op, res, preFinish)));
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
-      String table, List<Object> ids, String entityName) {
-    var map = _getTableMap(table, false);
-    if (map == null) return [];
+      String table, List<Object> ids, String entityName) async {
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return [];
 
-    var entries = ids
-        .map((id) {
-          var entry = map[id];
-
-          if (entry == null) {
-            return null;
-          }
-
-          return entry;
-        })
-        .whereNotNull()
-        .toList();
+    var entries =
+        await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
 
     return entries;
   }
@@ -608,10 +591,17 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
 
   FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
       String table, String entityName) {
-    var map = _getTableMap(table, false);
-    if (map == null) return [];
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return [];
 
-    var entries = map.values.toList();
+    var files = _listTableFiles(tableDir);
+
+    var entries = files.map((f) {
+      var fileName = pack_path.split(f.path).last;
+      var id = pack_path.withoutExtension(fileName);
+      return _readObject(table, id);
+    }).resolveAllNotNull();
+
     return entries;
   }
 
@@ -632,13 +622,19 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       TransactionOperation op,
       String table,
       EntityMatcher<dynamic> matcher,
-      Object? parameters) {
-    var map = _getTableMap(table, false);
-    if (map == null) return [];
+      Object? parameters) async {
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return [];
 
     if (matcher is ConditionID) {
       var id = matcher.idValue ?? matcher.getID(parameters);
-      var entry = map.remove(id);
+
+      var objFile = _resolveObjectFile(table, id);
+      if (!objFile.existsSync()) return [];
+
+      var entry = await _readObject(table, id);
+      objFile.deleteSync();
+
       return entry != null ? [entry] : [];
     }
 
@@ -665,7 +661,10 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       Map<String, dynamic> fields,
       String entityName,
       PreFinishDBOperation? preFinish) {
-    var map = _getTableMap(table, true)!;
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) {
+      tableDir.createSync();
+    }
 
     var entry =
         _normalizeEntityJSON(fields, entityName: entityName, table: table);
@@ -680,7 +679,7 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       throw StateError("Can't determine object ID to store it: $fields");
     }
 
-    map[id] = entry;
+    _saveObject(table, id, entry);
 
     return _finishOperation(op, id, preFinish);
   }
@@ -703,10 +702,13 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
       String entityName,
       Object id,
       PreFinishDBOperation? preFinish) {
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) {
+      tableDir.createSync();
+    }
+
     _log.info(
         '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`');
-
-    var map = _getTableMap(table, true)!;
 
     var entry =
         _normalizeEntityJSON(fields, entityName: entityName, table: table);
@@ -714,9 +716,53 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
 
-    map[id] = entry;
+    _saveObject(table, id, entry);
 
     return _finishOperation(op, id, preFinish);
+  }
+
+  Future<void> _saveObject(
+      String table, Object? id, Map<String, dynamic> obj) async {
+    var file = _resolveObjectFile(table, id);
+    var enc = dart_convert.json.encode(obj);
+    await file.writeAsString(enc);
+  }
+
+  Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
+    var file = _resolveObjectFile(table, id);
+    if (!file.existsSync()) return null;
+    var enc = await file.readAsString();
+    var obj = dart_convert.json.decode(enc) as Map<String, dynamic>;
+    return obj;
+  }
+
+  File _resolveObjectFile(String table, Object? id) {
+    var idStr = _normalizeID(id);
+    var tableDir = _resolveTableDirectory(table);
+    var file = File(pack_path.join(tableDir.path, '$idStr.json'));
+    return file;
+  }
+
+  Directory _resolveTableDirectory(String table) {
+    var tableStr = _normalizeTableName(table);
+    var tableDir = Directory(pack_path.join(directory.path, tableStr));
+    return tableDir;
+  }
+
+  String _normalizeID(Object? o) {
+    var id = o?.toString() ?? '';
+    if (id.isEmpty) {
+      throw StateError("Empty ID string.");
+    }
+    return id;
+  }
+
+  String _normalizeTableName(String table) {
+    table = table.trim().replaceAll(RegExp(r'\W'), '_');
+    if (table.isEmpty) {
+      throw StateError("Empty table name.");
+    }
+    return table;
   }
 
   Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
@@ -734,6 +780,9 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
     var entityJsonNormalized = entityJson.map((key, value) {
       if (value == null || (value as Object).isPrimitiveValue) {
         return MapEntry(key, value);
+      } else if (value is Uint8List) {
+        var dataURLBase64 = DataURLBase64.from(value);
+        return MapEntry(key, dataURLBase64.toString());
       }
 
       var fieldType = entityHandler.getFieldType(null, key);
@@ -815,7 +864,7 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   }
 
   Object resolveError(Object error, StackTrace stackTrace) =>
-      DBObjectMemoryAdapterException('error', '$error',
+      DBObjectDirectoryAdapterException('error', '$error',
           parentError: error, parentStackTrace: stackTrace);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -828,7 +877,7 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   }
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f) {
+      FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f) {
     var transaction = op.transaction;
 
     if (transaction.length == 1 && !transaction.isExecuting) {
@@ -846,13 +895,13 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
         () => openTransaction(transaction),
         callCloseTransactionRequired
             ? () => closeTransaction(transaction,
-                transaction.context as DBObjectMemoryAdapterContext?)
+                transaction.context as DBObjectDirectoryAdapterContext?)
             : null,
       );
     }
 
     return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
+      return transaction.addExecution<R, DBObjectDirectoryAdapterContext>(
         (c) => f(c),
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
@@ -861,15 +910,12 @@ class DBObjectMemoryAdapter extends DBAdapter<DBObjectMemoryAdapterContext> {
   }
 }
 
-@Deprecated("Renamed to 'DBObjectMemoryAdapterException'")
-typedef DBMemoryObjectAdapterException = DBObjectMemoryAdapterException;
-
-/// Error thrown by [DBObjectMemoryAdapter] operations.
-class DBObjectMemoryAdapterException extends DBAdapterException {
+/// Error thrown by [DBObjectDirectoryAdapter] operations.
+class DBObjectDirectoryAdapterException extends DBAdapterException {
   @override
-  String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
+  String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
 
-  DBObjectMemoryAdapterException(String type, String message,
+  DBObjectDirectoryAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);

@@ -259,7 +259,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (_boot) return;
     _boot = true;
 
-    DBMemorySQLAdapter.boot();
+    DBSQLMemoryAdapter.boot();
   }
 
   static final Map<String, DBSQLAdapterInstantiator> _registeredAdaptersByName =

@@ -33,7 +33,10 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     Transaction.registerErrorFilter((e, s) => e is MySqlException);
 
-    DBSQLAdapter.registerAdapter(['mysql'], DBMySQLAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter([
+      'sql.mysql',
+      'mysql',
+    ], DBMySQLAdapter, _instantiate);
   }
 
   static FutureOr<DBMySQLAdapter?> _instantiate(config,

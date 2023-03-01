@@ -803,9 +803,6 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider,
       EntityResolutionRulesResolved resolutionRulesResolved) {
-    var valEntityHandler = _resolveEntityHandler(
-        type, entityHandlerProvider, entityRepositoryProvider);
-
     if (entityRepositoryProvider == null) {
       if (this is EntityRepositoryProvider) {
         entityRepositoryProvider = this as EntityRepositoryProvider;
@@ -813,6 +810,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         entityRepositoryProvider = entityProvider;
       }
     }
+
+    var valEntityHandler = _resolveEntityHandler(
+        type, entityHandlerProvider, entityRepositoryProvider);
 
     var allowEntityFetch = resolutionRulesResolved.allowEntityFetch ||
         entityCache.allowEntityFetch;

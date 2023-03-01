@@ -13,7 +13,7 @@ final _log = logging.Logger('APITestConfig');
 
 const Map<String, dynamic> apiConfigMemory = <String, dynamic>{
   'db': {
-    'memory': {},
+    'sql.memory': {},
   },
   'dialect': 'generic',
 };
@@ -62,7 +62,7 @@ APITestConfigDB _getAPITestConfig(String dbType) {
     return APITestConfigDockerMySQL(apiConfigMysql,
         dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
   } else {
-    return APITestConfigDBMemory(apiConfigMemory);
+    return APITestConfigDBSQLMemory(apiConfigMemory);
   }
 }
 
