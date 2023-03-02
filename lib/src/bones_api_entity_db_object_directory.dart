@@ -8,6 +8,7 @@ import 'package:logging/logging.dart' as logging;
 import 'package:map_history/map_history.dart';
 import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition.dart';
@@ -749,16 +750,26 @@ class DBObjectDirectoryAdapter
     return tableDir;
   }
 
+  static final _regExpNormalizeIDInvalidChars = RegExp(r'[^\w.-]+');
+  static final _regExpNormalizeIDInvalidPrefix = RegExp(r'^\.+');
+
   String _normalizeID(Object? o) {
     var id = o?.toString() ?? '';
     if (id.isEmpty) {
       throw StateError("Empty ID string.");
     }
+
+    id = id
+        .replaceAll(_regExpNormalizeIDInvalidChars, '')
+        .replaceAll(_regExpNormalizeIDInvalidPrefix, '');
+    id = id.truncate(220);
     return id;
   }
 
+  static final _regExpNormalizeTableNonWord = RegExp(r'\W');
+
   String _normalizeTableName(String table) {
-    table = table.trim().replaceAll(RegExp(r'\W'), '_');
+    table = table.trim().replaceAll(_regExpNormalizeTableNonWord, '_');
     if (table.isEmpty) {
       throw StateError("Empty table name.");
     }
