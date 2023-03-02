@@ -256,7 +256,23 @@ abstract class EntityReferenceBase<T> {
     if (o == null) return null;
 
     var entityHandler = _resolveEntityHandler();
-    return entityHandler?.getID(o);
+    return _getEntityIDImpl(entityHandler, o);
+  }
+
+  Object? _getEntityIDImpl(EntityHandler<T>? entityHandler, T? o) {
+    if (o == null) return null;
+
+    if (entityHandler != null) {
+      return entityHandler.getID(o);
+    }
+
+    try {
+      // ignore: avoid_dynamic_calls
+      var id = (o as dynamic).id;
+      return id;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _checkValidEntity(entity) {
@@ -955,7 +971,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        var otherId = entityHandler.getID(otherEntity as T);
+        var otherId = _getEntityIDImpl(entityHandler, otherEntity as T);
         return id == otherId;
       }
 
@@ -1524,8 +1540,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
     var entityHandler = _resolveEntityHandler();
 
-    var ids =
-        os.map((o) => o == null ? null : entityHandler?.getID(o)).toList();
+    var ids = os.map((o) => _getEntityIDImpl(entityHandler, o)).toList();
 
     return ids;
   }
@@ -2123,7 +2138,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        var otherIDs = [entityHandler.getID(otherEntities as T)];
+        var otherIDs = [_getEntityIDImpl(entityHandler, otherEntities as T)];
         return _idsEquality.equals(ids, otherIDs);
       }
 
@@ -2135,8 +2150,9 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        var otherIDs =
-            otherEntities.map((e) => entityHandler.getID(e as T)).toList();
+        var otherIDs = otherEntities
+            .map((e) => _getEntityIDImpl(entityHandler, e as T))
+            .toList();
         return _idsEquality.equals(ids, otherIDs);
       }
 

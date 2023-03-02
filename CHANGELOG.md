@@ -1,4 +1,11 @@
-## 1.3.53 
+## 1.3.54
+
+- `DBObjectDirectoryAdapter`:
+  - `_normalizeID`: ensure safe ID for `File` path.
+- `EntityReferenceBase`:
+  - Improve `_getEntityID`: allow use of `dynamic.id` if there's not `EntityHandler`. 
+
+## 1.3.53
 
 - petitparser: ^5.2.0
 - postgres: ^2.6.1
