@@ -1,3 +1,8 @@
+## 1.3.55
+
+- `APIResponseStatus`
+  - Added `REDIRECT`: to perform URL/Location redirects.
+
 ## 1.3.54
 
 - `DBObjectDirectoryAdapter`:
