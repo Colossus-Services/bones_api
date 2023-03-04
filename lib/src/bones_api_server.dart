@@ -1088,6 +1088,20 @@ class APIServer {
             return Response.forbidden(payload, headers: headers);
           }
         }
+      case APIResponseStatus.REDIRECT:
+        {
+          var location = apiResponse.payload;
+          if (location is! Uri) {
+            return Response(400, body: "Invalid redirect URL: $location");
+          }
+
+          headers[HttpHeaders.locationHeader] = location.toString();
+
+          var body =
+              "<html><body>Redirecting to: <a href='$location'>$location</a></body></html>";
+
+          return Response(307, body: body, headers: headers);
+        }
       case APIResponseStatus.BAD_REQUEST:
         return Response(400, body: payload, headers: headers);
       case APIResponseStatus.ERROR:

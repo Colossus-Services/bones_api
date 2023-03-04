@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.54';
+  static const String VERSION = '1.3.55';
 
   static bool _boot = false;
 
@@ -1728,6 +1728,8 @@ enum APIResponseStatus {
   // ignore: constant_identifier_names
   UNAUTHORIZED,
   // ignore: constant_identifier_names
+  REDIRECT,
+  // ignore: constant_identifier_names
   BAD_REQUEST,
   // ignore: constant_identifier_names
   ERROR,
@@ -2228,11 +2230,15 @@ class APIResponse<T> extends APIPayload {
         keepAliveMaxRequests = keepAliveMaxRequests ?? 1000,
         _metrics = metrics;
 
-  static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) =>
-      payload ??
-      (payloadDynamic != null && TypeInfo.accepts<T>(payloadDynamic.runtimeType)
-          ? payloadDynamic as T
-          : null);
+  static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) {
+    if (payload != null) return payload;
+
+    if (payloadDynamic is T) {
+      return payloadDynamic;
+    } else {
+      return null;
+    }
+  }
 
   /// Copy this response casting the [payload] to [E].
   APIResponse<E> cast<E>({E? payload}) {
@@ -2446,6 +2452,31 @@ class APIResponse<T> extends APIPayload {
     return APIResponse.unauthorized(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
+        headers: headers ?? this.headers,
+        mimeType: mimeType ?? payloadMimeType,
+        metrics: metrics ?? _metrics)
+      .._copyStartedMetrics(this);
+  }
+
+  /// Creates a response of status `REDIRECT`.
+  factory APIResponse.redirecy(Uri location,
+      {Map<String, dynamic>? headers,
+      Object? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse(APIResponseStatus.REDIRECT,
+        headers: headers ?? <String, dynamic>{},
+        payloadDynamic: location,
+        payloadMimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `REDIRECT` response.
+  APIResponse<T> asRedirecy(
+      {Uri? location,
+      Map<String, dynamic>? headers,
+      Object? mimeType,
+      Map<String, Duration>? metrics}) {
+    return APIResponse.redirecy(location ?? Uri.parse('$payload'.trim()),
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
