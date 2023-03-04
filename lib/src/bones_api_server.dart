@@ -1095,10 +1095,11 @@ class APIServer {
             return Response(400, body: "Invalid redirect URL: $location");
           }
 
-          headers[HttpHeaders.locationHeader] = location.toString();
-
           var body =
               "<html><body>Redirecting to: <a href='$location'>$location</a></body></html>";
+
+          headers[HttpHeaders.locationHeader] = location.toString();
+          headers[HttpHeaders.contentTypeHeader] = 'text/html';
 
           return Response(307, body: body, headers: headers);
         }
