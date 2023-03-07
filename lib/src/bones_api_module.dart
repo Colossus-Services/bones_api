@@ -617,21 +617,11 @@ class APIRouteBuilder<M extends APIModule> {
       var bytes = _resolveRequestParameterValueAsBytes(value);
       return bytes;
     } else if (typeInfo.isList) {
-      var arg0 = typeInfo.arguments0;
-
       if (value is! List) {
-        List? l;
-        if (arg0 != null) {
-          l = arg0.callCasted(<V>() => TypeParser.parseList<V>(value));
-        } else {
-          l = TypeParser.parseList(value);
-        }
-
-        if (l != null) {
-          value = l;
-        }
+        value = TypeParser.parseList(value) ?? value;
       }
 
+      var arg0 = typeInfo.arguments0;
       if (value is List && arg0 != null && arg0.isPrimitiveType) {
         return typeInfo.castList(value);
       }
@@ -639,38 +629,28 @@ class APIRouteBuilder<M extends APIModule> {
       var arg0 = typeInfo.arguments0;
 
       if (value is! Set) {
-        Set? s;
         if (arg0 != null) {
-          s = arg0.callCasted(<V>() => TypeParser.parseSet<V>(value));
+          var s = _resolveValueSetTypeAsListType(
+              arg0, value, entityCache, resolutionRules);
+          if (s != null) return s;
         } else {
-          s = TypeParser.parseSet(value);
-        }
-
-        if (s != null) {
-          value = s;
+          value = TypeParser.parseSet(value) ?? value;
         }
       }
 
       if (value is Set && arg0 != null && arg0.isPrimitiveType) {
         return typeInfo.castSet(value);
+      } else if (arg0 != null) {
+        var s = _resolveValueSetTypeAsListType(
+            arg0, value, entityCache, resolutionRules);
+        if (s != null) return s;
       }
     } else if (typeInfo.isMap) {
       var arg0 = typeInfo.arguments0;
       var arg1 = typeInfo.arguments1;
 
       if (value is! Map) {
-        Map? m;
-        if (arg0 != null && arg1 != null) {
-          m = arg0.callCasted(<K>() {
-            return arg1.callCasted(<V>() => TypeParser.parseMap<K, V>(value));
-          });
-        } else {
-          m = TypeParser.parseMap(value);
-        }
-
-        if (m != null) {
-          value = m;
-        }
+        value = TypeParser.parseMap(value);
       }
 
       if (value is Map &&
@@ -690,6 +670,20 @@ class APIRouteBuilder<M extends APIModule> {
 
     var parsed = typeInfo.parse(value);
     return parsed ?? value;
+  }
+
+  Set? _resolveValueSetTypeAsListType(TypeInfo listType, Object value,
+      EntityCache? entityCache, EntityResolutionRules? resolutionRules) {
+    var setTypeAsList = TypeInfo.fromListType(listType);
+
+    var l = _resolveValueType(setTypeAsList, value,
+        entityCache: entityCache, resolutionRules: resolutionRules);
+
+    if (l is List) {
+      return l.toSet();
+    } else {
+      return null;
+    }
   }
 
   Uint8List? _resolveRequestParameterValueAsBytes(Object value) {
