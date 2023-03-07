@@ -901,6 +901,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// Disposes the current loaded [entity] instance and returns it.
   /// Id [id] is defined it will keep it.
   T? disposeEntity() {
+    _resolveID();
     var prev = entity;
     _entity = null;
     _entityTime = null;
@@ -1900,6 +1901,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Disposes the current loaded [entity] instance and returns it.
   /// Id [id] is defined it will keep it.
   List<T?>? disposeEntities() {
+    _resolveIDs();
     var prev = entities;
     _entities = null;
     _entitiesTime = null;

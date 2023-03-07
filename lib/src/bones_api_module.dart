@@ -616,15 +616,73 @@ class APIRouteBuilder<M extends APIModule> {
     } else if (typeInfo.isUInt8List) {
       var bytes = _resolveRequestParameterValueAsBytes(value);
       return bytes;
-    } else {
-      if (!typeInfo.isPrimitiveType) {
-        var o = _resolveValueAsEntity(typeInfo, value,
-            entityCache: entityCache, resolutionRules: resolutionRules);
-        if (o != null) return o;
+    } else if (typeInfo.isList) {
+      if (value is! List) {
+        value = TypeParser.parseList(value) ?? value;
       }
 
-      var parsed = typeInfo.parse(value);
-      return parsed ?? value;
+      var arg0 = typeInfo.arguments0;
+      if (value is List && arg0 != null && arg0.isPrimitiveType) {
+        return typeInfo.castList(value);
+      }
+    } else if (typeInfo.isSet) {
+      var arg0 = typeInfo.arguments0;
+
+      if (value is! Set) {
+        if (arg0 != null) {
+          var s = _resolveValueSetTypeAsListType(
+              arg0, value, entityCache, resolutionRules);
+          if (s != null) return s;
+        } else {
+          value = TypeParser.parseSet(value) ?? value;
+        }
+      }
+
+      if (value is Set && arg0 != null && arg0.isPrimitiveType) {
+        return typeInfo.castSet(value);
+      } else if (arg0 != null) {
+        var s = _resolveValueSetTypeAsListType(
+            arg0, value, entityCache, resolutionRules);
+        if (s != null) return s;
+      }
+    } else if (typeInfo.isMap) {
+      var arg0 = typeInfo.arguments0;
+      var arg1 = typeInfo.arguments1;
+
+      if (value is! Map) {
+        value = TypeParser.parseMap(value);
+      }
+
+      if (value is Map &&
+          arg0 != null &&
+          arg1 != null &&
+          arg0.isPrimitiveType &&
+          arg1.isPrimitiveType) {
+        return typeInfo.castMap(value);
+      }
+    }
+
+    if (!typeInfo.isPrimitiveType) {
+      var o = _resolveValueAsEntity(typeInfo, value,
+          entityCache: entityCache, resolutionRules: resolutionRules);
+      if (o != null) return o;
+    }
+
+    var parsed = typeInfo.parse(value);
+    return parsed ?? value;
+  }
+
+  Set? _resolveValueSetTypeAsListType(TypeInfo listType, Object value,
+      EntityCache? entityCache, EntityResolutionRules? resolutionRules) {
+    var setTypeAsList = TypeInfo.fromListType(listType);
+
+    var l = _resolveValueType(setTypeAsList, value,
+        entityCache: entityCache, resolutionRules: resolutionRules);
+
+    if (l is List) {
+      return l.toSet();
+    } else {
+      return null;
     }
   }
 
