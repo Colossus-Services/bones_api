@@ -1,3 +1,12 @@
+## 1.3.56
+
+- `EntityReference`:
+  - `disposeEntities`: force `_resolveID` before dispose.
+- `EntityReferenceList`:
+  - `disposeEntities`: force `_resolveIDs` before dispose.
+- `APIRouteBuilder`:
+  - `_resolveValueType`: resulve `List`, `Set`, `Map` generic types. 
+
 ## 1.3.55
 
 - `APIResponseStatus`

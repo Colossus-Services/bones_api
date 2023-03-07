@@ -427,6 +427,9 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
   /// The argument at index `0` (in [arguments]).
   TypeInfo? get arguments0 => argumentType(0);
 
+  /// The argument at index `1` (in [arguments]).
+  TypeInfo? get arguments1 => argumentType(1);
+
   /// Returns `true` if [isListEntity] OR [isEntityReferenceListType].
   bool get isListEntityOrReference => isListEntity || isEntityReferenceListType;
 

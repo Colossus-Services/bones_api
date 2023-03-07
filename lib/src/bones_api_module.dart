@@ -616,16 +616,80 @@ class APIRouteBuilder<M extends APIModule> {
     } else if (typeInfo.isUInt8List) {
       var bytes = _resolveRequestParameterValueAsBytes(value);
       return bytes;
-    } else {
-      if (!typeInfo.isPrimitiveType) {
-        var o = _resolveValueAsEntity(typeInfo, value,
-            entityCache: entityCache, resolutionRules: resolutionRules);
-        if (o != null) return o;
+    } else if (typeInfo.isList) {
+      var arg0 = typeInfo.arguments0;
+
+      if (value is! List) {
+        List? l;
+        if (arg0 != null) {
+          l = arg0.callCasted(<V>() => TypeParser.parseList<V>(value));
+        } else {
+          l = TypeParser.parseList(value);
+        }
+
+        if (l != null) {
+          value = l;
+        }
       }
 
-      var parsed = typeInfo.parse(value);
-      return parsed ?? value;
+      if (value is List && arg0 != null && arg0.isPrimitiveType) {
+        return typeInfo.castList(value);
+      }
+    } else if (typeInfo.isSet) {
+      var arg0 = typeInfo.arguments0;
+
+      if (value is! Set) {
+        Set? s;
+        if (arg0 != null) {
+          s = arg0.callCasted(<V>() => TypeParser.parseSet<V>(value));
+        } else {
+          s = TypeParser.parseSet(value);
+        }
+
+        if (s != null) {
+          value = s;
+        }
+      }
+
+      if (value is Set && arg0 != null && arg0.isPrimitiveType) {
+        return typeInfo.castSet(value);
+      }
+    } else if (typeInfo.isMap) {
+      var arg0 = typeInfo.arguments0;
+      var arg1 = typeInfo.arguments1;
+
+      if (value is! Map) {
+        Map? m;
+        if (arg0 != null && arg1 != null) {
+          m = arg0.callCasted(<K>() {
+            return arg1.callCasted(<V>() => TypeParser.parseMap<K, V>(value));
+          });
+        } else {
+          m = TypeParser.parseMap(value);
+        }
+
+        if (m != null) {
+          value = m;
+        }
+      }
+
+      if (value is Map &&
+          arg0 != null &&
+          arg1 != null &&
+          arg0.isPrimitiveType &&
+          arg1.isPrimitiveType) {
+        return typeInfo.castMap(value);
+      }
     }
+
+    if (!typeInfo.isPrimitiveType) {
+      var o = _resolveValueAsEntity(typeInfo, value,
+          entityCache: entityCache, resolutionRules: resolutionRules);
+      if (o != null) return o;
+    }
+
+    var parsed = typeInfo.parse(value);
+    return parsed ?? value;
   }
 
   Uint8List? _resolveRequestParameterValueAsBytes(Object value) {
