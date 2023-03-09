@@ -31,70 +31,37 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
     DBSQLAdapter.boot();
   }
 
-  static final Map<String, DBAdapterInstantiator> _registeredAdaptersByName =
-      <String, DBAdapterInstantiator>{};
-  static final Map<Type, DBAdapterInstantiator> _registeredAdaptersByType =
-      <Type, DBAdapterInstantiator>{};
+  static final DBAdapterRegister<Object, DBRelationalAdapter<Object>>
+      adapterRegister = DBAdapter.adapterRegister.createRegister();
 
   static List<String> get registeredAdaptersNames =>
-      _registeredAdaptersByName.keys.toList();
+      adapterRegister.registeredAdaptersNames;
 
   static List<Type> get registeredAdaptersTypes =>
-      _registeredAdaptersByType.keys.toList();
+      adapterRegister.registeredAdaptersTypes;
 
   static void
       registerAdapter<C extends Object, A extends DBRelationalAdapter<C>>(
           List<String> names,
           Type type,
           DBAdapterInstantiator<C, A> adapterInstantiator) {
-    for (var name in names) {
-      _registeredAdaptersByName[name] = adapterInstantiator;
-    }
-
-    _registeredAdaptersByType[type] = adapterInstantiator;
-
-    DBAdapter.registerAdapter(names, type, adapterInstantiator);
+    boot();
+    adapterRegister.registerAdapter(names, type, adapterInstantiator);
   }
 
   static DBAdapterInstantiator<C, A>? getAdapterInstantiator<C extends Object,
-      A extends DBRelationalAdapter<C>>({String? name, Type? type}) {
-    if (name == null && type == null) {
-      throw ArgumentError(
-          'One of the parameters `name` or `type` should NOT be null!');
-    }
-
-    if (name != null) {
-      var adapter = _registeredAdaptersByName[name];
-      if (adapter is DBAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    if (type != null) {
-      var adapter = _registeredAdaptersByType[type];
-      if (adapter is DBAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    return null;
-  }
+          A extends DBRelationalAdapter<C>>({String? name, Type? type}) =>
+      adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
       getAdapterInstantiatorsFromConfig<C extends Object,
               A extends DBRelationalAdapter<C>>(Map<String, dynamic> config) =>
-          DBAdapter.getAdapterInstantiatorsFromConfigImpl<C, A>(
-              config, registeredAdaptersNames, getAdapterInstantiator);
+          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
   DBRelationalAdapter(String name, int minConnections, int maxConnections,
       DBAdapterCapability capability,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      Object? populateSource,
-      String? workingPath})
-      : super(name, minConnections, maxConnections, capability,
-            parentRepositoryProvider: parentRepositoryProvider,
-            populateSource: populateSource,
-            workingPath: workingPath) {
+      {super.parentRepositoryProvider, super.populateSource, super.workingPath})
+      : super(name, minConnections, maxConnections, capability) {
     boot();
   }
 

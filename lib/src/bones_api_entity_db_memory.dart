@@ -81,11 +81,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   DBSQLMemoryAdapter(
-      {bool generateTables = false,
-      Object? populateTables,
-      Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath})
+      {super.generateTables = false,
+      super.populateTables,
+      super.populateSource,
+      super.parentRepositoryProvider,
+      super.workingPath,
+      super.logSQL})
       : super(
           'sql.memory',
           1,
@@ -99,11 +100,6 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
               transactions: true,
               transactionAbort: true,
               tableSQL: false),
-          generateTables: generateTables,
-          populateTables: populateTables,
-          populateSource: populateSource,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath,
         ) {
     boot();
 
@@ -131,12 +127,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       populateSource = populate['source'];
     }
 
+    var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
+
     var adapter = DBSQLMemoryAdapter(
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
       workingPath: workingPath,
+      logSQL: logSql,
     );
 
     return adapter;
@@ -1017,7 +1016,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     }
 
     var entityType =
-        fieldType.isListEntityOrReference ? fieldType.arguments0 : fieldType;
+        fieldType.isListEntityOrReference || fieldType.isEntityReferenceType
+            ? fieldType.arguments0
+            : fieldType;
 
     if (entityType == null ||
         !EntityHandler.isValidEntityType(entityType.type)) {
@@ -1027,16 +1028,24 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     return entityType;
   }
 
-  List<TableRelationshipReference> _findRelationshipTables(String table) {
+  Map<EntityRepository<Object>, Map<String, TableFieldReference>>
+      _allTablesReferences() {
     var allRepositories = this.allRepositories();
 
-    var allTablesReferences = Map.fromEntries(allRepositories.values.map((r) {
+    var entries = allRepositories.values.map((r) {
       var referencedTables = _findFieldsReferencedTables(r.name,
           entityType: r.type,
           entityHandler: r.entityHandler,
           onlyCollectionReferences: true);
       return MapEntry(r, referencedTables);
-    }).where((e) => e.value.isNotEmpty));
+    }).where((e) => e.value.isNotEmpty);
+
+    var allTablesReferences = Map.fromEntries(entries);
+    return allTablesReferences;
+  }
+
+  List<TableRelationshipReference> _findRelationshipTables(String table) {
+    var allTablesReferences = _allTablesReferences();
 
     for (var refs in allTablesReferences.values) {
       refs.removeWhere((field, refTable) => refTable.sourceTable != table);

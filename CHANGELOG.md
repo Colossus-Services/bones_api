@@ -1,3 +1,16 @@
+## 1.3.57
+
+- New `DBObjectAdapter`:
+  - Base class for `DBObjectMemoryAdapter` and `DBObjectDirectoryAdapter`.
+- New `DBAdapterRegister`:
+  - handles `DBAdapter` registration, avoiding repetitive static code in
+    `DBSQLAdapter`, `DBObjectAdapter` and `DBRelationalAdapter`.
+- `EntityHandler`
+  - Added `equalsValuesEntityMap`.
+  - Added `getEntityIDFrom`.
+  - `equalsValuesEntity` now also using `equalsValuesEntityMap`.
+    - This fixes an issue for `DBSQLMemoryAdapter`. 
+
 ## 1.3.56
 
 - `EntityReference`:

@@ -76,11 +76,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
-      bool generateTables = false,
-      Object? populateTables,
-      Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath})
+      super.generateTables = false,
+      super.populateTables,
+      super.populateSource,
+      super.parentRepositoryProvider,
+      super.workingPath,
+      super.logSQL})
       : host = host ?? 'localhost',
         port = port ?? 5432,
         _password = (password != null && password is! PasswordProvider
@@ -104,11 +105,6 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
               transactions: true,
               transactionAbort: true,
               tableSQL: true),
-          generateTables: generateTables,
-          populateTables: populateTables,
-          populateSource: populateSource,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath,
         ) {
     boot();
 
@@ -159,6 +155,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     if (database == null) throw ArgumentError.notNull('database');
     if (username == null) throw ArgumentError.notNull('username');
 
+    var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
+
     return DBPostgreSQLAdapter(
       database,
       username,
@@ -172,6 +170,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
+      logSQL: logSql,
     );
   }
 
