@@ -72,11 +72,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       int? port = 3306,
       int minConnections = 1,
       int maxConnections = 3,
-      bool generateTables = false,
-      Object? populateTables,
-      Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath})
+      super.generateTables,
+      super.populateTables,
+      super.populateSource,
+      super.parentRepositoryProvider,
+      super.workingPath,
+      super.logSQL})
       : host = host ?? 'localhost',
         port = port ?? 3306,
         _password = (password != null && password is! PasswordProvider
@@ -98,11 +99,6 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
               transactions: true,
               transactionAbort: true,
               tableSQL: true),
-          generateTables: generateTables,
-          populateTables: populateTables,
-          populateSource: populateSource,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath,
         ) {
     boot();
 
@@ -155,6 +151,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     if (database == null) throw ArgumentError.notNull('database');
     if (username == null) throw ArgumentError.notNull('username');
 
+    var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
+
     return DBMySQLAdapter(
       database,
       username,
@@ -168,6 +166,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
+      logSQL: logSql,
     );
   }
 

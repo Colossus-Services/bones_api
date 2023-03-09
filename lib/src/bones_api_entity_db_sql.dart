@@ -3,6 +3,7 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
+import 'package:swiss_knife/swiss_knife.dart' show parseBool;
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -262,81 +263,74 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     DBSQLMemoryAdapter.boot();
   }
 
-  static final Map<String, DBSQLAdapterInstantiator> _registeredAdaptersByName =
-      <String, DBSQLAdapterInstantiator>{};
-  static final Map<Type, DBSQLAdapterInstantiator> _registeredAdaptersByType =
-      <Type, DBSQLAdapterInstantiator>{};
+  static final DBAdapterRegister<Object, DBSQLAdapter<Object>> adapterRegister =
+      DBRelationalAdapter.adapterRegister.createRegister();
 
   static List<String> get registeredAdaptersNames =>
-      _registeredAdaptersByName.keys.toList();
+      adapterRegister.registeredAdaptersNames;
 
   static List<Type> get registeredAdaptersTypes =>
-      _registeredAdaptersByType.keys.toList();
+      adapterRegister.registeredAdaptersTypes;
 
   static void registerAdapter<C extends Object, A extends DBSQLAdapter<C>>(
       List<String> names,
       Type type,
       DBSQLAdapterInstantiator<C, A> adapterInstantiator) {
-    for (var name in names) {
-      _registeredAdaptersByName[name] = adapterInstantiator;
-    }
-
-    _registeredAdaptersByType[type] = adapterInstantiator;
-
-    DBRelationalAdapter.registerAdapter(names, type, adapterInstantiator);
+    boot();
+    adapterRegister.registerAdapter(names, type, adapterInstantiator);
   }
 
   static DBSQLAdapterInstantiator<C, A>?
       getAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>(
-          {String? name, Type? type}) {
-    if (name == null && type == null) {
-      throw ArgumentError(
-          'One of the parameters `name` or `type` should NOT be null!');
-    }
-
-    if (name != null) {
-      var adapter = _registeredAdaptersByName[name];
-      if (adapter is DBSQLAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    if (type != null) {
-      var adapter = _registeredAdaptersByType[type];
-      if (adapter is DBSQLAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    return null;
-  }
+              {String? name, Type? type}) =>
+          adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBSQLAdapterInstantiator<C, A>, Map<String, dynamic>>>
       getAdapterInstantiatorsFromConfig<C extends Object,
               A extends DBSQLAdapter<C>>(Map<String, dynamic> config) =>
-          DBAdapter.getAdapterInstantiatorsFromConfigImpl<C, A>(
-              config, registeredAdaptersNames, getAdapterInstantiator);
+          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
+
+  static bool? parseConfigLogSQL(Map<String, dynamic>? config) {
+    var logSql = config?.getIgnoreCase('log.sql');
+    if (logSql != null) {
+      return parseBool(logSql);
+    }
+
+    var log = config?['log'];
+
+    if (log is Map) {
+      var logSql = log.getIgnoreCase('sql');
+      if (logSql != null) {
+        return parseBool(log);
+      }
+    }
+    if (log != null) {
+      return parseBool(log);
+    }
+
+    return null;
+  }
 
   /// The [DBSQLAdapter] capability.
   @override
   DBSQLAdapterCapability get capability =>
       super.capability as DBSQLAdapterCapability;
 
+  final bool logSQL;
+
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
   DBSQLAdapter(String name, int minConnections, int maxConnections,
       DBSQLAdapterCapability capability,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      bool generateTables = false,
+      {bool generateTables = false,
       Object? populateTables,
-      Object? populateSource,
-      String? workingPath})
+      super.parentRepositoryProvider,
+      super.populateSource,
+      super.workingPath,
+      this.logSQL = false})
       : _generateTables = generateTables,
         _populateTables = populateTables,
-        super(name, minConnections, maxConnections, capability,
-            parentRepositoryProvider: parentRepositoryProvider,
-            populateSource: populateSource,
-            workingPath: workingPath) {
+        super(name, minConnections, maxConnections, capability) {
     boot();
 
     _conditionSQLGenerator =
@@ -684,9 +678,28 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return 0;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info('[transaction:${op.transactionId}] countSQL> $sql');
+      _logTransactionOperationSQL('countSQL', op, sql);
       return doCountSQL(entityName, table, sql, op.transaction, connection);
     });
+  }
+
+  void _logTransactionOperationSQL(
+      String method, TransactionOperation op, Object sql) {
+    if (logSQL) {
+      String s;
+      if (sql is List) {
+        if (sql.isEmpty) {
+          s = '<empty_sql>';
+        } else if (sql.length == 1) {
+          s = '${sql[0]}';
+        } else {
+          s = '\n  -- ${sql.join('\n  -- ')}';
+        }
+      } else {
+        s = '$sql';
+      }
+      _log.info('[transaction:${op.transactionId}] $method> $s');
+    }
   }
 
   FutureOr<int> doCountSQL(
@@ -803,7 +816,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return null;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info('[transaction:${op.transactionId}] insertSQL> $sql');
+      _logTransactionOperationSQL('insertSQL', op, sql);
       return doInsertSQL(entityName, table, sql, op.transaction, connection);
     });
   }
@@ -904,7 +917,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return id;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info('[transaction:${op.transactionId}] updateSQL> $sql');
+      _logTransactionOperationSQL('updateSQL', op, sql);
       return doUpdateSQL(entityName, table, sql, id, op.transaction, connection,
           allowAutoInsert: allowAutoInsert);
     });
@@ -1071,8 +1084,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
 
     return executeTransactionOperation(op, sqls.first, (connection) {
-      _log.info(
-          '[transaction:${op.transactionId}] insertRelationship>${sqls.length == 1 ? ' ' : '\n  - '}${sqls.join('\n  -')}');
+      _logTransactionOperationSQL('insertRelationshipSQLs', op, sqls);
 
       var retInserts = sqls.map((sql) {
         var ret = doInsertRelationshipSQL(entityName, sql.mainTable ?? table,
@@ -1080,8 +1092,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         if (sql.hasPosSQL) {
           sql.posSQL!.map((e) {
-            _log.info(
-                '[transaction:${op.transactionId}] insertRelationship[POS]> $e');
+            _logTransactionOperationSQL('insertRelationship[POS]', op, e);
             return doDeleteSQL(
                 entityName, e.mainTable!, e, op.transaction, connection);
           }).resolveAllWithValue(ret);
@@ -1161,8 +1172,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info(
-          '[transaction:${op.transactionId}] selectRelationshipSQL> $sql');
+      _logTransactionOperationSQL('selectRelationshipSQL', op, sql);
 
       var ret = doSelectSQL(
           entityName, sql.mainTable ?? table, sql, op.transaction, connection);
@@ -1249,8 +1259,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info(
-          '[transaction:${op.transactionId}] selectRelationshipsSQL> $sql');
+      _logTransactionOperationSQL('selectRelationshipsSQL', op, sql);
 
       var ret = doSelectSQL(
           entityName, sql.mainTable ?? table, sql, op.transaction, connection);
@@ -1507,7 +1516,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info('[transaction:${op.transactionId}] selectSQL> $sql');
+      _logTransactionOperationSQL('selectSQL', op, sql);
       return doSelectSQL(entityName, table, sql, op.transaction, connection);
     });
   }
@@ -1607,7 +1616,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _log.info('[transaction:${op.transactionId}] deleteSQL> $sql');
+      _logTransactionOperationSQL('deleteSQL', op, sql);
       return doDeleteSQL(entityName, table, sql, op.transaction, connection);
     });
   }

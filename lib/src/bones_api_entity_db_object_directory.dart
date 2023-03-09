@@ -15,9 +15,9 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
-import 'bones_api_initializable.dart';
 
 final _log = logging.Logger('DBObjectDirectoryAdapter');
 
@@ -46,14 +46,14 @@ class DBObjectDirectoryAdapterContext
 ///
 /// Simulates a SQL Database adapter. Useful for tests.
 class DBObjectDirectoryAdapter
-    extends DBAdapter<DBObjectDirectoryAdapterContext> {
+    extends DBObjectAdapter<DBObjectDirectoryAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
     if (_boot) return;
     _boot = true;
 
-    DBAdapter.registerAdapter([
+    DBObjectAdapter.registerAdapter([
       'object.directory',
       'obj.dir',
     ], DBObjectDirectoryAdapter, _instantiate);
@@ -77,11 +77,12 @@ class DBObjectDirectoryAdapter
   final Directory directory;
 
   DBObjectDirectoryAdapter(this.directory,
-      {bool generateTables = false,
-      Object? populateTables,
-      Object? populateSource,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath})
+      {super.generateTables,
+      super.populateTables,
+      super.populateSource,
+      super.parentRepositoryProvider,
+      super.workingPath,
+      super.log})
       : super(
           'object.directory',
           1,
@@ -90,9 +91,6 @@ class DBObjectDirectoryAdapter
               dialect: DBDialect('object'),
               transactions: true,
               transactionAbort: true),
-          populateSource: populateSource,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath,
         ) {
     boot();
 
@@ -148,14 +146,6 @@ class DBObjectDirectoryAdapter
     );
 
     return adapter;
-  }
-
-  @override
-  List<Initializable> initializeDependencies() {
-    var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider
-    ];
   }
 
   @override
@@ -247,143 +237,14 @@ class DBObjectDirectoryAdapter
     var fieldsTypes =
         entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
 
-    var fieldsReferencedTables = _findFieldsReferencedTables(table,
-        entityHandler: entityHandler, entityFieldsTypes: entityFieldsTypes);
-
-    var relationshipTables = _findRelationshipTables(table);
-
-    fieldsTypes.removeWhere((key, value) =>
-        relationshipTables.any((r) => r.relationshipField == key));
-
     tableScheme = TableScheme(table,
         relationship: relationship != null,
         idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes,
-        fieldsReferencedTables: fieldsReferencedTables,
-        relationshipTables: relationshipTables);
+        fieldsTypes: fieldsTypes);
 
     _log.info('$tableScheme');
 
     return tableScheme;
-  }
-
-  Map<String, TableFieldReference> _findFieldsReferencedTables(String table,
-      {Type? entityType,
-      EntityHandler<dynamic>? entityHandler,
-      Map<String, TypeInfo>? entityFieldsTypes,
-      bool onlyCollectionReferences = false}) {
-    entityHandler ??=
-        getEntityHandler(tableName: table, entityType: entityType);
-
-    entityFieldsTypes ??= entityHandler!.fieldsTypes();
-
-    var relationshipFields =
-        Map<String, TypeInfo>.fromEntries(entityFieldsTypes.entries.where((e) {
-      var fieldType = e.value;
-      if (fieldType.isCollection != onlyCollectionReferences) return false;
-
-      var entityType = _resolveEntityType(fieldType);
-      if (entityType == null || entityType.isBasicType) return false;
-
-      var typeEntityHandler =
-          entityHandler!.getEntityHandler(type: entityType.type);
-      return typeEntityHandler != null;
-    }));
-
-    var fieldsReferencedTables = relationshipFields.map((field, fieldType) {
-      var targetEntityType = _resolveEntityType(fieldType)!;
-      var targetEntityHandler =
-          getEntityHandler(entityType: targetEntityType.type);
-
-      String? targetName;
-      String? targetIdField;
-      Type? targetIdType;
-      if (targetEntityHandler != null) {
-        targetName = getEntityRepositoryByType(targetEntityHandler.type)?.name;
-        targetIdField = targetEntityHandler.idFieldName();
-        targetIdType =
-            targetEntityHandler.getFieldType(null, targetIdField)?.type;
-      }
-
-      targetName ??= targetEntityType.type.toString().toLowerCase();
-      targetIdField ??= 'id';
-      targetIdType ??= int;
-
-      var tableRef = TableFieldReference(
-          table, field, targetIdType, targetName, targetIdField, targetIdType);
-      return MapEntry(field, tableRef);
-    });
-    return fieldsReferencedTables;
-  }
-
-  TypeInfo? _resolveEntityType(TypeInfo fieldType) {
-    if (fieldType.isPrimitiveType) {
-      return null;
-    }
-
-    var entityType =
-        fieldType.isListEntityOrReference ? fieldType.arguments0! : fieldType;
-
-    if (!EntityHandler.isValidEntityType(entityType.type)) {
-      return null;
-    }
-
-    return entityType;
-  }
-
-  List<TableRelationshipReference> _findRelationshipTables(String table) {
-    var allRepositories = this.allRepositories();
-
-    var allTablesReferences = Map.fromEntries(allRepositories.values.map((r) {
-      var referencedTables = _findFieldsReferencedTables(r.name,
-          entityType: r.type,
-          entityHandler: r.entityHandler,
-          onlyCollectionReferences: true);
-      return MapEntry(r, referencedTables);
-    }).where((e) => e.value.isNotEmpty));
-
-    for (var refs in allTablesReferences.values) {
-      refs.removeWhere((field, refTable) => refTable.sourceTable != table);
-    }
-
-    allTablesReferences.removeWhere((repo, refs) => refs.isEmpty);
-
-    var relationships = allTablesReferences.entries.expand((e) {
-      var repo = e.key;
-      var refs = e.value;
-
-      return refs.values.map((ref) {
-        var sourceTable = ref.sourceTable;
-        var sourceField = ref.sourceField;
-
-        var targetTable = ref.targetTable;
-        var targetField = ref.targetField;
-
-        var sourceEntityHandler = repo.entityHandler;
-        var sourceFieldId = sourceEntityHandler.idFieldName();
-        var sourceFieldIdType =
-            sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
-
-        var relTable = '${sourceTable}__${sourceField}__rel';
-        var relSourceField = '${sourceTable}__$sourceFieldId';
-        var relTargetField = '${targetTable}__$targetField';
-
-        return TableRelationshipReference(
-          relTable,
-          sourceTable,
-          sourceFieldId,
-          sourceFieldIdType,
-          relSourceField,
-          targetTable,
-          ref.targetField,
-          ref.targetFieldType,
-          relTargetField,
-          relationshipField: sourceField,
-        );
-      });
-    }).toList();
-
-    return relationships;
   }
 
   @override
@@ -922,7 +783,7 @@ class DBObjectDirectoryAdapter
 }
 
 /// Error thrown by [DBObjectDirectoryAdapter] operations.
-class DBObjectDirectoryAdapterException extends DBAdapterException {
+class DBObjectDirectoryAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
 

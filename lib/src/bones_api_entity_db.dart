@@ -1,19 +1,11 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/src/bones_api_entity_db_object.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' hide IterableIntExtension;
 
-import 'bones_api_condition.dart';
-import 'bones_api_condition_encoder.dart';
-import 'bones_api_entity.dart';
-import 'bones_api_entity_db_relational.dart';
-import 'bones_api_entity_rules.dart';
-import 'bones_api_entity_sql.dart';
-import 'bones_api_extension.dart';
-import 'bones_api_initializable.dart';
 import 'bones_api_mixin.dart';
-import 'bones_api_utils.dart';
 
 final _log = logging.Logger('DBAdapter');
 
@@ -83,84 +75,33 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     _boot = true;
 
     DBRelationalAdapter.boot();
+    DBObjectAdapter.boot();
   }
 
-  static final Map<String, DBAdapterInstantiator> _registeredAdaptersByName =
-      <String, DBAdapterInstantiator>{};
-  static final Map<Type, DBAdapterInstantiator> _registeredAdaptersByType =
-      <Type, DBAdapterInstantiator>{};
+  static final DBAdapterRegister<Object, DBAdapter<Object>> adapterRegister =
+      DBAdapterRegister();
 
   static List<String> get registeredAdaptersNames =>
-      _registeredAdaptersByName.keys.toList();
+      adapterRegister.registeredAdaptersNames;
 
   static List<Type> get registeredAdaptersTypes =>
-      _registeredAdaptersByType.keys.toList();
+      adapterRegister.registeredAdaptersTypes;
 
   static void registerAdapter<C extends Object, A extends DBAdapter<C>>(
-      List<String> names,
-      Type type,
-      DBAdapterInstantiator<C, A> adapterInstantiator) {
-    for (var name in names) {
-      _registeredAdaptersByName[name] = adapterInstantiator;
-    }
-
-    _registeredAdaptersByType[type] = adapterInstantiator;
-  }
+          List<String> names,
+          Type type,
+          DBAdapterInstantiator<C, A> adapterInstantiator) =>
+      adapterRegister.registerAdapter(names, type, adapterInstantiator);
 
   static DBAdapterInstantiator<C, A>?
       getAdapterInstantiator<C extends Object, A extends DBAdapter<C>>(
-          {String? name, Type? type}) {
-    if (name == null && type == null) {
-      throw ArgumentError(
-          'One of the parameters `name` or `type` should NOT be null!');
-    }
-
-    if (name != null) {
-      var adapter = _registeredAdaptersByName[name];
-      if (adapter is DBAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    if (type != null) {
-      var adapter = _registeredAdaptersByType[type];
-      if (adapter is DBAdapterInstantiator<C, A>) {
-        return adapter;
-      }
-    }
-
-    return null;
-  }
+              {String? name, Type? type}) =>
+          adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
       getAdapterInstantiatorsFromConfig<C extends Object,
               A extends DBAdapter<C>>(Map<String, dynamic> config) =>
-          getAdapterInstantiatorsFromConfigImpl<C, A>(
-              config, registeredAdaptersNames, getAdapterInstantiator);
-
-  static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfigImpl<C extends Object,
-                  A extends DBAdapter<C>>(
-              Map<String, dynamic> config,
-              List<String> registeredAdaptersNames,
-              DBAdapterInstantiator<C, A>? Function({String? name, Type? type})
-                  getAdapterInstantiator) =>
-          registeredAdaptersNames
-              .where((n) => config.containsKey(n))
-              .map((n) {
-                var instantiator = getAdapterInstantiator(name: n);
-                if (instantiator == null) return null;
-                var conf = config[n] ?? <String, dynamic>{};
-                if (conf is! Map) return null;
-                return MapEntry<DBAdapterInstantiator<C, A>,
-                        Map<String, dynamic>>(
-                    instantiator,
-                    conf.map((key, value) => MapEntry<String, dynamic>(
-                        key.toString(), value as dynamic)));
-              })
-              .whereNotNull()
-              .toList()
-            ..sort((a, b) => a.value.length.compareTo(b.value.length));
+          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
   /// The name of the adapter.
   final String name;
@@ -763,6 +704,97 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     return allRepositories;
   }
+}
+
+/// [DBAdapter] register.
+/// Handles the implementation of:
+/// - [DBAdapter.registerAdapter]
+/// - [DBAdapter.getAdapterInstantiator]
+/// - [DBAdapter.getAdapterInstantiatorsFromConfig]
+class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
+  final DBAdapterRegister? superRegister;
+
+  DBAdapterRegister({this.superRegister});
+
+  /// Creates a child register.
+  DBAdapterRegister<C2, A2>
+      createRegister<C2 extends Object, A2 extends DBAdapter<C2>>() =>
+          DBAdapterRegister<C2, A2>(superRegister: this);
+
+  final Map<String, DBAdapterInstantiator<C, A>> _registeredAdaptersByName = {};
+  final Map<Type, DBAdapterInstantiator<C, A>> _registeredAdaptersByType = {};
+
+  List<String> get registeredAdaptersNames =>
+      _registeredAdaptersByName.keys.toList();
+
+  List<Type> get registeredAdaptersTypes =>
+      _registeredAdaptersByType.keys.toList();
+
+  void registerAdapter(List<String> names, Type type,
+      DBAdapterInstantiator<C, A> adapterInstantiator) {
+    for (var name in names) {
+      _registeredAdaptersByName[name] = adapterInstantiator;
+    }
+
+    _registeredAdaptersByType[type] = adapterInstantiator;
+
+    superRegister?.registerAdapter(names, type, adapterInstantiator);
+  }
+
+  DBAdapterInstantiator<C2, A2>?
+      getAdapterInstantiator<C2 extends C, A2 extends DBAdapter<C2>>(
+          {String? name, Type? type}) {
+    if (name == null && type == null) {
+      throw ArgumentError(
+          'One of the parameters `name` or `type` should NOT be null!');
+    }
+
+    if (name != null) {
+      var adapter = _registeredAdaptersByName[name];
+      if (adapter is DBAdapterInstantiator<C2, A2>) {
+        return adapter as DBAdapterInstantiator<C2, A2>;
+      }
+    }
+
+    if (type != null) {
+      var adapter = _registeredAdaptersByType[type];
+      if (adapter is DBAdapterInstantiator<C2, A2>) {
+        return adapter as DBAdapterInstantiator<C2, A2>;
+      }
+    }
+
+    return null;
+  }
+
+  List<MapEntry<DBAdapterInstantiator<C2, A2>, Map<String, dynamic>>>
+      getAdapterInstantiatorsFromConfig<C2 extends C, A2 extends DBAdapter<C2>>(
+              Map<String, dynamic> config) =>
+          getAdapterInstantiatorsFromConfigImpl<C2, A2>(
+              config, registeredAdaptersNames, getAdapterInstantiator);
+
+  static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
+      getAdapterInstantiatorsFromConfigImpl<C extends Object,
+                  A extends DBAdapter<C>>(
+              Map<String, dynamic> config,
+              List<String> registeredAdaptersNames,
+              DBAdapterInstantiator<C, A>? Function({String? name, Type? type})
+                  getAdapterInstantiator) =>
+          registeredAdaptersNames
+              .where((n) => config.containsKey(n))
+              .map((n) {
+                var instantiator = getAdapterInstantiator(name: n);
+                if (instantiator == null) return null;
+                var conf = config[n] ?? <String, dynamic>{};
+                if (conf is! Map) return null;
+                return MapEntry<DBAdapterInstantiator<C, A>,
+                        Map<String, dynamic>>(
+                    instantiator,
+                    conf.map((key, value) => MapEntry<String, dynamic>(
+                        key.toString(), value as dynamic)));
+              })
+              .whereNotNull()
+              .toList()
+            ..sort((a, b) => a.value.length.compareTo(b.value.length));
 }
 
 /// An adapter for [EntityRepository] and [DBAdapter].

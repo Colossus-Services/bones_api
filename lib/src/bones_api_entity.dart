@@ -1432,7 +1432,32 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return id1 == id2;
     }
 
-    return false;
+    return equalsValuesEntityMap(value1, value2, entityHandler: entityHandler);
+  }
+
+  static bool equalsValuesEntityMap(Object value1, Object value2,
+      {EntityHandler? entityHandler}) {
+    if (value1 is Map && value2 is Map) {
+      return isEqualsDeep(value1, value2);
+    }
+
+    var id1 = getEntityIDFrom(value1, entityHandler: entityHandler);
+    var id2 = getEntityIDFrom(value2, entityHandler: entityHandler);
+
+    return id1 == id2;
+  }
+
+  static Object? getEntityIDFrom(Object o, {EntityHandler? entityHandler}) {
+    if (o is num || o is String) {
+      return o;
+    } else if (o is Map) {
+      return o.getIgnoreCase('id');
+    } else if (entityHandler != null && isValidEntityType(o.runtimeType)) {
+      var objEntityHandler = entityHandler.getEntityHandler(obj: o);
+      return objEntityHandler?.getID(o);
+    }
+
+    return null;
   }
 
   static bool? equalsEntityReferenceBase(Object value1, Object value2) {
