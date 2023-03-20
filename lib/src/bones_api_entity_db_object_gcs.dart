@@ -576,7 +576,6 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return _finishOperation(op, id, preFinish);
   }
 
-
   static final _jsonEncoder = dart_convert.JsonUtf8Encoder();
   static const _jsonDecoder = dart_convert.JsonDecoder();
   static const _utf8Decoder = dart_convert.Utf8Decoder();
@@ -750,8 +749,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     _log.info('[CACHE] Removed files: ${delResuls.length} ($delSize bytes)');
   }
 
-  bool _isValidId(Object? id){
-    if (id == null) return false ;
+  bool _isValidId(Object? id) {
+    if (id == null) return false;
     var idStr = id.toString().trim();
     return idStr.isNotEmpty;
   }
