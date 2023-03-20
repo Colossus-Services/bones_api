@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.4
+// BUILDER: reflection_factory/2.0.5
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,12 +17,14 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.4');
+  static final Version _version = Version.parse('2.0.5');
 
   Version get reflectionFactoryVersion => _version;
 
   List<Reflection> siblingsReflection() => _siblingsReflection();
 }
+
+Future<T> __retFut$<T>(Object? o) => ClassProxy.returnFuture<T>(o);
 
 // ignore: non_constant_identifier_names
 MyInfoModule MyInfoModule$fromJson(Map<String, Object?> map) =>
@@ -879,11 +881,7 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
           'msg': msg,
         },
         __TR.tFutureString);
-    return ret is Future<String>
-        ? ret as Future<String>
-        : (ret is Future
-            ? ret.then((v) => v as String)
-            : Future<String>.value(ret as dynamic));
+    return __retFut$<String>(ret);
   }
 
   Future<String> toUpperCase(String msg) {
@@ -894,11 +892,7 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
           'msg': msg,
         },
         __TR.tFutureString);
-    return ret is Future<String>
-        ? ret as Future<String>
-        : (ret is Future
-            ? ret.then((v) => v as String)
-            : Future<String>.value(ret as dynamic));
+    return __retFut$<String>(ret);
   }
 }
 
