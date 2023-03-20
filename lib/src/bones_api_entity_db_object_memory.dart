@@ -39,9 +39,9 @@ class DBObjectMemoryAdapterContext
 @Deprecated("Renamed to 'DBObjectMemoryAdapter'")
 typedef DBMemoryObjectAdapter = DBObjectMemoryAdapter;
 
-/// A [SQLAdapter] that stores tables data in memory.
+/// A [DBObjectAdapter] that stores objects in memory.
 ///
-/// Simulates a SQL Database adapter. Useful for tests.
+/// Simulates an Object Database adapter. Useful for tests.
 class DBObjectMemoryAdapter
     extends DBObjectAdapter<DBObjectMemoryAdapterContext> {
   static bool _boot = false;
