@@ -3,6 +3,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:crclib/catalog.dart';
+import 'package:crclib/crclib.dart';
+import 'package:gcloud/storage.dart' as gcs;
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart' as logging;
 import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
@@ -17,13 +22,13 @@ import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 
-final _log = logging.Logger('DBObjectDirectoryAdapter');
+final _log = logging.Logger('DBObjectGCSAdapter');
 
-class DBObjectDirectoryAdapterContext
-    implements Comparable<DBObjectDirectoryAdapterContext> {
+class DBObjectGCSAdapterContext
+    implements Comparable<DBObjectGCSAdapterContext> {
   final int id;
 
-  DBObjectDirectoryAdapterContext(this.id);
+  DBObjectGCSAdapterContext(this.id);
 
   bool _closed = false;
 
@@ -34,15 +39,13 @@ class DBObjectDirectoryAdapterContext
   }
 
   @override
-  int compareTo(DBObjectDirectoryAdapterContext other) =>
-      id.compareTo(other.id);
+  int compareTo(DBObjectGCSAdapterContext other) => id.compareTo(other.id);
 }
 
-/// A [DBObjectAdapter] that stores objects in a [Directory].
+/// A [DBObjectAdapter] that stores objects in Google Cloud Storage (GCS).
 ///
-/// Simulates an Object Database adapter. Useful for development.
-class DBObjectDirectoryAdapter
-    extends DBObjectAdapter<DBObjectDirectoryAdapterContext> {
+/// - See https://cloud.google.com/storage
+class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   static bool _boot = false;
 
   static void boot() {
@@ -50,18 +53,20 @@ class DBObjectDirectoryAdapter
     _boot = true;
 
     DBObjectAdapter.registerAdapter([
-      'object.directory',
-      'obj.dir',
-    ], DBObjectDirectoryAdapter, _instantiate);
+      'object.gcs',
+      'obj.gcs',
+      'object.gcp',
+      'obj.gcp',
+    ], DBObjectGCSAdapter, _instantiate);
   }
 
-  static FutureOr<DBObjectDirectoryAdapter?> _instantiate(config,
+  static FutureOr<DBObjectGCSAdapter?> _instantiate(config,
       {int? minConnections,
       int? maxConnections,
       EntityRepositoryProvider? parentRepositoryProvider,
       String? workingPath}) {
     try {
-      return DBObjectDirectoryAdapter.fromConfig(config,
+      return DBObjectGCSAdapter.fromConfig(config,
           parentRepositoryProvider: parentRepositoryProvider,
           workingPath: workingPath);
     } catch (e, s) {
@@ -70,17 +75,26 @@ class DBObjectDirectoryAdapter
     }
   }
 
-  final Directory directory;
+  final String projectName;
+  final String bucketName;
 
-  DBObjectDirectoryAdapter(this.directory,
-      {super.generateTables,
+  final Directory? cacheDirectory;
+  final int? cacheLimit;
+
+  late final gcs.Storage storage;
+  late final gcs.Bucket bucket;
+
+  DBObjectGCSAdapter(http.Client client, this.projectName, this.bucketName,
+      {this.cacheDirectory,
+      this.cacheLimit,
+      super.generateTables,
       super.populateTables,
       super.populateSource,
       super.parentRepositoryProvider,
       super.workingPath,
       super.log})
       : super(
-          'object.directory',
+          'object.gcs',
           1,
           3,
           const DBAdapterCapability(
@@ -90,28 +104,78 @@ class DBObjectDirectoryAdapter
         ) {
     boot();
 
-    if (!directory.existsSync()) {
-      throw ArgumentError("Directory doesn't exists: $directory");
-    }
+    storage = gcs.Storage(client, projectName);
 
-    var modeString = directory.statSync().modeString();
-    if (!modeString.contains('rw')) {
-      throw StateError("Can't read+write the directory: $directory");
-    }
+    bucket = storage.bucket(bucketName);
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
+
+    _checkCacheDirectoryLimit();
   }
 
-  static FutureOr<DBObjectDirectoryAdapter> fromConfig(
-      Map<String, dynamic>? config,
+  static Future<DBObjectGCSAdapter> fromConfig(Map<String, dynamic>? config,
       {EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+      String? workingPath}) async {
     boot();
 
-    var directoryPath = config?['path'] ?? config?['directory'];
+    var credential = config?.getIgnoreCase('credential');
+    if (credential == null) {
+      throw ArgumentError("Config without `credential`");
+    }
 
-    if (directoryPath == null) {
-      throw ArgumentError("Config without `path` entry!");
+    var project = config?.getAsString('project', ignoreCase: true);
+    if (project == null || project.isEmpty) {
+      throw ArgumentError("Config without `project`");
+    }
+
+    var bucket = config?.getAsString('bucket', ignoreCase: true);
+    if (bucket == null || bucket.isEmpty) {
+      throw ArgumentError("Config without `bucket`");
+    }
+
+    var cacheConfig = config?.getAsMap('cache', ignoreCase: true);
+
+    Directory? cacheDir;
+    int? cacheLimit;
+
+    if (cacheConfig != null) {
+      var path = cacheConfig.getAsString('path', ignoreCase: true)?.trim();
+      if (path != null && path.isNotEmpty) {
+        cacheDir = Directory(path);
+      }
+
+      var limitStr = cacheConfig.getAsString('limit', ignoreCase: true)?.trim();
+
+      if (limitStr != null && limitStr.isNotEmpty) {
+        limitStr = limitStr.replaceAll(RegExp(r'\s'), '').toLowerCase();
+
+        var nPart = limitStr.length > 1
+            ? limitStr.substring(0, limitStr.length - 1)
+            : limitStr;
+
+        int unit;
+        if (limitStr.endsWith('g')) {
+          cacheLimit = int.tryParse(nPart);
+          unit = 1024 * 1024 * 1024;
+        } else if (limitStr.endsWith('m')) {
+          cacheLimit = int.tryParse(nPart);
+          unit = 1024 * 1024;
+        } else if (limitStr.endsWith('k')) {
+          cacheLimit = int.tryParse(nPart);
+          unit = 1024;
+        } else {
+          cacheLimit = int.tryParse(limitStr);
+          unit = 1;
+        }
+
+        if (cacheLimit != null) {
+          cacheLimit = cacheLimit * unit;
+
+          if (cacheLimit <= 0) {
+            cacheLimit = null;
+          }
+        }
+      }
     }
 
     var populate = config?['populate'];
@@ -130,10 +194,14 @@ class DBObjectDirectoryAdapter
       populateSource = populate['source'];
     }
 
-    var directory = Directory(directoryPath);
+    var client = await createGCSClient(credential);
 
-    var adapter = DBObjectDirectoryAdapter(
-      directory,
+    var adapter = DBObjectGCSAdapter(
+      client,
+      project,
+      bucket,
+      cacheDirectory: cacheDir,
+      cacheLimit: cacheLimit,
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -144,21 +212,41 @@ class DBObjectDirectoryAdapter
     return adapter;
   }
 
+  static Future<auth.AutoRefreshingAuthClient> createGCSClient(
+      credential) async {
+    if (credential is String) {
+      var credentialLC = credential.toLowerCase();
+      if (credentialLC == 'metadata' || credentialLC == 'metadata.server') {
+        return auth.clientViaMetadataServer();
+      }
+    }
+
+    final accountCredentials =
+        auth.ServiceAccountCredentials.fromJson(credential);
+
+    try {
+      var client = await auth.clientViaServiceAccount(
+          accountCredentials, gcs.Storage.SCOPES);
+      return client;
+    } catch (e) {
+      throw StateError("Error creating GCP client: $e");
+    }
+  }
+
   @override
-  String getConnectionURL(DBObjectDirectoryAdapterContext connection) =>
+  String getConnectionURL(DBObjectGCSAdapterContext connection) =>
       'object.directory://${connection.id}';
 
   int _connectionCount = 0;
 
   @override
-  DBObjectDirectoryAdapterContext createConnection() {
+  DBObjectGCSAdapterContext createConnection() {
     var id = ++_connectionCount;
-
-    return DBObjectDirectoryAdapterContext(id);
+    return DBObjectGCSAdapterContext(id);
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectDirectoryAdapterContext connection) {
+  FutureOr<bool> closeConnection(DBObjectGCSAdapterContext connection) {
     connection.close();
     return true;
   }
@@ -166,7 +254,8 @@ class DBObjectDirectoryAdapter
   @override
   Map<String, dynamic> information({bool extended = false, String? table}) {
     var info = <String, dynamic>{};
-    info['tables'] = _listTablesNames();
+    info['project'] = projectName;
+    info['bucket'] = bucketName;
     return info;
   }
 
@@ -236,11 +325,11 @@ class DBObjectDirectoryAdapter
   @override
   FutureOr<bool> isConnectionValid(connection) => true;
 
-  final Map<DBObjectDirectoryAdapterContext, DateTime>
-      _openTransactionsContexts = <DBObjectDirectoryAdapterContext, DateTime>{};
+  final Map<DBObjectGCSAdapterContext, DateTime> _openTransactionsContexts =
+      <DBObjectGCSAdapterContext, DateTime>{};
 
   @override
-  DBObjectDirectoryAdapterContext openTransaction(Transaction transaction) {
+  DBObjectGCSAdapterContext openTransaction(Transaction transaction) {
     var conn = createConnection();
 
     _openTransactionsContexts[conn] = DateTime.now();
@@ -257,7 +346,7 @@ class DBObjectDirectoryAdapter
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectDirectoryAdapterContext connection,
+      DBObjectGCSAdapterContext connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -269,20 +358,23 @@ class DBObjectDirectoryAdapter
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBObjectDirectoryAdapterContext? connection) {
+      Transaction transaction, DBObjectGCSAdapterContext? connection) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
   }
 
-  void _consolidateTransactionContext(DBObjectDirectoryAdapterContext context) {
+  void _consolidateTransactionContext(DBObjectGCSAdapterContext context) {
     _openTransactionsContexts.remove(context);
   }
 
   @override
   String toString() {
-    var closedStr = isClosed ? '{closed}' : '';
-    return 'DBObjectDirectoryAdapter#$instanceID$closedStr@${directory.path}';
+    final cacheDirectory = this.cacheDirectory;
+    var closedStr = isClosed ? ', closed' : '';
+    return 'DBObjectGCSAdapter#$instanceID'
+        '{project: $projectName, bucket: $bucketName$closedStr}'
+        '${cacheDirectory != null ? '@${cacheDirectory.path}' : ''}';
   }
 
   @override
@@ -299,41 +391,37 @@ class DBObjectDirectoryAdapter
             .resolveMapped((res) => _finishOperation(op, res, preFinish)));
   }
 
-  int _doCountImpl(TransactionOperation op, String table,
-      EntityMatcher? matcher, Object? parameters) {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) return 0;
-
+  Future<int> _doCountImpl(TransactionOperation op, String table,
+      EntityMatcher? matcher, Object? parameters) async {
     if (matcher != null) {
       if (matcher is ConditionID) {
         var id = matcher.idValue ?? matcher.getID(parameters);
 
-        var objFile = _resolveObjectFile(table, id);
-        return objFile.existsSync() ? 1 : 0;
+        var objFile = _resolveObjectFilePath(table, id);
+
+        try {
+          var objInfo = await bucket.info(objFile);
+          return objInfo.length > 0 ? 1 : 0;
+        } catch (_) {
+          return 0;
+        }
       }
 
       throw UnsupportedError("Relationship count not supported for: $matcher");
     }
 
-    var list = _listTableFiles(tableDir);
+    var list = await _listTableFiles(table);
     return list.length;
   }
 
-  List<File> _listTableFiles(Directory tableDir) {
-    var list = tableDir.listSync(recursive: false).whereType<File>().where((e) {
-      var path = e.path;
-      return path.endsWith('.json') && !path.startsWith('.');
-    }).toList();
-    return list;
-  }
+  Future<List<String>> _listTableFiles(String table) async {
+    var tablePath = _resolveTablePath(table);
 
-  List<Directory> _listTablesDirs() {
-    var dirs = directory.listSync().whereType<Directory>().toList();
-    return dirs;
-  }
+    var entries = bucket.list(prefix: '$tablePath/', delimiter: '/');
 
-  List<String> _listTablesNames() =>
-      _listTablesDirs().map((d) => pack_path.split(d.path).last).toList();
+    var listAll = await entries.map((e) => e.name).toList();
+    return listAll;
+  }
 
   @override
   FutureOr<R?> doSelectByID<R>(
@@ -345,13 +433,8 @@ class DBObjectDirectoryAdapter
               .resolveMapped((res) => _finishOperation(op, res, preFinish)));
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
-      String table, Object id, String entityName) async {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) return null;
-
-    var entry = await _readObject(table, id);
-    return entry;
-  }
+          String table, Object id, String entityName) =>
+      _readObject(table, id);
 
   @override
   FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
@@ -365,9 +448,6 @@ class DBObjectDirectoryAdapter
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
       String table, List<Object> ids, String entityName) async {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) return [];
-
     var entries =
         await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
 
@@ -384,15 +464,12 @@ class DBObjectDirectoryAdapter
           (conn) => _doSelectAllImpl<R>(table, entityName)
               .resolveMapped((res) => _finishOperation(op, res, preFinish)));
 
-  FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
-      String table, String entityName) {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) return [];
-
-    var files = _listTableFiles(tableDir);
+  Future<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
+      String table, String entityName) async {
+    var files = await _listTableFiles(table);
 
     var entries = files.map((f) {
-      var fileName = pack_path.split(f.path).last;
+      var fileName = f.split('/').last;
       var id = pack_path.withoutExtension(fileName);
       return _readObject(table, id);
     }).resolveAllNotNull();
@@ -418,19 +495,12 @@ class DBObjectDirectoryAdapter
       String table,
       EntityMatcher<dynamic> matcher,
       Object? parameters) async {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) return [];
-
     if (matcher is ConditionID) {
       var id = matcher.idValue ?? matcher.getID(parameters);
 
-      var objFile = _resolveObjectFile(table, id);
-      if (!objFile.existsSync()) return [];
+      var entry = await _deleteObject(table, id);
 
-      var entry = await _readObject(table, id);
-      objFile.deleteSync();
-
-      return entry != null ? [entry] : [];
+      return entry == null ? [] : [entry];
     }
 
     throw UnsupportedError("Relationship delete not supported for: $matcher");
@@ -455,12 +525,7 @@ class DBObjectDirectoryAdapter
       String table,
       Map<String, dynamic> fields,
       String entityName,
-      PreFinishDBOperation? preFinish) {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) {
-      tableDir.createSync();
-    }
-
+      PreFinishDBOperation? preFinish) async {
     var entry =
         _normalizeEntityJSON(fields, entityName: entityName, table: table);
 
@@ -474,7 +539,7 @@ class DBObjectDirectoryAdapter
       throw StateError("Can't determine object ID to store it: $fields");
     }
 
-    _saveObject(table, id, entry);
+    await _saveObject(table, id, entry);
 
     return _finishOperation(op, id, preFinish);
   }
@@ -496,12 +561,7 @@ class DBObjectDirectoryAdapter
       Map<String, dynamic> fields,
       String entityName,
       Object id,
-      PreFinishDBOperation? preFinish) {
-    var tableDir = _resolveTableDirectory(table);
-    if (!tableDir.existsSync()) {
-      tableDir.createSync();
-    }
-
+      PreFinishDBOperation? preFinish) async {
     _log.info(
         '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`');
 
@@ -511,36 +571,224 @@ class DBObjectDirectoryAdapter
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
 
-    _saveObject(table, id, entry);
+    await _saveObject(table, id, entry);
 
     return _finishOperation(op, id, preFinish);
   }
 
-  Future<void> _saveObject(
+
+  static final _jsonEncoder = dart_convert.JsonUtf8Encoder();
+  static const _jsonDecoder = dart_convert.JsonDecoder();
+  static const _utf8Decoder = dart_convert.Utf8Decoder();
+
+  static const String _objectContentType = 'application/json';
+
+  Future<bool> _saveObject(
       String table, Object? id, Map<String, dynamic> obj) async {
-    var file = _resolveObjectFile(table, id);
-    var enc = dart_convert.json.encode(obj);
-    await file.writeAsString(enc);
+    if (!_isValidId(id)) return false;
+
+    var file = _resolveObjectFilePath(table, id);
+
+    var jsonBytes = _jsonEncoder.convert(obj);
+
+    var cacheFile = _resolveCacheObjectFile(table, id);
+    if (cacheFile != null && cacheFile.existsSync()) {
+      var info = await bucket.info(file);
+
+      if (info.length == jsonBytes.length) {
+        var crc32GCS = info.crc32CChecksumBytes;
+        var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
+
+        var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
+
+        if (crc32JsonOk) {
+          var cacheBytes = cacheFile.readAsBytesSync();
+
+          if (!cacheBytes.equalsElements(jsonBytes)) {
+            cacheFile.writeAsBytesSync(jsonBytes);
+          }
+
+          return true;
+        }
+      }
+    }
+
+    var objInfo = await bucket.writeBytes(file, jsonBytes,
+        contentType: _objectContentType);
+    var ok = objInfo.length == jsonBytes.length;
+
+    cacheFile = _resolveCacheObjectFile(table, id, autoCreateDir: true);
+
+    if (cacheFile != null) {
+      _checkCacheDirectoryLimit();
+      cacheFile.writeAsBytesSync(jsonBytes);
+      _checkCacheDirectoryLimitUntrackedTotal += jsonBytes.length;
+    }
+
+    return ok;
   }
 
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
-    var file = _resolveObjectFile(table, id);
-    if (!file.existsSync()) return null;
-    var enc = await file.readAsString();
-    var obj = dart_convert.json.decode(enc) as Map<String, dynamic>;
+    if (!_isValidId(id)) return null;
+
+    var cacheFile = _resolveCacheObjectFile(table, id);
+
+    List<int> bytes;
+
+    if (cacheFile != null && cacheFile.existsSync()) {
+      bytes = cacheFile.readAsBytesSync();
+    } else {
+      var file = _resolveObjectFilePath(table, id);
+
+      try {
+        bytes = await bucket
+            .read(file)
+            .reduce((previous, element) => previous + element);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    cacheFile?.writeAsBytesSync(bytes);
+    _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
+
+    var json = _utf8Decoder.convert(bytes);
+
+    var obj = _jsonDecoder.convert(json) as Map<String, dynamic>;
     return obj;
   }
 
-  File _resolveObjectFile(String table, Object? id) {
+  Future<Map<String, dynamic>?> _deleteObject(String table, Object? id) async {
+    var entry = await _readObject(table, id);
+    if (entry == null) return null;
+
+    var objFile = _resolveObjectFilePath(table, id);
+    await bucket.delete(objFile);
+
+    var cacheFile = _resolveCacheObjectFile(table, id);
+    cacheFile?.deleteSync();
+
+    return entry;
+  }
+
+  DateTime _checkCacheDirectoryLimitLastTime = DateTime.utc(2020);
+  int _checkCacheDirectoryLimitSkips = 0;
+  int _checkCacheDirectoryLimitLastTotal = 0;
+  int _checkCacheDirectoryLimitUntrackedTotal = 0;
+
+  void _checkCacheDirectoryLimit({bool force = false}) async {
+    var cacheLimit = this.cacheLimit ?? 0;
+    if (cacheLimit <= 0) return;
+
+    if (!force) {
+      var estimatedTotal = _checkCacheDirectoryLimitLastTotal +
+          _checkCacheDirectoryLimitUntrackedTotal;
+
+      var inLimit = estimatedTotal <= cacheLimit;
+      var lowSkips = _checkCacheDirectoryLimitSkips < 100;
+      var notExpired =
+          _checkCacheDirectoryLimitLastTime.elapsedTime < Duration(minutes: 5);
+
+      // Skip check:
+      if (inLimit && lowSkips && notExpired) {
+        ++_checkCacheDirectoryLimitSkips;
+        return;
+      }
+    }
+
+    var list = cacheDirectory?.listSync(recursive: true);
+    if (list == null || list.isEmpty) return;
+
+    _checkCacheDirectoryLimitLastTime = DateTime.now();
+    _checkCacheDirectoryLimitSkips = 0;
+
+    var files =
+        list.whereType<File>().where((f) => f.path.endsWith(".json")).toList();
+
+    var filesStats = await files
+        .map((f) => MapEntry(f, f.stat()))
+        .toMapFromEntries()
+        .resolveAllValues();
+
+    var totalSize = filesStats.values.map((s) => s.size).sum;
+
+    _checkCacheDirectoryLimitLastTotal = totalSize;
+    _checkCacheDirectoryLimitUntrackedTotal = 0;
+
+    if (totalSize <= cacheLimit) {
+      var r = (totalSize / cacheLimit) * 100;
+      _log.info(
+          '[CACHE] Limit check: OK ($totalSize / $cacheLimit bytes ${r.toStringAsFixed(2)}%)  (${filesStats.length} files)');
+      return;
+    }
+
+    var entries = filesStats.entries.toList();
+    entries.sort((a, b) => a.value.modified.compareTo(b.value.modified));
+
+    final delNeededSize = ((totalSize * 0.80) - cacheLimit).toInt();
+
+    _log.info(
+        '[CACHE] Reached limit: $totalSize / $cacheLimit bytes (${entries.length} files)! Releasing $delNeededSize bytes...');
+
+    var del = <File>[];
+    var delSize = 0;
+
+    for (var e in entries) {
+      var f = e.key;
+      var s = e.value;
+
+      del.add(f);
+
+      delSize += s.size;
+      if (delSize >= delNeededSize) break;
+    }
+
+    _log.info('[CACHE] Removing ${del.length} files...');
+
+    var delResuls = await del.map((f) => f.delete()).toList().resolveAll();
+
+    _log.info('[CACHE] Removed files: ${delResuls.length} ($delSize bytes)');
+  }
+
+  bool _isValidId(Object? id){
+    if (id == null) return false ;
+    var idStr = id.toString().trim();
+    return idStr.isNotEmpty;
+  }
+
+  String _resolveObjectFilePath(String table, Object? id) {
     var idStr = _normalizeID(id);
-    var tableDir = _resolveTableDirectory(table);
+    var tablePath = _resolveTablePath(table);
+    var file = '$tablePath/$idStr.json';
+    return file;
+  }
+
+  String _resolveTablePath(String table) {
+    var tableStr = _normalizeTableName(table);
+    return tableStr;
+  }
+
+  File? _resolveCacheObjectFile(String table, Object? id,
+      {bool autoCreateDir = false}) {
+    var tableDir =
+        _resolveCacheTableDirectory(table, autoCreateDir: autoCreateDir);
+    if (tableDir == null) return null;
+    var idStr = _normalizeID(id);
     var file = File(pack_path.join(tableDir.path, '$idStr.json'));
     return file;
   }
 
-  Directory _resolveTableDirectory(String table) {
+  Directory? _resolveCacheTableDirectory(String table,
+      {bool autoCreateDir = false}) {
+    var cacheDirectory = this.cacheDirectory;
+    if (cacheDirectory == null) return null;
     var tableStr = _normalizeTableName(table);
-    var tableDir = Directory(pack_path.join(directory.path, tableStr));
+    var tableDir = Directory(pack_path.join(cacheDirectory.path, tableStr));
+
+    if (autoCreateDir && !tableDir.existsSync()) {
+      tableDir.createSync();
+    }
+
     return tableDir;
   }
 
@@ -669,7 +917,7 @@ class DBObjectDirectoryAdapter
   }
 
   Object resolveError(Object error, StackTrace stackTrace) =>
-      DBObjectDirectoryAdapterException('error', '$error',
+      DBObjectGCSAdapterException('error', '$error',
           parentError: error, parentStackTrace: stackTrace);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -682,7 +930,7 @@ class DBObjectDirectoryAdapter
   }
 
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f) {
+      FutureOr<R> Function(DBObjectGCSAdapterContext connection) f) {
     var transaction = op.transaction;
 
     if (transaction.length == 1 && !transaction.isExecuting) {
@@ -699,14 +947,14 @@ class DBObjectDirectoryAdapter
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
-            ? () => closeTransaction(transaction,
-                transaction.context as DBObjectDirectoryAdapterContext?)
+            ? () => closeTransaction(
+                transaction, transaction.context as DBObjectGCSAdapterContext?)
             : null,
       );
     }
 
     return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, DBObjectDirectoryAdapterContext>(
+      return transaction.addExecution<R, DBObjectGCSAdapterContext>(
         (c) => f(c),
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
@@ -715,13 +963,37 @@ class DBObjectDirectoryAdapter
   }
 }
 
-/// Error thrown by [DBObjectDirectoryAdapter] operations.
-class DBObjectDirectoryAdapterException extends DBObjectAdapterException {
+/// Error thrown by [DBObjectGCSAdapter] operations.
+class DBObjectGCSAdapterException extends DBObjectAdapterException {
   @override
-  String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
+  String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
-  DBObjectDirectoryAdapterException(String type, String message,
+  DBObjectGCSAdapterException(String type, String message,
       {Object? parentError, StackTrace? parentStackTrace})
       : super(type, message,
             parentError: parentError, parentStackTrace: parentStackTrace);
+}
+
+extension _ObjectInfoExtension on gcs.ObjectInfo {
+  List<int> get crc32CChecksumBytes {
+    var n = crc32CChecksum;
+    return [
+      (n) & 0xFF,
+      (n >> 8) & 0xFF,
+      (n >> 16) & 0xFF,
+      (n >> 24) & 0xFF,
+    ];
+  }
+}
+
+extension _CrcValueExtension on CrcValue {
+  List<int> get crc32CChecksumBytes {
+    var n = toBigInt().toInt();
+    return [
+      (n >> 24) & 0xFF,
+      (n >> 16) & 0xFF,
+      (n >> 8) & 0xFF,
+      (n) & 0xFF,
+    ];
+  }
 }

@@ -1,3 +1,16 @@
+## 1.3.58
+
+- New `DBObjectGCSAdapter`.
+- New library: `bones_api_db_gcp.dart`.
+- `DBObjectDirectoryAdapter`: clean code.
+- `DBEntityRepositoryProvider`:
+  - Added `requiredAdapters` and `requiredEntityRepositoryProviders`:
+    - Used by `initializeDependencies`.
+- reflection_factory: ^2.0.5
+- http: ^0.13.5
+- googleapis_auth: ^1.4.0
+- crclib: ^3.0.0
+
 ## 1.3.57
 
 - New `DBObjectAdapter`:

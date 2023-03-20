@@ -613,8 +613,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
     }
 
-    var entityRepository =
-        parentRepositoryProvider?.getEntityRepository<O>(obj: obj, type: type);
+    var entityRepository = parentRepositoryProvider?.getEntityRepository<O>(
+        obj: obj, type: type, name: name);
 
     if (entityRepository != null) {
       return entityRepository;
@@ -1633,6 +1633,15 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
       );
 
   @override
+  FutureOr<List<Initializable>> initializeDependencies() {
+    return requiredEntityRepositoryProviders().resolveOther(requiredAdapters(),
+        (requiredRepoProviders, requiredAdapters) {
+      var dependencies = [...requiredRepoProviders, ...requiredAdapters];
+      return dependencies;
+    });
+  }
+
+  @override
   FutureOr<InitializationResult> initialize() {
     return adapter.resolveMapped((adapter) {
       var repositories = buildRepositories(adapter);
@@ -1643,6 +1652,13 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
       });
     });
   }
+
+  /// List of adapters that need to be initialized to [buildRepositories].
+  FutureOr<List<DBAdapter>> requiredAdapters() => <DBAdapter>[];
+
+  /// List of [EntityRepositoryProvider] that need to be initialized to [buildRepositories].
+  FutureOr<List<EntityRepositoryProvider>>
+      requiredEntityRepositoryProviders() => <EntityRepositoryProvider>[];
 
   /// Builds the [EntityRepository], called by [initialize].
   /// See [extraDependencies].
