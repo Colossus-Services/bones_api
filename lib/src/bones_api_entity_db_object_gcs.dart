@@ -399,12 +399,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
         var objFile = _resolveObjectFilePath(table, id);
 
-        try {
-          var objInfo = await bucket.info(objFile);
-          return objInfo.length > 0 ? 1 : 0;
-        } catch (_) {
-          return 0;
-        }
+        var objInfo = await _getObjectInfo(objFile);
+        return objInfo != null && objInfo.length > 0 ? 1 : 0;
       }
 
       throw UnsupportedError("Relationship count not supported for: $matcher");
@@ -582,6 +578,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   static const String _objectContentType = 'application/json';
 
+  Future<gcs.ObjectInfo?> _getObjectInfo(String file) async {
+    try {
+      var info = await bucket.info(file);
+      return info;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<bool> _saveObject(
       String table, Object? id, Map<String, dynamic> obj) async {
     if (!_isValidId(id)) return false;
@@ -592,9 +597,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var cacheFile = _resolveCacheObjectFile(table, id);
     if (cacheFile != null && cacheFile.existsSync()) {
-      var info = await bucket.info(file);
+      var info = await _getObjectInfo(file);
 
-      if (info.length == jsonBytes.length) {
+      if (info != null && info.length == jsonBytes.length) {
         var crc32GCS = info.crc32CChecksumBytes;
         var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
 

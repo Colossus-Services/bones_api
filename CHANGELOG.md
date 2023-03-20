@@ -1,3 +1,8 @@
+## 1.3.59
+
+- `DBObjectGCSAdapter`:
+  - Fix call to `bucket.info`: replace with `_getObjectInfo` & try/catch.
+
 ## 1.3.58
 
 - New `DBObjectGCSAdapter`.
