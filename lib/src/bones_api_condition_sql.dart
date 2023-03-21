@@ -1,5 +1,6 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -436,6 +437,17 @@ class ConditionSQLEncoder extends ConditionEncoder {
     }
   }
 
+  @override
+  FutureOr<Object?> resolveValueToCompatibleType(Object? value) {
+    if (value is Decimal) {
+      return value.toDouble();
+    } else if (value is DynamicInt) {
+      return value.toBigInt();
+    } else {
+      return value;
+    }
+  }
+
   FutureOr<String> valueToSQL(EncodingContext context, dynamic value,
           {String? fieldKey, Type? fieldType, bool valueAsList = false}) =>
       valueToParameterValue(context, value,
@@ -519,6 +531,12 @@ class ConditionSQLEncoder extends ConditionEncoder {
     } else if (value is num || value is bool) {
       return EncodingValuePrimitive(
           key, type, value, encodeEncodingValuePrimitive);
+    } else if (value is Decimal) {
+      return EncodingValuePrimitive(
+          key, type, value.toDouble(), encodeEncodingValuePrimitive);
+    } else if (value is DynamicInt) {
+      return EncodingValuePrimitive(
+          key, type, value.toBigInt(), encodeEncodingValuePrimitive);
     } else {
       return EncodingValueText(
           key, type, value.toString(), encodeEncodingValueText);

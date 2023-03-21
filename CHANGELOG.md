@@ -1,3 +1,11 @@
+## 1.3.60
+
+- `ConditionEncoder`:
+  - Fix queries using values of type `Decimal` or `DynamicInt`. 
+- `ConditionSQLEncoder`:
+  - Handle `Decimal` as `double`.
+  - Handle `DynamicInt` as `BigInt`.
+
 ## 1.3.59
 
 - `DBObjectGCSAdapter`:
