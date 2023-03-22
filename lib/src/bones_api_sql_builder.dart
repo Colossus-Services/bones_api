@@ -165,6 +165,7 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   }
 }
 
+/// A `CREATE INDEX` SQL builder.
 class CreateIndexSQL extends SQLBuilder {
   /// The table name.
   final String table;
