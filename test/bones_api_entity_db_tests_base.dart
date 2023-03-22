@@ -254,6 +254,13 @@ Future<bool> runAdapterTests(
       expect(fullCreateTableSQLs, contains(tableAddressRegexp),
           reason: "`address` table SQL");
 
+      var indexAddressRegexp =
+          RegExp('CREATE INDEX IF NOT EXISTS ${q}address__state__idx$q ON '
+              '${q}address$q \\(${q}state$q\\)');
+
+      expect(fullCreateTableSQLs, contains(indexAddressRegexp),
+          reason: "`address` index SQL");
+
       var tableRoleRegexp =
           RegExp('CREATE TABLE IF NOT EXISTS ${q}role$q \\($reS'
               '${q}id$q $reAnyType PRIMARY KEY,$reS'
@@ -430,7 +437,10 @@ Future<bool> runAdapterTests(
 
       {
         var address = Address('NY', 'New York', 'street A', 101,
-            stores: [store1, store2], closedStores: [storeClosed]);
+            stores: [store1, store2],
+            closedStores: [storeClosed],
+            latitude: 0.20,
+            longitude: 0.30);
         var role = Role(RoleType.admin);
 
         var photo = Photo.from(png1PixelBase64);
@@ -528,6 +538,58 @@ Future<bool> runAdapterTests(
         expect((await addressAPIRepository.existsID(1)), isTrue);
 
         expect((await photoAPIRepository.existsID(png1PixelSha256)), isTrue);
+
+        {
+          var address1 = await addressAPIRepository.selectByID(address.id);
+          expect(address1, isNotNull);
+          expect(address1!.id, equals(address.id));
+          expect(address1.state, equals('NY'));
+          expect(address1.number, equals(101));
+          expect(address1.latitude, equals(Decimal.fromDouble(0.20)));
+          expect(address1.longitude, equals(Decimal.fromDouble(0.30)));
+
+          var sel1 = await addressAPIRepository
+              .selectFirstByQuery(" state == ? ", parameters: ['NY']);
+          expect(sel1?.number, equals(101));
+
+          var sel2 = await addressAPIRepository
+              .selectFirstByQuery(" state == ? ", parameters: ['XX']);
+          expect(sel2, isNull);
+
+          var sel3 = await addressAPIRepository.selectFirstByQuery(
+              " latitude >= 0.19 && latitude <= 0.21 && longitude >= 0.29 && longitude <= 0.31 ");
+          expect(sel3?.number, equals(101));
+
+          var sel4 = await addressAPIRepository.selectFirstByQuery(
+              " latitude >= ?:lat1 && latitude <= ?:lat2 && longitude >= ?:long1 && longitude <= ?:long2 ",
+              parameters: {
+                'lat1': Decimal.fromDouble(0.19),
+                'lat2': Decimal.fromDouble(0.21),
+                'long1': Decimal.fromDouble(0.29),
+                'long2': Decimal.fromDouble(0.31)
+              });
+          expect(sel4?.number, equals(101));
+
+          var sel5 = await addressAPIRepository.selectFirstByQuery(
+              " latitude >= ?:lat1 && latitude <= ?:lat2 && longitude >= ?:long1 && longitude <= ?:long2 ",
+              parameters: {
+                'lat1': Decimal.fromDouble(0.19),
+                'lat2': Decimal.fromDouble(0.21),
+                'long1': Decimal.fromDouble(1.29),
+                'long2': Decimal.fromDouble(1.31)
+              });
+          expect(sel5, isNull);
+
+          var sel6 = await addressAPIRepository.selectFirstByQuery(
+              " latitude >= ?:lat1 && latitude <= ?:lat2 && longitude >= ?:long1 && longitude <= ?:long2 ",
+              parameters: {
+                'lat1': Decimal.fromDouble(1.19),
+                'lat2': Decimal.fromDouble(1.21),
+                'long1': Decimal.fromDouble(0.29),
+                'long2': Decimal.fromDouble(0.31)
+              });
+          expect(sel6, isNull);
+        }
 
         {
           var user = await userAPIRepository.selectByID(1);

@@ -1193,7 +1193,8 @@ abstract class SQLGenerator {
               ]));
         } else if (entityFieldAnnotations.hasIndexed) {
           var indexName = '${table}__${columnName}__idx';
-          indexSQLs.add(CreateIndexSQL(dialect, table, columnName, indexName));
+          indexSQLs
+              .add(CreateIndexSQL(dialect, table, columnName, indexName, q: q));
         }
       }
     }
