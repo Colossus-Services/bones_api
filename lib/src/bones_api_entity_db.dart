@@ -534,6 +534,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   List<EntityRepository> get entityRepositories =>
       _entityRepositories.values.toList();
 
+  List<EntityRepository> get entityRepositoriesBuildOrder => entityRepositories;
+
   @override
   void registerEntityRepository<O extends Object>(
       EntityRepository<O> entityRepository) {
@@ -694,8 +696,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     traversedProviders.add(this);
 
-    for (var e in _entityRepositories.entries) {
-      allRepositories.putIfAbsent(e.key, () => e.value);
+    for (var repo in entityRepositoriesBuildOrder) {
+      allRepositories.putIfAbsent(repo.type, () => repo);
     }
 
     for (var e in _knownEntityRepositoryProviders) {

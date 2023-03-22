@@ -157,6 +157,8 @@ void main() {
               'number': 123,
               'stores': [],
               'closedStores': {'EntityReferenceList': 'Store'},
+              'latitude': 0.0,
+              'longitude': 0.0
             },
             'roles': [],
             'level': null,
@@ -304,6 +306,8 @@ Map<String, Object?> _buildTestUserJson(int id, String email, int n,
       'number': n,
       'stores': [],
       'closedStores': {'EntityReferenceList': 'Store'},
+      'latitude': 0.0,
+      'longitude': 0.0
     },
     'roles': [],
     'level': null,

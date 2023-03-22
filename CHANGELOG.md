@@ -1,3 +1,26 @@
+## 1.3.61
+
+- Added `CreateIndexSQL`.
+- `EntityField`:
+  - Added `_indexed` and `isIndexed`.
+  - Added constructor `EntityField.indexed()`.
+- `DBSQLAdapter`:
+  - Added getter `entityRepositoriesBuildOrder`.
+- `DBAdapter`:
+  - `allRepositories`:
+    - Use `entityRepositoriesBuildOrder` to return the repositores in the build order.
+- `APIDBModule`:
+  - `tables`: list repositories ordered by name.
+  - `dump`: list repositories in build order to allow use of the dump to populate a DB. 
+
+## 1.3.60
+
+- `ConditionEncoder`:
+  - Fix queries using values of type `Decimal` or `DynamicInt`. 
+- `ConditionSQLEncoder`:
+  - Handle `Decimal` as `double`.
+  - Handle `DynamicInt` as `BigInt`.
+
 ## 1.3.59
 
 - `DBObjectGCSAdapter`:

@@ -77,7 +77,15 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var map = allRepositories.map((type, repo) => MapEntry('$type', repo.name));
+    var map = allRepositories.entries
+        .map((e) {
+          var type = e.key;
+          var repo = e.value;
+          return MapEntry('$type', repo.name);
+        })
+        .sorted((a, b) => a.key.compareTo(b.key))
+        .toMapFromEntries();
+
     return APIResponse.ok(map, mimeType: 'json');
   }
 

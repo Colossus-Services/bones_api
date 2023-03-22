@@ -931,23 +931,38 @@ abstract class ConditionEncoder {
         return [];
       } else if (value is Iterable) {
         var list = value
-            .map((v) => _resolveValueToTypeImpl(v, valueType))
+            .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))
             .toList(growable: false)
             .resolveAll();
         return list;
       } else {
-        var list = _resolveValueToTypeImpl(value, valueType)
+        var list = _resolveValueToTypeCompatibleImpl(value, valueType)
             .resolveMapped((val) => [val]);
         return list;
       }
     } else {
-      return _resolveValueToTypeImpl(value, valueType);
+      return _resolveValueToTypeCompatibleImpl(value, valueType);
     }
+  }
+
+  FutureOr<Object?> _resolveValueToTypeCompatibleImpl(
+      Object? value, Type valueType) {
+    value = _resolveValueToTypeImpl(value, valueType);
+    value = resolveValueToCompatibleType(value);
+    return value;
+  }
+
+  FutureOr<Object?> resolveValueToCompatibleType(Object? value) {
+    return value;
   }
 
   FutureOr<Object?> _resolveValueToTypeImpl(Object? value, Type valueType) {
     if (value == null) {
       return null;
+    }
+
+    if (value.runtimeType == valueType) {
+      return value;
     }
 
     var valueTypeInfo = TypeInfo.from(valueType);

@@ -628,22 +628,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
-      Type type, String column,
+  MapEntry<String, List<String>>? enumTypeToSQLType(Type type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
-    return super
-        .enumTypeToSQLType(type, column,
-            entityFieldAnnotations: entityFieldAnnotations)
-        .resolveMapped((enumType) {
-      if (enumType == null) return null;
+    var enumType = super.enumTypeToSQLType(type, column,
+        entityFieldAnnotations: entityFieldAnnotations);
 
-      var values = enumType.value;
-      if (values.isEmpty) {
-        return MapEntry('VARCHAR', values);
-      }
+    if (enumType == null) return null;
 
-      return MapEntry('VARCHAR CHECK', values);
-    });
+    var values = enumType.value;
+    if (values.isEmpty) {
+      return MapEntry('VARCHAR', values);
+    }
+
+    return MapEntry('VARCHAR CHECK', values);
   }
 
   @override

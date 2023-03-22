@@ -751,6 +751,7 @@ class Store extends Entity {
 class Address extends Entity {
   int? id;
 
+  @EntityField.indexed()
   @EntityField.maximum(3)
   String state;
 
@@ -762,15 +763,24 @@ class Address extends Entity {
 
   int number;
 
+  Decimal latitude;
+  Decimal longitude;
+
   List<Store> stores;
   EntityReferenceList<Store> closedStores;
 
   Address(this.state, this.city, this.street, this.number,
-      {this.id, List<Store>? stores, Object? closedStores})
+      {this.id,
+      List<Store>? stores,
+      Object? closedStores,
+      Object? latitude,
+      Object? longitude})
       : stores = stores ?? <Store>[],
         closedStores = EntityReferenceList<Store>.from(
             closedStores ?? <Store>[],
-            entityHandler: storeEntityHandler);
+            entityHandler: storeEntityHandler),
+        latitude = Decimal.from(latitude) ?? Decimal.zero,
+        longitude = Decimal.from(longitude) ?? Decimal.zero;
 
   Address.empty() : this('', '', '', 0);
 
@@ -779,6 +789,8 @@ class Address extends Entity {
             map.getAsString('street')!, map.getAsInt('number')!,
             stores: map.getAsList<Store>('stores', def: <Store>[])!,
             closedStores: map['closedStores'],
+            latitude: map['latitude'],
+            longitude: map['longitude'],
             id: map.getAsInt('id'));
 
   @override
@@ -790,7 +802,9 @@ class Address extends Entity {
           state == other.state &&
           city == other.city &&
           street == other.street &&
-          number == other.number;
+          number == other.number &&
+          latitude == other.latitude &&
+          longitude == other.longitude;
 
   @override
   int get hashCode =>
@@ -798,7 +812,9 @@ class Address extends Entity {
       state.hashCode ^
       city.hashCode ^
       street.hashCode ^
-      number.hashCode;
+      number.hashCode ^
+      latitude.hashCode ^
+      longitude.hashCode;
 
   @override
   String get idFieldName => 'id';
@@ -812,7 +828,9 @@ class Address extends Entity {
         'street',
         'number',
         'stores',
-        'closedStores'
+        'closedStores',
+        'latitude',
+        'longitude',
       ];
 
   @override
@@ -832,6 +850,10 @@ class Address extends Entity {
         return stores as V?;
       case 'closedStores':
         return closedStores as V?;
+      case 'latitude':
+        return latitude as V?;
+      case 'longitude':
+        return longitude as V?;
       default:
         return null;
     }
@@ -855,6 +877,10 @@ class Address extends Entity {
       case 'closedStores':
         return TypeInfo<EntityReferenceList<Store>>.fromType(
             EntityReferenceList, [TypeInfo<Store>.fromType(Store)]);
+      case 'latitude':
+        return TypeInfo.fromType(Decimal);
+      case 'longitude':
+        return TypeInfo.fromType(Decimal);
       default:
         return null;
     }
@@ -864,7 +890,7 @@ class Address extends Entity {
   List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
     switch (key) {
       case 'state':
-        return [EntityField.maximum(3)];
+        return [EntityField.indexed(), EntityField.maximum(3)];
       case 'city':
         return [EntityField.maximum(100)];
       case 'street':
@@ -913,6 +939,16 @@ class Address extends Entity {
           closedStores = EntityReferenceList<Store>.from(value);
           break;
         }
+      case 'latitude':
+        {
+          latitude = Decimal.from(value) ?? Decimal.zero;
+          break;
+        }
+      case 'longitude':
+        {
+          longitude = Decimal.from(value) ?? Decimal.zero;
+          break;
+        }
       default:
         return;
     }
@@ -927,6 +963,8 @@ class Address extends Entity {
         'number': number,
         'stores': stores.map((e) => e.toJson()).toList(),
         'closedStores': closedStores.toJson(),
+        'latitude': latitude.toDouble(),
+        'longitude': longitude.toDouble(),
       };
 }
 
