@@ -515,32 +515,66 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return tables;
   }
 
+  List<EntityRepository>? _entityRepositoriesBuildOrderIn;
+  List<EntityRepository>? _entityRepositoriesBuildOrderOut;
+
+  @override
+  List<EntityRepository> get entityRepositoriesBuildOrder {
+    var repositories = super.entityRepositoriesBuildOrder;
+
+    var entityRepositoriesBuildOrderIn = _entityRepositoriesBuildOrderIn;
+    var entityRepositoriesBuildOrderOut = _entityRepositoriesBuildOrderOut;
+
+    if (entityRepositoriesBuildOrderIn != null &&
+        entityRepositoriesBuildOrderOut != null &&
+        entityRepositoriesBuildOrderIn.equalsElements(repositories)) {
+      return entityRepositoriesBuildOrderOut.toList();
+    }
+
+    _entityRepositoriesBuildOrderIn = repositories.toList();
+
+    var sqls = generateEntityRepositoresCreateTableSQLs();
+
+    var ordered = sqls.entries.bestOrder().map((e) => e.key).toList();
+
+    repositories.sort((a, b) {
+      var i1 = ordered.indexOf(a);
+      var i2 = ordered.indexOf(b);
+      var cmp = i1.compareTo(i2);
+      return cmp;
+    });
+
+    _entityRepositoriesBuildOrderOut = repositories.toList();
+
+    return repositories;
+  }
+
   /// Generates the [CreateTableSQL] for each [EntityRepository].
   /// See [entityRepositories].
-  FutureOr<Map<EntityRepository, CreateTableSQL>>
+  Map<EntityRepository, CreateTableSQL>
       generateEntityRepositoresCreateTableSQLs(
               {bool ifNotExists = true, bool sortColumns = true}) =>
           entityRepositories
-              .map((r) => MapEntry<EntityRepository, FutureOr<CreateTableSQL>>(
+              .map((r) => MapEntry<EntityRepository, CreateTableSQL>(
                   r,
                   generateCreateTableSQL(
                       entityRepository: r,
                       ifNotExists: ifNotExists,
                       sortColumns: sortColumns)))
               .toMapFromEntries()
-              .resolveAllValues();
+              .bestOrder();
 
   /// Generate all the SQLs to create the tables.
   @override
-  FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
-          {bool ifNotExists = true, bool sortColumns = true}) =>
-      generateEntityRepositoresCreateTableSQLs(
-              ifNotExists: ifNotExists, sortColumns: sortColumns)
-          .resolveMapped((sqls) {
-        var allSQLs = sqls.values.expand((e) => e.allSQLBuilders).toList();
-        allSQLs.bestOrder();
-        return allSQLs;
-      });
+  List<SQLBuilder> generateCreateTableSQLs(
+      {bool ifNotExists = true, bool sortColumns = true}) {
+    var sqls = generateEntityRepositoresCreateTableSQLs(
+        ifNotExists: ifNotExists, sortColumns: sortColumns);
+
+    var allSQLs = sqls.values.expand((e) => e.allSQLBuilders).toList();
+    allSQLs.bestOrder();
+    return allSQLs;
+  }
 
   /// Converts [value] to an acceptable SQL value for the adapter.
   Object? valueToSQL(Object? value) {

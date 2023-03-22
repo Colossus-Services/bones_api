@@ -165,6 +165,70 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   }
 }
 
+class CreateIndexSQL extends SQLBuilder {
+  /// The table name.
+  final String table;
+
+  /// The column;
+  final String column;
+
+  /// The name of the index;
+  final String? indexName;
+
+  CreateIndexSQL(SQLDialect dialect, this.table, this.column, this.indexName,
+      {String q = '"'})
+      : super(dialect, q);
+
+  @override
+  String buildSQL({bool multiline = true, bool ifNotExists = true}) {
+    final sql = StringBuffer();
+
+    sql.write('CREATE INDEX ');
+
+    if (ifNotExists) {
+      sql.write('IF NOT EXISTS ');
+    }
+
+    sql.write('$q$indexName$q ON $q$table$q ($q$column$q)');
+
+    return sql.toString();
+  }
+
+  @override
+  int compareTo(SQLBuilder other) {
+    if (other is CreateIndexSQL) {
+      return 0;
+    }
+    if (other is CreateTableSQL) {
+      if (other.table == table) {
+        return 1;
+      }
+
+      var ref1 = referenceTablesLength;
+      var ref2 = other.referenceTablesLength + other.relationshipsTables.length;
+
+      var cmp = ref1.compareTo(ref2);
+      if (cmp != 0) return cmp;
+
+      return table.compareTo(other.table);
+    } else {
+      var referenceTables = other.referenceTables;
+      return referenceTables != null && referenceTables.contains(table)
+          ? -1
+          : 0;
+    }
+  }
+
+  @override
+  List<SQLBuilder>? get extraSQLBuilders => null;
+
+  @override
+  List<String> get referenceTables => <String>[table];
+
+  @override
+  String toString() => buildSQL(multiline: false, ifNotExists: false);
+}
+
 /// A base class for `CREATE` and `ALTER` table SQLs.
 abstract class TableSQL extends SQLBuilder {
   /// The table name.
@@ -186,6 +250,9 @@ abstract class TableSQL extends SQLBuilder {
 
 /// A `CREATE TABLE` SQL builder.
 class CreateTableSQL extends TableSQL {
+  /// The related `CREATE INDEX` SQLs.
+  List<CreateIndexSQL>? indexes;
+
   /// The related `ALTER TABLE` SQLs.
   List<AlterTableSQL>? alterTables;
 
@@ -197,6 +264,7 @@ class CreateTableSQL extends TableSQL {
 
   CreateTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
       {String q = '"',
+      this.indexes,
       this.alterTables,
       this.relationships,
       String? parentTable,
@@ -227,7 +295,7 @@ class CreateTableSQL extends TableSQL {
 
   @override
   List<SQLBuilder> get extraSQLBuilders =>
-      <SQLBuilder>[...?relationships, ...?alterTables];
+      <SQLBuilder>[...?indexes, ...?relationships, ...?alterTables];
 
   /// Returns the `CONSTRAINT` [entries].
   List<SQLEntry> get constraints =>
@@ -345,6 +413,9 @@ class CreateTableSQL extends TableSQL {
       return table.compareTo(other.table);
     } else if (other is AlterTableSQL) {
       return -1;
+    } else if (other is CreateIndexSQL) {
+      var cmp = other.compareTo(this);
+      return -cmp;
     } else {
       return 0;
     }
@@ -432,6 +503,9 @@ class AlterTableSQL extends TableSQL {
       return -other.compareTo(this);
     } else if (other is AlterTableSQL) {
       return table.compareTo(other.table);
+    } else if (other is CreateIndexSQL) {
+      var cmp = other.compareTo(this);
+      return -cmp;
     } else {
       return 0;
     }
@@ -448,6 +522,33 @@ class AlterTableSQL extends TableSQL {
       if (parentStr != null) parentStr,
       if (refsStr != null) refsStr,
     ].join(', ')}}';
+  }
+}
+
+extension SQLBuilderMapExtension<K> on Map<K, CreateTableSQL> {
+  Map<K, CreateTableSQL> bestOrder() {
+    var allSQLs = values.expand((e) => e.allSQLBuilders).toList();
+    allSQLs.bestOrder();
+
+    var ordered = entries.bestOrder().toMapFromEntries();
+    return ordered;
+  }
+}
+
+extension SQLBuilderIterableMapEntryExtension<K>
+    on Iterable<MapEntry<K, CreateTableSQL>> {
+  List<MapEntry<K, CreateTableSQL>> bestOrder() {
+    var allSQLs = expand((e) => e.value.allSQLBuilders).toList();
+    allSQLs.bestOrder();
+
+    var ordered = sorted((a, b) {
+      var i1 = allSQLs.indexOf(a.value);
+      var i2 = allSQLs.indexOf(b.value);
+      var cmp = i1.compareTo(i2);
+      return cmp;
+    }).toList();
+
+    return ordered;
   }
 }
 
@@ -555,9 +656,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         .toList();
     removeAll(withRelationship);
 
-    var withReference = whereType<TableSQL>()
-        .where((e) => e.referenceTables.isNotEmpty)
-        .toList();
+    var withReference = where((e) {
+      var referenceTables = e.referenceTables;
+      return referenceTables != null && referenceTables.isNotEmpty;
+    }).toList();
     removeAll(withReference);
 
     withParents._bestOrderLoop();
@@ -566,9 +668,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     _bestOrderLoop();
 
-    refsGetter(TableSQL e) => e is CreateTableSQL
+    refsGetter(SQLBuilder e) => e is CreateTableSQL
         ? e.referenceAndRelationshipTables
-        : e.referenceTables;
+        : e.referenceTables ?? [];
 
     _addByRefPos(withReference, addAtEnd: true);
     _addByRefPos(withRelationship, addAtEnd: true, refsGetter: refsGetter);
@@ -608,9 +710,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     _bestOrderLoop();
   }
 
-  int _addByRefPos(List<TableSQL> list,
-      {List<String> Function(TableSQL e)? refsGetter, bool addAtEnd = false}) {
-    refsGetter ??= (e) => e.referenceTables;
+  int _addByRefPos(List<SQLBuilder> list,
+      {List<String> Function(SQLBuilder e)? refsGetter,
+      bool addAtEnd = false}) {
+    refsGetter ??= (e) => e.referenceTables ?? [];
 
     var count = 0;
 
@@ -636,6 +739,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
         if (idx != null) {
           ++idx;
+          while (idx! < length && this[idx] is CreateIndexSQL) {
+            ++idx;
+          }
+
           insert(idx, e);
           list.removeAt(i);
           count++;
@@ -673,9 +780,15 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         var idx = _indexWithAllReferenceTables(refsInList, 0);
 
         if (idx != null && idx > i) {
-          moved = true;
-          insert(idx + 1, e);
+          ++idx;
+          while (idx! < length && this[idx] is CreateIndexSQL) {
+            ++idx;
+          }
+
+          insert(idx, e);
           var prev = removeAt(i);
+          moved = true;
+
           assert(identical(prev, e));
           continue;
         }
@@ -893,7 +1006,7 @@ abstract class SQLGenerator {
   }
 
   /// Returns info for the column: table -> idName: sqlType
-  FutureOr<MapEntry<String, MapEntry<String, String>>?> entityTypeToSQLType(
+  MapEntry<String, MapEntry<String, String>>? entityTypeToSQLType(
       TypeInfo type, String? column,
       {List<EntityField>? entityFieldAnnotations}) {
     var typeEntityRepository = getEntityRepositoryByTypeInfo(type);
@@ -911,14 +1024,11 @@ abstract class SQLGenerator {
     var sqlType = foreignKeyTypeToSQLType(TypeInfo.fromType(idType), idName,
         entityFieldAnnotations: idEntityAnnotations);
 
-    if (sqlType != null) {
-      return getTableForEntityRepository(typeEntityRepository)
-          .resolveMapped((table) {
-        return MapEntry(table, MapEntry(idName, sqlType));
-      });
-    }
+    if (sqlType == null) return null;
 
-    return null;
+    var table = getTableForEntityRepository(typeEntityRepository);
+
+    return MapEntry(table, MapEntry(idName, sqlType));
   }
 
   String? foreignKeyTypeToSQLType(TypeInfo idType, String idName,
@@ -933,8 +1043,7 @@ abstract class SQLGenerator {
   }
 
   /// Returns: ENUM: valuesNames
-  FutureOr<MapEntry<String, List<String>>?> enumTypeToSQLType(
-      Type type, String column,
+  MapEntry<String, List<String>>? enumTypeToSQLType(Type type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
     var reflectionFactory = ReflectionFactory();
     var enumReflection = reflectionFactory.getRegisterEnumReflection(type);
@@ -950,14 +1059,14 @@ abstract class SQLGenerator {
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
       {bool ifNotExists = true, bool sortColumns = true});
 
-  FutureOr<CreateTableSQL> generateCreateTableSQL(
+  CreateTableSQL generateCreateTableSQL(
       {EntityRepository? entityRepository,
       Object? obj,
       Type? type,
       String? name,
       String? tableName,
       bool ifNotExists = true,
-      bool sortColumns = true}) async {
+      bool sortColumns = true}) {
     entityRepository ??=
         getEntityRepository(type: type, obj: obj, name: name, tableName: name);
     if (entityRepository == null) {
@@ -989,6 +1098,8 @@ abstract class SQLGenerator {
           comment: '$idType $idFieldName',
           columns: [SQLColumn(table, idColumnName)]),
     ];
+
+    var indexSQLs = <CreateIndexSQL>[];
 
     var fieldsEntries = entityHandler
         .fieldsTypes()
@@ -1023,7 +1134,7 @@ abstract class SQLGenerator {
           entityFieldAnnotations: entityFieldAnnotations);
 
       if (fieldSQLType == null) {
-        var entityType = await entityTypeToSQLType(fieldType, columnName,
+        var entityType = entityTypeToSQLType(fieldType, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
         if (entityType != null) {
           if (isSiblingEntityType(entityRepository, fieldType.type)) {
@@ -1040,7 +1151,7 @@ abstract class SQLGenerator {
       }
 
       if (fieldSQLType == null) {
-        var enumType = await enumTypeToSQLType(fieldType.type, columnName,
+        var enumType = enumTypeToSQLType(fieldType.type, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
         if (enumType != null) {
           var type = enumType.key;
@@ -1070,15 +1181,20 @@ abstract class SQLGenerator {
                 referenceTable: refTable, referenceColumn: refColumn)
           ]));
 
-      if (entityFieldAnnotations != null && entityFieldAnnotations.hasUnique) {
-        var constrainUniqueName = '${table}__${columnName}__unique';
+      if (entityFieldAnnotations != null) {
+        if (entityFieldAnnotations.hasUnique) {
+          var constrainUniqueName = '${table}__${columnName}__unique';
 
-        sqlEntries.add(SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
-            columns: [
-              SQLColumn(table, columnName,
-                  referenceTable: refTable, referenceColumn: refColumn)
-            ]));
+          sqlEntries.add(SQLEntry('CONSTRAINT',
+              ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+              columns: [
+                SQLColumn(table, columnName,
+                    referenceTable: refTable, referenceColumn: refColumn)
+              ]));
+        } else if (entityFieldAnnotations.hasIndexed) {
+          var indexName = '${table}__${columnName}__idx';
+          indexSQLs.add(CreateIndexSQL(dialect, table, columnName, indexName));
+        }
       }
     }
 
@@ -1114,7 +1230,7 @@ abstract class SQLGenerator {
     });
 
     var createSQL = CreateTableSQL(dialect, table, sqlEntries,
-        q: q, entityRepository: entityRepository);
+        q: q, entityRepository: entityRepository, indexes: indexSQLs);
 
     var relationshipSQLs = <CreateTableSQL>[];
 
@@ -1140,7 +1256,7 @@ abstract class SQLGenerator {
           TypeInfo.fromType(idType), srcFieldName,
           entityFieldAnnotations: entityFieldAnnotations);
 
-      var relDstType = await entityTypeToSQLType(fieldType, null);
+      var relDstType = entityTypeToSQLType(fieldType, null);
       if (relDstType == null) continue;
 
       var relDstTable = relDstType.key;

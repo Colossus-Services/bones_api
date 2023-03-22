@@ -19,6 +19,7 @@ abstract class EntityAnnotation {
 class EntityField extends EntityAnnotation {
   final bool _hidden;
   final bool _unique;
+  final bool _indexed;
   final num? minimum;
   final num? maximum;
   final String? regexp;
@@ -27,18 +28,22 @@ class EntityField extends EntityAnnotation {
   const EntityField(
       {bool hidden = false,
       bool unique = false,
+      bool indexed = false,
       this.minimum,
       this.maximum,
       this.validator,
       this.regexp})
       : _hidden = hidden,
-        _unique = unique;
+        _unique = unique,
+        _indexed = indexed;
 
   const EntityField.visible() : this(hidden: false);
 
   const EntityField.hidden() : this(hidden: true);
 
   const EntityField.unique() : this(unique: true);
+
+  const EntityField.indexed() : this(indexed: true);
 
   const EntityField.minimum(int minimum) : this(minimum: minimum);
 
@@ -60,6 +65,9 @@ class EntityField extends EntityAnnotation {
 
   /// Returns `true` if the annotated field should be unique.
   bool get isUnique => _unique;
+
+  /// Returns `true` if the annotated field should be indexed.
+  bool get isIndexed => _indexed;
 
   /// Returns `true` if [value] is valid for this [EntityField] configuration.
   bool isValidValue(Object? value, {String? fieldName}) =>
@@ -188,6 +196,8 @@ extension IterableEntityFieldExtension on Iterable<EntityField> {
   List<EntityField> get visible => where((e) => e.isVisible).toList();
 
   bool get hasUnique => any((e) => e.isUnique);
+
+  bool get hasIndexed => any((e) => e.isIndexed);
 
   bool get hasHidden => any((e) => e.isHidden);
 

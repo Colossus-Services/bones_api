@@ -655,9 +655,17 @@ class Address$reflection extends ClassReflection<Address>
             Address,
             '',
             () => (String state, String city, String street, int number,
-                    {int? id, List<Store>? stores, Object? closedStores}) =>
+                    {int? id,
+                    List<Store>? stores,
+                    Object? closedStores,
+                    Object? latitude,
+                    Object? longitude}) =>
                 Address(state, city, street, number,
-                    id: id, stores: stores, closedStores: closedStores),
+                    id: id,
+                    stores: stores,
+                    closedStores: closedStores,
+                    latitude: latitude,
+                    longitude: longitude),
             const <__PR>[
               __PR(__TR.tString, 'state', false, true),
               __PR(__TR.tString, 'city', false, true),
@@ -668,6 +676,8 @@ class Address$reflection extends ClassReflection<Address>
             const <String, __PR>{
               'closedStores': __PR(__TR.tObject, 'closedStores', true, false),
               'id': __PR(__TR.tInt, 'id', true, false),
+              'latitude': __PR(__TR.tObject, 'latitude', true, false),
+              'longitude': __PR(__TR.tObject, 'longitude', true, false),
               'stores': __PR(
                   __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
                   'stores',
@@ -719,6 +729,8 @@ class Address$reflection extends ClassReflection<Address>
     'hashCode',
     'id',
     'idFieldName',
+    'latitude',
+    'longitude',
     'number',
     'state',
     'stores',
@@ -803,7 +815,7 @@ class Address$reflection extends ClassReflection<Address>
           obj,
           false,
           false,
-          const [EntityField.maximum(3)],
+          const [EntityField.indexed(), EntityField.maximum(3)],
         );
       case 'city':
         return FieldReflection<Address, String>(
@@ -842,6 +854,32 @@ class Address$reflection extends ClassReflection<Address>
           false,
           (o) => () => o!.number,
           (o) => (v) => o!.number = v,
+          obj,
+          false,
+          false,
+        );
+      case 'latitude':
+        return FieldReflection<Address, Decimal>(
+          this,
+          Address,
+          __TR<Decimal>(Decimal),
+          'latitude',
+          false,
+          (o) => () => o!.latitude,
+          (o) => (v) => o!.latitude = v,
+          obj,
+          false,
+          false,
+        );
+      case 'longitude':
+        return FieldReflection<Address, Decimal>(
+          this,
+          Address,
+          __TR<Decimal>(Decimal),
+          'longitude',
+          false,
+          (o) => () => o!.longitude,
+          (o) => (v) => o!.longitude = v,
           obj,
           false,
           false,
