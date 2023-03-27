@@ -1144,7 +1144,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       : this._(
             type,
             typeName,
-            ids,
+            ids?.toList(),
             null,
             null,
             entityHandler,
@@ -1157,7 +1157,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReferenceList] with the [entities] instances list.
   /// The [ids] is resolved through the [entities] instance list.
   /// See [entities] and [isEntitiesSet].
-  EntityReferenceList.fromEntities(List<T?>? entities,
+  EntityReferenceList.fromEntities(Iterable<T?>? entities,
       {Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,
@@ -1170,7 +1170,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             type,
             typeName,
             null,
-            entities,
+            entities?.toList(),
             null,
             entityHandler,
             entityProvider,
@@ -1180,7 +1180,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             checkGenericType);
 
   /// Creates an [EntityReferenceList] with an [entities] instance list from [entitiesMaps].
-  EntityReferenceList.fromEntitiesMaps(List<Map<String, dynamic>?> entitiesMaps,
+  EntityReferenceList.fromEntitiesMaps(
+      Iterable<Map<String, dynamic>?> entitiesMaps,
       {Type? type,
       String? typeName,
       EntityHandler<T>? entityHandler,
@@ -1194,7 +1195,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             typeName,
             null,
             null,
-            entitiesMaps,
+            entitiesMaps.asList,
             entityHandler,
             entityProvider,
             entityHandlerProvider,
@@ -1491,8 +1492,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     var cp = EntityReferenceList<T>._(
         _type,
         _typeName,
-        _ids,
-        withEntity ? _entities : null,
+        _ids?.toList(),
+        withEntity ? _entities?.toList() : null,
         null,
         _entityHandler,
         _entityProvider,
@@ -1803,7 +1804,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     } else {
       var ids = _getEntitiesIDs(os);
       _ids = ids;
-      _entities = os;
+      _entities = os.toList();
       _entitiesTime = DateTime.now();
     }
 
@@ -1985,22 +1986,33 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   void add(T o) {
     if (isNull) {
       set([o]);
+      return;
     }
 
     var ids = _ids;
 
     if (isEntitiesSet) {
-      _entities!.add(o);
+      var entities = _entities!;
+      entities.add(o);
       if (ids != null) {
         var id = _getEntityID(o);
         ids.add(id);
+        assert(entities.length == ids.length);
       }
     } else if (isIDsSet) {
       var id = _getEntityID(o);
       ids!.add(id);
 
-      var entities = _entities = List<T?>.filled(ids.length, null);
-      entities[ids.lastIndex] = o;
+      if (ids.length == 1) {
+        _entities = <T?>[o];
+      } else {
+        var entities =
+            _entities = List<T?>.filled(ids.length, null, growable: true);
+
+        entities[ids.lastIndex] = o;
+      }
+
+      assert(ids.length == _entities!.length);
     }
   }
 

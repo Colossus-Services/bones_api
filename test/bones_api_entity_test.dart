@@ -885,6 +885,40 @@ void main() {
       expect(() => EntityReferenceList<Set>.asNull(), throwsStateError);
       expect(() => EntityReferenceList<Iterable>.asNull(), throwsStateError);
     });
+
+    test('add', () {
+      {
+        var refList = EntityReferenceList<UserInfo>.from([]);
+
+        expect(refList.length, equals(0));
+        expect(refList.isEmpty, isTrue);
+        expect(refList.isEmptyOrNull, isTrue);
+        expect(refList.isNull, isFalse);
+
+        refList.add(UserInfo('a', id: 101));
+
+        expect(refList.length, equals(1));
+        expect(refList.isEmpty, isFalse);
+        expect(refList.isEmptyOrNull, isFalse);
+        expect(refList.isNull, isFalse);
+      }
+
+      {
+        var refList = EntityReferenceList<UserInfo>.from(null);
+
+        expect(refList.length, equals(null));
+        expect(refList.isEmpty, isFalse);
+        expect(refList.isEmptyOrNull, isTrue);
+        expect(refList.isNull, isTrue);
+
+        refList.add(UserInfo('a', id: 102));
+
+        expect(refList.length, equals(1));
+        expect(refList.isEmpty, isFalse);
+        expect(refList.isEmptyOrNull, isFalse);
+        expect(refList.isNull, isFalse);
+      }
+    });
   });
 
   group('Entity', () {
