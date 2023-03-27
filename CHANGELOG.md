@@ -1,3 +1,8 @@
+## 1.3.62
+
+- `EntityReferenceList`:
+  - Fix `add`.
+
 ## 1.3.61
 
 - Added `CreateIndexSQL`.
