@@ -329,6 +329,20 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return getID(value as O);
     } else if (value is Map) {
       return resolveIDFromMap(value);
+    } else if (value is EntityReference) {
+      var id = value.id;
+      return id as V?;
+    } else if (value is EntityReferenceList) {
+      var ids = value.idsNotNull;
+      var idsLng = ids.length;
+      if (idsLng == 0) {
+        return null;
+      } else if (idsLng == 1) {
+        var id = ids.first;
+        return id as V?;
+      } else {
+        return null;
+      }
     } else {
       var idType = this.idType();
 
@@ -339,6 +353,63 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       var idTypeInfo = TypeInfo.fromType(idType);
       return idTypeInfo.parse(value) as V?;
     }
+  }
+
+  List<V> resolveIDs<V>(Object? value) {
+    if (value == null) return <V>[];
+
+    if (value is O) {
+      var id = getID(value as O);
+      return id != null ? <V>[id] : [];
+    } else if (value is Map) {
+      var id = resolveIDFromMap(value);
+      return id != null ? <V>[id] : [];
+    } else if (value is Iterable) {
+      var ids =
+          value.map((e) => resolveID<V>(e)).whereNotNullResolved().toList();
+      return ids;
+    } else if (value is EntityReference) {
+      var id = value.id;
+      var ids = id != null ? <V>[id as V] : <V>[];
+      return ids;
+    } else if (value is EntityReferenceList) {
+      var ids = value.idsNotNull.cast<V>().toList();
+      return ids;
+    }
+
+    var idType = TypeInfo.fromType(this.idType());
+
+    if (idType.isInt) {
+      var ids = TypeParser.parseList<int>(value,
+              elementParser: TypeParser.parseInt) ??
+          <int>[];
+      return ids as List<V>;
+    } else if (idType.isBigInt) {
+      var ids = TypeParser.parseList<BigInt>(value,
+              elementParser: TypeParser.parseBigInt) ??
+          <BigInt>[];
+      return ids as List<V>;
+    } else if (idType.isDouble) {
+      var ids = TypeParser.parseList<double>(value,
+              elementParser: TypeParser.parseDouble) ??
+          <double>[];
+      return ids as List<V>;
+    } else if (idType.isString) {
+      var ids = value
+          .toString()
+          .trim()
+          .split(RegExp(r'\s+'))
+          .map((s) => s.trim())
+          .map((s) => (s.startsWith('"') && s.endsWith('"')) ||
+                  (s.startsWith("'") && s.endsWith("'"))
+              ? s.substring(1, s.length - 1)
+              : s)
+          .where((s) => s.isNotEmpty)
+          .toList();
+      return ids as List<V>;
+    }
+
+    return <V>[value as V];
   }
 
   V? resolveIDFromMap<V>(Map map) {
@@ -533,9 +604,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   }
 
   static final TypeInfo _typeInfoTime = TypeInfo(Time);
+  static final TypeInfo _typeInfoDateTime = TypeInfo(DateTime);
   static final TypeInfo _typeInfoDecimal = TypeInfo(Decimal);
   static final TypeInfo _typeInfoDynamicInt = TypeInfo(DynamicInt);
   static final TypeInfo _typeInfoUint8List = TypeInfo(Uint8List);
+
+  static final RegExp _regExpStringList = RegExp(
+      r'^\s*(?:\d+|[^\s,;]+)(?:\s*[,;]\s*(?:\d+|[^\s,;]+))*\s*(?:[,;]\s*)?$');
 
   FutureOr<T?> resolveValueByType<T>(TypeInfo? type, Object? value,
       {EntityProvider? entityProvider,
@@ -547,8 +622,17 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return value as T?;
     }
 
-    final resolutionRulesResolved =
-        resolveEntityResolutionRules(resolutionRules);
+    if (type.isPrimitiveType) {
+      return type.parse(value) as T?;
+    } else if (type.equalsType(_typeInfoTime)) {
+      return Time.from(value) as T?;
+    } else if (type.equalsType(_typeInfoDateTime)) {
+      return TypeParser.parseDateTime(value) as T?;
+    } else if (type.equalsType(_typeInfoDecimal)) {
+      return Decimal.from(value) as T?;
+    } else if (type.equalsType(_typeInfoDynamicInt)) {
+      return DynamicInt.from(value) as T?;
+    }
 
     var tType = TypeInfo.from(T);
     var valueType = value != null ? TypeInfo.from(value) : null;
@@ -559,113 +643,147 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return value;
     }
 
-    if (type.equalsType(_typeInfoTime)) {
-      return Time.from(value) as T?;
-    } else if (type.equalsType(_typeInfoDecimal)) {
-      return Decimal.from(value) as T?;
-    } else if (type.equalsType(_typeInfoDynamicInt)) {
-      return DynamicInt.from(value) as T?;
-    } else if (type.equalsType(_typeInfoUint8List)) {
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
+    if (type.equalsType(_typeInfoUint8List)) {
       return _resolveValueAsUInt8List(value, resolutionRulesResolved) as T?;
     }
 
     entityCache ??= JsonEntityCacheSimple();
 
-    if (value is Map<String, Object?>) {
-      if (type.isMap) {
-        return type.parse<T>(value);
-      } else {
-        var valEntityHandler = _resolveEntityHandler(
-            type, entityHandlerProvider, entityRepositoryProvider);
-
-        Object? resolved;
-
-        if (type.isEntityReferenceType) {
-          resolved = type.arguments0!.toEntityReference(value,
-              entityHandler: valEntityHandler,
-              entityHandlerProvider: entityHandlerProvider,
-              entityCache: entityCache);
-        } else if (type.isEntityReferenceListType) {
-          resolved = type.arguments0!.toEntityReferenceList(value,
-              entityHandler: valEntityHandler,
-              entityHandlerProvider: entityHandlerProvider,
-              entityCache: entityCache);
-        } else {
-          resolved = valEntityHandler != null
-              ? valEntityHandler.createFromMap(value,
-                  entityProvider: entityProvider,
-                  entityCache: entityCache,
-                  resolutionRules: resolutionRulesResolved)
-              : value;
-        }
-
-        return resolved as T?;
+    if (value is String &&
+        (type.isListEntity || type.isEntityReferenceListType) &&
+        _regExpStringList.hasMatch(value)) {
+      var list = TypeParser.parseList(value);
+      if (list != null) {
+        value = list;
       }
-    } else if (value is List<Object?>) {
-      if (type.isList && type.hasArguments) {
-        var elementType = type.arguments.first;
-        var valEntityHandler = _resolveEntityHandler(
-            elementType, entityHandlerProvider, entityRepositoryProvider);
+    }
 
-        return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRulesResolved);
+    if (value is List<Object?>) {
+      return _resolveListByType<T>(
+          type,
+          value,
+          entityProvider,
+          entityHandlerProvider,
+          entityRepositoryProvider,
+          entityCache,
+          resolutionRulesResolved);
+    } else if (value is Map<String, Object?>) {
+      return _resolveMapByType<T>(
+          type,
+          value,
+          entityProvider,
+          entityHandlerProvider,
+          entityRepositoryProvider,
+          entityCache,
+          resolutionRulesResolved);
+    } else {
+      return _resolveEntityByType<T>(
+          type,
+          value,
+          entityProvider,
+          entityHandlerProvider,
+          entityRepositoryProvider,
+          entityCache,
+          resolutionRulesResolved);
+    }
+  }
+
+  FutureOr<T?> _resolveListByType<T>(
+      TypeInfo type,
+      List<Object?> value,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      JsonEntityCache entityCache,
+      EntityResolutionRulesResolved resolutionRulesResolved) {
+    if (type.isList && type.hasArguments) {
+      var elementType = type.arguments.first;
+      var valEntityHandler = _resolveEntityHandler(elementType, entityProvider,
+          entityHandlerProvider, entityRepositoryProvider);
+
+      return _resolveListValueByType<T>(valEntityHandler, value, elementType,
+          entityProvider, entityCache, resolutionRulesResolved);
+    } else if (type.isEntityReferenceListType) {
+      var elementType = type.arguments.first;
+
+      var valEntityHandler = _resolveEntityHandler(elementType, entityProvider,
+          entityHandlerProvider, entityRepositoryProvider);
+
+      var eagerEntityType =
+          resolutionRulesResolved.isEagerEntityType(elementType.type);
+      if (!eagerEntityType) {
+        return elementType.toEntityReferenceList(value,
+            entityProvider: entityProvider,
+            entityHandler: valEntityHandler,
+            entityCache: entityCache) as T;
+      }
+
+      return _resolveListValueByType<T>(valEntityHandler, value, elementType,
+          entityProvider, entityCache, resolutionRulesResolved);
+    } else {
+      return type.parseEntity<T>(value);
+    }
+  }
+
+  FutureOr<T?> _resolveMapByType<T>(
+      TypeInfo type,
+      Map<String, Object?> value,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      JsonEntityCache entityCache,
+      EntityResolutionRulesResolved resolutionRulesResolved) {
+    if (type.isMap) {
+      return type.parse<T>(value);
+    } else {
+      var valEntityHandler = _resolveEntityHandler(type, entityProvider,
+          entityHandlerProvider, entityRepositoryProvider);
+
+      Object? resolved;
+
+      if (type.isEntityReferenceType) {
+        resolved = type.arguments0!.toEntityReference(value,
+            entityHandler: valEntityHandler,
+            entityHandlerProvider: entityHandlerProvider,
+            entityCache: entityCache);
       } else if (type.isEntityReferenceListType) {
-        var elementType = type.arguments.first;
-
-        var valEntityHandler = _resolveEntityHandler(
-            elementType, entityHandlerProvider, entityRepositoryProvider);
-
-        var eagerEntityType =
-            resolutionRulesResolved.isEagerEntityType(elementType.type);
-        if (!eagerEntityType) {
-          return elementType.toEntityReferenceList(value,
-              entityProvider: entityProvider,
-              entityHandler: valEntityHandler,
-              entityCache: entityCache) as T;
-        }
-
-        return _resolveListValueByType<T>(valEntityHandler, value, elementType,
-            entityProvider, entityCache, resolutionRulesResolved);
+        resolved = type.arguments0!.toEntityReferenceList(value,
+            entityHandler: valEntityHandler,
+            entityHandlerProvider: entityHandlerProvider,
+            entityCache: entityCache);
       } else {
-        return type.parseEntity<T>(value);
-      }
-    } else if (value != null && !type.isBasicType) {
-      var entityType = type.entityType;
-
-      if (entityType != null && value.isEntityIDType) {
-        var entity = entityCache.getCachedEntityByID(value, type: entityType);
-        if (entity != null) return entity as T;
+        resolved = valEntityHandler != null
+            ? valEntityHandler.createFromMap(value,
+                entityProvider: entityProvider,
+                entityCache: entityCache,
+                resolutionRules: resolutionRulesResolved)
+            : value;
       }
 
+      return resolved as FutureOr<T?>;
+    }
+  }
+
+  FutureOr<T?> _resolveEntityByType<T>(
+      TypeInfo type,
+      Object? value,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      JsonEntityCache entityCache,
+      EntityResolutionRulesResolved resolutionRulesResolved) {
+    if (value == null || type.isBasicType) {
+      return type.parseEntity<T>(value);
+    }
+
+    var entityType = type.entityType;
+
+    if (entityType == null) {
       var parsed = type.parseEntity<T>(value);
       if (parsed != null) return parsed;
-
-      if (entityProvider != null && entityType != null) {
-        var eagerEntityType =
-            resolutionRulesResolved.isEagerEntityType(entityType);
-
-        if (eagerEntityType) {
-          var entityAsync = entityProvider.getEntityByID(value,
-              type: entityType, resolutionRules: resolutionRulesResolved);
-
-          if (entityAsync != null) {
-            return entityAsync.resolveMapped<T?>((entity) {
-              if (entity != null) {
-                entityCache!.cacheEntity(entity);
-                return entity as T?;
-              }
-              return _resolveValueByEntityHandler<T>(
-                  value,
-                  type,
-                  entityProvider,
-                  entityCache!,
-                  entityHandlerProvider,
-                  entityRepositoryProvider,
-                  resolutionRulesResolved);
-            });
-          }
-        }
-      }
 
       return _resolveValueByEntityHandler<T>(
           value,
@@ -675,9 +793,56 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityHandlerProvider,
           entityRepositoryProvider,
           resolutionRulesResolved);
-    } else {
-      return type.parseEntity<T>(value);
     }
+
+    var valEntityHandler = _resolveEntityHandler(
+        type, entityProvider, entityHandlerProvider, entityRepositoryProvider);
+
+    Object id = valEntityHandler?.resolveID(value) ?? value;
+
+    if (id.isEntityIDType) {
+      var entity = entityCache.getCachedEntityByID(id, type: entityType);
+      if (entity != null) return entity as T;
+    }
+
+    var parsed = type.parseEntity<T>(value);
+    if (parsed != null) return parsed;
+
+    var eagerEntityType = entityProvider != null &&
+        resolutionRulesResolved.isEagerEntityType(entityType);
+
+    if (eagerEntityType) {
+      var entityAsync = entityProvider.getEntityByID(id,
+          type: entityType, resolutionRules: resolutionRulesResolved);
+
+      if (entityAsync != null) {
+        return entityAsync.resolveMapped<T?>((entity) {
+          if (entity != null) {
+            entityCache.cacheEntity(entity);
+            return entity as T?;
+          }
+          return _resolveValueByEntityHandler<T>(
+              value,
+              type,
+              entityProvider,
+              entityCache,
+              entityHandlerProvider,
+              entityRepositoryProvider,
+              resolutionRulesResolved,
+              valEntityHandler);
+        });
+      }
+    }
+
+    return _resolveValueByEntityHandler<T>(
+        value,
+        type,
+        entityProvider,
+        entityCache,
+        entityHandlerProvider,
+        entityRepositoryProvider,
+        resolutionRulesResolved,
+        valEntityHandler);
   }
 
   FutureOr<T?> _resolveListValueByType<T>(
@@ -694,8 +859,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       value = value.map((e) {
         if (e.isEntityIDType) {
           totalEntitiesToResolve++;
+
+          var id = valEntityHandler?.resolveID(e) ?? e;
+
           var entity =
-              entityCache.getCachedEntityByID(e, type: elementType.type);
+              entityCache.getCachedEntityByID(id, type: elementType.type);
 
           if (entity != null) {
             totalResolvedEntities++;
@@ -802,17 +970,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityCache entityCache,
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider,
-      EntityResolutionRulesResolved resolutionRulesResolved) {
-    if (entityRepositoryProvider == null) {
-      if (this is EntityRepositoryProvider) {
-        entityRepositoryProvider = this as EntityRepositoryProvider;
-      } else if (entityProvider is EntityRepositoryProvider) {
-        entityRepositoryProvider = entityProvider;
-      }
-    }
-
-    var valEntityHandler = _resolveEntityHandler(
-        type, entityHandlerProvider, entityRepositoryProvider);
+      EntityResolutionRulesResolved resolutionRulesResolved,
+      [EntityHandler? valEntityHandler]) {
+    valEntityHandler ??= _resolveEntityHandler(
+        type, entityProvider, entityHandlerProvider, entityRepositoryProvider);
 
     var allowEntityFetch = resolutionRulesResolved.allowEntityFetch ||
         entityCache.allowEntityFetch;
@@ -831,8 +992,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityHandlerProvider: entityHandlerProvider ?? provider);
 
       if (entityRepository != null) {
+        var id = valEntityHandler?.resolveID(value) ?? value;
         var transaction = entityProvider is Transaction ? entityProvider : null;
-        var retEntity = entityRepository.selectByID(value,
+        var retEntity = entityRepository.selectByID(id,
             transaction: transaction, resolutionRules: resolutionRulesResolved);
         return retEntity.resolveMapped((val) {
           return val as T?;
@@ -957,10 +1119,19 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   EntityHandler? _resolveEntityHandler(
       TypeInfo fieldType,
+      EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
       EntityRepositoryProvider? entityRepositoryProvider) {
     var entityType = fieldType.entityType;
     if (entityType == null) return null;
+
+    if (entityRepositoryProvider == null) {
+      if (this is EntityRepositoryProvider) {
+        entityRepositoryProvider = this as EntityRepositoryProvider;
+      } else if (entityProvider is EntityRepositoryProvider) {
+        entityRepositoryProvider = entityProvider;
+      }
+    }
 
     EntityHandler? valEntityHandler = type == entityType ? this : null;
     if (valEntityHandler != null) return valEntityHandler;
@@ -1016,7 +1187,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   TypeInfo? getFieldType(O? o, String key);
 
-  Map<String, TypeInfo> getFieldsTypes(O o) {
+  Map<String, TypeInfo> getFieldsTypes([O? o]) {
     return Map<String, TypeInfo>.fromEntries(fieldsNames(o)
         .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
   }

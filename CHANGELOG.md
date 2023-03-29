@@ -1,3 +1,15 @@
+## 1.3.63
+
+- New `HTMLDocument`.
+- `APIDBModule`:
+  - Added insert & update support.
+  - Added delete operation.
+  - Added UI (HTML).
+- `EntityHandler`:
+  - Added `resolveIDs`.
+  - Improve `resolveValueByType`.
+- reflection_factory: ^2.0.6
+
 ## 1.3.62
 
 - `EntityReferenceList`:
