@@ -327,6 +327,7 @@ export 'src/bones_api_entity_rules.dart';
 export 'src/bones_api_entity_sql.dart';
 export 'src/bones_api_error_zone.dart';
 export 'src/bones_api_extension.dart';
+export 'src/bones_api_html_document.dart';
 export 'src/bones_api_initializable.dart';
 export 'src/bones_api_module.dart';
 export 'src/bones_api_platform.dart';

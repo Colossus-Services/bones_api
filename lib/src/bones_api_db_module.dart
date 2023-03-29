@@ -2,10 +2,19 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:async_extension/async_extension.dart';
-import 'package:bones_api/bones_api.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
+
+import 'bones_api_base.dart';
+import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
+import 'bones_api_entity_rules.dart';
+import 'bones_api_extension.dart';
+import 'bones_api_html_document.dart';
+import 'bones_api_module.dart';
+import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIDBModule');
 
@@ -21,21 +30,24 @@ class APIDBModule extends APIModule {
   @override
   String? get defaultRouteName => 'tables';
 
+  String get basePath => '/$name/';
+
   @override
   void configure() {
     if (onlyOnDevelopment && !development) return;
 
-    routes.add(null, 'tables', (request) async => tables());
+    routes.add(null, 'tables', (request) async {
+      var pathParams = _parsePath(request, 'tables');
+
+      var json = _containsKey(pathParams ?? [], 'json');
+      return tables(json: json);
+    });
 
     routes.add(null, 'select', (request) async {
-      var pathParts = request.pathParts;
-
-      var idx = pathParts.indexOf('select');
-      if (idx < 0 || idx == pathParts.length - 1) {
+      var pathParams = _parsePath(request, 'select');
+      if (pathParams == null) {
         return APIResponse.notFound();
       }
-
-      var pathParams = pathParts.sublist(idx + 1);
 
       var table = pathParams.removeAt(0);
 
@@ -43,18 +55,38 @@ class APIDBModule extends APIModule {
           ? true
           : null;
 
-      return select(table, request, eager: eager);
+      var json = _containsKey(pathParams, 'json');
+      return select(table, request, eager: eager, json: json);
     });
 
-    routes.add(null, 'dump', (request) async {
-      var pathParts = request.pathParts;
-
-      var idx = pathParts.indexOf('dump');
-      if (idx < 0) {
+    routes.add(null, 'insert', (request) async {
+      var pathParams = _parsePath(request, 'insert');
+      if (pathParams == null) {
         return APIResponse.notFound();
       }
 
-      var pathParams = pathParts.sublist(idx + 1);
+      var table = pathParams.removeAt(0);
+
+      return insert(table, request);
+    });
+
+    routes.add(null, 'update', (request) async {
+      var pathParams = _parsePath(request, 'update');
+      if (pathParams == null) {
+        return APIResponse.notFound();
+      }
+
+      var table = pathParams.removeAt(0);
+      var id = pathParams.isNotEmpty ? pathParams.removeAt(0) : null;
+
+      return insert(table, request, id: id);
+    });
+
+    routes.add(null, 'dump', (request) async {
+      var pathParams = _parsePath(request, 'dump');
+      if (pathParams == null) {
+        return APIResponse.notFound();
+      }
 
       var zip = pathParams.any((p) => equalsIgnoreAsciiCase(p, 'zip'));
 
@@ -62,13 +94,30 @@ class APIDBModule extends APIModule {
     });
   }
 
+  List<String>? _parsePath(APIRequest request, String route) {
+    var pathParts = request.pathParts;
+
+    var idx = pathParts.indexOf(route);
+    if (idx < 0) {
+      return null;
+    } else if (idx == pathParts.length - 1) {
+      return [];
+    }
+
+    var pathParams = pathParts.sublist(idx + 1);
+    return pathParams;
+  }
+
+  bool _containsKey(List<String> pathParams, String key) =>
+      pathParams.any((p) => equalsIgnoreAsciiCase(p, key));
+
   List<EntityRepositoryProvider>? _entityRepositoryProviders;
 
   Future<List<EntityRepositoryProvider>> get entityRepositoryProviders async =>
       _entityRepositoryProviders ??=
           await apiRoot.loadEntityRepositoryProviders();
 
-  Future<APIResponse<Map<String, String>>> tables() async {
+  Future<APIResponse<dynamic>> tables({bool json = false}) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
@@ -77,28 +126,64 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var map = allRepositories.entries
-        .map((e) {
-          var type = e.key;
-          var repo = e.value;
-          return MapEntry('$type', repo.name);
-        })
-        .sorted((a, b) => a.key.compareTo(b.key))
-        .toMapFromEntries();
+    if (json) {
+      var map = allRepositories.entries
+          .map((e) {
+            var type = e.key;
+            var repo = e.value;
+            return MapEntry('$type', repo.name);
+          })
+          .sorted((a, b) => a.key.compareTo(b.key))
+          .toMapFromEntries();
 
-    return APIResponse.ok(map, mimeType: 'json');
+      return APIResponse.ok(map, mimeType: 'json');
+    }
+
+    var htmlDoc = HTMLDocument.darkTheme(
+      title: 'DB - Tables',
+      top:
+          _buildTop(apiRootName: apiRoot.name, apiRootVersion: apiRoot.version),
+      footer: _buildFooter(),
+    );
+
+    var content = [];
+
+    content.add('<br><table class="center">');
+    content.add(
+        '<thead><tr><td style="text-align: right">Type: &nbsp;</td><td style="text-align: center">Table:</td><td style="text-align: center">Operations:</td></tr></thead>');
+
+    for (var e in allRepositories.entries) {
+      var type = e.key;
+      var repo = e.value;
+      var repoName = repo.name;
+      content.add(
+          '<tr><td style="text-align: right"><b>$type:</b> &nbsp;</td><td style="text-align: center">$repoName</td><td> &nbsp; [ <a href="${basePath}select/$repoName">select</a> &nbsp;|&nbsp; <a href="${basePath}insert/$repoName">insert</a> ] &nbsp;</td></tr>');
+    }
+
+    content.add('</table>');
+
+    content.add(
+        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}tables/json">JSON</a></i></div>');
+
+    htmlDoc.content = content;
+
+    var html = htmlDoc.build();
+
+    return APIResponse.ok(html, mimeType: 'html');
   }
 
-  Future<APIResponse<List>> select(String selectTable, APIRequest apiRequest,
-      {bool? eager}) async {
+  Future<APIResponse<dynamic>> select(String selectTable, APIRequest apiRequest,
+      {bool? eager, bool json = false}) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 
     var requestedUri = apiRequest.requestedUri;
 
-    var entityRepository = (await entityRepositoryProviders)
-        .getEntityRepository(name: selectTable);
+    final entityRepositoryProviders = await this.entityRepositoryProviders;
+
+    var entityRepository =
+        entityRepositoryProviders.getEntityRepository(name: selectTable);
 
     if (entityRepository == null) {
       return APIResponse.error(error: "Can't find table: $selectTable");
@@ -135,8 +220,277 @@ class APIDBModule extends APIModule {
       list = selectByQuery.toList();
     }
 
-    var entitiesJson = _entitiesToJsonMap(list);
-    return APIResponse.ok(entitiesJson, mimeType: 'json');
+    if (json) {
+      var entitiesJson = _entitiesToJsonMap(list);
+      return APIResponse.ok(entitiesJson, mimeType: 'json');
+    }
+
+    var htmlDoc = HTMLDocument.darkTheme(
+      title: 'DB - Tables',
+      top: _buildTop(
+          apiRootName: apiRoot.name,
+          apiRootVersion: apiRoot.version,
+          table: selectTable,
+          entityType: entityRepository.type),
+      footer: _buildFooter(),
+    );
+
+    var content = [];
+
+    var entityHandler = entityRepository.entityHandler;
+    var entityType = entityRepository.type;
+
+    var repoName = entityRepository.name;
+
+    var fieldsEntries = _fieldsOrdered(entityHandler);
+
+    content.add('<br><h2>$entityType</h2>');
+
+    content.add('<table class="center">');
+
+    content.add('<thead><tr>');
+    for (var e in fieldsEntries) {
+      content.add('<td style="text-align: center">${e.key}</td>');
+    }
+    content.add(
+        '<td style="text-align: center; min-width: 100px;">[operations]</td>');
+    content.add('</tr></thead>');
+
+    for (var o in list) {
+      content.add('<tr>');
+
+      for (var e in fieldsEntries) {
+        var fieldName = e.key;
+        var fieldType = e.value;
+
+        var v = entityHandler.getField(o, fieldName);
+        var v2 = _resolveValue(v, fieldType);
+
+        var entityType = fieldType.entityType ?? fieldType.listEntityType?.type;
+        var fieldEntityRepository = entityType != null
+            ? entityRepositoryProviders.getEntityRepositoryByType(entityType)
+            : null;
+
+        if (fieldEntityRepository != null) {
+          var repoName = fieldEntityRepository.name;
+
+          content.add('<td style="text-align: center">');
+
+          if (v2 is List) {
+            var ids = v2
+                .map((e) => '<a href="${basePath}update/$repoName/$e">$e</a>')
+                .join(' , ');
+            content.add(ids);
+          } else {
+            content.add('<a href="${basePath}update/$repoName/$v2">$v2</a>');
+          }
+
+          content.add('</td>');
+        } else {
+          content.add('<td style="text-align: center">$v2</td>');
+        }
+      }
+
+      var id = entityHandler.getID(o);
+
+      if (id != null) {
+        content.add('<td style="text-align: center"> &nbsp; [ ');
+
+        content.add('<a href="../update/$repoName/$id">edit</a>');
+
+        content.add(' &nbsp;|&nbsp; <a href="../delete/$repoName/$id">del</a>');
+
+        content.add(' ] &nbsp;</td>');
+      }
+
+      content.add('</tr>');
+    }
+
+    content.add(
+        '<tr><td colspan="${fieldsEntries.length + 1}" style="text-align: right"><a href="${basePath}insert/$repoName">&nbsp;+&nbsp;</a></td></tr>');
+
+    content.add('</table>');
+
+    content.add(
+        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json">JSON</a></i></div>');
+
+    htmlDoc.content = content;
+
+    var html = htmlDoc.build();
+
+    return APIResponse.ok(html, mimeType: 'html');
+  }
+
+  static const _fieldsNamesOrder = [
+    'id',
+    'active',
+    'enabled',
+    'disabled',
+    'allowed',
+    'name',
+    'email',
+    'username',
+    'password',
+    'passwordHash',
+    'title',
+    'description',
+    'text',
+  ];
+
+  static const _fieldsTypesOrder = [
+    int,
+    double,
+    num,
+    bool,
+    String,
+    Enum,
+    DateTime,
+    EntityReference,
+    EntityReferenceList
+  ];
+
+  Future<APIResponse<String>> insert(String insertTable, APIRequest apiRequest,
+      {Object? id}) async {
+    if (onlyOnDevelopment && !development) {
+      return APIResponse.error(error: "Unsupported request!");
+    }
+
+    var entityRepository = (await entityRepositoryProviders)
+        .getEntityRepository(name: insertTable);
+
+    if (entityRepository == null) {
+      return APIResponse.error(error: "Can't find table: $insertTable");
+    }
+
+    final entityType = entityRepository.type;
+    final entityHandler = entityRepository.entityHandler;
+
+    var update = false;
+    Object? entity;
+
+    if (id != null) {
+      var id2 = entityHandler.resolveID(id);
+      entity = await entityRepository.selectByID(id2);
+      update = entity != null;
+    }
+
+    var htmlDoc = HTMLDocument.darkTheme(
+      title: 'DB - ${update ? 'update' : 'insert'} @ ${entityRepository.type}',
+      top: _buildTop(
+          apiRootName: apiRoot.name,
+          apiRootVersion: apiRoot.version,
+          table: insertTable,
+          entityType: entityType),
+      footer: _buildFooter(),
+    );
+
+    var content = [];
+
+    var parameters = apiRequest.parameters;
+    if (parameters.isNotEmpty) {
+      try {
+        entity = await entityHandler.createFromMap(parameters,
+            entityProvider: entityRepository.provider,
+            resolutionRules: EntityResolutionRules(allowEntityFetch: true));
+      } catch (e, s) {
+        content.add(
+            '<h3 style="text-align: left;">Error instantiating `$entityType`:</h3>\n');
+        content.add(
+            '<pre>Parameters: ${Json.encode(parameters, pretty: true)}</pre>\n');
+        content.add('<pre>ERROR:\n$e\n$s\n</pre>');
+        content.add('<hr>\n');
+      }
+
+      if (entity != null) {
+        try {
+          var id = await entityRepository.store(entity);
+
+          var json = entityHandler.toJson(entity);
+          var jsonEnc = Json.encode(json, pretty: true);
+
+          content.add(
+              '<h2 style="text-align: left;">${update ? 'Updated' : 'Inserted'}: #$id</h2>\n');
+          content.add('<pre>\n');
+          content.add('$entityType $jsonEnc\n');
+          content.add('</pre><hr>\n');
+        } catch (e, s) {
+          content.add(
+              '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+          content.add('<pre>EntityRepository: $entityRepository</pre>\n');
+          content.add('<pre>ERROR:\n$e\n$s\n</pre>');
+          content.add('<hr>\n');
+        }
+      }
+    }
+
+    content.add('<form method="post">');
+
+    _writeInputTable(entityRepository, content, entity);
+
+    content.add(
+        '<br><div style="text-align: center; width: 100%;"><button type="submit">${update ? 'Update' : 'Insert'}</button></div>');
+
+    content.add('</form>');
+
+    htmlDoc.content = content;
+
+    var html = htmlDoc.build();
+
+    return APIResponse.ok(html, mimeType: 'html');
+  }
+
+  void _writeInputTable(
+      EntityRepository<Object> entityRepository, List content, Object? entity) {
+    var entityHandler = entityRepository.entityHandler;
+
+    var fieldsEntries = _fieldsOrdered(entityHandler);
+
+    content.add('<br><table class="center">');
+
+    content.add(
+        '<tr><td colspan="3"><h2>${entityRepository.type}:</h2></td></tr>');
+
+    for (var e in fieldsEntries) {
+      var name = e.key;
+      var type = e.value;
+
+      Object? value;
+      if (entity != null) {
+        value = entityHandler.getField(entity, name);
+      }
+
+      content.add('<tr><td style="text-align: right; vertical-align: top;">');
+      content.add('$name: &nbsp;\n');
+
+      content.add('</td><td>');
+
+      content.add(HTMLInput(name, type, value: value));
+
+      content.add('</td><td>');
+
+      String typeStr;
+      if (type.isEntityReferenceType) {
+        typeStr = type.isValidGenericType
+            ? type.genericType.toString()
+            : type.toString(withT: false);
+      } else if (type.isEntityReferenceListType) {
+        typeStr = type.isValidGenericType
+            ? type.genericType.toString()
+            : type.toString(withT: false);
+      } else if (type.isListEntity) {
+        typeStr = type.genericType.toString();
+      } else {
+        typeStr = (type.hasArguments ? type : type.type).toString();
+      }
+
+      typeStr = typeStr.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+      content.add('&nbsp;&nbsp;<span class="note">$typeStr</span>');
+
+      content.add('</td></tr>');
+    }
+
+    content.add('</table>');
   }
 
   Future<APIResponse<Object>> dump(bool zip) async {
@@ -189,6 +543,125 @@ class APIDBModule extends APIModule {
     }
 
     return APIResponse.ok(dumpJson, mimeType: 'json');
+  }
+
+  Object? _resolveValue(Object? o, TypeInfo typeInfo) {
+    if (o == null) return null;
+
+    if (typeInfo.isPrimitiveType) {
+      return o;
+    } else if (o is EntityReference) {
+      return o.entityOrID;
+    } else if (o is EntityReferenceList) {
+      return o.entitiesOrIDs;
+    }
+
+    var reflectionFactory = ReflectionFactory();
+
+    var enumReflection =
+        reflectionFactory.getRegisterEnumReflection(typeInfo.type);
+    if (enumReflection != null) {
+      return enumReflection.name(o);
+    }
+
+    var entityType = typeInfo.entityType ?? typeInfo.listEntityType?.type;
+
+    var classReflection =
+        reflectionFactory.getRegisterClassReflection(entityType);
+    if (classReflection != null) {
+      var entityHandler = classReflection.entityHandler;
+
+      var id =
+          o is List ? entityHandler.resolveIDs(o) : entityHandler.resolveID(o);
+
+      return id;
+    }
+
+    return o;
+  }
+
+  static Type _resolveTypeForSorting(Type t) {
+    var enumReflection = ReflectionFactory().getRegisterEnumReflection(t);
+    return enumReflection != null ? Enum : t;
+  }
+
+  List<MapEntry<String, TypeInfo>> _fieldsOrdered(EntityHandler entityHandler) {
+    var fieldsTypes = entityHandler.getFieldsTypes();
+
+    var fieldsEntries = fieldsTypes.entries.toList();
+
+    fieldsEntries.sort((a, b) {
+      var i1 = _fieldsNamesOrder.indexOf(a.key);
+      var i2 = _fieldsNamesOrder.indexOf(b.key);
+
+      if (i1 >= 0) {
+        if (i2 >= 0) {
+          return i1.compareTo(i2);
+        } else {
+          return -1;
+        }
+      } else if (i2 >= 0) {
+        return 1;
+      } else {
+        i1 = _fieldsTypesOrder.indexOf(_resolveTypeForSorting(a.value.type));
+        i2 = _fieldsTypesOrder.indexOf(_resolveTypeForSorting(b.value.type));
+
+        if (i1 >= 0) {
+          if (i2 >= 0) {
+            return i1.compareTo(i2);
+          } else {
+            return -1;
+          }
+        } else if (i2 >= 0) {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    });
+
+    return fieldsEntries;
+  }
+
+  String _buildTop(
+      {String? apiRootName,
+      String? apiRootVersion,
+      String? table,
+      Type? entityType}) {
+    var html = StringBuffer();
+
+    apiRootName = apiRootName?.trim();
+    apiRootVersion = apiRootVersion?.trim();
+
+    html.write('<b>DB');
+    if (apiRootName != null && apiRootName.isNotEmpty) {
+      html.write(
+          '[$apiRootName${apiRootVersion != null && apiRootVersion.isNotEmpty ? '/$apiRootVersion' : ''}]');
+    }
+    html.write(':</b> &nbsp; ');
+
+    html.write('<a href="${basePath}tables">Tables</a>');
+
+    if (table != null && table.isNotEmpty && entityType != null) {
+      html.write(
+          ' &nbsp;|&nbsp; <a href="${basePath}select/$table">Select / $entityType</a></li>');
+    }
+
+    html.write(' &nbsp;|&nbsp; <a href="${basePath}dump">Dump</a>');
+
+    html.write('\n<hr>');
+
+    return html.toString();
+  }
+
+  String _buildFooter() {
+    var html = StringBuffer();
+
+    html.write('<br><hr>');
+    html.write(
+        '<a href="https://pub.dev/packages/bones_api" target="_blank">Bones_API/${BonesAPI.VERSION}</a>');
+
+    return html.toString();
   }
 
   List<Map<String, dynamic>> _entitiesToJsonMap(Iterable<Object> list) {

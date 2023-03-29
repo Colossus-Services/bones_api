@@ -647,7 +647,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     } else if (o is EntityReference) {
       return o as EntityReference<E>;
     } else if (o.isEntityIDType) {
-      return EntityReference<E>.fromID(o,
+      var id = entityHandler?.resolveID(o) ?? o;
+      return EntityReference<E>.fromID(id,
           type: type,
           typeName: typeName,
           entityHandler: entityHandler,
@@ -746,7 +747,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     } else if (o is EntityReferenceList) {
       return o as EntityReferenceList<E>;
     } else if (o.isEntityIDType) {
-      return EntityReferenceList<E>.fromIDs([o],
+      var ids = entityHandler?.resolveIDs(o) ?? [o];
+      return EntityReferenceList<E>.fromIDs(ids,
           type: type,
           typeName: typeName,
           entityHandler: entityHandler,

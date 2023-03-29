@@ -1066,6 +1066,130 @@ void main() {
           }));
     });
 
+    test('EntityHandler.createFromMap', () async {
+      {
+        var entityHandler = User$reflection.staticInstance.entityHandler;
+
+        var address = Address('NY', 'New York', 'St. one', 101, id: 101);
+
+        var user = User(
+            'a@mail.com',
+            '123',
+            address,
+            [
+              Role(RoleType.admin,
+                  value: Decimal.fromDouble(1.23), enabled: true, id: 1001),
+              Role(RoleType.guest, enabled: false, id: 1002)
+            ],
+            userInfo: UserInfo('foo', id: 123),
+            creationTime: DateTime.utc(2021, 1, 2));
+
+        expect(
+            user.toJson(),
+            equals({
+              'email': 'a@mail.com',
+              'password': '123',
+              'address': {
+                'id': 101,
+                'state': 'NY',
+                'city': 'New York',
+                'street': 'St. one',
+                'number': 101,
+                'stores': [],
+                'closedStores': {'EntityReferenceList': 'Store'},
+                'latitude': 0.0,
+                'longitude': 0.0
+              },
+              'roles': [
+                {'enabled': true, 'id': 1001, 'type': 'admin', 'value': '1.23'},
+                {'enabled': false, 'id': 1002, 'type': 'guest', 'value': null}
+              ],
+              'level': null,
+              'wakeUpTime': null,
+              'userInfo': {
+                'EntityReference': 'UserInfo',
+                'id': 123,
+                'entity': {'id': 123, 'info': 'foo'}
+              },
+              'creationTime': 1609545600000
+            }));
+
+        var entityCache = JsonEntityCacheSimple();
+
+        entityCache.cacheEntity(user.address, (o) => o.id);
+        entityCache.cacheEntities(user.roles, (o) => o.id);
+
+        var user2 = await entityHandler.createFromMap({
+          'email': 'a@mail.com',
+          'password': '123',
+          'address': 101,
+          'roles': [1001],
+          'userInfo': 123,
+          'creationTime': 1609545600000
+        }, entityCache: entityCache);
+
+        expect(
+            user2.toJson(),
+            equals({
+              'email': 'a@mail.com',
+              'password': '123',
+              'address': {
+                'id': 101,
+                'state': 'NY',
+                'city': 'New York',
+                'street': 'St. one',
+                'number': 101,
+                'stores': [],
+                'closedStores': {'EntityReferenceList': 'Store'},
+                'latitude': 0.0,
+                'longitude': 0.0
+              },
+              'roles': [
+                {'enabled': true, 'id': 1001, 'type': 'admin', 'value': '1.23'},
+              ],
+              'level': null,
+              'wakeUpTime': null,
+              'userInfo': {'EntityReference': 'UserInfo', 'id': 123},
+              'creationTime': 1609545600000
+            }));
+
+        var user3 = await entityHandler.createFromMap({
+          'email': 'a@mail.com',
+          'password': '123',
+          'address': '101',
+          'roles': '1001, 1002',
+          'userInfo': '"123"',
+          'creationTime': '1609545600000'
+        }, entityCache: entityCache);
+
+        expect(
+            user3.toJson(),
+            equals({
+              'email': 'a@mail.com',
+              'password': '123',
+              'address': {
+                'id': 101,
+                'state': 'NY',
+                'city': 'New York',
+                'street': 'St. one',
+                'number': 101,
+                'stores': [],
+                'closedStores': {'EntityReferenceList': 'Store'},
+                'latitude': 0.0,
+                'longitude': 0.0
+              },
+              'roles': [
+                {'enabled': true, 'id': 1001, 'type': 'admin', 'value': '1.23'},
+                {'enabled': false, 'id': 1002, 'type': 'guest', 'value': null}
+              ],
+              'level': null,
+              'wakeUpTime': null,
+              'userInfo': {'EntityReference': 'UserInfo', 'id': 123},
+              'creationTime': 1609545600000
+            }));
+      }
+    });
+
     test('basic', () async {
       var user1 = User(
           'joe@mail.com',
