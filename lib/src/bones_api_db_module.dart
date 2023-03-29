@@ -82,6 +82,18 @@ class APIDBModule extends APIModule {
       return insert(table, request, id: id);
     });
 
+    routes.add(null, 'delete', (request) async {
+      var pathParams = _parsePath(request, 'delete');
+      if (pathParams == null) {
+        return APIResponse.notFound();
+      }
+
+      var table = pathParams.removeAt(0);
+      var id = pathParams.isNotEmpty ? pathParams.removeAt(0) : null;
+
+      return delete(table, request, id);
+    });
+
     routes.add(null, 'dump', (request) async {
       var pathParams = _parsePath(request, 'dump');
       if (pathParams == null) {
@@ -172,7 +184,7 @@ class APIDBModule extends APIModule {
     return APIResponse.ok(html, mimeType: 'html');
   }
 
-  Future<APIResponse<dynamic>> select(String selectTable, APIRequest apiRequest,
+  Future<APIResponse<dynamic>> select(String table, APIRequest apiRequest,
       {bool? eager, bool json = false}) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
@@ -183,10 +195,10 @@ class APIDBModule extends APIModule {
     final entityRepositoryProviders = await this.entityRepositoryProviders;
 
     var entityRepository =
-        entityRepositoryProviders.getEntityRepository(name: selectTable);
+        entityRepositoryProviders.getEntityRepository(name: table);
 
     if (entityRepository == null) {
-      return APIResponse.error(error: "Can't find table: $selectTable");
+      return APIResponse.error(error: "Can't find table: $table");
     }
 
     var query = Uri.decodeQueryComponent(requestedUri.query);
@@ -202,7 +214,7 @@ class APIDBModule extends APIModule {
     eager ??= false;
 
     _log.info("APIDBModule[REQUEST]> select> "
-        "table: `$selectTable` ; "
+        "table: `$table` ; "
         "eager: $eager"
         "${query.isNotEmpty ? ' ; QUERY> $query' : ''}");
 
@@ -225,20 +237,21 @@ class APIDBModule extends APIModule {
       return APIResponse.ok(entitiesJson, mimeType: 'json');
     }
 
+    var entityType = entityRepository.type;
+
     var htmlDoc = HTMLDocument.darkTheme(
       title: 'DB - Tables',
       top: _buildTop(
           apiRootName: apiRoot.name,
           apiRootVersion: apiRoot.version,
-          table: selectTable,
-          entityType: entityRepository.type),
+          table: table,
+          entityType: entityType),
       footer: _buildFooter(),
     );
 
     var content = [];
 
     var entityHandler = entityRepository.entityHandler;
-    var entityType = entityRepository.type;
 
     var repoName = entityRepository.name;
 
@@ -349,17 +362,17 @@ class APIDBModule extends APIModule {
     EntityReferenceList
   ];
 
-  Future<APIResponse<String>> insert(String insertTable, APIRequest apiRequest,
+  Future<APIResponse<String>> insert(String table, APIRequest apiRequest,
       {Object? id}) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 
-    var entityRepository = (await entityRepositoryProviders)
-        .getEntityRepository(name: insertTable);
+    var entityRepository =
+        (await entityRepositoryProviders).getEntityRepository(name: table);
 
     if (entityRepository == null) {
-      return APIResponse.error(error: "Can't find table: $insertTable");
+      return APIResponse.error(error: "Can't find table: $table");
     }
 
     final entityType = entityRepository.type;
@@ -375,11 +388,11 @@ class APIDBModule extends APIModule {
     }
 
     var htmlDoc = HTMLDocument.darkTheme(
-      title: 'DB - ${update ? 'update' : 'insert'} @ ${entityRepository.type}',
+      title: 'DB - ${update ? 'update' : 'insert'} @ $entityType',
       top: _buildTop(
           apiRootName: apiRoot.name,
           apiRootVersion: apiRoot.version,
-          table: insertTable,
+          table: table,
           entityType: entityType),
       footer: _buildFooter(),
     );
@@ -405,20 +418,18 @@ class APIDBModule extends APIModule {
         try {
           var id = await entityRepository.store(entity);
 
-          var json = entityHandler.toJson(entity);
-          var jsonEnc = Json.encode(json, pretty: true);
-
           content.add(
-              '<h2 style="text-align: left;">${update ? 'Updated' : 'Inserted'}: #$id</h2>\n');
-          content.add('<pre>\n');
-          content.add('$entityType $jsonEnc\n');
-          content.add('</pre><hr>\n');
+              '<br><h2 style="text-align: left;">${update ? 'Updated' : 'Inserted'}: #$id</h2>\n');
+
+          _writeEntityJson(entityHandler, entityType, entity, content);
+
+          content.add('<br><hr>');
         } catch (e, s) {
           content.add(
-              '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+              '<br><h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
           content.add('<pre>EntityRepository: $entityRepository</pre>\n');
           content.add('<pre>ERROR:\n$e\n$s\n</pre>');
-          content.add('<hr>\n');
+          content.add('<br><hr>\n');
         }
       }
     }
@@ -437,6 +448,16 @@ class APIDBModule extends APIModule {
     var html = htmlDoc.build();
 
     return APIResponse.ok(html, mimeType: 'html');
+  }
+
+  void _writeEntityJson(EntityHandler entityHandler, Type entityType,
+      Object entity, List content) {
+    var json = entityHandler.toJson(entity);
+    var jsonEnc = Json.encode(json, pretty: true);
+
+    content.add('<pre>\n');
+    content.add('$entityType $jsonEnc\n');
+    content.add('</pre>\n');
   }
 
   void _writeInputTable(
@@ -491,6 +512,95 @@ class APIDBModule extends APIModule {
     }
 
     content.add('</table>');
+  }
+
+  Future<APIResponse<String>> delete(
+      String table, APIRequest apiRequest, Object? id) async {
+    if (onlyOnDevelopment && !development) {
+      return APIResponse.error(error: "Unsupported request!");
+    }
+
+    var entityRepository =
+        (await entityRepositoryProviders).getEntityRepository(name: table);
+
+    if (entityRepository == null) {
+      return APIResponse.error(error: "Can't find table: $table");
+    }
+
+    final entityType = entityRepository.type;
+    final entityHandler = entityRepository.entityHandler;
+
+    id = entityHandler.resolveID(id) ?? id;
+    if (id == null) {
+      return APIResponse.notFound(payloadDynamic: "Null ID.");
+    }
+
+    var entityExists = await entityRepository.existsID(id);
+    if (!entityExists) {
+      return APIResponse.notFound(
+          payloadDynamic: "Can't find `$entityType` entity with ID: $id");
+    }
+
+    var htmlDoc = HTMLDocument.darkTheme(
+      title: 'DB - delete @ $entityType',
+      top: _buildTop(
+          apiRootName: apiRoot.name,
+          apiRootVersion: apiRoot.version,
+          table: table,
+          entityType: entityType),
+      footer: _buildFooter(),
+    );
+
+    var content = [];
+
+    var confirmed = apiRequest.parameters.getAsBool('confirm') ?? false;
+
+    if (confirmed) {
+      try {
+        var entity = await entityRepository.deleteByID(id);
+
+        if (entity == null) {
+          throw StateError("Delete returned a null Entity: $id @ $entityType");
+        }
+
+        content.add('<br><h2 style="text-align: left;">Deleted: #$id</h2>\n');
+
+        _writeEntityJson(entityHandler, entityType, entity, content);
+      } catch (e, s) {
+        content.add(
+            '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+        content.add('<pre>EntityRepository: $entityRepository</pre>\n');
+        content.add('<pre>ERROR:\n$e\n$s\n</pre>\n');
+      }
+    } else {
+      try {
+        var entity = await entityRepository.selectByID(id);
+
+        if (entity == null) {
+          throw StateError("Can't select entity: $id @ $entityType");
+        }
+
+        content.add('<br><h2 style="text-align: left;">Delete? #$id</h2>\n');
+
+        _writeEntityJson(entityHandler, entityType, entity, content);
+      } catch (e, s) {
+        content.add(
+            '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+        content.add('<pre>EntityRepository: $entityRepository</pre>\n');
+        content.add('<pre>ERROR:\n$e\n$s\n</pre>\n');
+      }
+
+      var url = apiRequest.requestedUri;
+
+      content.add(
+          '''<br><div style="text-align: left; width: 100%;"><button type="submit" onclick="window.location='${url.path}?confirm=true'">Confirm Deletion</button></div>''');
+    }
+
+    htmlDoc.content = content;
+
+    var html = htmlDoc.build();
+
+    return APIResponse.ok(html, mimeType: 'html');
   }
 
   Future<APIResponse<Object>> dump(bool zip) async {

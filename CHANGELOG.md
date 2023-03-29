@@ -3,6 +3,7 @@
 - New `HTMLDocument`.
 - `APIDBModule`:
   - Added insert & update support.
+  - Added delete operation.
   - Added UI (HTML).
 - `EntityHandler`:
   - Added `resolveIDs`.
