@@ -380,64 +380,36 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var idType = TypeInfo.fromType(this.idType());
 
     if (idType.isInt) {
-      if (value is String) {
-        var ids = value
-            .trim()
-            .split(RegExp(r'\D+'))
-            .map(TypeParser.parseInt)
-            .whereNotNull()
-            .toList();
-        return ids as List<V>;
-      } else {
-        var id = TypeParser.parseInt(value);
-        return id != null ? <V>[id as V] : [];
-      }
+      var ids = TypeParser.parseList<int>(value,
+              elementParser: TypeParser.parseInt) ??
+          <int>[];
+      return ids as List<V>;
     } else if (idType.isBigInt) {
-      if (value is String) {
-        var ids = value
-            .trim()
-            .split(RegExp(r'[^\d-]+'))
-            .map(TypeParser.parseBigInt)
-            .whereNotNull()
-            .toList();
-        return ids as List<V>;
-      } else {
-        var id = TypeParser.parseBigInt(value);
-        return id != null ? <V>[id as V] : [];
-      }
+      var ids = TypeParser.parseList<BigInt>(value,
+              elementParser: TypeParser.parseBigInt) ??
+          <BigInt>[];
+      return ids as List<V>;
     } else if (idType.isDouble) {
-      if (value is String) {
-        var ids = value
-            .trim()
-            .split(RegExp(r'[^\d.-]+'))
-            .map(TypeParser.parseDouble)
-            .whereNotNull()
-            .toList();
-        return ids as List<V>;
-      } else {
-        var id = TypeParser.parseDouble(value);
-        return id != null ? <V>[id as V] : [];
-      }
+      var ids = TypeParser.parseList<double>(value,
+              elementParser: TypeParser.parseDouble) ??
+          <double>[];
+      return ids as List<V>;
     } else if (idType.isString) {
       var ids = value
           .toString()
           .trim()
           .split(RegExp(r'\s+'))
           .map((s) => s.trim())
-          .map((s) {
-            if ((s.startsWith('"') && s.endsWith('"')) ||
-                (s.startsWith("'") && s.endsWith("'"))) {
-              return s.substring(1, s.length - 1);
-            } else {
-              return s;
-            }
-          })
-          .where((s) => s.isEmpty)
+          .map((s) => (s.startsWith('"') && s.endsWith('"')) ||
+                  (s.startsWith("'") && s.endsWith("'"))
+              ? s.substring(1, s.length - 1)
+              : s)
+          .where((s) => s.isNotEmpty)
           .toList();
       return ids as List<V>;
     }
 
-    return [value] as List<V>;
+    return <V>[value as V];
   }
 
   V? resolveIDFromMap<V>(Map map) {

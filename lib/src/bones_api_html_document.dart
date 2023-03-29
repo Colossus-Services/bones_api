@@ -221,9 +221,9 @@ class HTMLDocument {
 
     if (o is MapEntry) {
       if (o is MapEntry<String, TypeInfo>) {
-        return _resolveInput(o.key, o.value);
+        o = HTMLInput.from(o);
       } else if (o is MapEntry<String, Type>) {
-        return _resolveInput(o.key, TypeInfo.from(o.value));
+        o = HTMLInput.from(o);
       } else {
         var k = resolve(o.key);
         var v = resolve(o.value);
@@ -232,7 +232,7 @@ class HTMLDocument {
     }
 
     if (o is HTMLInput) {
-      return _resolveInput(o.name, o.type, o.value);
+      return o.build();
     }
 
     if (o is EntityReference) {
@@ -264,6 +264,52 @@ class HTMLDocument {
       html.write('$s\n');
     }
   }
+}
+
+/// An HTML input used by [HTMLDocument].
+class HTMLInput {
+  /// The name of the input.
+  final String name;
+
+  /// The type of the input.
+  final TypeInfo type;
+
+  /// The optional value of the input.
+  final Object? value;
+
+  HTMLInput(this.name, this.type, {this.value});
+
+  factory HTMLInput.from(MapEntry<String, Object> entry) {
+    var name = entry.key;
+    var type = entry.value;
+
+    if (type is TypeInfo) {
+      return HTMLInput(name, type);
+    } else if (type is Type) {
+      return HTMLInput(name, TypeInfo.fromType(type));
+    } else {
+      return HTMLInput(name, TypeInfo.from(type));
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HTMLInput &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          type == other.type &&
+          value == other.value;
+
+  @override
+  int get hashCode => name.hashCode ^ type.hashCode ^ value.hashCode;
+
+  @override
+  String toString() {
+    return 'HTMLInput{name: $name, type: $type, value: $value}';
+  }
+
+  String build() => _resolveInput(name, type, value);
 
   static String _resolveInput(String name, TypeInfo<dynamic> type,
       [Object? value]) {
@@ -281,7 +327,13 @@ class HTMLDocument {
       return '<input id="field_$name" name="$name" type="checkbox"${checked ? ' checked' : ''}>';
     } else if (type.isDateTime) {
       var d = TypeParser.parseDateTime(value);
-      var dStr = d?.formatToYMDHms();
+      String? dStr;
+      if (d != null) {
+        dStr = d.toIso8601String();
+        var idx = dStr.lastIndexOf(':');
+        assert(idx > 4);
+        dStr = dStr.substring(0, idx);
+      }
       valAttr = d != null ? ' value="$dStr"' : '';
       return '<input id="field_$name" name="$name" type="datetime-local"$valAttr>';
     } else if (type.type == Time) {
@@ -386,36 +438,5 @@ class HTMLDocument {
 
       return ['$value'];
     }
-  }
-}
-
-/// An HTML input used by [HTMLDocument].
-class HTMLInput {
-  /// The name of the input.
-  final String name;
-
-  /// The type of the input.
-  final TypeInfo type;
-
-  /// The optional value of the input.
-  final Object? value;
-
-  HTMLInput(this.name, this.type, {this.value});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is HTMLInput &&
-          runtimeType == other.runtimeType &&
-          name == other.name &&
-          type == other.type &&
-          value == other.value;
-
-  @override
-  int get hashCode => name.hashCode ^ type.hashCode ^ value.hashCode;
-
-  @override
-  String toString() {
-    return 'HTMLInput{name: $name, type: $type, value: $value}';
   }
 }

@@ -138,8 +138,12 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
+    var allRepositoriesEntries = allRepositories.entries
+        .sorted((a, b) => a.value.name.compareTo(b.value.name))
+        .toList();
+
     if (json) {
-      var map = allRepositories.entries
+      var map = allRepositoriesEntries
           .map((e) {
             var type = e.key;
             var repo = e.value;
@@ -164,7 +168,7 @@ class APIDBModule extends APIModule {
     content.add(
         '<thead><tr><td style="text-align: right">Type: &nbsp;</td><td style="text-align: center">Table:</td><td style="text-align: center">Operations:</td></tr></thead>');
 
-    for (var e in allRepositories.entries) {
+    for (var e in allRepositoriesEntries) {
       var type = e.key;
       var repo = e.value;
       var repoName = repo.name;
