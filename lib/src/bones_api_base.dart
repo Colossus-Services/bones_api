@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.63';
+  static const String VERSION = '1.3.64';
 
   static bool _boot = false;
 
@@ -186,11 +186,18 @@ abstract class APIRoot with Initializable, Closable {
   FutureOr<List<Initializable>> initializeDependencies() {
     var lAsync1 = loadEntityProviders();
     var lAsync2 = loadEntityRepositoryProviders();
+    var lAsync3 = loadDependencies();
 
-    var inits = lAsync1.resolveBoth(lAsync2,
-        (l1, l2) => [...l1, ...l2].whereType<Initializable>().toList());
-    return inits;
+    var lAsyncAll = [lAsync1, lAsync2, lAsync3];
+
+    return lAsyncAll.resolveAll().resolveMapped((l) {
+      var inits = l.expand((e) => e).whereType<Initializable>().toList();
+      return inits;
+    });
   }
+
+  /// Gracefully loads the [Initializable] dependencies for this [APIRoot].
+  FutureOr<List<Initializable>> loadDependencies() => <Initializable>[];
 
   @override
   FutureOr<InitializationResult> initialize() => _ensureModulesLoaded();

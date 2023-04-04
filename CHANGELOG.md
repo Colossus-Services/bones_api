@@ -1,3 +1,8 @@
+## 1.3.64
+
+- `APIRoot`:
+  - Added `loadDependencies`.
+
 ## 1.3.63
 
 - New `HTMLDocument`.
