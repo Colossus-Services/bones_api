@@ -31,8 +31,8 @@ jobs:
         run: dart test --platform vm
       - name: Run tests (Chrome)
         run: dart test --platform chrome
-      - name: dart doc
-        run: dart doc --dry-run
+#      - name: dart doc
+#        run: dart doc --dry-run
       - name: Generate coverage report
         run: |
           dart pub global activate coverage

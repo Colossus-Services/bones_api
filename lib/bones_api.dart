@@ -142,6 +142,7 @@
 /// {@canonicalFor bones_api_entity_db.DBAdapterCapability}
 /// {@canonicalFor bones_api_entity_db.DBAdapterException}
 /// {@canonicalFor bones_api_entity_db.DBAdapterInstantiator}
+/// {@canonicalFor bones_api_entity_db.DBAdapterRegister}
 /// {@canonicalFor bones_api_entity_db.DBAdapter}
 /// {@canonicalFor bones_api_entity_db.DBDialect}
 /// {@canonicalFor bones_api_entity_db.DBEntityRepositoryProvider}
@@ -154,9 +155,6 @@
 /// {@canonicalFor bones_api_entity_db_memory.DBSQLMemoryAdapterContext}
 /// {@canonicalFor bones_api_entity_db_memory.DBSQLMemoryAdapterException}
 /// {@canonicalFor bones_api_entity_db_memory.DBSQLMemoryAdapter}
-/// {@canonicalFor bones_api_entity_db_object_directory.DBObjectDirectoryAdapterContext}
-/// {@canonicalFor bones_api_entity_db_object_directory.DBObjectDirectoryAdapterException}
-/// {@canonicalFor bones_api_entity_db_object_directory.DBObjectDirectoryAdapter}
 /// {@canonicalFor bones_api_entity_db_object_memory.DBMemoryObjectAdapterException}
 /// {@canonicalFor bones_api_entity_db_object_memory.DBMemoryObjectAdapter}
 /// {@canonicalFor bones_api_entity_db_object_memory.DBObjectMemoryAdapterContext}
@@ -209,6 +207,8 @@
 /// {@canonicalFor bones_api_extension.ReflectionFactoryExtension}
 /// {@canonicalFor bones_api_extension.TypeInfoEntityExtension}
 /// {@canonicalFor bones_api_extension.TypeReflectionEntityExtension}
+/// {@canonicalFor bones_api_html_document.HTMLDocument}
+/// {@canonicalFor bones_api_html_document.HTMLInput}
 /// {@canonicalFor bones_api_initializable.ExecuteInitializedCallback}
 /// {@canonicalFor bones_api_initializable.InitializableListExtension}
 /// {@canonicalFor bones_api_initializable.Initializable}
@@ -240,8 +240,11 @@
 /// {@canonicalFor bones_api_session.APISessionSet}
 /// {@canonicalFor bones_api_session.APISession}
 /// {@canonicalFor bones_api_sql_builder.AlterTableSQL}
+/// {@canonicalFor bones_api_sql_builder.CreateIndexSQL}
 /// {@canonicalFor bones_api_sql_builder.CreateTableSQL}
+/// {@canonicalFor bones_api_sql_builder.SQLBuilderIterableMapEntryExtension}
 /// {@canonicalFor bones_api_sql_builder.SQLBuilderListExtension}
+/// {@canonicalFor bones_api_sql_builder.SQLBuilderMapExtension}
 /// {@canonicalFor bones_api_sql_builder.SQLBuilder}
 /// {@canonicalFor bones_api_sql_builder.SQLColumn}
 /// {@canonicalFor bones_api_sql_builder.SQLDialect}
