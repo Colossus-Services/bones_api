@@ -782,7 +782,7 @@ class APIServer {
         if (mimeType.isJSON) {
           payload = json.decode(s);
         } else if (mimeType.isFormURLEncoded) {
-          payload = decodeQueryStringParameters(s);
+          payload = decodeQueryStringParameters(s, charset: mimeType.charset);
         }
 
         return payload == null ? null : MapEntry(mimeType, payload);

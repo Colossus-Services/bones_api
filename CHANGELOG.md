@@ -1,3 +1,11 @@
+## 1.3.65
+
+- `decodeQueryStringParameters`:
+  - Added parameter `charset`.
+- swiss_knife: ^3.1.5
+- resource_portable: ^3.0.2
+- archive: ^3.3.7
+
 ## 1.3.64
 
 - `APIRoot`:
