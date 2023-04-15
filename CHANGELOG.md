@@ -1,3 +1,11 @@
+## 1.3.66
+
+- reflection_factory: ^2.0.7
+- hotreloader: ^3.0.6
+- statistics: ^1.0.25
+- petitparser: ^5.3.0
+- meta: ^1.9.1
+
 ## 1.3.65
 
 - `decodeQueryStringParameters`:
