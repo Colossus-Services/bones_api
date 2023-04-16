@@ -86,6 +86,7 @@ void main() {
       _testTime(Time(20, 11, 31), '20:11:31.000', withMillisecond: true);
       _testTime(Time(20, 11, 31), '20:11:31.000000',
           withMillisecond: true, withMicrosecond: true);
+      _testTime(Time(20, 11, 31), '20:11', withSeconds: false);
 
       _testTime(Time(20, 11, 31, 123), '20:11:31.123');
 
@@ -201,7 +202,12 @@ void _testTime(Time t, String ts,
           withMillisecond: withMillisecond,
           withMicrosecond: withMicrosecond),
       equals(ts));
-  expect(Time.parse(ts), equals(t));
+  if (withSeconds) {
+    expect(Time.parse(ts), equals(t));
+  } else {
+    expect(Time.parse(ts),
+        equals(t.copyWith(second: 0, millisecond: 0, microsecond: 0)));
+  }
 }
 
 class AB {

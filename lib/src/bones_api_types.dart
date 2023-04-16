@@ -288,6 +288,8 @@ class Time implements Comparable<Time> {
       } else {
         return '$h:$m:$s.$ms';
       }
+    } else if (!withSeconds) {
+      return '$h:$m';
     } else {
       return '$h:$m:$s';
     }
@@ -295,6 +297,16 @@ class Time implements Comparable<Time> {
 
   static String _intToPaddedString(int n, [int padding = 2]) =>
       n.toString().padLeft(padding, '0');
+
+  /// Creates a new [Time] from this one by updating individual properties.
+  Time copyWith(
+          {int? hour,
+          int? minute,
+          int? second,
+          int? millisecond,
+          int? microsecond}) =>
+      Time(hour ?? this.hour, minute ?? this.minute, second ?? this.second,
+          millisecond ?? this.millisecond, microsecond ?? this.microsecond);
 
   /// Converts this [Time] to [DateTime].
   DateTime toDateTime(int year,

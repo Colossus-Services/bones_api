@@ -1,3 +1,9 @@
+## 1.3.67
+
+- `Time.toString`:
+  - Fix `withSeconds` parameter.
+- Added `Time.copyWith`.
+
 ## 1.3.66
 
 - reflection_factory: ^2.0.7
