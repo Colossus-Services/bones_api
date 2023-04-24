@@ -1,3 +1,8 @@
+## 1.3.69
+
+- `APIAuthentication`:
+  - Added `_credential` field to allow return (by `get credential`) of the `APICredential` instance used in the authentication process. 
+
 ## 1.3.68
 
 - `APISecurity`:

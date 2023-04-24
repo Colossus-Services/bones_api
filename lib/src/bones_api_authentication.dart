@@ -100,6 +100,19 @@ class APICredential {
   }
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is APICredential &&
+          runtimeType == other.runtimeType &&
+          username == other.username &&
+          password == other.password &&
+          token == other.token &&
+          identical(usernameEntity, other.usernameEntity);
+
+  @override
+  int get hashCode => username.hashCode ^ password.hashCode ^ token.hashCode;
+
+  @override
   String toString() {
     return 'APICredential{username: $username, ${hasToken ? 'token: $token' : 'password: $password'}';
   }
@@ -237,16 +250,19 @@ class APIAuthentication {
 
   final dynamic data;
 
+  APICredential? _credential;
+
   APIAuthentication(this.token,
-      {List<APIPermission>? permissions, this.resumed = false, this.data})
+      {List<APIPermission>? permissions, this.resumed = false, this.data, APICredential? credential})
       : permissions =
-            List<APIPermission>.unmodifiable(permissions ?? <APIPermission>[]);
+            List<APIPermission>.unmodifiable(permissions ?? <APIPermission>[]),
+        _credential = credential;
 
   String get username => token.username;
 
   String get tokenKey => token.token;
 
-  APICredential get credential => APICredential(username, token: tokenKey);
+  APICredential get credential => _credential ?? APICredential(username, token: tokenKey);
 
   bool isExpired({DateTime? now}) => token.isExpired();
 

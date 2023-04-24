@@ -193,7 +193,7 @@ abstract class APISecurity {
     token ??= getValidToken(credential.username)!;
 
     return APIAuthentication(token,
-        permissions: permissions, data: data, resumed: resumed);
+        permissions: permissions, data: data, resumed: resumed, credential: credential);
   }
 
   FutureOr<APIAuthentication?> resumeAuthentication(APIToken? token,

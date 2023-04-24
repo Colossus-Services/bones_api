@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.68';
+  static const String VERSION = '1.3.69';
 
   static bool _boot = false;
 
@@ -470,7 +470,7 @@ abstract class APIRoot with Initializable, Closable {
 
   FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
     if (!externalCall) {
-      var original = identical(request.credential, request.originalRequest);
+      var original = identical(request.credential, request.originalCredential);
 
       var credential = request.credential =
           request.credential?.copy(withUsernameEntity: false);
