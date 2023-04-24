@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.0.7
+// BUILDER: reflection_factory/2.1.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -17,7 +17,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.0.7');
+  static final Version _version = Version.parse('2.1.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -2267,14 +2267,14 @@ class RoleType$reflection extends EnumReflection<RoleType>
   @override
   List<Object> get classAnnotations => _classAnnotations;
 
-  static const List<String> _fieldsNames = const <String>[
+  static const List<String> _staticFieldsNames = const <String>[
     'admin',
     'guest',
     'unknown'
   ];
 
   @override
-  List<String> get fieldsNames => _fieldsNames;
+  List<String> get staticFieldsNames => _staticFieldsNames;
 
   static const Map<String, RoleType> _valuesByName = const <String, RoleType>{
     'admin': RoleType.admin,
@@ -2286,6 +2286,11 @@ class RoleType$reflection extends EnumReflection<RoleType>
   Map<String, RoleType> get valuesByName => _valuesByName;
   @override
   List<RoleType> get values => RoleType.values;
+
+  static const List<String> _fieldsNames = const <String>[];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
 }
 
 class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {

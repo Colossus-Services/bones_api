@@ -1,3 +1,7 @@
+## 1.4.0
+
+- reflection_factory: ^2.1.0
+
 ## 1.3.69
 
 - `APIAuthentication`:
