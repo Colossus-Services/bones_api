@@ -253,7 +253,10 @@ class APIAuthentication {
   APICredential? _credential;
 
   APIAuthentication(this.token,
-      {List<APIPermission>? permissions, this.resumed = false, this.data, APICredential? credential})
+      {List<APIPermission>? permissions,
+      this.resumed = false,
+      this.data,
+      APICredential? credential})
       : permissions =
             List<APIPermission>.unmodifiable(permissions ?? <APIPermission>[]),
         _credential = credential;
@@ -262,7 +265,8 @@ class APIAuthentication {
 
   String get tokenKey => token.token;
 
-  APICredential get credential => _credential ?? APICredential(username, token: tokenKey);
+  APICredential get credential =>
+      _credential ?? APICredential(username, token: tokenKey);
 
   bool isExpired({DateTime? now}) => token.isExpired();
 
