@@ -77,6 +77,23 @@ abstract class APISecurity {
     });
   }
 
+  Future<APIAuthentication?> authenticateMultiple(
+      List<APICredential> credentials,
+      {APIRequest? request}) async {
+    if (credentials.isEmpty) return null;
+
+    for (var credential in credentials) {
+      var auth = await prepareCredential(credential)
+          .resolveMapped((c) => _authenticateImpl(c, request: request));
+
+      if (auth != null) {
+        return auth;
+      }
+    }
+
+    return null;
+  }
+
   FutureOr<APIAuthentication?> authenticate(APICredential? credential,
       {APIRequest? request}) {
     if (credential == null) return null;
@@ -376,10 +393,14 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
       {bool allowLogout = false}) {
-    var credential = resolveRequestCredential(request);
-    credential ??= resolveSessionCredential(request);
+    var credentials = resolveRequestCredentials(request);
 
-    if (credential == null) {
+    if (credentials.isEmpty) {
+      var sessionCredential = resolveSessionCredential(request);
+      if (sessionCredential != null) credentials.add(sessionCredential);
+    }
+
+    if (credentials.isEmpty) {
       return null;
     }
 
@@ -394,6 +415,10 @@ abstract class APISecurity {
               request.parameters.getAsBool('allTokens', ignoreCase: true) ??
               false);
 
+      var credential = credentials.last;
+      request.credential = credential;
+      request.originalCredential ??= credential;
+
       return this
           .logout(credential, allTokens: allTokens, request: request)
           .resolveMapped((ok) {
@@ -405,9 +430,28 @@ abstract class APISecurity {
       });
     }
 
-    request.credential = credential;
+    if (credentials.length == 1) {
+      var credential = credentials.last;
+      request.credential = credential;
+      request.originalCredential ??= credential;
 
-    return authenticate(credential, request: request);
+      return authenticate(credential, request: request);
+    }
+
+    request.credential ??= credentials.first;
+    request.originalCredential ??= request.credential;
+
+    return authenticateMultiple(credentials, request: request).then((auth) {
+      APICredential? credential;
+      if (auth != null) {
+        credential = request.credential = auth.credential;
+      } else {
+        credential = request.credential = credentials.first;
+      }
+
+      request.originalCredential ??= credential;
+      return auth;
+    });
   }
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
@@ -528,7 +572,9 @@ abstract class APISecurity {
     });
   }
 
-  APICredential? resolveRequestCredential(APIRequest request) {
+  List<APICredential> resolveRequestCredentials(APIRequest request) {
+    var credentials = <APICredential>[];
+
     var credential = request.credential;
 
     if (credential != null) {
@@ -549,7 +595,7 @@ abstract class APISecurity {
         }
       }
 
-      return credential;
+      credentials.add(credential);
     }
 
     var username = getRequestParameterUsername(request).trim();
@@ -558,23 +604,22 @@ abstract class APISecurity {
     if (username.isNotEmpty) {
       if (tokenKey.isNotEmpty) {
         var credential = APICredential(username, token: tokenKey);
-        request.credential = credential;
-        return credential;
+        credentials.add(credential);
       } else {
         var password = getRequestParameterPassword(request).trim();
 
         var credential = APICredential(username, passwordHash: password);
-        request.credential = credential;
-        return credential;
+        credentials.add(credential);
       }
     } else if (tokenKey.isNotEmpty) {
       var token = getTokenByKey(tokenKey);
       if (token != null && !token.isExpired()) {
-        return APICredential(token.username, token: token.token);
+        var credential = APICredential(token.username, token: token.token);
+        credentials.add(credential);
       }
     }
 
-    return null;
+    return credentials;
   }
 
   String getRequestParameterPassword(APIRequest request) {

@@ -85,21 +85,62 @@ void main() {
           apiSecurity.authenticate(APICredential('foo', token: 'any')), isNull);
     });
 
-    test('authenticateByRequest', () {
+    test('authenticateByRequest', () async {
       var apiSecurity = _MyAPISecurity();
 
-      var request1 = APIRequest(APIRequestMethod.GET, 'foo');
-      request1.credential = APICredential('foo', passwordHash: 'foo');
+      {
+        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
+        request1.credential = APICredential('foo', passwordHash: 'foo');
 
-      expect(apiSecurity.authenticateByRequest(request1), isNotNull);
-      expect(request1.authentication, isNotNull);
-      expect(request1.authentication!.username, equals('foo'));
+        expect(apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(request1.authentication, isNotNull);
+        expect(request1.authentication!.username, equals('foo'));
 
-      var request2 = APIRequest(APIRequestMethod.GET, 'foo');
-      request2.credential = APICredential('bar', passwordHash: 'xxx');
+        var request2 = APIRequest(APIRequestMethod.GET, 'foo');
+        request2.credential = APICredential('bar', passwordHash: 'xxx');
 
-      expect(apiSecurity.authenticateByRequest(request2), isNull);
-      expect(request2.authentication, isNull);
+        expect(apiSecurity.authenticateByRequest(request2), isNull);
+        expect(request2.authentication, isNull);
+      }
+
+      {
+        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
+        request1.parameters['username'] = 'foo';
+        request1.parameters['password'] = 'foo';
+
+        expect(apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(request1.authentication, isNotNull);
+        expect(request1.authentication!.username, equals('foo'));
+
+        var request2 = APIRequest(APIRequestMethod.GET, 'foo');
+        request2.parameters['username'] = 'foo';
+        request2.parameters['password'] = 'not_foo';
+
+        expect(apiSecurity.authenticateByRequest(request2), isNull);
+        expect(request2.authentication, isNull);
+      }
+
+      {
+        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
+        request1.credential = APICredential('foo', passwordHash: 'foo');
+        request1.parameters['username'] = 'bar';
+        request1.parameters['password'] = 'bar';
+
+        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(request1.authentication, isNotNull);
+        expect(request1.authentication!.username, equals('foo'));
+      }
+
+      {
+        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
+        request1.credential = APICredential('foo', passwordHash: 'not_foo');
+        request1.parameters['username'] = 'bar';
+        request1.parameters['password'] = 'bar';
+
+        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(request1.authentication, isNotNull);
+        expect(request1.authentication!.username, equals('bar'));
+      }
     });
 
     test('resolveRequestCredential', () {
@@ -109,9 +150,10 @@ void main() {
         var request = APIRequest(APIRequestMethod.GET, 'foo');
         request.credential = APICredential('foo', passwordHash: 'foo');
 
-        var credential = apiSecurity.resolveRequestCredential(request);
-        expect(credential, isNotNull);
-        expect(credential!.username, equals('foo'));
+        var credentials = apiSecurity.resolveRequestCredentials(request);
+        expect(credentials, isNotEmpty);
+        expect(credentials.length, equals(1));
+        expect(credentials[0].username, equals('foo'));
       }
 
       {
@@ -129,19 +171,21 @@ void main() {
             APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
         request.credential = APICredential('', token: fooSha256);
 
-        var credential = apiSecurity.resolveRequestCredential(request);
-        expect(credential, isNotNull);
-        expect(credential!.username, equals('foo'));
+        var credentials = apiSecurity.resolveRequestCredentials(request);
+        expect(credentials, isNotEmpty);
+        expect(credentials.length, equals(1));
+        expect(credentials[0].username, equals('foo'));
       }
 
       {
         var request = APIRequest(APIRequestMethod.GET, 'foo',
             parameters: {'user': 'foo', 'pass': '123456'});
 
-        var credential = apiSecurity.resolveRequestCredential(request);
-        expect(credential, isNotNull);
-        expect(credential!.username, equals('foo'));
-        expect(credential.password, equals(APIPassword('123456')));
+        var credentials = apiSecurity.resolveRequestCredentials(request);
+        expect(credentials, isNotEmpty);
+        expect(credentials.length, equals(1));
+        expect(credentials[0].username, equals('foo'));
+        expect(credentials[0].password, equals(APIPassword('123456')));
       }
     });
 

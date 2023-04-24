@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.3.67';
+  static const String VERSION = '1.3.68';
 
   static bool _boot = false;
 
@@ -432,7 +432,7 @@ abstract class APIRoot with Initializable, Closable {
       try {
         var response = _preCall<T>(request, externalCall);
 
-        // Any throwed error won't be passed to the previous `Zone`.
+        // Any thrown error won't be passed to the previous `Zone`.
         // Then the erros will be wrapped into a `APIResponse.error`,
         // to be rethrown by the previous `Zone`.
 
@@ -470,7 +470,17 @@ abstract class APIRoot with Initializable, Closable {
 
   FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
     if (!externalCall) {
-      request.credential = request.credential?.copy(withUsernameEntity: false);
+      var original = identical(request.credential, request.originalRequest);
+
+      var credential = request.credential =
+          request.credential?.copy(withUsernameEntity: false);
+
+      if (original) {
+        request.originalCredential = credential;
+      } else {
+        request.originalCredential =
+            request.originalCredential?.copy(withUsernameEntity: false);
+      }
     }
 
     var preResponse = callHandlers<T>(
@@ -1130,7 +1140,13 @@ class APIRequest extends APIPayload {
   final bool newSession;
 
   /// The request credential.
+  /// After the authentication process this credential maybe updated/resolved.
+  /// See [originalCredential]
   APICredential? credential;
+
+  /// The request original credential, before the authentication process.
+  /// See [credential]
+  APICredential? originalCredential;
 
   /// The authentication of this request, processed by [APISecurity].
   APIAuthentication? authentication;
@@ -1177,6 +1193,7 @@ class APIRequest extends APIPayload {
         headers = headers ?? <String, dynamic>{},
         _pathParts = _buildPathParts(path),
         scheme = scheme?.trim(),
+        originalCredential = credential,
         requesterSource = _resolveRestSource(requesterAddress),
         _requesterAddress = requesterAddress,
         requestedUri = requestedUri ??

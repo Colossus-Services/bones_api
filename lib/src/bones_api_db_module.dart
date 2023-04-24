@@ -14,6 +14,7 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_html_document.dart';
 import 'bones_api_module.dart';
+import 'bones_api_authentication.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIDBModule');
@@ -21,8 +22,10 @@ final _log = logging.Logger('APIDBModule');
 class APIDBModule extends APIModule {
   final bool onlyOnDevelopment;
 
+  final APICredential? credential;
+
   APIDBModule(APIRoot apiRoot,
-      {String name = 'db', this.onlyOnDevelopment = true})
+      {String name = 'db', this.onlyOnDevelopment = true, this.credential})
       : super(apiRoot, name);
 
   bool get development => apiConfig.development;
@@ -37,6 +40,9 @@ class APIDBModule extends APIModule {
     if (onlyOnDevelopment && !development) return;
 
     routes.add(null, 'tables', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'tables');
 
       var json = _containsKey(pathParams ?? [], 'json');
@@ -44,6 +50,9 @@ class APIDBModule extends APIModule {
     });
 
     routes.add(null, 'select', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'select');
       if (pathParams == null) {
         return APIResponse.notFound();
@@ -60,6 +69,9 @@ class APIDBModule extends APIModule {
     });
 
     routes.add(null, 'insert', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'insert');
       if (pathParams == null) {
         return APIResponse.notFound();
@@ -71,6 +83,9 @@ class APIDBModule extends APIModule {
     });
 
     routes.add(null, 'update', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'update');
       if (pathParams == null) {
         return APIResponse.notFound();
@@ -83,6 +98,9 @@ class APIDBModule extends APIModule {
     });
 
     routes.add(null, 'delete', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'delete');
       if (pathParams == null) {
         return APIResponse.notFound();
@@ -95,6 +113,9 @@ class APIDBModule extends APIModule {
     });
 
     routes.add(null, 'dump', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
       var pathParams = _parsePath(request, 'dump');
       if (pathParams == null) {
         return APIResponse.notFound();
@@ -104,6 +125,28 @@ class APIDBModule extends APIModule {
 
       return dump(zip);
     });
+  }
+
+  Future<APIResponse<Object>?> checkAuthentication(APIRequest request) async {
+    var credential = this.credential;
+    if (credential == null) {
+      if (!development) {
+        throw APIResponse.error(
+            error:
+                "Not a `development` environment to allow unauthenticated access.");
+      }
+
+      return null;
+    }
+
+    var requestCredential = request.originalCredential;
+    if (requestCredential != null &&
+        credential.checkCredential(requestCredential)) {
+      return null;
+    }
+
+    return APIResponse.unauthorized(payload: 'Authorization required.')
+      ..requireAuthentication(require: true, realm: 'DB', type: 'Basic');
   }
 
   List<String>? _parsePath(APIRequest request, String route) {
@@ -405,10 +448,17 @@ class APIDBModule extends APIModule {
 
     var parameters = apiRequest.parameters;
     if (parameters.isNotEmpty) {
+      var entity2 = await entityHandler.createFromMap(parameters,
+          entityProvider: entityRepository.provider,
+          resolutionRules: EntityResolutionRules(allowEntityFetch: true));
+
       try {
-        entity = await entityHandler.createFromMap(parameters,
-            entityProvider: entityRepository.provider,
-            resolutionRules: EntityResolutionRules(allowEntityFetch: true));
+        if (entity != null) {
+          var fields = entityHandler.getFields(entity2);
+          entity = await entityHandler.setFieldsFromMap(entity, fields);
+        } else {
+          entity = entity2;
+        }
       } catch (e, s) {
         content.add(
             '<h3 style="text-align: left;">Error instantiating `$entityType`:</h3>\n');

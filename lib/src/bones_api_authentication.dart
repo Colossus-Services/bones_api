@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_extension.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils_json.dart';
 
@@ -34,6 +35,37 @@ class APICredential {
   APICredential._(
       this.username, this.usernameEntity, this.password, this.token);
 
+  static APICredential? fromMap(Map<String, dynamic>? map,
+      {bool requiresUsernameAndPassword = false}) {
+    if (map == null) {
+      if (!requiresUsernameAndPassword) {
+        return null;
+      }
+
+      map = {};
+    }
+
+    var username = map.getAsString('username', ignoreCase: true) ??
+        map.getAsString('user', ignoreCase: true)?.trim();
+
+    var password = map.getAsString('password', ignoreCase: true) ??
+        map.getAsString('pass', ignoreCase: true)?.trim();
+
+    if (requiresUsernameAndPassword) {
+      if (password == null || password.isEmpty) {
+        throw ArgumentError("Can't define `password` from passed `map`.");
+      }
+
+      if (username == null || username.isEmpty) {
+        throw ArgumentError("Can't define `username` from passed `map`.");
+      }
+    } else {
+      if (username == null) return null;
+    }
+
+    return APICredential(username, passwordHash: password);
+  }
+
   /// Returns a copy of this [APICredential].
   APICredential copy(
           {bool withUsernameEntity = true,
@@ -56,6 +88,15 @@ class APICredential {
   bool checkPassword(String? passwordOrHash) {
     if (passwordOrHash == null) return false;
     return password != null && password!.checkPassword(passwordOrHash);
+  }
+
+  /// Checks if the passed [credential] matches `this` credential's [username] and [password].
+  bool checkCredential(APICredential? credential) {
+    if (credential == null) return false;
+
+    if (username != credential.username) return false;
+
+    return !hasPassword || checkPassword(credential.password?.passwordHash);
   }
 
   @override

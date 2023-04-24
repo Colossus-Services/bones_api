@@ -1,3 +1,14 @@
+## 1.3.68
+
+- `APISecurity`:
+  - Added `authenticateMultiple` for when the request has an `APICredential` and also a payload with credential.
+- `APICredential`:
+  - Added `originalCredential` field.
+  - Added `APICredential.fromMap` and `checkCredential`.
+- `APIDBModule`: Added `credential` support.
+- async_events: ^1.0.11
+- test: ^1.24.1
+
 ## 1.3.67
 
 - `Time.toString`:
