@@ -284,6 +284,139 @@ void main() {
       apiRoot.close();
     });
   });
+
+  group('APIRouteBuilder.resolveValueType', () {
+    test('int', () {
+      var t = TypeInfo(int);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals(123));
+      expect(APIRouteBuilder.resolveValueByType(t, '456'), equals(456));
+      expect(APIRouteBuilder.resolveValueByType(t, '"567"'), equals(567));
+    });
+
+    test('double', () {
+      var t = TypeInfo(double);
+      expect(APIRouteBuilder.resolveValueByType(t, 123),
+          allOf(equals(123.0), isA<double>()));
+      expect(APIRouteBuilder.resolveValueByType(t, 12.3), equals(12.3));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals(45.6));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals(56.7));
+    });
+
+    test('num', () {
+      var t = TypeInfo(num);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals(123));
+      expect(APIRouteBuilder.resolveValueByType(t, 12.3), equals(12.3));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals(45.6));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals(56.7));
+    });
+
+    test('String', () {
+      var t = TypeInfo(String);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals('123'));
+      expect(APIRouteBuilder.resolveValueByType(t, 12.3), equals('12.3'));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals('45.6'));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals('"56.7"'));
+    });
+
+    test('List', () {
+      var t = TypeInfo<List>(List);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123]));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals(['123']));
+      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+          equals([12, 34.5]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals(['45.6']));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals(['"56.7"']));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals(['45', '6']));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45;6'), equals(['45', '6']));
+    });
+
+    test('List<int>', () {
+      var t = TypeInfo<List<int>>(List, [int]);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123]));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals([123]));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, [12, 34.5]), equals([12, 34]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals([45]));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals([56]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45, 6'), equals([45, 6]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45;6'), equals([45, 6]));
+    });
+
+    test('List<double>', () {
+      var t = TypeInfo<List<double>>(List, [double]);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123.0]));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals([123.0]));
+      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+          equals([12, 34.5]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals([45.6]));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals([56.7]));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals([45.0, 6.0]));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45;6.1'), equals([45.0, 6.1]));
+    });
+
+    test('Set', () {
+      var t = TypeInfo<Set>(Set);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123}));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({'123'}));
+      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+          equals([12, 34.5]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({'45.6'}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({'"56.7"'}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({'45', '6'}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45;6'), equals({'45', '6'}));
+    });
+
+    test('Set<int>', () {
+      var t = TypeInfo<Set<int>>(Set, [int]);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123}));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({123}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, [12, 34.5]), equals({12, 34}));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({45}));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({56}));
+      expect(APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({45, 6}));
+      expect(APIRouteBuilder.resolveValueByType(t, '45;6'), equals({45, 6}));
+    });
+
+    test('Set<double>', () {
+      var t = TypeInfo<Set<double>>(Set, [double]);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123.0}));
+      expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({123.0}));
+      expect(APIRouteBuilder.resolveValueByType(t, {12, 34.5}),
+          equals([12, 34.5]));
+      expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({45.6}));
+      expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({56.7}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({45.0, 6.0}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '45;6.1'), equals({45.0, 6.1}));
+    });
+
+    test('Map', () {
+      var t = TypeInfo<Map>(Map);
+      expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123: null}));
+      expect(
+          APIRouteBuilder.resolveValueByType(t, '123'), equals({'123': null}));
+      expect(APIRouteBuilder.resolveValueByType(t, [12, 34]),
+          equals({12: null, 34: null}));
+      expect(APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
+          equals({'a': '123', 'b': '456'}));
+    });
+
+    test('Map<String,int>', () {
+      var t = TypeInfo<Map<String, int>>(Map, [String, int]);
+      expect(APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
+          equals({'a': 123, 'b': 456}));
+    });
+  });
 }
 
 User _buildTestUser() {

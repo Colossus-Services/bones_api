@@ -590,10 +590,10 @@ class APIRouteBuilder<M extends APIModule> {
 
     if (value == null) return null;
 
-    return _resolveValueType(parameterTypeInfo, value);
+    return resolveValueByType(parameterTypeInfo, value);
   }
 
-  Object? _resolveValueType(TypeInfo typeInfo, Object? value,
+  static Object? resolveValueByType(TypeInfo typeInfo, Object? value,
       {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
     if (value == null) {
       return null;
@@ -623,6 +623,12 @@ class APIRouteBuilder<M extends APIModule> {
 
       var arg0 = typeInfo.arguments0;
       if (value is List && arg0 != null && arg0.isPrimitiveType) {
+        var argParser = TypeParser.parserFor(typeInfo: arg0);
+        if (argParser != null && !typeInfo.isCastedList(value)) {
+          value =
+              TypeParser.parseList(value, elementParser: argParser) ?? value;
+        }
+
         return typeInfo.castList(value);
       }
     } else if (typeInfo.isSet) {
@@ -639,6 +645,11 @@ class APIRouteBuilder<M extends APIModule> {
       }
 
       if (value is Set && arg0 != null && arg0.isPrimitiveType) {
+        var argParser = TypeParser.parserFor(typeInfo: arg0);
+        if (argParser != null && !typeInfo.isCastedSet(value)) {
+          value = TypeParser.parseSet(value, elementParser: argParser) ?? value;
+        }
+
         return typeInfo.castSet(value);
       } else if (arg0 != null) {
         var s = _resolveValueSetTypeAsListType(
@@ -658,6 +669,23 @@ class APIRouteBuilder<M extends APIModule> {
           arg1 != null &&
           arg0.isPrimitiveType &&
           arg1.isPrimitiveType) {
+        var argParser0 = TypeParser.parserFor(typeInfo: arg0);
+        var argParser1 = TypeParser.parserFor(typeInfo: arg1);
+
+        if ((argParser0 != null || argParser1 != null) &&
+            !typeInfo.isCastedMap(value)) {
+          Map? m = typeInfo.callCastedArgumentsAB(<K, V>() {
+            return TypeParser.parseMap<K, V>(
+              value,
+              keyParser: argParser0 is TypeElementParser<K> ? argParser0 : null,
+              valueParser:
+                  argParser1 is TypeElementParser<V> ? argParser1 : null,
+            );
+          });
+
+          value = m ?? value;
+        }
+
         return typeInfo.castMap(value);
       }
     }
@@ -672,11 +700,11 @@ class APIRouteBuilder<M extends APIModule> {
     return parsed ?? value;
   }
 
-  Set? _resolveValueSetTypeAsListType(TypeInfo listType, Object value,
+  static Set? _resolveValueSetTypeAsListType(TypeInfo listType, Object value,
       EntityCache? entityCache, EntityResolutionRules? resolutionRules) {
     var setTypeAsList = TypeInfo.fromListType(listType);
 
-    var l = _resolveValueType(setTypeAsList, value,
+    var l = resolveValueByType(setTypeAsList, value,
         entityCache: entityCache, resolutionRules: resolutionRules);
 
     if (l is List) {
@@ -686,7 +714,7 @@ class APIRouteBuilder<M extends APIModule> {
     }
   }
 
-  Uint8List? _resolveRequestParameterValueAsBytes(Object value) {
+  static Uint8List? _resolveRequestParameterValueAsBytes(Object value) {
     if (value is List<int>) {
       var data = value.asUint8List;
       return data;
@@ -714,7 +742,8 @@ class APIRouteBuilder<M extends APIModule> {
     return null;
   }
 
-  Object? _resolveValueAsEntity(TypeInfo parameterTypeInfo, Object? value,
+  static Object? _resolveValueAsEntity(
+      TypeInfo parameterTypeInfo, Object? value,
       {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
     if (value == null) return null;
 
@@ -777,7 +806,7 @@ class APIRouteBuilder<M extends APIModule> {
     return parameterTypeInfo.parse(value);
   }
 
-  List _castList(List<Object?> list, TypeInfo typeInfo) {
+  static List _castList(List<Object?> list, TypeInfo typeInfo) {
     var reflectionFactory = ReflectionFactory();
 
     var classReflection =

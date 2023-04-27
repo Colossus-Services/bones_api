@@ -1,7 +1,13 @@
 ## 1.4.1
 
 - `APIModuleHttpProxy`:
-  - for `POST` request if any parameter is a `List` or `Map`. 
+  - Force `POST` request if any parameter is a `List` or `Map`. 
+- `APIRouteBuilder.resolveValueByType`:
+  - Renamed: `_resolveValueType` to `resolveValueByType`
+  - Exposed and static.
+  - Fix parsing of typed `List`, `Set` and `Map` parameters.
+  - Improved tests.
+- reflection_factory: ^2.1.2
 
 ## 1.4.0
 
