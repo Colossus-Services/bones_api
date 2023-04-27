@@ -890,13 +890,17 @@ class APIModuleHttpProxy implements ClassProxyListener {
 
     parameters = parameters.map((key, value) {
       Object? val = value;
-      if ((!value.isPrimitiveValue &&
-              !value.isPrimitiveList &&
-              !value.isPrimitiveMap) ||
-          (value is Uint8List)) {
+
+      if (value is Uint8List) {
+        val = Json.toJson(value);
+        needsJsonRequest = true;
+      } else if (value.isPrimitiveList || value.isPrimitiveMap) {
+        needsJsonRequest = true;
+      } else if (!value.isPrimitiveValue) {
         val = Json.toJson(value);
         needsJsonRequest = true;
       }
+
       return MapEntry(key, val);
     });
 

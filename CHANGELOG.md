@@ -1,3 +1,8 @@
+## 1.4.1
+
+- `APIModuleHttpProxy`:
+  - for `POST` request if any parameter is a `List` or `Map`. 
+
 ## 1.4.0
 
 - reflection_factory: ^2.1.0
