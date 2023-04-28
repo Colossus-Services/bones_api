@@ -1,3 +1,11 @@
+## 1.4.2
+
+- `Json`:
+  - Fix `_jsonEncodableProvider`: do not use `EntityHandler` if there's a registered `ClassReflection`.
+- `APIServer`:
+  - Fix `_toJsonEncodableAccessRules` when there's an `EntityAccessRules` for
+    an entity but there's no encodable function.
+
 ## 1.4.1
 
 - `APIModuleHttpProxy`:

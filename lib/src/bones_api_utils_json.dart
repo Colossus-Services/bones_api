@@ -199,7 +199,9 @@ class Json {
 
   static ToEncodableJson? _jsonEncodableProvider(
       Object object, EntityHandlerProvider? entityHandlerProvider) {
-    if (object is Time) {
+    if (object is DateTime) {
+      return (o, j) => (o as DateTime).toUtc().toString();
+    } else if (object is Time) {
       return (o, j) => o.toString();
     } else if (object is DynamicNumber) {
       return (o, j) => (o as DynamicNumber).toStringStandard();
@@ -209,19 +211,33 @@ class Json {
 
     var oType = object.runtimeType;
 
-    if (entityHandlerProvider != null) {
-      var entityHandler = entityHandlerProvider.getEntityHandler(type: oType);
+    if (object is! num &&
+        object is! String &&
+        object is! bool &&
+        object is! List &&
+        object is! Map &&
+        object is! Set) {
+      final reflectionFactory = ReflectionFactory();
 
-      if (entityHandler != null) {
-        return (o, j) => entityHandler.getFields(o);
+      var classReflection = reflectionFactory.getRegisterClassReflection(oType);
+
+      // Do not use `EntityHandler` if there's a registered `ClassReflection`:
+      if (classReflection != null) {
+        return null;
       }
     }
 
-    var entityHandler =
+    EntityHandler? entityHandler;
+
+    if (entityHandlerProvider != null) {
+      entityHandler = entityHandlerProvider.getEntityHandler(type: oType);
+    }
+
+    entityHandler ??=
         EntityHandlerProvider.globalProvider.getEntityHandler(type: oType);
 
     if (entityHandler != null) {
-      return (o, j) => entityHandler.getFields(o);
+      return (o, j) => entityHandler!.getFields(o);
     }
 
     return null;

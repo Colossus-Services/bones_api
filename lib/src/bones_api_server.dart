@@ -1217,40 +1217,46 @@ class APIServer {
 
     var t = o is EntityReference ? o.type : o.runtimeType;
 
-    if (accessRules.hasRuleForEntityType(t)) {
-      var allowType = accessRules.isAllowedEntityType(t);
-      if (allowType != null && !allowType) {
-        return (o, j) => <String, Object>{};
-      }
+    // No rule for entity type. No `ToEncodableJson` filter: return null
+    if (!accessRules.hasRuleForEntityType(t)) return null;
 
-      if (!accessRules.hasRuleForEntityTypeField(t)) {
-        return null;
-      }
+    var allowType = accessRules.isAllowedEntityType(t);
 
-      return (o, j) {
-        if (o == null) return null;
-
-        var enc = encodableJsonProvider(o);
-        if (enc == null) return null;
-
-        var map = enc(o, j);
-        if (map is! Map) return map;
-
-        var t = o.runtimeType;
-
-        var c = EntityAccessRulesContext(accessRules, o, context: apiRequest);
-
-        map.removeWhere((key, _) {
-          var allowed =
-              accessRules.isAllowedEntityTypeField(t, key, context: c);
-          return allowed != null && !allowed;
-        });
-
-        return map;
-      };
+    // Block not allowed type. Return `ToEncodableJson` filter: empty `Map`
+    if (allowType != null && !allowType) {
+      return (o, j) => <String, Object>{};
     }
 
-    return null;
+    // No rule for entity field. No `ToEncodableJson` filter: return null
+    if (!accessRules.hasRuleForEntityTypeField(t)) {
+      return null;
+    }
+
+    return (o, j) {
+      if (o == null) return null;
+
+      var enc = encodableJsonProvider(o);
+
+      Object? map;
+      if (enc == null) {
+        map = Json.toJson(o, toEncodable: ReflectionFactory.toJsonEncodable);
+      } else {
+        map = enc(o, j);
+      }
+
+      if (map is! Map) return map;
+
+      var t = o.runtimeType;
+
+      var c = EntityAccessRulesContext(accessRules, o, context: apiRequest);
+
+      map.removeWhere((key, _) {
+        var allowed = accessRules.isAllowedEntityTypeField(t, key, context: c);
+        return allowed != null && !allowed;
+      });
+
+      return map;
+    };
   }
 
   static final RegExp _htmlTag = RegExp(r'<\w+.*?>');
