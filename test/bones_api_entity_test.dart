@@ -978,11 +978,11 @@ void main() {
           creationTime: DateTime.utc(2021, 10, 12, 12, 13, 14, 0, 0));
 
       var user1Json =
-          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101,"stores":[],"closedStores":{"EntityReferenceList":"Store"},"latitude":"0.0","longitude":"0.0"},"roles":[{"enabled":true,"type":"admin"}],"level":10,"userInfo":{"EntityReference":"UserInfo","id":123,"entity":{"id":123,"info":"The user 1"}},"creationTime":"2020-10-11 12:13:14.000Z"}';
+          '{"email":"joe@mail.com","password":"123","address":{"state":"NY","city":"New York","street":"Fifth Avenue","number":101,"stores":[],"closedStores":{"EntityReferenceList":"Store"},"latitude":0.0,"longitude":0.0},"roles":[{"enabled":true,"type":"admin"}],"level":10,"userInfo":{"EntityReference":"UserInfo","id":123,"entity":{"id":123,"info":"The user 1"}},"creationTime":1602418394000}';
       var user2Json =
-          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store","entities":[{"name":"s2","number":2}]},"latitude":"0.0","longitude":"0.0"},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","userInfo":null,"creationTime":"2021-10-11 12:13:14.000Z"}';
+          '{"email":"smith@mail.com","password":"abc","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":404,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store","entities":[{"name":"s2","number":2}]},"latitude":0.0,"longitude":0.0},"roles":[{"enabled":true,"type":"guest","value":"12345.678"}],"wakeUpTime":"12:13:14.150","creationTime":1633954394000}';
       var user3Json =
-          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store"},"latitude":"0.5","longitude":"0.6"},"roles":[],"wakeUpTime":"00:13:14.150","userInfo":null,"creationTime":"2021-10-12 12:13:14.000Z"}';
+          '{"email":"john@mail.com","password":"456","address":{"state":"CA","city":"Los Angeles","street":"Hollywood Boulevard","number":101,"stores":[{"name":"s1","number":1}],"closedStores":{"EntityReferenceList":"Store"},"latitude":0.5,"longitude":0.6},"roles":[],"wakeUpTime":"00:13:14.150","creationTime":1634040794000}';
 
       addressEntityHandler.inspectObject(user1.address);
       roleEntityHandler.inspectObject(user1.roles.first);

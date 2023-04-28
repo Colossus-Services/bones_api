@@ -56,7 +56,7 @@ void main() {
 
       expect(
           Json.toJson(Role(RoleType.admin), removeField: (k) => k == 'enabled'),
-          equals({'id': null, 'type': 'admin', 'value': null}));
+          equals({'type': 'admin', 'value': null}));
 
       expect(
           Json.toJson(
@@ -69,12 +69,7 @@ void main() {
           Json.toJson(EntityReference.fromEntity(Role(RoleType.admin))),
           equals({
             'EntityReference': 'Role',
-            'entity': {
-              'enabled': true,
-              'id': null,
-              'type': 'admin',
-              'value': null
-            }
+            'entity': {'enabled': true, 'type': 'admin', 'value': null}
           }));
 
       expect(
@@ -91,8 +86,8 @@ void main() {
           equals({
             'EntityReferenceList': 'Role',
             'entities': [
-              {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
-              {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+              {'enabled': true, 'type': 'admin', 'value': null},
+              {'enabled': true, 'type': 'guest', 'value': null}
             ]
           }));
 
@@ -120,8 +115,8 @@ void main() {
             'value': {
               'EntityReferenceList': 'Role',
               'entities': [
-                {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
-                {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+                {'enabled': true, 'type': 'admin', 'value': null},
+                {'enabled': true, 'type': 'guest', 'value': null}
               ]
             }
           }));
@@ -158,19 +153,14 @@ void main() {
               {
                 'EntityReferenceList': 'Role',
                 'entities': [
-                  {'enabled': true, 'id': null, 'type': 'admin', 'value': null},
-                  {'enabled': true, 'id': null, 'type': 'guest', 'value': null}
+                  {'enabled': true, 'type': 'admin', 'value': null},
+                  {'enabled': true, 'type': 'guest', 'value': null}
                 ]
               },
               {
                 'EntityReferenceList': 'Role',
                 'entities': [
-                  {
-                    'enabled': true,
-                    'id': null,
-                    'type': 'unknown',
-                    'value': null
-                  }
+                  {'enabled': true, 'type': 'unknown', 'value': null}
                 ]
               }
             ]
