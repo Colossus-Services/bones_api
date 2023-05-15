@@ -12,6 +12,8 @@
   - Fix `valueToDynamicNumber` for `DateTime` types.
 - Added `APIEntityTypeNullableExtension` to avoid resolution to `APIEntityObjectExtension` on `Type?` variables.
 - `SQLBuilder`: added logger and messages.
+- `DBMySQLAdapter`:
+  - Decode `TIME` SQL type as `Time` class. 
 
 ## 1.4.2
 

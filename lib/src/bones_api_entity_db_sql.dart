@@ -446,12 +446,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       for (var e in repositorySchemes.entries) {
         var repository = e.key;
         var scheme = e.value;
+
+        var repoType = repository.type;
+
         if (scheme == null) {
           _log.severe(
-              'No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> generateTables: $_generateTables @ $this');
+              'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
 
           throw StateError(
-              'No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> generateTables: $_generateTables @ $this');
+              'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
         }
 
         var entityHandler = repository.entityHandler;
@@ -480,7 +483,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           var schemeType = e.value;
           var fieldType = entityHandler.getFieldType(null, f);
 
-          if (!checkDBTableField(schemeType, fieldType)) {
+          if (!checkDBTableField(repoType, f, schemeType, fieldType)) {
             throw StateError(
                 "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
           }
@@ -528,10 +531,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         if (missingFields.isNotEmpty) {
           _log.severe(
-              "ERROR Checking table `$schemeTableName`> entityType: `${repository.type}` ; missingFields: $missingFields");
+              "ERROR Checking table `$schemeTableName`> entityType: `$repoType` ; missingFields: $missingFields");
 
           throw StateError(
-              "Can't find all `${repository.type}` fields in table `$schemeTableName` scheme>\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingFields: $missingFields\n");
+              "Can't find all `$repoType` fields in table `$schemeTableName` scheme>\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingFields: $missingFields\n");
         }
 
         _log.info('Checking table `$schemeTableName`: OK');
@@ -544,20 +547,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  bool checkDBTableField(Type? schemeType, TypeInfo<dynamic>? fieldType) {
+  bool checkDBTableField(Type entityType, String fieldName, Type? schemeType,
+      TypeInfo<dynamic>? fieldType) {
     if (schemeType == null || fieldType == null) {
       throw StateError(
-          "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType > $this");
+          "Invalid scheme field(`$entityType`.`$fieldName`) type> schemeType: $schemeType ; fieldType: $fieldType > $this");
     }
 
-    var entityType = fieldType.entityType;
+    var fieldEntityType = fieldType.entityType;
 
-    if (entityType != null) {
-      if (schemeType != entityType &&
+    if (fieldEntityType != null) {
+      if (schemeType != fieldEntityType &&
           !schemeType.isEntityIDType &&
           !fieldType.isEntityReferenceType) {
         throw StateError(
-            "Invalid scheme type> entityType: $entityType ; schemeType: $schemeType (invalid ID type) > $this");
+            "Invalid scheme field(`$fieldName`) type> fieldEntityType: $fieldEntityType ; schemeType: $schemeType (invalid ID type) > $this");
       }
 
       return true;
@@ -576,7 +580,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       throw StateError(
-          "Invalid scheme type> entityType: $entityType != schemeType: $schemeType > $this");
+          "Invalid scheme field(`$fieldName`) type> fieldType: $type != schemeType: $schemeType > $this");
     }
   }
 

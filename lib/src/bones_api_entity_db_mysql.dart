@@ -13,6 +13,7 @@ import 'bones_api_entity_db_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
@@ -366,9 +367,10 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       case 'varchar':
       case 'enum':
         return String;
+      case 'time':
+        return Time;
       case 'timestamp':
       case 'date':
-      case 'time':
       case 'datetime':
         return DateTime;
       default:

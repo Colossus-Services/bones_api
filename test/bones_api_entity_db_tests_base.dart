@@ -193,7 +193,7 @@ Future<bool> runAdapterTests(
   var testDomain = '${dbName.toLowerCase()}.com';
 
   group(
-      'SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}${checkTables ? '+checkTables' : ''}${generateTables ? '+generateTables' : ''}]',
+      'SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}${generateTables ? '+generateTables' : ''}${checkTables ? '+checkTables' : ''}]',
       () {
     late final TestEntityRepositoryProvider entityRepositoryProvider;
     late final TestEntityRepositoryProvider2 entityRepositoryProvider2;
