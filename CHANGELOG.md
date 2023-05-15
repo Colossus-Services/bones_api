@@ -1,3 +1,18 @@
+## 1.4.3
+
+- `DBAdapter`:
+  - Added `checkDB`: checks DB tables and fields.
+    - Moved call to `generateTables` to `checkDB`. 
+  - `createPoolElement`: optimize calls to `createConnection` when creating multiple connections simultaneously.
+- `FieldsFromMap`:
+  - Added `getFieldsKeysInMap`.
+- `TableScheme`:
+  - Added `relationshipTables`.
+- `EntityHandler`:
+  - Fix `valueToDynamicNumber` for `DateTime` types.
+- Added `APIEntityTypeNullableExtension` to avoid resolution to `APIEntityObjectExtension` on `Type?` variables.
+- `SQLBuilder`: added logger and messages.
+
 ## 1.4.2
 
 - `Json`:

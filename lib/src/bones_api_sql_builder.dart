@@ -10,6 +10,9 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _log = logging.Logger('SQLBuilder');
 
 /// A column information of a [SQLEntry].
 class SQLColumn implements Comparable<SQLColumn> {
@@ -1173,7 +1176,10 @@ abstract class SQLGenerator {
         }
       }
 
-      if (fieldSQLType == null) continue;
+      if (fieldSQLType == null) {
+        _log.warning("Can't define field SQL type: `$table`.`$fieldName`");
+        continue;
+      }
 
       sqlEntries.add(SQLEntry('COLUMN', ' $q$columnName$q $fieldSQLType',
           comment: comment,

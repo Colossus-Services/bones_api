@@ -1484,15 +1484,18 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   static DynamicNumber valueToDynamicNumber(Object? value,
       {DynamicNumber? def}) {
-    DynamicNumber? n;
-
-    if (value == null) {
-      n = def;
-    } else if (value is DynamicNumber) {
-      n = value;
-    } else {
-      n = Decimal.from(value.toString().trim()) ?? def;
+    if (value is DynamicNumber) {
+      return value;
+    } else if (value is double) {
+      return Decimal.fromDouble(value);
+    } else if (value is int) {
+      return DynamicInt.fromInt(value);
+    } else if (value is DateTime) {
+      return DynamicInt.fromInt(value.millisecondsSinceEpoch);
     }
+
+    DynamicNumber? n =
+        value == null ? def : (Decimal.from(value.toString().trim()) ?? def);
 
     if (n == null) {
       throw ArgumentError(

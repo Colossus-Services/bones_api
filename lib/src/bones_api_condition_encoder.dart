@@ -207,6 +207,12 @@ class TableScheme with FieldsFromMap {
         UnmodifiableListView<TableRelationshipReference>(value));
   }
 
+  /// Returns [_relationshipTables] length.
+  int get relationshipTablesLength => _relationshipTables.length;
+
+  Set<TableRelationshipReference> get relationshipTables =>
+      UnmodifiableSetView(_relationshipTables);
+
   bool get hasTableReferences =>
       fieldsReferencedTablesLength > 0 || tableRelationshipReferenceLength > 0;
 
@@ -220,6 +226,7 @@ class TableScheme with FieldsFromMap {
   int get tableRelationshipReferenceLength =>
       _tableRelationshipReference.length;
 
+  /// Returns [_tableRelationshipReference].
   Map<String, List<TableRelationshipReference>>
       get tableRelationshipReference =>
           UnmodifiableMapView<String, List<TableRelationshipReference>>(

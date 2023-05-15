@@ -360,23 +360,185 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   bool _generateTables = false;
+
+  @override
+  FutureOr<bool> checkDB() {
+    if (_generateTables) {
+      _generateTables = false;
+
+      return generateTables().resolveMapped((tables) {
+        tables.sort();
+        _log.info("Generated tables: $tables");
+        return checkDBTables();
+      });
+    }
+
+    return checkDBTables();
+  }
+
+  FutureOr<bool> checkDBTables() {
+    _log.info("Checking DB tables for $this> loading tables schemes...");
+
+    var repositorySchemes = getRepositoriesSchemes();
+
+    return repositorySchemes.resolveMapped((repositorySchemes) {
+      for (var e in repositorySchemes.entries) {
+        var repository = e.key;
+        var scheme = e.value;
+        if (scheme == null) {
+          _log.warning(
+              'Ignoring `${repository.name}`: No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> $this');
+          continue;
+        }
+
+        var entityHandler = repository.entityHandler;
+        var repoFieldsNames = entityHandler.fieldsNames();
+
+        var repoFieldsMap =
+            repoFieldsNames.map((f) => MapEntry(f, f)).toMapFromEntries();
+
+        var repoTable = getTableForEntityRepository(repository);
+
+        var schemeToRepoMap =
+            scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
+
+        var schemesTypes = schemeToRepoMap.entries
+            .map((e) {
+              var schemeField = e.key;
+              var repoField = e.value;
+              if (repoField == null) return null;
+              return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
+            })
+            .whereNotNull()
+            .toMapFromEntries();
+
+        for (var e in schemesTypes.entries) {
+          var f = e.key;
+          var schemeType = e.value;
+          var fieldType = entityHandler.getFieldType(null, f);
+
+          if (!checkDBTableField(schemeType, fieldType)) {
+            throw StateError(
+                "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
+          }
+        }
+
+        var fieldsInScheme = schemeToRepoMap.values.toList();
+
+        var repoFieldsNotInScheme = repoFieldsNames
+            .whereNot((f) => fieldsInScheme.contains(f))
+            .toList();
+
+        var relationshipFields = repoFieldsNotInScheme
+            .map((f) {
+              var fieldType = entityHandler.getFieldType(null, f);
+              if (fieldType == null) return null;
+              var entityType =
+                  fieldType.entityTypeInfo ?? fieldType.listEntityType;
+              if (entityType == null) return null;
+              var refTable = getTableForType(entityType);
+              if (refTable == null) return null;
+
+              try {
+                var tableRef = scheme.getTableRelationshipReference(
+                    sourceTable: repoTable,
+                    sourceField: f,
+                    targetTable: refTable);
+
+                return MapEntry(f, tableRef);
+              } catch (e) {
+                _log.warning(
+                    "Can't find relationship table for field: `$repoTable`.`$f`",
+                    e);
+                return null;
+              }
+            })
+            .whereNotNull()
+            .toMapFromEntries();
+
+        var missingFields = repoFieldsNames
+            .whereNot((f) =>
+                fieldsInScheme.contains(f) || relationshipFields.containsKey(f))
+            .toList();
+
+        var schemeTableName = scheme.name;
+
+        if (missingFields.isNotEmpty) {
+          _log.severe(
+              "ERROR Checking table `$schemeTableName`> entityType: `${repository.type}` ; missingFields: $missingFields");
+
+          throw StateError(
+              "Can't find all `${repository.type}` fields in table `$schemeTableName` scheme>\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingFields: $missingFields\n");
+        }
+
+        _log.info('Checking table `$schemeTableName`: OK');
+      }
+
+      _log.info('All tables OK @ $this');
+
+      return true;
+    });
+  }
+
+  bool checkDBTableField(Type? schemeType, TypeInfo<dynamic>? fieldType) {
+    if (schemeType == null || fieldType == null) {
+      throw StateError(
+          "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType > $this");
+    }
+
+    var entityType = fieldType.entityType;
+
+    if (entityType != null) {
+      if (schemeType != entityType &&
+          !schemeType.isEntityIDType &&
+          !fieldType.isEntityReferenceType) {
+        throw StateError(
+            "Invalid scheme type> entityType: $entityType ; schemeType: $schemeType (invalid ID type) > $this");
+      }
+
+      return true;
+    } else {
+      var type = fieldType.type;
+      if (schemeType == type) {
+        return true;
+      }
+
+      if (schemeType == String) {
+        var enumReflection =
+            ReflectionFactory().getRegisterEnumReflection(type);
+        if (enumReflection != null && enumReflection.enumType == type) {
+          return true;
+        }
+      }
+
+      throw StateError(
+          "Invalid scheme type> entityType: $entityType != schemeType: $schemeType > $this");
+    }
+  }
+
+  Future<Map<EntityRepository<Object>, TableScheme?>>
+      getRepositoriesSchemes() async {
+    var reposBlocks =
+        entityRepositories.splitBeforeIndexed((i, r) => i % 2 == 0).toList();
+
+    final allSchemes = <EntityRepository<Object>, TableScheme?>{};
+
+    for (var block in reposBlocks) {
+      var repositorySchemes = await block
+          .map((r) => MapEntry(r, getTableSchemeForEntityRepository(r)))
+          .toMapFromEntries()
+          .resolveAllValues();
+
+      allSchemes.addAll(repositorySchemes);
+    }
+
+    return allSchemes;
+  }
+
   Object? _populateTables;
 
   @override
   FutureOr<InitializationResult> populateImpl() {
-    if (_generateTables) {
-      _generateTables = false;
-      return generateTables().resolveMapped((tables) {
-        tables.sort();
-        _log.info("Generated tables: $tables");
-        return _populateImpl2();
-      });
-    }
-
-    return _populateImpl2();
-  }
-
-  FutureOr<InitializationResult> _populateImpl2() {
     var tables = _populateTables;
     if (tables != null) {
       _populateTables = null;

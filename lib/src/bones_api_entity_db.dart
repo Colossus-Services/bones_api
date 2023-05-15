@@ -213,12 +213,20 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<InitializationResult> initialize() => populateImpl();
+  FutureOr<InitializationResult> initialize() {
+    return checkDB().resolveMapped((dbOK) {
+      if (!dbOK) {
+        throw StateError("Can't initialize `DBAdapter`: Table check failed!");
+      }
 
-  final StreamController<DBAdapter<C>> _onCloseControler = StreamController();
+      return populateImpl();
+    });
+  }
+
+  final StreamController<DBAdapter<C>> _onCloseController = StreamController();
 
   /// On [close] events.
-  late final Stream<DBAdapter<C>> onClose = _onCloseControler.stream;
+  late final Stream<DBAdapter<C>> onClose = _onCloseController.stream;
 
   @override
   bool close() {
@@ -228,7 +236,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     // ignore: discarded_futures
     clearPool();
 
-    _onCloseControler.add(this);
+    _onCloseController.add(this);
 
     return true;
   }
@@ -237,6 +245,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       <String, dynamic>{};
 
   final String? _workingPath;
+
+  FutureOr<bool> checkDB() => true;
 
   Object? _populateSource;
 
@@ -470,15 +480,85 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   @override
   int get poolSizeDesiredLimit => maxConnections;
 
+  int _creatingConnectionsYieldCount = 0;
+
   /// Defaults: calls [createConnection].
   @override
   FutureOr<C?> createPoolElement() {
     super.createPoolElement();
 
     if (poolSize < maxConnections) {
-      return createConnection();
+      if (_creatingConnectionsCount > 3) {
+        var yield1 = _yieldByCreatingConnections();
+        var yield2 = _yieldByCreatingConnectionsYield();
+        final yieldMs = yield1 + yield2;
+
+        ++_creatingConnectionsYieldCount;
+
+        return Future.delayed(Duration(milliseconds: yieldMs), () {
+          --_creatingConnectionsYieldCount;
+
+          var conn = catchFromPopulatedPool();
+          if (conn == null) {
+            //print('!!! yieldMs: $yield1 + $yield2 = $yieldMs >> _creatingConnectionsCount: $_creatingConnectionsCount > _creatingConnectionsYeldCount: $_creatingConnectionsYieldCount');
+            return _createPoolElementImpl();
+          }
+
+          return conn.resolveMapped((conn) {
+            if (conn != null) return conn;
+            return _createPoolElementImpl();
+          });
+        });
+      } else {
+        return _createPoolElementImpl();
+      }
     } else {
       return null;
+    }
+  }
+
+  int _yieldByCreatingConnectionsYield() {
+    final count = _creatingConnectionsYieldCount;
+    if (count > 20) {
+      return 2000;
+    } else if (count > 10) {
+      return count * 50;
+    } else {
+      return count * 20;
+    }
+  }
+
+  int _yieldByCreatingConnections() {
+    final count = _creatingConnectionsCount;
+    if (count > 20) {
+      return 2000;
+    } else if (count > 10) {
+      return count * 50;
+    } else {
+      return count * 20;
+    }
+  }
+
+  FutureOr<C?> _createPoolElementImpl() {
+    var ret = createConnection();
+    if (ret is! Future) {
+      return ret;
+    }
+
+    return _createPoolElementAsync(ret);
+  }
+
+  int _creatingConnectionsCount = 0;
+
+  FutureOr<C> _createPoolElementAsync(FutureOr<C> connAsync) async {
+    try {
+      ++_creatingConnectionsCount;
+
+      var conn = await connAsync;
+      return conn;
+    } finally {
+      --_creatingConnectionsCount;
+      assert(_creatingConnectionsCount >= 0);
     }
   }
 

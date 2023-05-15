@@ -482,6 +482,20 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     return EntityHandler.isValidEntityType(entityType) ? entityType : null;
   }
 
+  /// Same as [entityType]. Returns a valid entity [TypeInfo].
+  TypeInfo? get entityTypeInfo {
+    TypeInfo? entityType;
+    if (type.isEntityReferenceBaseType) {
+      entityType = arguments0;
+    } else {
+      entityType = this;
+    }
+
+    return EntityHandler.isValidEntityType(entityType?.type)
+        ? entityType
+        : null;
+  }
+
   bool equalsEntityType(TypeInfo? other) {
     if (other == null) return false;
 
@@ -839,6 +853,34 @@ extension APIEntityTypeExtension on Type {
 
   /// Parses [value] using [TypeInfo.parse].
   V? tryParse<V>(Object? value, [V? def]) => typeInfo.parse(value);
+}
+
+/// Extension for entity [Type]s.
+/// - `extension on Type?` avoids resolution to `extension on Object?`.
+extension APIEntityTypeNullableExtension on Type? {
+  /// Returns `true` if `this` [Type] is an [int] or [String].
+  bool get isEntityIDPrimitiveType {
+    var self = this;
+    return self != null && self.isEntityIDPrimitiveType;
+  }
+
+  /// Returns `true` if `this` [Type] is an [int], [BigInt] or [String].
+  bool get isEntityIDType {
+    var self = this;
+    return self != null && self.isEntityIDType;
+  }
+
+  /// Returns `true` if `this` [Type] is an [EntityReference] or [EntityReferenceList].
+  bool get isEntityReferenceBaseType {
+    var self = this;
+    return self != null && self.isEntityReferenceBaseType;
+  }
+
+  /// Returns this [type] as a [TypeInfo].
+  TypeInfo? get typeInfo {
+    var self = this;
+    return self?.typeInfo;
+  }
 }
 
 /// Extension for entity [Object]s.

@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_utils.dart';
 
@@ -187,6 +188,11 @@ mixin Pool<O> {
         return ret;
       }
     });
+  }
+
+  FutureOr<O?> catchFromPopulatedPool() {
+    if (_pool.isEmpty) return null;
+    return _catchFromPopulatedPool();
   }
 
   FutureOr<O> _catchFromPopulatedPool() {
@@ -458,7 +464,28 @@ mixin FieldsFromMap {
     return MapEntry(field, value);
   }
 
-  /// Returns a [field] value from [map].
+  /// Returns a [Map] of [field] keys from [map].
+  /// - [field] is case insensitive.
+  Map<String, String?> getFieldsKeysInMap(
+      List<String> fields, Map<String, Object?> map,
+      {String? fieldLC,
+      String? fieldSimple,
+      Map<String, String>? mapLC,
+      Map<String, String>? mapSimple}) {
+    var fieldsMap = fields
+        .map((f) => MapEntry(
+            f,
+            getFieldKeyInMap(f, map,
+                fieldLC: fieldLC,
+                fieldSimple: fieldSimple,
+                mapLC: mapLC,
+                mapSimple: mapSimple)))
+        .toMapFromEntries();
+
+    return fieldsMap;
+  }
+
+  /// Returns a [field] key from [map].
   /// - [field] is case insensitive.
   String? getFieldKeyInMap(String field, Map<String, Object?> map,
       {String? fieldLC,
