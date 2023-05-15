@@ -34,10 +34,10 @@ Future<bool> _runTest(bool useReflection) {
   return runAdapterTests(
     'DBSQLMemory+obj.dir',
     MemoryTestConfig(),
-    (provider, dbPort) => DBSQLMemoryAdapter(
+    (provider, dbPort, dbConfig) => DBSQLMemoryAdapter(
       parentRepositoryProvider: provider,
     ),
-    (provider, dbPort) => DBObjectDirectoryAdapter(tempObjectDir,
+    (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(tempObjectDir,
         parentRepositoryProvider: provider)
       ..onClose.listen((_) {
         tempObjectDir.deleteSync(recursive: true);
@@ -45,5 +45,7 @@ Future<bool> _runTest(bool useReflection) {
     '"',
     'int',
     entityByReflection: useReflection,
+    generateTables: false,
+    checkTables: false,
   );
 }

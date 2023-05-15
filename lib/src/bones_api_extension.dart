@@ -228,11 +228,27 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       getParsed(key, TypeParser.parseBool,
           defaultValue: defaultValue, ignoreCase: ignoreCase);
 
+  /// Gets the value of the first matching [keys], parsing as [bool].
+  ///
+  /// - [def] is the default value if the value is invalid.
+  bool? getMultiKeyAsBool(List<K> keys,
+          {bool? defaultValue, bool ignoreCase = false}) =>
+      getMultiKeyParsed(keys, TypeParser.parseBool,
+          defaultValue: defaultValue, ignoreCase: ignoreCase);
+
   /// Gets a [key] value parsing as [int].
   ///
   /// - [def] is the default value if the value is invalid.
   int? getAsInt(K key, {int? defaultValue, bool ignoreCase = false}) =>
       getParsed(key, TypeParser.parseInt,
+          defaultValue: defaultValue, ignoreCase: ignoreCase);
+
+  /// Gets the value of the first matching [keys], parsing as [int].
+  ///
+  /// - [def] is the default value if the value is invalid.
+  int? getMultiKeyAsInt(List<K> keys,
+          {int? defaultValue, bool ignoreCase = false}) =>
+      getMultiKeyParsed(keys, TypeParser.parseInt,
           defaultValue: defaultValue, ignoreCase: ignoreCase);
 
   /// Gets a [key] value parsing as [double].
@@ -242,6 +258,14 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       getParsed(key, TypeParser.parseDouble,
           defaultValue: defaultValue, ignoreCase: ignoreCase);
 
+  /// Gets the value of the first matching [keys], parsing as [double].
+  ///
+  /// - [def] is the default value if the value is invalid.
+  double? getMultiKeyAsDouble(List<K> keys,
+          {double? defaultValue, bool ignoreCase = false}) =>
+      getMultiKeyParsed(keys, TypeParser.parseDouble,
+          defaultValue: defaultValue, ignoreCase: ignoreCase);
+
   /// Gets a [key] value parsing to [num] type.
   ///
   /// - [def] is the default value if the value is invalid.
@@ -249,11 +273,27 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       getParsed(key, TypeParser.parseNum,
           defaultValue: defaultValue, ignoreCase: ignoreCase);
 
+  /// Gets the value of the first matching [keys], parsing as [num].
+  ///
+  /// - [def] is the default value if the value is invalid.
+  num? getMultiKeyAsNum(List<K> keys,
+          {num? defaultValue, bool ignoreCase = false}) =>
+      getMultiKeyParsed(keys, TypeParser.parseNum,
+          defaultValue: defaultValue, ignoreCase: ignoreCase);
+
   /// Gets a [key] value parsing as [String].
   ///
   /// - [def] is the default value if the value is invalid.
   String? getAsString(K key, {String? defaultValue, bool ignoreCase = false}) =>
       getParsed(key, TypeParser.parseString,
+          defaultValue: defaultValue, ignoreCase: ignoreCase);
+
+  /// Gets the value of the first matching [keys], parsing as [num].
+  ///
+  /// - [def] is the default value if the value is invalid.
+  String? getMultiKeyAsString(List<K> keys,
+          {String? defaultValue, bool ignoreCase = false}) =>
+      getMultiKeyParsed(keys, TypeParser.parseString,
           defaultValue: defaultValue, ignoreCase: ignoreCase);
 
   /// Gets a [key] value parsing as [List].
@@ -316,6 +356,33 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       return value ?? defaultValue;
     } else {
       throw ArgumentError("Can't parse key('$key') value as `$T`: $value");
+    }
+  }
+
+  /// Same as [getParsed] but accepts multiple [keys].
+  T? getMultiKeyParsed<T>(List<K> keys, TypeElementParser<T>? parser,
+      {T? defaultValue, bool ignoreCase = false}) {
+    V? value;
+    if (ignoreCase) {
+      for (var k in keys) {
+        value = getIgnoreCase(k);
+        if (value != null) break;
+      }
+    } else {
+      for (var k in keys) {
+        value = this[k];
+        if (value != null) break;
+      }
+    }
+
+    if (parser != null) {
+      var val2 = parser(value);
+      return val2 ?? defaultValue;
+    } else if (value is T?) {
+      return value ?? defaultValue;
+    } else {
+      throw ArgumentError(
+          "Can't parse key('${keys.join("','")}') value as `$T`: $value");
     }
   }
 }

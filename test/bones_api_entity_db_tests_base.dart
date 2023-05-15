@@ -14,11 +14,14 @@ import 'bones_api_test_entities.dart';
 final _log = logging.Logger('bones_api_test_adapter');
 
 typedef DBAdapterCreator<A extends DBAdapter> = A Function(
-    EntityRepositoryProvider? parentRepositoryProvider, int dbPort);
+    EntityRepositoryProvider? parentRepositoryProvider,
+    int dbPort,
+    Map<String, dynamic>? dbConfig);
 
 class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator;
   final int dbPort;
+  final Map<String, dynamic>? dbConfig;
 
   final EntityHandler<Store> storeEntityHandler;
   final EntityHandler<Address> addressEntityHandler;
@@ -39,14 +42,15 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
       this.userInfoEntityHandler,
       this.userEntityHandler,
       this.sqlAdapterCreator,
-      this.dbPort);
+      this.dbPort,
+      this.dbConfig);
 
   @override
   Map<String, dynamic> get adapterConfig => {};
 
   @override
   FutureOr<DBSQLAdapter<Object>> buildAdapter() =>
-      sqlAdapterCreator(this, dbPort);
+      sqlAdapterCreator(this, dbPort, dbConfig);
 
   List<DBSQLEntityRepository<Object>>? _repositories;
 
@@ -76,20 +80,21 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
 class TestEntityRepositoryProvider2 extends DBEntityRepositoryProvider {
   final DBAdapterCreator<DBAdapter> objectAdapterCreator;
   final int dbPort;
+  final Map<String, dynamic>? dbConfig;
 
   final EntityHandler<Photo> photoEntityHandler;
 
   late final PhotoAPIRepository photoAPIRepository;
 
-  TestEntityRepositoryProvider2(
-      this.photoEntityHandler, this.objectAdapterCreator, this.dbPort);
+  TestEntityRepositoryProvider2(this.photoEntityHandler,
+      this.objectAdapterCreator, this.dbPort, this.dbConfig);
 
   @override
   Map<String, dynamic> get adapterConfig => {};
 
   @override
   FutureOr<DBAdapter<Object>> buildAdapter() =>
-      objectAdapterCreator(this, dbPort);
+      objectAdapterCreator(this, dbPort, dbConfig);
 
   List<DBEntityRepository<Object>>? _repositories;
 
@@ -110,7 +115,8 @@ class TestEntityRepositoryProvider2 extends DBEntityRepositoryProvider {
 TestEntityRepositoryProvider createEntityRepositoryProvider(
         bool entityByReflection,
         DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator,
-        int dbPort) =>
+        int dbPort,
+        Map<String, dynamic>? dbConfig) =>
     entityByReflection
         ? TestEntityRepositoryProvider(
             Store$reflection().entityHandler,
@@ -120,6 +126,7 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
             User$reflection().entityHandler,
             sqlAdapterCreator,
             dbPort,
+            dbConfig,
           )
         : TestEntityRepositoryProvider(
             storeEntityHandler..inspectObject(Store.empty()),
@@ -129,22 +136,26 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
             userEntityHandler..inspectObject(User.empty()),
             sqlAdapterCreator,
             dbPort,
+            dbConfig,
           );
 
 TestEntityRepositoryProvider2 createEntityRepositoryProvider2(
         bool entityByReflection,
         DBAdapterCreator<DBAdapter> objectAdapterCreator,
-        int dbPort) =>
+        int dbPort,
+        Map<String, dynamic>? dbConfig) =>
     entityByReflection
         ? TestEntityRepositoryProvider2(
             Photo$reflection().entityHandler,
             objectAdapterCreator,
             dbPort,
+            dbConfig,
           )
         : TestEntityRepositoryProvider2(
             photoEntityHandler..inspectObject(Photo.empty()),
             objectAdapterCreator,
             dbPort,
+            dbConfig,
           );
 
 const String png1PixelBase64 =
@@ -160,7 +171,9 @@ Future<bool> runAdapterTests(
     DBAdapterCreator<DBAdapter> objectAdapterCreator,
     String cmdQuote,
     String serialIntType,
-    {required bool entityByReflection}) async {
+    {required bool entityByReflection,
+    required bool checkTables,
+    required bool generateTables}) async {
   _log.handler.logToConsole();
 
   User$reflection.boot();
@@ -179,7 +192,9 @@ Future<bool> runAdapterTests(
 
   var testDomain = '${dbName.toLowerCase()}.com';
 
-  group('SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}]', () {
+  group(
+      'SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}${checkTables ? '+checkTables' : ''}${generateTables ? '+generateTables' : ''}]',
+      () {
     late final TestEntityRepositoryProvider entityRepositoryProvider;
     late final TestEntityRepositoryProvider2 entityRepositoryProvider2;
 
@@ -195,14 +210,18 @@ Future<bool> runAdapterTests(
       testLog
           .info('Container start: $startOk > dbPort: $dbPort > $testConfigDB');
 
+      var dbConfig = testConfigDB.apiConfigMap['db'] as Map<String, dynamic>?;
+
       entityRepositoryProvider = createEntityRepositoryProvider(
-          entityByReflection, sqlAdapterCreator, dbPort);
+          entityByReflection, sqlAdapterCreator, dbPort, dbConfig);
 
       entityRepositoryProvider2 = createEntityRepositoryProvider2(
-          entityByReflection, objectAdapterCreator, dbPort);
+          entityByReflection, objectAdapterCreator, dbPort, dbConfig);
 
       await entityRepositoryProvider2.ensureInitialized();
       await entityRepositoryProvider.ensureInitialized();
+
+      await Future.delayed(Duration(seconds: 1));
     });
 
     tearDownAll(() async {
@@ -219,6 +238,10 @@ Future<bool> runAdapterTests(
     test('generateFullCreateTableSQLs', () async {
       var sqlAdapter = await entityRepositoryProvider.adapter;
       expect(sqlAdapter, isNotNull);
+
+      expect(sqlAdapter.isInitialized, isTrue);
+      expect(sqlAdapter.generatedTables, generateTables);
+      expect(sqlAdapter.checkedTables, checkTables);
 
       var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
           title: 'Test Generated SQL', withDate: false);

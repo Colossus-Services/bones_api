@@ -15,7 +15,7 @@ class PostgresTestConfig extends APITestConfigDockerPostgreSQL {
   @override
   String get runtimeTypeNameSafe => 'PostgresTestConfig';
 
-  PostgresTestConfig()
+  PostgresTestConfig({required bool generateTables, required bool checkTables})
       : super({
           'db': {
             'postgres': {
@@ -23,29 +23,41 @@ class PostgresTestConfig extends APITestConfigDockerPostgreSQL {
               'password': dbPass,
               'database': dbName,
               'port': -5432,
+              'generateTables': generateTables,
+              'checkTables': checkTables,
             }
           }
         }, containerNamePrefix: 'bones_api_test_postgres');
 }
 
 Future<void> main() async {
-  await _runTest(true);
-  await _runTest(false);
+  await _runTest(true, false, false);
+  await _runTest(false, false, false);
+
+  await _runTest(true, true, false);
+  await _runTest(true, true, true);
 }
 
-Future<bool> _runTest(bool useReflection) => runAdapterTests(
+Future<bool> _runTest(
+        bool useReflection, bool generateTables, bool checkTables) =>
+    runAdapterTests(
       'PostgreSQL',
-      PostgresTestConfig(),
-      (provider, dbPort) => DBPostgreSQLAdapter(
+      PostgresTestConfig(
+          generateTables: generateTables, checkTables: checkTables),
+      (provider, dbPort, dbConfig) => DBPostgreSQLAdapter(
         dbName,
         dbUser,
         password: dbPass,
         port: dbPort,
         parentRepositoryProvider: provider,
+        generateTables: generateTables,
+        checkTables: checkTables,
       ),
-      (provider, dbPort) =>
+      (provider, dbPort, dbConfig) =>
           DBObjectMemoryAdapter(parentRepositoryProvider: provider),
       '"',
       'bigint',
       entityByReflection: useReflection,
+      generateTables: generateTables,
+      checkTables: checkTables,
     );

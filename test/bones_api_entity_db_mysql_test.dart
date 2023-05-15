@@ -15,7 +15,7 @@ class MySQLTestConfig extends APITestConfigDockerMySQL {
   @override
   String get runtimeTypeNameSafe => 'MySQLTestConfig';
 
-  MySQLTestConfig()
+  MySQLTestConfig({required bool generateTables, required bool checkTables})
       : super({
           'db': {
             'mysql': {
@@ -23,6 +23,8 @@ class MySQLTestConfig extends APITestConfigDockerMySQL {
               'password': dbPass,
               'database': dbName,
               'port': -3306,
+              'generateTables': generateTables,
+              'checkTables': checkTables,
             }
           }
         },
@@ -31,24 +33,33 @@ class MySQLTestConfig extends APITestConfigDockerMySQL {
 }
 
 Future<void> main() async {
-  await _runTest(false);
-  await _runTest(true);
+  await _runTest(false, false, false);
+  await _runTest(true, false, false);
+
+  await _runTest(true, true, false);
+  await _runTest(true, true, true);
 }
 
-Future<bool> _runTest(bool useReflection) => runAdapterTests(
+Future<bool> _runTest(
+        bool useReflection, bool generateTables, bool checkTables) =>
+    runAdapterTests(
       'MySQL',
-      MySQLTestConfig(),
-      (provider, dbPort) => DBMySQLAdapter(
+      MySQLTestConfig(generateTables: generateTables, checkTables: checkTables),
+      (provider, dbPort, dbConfig) => DBMySQLAdapter(
         dbName,
         dbUser,
         password: dbPass,
         host: '127.0.0.1',
         port: dbPort,
         parentRepositoryProvider: provider,
+        generateTables: generateTables,
+        checkTables: checkTables,
       ),
-      (provider, dbPort) =>
+      (provider, dbPort, dbConfig) =>
           DBObjectMemoryAdapter(parentRepositoryProvider: provider),
       '`',
       'bigint unsigned',
       entityByReflection: useReflection,
+      generateTables: generateTables,
+      checkTables: checkTables,
     );

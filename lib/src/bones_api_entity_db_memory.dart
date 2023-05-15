@@ -81,7 +81,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   DBSQLMemoryAdapter(
-      {super.generateTables = false,
+      {super.generateTables,
+      super.checkTables,
       super.populateTables,
       super.populateSource,
       super.parentRepositoryProvider,
@@ -111,18 +112,17 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       String? workingPath}) {
     boot();
 
-    var populate = config?['populate'];
+    var retCheckTablesAndGenerateTables =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
-    var generateTables = false;
+    var generateTables = retCheckTablesAndGenerateTables[0];
+    var checkTables = retCheckTablesAndGenerateTables[1];
+
+    var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
-          populate.getAsBool('generate-tables', ignoreCase: true) ??
-          populate.getAsBool('generate_tables', ignoreCase: true) ??
-          false;
-
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -132,6 +132,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var adapter = DBSQLMemoryAdapter(
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
+      checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
       workingPath: workingPath,

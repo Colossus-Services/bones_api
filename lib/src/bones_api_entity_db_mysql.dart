@@ -11,7 +11,6 @@ import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_error_zone.dart';
-import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_utils.dart';
@@ -73,6 +72,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       int minConnections = 1,
       int maxConnections = 3,
       super.generateTables,
+      super.checkTables,
       super.populateTables,
       super.populateSource,
       super.parentRepositoryProvider,
@@ -132,18 +132,17 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
 
-    var populate = config?['populate'];
+    var retCheckTablesAndGenerateTables =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
-    var generateTables = false;
+    var generateTables = retCheckTablesAndGenerateTables[0];
+    var checkTables = retCheckTablesAndGenerateTables[1];
+
+    var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
-          populate.getAsBool('generate-tables', ignoreCase: true) ??
-          populate.getAsBool('generate_tables', ignoreCase: true) ??
-          false;
-
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -162,6 +161,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       minConnections: minConnections!,
       maxConnections: maxConnections!,
       generateTables: generateTables,
+      checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,

@@ -311,6 +311,46 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return null;
   }
 
+  static List<bool> parseConfigDBGenerateTablesAndCheckTables(
+      Map<String, dynamic>? config) {
+    bool? checkTables;
+    bool? generateTables;
+
+    const generateTablesKeys = [
+      'generateTables',
+      'generate-tables',
+      'generate_tables',
+    ];
+
+    const checkTablesKeys = [
+      'checkTables',
+      'check-tables',
+      'check_tables',
+    ];
+
+    generateTables =
+        config?.getMultiKeyAsBool(generateTablesKeys, ignoreCase: true);
+
+    checkTables = config?.getMultiKeyAsBool(checkTablesKeys, ignoreCase: true);
+
+    if (generateTables == null || checkTables == null) {
+      var populate = config?['populate'];
+
+      if (populate is Map) {
+        generateTables ??=
+            populate.getMultiKeyAsBool(generateTablesKeys, ignoreCase: true);
+
+        checkTables ??=
+            populate.getMultiKeyAsBool(checkTablesKeys, ignoreCase: true);
+      }
+    }
+
+    generateTables ??= false;
+    checkTables ??= true;
+
+    return [generateTables, checkTables];
+  }
+
   /// The [DBSQLAdapter] capability.
   @override
   DBSQLAdapterCapability get capability =>
@@ -323,12 +363,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   DBSQLAdapter(String name, int minConnections, int maxConnections,
       DBSQLAdapterCapability capability,
       {bool generateTables = false,
+      bool checkTables = true,
       Object? populateTables,
       super.parentRepositoryProvider,
       super.populateSource,
       super.workingPath,
       this.logSQL = false})
       : _generateTables = generateTables,
+        _checkTables = checkTables,
         _populateTables = populateTables,
         super(name, minConnections, maxConnections, capability) {
     boot();
@@ -359,7 +401,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         workingPath: workingPath);
   }
 
-  bool _generateTables = false;
+  bool _generateTables;
+  bool _generatedTables = false;
+
+  /// Return `true` if DB tables where successfully generated.
+  /// - [generateTables] is only called if `generateTables: true` is passed to the constructor.
+  bool get generatedTables => _generatedTables;
 
   @override
   FutureOr<bool> checkDB() {
@@ -376,7 +423,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return checkDBTables();
   }
 
+  bool _checkTables;
+  bool _checkedTables = false;
+
+  /// Return `true` if DB tables where successfully checked.
+  /// - [checkDBTables] is only called if `checkTables: true` is passed to the constructor.
+  bool get checkedTables => _checkedTables;
+
   FutureOr<bool> checkDBTables() {
+    if (!_checkTables) {
+      _log.warning("Ignoring check of DB tables for $this.");
+      return true;
+    }
+
+    _checkTables = false;
+
     _log.info("Checking DB tables for $this> loading tables schemes...");
 
     var repositorySchemes = getRepositoriesSchemes();
@@ -386,9 +447,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         var repository = e.key;
         var scheme = e.value;
         if (scheme == null) {
-          _log.warning(
-              'Ignoring `${repository.name}`: No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> $this');
-          continue;
+          _log.severe(
+              'No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> generateTables: $_generateTables @ $this');
+
+          throw StateError(
+              'No scheme for repository `${repository.name}` (`${repository.type}`) in this adapter> generateTables: $_generateTables @ $this');
         }
 
         var entityHandler = repository.entityHandler;
@@ -476,6 +539,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       _log.info('All tables OK @ $this');
 
+      _checkedTables = true;
       return true;
     });
   }
@@ -549,11 +613,17 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   FutureOr<List<String>> generateTables() {
-    if (!capability.tableSQL) return <String>[];
+    if (!capability.tableSQL) {
+      _generatedTables = true;
+      return <String>[];
+    }
 
     return generateFullCreateTableSQLs(withDate: false)
         .resolveMapped((fullCreateTableSQLs) {
       return populateTables(fullCreateTableSQLs);
+    }).resolveMapped((tables) {
+      _generatedTables = true;
+      return tables;
     });
   }
 

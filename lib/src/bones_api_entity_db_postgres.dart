@@ -76,7 +76,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
-      super.generateTables = false,
+      super.generateTables,
+      super.checkTables,
       super.populateTables,
       super.populateSource,
       super.parentRepositoryProvider,
@@ -136,18 +137,17 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     minConnections ??= config?['minConnections'] ?? 1;
     maxConnections ??= config?['maxConnections'] ?? 3;
 
-    var populate = config?['populate'];
+    var retCheckTablesAndGenerateTables =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
-    var generateTables = false;
+    var generateTables = retCheckTablesAndGenerateTables[0];
+    var checkTables = retCheckTablesAndGenerateTables[1];
+
+    var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
-          populate.getAsBool('generate-tables', ignoreCase: true) ??
-          populate.getAsBool('generate_tables', ignoreCase: true) ??
-          false;
-
       populateTables = populate['tables'];
       populateSource = populate['source'];
     }
@@ -166,6 +166,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       minConnections: minConnections!,
       maxConnections: maxConnections!,
       generateTables: generateTables,
+      checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
       parentRepositoryProvider: parentRepositoryProvider,

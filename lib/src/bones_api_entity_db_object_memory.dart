@@ -72,7 +72,7 @@ class DBObjectMemoryAdapter
   }
 
   DBObjectMemoryAdapter(
-      {super.generateTables = false,
+      {super.generateTables,
       super.populateTables,
       super.populateSource,
       super.parentRepositoryProvider,

@@ -6,34 +6,45 @@ import 'package:test/test.dart';
 import 'bones_api_entity_db_tests_base.dart';
 
 class MemoryTestConfig extends APITestConfigDBSQLMemory {
-  MemoryTestConfig()
+  MemoryTestConfig({required bool generateTables, required bool checkTables})
       : super({
           'db': {
             'sql.memory': {
               'port': 0,
+              'generateTables': generateTables,
+              'checkTable': checkTables,
             }
           }
         });
 }
 
 Future<void> main() async {
-  await _runTest(true);
-  await _runTest(false);
-  await _runTest(true);
-  await _runTest(false);
+  await _runTest(true, false, false);
+  await _runTest(false, false, false);
+
+  await _runTest(true, true, false);
+  await _runTest(true, true, true);
+
+  await _runTest(false, true, false);
+  await _runTest(false, true, true);
 }
 
-Future<bool> _runTest(bool useReflection) {
+Future<bool> _runTest(
+    bool useReflection, bool generateTables, bool checkTables) {
   return runAdapterTests(
     'DBSQLMemory',
-    MemoryTestConfig(),
-    (provider, dbPort) => DBSQLMemoryAdapter(
+    MemoryTestConfig(generateTables: generateTables, checkTables: checkTables),
+    (provider, dbPort, dbConfig) => DBSQLMemoryAdapter(
       parentRepositoryProvider: provider,
+      generateTables: generateTables,
+      checkTables: checkTables,
     ),
-    (provider, dbPort) =>
+    (provider, dbPort, dbConfig) =>
         DBObjectMemoryAdapter(parentRepositoryProvider: provider),
     '"',
     'int',
     entityByReflection: useReflection,
+    generateTables: generateTables,
+    checkTables: checkTables,
   );
 }
