@@ -36,6 +36,8 @@ Future<bool> _runTest(bool useReflection) {
     MemoryTestConfig(),
     (provider, dbPort, dbConfig) => DBSQLMemoryAdapter(
       parentRepositoryProvider: provider,
+      generateTables: false,
+      checkTables: false,
     ),
     (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(tempObjectDir,
         parentRepositoryProvider: provider)
