@@ -14,6 +14,7 @@
 - `SQLBuilder`: added logger and messages.
 - `DBMySQLAdapter`:
   - Decode `TIME` SQL type as `Time` class. 
+- sdk: '>=2.18.0 <4.0.0'
 
 ## 1.4.2
 
