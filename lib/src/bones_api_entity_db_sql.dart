@@ -9,6 +9,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_memory.dart';
 import 'bones_api_entity_db_relational.dart';
@@ -442,109 +443,139 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var repositorySchemes = getRepositoriesSchemes();
 
-    return repositorySchemes.resolveMapped((repositorySchemes) {
-      for (var e in repositorySchemes.entries) {
-        var repository = e.key;
-        var scheme = e.value;
+    return repositorySchemes.resolveMapped(_checkDBTablesImpl);
+  }
 
-        var repoType = repository.type;
+  FutureOr<bool> _checkDBTablesImpl(
+      Map<EntityRepository<Object>, TableScheme?> repositorySchemes) {
+    var repositoriesChecks = repositorySchemes.entries
+        .map((e) => _checkDBTableScheme(e.key, e.value))
+        .toList();
 
-        if (scheme == null) {
-          _log.severe(
-              'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
+    var repositoriesChecksErrors =
+        repositoriesChecks.where((e) => e.isError).toList();
 
-          throw StateError(
-              'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
-        }
+    if (repositoriesChecksErrors.isNotEmpty) {
+      var alterTablesSQLs = repositoriesChecksErrors
+          .where((e) => e.missingColumns != null)
+          .expand((e) => e.generateMissingColumnsAlterTableSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-        var entityHandler = repository.entityHandler;
-        var repoFieldsNames = entityHandler.fieldsNames();
+      _log.info(
+          'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
 
-        var repoFieldsMap =
-            repoFieldsNames.map((f) => MapEntry(f, f)).toMapFromEntries();
+      var allErrors = repositoriesChecksErrors.join('\n');
 
-        var repoTable = getTableForEntityRepository(repository);
+      throw StateError('Error checking DB tables:\n\n$allErrors');
+    }
 
-        var schemeToRepoMap =
-            scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
+    _log.info('All tables OK @ $this');
 
-        var schemesTypes = schemeToRepoMap.entries
-            .map((e) {
-              var schemeField = e.key;
-              var repoField = e.value;
-              if (repoField == null) return null;
-              return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
-            })
-            .whereNotNull()
-            .toMapFromEntries();
+    _checkedTables = true;
+    return true;
+  }
 
-        for (var e in schemesTypes.entries) {
-          var f = e.key;
-          var schemeType = e.value;
-          var fieldType = entityHandler.getFieldType(null, f);
+  _DBTableCheck _checkDBTableScheme(
+      EntityRepository<Object> repository, TableScheme? scheme) {
+    var repoType = repository.type;
 
-          if (!checkDBTableField(repoType, f, schemeType, fieldType)) {
-            throw StateError(
-                "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
-          }
-        }
+    if (scheme == null) {
+      _log.severe(
+          'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
 
-        var fieldsInScheme = schemeToRepoMap.values.toList();
+      return _DBTableCheck.error(
+          'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
+    }
 
-        var repoFieldsNotInScheme = repoFieldsNames
-            .whereNot((f) => fieldsInScheme.contains(f))
-            .toList();
+    var entityHandler = repository.entityHandler;
+    var repoFieldsNames = entityHandler.fieldsNames();
 
-        var relationshipFields = repoFieldsNotInScheme
-            .map((f) {
-              var fieldType = entityHandler.getFieldType(null, f);
-              if (fieldType == null) return null;
-              var entityType =
-                  fieldType.entityTypeInfo ?? fieldType.listEntityType;
-              if (entityType == null) return null;
-              var refTable = getTableForType(entityType);
-              if (refTable == null) return null;
+    var repoFieldsMap =
+        repoFieldsNames.map((f) => MapEntry(f, f)).toMapFromEntries();
 
-              try {
-                var tableRef = scheme.getTableRelationshipReference(
-                    sourceTable: repoTable,
-                    sourceField: f,
-                    targetTable: refTable);
+    var repoTable = getTableForEntityRepository(repository);
 
-                return MapEntry(f, tableRef);
-              } catch (e) {
-                _log.warning(
-                    "Can't find relationship table for field: `$repoTable`.`$f`",
-                    e);
-                return null;
-              }
-            })
-            .whereNotNull()
-            .toMapFromEntries();
+    var schemeToRepoMap =
+        scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
 
-        var missingFields = repoFieldsNames
-            .whereNot((f) =>
-                fieldsInScheme.contains(f) || relationshipFields.containsKey(f))
-            .toList();
+    var schemesTypes = schemeToRepoMap.entries
+        .map((e) {
+          var schemeField = e.key;
+          var repoField = e.value;
+          if (repoField == null) return null;
+          return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
+        })
+        .whereNotNull()
+        .toMapFromEntries();
 
-        var schemeTableName = scheme.name;
+    for (var e in schemesTypes.entries) {
+      var f = e.key;
+      var schemeType = e.value;
+      var fieldType = entityHandler.getFieldType(null, f);
 
-        if (missingFields.isNotEmpty) {
-          _log.severe(
-              "ERROR Checking table `$schemeTableName`> entityType: `$repoType` ; missingFields: $missingFields");
-
-          throw StateError(
-              "Can't find all `$repoType` fields in table `$schemeTableName` scheme>\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingFields: $missingFields\n");
-        }
-
-        _log.info('Checking table `$schemeTableName`: OK');
+      if (!checkDBTableField(repoType, f, schemeType, fieldType)) {
+        return _DBTableCheck.error(
+            "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
       }
+    }
 
-      _log.info('All tables OK @ $this');
+    var fieldsInScheme = schemeToRepoMap.values.toList();
 
-      _checkedTables = true;
-      return true;
-    });
+    var repoFieldsNotInScheme =
+        repoFieldsNames.whereNot((f) => fieldsInScheme.contains(f)).toList();
+
+    var relationshipFields = repoFieldsNotInScheme
+        .map((f) {
+          var fieldType = entityHandler.getFieldType(null, f);
+          if (fieldType == null) return null;
+          var entityType = fieldType.entityTypeInfo ?? fieldType.listEntityType;
+          if (entityType == null) return null;
+          var refTable = getTableForType(entityType);
+          if (refTable == null) return null;
+
+          try {
+            var tableRef = scheme.getTableRelationshipReference(
+                sourceTable: repoTable, sourceField: f, targetTable: refTable);
+
+            return MapEntry(f, tableRef);
+          } catch (e) {
+            _log.warning(
+                "Can't find relationship table for field: `$repoTable`.`$f`",
+                e);
+            return null;
+          }
+        })
+        .whereNotNull()
+        .toMapFromEntries();
+
+    var missingColumns = repoFieldsNames
+        .whereNot((f) =>
+            fieldsInScheme.contains(f) || relationshipFields.containsKey(f))
+        .toList();
+
+    var schemeTableName = scheme.name;
+
+    if (missingColumns.isNotEmpty) {
+      _log.severe(
+          "ERROR Checking table `$schemeTableName`> entityType: `$repoType` ; missingColumns: $missingColumns");
+
+      return _DBTableCheck.missingColumns(
+          repository,
+          scheme,
+          missingColumns.map((f) {
+            var type = entityHandler.getFieldType(null, f) ?? TypeInfo.tString;
+            var annotations = entityHandler
+                .getFieldEntityAnnotations(null, f)
+                ?.whereType<EntityField>()
+                .toList();
+            return _DBTableMissingColumn(f, type, annotations);
+          }).toList());
+    }
+
+    _log.info('Checking table `$schemeTableName`: OK');
+
+    return _DBTableCheck.ok();
   }
 
   bool checkDBTableField(Type entityType, String fieldName, Type? schemeType,
@@ -2087,6 +2118,71 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .resolveMapped((r) => _finishOperation(op, r, preFinish));
     });
   }
+}
+
+class _DBTableCheck {
+  EntityRepository<Object>? repository;
+  TableScheme? scheme;
+  List<_DBTableMissingColumn>? missingColumns;
+
+  _DBTableCheck.missingColumns(
+      this.repository, this.scheme, this.missingColumns);
+
+  String? error;
+
+  _DBTableCheck.error(this.error);
+
+  _DBTableCheck.ok();
+
+  bool get isOK => error == null && missingColumns == null;
+
+  bool get isError => !isOK;
+
+  List<AlterTableSQL> generateMissingColumnsAlterTableSQLs(
+      SQLGenerator sqlGenerator) {
+    var missingColumns = this.missingColumns;
+    var scheme = this.scheme;
+    if (missingColumns == null || missingColumns.isEmpty || scheme == null) {
+      return [];
+    }
+
+    var table = scheme.name;
+
+    var sqls = missingColumns
+        .map((f) => sqlGenerator.generateAddColumnAlterTableSQL(
+            table, f.name, f.type,
+            entityFieldAnnotations: f.annotations))
+        .toList();
+
+    return sqls;
+  }
+
+  @override
+  String toString() {
+    var missingColumns = this.missingColumns;
+    if (missingColumns != null) {
+      var repoType = repository?.type;
+      var schemeTableName = scheme?.name;
+      var missingColumnsStr = missingColumns
+          .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+          .join(' , ');
+
+      return "Can't find all `$repoType` fields in table `$schemeTableName` scheme:\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingColumns: [$missingColumnsStr]\n";
+    }
+
+    return error?.toString() ?? '';
+  }
+}
+
+class _DBTableMissingColumn {
+  final String name;
+  final TypeInfo type;
+  final List<EntityField>? annotations;
+
+  _DBTableMissingColumn(this.name, this.type, this.annotations);
+
+  @override
+  String toString() => '{$name: $type}';
 }
 
 /// An adapter for [EntityRepository] and [DBSQLAdapter].

@@ -1,3 +1,21 @@
+## 1.4.4
+
+- `AlterTableSQL`:
+  - Added `indexes`.
+  - `buildSQL`: implement `ifNotExists` for `ADD COLUMN`.
+- `SQLGenerator`:
+  - Added `generateAddColumnAlterTableSQL`.
+- `DBSQLAdapter`:
+  - `checkDBTables`:
+    - Now prints in the log a suggestion of `ALTER TABLE` SQLs to fix missing table columns.
+- args: ^2.4.1
+- crypto: ^3.0.3
+- gcloud: ^0.8.8
+- http: ^0.13.6
+- shelf: ^1.4.1
+- shelf_static: ^1.1.2
+- yaml: ^3.1.2
+
 ## 1.4.3
 
 - `DBAdapter`:

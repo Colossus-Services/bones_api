@@ -151,7 +151,7 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// Some extra SQL related to this `SQL`.
   List<SQLBuilder>? get extraSQLBuilders;
 
-  /// All the `SQL`s of this builder tree.
+  /// All the `SQL`s of this builder tree node.
   List<SQLBuilder> get allSQLBuilders =>
       <SQLBuilder>[this, ...?extraSQLBuilders?.expand((e) => e.allSQLBuilders)];
 
@@ -193,7 +193,7 @@ class CreateIndexSQL extends SQLBuilder {
       sql.write('IF NOT EXISTS ');
     }
 
-    sql.write('$q$indexName$q ON $q$table$q ($q$column$q)');
+    sql.write('$q$indexName$q ON $q$table$q ($q$column$q) ;');
 
     return sql.toString();
   }
@@ -444,11 +444,13 @@ class CreateTableSQL extends TableSQL {
 
 /// A `ALTER TABLE` SQL builder.
 class AlterTableSQL extends TableSQL {
+  List<CreateIndexSQL>? indexes;
+
   @override
-  List<CreateTableSQL>? extraSQLBuilders;
+  List<SQLBuilder> get extraSQLBuilders => <SQLBuilder>[...?indexes];
 
   AlterTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
-      {String q = '"', this.extraSQLBuilders, String? parentTable})
+      {String q = '"', this.indexes, String? parentTable})
       : super(dialect, table, entries, q: q, parentTable: parentTable);
 
   List<String>? _referenceTables;
@@ -472,6 +474,15 @@ class AlterTableSQL extends TableSQL {
     var i = 0;
     for (var e in entries) {
       var line = e.sql;
+
+      if (ifNotExists) {
+        line = line.trim();
+        if (line.toUpperCase().startsWith('ADD COLUMN ') &&
+            !line.toUpperCase().contains(' IF NOT EXISTS ')) {
+          line = 'ADD COLUMN IF NOT EXISTS ${line.substring(11)}';
+        }
+      }
+
       var comment = e.comment;
 
       var lineLength = line.length;
@@ -496,7 +507,7 @@ class AlterTableSQL extends TableSQL {
       i++;
     }
 
-    sql.write(' $ln ;');
+    sql.write('$ln ;');
 
     return sql.toString();
   }
@@ -1058,6 +1069,34 @@ abstract class SQLGenerator {
     }
 
     return null;
+  }
+
+  AlterTableSQL generateAddColumnAlterTableSQL(
+      String table, String fieldName, TypeInfo fieldType,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var q = dialect.elementQuote;
+    var columnName = normalizeColumnName(fieldName);
+    var fieldSQLType = typeToSQLType(fieldType, columnName,
+        entityFieldAnnotations: entityFieldAnnotations);
+
+    var columnEntry =
+        SQLEntry('ADD', ' ADD COLUMN $q$columnName$q $fieldSQLType');
+
+    List<CreateIndexSQL>? indexes;
+
+    if (entityFieldAnnotations != null && entityFieldAnnotations.isNotEmpty) {
+      var indexed = entityFieldAnnotations.any((a) => a.isIndexed);
+
+      if (indexed) {
+        var indexName = '${table}__${columnName}__idx';
+        indexes = [CreateIndexSQL(dialect, table, columnName, indexName)];
+      }
+    }
+
+    var alterTableSQL =
+        AlterTableSQL(dialect, table, [columnEntry], indexes: indexes);
+
+    return alterTableSQL;
   }
 
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
