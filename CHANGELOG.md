@@ -1,3 +1,13 @@
+## 1.4.5
+
+- `DBSQLAdapter`:
+  - Now checks for missing reference columns.
+  - Suggest `ALTER TABLE` with CONSTRAINTs.
+- `SQLGenerator`:
+  - `generateAddColumnAlterTableSQL`:
+    - Handle enums and references.
+    - Generate CONSTRAINTs for `FOREIGN KEY` and `UNIQUE`.
+
 ## 1.4.4
 
 - `AlterTableSQL`:

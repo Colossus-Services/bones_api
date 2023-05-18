@@ -446,11 +446,14 @@ class CreateTableSQL extends TableSQL {
 class AlterTableSQL extends TableSQL {
   List<CreateIndexSQL>? indexes;
 
+  List<AlterTableSQL>? constraints;
+
   @override
-  List<SQLBuilder> get extraSQLBuilders => <SQLBuilder>[...?indexes];
+  List<SQLBuilder> get extraSQLBuilders =>
+      <SQLBuilder>[...?indexes, ...?constraints];
 
   AlterTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
-      {String q = '"', this.indexes, String? parentTable})
+      {String q = '"', this.indexes, this.constraints, String? parentTable})
       : super(dialect, table, entries, q: q, parentTable: parentTable);
 
   List<String>? _referenceTables;
@@ -476,9 +479,10 @@ class AlterTableSQL extends TableSQL {
       var line = e.sql;
 
       if (ifNotExists) {
-        line = line.trim();
-        if (line.toUpperCase().startsWith('ADD COLUMN ') &&
-            !line.toUpperCase().contains(' IF NOT EXISTS ')) {
+        var lineTrimUC =
+            line.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+        if (lineTrimUC.startsWith('ADD COLUMN ') &&
+            !lineTrimUC.contains(' IF NOT EXISTS ')) {
           line = 'ADD COLUMN IF NOT EXISTS ${line.substring(11)}';
         }
       }
@@ -1079,22 +1083,90 @@ abstract class SQLGenerator {
     var fieldSQLType = typeToSQLType(fieldType, columnName,
         entityFieldAnnotations: entityFieldAnnotations);
 
-    var columnEntry =
-        SQLEntry('ADD', ' ADD COLUMN $q$columnName$q $fieldSQLType');
+    var comment = '${fieldType.toString(withT: false)} $fieldName';
+
+    MapEntry<String, MapEntry<String, String>>? entityType;
+    String? refTable;
+    String? refColumn;
+
+    if (fieldSQLType == null) {
+      entityType = entityTypeToSQLType(fieldType, columnName,
+          entityFieldAnnotations: entityFieldAnnotations);
+      if (entityType != null) {
+        fieldSQLType = entityType.value.value;
+
+        refTable = entityType.key;
+        refColumn = entityType.value.key;
+
+        comment += ' @ $refTable.$refColumn';
+      }
+    }
+
+    if (fieldSQLType == null) {
+      var enumType = enumTypeToSQLType(fieldType.type, columnName,
+          entityFieldAnnotations: entityFieldAnnotations);
+      if (enumType != null) {
+        var type = enumType.key;
+        var values = enumType.value;
+
+        fieldSQLType =
+            _buildEnumSQLType(type, fieldSQLType, values, q, columnName);
+
+        comment += ' enum(${values.join(', ')})';
+      }
+    }
+
+    var columnEntry = SQLEntry(
+        'ADD', ' ADD COLUMN $q$columnName$q $fieldSQLType',
+        comment: comment);
 
     List<CreateIndexSQL>? indexes;
+    List<AlterTableSQL>? constraints;
 
     if (entityFieldAnnotations != null && entityFieldAnnotations.isNotEmpty) {
-      var indexed = entityFieldAnnotations.any((a) => a.isIndexed);
+      if (entityFieldAnnotations.hasUnique) {
+        var constrainUniqueName = '${table}__${columnName}__unique';
 
-      if (indexed) {
+        var uniqueEntry = SQLEntry('CONSTRAINT',
+            ' ADD CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+            columns: [
+              SQLColumn(table, columnName,
+                  referenceTable: refTable!, referenceColumn: refColumn!)
+            ]);
+
+        constraints = [
+          AlterTableSQL(dialect, table, [uniqueEntry])
+        ];
+      } else if (entityFieldAnnotations.hasIndexed) {
         var indexName = '${table}__${columnName}__idx';
         indexes = [CreateIndexSQL(dialect, table, columnName, indexName)];
       }
     }
 
-    var alterTableSQL =
-        AlterTableSQL(dialect, table, [columnEntry], indexes: indexes);
+    if (entityType != null) {
+      var fieldName = columnName;
+      var ref = entityType;
+
+      var refTableName = ref.key;
+      var refField = ref.value.key.toLowerCase();
+
+      var constrainName = '${table}__${columnName}__fkey';
+
+      constraints ??= [];
+
+      var constraintEntry = SQLEntry('CONSTRAINT',
+          ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
+          comment: '$fieldName @ $refTableName.$refField',
+          columns: [
+            SQLColumn(table, columnName,
+                referenceTable: refTableName, referenceColumn: refField)
+          ]);
+
+      constraints.add(AlterTableSQL(dialect, table, [constraintEntry]));
+    }
+
+    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry],
+        indexes: indexes, constraints: constraints);
 
     return alterTableSQL;
   }
@@ -1200,16 +1272,8 @@ abstract class SQLGenerator {
           var type = enumType.key;
           var values = enumType.value;
 
-          if (type == 'ENUM') {
-            fieldSQLType = type;
-            fieldSQLType += '(${values.map((e) => "'$e'").join(',')})';
-          } else if (type.endsWith(' CHECK')) {
-            fieldSQLType = type;
-            fieldSQLType +=
-                '( $q$columnName$q IN (${values.map((e) => "'$e'").join(',')}) )';
-          } else {
-            fieldSQLType = type;
-          }
+          fieldSQLType =
+              _buildEnumSQLType(type, fieldSQLType, values, q, columnName);
 
           comment += ' enum(${values.join(', ')})';
         }
@@ -1362,6 +1426,21 @@ abstract class SQLGenerator {
     createSQL.relationships = relationshipSQLs;
 
     return createSQL;
+  }
+
+  String? _buildEnumSQLType(String type, String? fieldSQLType,
+      List<String> values, String q, String columnName) {
+    if (type == 'ENUM') {
+      fieldSQLType = type;
+      fieldSQLType += '(${values.map((e) => "'$e'").join(',')})';
+    } else if (type.endsWith(' CHECK')) {
+      fieldSQLType = type;
+      fieldSQLType +=
+          '( $q$columnName$q IN (${values.map((e) => "'$e'").join(',')}) )';
+    } else {
+      fieldSQLType = type;
+    }
+    return fieldSQLType;
   }
 
   String normalizeColumnName(String fieldName) =>

@@ -456,11 +456,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         repositoriesChecks.where((e) => e.isError).toList();
 
     if (repositoriesChecksErrors.isNotEmpty) {
-      var alterTablesSQLs = repositoriesChecksErrors
-          .where((e) => e.missingColumns != null)
-          .expand((e) => e.generateMissingColumnsAlterTableSQLs(this))
+      var missingColumnsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingColumns?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingColumnsSQLs(this))
           .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
           .toList();
+
+      var missingReferenceColumnsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingReferenceColumns?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingReferenceColumnsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
+
+      var alterTablesSQLs = [
+        ...missingColumnsSQLs,
+        ...missingReferenceColumnsSQLs,
+      ];
 
       _log.info(
           'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
@@ -525,57 +536,73 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var repoFieldsNotInScheme =
         repoFieldsNames.whereNot((f) => fieldsInScheme.contains(f)).toList();
 
-    var relationshipFields = repoFieldsNotInScheme
-        .map((f) {
-          var fieldType = entityHandler.getFieldType(null, f);
-          if (fieldType == null) return null;
-          var entityType = fieldType.entityTypeInfo ?? fieldType.listEntityType;
-          if (entityType == null) return null;
-          var refTable = getTableForType(entityType);
-          if (refTable == null) return null;
-
-          try {
-            var tableRef = scheme.getTableRelationshipReference(
-                sourceTable: repoTable, sourceField: f, targetTable: refTable);
-
-            return MapEntry(f, tableRef);
-          } catch (e) {
-            _log.warning(
-                "Can't find relationship table for field: `$repoTable`.`$f`",
-                e);
-            return null;
-          }
-        })
+    var referenceFields = repoFieldsNotInScheme
+        .map((f) => _checkDBTableSchemeReferenceField(
+            entityHandler, scheme, repoTable, f))
         .whereNotNull()
         .toMapFromEntries();
 
+    var missingReferenceColumns = referenceFields.entries
+        .where((e) => e.value == null)
+        .map((e) => e.key)
+        .toList();
+
     var missingColumns = repoFieldsNames
-        .whereNot((f) =>
-            fieldsInScheme.contains(f) || relationshipFields.containsKey(f))
+        .whereNot(
+            (f) => fieldsInScheme.contains(f) || referenceFields.containsKey(f))
         .toList();
 
     var schemeTableName = scheme.name;
 
-    if (missingColumns.isNotEmpty) {
+    if (missingColumns.isNotEmpty || missingReferenceColumns.isNotEmpty) {
       _log.severe(
-          "ERROR Checking table `$schemeTableName`> entityType: `$repoType` ; missingColumns: $missingColumns");
+          "ERROR Checking table `$schemeTableName`> entityType: `$repoType` "
+          "${missingColumns.isNotEmpty ? '; missingColumns: $missingColumns ' : ''}"
+          "${missingReferenceColumns.isNotEmpty ? '; missingReferenceColumns: $missingReferenceColumns' : ''}");
 
-      return _DBTableCheck.missingColumns(
-          repository,
-          scheme,
-          missingColumns.map((f) {
-            var type = entityHandler.getFieldType(null, f) ?? TypeInfo.tString;
-            var annotations = entityHandler
-                .getFieldEntityAnnotations(null, f)
-                ?.whereType<EntityField>()
-                .toList();
-            return _DBTableMissingColumn(f, type, annotations);
-          }).toList());
+      return _DBTableCheck.missing(
+        repository,
+        scheme,
+        missingColumns
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingReferenceColumns
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+      );
     }
 
     _log.info('Checking table `$schemeTableName`: OK');
 
     return _DBTableCheck.ok();
+  }
+
+  MapEntry<String, TableRelationshipReference?>?
+      _checkDBTableSchemeReferenceField(
+    EntityHandler<Object> entityHandler,
+    TableScheme scheme,
+    String table,
+    String fieldName,
+  ) {
+    var fieldType = entityHandler.getFieldType(null, fieldName);
+    if (fieldType == null) return null;
+    var entityType = fieldType.entityTypeInfo ?? fieldType.listEntityType;
+    if (entityType == null) return null;
+    var targetTable = getTableForType(entityType);
+    if (targetTable == null) return null;
+
+    TableRelationshipReference? tableRef;
+
+    try {
+      tableRef = scheme.getTableRelationshipReference(
+          sourceTable: table, sourceField: fieldName, targetTable: targetTable);
+    } catch (e) {
+      _log.warning(
+          "Error while getting relationship table for field: `$table`.`$fieldName`",
+          e);
+    }
+
+    return MapEntry(fieldName, tableRef);
   }
 
   bool checkDBTableField(Type entityType, String fieldName, Type? schemeType,
@@ -2123,10 +2150,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 class _DBTableCheck {
   EntityRepository<Object>? repository;
   TableScheme? scheme;
-  List<_DBTableMissingColumn>? missingColumns;
+  List<_DBTableColumn>? missingColumns;
 
-  _DBTableCheck.missingColumns(
-      this.repository, this.scheme, this.missingColumns);
+  List<_DBTableColumn>? missingReferenceColumns;
+
+  _DBTableCheck.missing(this.repository, this.scheme, this.missingColumns,
+      this.missingReferenceColumns);
 
   String? error;
 
@@ -2134,23 +2163,30 @@ class _DBTableCheck {
 
   _DBTableCheck.ok();
 
-  bool get isOK => error == null && missingColumns == null;
+  bool get isOK =>
+      error == null &&
+      missingColumns == null &&
+      missingReferenceColumns == null;
 
   bool get isError => !isOK;
 
-  List<AlterTableSQL> generateMissingColumnsAlterTableSQLs(
-      SQLGenerator sqlGenerator) {
-    var missingColumns = this.missingColumns;
+  List<AlterTableSQL> generateMissingColumnsSQLs(SQLGenerator sqlGenerator) =>
+      _generateMissingSQLs(missingColumns, sqlGenerator);
+
+  List<AlterTableSQL> generateMissingReferenceColumnsSQLs(
+          SQLGenerator sqlGenerator) =>
+      _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
+
+  List<AlterTableSQL> _generateMissingSQLs(
+      List<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
     var scheme = this.scheme;
-    if (missingColumns == null || missingColumns.isEmpty || scheme == null) {
+    if (missing == null || missing.isEmpty || scheme == null) {
       return [];
     }
 
-    var table = scheme.name;
-
-    var sqls = missingColumns
+    var sqls = missing
         .map((f) => sqlGenerator.generateAddColumnAlterTableSQL(
-            table, f.name, f.type,
+            scheme.name, f.name, f.type,
             entityFieldAnnotations: f.annotations))
         .toList();
 
@@ -2159,27 +2195,53 @@ class _DBTableCheck {
 
   @override
   String toString() {
-    var missingColumns = this.missingColumns;
-    if (missingColumns != null) {
+    var missingColumns = this.missingColumns ?? [];
+    var missingReferenceColumns = this.missingReferenceColumns ?? [];
+
+    if (missingColumns.isNotEmpty || missingReferenceColumns.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
+
       var missingColumnsStr = missingColumns
           .map((e) => '${e.type.toString(withT: false)} ${e.name}')
           .join(' , ');
 
-      return "Can't find all `$repoType` fields in table `$schemeTableName` scheme:\n  -- repository: $repository\n  -- scheme: $scheme\n  -- missingColumns: [$missingColumnsStr]\n";
+      var missingReferenceColumnsStr = missingReferenceColumns
+          .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+          .join(' , ');
+
+      var errorMsg = [
+        "Can't find all `$repoType` fields in table `$schemeTableName` scheme:",
+        "  -- repository: $repository\n  -- scheme: $scheme",
+        if (missingColumns.isNotEmpty)
+          "  -- missingColumns: [$missingColumnsStr]",
+        if (missingReferenceColumns.isNotEmpty)
+          "  -- missingReferenceColumns: [$missingReferenceColumnsStr]",
+      ].join('\n');
+
+      return '$errorMsg\n';
     }
 
     return error?.toString() ?? '';
   }
 }
 
-class _DBTableMissingColumn {
+class _DBTableColumn {
   final String name;
   final TypeInfo type;
   final List<EntityField>? annotations;
 
-  _DBTableMissingColumn(this.name, this.type, this.annotations);
+  _DBTableColumn(this.name, this.type, this.annotations);
+
+  factory _DBTableColumn.fromEntityHandler(
+      EntityHandler<Object> entityHandler, String fieldName) {
+    var type = entityHandler.getFieldType(null, fieldName) ?? TypeInfo.tString;
+    var annotations = entityHandler
+        .getFieldEntityAnnotations(null, fieldName)
+        ?.whereType<EntityField>()
+        .toList();
+    return _DBTableColumn(fieldName, type, annotations);
+  }
 
   @override
   String toString() => '{$name: $type}';
