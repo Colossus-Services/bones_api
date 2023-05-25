@@ -1,3 +1,11 @@
+## 1.4.6
+
+- `ConditionEncoder`:
+  - Fix `_resolveValueToTypeImpl`:
+    - Convert `Enum` values to `String` calling `Enum.name`.
+    - Convert `Enum` values to `int|num|BigInt` calling `Enum.index`.
+- reflection_factory: ^2.1.3
+
 ## 1.4.5
 
 - `DBSQLAdapter`:

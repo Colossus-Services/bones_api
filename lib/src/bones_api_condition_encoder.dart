@@ -972,6 +972,18 @@ abstract class ConditionEncoder {
       return value;
     }
 
+    if (value is Enum) {
+      if (valueType == String) {
+        return value.name;
+      } else if (valueType == int || valueType == num) {
+        return value.index;
+      } else if (valueType == double) {
+        return value.index.toDouble();
+      } else if (valueType == BigInt) {
+        return value.index.toBigInt();
+      }
+    }
+
     var valueTypeInfo = TypeInfo.from(valueType);
 
     var valueParser = TypeParser.parserFor(typeInfo: valueTypeInfo);
