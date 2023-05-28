@@ -878,7 +878,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 }
 
 /// Base class for a `SQL` generator.
-abstract class SQLGenerator {
+abstract mixin class SQLGenerator {
   /// The generated SQL dialect.
   SQLDialect get dialect;
 
