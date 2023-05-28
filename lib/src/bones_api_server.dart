@@ -538,7 +538,8 @@ class APIServer {
     return (request) {
       var requestedUri = request.requestedUri;
 
-      if (requestedUri.scheme == 'http') {
+      if (requestedUri.scheme == 'http' &&
+          !requestedUri.path.contains('/.well-known/acme-challenge/')) {
         final domains = this.domains;
         if (domains.contains(requestedUri.host)) {
           var secureUri = requestedUri.replace(scheme: 'https');

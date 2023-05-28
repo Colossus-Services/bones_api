@@ -1,3 +1,10 @@
+## 1.4.7
+
+- `APIServer`:
+  - `_redirectToHttpsMiddleware`: do not redirect `/.well-known/acme-challenge/` paths.
+- collection: ^1.17.1
+- googleapis_auth: ^1.4.1
+
 ## 1.4.6
 
 - `ConditionEncoder`:
