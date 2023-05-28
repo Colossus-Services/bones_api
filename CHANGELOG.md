@@ -2,8 +2,11 @@
 
 - `APIServer`:
   - `_redirectToHttpsMiddleware`: do not redirect `/.well-known/acme-challenge/` paths.
+- sdk: '>=3.0.0 <4.0.0'
 - collection: ^1.17.1
 - googleapis_auth: ^1.4.1
+- shelf_letsencrypt: ^1.2.0
+- lints: ^2.1.0
 
 ## 1.4.6
 
