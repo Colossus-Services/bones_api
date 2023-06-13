@@ -1071,8 +1071,8 @@ Future<bool> runAdapterTests(
 
         expect(result!.length, equals(3));
         expect(transaction.isAborted, isFalse);
-        expect(transaction.length, equals(10));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.length, equals(11));
+        expect(transaction.cachedEntitiesLength, equals(14));
       }
 
       {
@@ -1151,7 +1151,7 @@ Future<bool> runAdapterTests(
         expect(result!.length, equals(3));
         expect(transaction.isAborted, isFalse);
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.cachedEntitiesLength, equals(14));
       }
 
       {
@@ -1236,7 +1236,7 @@ Future<bool> runAdapterTests(
 
         expect(result!.length, equals(3));
         expect(transaction.length, greaterThanOrEqualTo(8));
-        expect(transaction.cachedEntitiesLength, equals(13));
+        expect(transaction.cachedEntitiesLength, equals(14));
       }
 
       {
