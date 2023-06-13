@@ -1,3 +1,10 @@
+## 1.4.8
+
+- `DBEntityRepository`
+  - `_resolveEntitiesSubEntities`: fix passing of parameter `resolutionRules` on special case.
+
+- args: ^2.4.2
+
 ## 1.4.7
 
 - `APIServer`:

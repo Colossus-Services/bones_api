@@ -1312,7 +1312,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           var idsUniques = ids.whereNotNull().toSet().toList();
 
           var entities = repo
-              .selectByIDs(idsUniques, transaction: transaction)
+              .selectByIDs(idsUniques,
+                  transaction: transaction,
+                  resolutionRules: resolutionRulesResolved)
               .resolveMapped((entities) => idsUniques
                   .mapIndexed((i, id) => MapEntry(id, entities[i]))
                   .toList());
