@@ -765,6 +765,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         });
       },
       validator: (c) => !transaction.isAborted,
+      onError: (e, s) => transaction.notifyExecutionError(
+        e,
+        s,
+        errorResolver: resolveError,
+        debugInfo: () => transaction.toString(),
+      ),
     );
 
     transaction.transactionResult = result;

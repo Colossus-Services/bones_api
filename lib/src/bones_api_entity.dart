@@ -4769,6 +4769,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     return _onExecutionError<R>(error, stackTrace, errorResolver, debugInfo);
   }
 
+  Object? _error;
+
+  Object? get error => _error;
+
   FutureOr<R> _onExecutionError<R>(
       Object error,
       StackTrace stackTrace,
@@ -4781,18 +4785,26 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       error = errorResolver(error, stackTrace) ?? error;
     }
 
-    if (info != null && info.isNotEmpty) {
-      _log.severe(
-          "Error executing transaction operation: $info", error, stackTrace);
-    } else {
-      _log.severe("Error executing transaction operation!", error, stackTrace);
+    var firstExecutionError = false;
+
+    if (_error == null) {
+      _error = error;
+      firstExecutionError = true;
+
+      if (info != null && info.isNotEmpty) {
+        _log.severe(
+            "Error executing transaction operation: $info", error, stackTrace);
+      } else {
+        _log.severe(
+            "Error executing transaction operation!", error, stackTrace);
+      }
     }
 
     if (!_aborted) {
       abort(error: error, stackTrace: stackTrace);
     }
 
-    if (rethrowError) {
+    if (rethrowError && firstExecutionError) {
       Error.throwWithStackTrace(error, stackTrace);
     } else {
       return error as R;

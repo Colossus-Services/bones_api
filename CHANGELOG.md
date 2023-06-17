@@ -6,7 +6,9 @@
   - Added `Transaction.openInstances`.
   - Added `canPropagate` to indicated that a `Transaction` can have multiple operations.
   - Added `initTime`, `endTime` and `duration` getters.
+  - Added `error`.
   - Log slow and long transactions.
+  - `_onExecutionError`: only logs and rethrows the error in the 1st error notification.
 - `TransactionOperation`:
   - Added `initTime`, `endTime` and `duration` getters.
 - Added `APIRouteConfig`.
