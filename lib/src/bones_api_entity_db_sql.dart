@@ -1599,14 +1599,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       DBSQLAdapterException('error', '$error',
           parentError: error, parentStackTrace: stackTrace);
 
+  @override
+  bool isTransactionWithSingleOperation(TransactionOperation op,
+      [SQLWrapper? sql]) {
+    return super.isTransactionWithSingleOperation(op) &&
+        (sql == null || (sql.sqlsLength == 1 && !sql.mainSQL.hasPreOrPosSQL));
+  }
+
   FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
       SQLWrapper sql, FutureOr<R> Function(C connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 &&
-        !transaction.isExecuting &&
-        sql.sqlsLength == 1 &&
-        !sql.mainSQL.hasPreOrPosSQL) {
+    if (isTransactionWithSingleOperation(op, sql)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -1616,7 +1620,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, C>(
+        f,
+        errorResolver: resolveError,
+        debugInfo: () => sql.mainSQL.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
@@ -1627,7 +1639,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     return transaction.onOpen<R>(() {
       return transaction.addExecution<R, C>(
-        (c) => f(c),
+        f,
         errorResolver: resolveError,
         debugInfo: () => sql.mainSQL.toString(),
       );

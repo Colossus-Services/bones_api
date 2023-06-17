@@ -309,8 +309,13 @@ class DBRelationalEntityRepository<O extends Object>
       EntityResolutionRules? resolutionRules}) {
     checkNotClosed();
 
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
+    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
+
     var op = TransactionOperationSelect(
-        name, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher, transaction);
 
     try {
       return repositoryAdapter.doSelect(op, matcher,
@@ -319,7 +324,7 @@ class DBRelationalEntityRepository<O extends Object>
           namedParameters: namedParameters,
           limit: limit, preFinish: (results) {
         return resolveEntities(op.transaction, results,
-            resolutionRules: resolutionRules);
+            resolutionRules: resolutionRulesResolved);
       });
     } catch (e, s) {
       var message = 'select> '
@@ -363,7 +368,11 @@ class DBRelationalEntityRepository<O extends Object>
       return _update(o, transaction, true);
     }
 
-    var op = TransactionOperationStore(name, operationExecutor, o, transaction);
+    var canPropagate = hasReferencedEntities(
+        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+
+    var op = TransactionOperationStore(
+        name, canPropagate, operationExecutor, o, transaction);
 
     try {
       return ensureReferencesStored(o, transaction: op.transaction)
@@ -393,8 +402,11 @@ class DBRelationalEntityRepository<O extends Object>
 
   FutureOr<dynamic> _update(
       O o, Transaction? transaction, bool allowAutoInsert) {
-    var op =
-        TransactionOperationUpdate(name, operationExecutor, o, transaction);
+    var canPropagate = hasReferencedEntities(
+        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+
+    var op = TransactionOperationUpdate(
+        name, canPropagate, operationExecutor, o, transaction);
 
     return ensureReferencesStored(o, transaction: op.transaction)
         .resolveWith(() {
@@ -646,11 +658,11 @@ class DBRelationalEntityRepository<O extends Object>
       return cachedRelationships;
     }
 
-    var op = TransactionOperationSelectRelationships(
-        name, operationExecutor, os ?? oIds, transaction);
-
     var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
+
+    var op = TransactionOperationSelectRelationships(
+        name, valuesTableName, operationExecutor, os ?? oIds, transaction);
 
     try {
       return repositoryAdapter

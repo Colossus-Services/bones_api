@@ -1,3 +1,29 @@
+## 1.4.9
+
+- New `WeakList`.
+- Added `DBAdapter.instances`.
+- `Transaction`:
+  - Added `Transaction.openInstances`.
+  - Added `canPropagate` to indicated that a `Transaction` can have multiple operations.
+  - Added `initTime`, `endTime` and `duration` getters.
+  - Log slow and long transactions.
+- `TransactionOperation`:
+  - Added `initTime`, `endTime` and `duration` getters.
+- Added `APIRouteConfig`.
+- `APIRouteHandler.call`: log response time.
+- `DBMySQLAdapter` and `DBPostgreSQLAdapter`.
+  - Allow `minConnections` and `maxConnections` from config.
+- `DBEntityRepository`: optimize `_getRelationshipFields`.
+- `DBAdapter`:
+  - added `isTransactionWithSingleOperation`.
+  - Fix `executeTransactionOperation`: identify single operation transactions.
+  - Fix `createPoolElement`: respect `maxConnections` with correct `poolAliveElementsSize` calculation.
+- `Pool`:
+  - Fix `poolDisposedElementsCount` to also count `_invalidatedElementsCount`.
+
+- lints: ^2.1.1
+- build_runner: ^2.4.5
+
 ## 1.4.8
 
 - `DBEntityRepository`

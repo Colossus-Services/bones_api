@@ -158,8 +158,10 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectDirectoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBObjectDirectoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -685,7 +687,7 @@ class DBObjectDirectoryAdapter
       FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 && !transaction.isExecuting) {
+    if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -695,7 +697,15 @@ class DBObjectDirectoryAdapter
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, DBObjectDirectoryAdapterContext>(
+        (c) => f(c),
+        errorResolver: resolveError,
+        debugInfo: () => op.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired

@@ -630,6 +630,9 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
   static const EntityResolutionRules innocuous =
       _EntityResolutionRulesInnocuous();
 
+  static final EntityResolutionRules instanceAllEager =
+      EntityResolutionRules.fetch(allEager: true);
+
   final bool? _allowEntityFetch;
 
   /// If `true` it will allow the use of on DB/repository to fetch an entity by an ID reference.

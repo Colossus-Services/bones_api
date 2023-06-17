@@ -148,8 +148,10 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectMemoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBObjectMemoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -698,7 +700,7 @@ class DBObjectMemoryAdapter
       FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 && !transaction.isExecuting) {
+    if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -708,7 +710,15 @@ class DBObjectMemoryAdapter
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
+        f,
+        errorResolver: resolveError,
+        debugInfo: () => op.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
@@ -720,7 +730,7 @@ class DBObjectMemoryAdapter
 
     return transaction.onOpen<R>(() {
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
-        (c) => f(c),
+        f,
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
       );

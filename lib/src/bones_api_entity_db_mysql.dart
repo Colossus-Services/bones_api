@@ -130,8 +130,18 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         config?['username'] ?? config?['user'] ?? defaultUsername;
     String? password = (config?['password'] ?? config?['pass'])?.toString();
 
-    minConnections ??= config?['minConnections'] ?? 1;
-    maxConnections ??= config?['maxConnections'] ?? 3;
+    int? confMinConnections = config?['minConnections'];
+    if (confMinConnections != null) {
+      minConnections = confMinConnections;
+    }
+
+    int? confMaxConnections = config?['maxConnections'];
+    if (confMaxConnections != null) {
+      maxConnections = confMaxConnections;
+    }
+
+    minConnections ??= 1;
+    maxConnections ??= 3;
 
     var retCheckTablesAndGenerateTables =
         DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
@@ -159,8 +169,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       password: password,
       host: host,
       port: port,
-      minConnections: minConnections!,
-      maxConnections: maxConnections!,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
@@ -232,17 +242,17 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  FutureOr<bool> closeConnection(DBMySqlConnectionWrapper connection) {
+  bool closeConnection(DBMySqlConnectionWrapper connection) {
     _log.info('closeConnection> $connection');
-
-    connection.connection.close();
-
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
   @override
-  FutureOr<bool> isConnectionValid(DBMySqlConnectionWrapper connection) {
-    return true;
+  bool isConnectionValid(DBMySqlConnectionWrapper connection) {
+    return !connection.isClosed;
   }
 
   @override
@@ -791,9 +801,21 @@ abstract class DBMySqlConnectionWrapper {
   Future<Results> query(String sql, [List<Object?>? values]);
 
   Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values);
+
+  bool _closed = false;
+
+  bool get isClosed => _closed;
+
+  void close() {
+    _closed = true;
+    try {
+      // ignore: discarded_futures
+      connection.close();
+    } catch (_) {}
+  }
 }
 
-class _DBMySqlConnectionWrapped implements DBMySqlConnectionWrapper {
+class _DBMySqlConnectionWrapped extends DBMySqlConnectionWrapper {
   @override
   final MySqlConnection connection;
 
@@ -809,7 +831,7 @@ class _DBMySqlConnectionWrapped implements DBMySqlConnectionWrapper {
       connection.queryMulti(sql, values.map((e) => e.cast<Object?>()));
 }
 
-class _DBMySqlConnectionTransaction implements DBMySqlConnectionWrapper {
+class _DBMySqlConnectionTransaction extends DBMySqlConnectionWrapper {
   @override
   final MySqlConnection connection;
 

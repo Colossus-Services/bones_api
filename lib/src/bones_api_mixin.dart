@@ -75,11 +75,14 @@ mixin Pool<O> {
     return elements;
   }
 
+  int _invalidatedElementsCount = 0;
+
   FutureOr<bool> removeInvalidElementsFromPool() {
     FutureOr<List<O>> ret = invalidPoolElements();
 
     return ret.resolveMapped((l) {
       for (var o in l) {
+        ++_invalidatedElementsCount;
         removeFromPool(o);
       }
       return true;
@@ -106,7 +109,9 @@ mixin Pool<O> {
   int get poolCreatedElementsCount => _createElementCount;
 
   int get poolDisposedElementsCount =>
-      _closedElementsCount + _unrecycledElementCount;
+      _closedElementsCount +
+      _unrecycledElementsCount +
+      _invalidatedElementsCount;
 
   int get poolAliveElementsSize =>
       poolCreatedElementsCount - poolDisposedElementsCount;
@@ -264,7 +269,7 @@ mixin Pool<O> {
     return retValid.resolveMapped((valid) => valid ? o : null);
   }
 
-  int _unrecycledElementCount = 0;
+  int _unrecycledElementsCount = 0;
 
   FutureOr<bool> releaseIntoPool(O o) {
     var ret = recyclePoolElement(o);
@@ -288,7 +293,8 @@ mixin Pool<O> {
 
         return true;
       } else {
-        ++_unrecycledElementCount;
+        ++_unrecycledElementsCount;
+        disposePoolElement(o);
         return false;
       }
     });

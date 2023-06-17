@@ -186,8 +186,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr<bool> closeConnection(DBSQLMemoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBSQLMemoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 

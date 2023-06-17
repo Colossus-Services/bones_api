@@ -134,8 +134,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
         config?['username'] ?? config?['user'] ?? defaultUsername;
     String? password = (config?['password'] ?? config?['pass'])?.toString();
 
-    minConnections ??= config?['minConnections'] ?? 1;
-    maxConnections ??= config?['maxConnections'] ?? 3;
+    int? confMinConnections = config?['minConnections'];
+    if (confMinConnections != null) {
+      minConnections = confMinConnections;
+    }
+
+    int? confMaxConnections = config?['maxConnections'];
+    if (confMaxConnections != null) {
+      maxConnections = confMaxConnections;
+    }
+
+    minConnections ??= 1;
+    maxConnections ??= 3;
 
     var retCheckTablesAndGenerateTables =
         DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
@@ -163,8 +173,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       password: password,
       host: host,
       port: port,
-      minConnections: minConnections!,
-      maxConnections: maxConnections!,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
@@ -303,17 +313,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
+  bool closeConnection(PostgreSQLExecutionContext connection) {
     _log.info('closeConnection> $connection > poolSize: $poolSize');
-
     if (connection is PostgreSQLConnection) {
-      connection.close();
+      try {
+        // ignore: discarded_futures
+        connection.close();
+      } catch (_) {}
     }
     return true;
   }
 
   @override
-  FutureOr<bool> isConnectionValid(PostgreSQLExecutionContext connection) {
+  bool isConnectionValid(PostgreSQLExecutionContext connection) {
     return connection is PostgreSQLConnection && !connection.isClosed;
   }
 
