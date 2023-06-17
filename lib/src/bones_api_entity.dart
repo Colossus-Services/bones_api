@@ -4547,18 +4547,14 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       var duration = this.duration ?? Duration(milliseconds: -1);
 
       _logTransaction.info(
-          '[transaction:$id] Committed> time: ${duration
-              .inMilliseconds} ms ;  ops: ${_operations
-              .length} ; root: ${_operations.firstOrNull} > result: $result');
+          '[transaction:$id] Committed> time: ${duration.inMilliseconds} ms ;  ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: $result');
 
       if (duration.inMilliseconds > 500) {
         _logTransaction.warning(
-            'SLOW TRANSACTION (${duration.inMilliseconds} ms):\n${toString(
-                withExecutedOperations: false)}');
+            'SLOW TRANSACTION (${duration.inMilliseconds} ms):\n${toString(withExecutedOperations: false)}');
       } else if (_operations.length > 15) {
         _logTransaction.warning(
-            'LONG TRANSACTION (${_operations.length}):\n${toString(
-                withExecutedOperations: false)}');
+            'LONG TRANSACTION (${_operations.length}):\n${toString(withExecutedOperations: false)}');
       }
     }
 
