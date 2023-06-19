@@ -259,25 +259,29 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   Future<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableFieldsTypesImpl> $table');
+    try {
+      _log.info('getTableFieldsTypesImpl> $table');
 
-    var sql = "SHOW COLUMNS FROM `$table`";
+      var sql = "SHOW COLUMNS FROM `$table`";
+      var results = await connection.query(sql);
 
-    var results = await connection.query(sql);
+      var scheme = results.toList();
 
-    if (results.isEmpty) return null;
+      await releaseIntoPool(connection);
 
-    var scheme = results;
+      if (scheme.isEmpty) return null;
 
-    if (scheme.isEmpty) return null;
+      var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+        var k = e['Field'] as String;
+        var v = _toFieldType(e['Type'].toString());
+        return MapEntry(k, v);
+      }));
 
-    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
-      var k = e['Field'] as String;
-      var v = _toFieldType(e['Type'].toString());
-      return MapEntry(k, v);
-    }));
-
-    return fieldsTypes;
+      return fieldsTypes;
+    } catch (e) {
+      await disposePoolElement(connection);
+      rethrow;
+    }
   }
 
   @override
@@ -285,50 +289,55 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       String table, TableRelationshipReference? relationship) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+    try {
+      _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
-    var sql = "SHOW COLUMNS FROM `$table`";
+      var sql = "SHOW COLUMNS FROM `$table`";
+      var results = await connection.query(sql);
 
-    var results = await connection.query(sql);
+      var scheme = results.toList();
 
-    if (results.isEmpty) return null;
+      if (scheme.isEmpty) {
+        await releaseIntoPool(connection);
+        return null;
+      }
 
-    var scheme = results;
+      var idFieldName = await _findIDField(connection, table, scheme);
 
-    if (scheme.isEmpty) return null;
+      var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+        var k = e['Field'] as String;
+        var v = _toFieldType(e['Type'].toString());
+        return MapEntry(k, v);
+      }));
 
-    var idFieldName = await _findIDField(connection, table, scheme);
+      notifyTableFieldTypes(table, fieldsTypes);
 
-    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
-      var k = e['Field'] as String;
-      var v = _toFieldType(e['Type'].toString());
-      return MapEntry(k, v);
-    }));
+      var fieldsReferencedTables =
+          await _findFieldsReferencedTables(connection, table);
 
-    notifyTableFieldTypes(table, fieldsTypes);
+      var relationshipTables =
+          await _findRelationshipTables(connection, table, idFieldName);
 
-    var fieldsReferencedTables =
-        await _findFieldsReferencedTables(connection, table);
+      await releaseIntoPool(connection);
 
-    var relationshipTables =
-        await _findRelationshipTables(connection, table, idFieldName);
+      var tableScheme = TableScheme(table,
+          relationship: relationship != null,
+          idFieldName: idFieldName,
+          fieldsTypes: fieldsTypes,
+          fieldsReferencedTables: fieldsReferencedTables,
+          relationshipTables: relationshipTables);
 
-    await releaseIntoPool(connection);
+      _log.info('$tableScheme');
 
-    var tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes,
-        fieldsReferencedTables: fieldsReferencedTables,
-        relationshipTables: relationshipTables);
-
-    _log.info('$tableScheme');
-
-    return tableScheme;
+      return tableScheme;
+    } catch (_) {
+      await disposePoolElement(connection);
+      rethrow;
+    }
   }
 
-  FutureOr<String> _findIDField(
-      DBMySqlConnectionWrapper connection, String table, Results scheme) async {
+  FutureOr<String> _findIDField(DBMySqlConnectionWrapper connection,
+      String table, List<ResultRow> scheme) async {
     var field = scheme.firstWhereOrNull((f) => f['Key'] == 'PRI');
     var name = field?['Field'] ?? 'id';
 
@@ -758,7 +767,15 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
               _DBMySqlConnectionTransaction(connection.connection, t);
           contextCompleter.complete(transactionWrap);
 
-          return transaction.transactionFuture.catchError((e, s) {
+          return transaction.transactionFuture.then((ret) {
+            // When aborted `_transactionCompleter.complete` will be called
+            // with the error (not calling `completeError`), since it's
+            // running in another error zone (won't reach `onError`):
+            if (ret is TransactionAbortedError) {
+              throw ret;
+            }
+            return ret;
+          }, onError: (e, s) {
             cancelTransaction(transaction, connection, e, s);
             throw e;
           });
@@ -781,7 +798,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBMySqlConnectionWrapper connection,
+      DBMySqlConnectionWrapper? connection,
       Object? error,
       StackTrace? stackTrace) {
     return true;

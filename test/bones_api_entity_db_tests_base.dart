@@ -221,6 +221,12 @@ Future<bool> runAdapterTests(
       await entityRepositoryProvider2.ensureInitialized();
       await entityRepositoryProvider.ensureInitialized();
 
+      var sqlAdapter = await entityRepositoryProvider.adapter;
+      await sqlAdapter.ensureInitialized();
+
+      expect(sqlAdapter.isInitialized, isTrue,
+          reason: "`DBSQLAdapter` not initialized: $sqlAdapter");
+
       await Future.delayed(Duration(seconds: 1));
     });
 
@@ -500,6 +506,8 @@ Future<bool> runAdapterTests(
               level: 100, creationTime: user1CreationTime);
 
           expect(user.reflection.allFieldsValids(), isFalse);
+
+          print(user);
 
           EntityFieldInvalid? error;
           try {

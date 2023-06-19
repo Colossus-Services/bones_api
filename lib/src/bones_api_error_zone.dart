@@ -87,7 +87,7 @@ void _handleUncaughtError(
 ///
 /// See [printToZoneStderr].
 void printZoneError(Object error, StackTrace stackTrace,
-    {String? title, bool printErrorToStderr = true}) {
+    {String? title, String? message, bool printErrorToStderr = true}) {
   var p = printErrorToStderr ? printToZoneStderr : print;
 
   p('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
@@ -99,6 +99,11 @@ void printZoneError(Object error, StackTrace stackTrace,
   p(error);
   p('');
   p(stackTrace);
+
+  if (message != null && message.isNotEmpty) {
+    p('------------------------------------------------------------------------------\n');
+    p(message);
+  }
 
   p('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 }

@@ -348,7 +348,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectGCSAdapterContext connection,
+      DBObjectGCSAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);

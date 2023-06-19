@@ -4185,13 +4185,21 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         uncaughtErrorTitle: '', onUncaughtError: _onErrorZoneUncaughtError);
   }
 
+  static final Expando<Transaction> _errorsTransactions =
+      Expando<Transaction>();
+
   static void _onErrorZoneUncaughtError(Object error, StackTrace stackTrace) {
     if (error is TransactionAbortedError ||
         isFilteredError(error, stackTrace)) {
       return;
     }
 
-    printZoneError(error, stackTrace, title: '[Transaction ERROR]');
+    var transaction = _errorsTransactions[error];
+
+    var message = transaction != null ? '$transaction' : null;
+
+    printZoneError(error, stackTrace,
+        title: '[Transaction ERROR]', message: message);
   }
 
   static final Set<ErrorFilter> _errorFilters = <ErrorFilter>{};
@@ -4274,7 +4282,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _transactionCloser = closer;
 
     return asyncTry(opener, then: (c) {
-      _setContext(c!);
+      _openImpl(c!);
       return c;
     }, onError: (e, s) {
       _logTransaction.severe("Error opening transaction:\n$this", e, s);
@@ -4307,12 +4315,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Object? get context => _context;
 
-  void _setContext(Object context) {
+  void _openImpl(Object context) {
     _context = context;
     _open = true;
     _opening = false;
-    _openCompleter.complete(true);
 
+    _openCompleter.complete(true);
     _openInstances.add(this);
   }
 
@@ -4636,8 +4644,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<TransactionAbortedError> _abortImpl() {
     var abortError = _abortedError!;
 
-    _transactionCompleter.completeError(
-        abortError.abortError ?? abortError, abortError.abortStackTrace);
+    // Can't call `completeError` since the `Completer`
+    // was created in a separated hidden error `Zone` (`_errorZone`).
+    // The error won't be caught by the adapter,
+    // since it's running in another `Zone` and
+    // will wait for the completion forever.
+    _transactionCompleter.complete(abortError);
 
     _close();
 
@@ -4785,6 +4797,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       error = errorResolver(error, stackTrace) ?? error;
     }
 
+    _errorsTransactions[error] = this;
+
     var firstExecutionError = false;
 
     if (_error == null) {
@@ -4803,6 +4817,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     if (!_aborted) {
       abort(error: error, stackTrace: stackTrace);
     }
+
+    _doAutoCommit();
 
     if (rethrowError && firstExecutionError) {
       Error.throwWithStackTrace(error, stackTrace);

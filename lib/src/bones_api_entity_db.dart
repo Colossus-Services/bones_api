@@ -462,7 +462,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<C> openTransaction(Transaction transaction);
 
-  FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
+  FutureOr<bool> cancelTransaction(Transaction transaction, C? connection,
       Object? error, StackTrace? stackTrace);
 
   bool get callCloseTransactionRequired;
@@ -499,8 +499,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   /// Defaults: calls [createConnection].
   @override
-  FutureOr<C?> createPoolElement() {
-    if (poolAliveElementsSize < maxConnections) {
+  FutureOr<C?> createPoolElement({bool force = false}) {
+    if (poolAliveElementsSize < maxConnections || force) {
       if (_creatingConnectionsCount > 3) {
         var yield1 = _yieldByCreatingConnections();
         var yield2 = _yieldByCreatingConnectionsYield();
@@ -514,8 +514,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           var conn = catchFromPopulatedPool();
           if (conn == null) {
             //print('!!! yieldMs: $yield1 + $yield2 = $yieldMs >> _creatingConnectionsCount: $_creatingConnectionsCount > _creatingConnectionsYeldCount: $_creatingConnectionsYieldCount');
-            if (poolAliveElementsSize < maxConnections) {
-              super.createPoolElement();
+            if (poolAliveElementsSize < maxConnections || force) {
+              super.createPoolElement(force: force);
               return _createPoolElementImpl();
             } else {
               return null;
@@ -525,8 +525,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           return conn.resolveMapped((conn) {
             if (conn != null) return conn;
 
-            if (poolAliveElementsSize < maxConnections) {
-              super.createPoolElement();
+            if (poolAliveElementsSize < maxConnections || force) {
+              super.createPoolElement(force: force);
               return _createPoolElementImpl();
             } else {
               return null;
@@ -534,7 +534,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           });
         });
       } else {
-        super.createPoolElement();
+        super.createPoolElement(force: force);
         return _createPoolElementImpl();
       }
     } else {

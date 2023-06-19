@@ -1123,9 +1123,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBSQLMemoryAdapterContext connection,
+      DBSQLMemoryAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
+    if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
     return true;

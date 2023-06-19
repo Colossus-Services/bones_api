@@ -259,7 +259,7 @@ class DBObjectDirectoryAdapter
   @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectDirectoryAdapterContext connection,
+      DBObjectDirectoryAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
