@@ -221,6 +221,12 @@ Future<bool> runAdapterTests(
       await entityRepositoryProvider2.ensureInitialized();
       await entityRepositoryProvider.ensureInitialized();
 
+      var sqlAdapter = await entityRepositoryProvider.adapter;
+      await sqlAdapter.ensureInitialized();
+
+      expect(sqlAdapter.isInitialized, isTrue,
+          reason: "`DBSQLAdapter` not initialized: $sqlAdapter");
+
       await Future.delayed(Duration(seconds: 1));
     });
 
@@ -420,14 +426,17 @@ Future<bool> runAdapterTests(
     });
 
     test('TestEntityRepositoryProvider', () async {
-      var storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
-      var addressAPIRepository = entityRepositoryProvider.addressAPIRepository;
-      var roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
-      var userInfoAPIRepository =
+      final sqlAdapter = await entityRepositoryProvider.adapter;
+      final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
+      final addressAPIRepository =
+          entityRepositoryProvider.addressAPIRepository;
+      final roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+      final userInfoAPIRepository =
           entityRepositoryProvider.userInfoAPIRepository;
-      var userAPIRepository = entityRepositoryProvider.userAPIRepository;
-      var photoAPIRepository = entityRepositoryProvider2.photoAPIRepository;
+      final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+      final photoAPIRepository = entityRepositoryProvider2.photoAPIRepository;
 
+      expect(sqlAdapter.isInitialized, isTrue);
       expect(await userAPIRepository.length(), equals(0));
 
       {
@@ -500,6 +509,8 @@ Future<bool> runAdapterTests(
               level: 100, creationTime: user1CreationTime);
 
           expect(user.reflection.allFieldsValids(), isFalse);
+
+          print(user);
 
           EntityFieldInvalid? error;
           try {
@@ -699,20 +710,83 @@ Future<bool> runAdapterTests(
         var userDuplicated = User('joe@$testDomain', '456', address, [role],
             level: 100, creationTime: user1CreationTime);
 
-        EntityFieldInvalid? error;
-        try {
-          await userAPIRepository.store(userDuplicated);
-        } on EntityFieldInvalid catch (e) {
-          error = e;
+        {
+          EntityFieldInvalid? error;
+          int? result;
+          try {
+            result = await userAPIRepository.store(userDuplicated);
+          } on EntityFieldInvalid catch (e) {
+            error = e;
+          }
+
+          expect(result, isNull);
+
+          expect(error, isA<EntityFieldInvalid>());
+          expect(
+            error.toString(),
+            matches(RegExp(
+                r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
+                dotAll: true)),
+          );
         }
 
-        expect(error, isA<EntityFieldInvalid>());
-        expect(
-          error.toString(),
-          matches(RegExp(
-              r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
-              dotAll: true)),
-        );
+        if (sqlAdapter.capability.transactionAbort) {
+          var transaction = Transaction();
+
+          var result = await transaction.execute(() async {
+            var id = await userAPIRepository.store(userDuplicated);
+            return id as int?;
+          });
+
+          print(transaction);
+
+          expect(result, isNull);
+
+          expect(transaction.isAborted, isTrue);
+          expect(transaction.isCommitted, isFalse);
+          expect(transaction.abortError, isNotNull);
+          expect(transaction.abortError?.reason, isNull);
+
+          expect(transaction.abortError?.error, isA<EntityFieldInvalid>());
+          expect(
+            transaction.abortError?.error.toString(),
+            matches(RegExp(
+                r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
+                dotAll: true)),
+          );
+        }
+
+        if (sqlAdapter.capability.transactionAbort) {
+          var transaction = Transaction();
+
+          var result = await transaction.execute(() async {
+            var prevUsers = await userAPIRepository
+                .selectFirstByQuery('email == "${userDuplicated.email}"');
+            expect(prevUsers, isNotNull);
+            expect(prevUsers?.email, equals(userDuplicated.email));
+            var id = await userAPIRepository.store(userDuplicated);
+            return id as int?;
+          });
+
+          print(transaction);
+
+          expect(result, isNull);
+
+          expect(transaction.isOpen, isTrue);
+          expect(transaction.isAborted, isTrue);
+          expect(transaction.isCommitted, isFalse);
+          expect(transaction.length, greaterThanOrEqualTo(1));
+          expect(transaction.abortError, isNotNull);
+          expect(transaction.abortError?.reason, isNull);
+
+          expect(transaction.abortError?.error, isA<EntityFieldInvalid>());
+          expect(
+            transaction.abortError?.error.toString(),
+            matches(RegExp(
+                r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
+                dotAll: true)),
+          );
+        }
       }
 
       var user2CreationTime = DateTime.utc(2021, 9, 21, 22, 11, 12, 0, 0);
@@ -1384,10 +1458,8 @@ Future<bool> runAdapterTests(
         expect(transaction.isAborted, isFalse);
         expect(transaction.isCommitted, isTrue);
         expect(transaction.length, greaterThanOrEqualTo(7));
-        expect(transaction.abortedError, isNull);
+        expect(transaction.abortError, isNull);
       }
-
-      var sqlAdapter = await entityRepositoryProvider.adapter;
 
       // If `Transaction.abort` is supported:
       if (sqlAdapter.capability.transactionAbort) {
@@ -1419,8 +1491,8 @@ Future<bool> runAdapterTests(
         expect(transaction.isAborted, isTrue);
         expect(transaction.isCommitted, isFalse);
         expect(transaction.length, greaterThanOrEqualTo(6));
-        expect(transaction.abortedError, isNotNull);
-        expect(transaction.abortedError?.reason, equals('Test'));
+        expect(transaction.abortError, isNotNull);
+        expect(transaction.abortError?.reason, equals('Test'));
       }
 
       {

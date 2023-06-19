@@ -137,15 +137,17 @@ abstract class APIModule with Initializable {
   /// [function] The route handler, to process calls.
   APIModule addRoute(
       APIRequestMethod? method, String name, APIRouteFunction function,
-      {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) {
+      {Map<String, TypeInfo>? parameters,
+      Iterable<APIRouteRule>? rules,
+      APIRouteConfig? config}) {
     if (method == APIRequestMethod.OPTIONS) {
       throw ArgumentError("Can't add a route with method `OPTIONS`."
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
     }
 
     var routesHandlers = _getRoutesHandlers(method);
-    routesHandlers[name] =
-        APIRouteHandler(this, method, name, function, parameters, rules);
+    routesHandlers[name] = APIRouteHandler(
+        this, method, name, function, parameters, rules, config);
     return this;
   }
 
@@ -358,9 +360,11 @@ class APIRouteBuilder<M extends APIModule> {
   /// Adds a route of [name] with [handler] for the request [method].
   APIModule add(
           APIRequestMethod? method, String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+          {Map<String, TypeInfo>? parameters,
+          Iterable<APIRouteRule>? rules,
+          APIRouteConfig? config}) =>
       module.addRoute(method, name, function,
-          parameters: parameters, rules: rules);
+          parameters: parameters, rules: rules, config: config);
 
   /// Adds routes from [provider] for ANY request method.
   void anyFrom(Object? provider) => from(null, provider);
@@ -449,6 +453,8 @@ class APIRouteBuilder<M extends APIModule> {
             ];
     }
 
+    var config = apiMethod.annotations.whereType<APIRouteConfig>().firstOrNull;
+
     if (returnsAPIResponse && receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
       var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
@@ -460,6 +466,7 @@ class APIRouteBuilder<M extends APIModule> {
         (req) => _apiMethodStandard(apiMethod, req),
         parameters: parameters,
         rules: rules,
+        config: config,
       );
     } else if (receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
@@ -472,6 +479,7 @@ class APIRouteBuilder<M extends APIModule> {
         (req) => _apiMethodStandard(apiMethod, req),
         parameters: parameters,
         rules: rules,
+        config: config,
       );
     } else if (returnsAPIResponse) {
       var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
@@ -484,6 +492,7 @@ class APIRouteBuilder<M extends APIModule> {
         (req) => _apiMethodInvocation(apiMethod, req),
         parameters: parameters,
         rules: rules,
+        config: config,
       );
     }
   }

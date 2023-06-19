@@ -39,6 +39,25 @@ class APIDBModule extends APIModule {
   void configure() {
     if (onlyOnDevelopment && !development) return;
 
+    routes.add(null, 'info', (request) async {
+      var authResp = await checkAuthentication(request);
+      if (authResp != null) return authResp;
+
+      var openTransactions = Transaction.openInstances;
+
+      var info =
+          StringBuffer('Open Transactions (${openTransactions.length}):\n');
+
+      for (var t in openTransactions) {
+        info.write(t);
+        info.write('\n');
+      }
+
+      Transaction.executingTransaction;
+
+      return APIResponse.ok(info.toString());
+    });
+
     routes.add(null, 'tables', (request) async {
       var authResp = await checkAuthentication(request);
       if (authResp != null) return authResp;

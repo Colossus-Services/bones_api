@@ -188,8 +188,8 @@ class _PoolTest with Pool<_PoolElement> {
   int _idCount = 0;
 
   @override
-  FutureOr<_PoolElement> createPoolElement() {
-    super.createPoolElement();
+  FutureOr<_PoolElement> createPoolElement({bool force = false}) {
+    super.createPoolElement(force: force);
     return _PoolElement(++_idCount);
   }
 

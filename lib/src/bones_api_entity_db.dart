@@ -103,6 +103,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
               A extends DBAdapter<C>>(Map<String, dynamic> config) =>
           adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
+  static final WeakList<DBAdapter> _instances = WeakList<DBAdapter>();
+
+  static List<DBAdapter> get instances => _instances.toList();
+
   /// The name of the adapter.
   final String name;
 
@@ -136,6 +140,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       : _populateSource = populateSource,
         _workingPath = workingPath {
     boot();
+
+    _instances.add(this);
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
@@ -445,9 +451,45 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       Map<String, Object?>? namedParameters,
       PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
 
+  bool isTransactionWithSingleOperation(TransactionOperation op) {
+    var transaction = op.transaction;
+
+    return transaction.length == 1 &&
+        !transaction.canPropagate &&
+        !op.canPropagate &&
+        !transaction.isExecuting;
+  }
+
   FutureOr<C> openTransaction(Transaction transaction);
 
-  FutureOr<bool> cancelTransaction(Transaction transaction, C connection,
+  bool get cancelTransactionResultWithError;
+
+  bool get throwTransactionResultWithError;
+
+  FutureOr<dynamic> resolveTransactionResult(
+      dynamic result, Transaction transaction, C? connection) async {
+    // When aborted `_transactionCompleter.complete` will be called
+    // with the error (not calling `completeError`), since it's
+    // running in another error zone (won't reach `onError`):
+    if (result is TransactionAbortedError) {
+      if (cancelTransactionResultWithError) {
+        await cancelTransaction(
+            transaction, connection, result, result.stackTrace);
+
+        if (throwTransactionResultWithError) {
+          throw result;
+        } else {
+          return result;
+        }
+      } else if (throwTransactionResultWithError) {
+        throw result;
+      }
+    }
+
+    return result;
+  }
+
+  FutureOr<bool> cancelTransaction(Transaction transaction, C? connection,
       Object? error, StackTrace? stackTrace);
 
   bool get callCloseTransactionRequired;
@@ -484,10 +526,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   /// Defaults: calls [createConnection].
   @override
-  FutureOr<C?> createPoolElement() {
-    super.createPoolElement();
-
-    if (poolSize < maxConnections) {
+  FutureOr<C?> createPoolElement({bool force = false}) {
+    if (poolAliveElementsSize < maxConnections || force) {
       if (_creatingConnectionsCount > 3) {
         var yield1 = _yieldByCreatingConnections();
         var yield2 = _yieldByCreatingConnectionsYield();
@@ -501,15 +541,27 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           var conn = catchFromPopulatedPool();
           if (conn == null) {
             //print('!!! yieldMs: $yield1 + $yield2 = $yieldMs >> _creatingConnectionsCount: $_creatingConnectionsCount > _creatingConnectionsYeldCount: $_creatingConnectionsYieldCount');
-            return _createPoolElementImpl();
+            if (poolAliveElementsSize < maxConnections || force) {
+              super.createPoolElement(force: force);
+              return _createPoolElementImpl();
+            } else {
+              return null;
+            }
           }
 
           return conn.resolveMapped((conn) {
             if (conn != null) return conn;
-            return _createPoolElementImpl();
+
+            if (poolAliveElementsSize < maxConnections || force) {
+              super.createPoolElement(force: force);
+              return _createPoolElementImpl();
+            } else {
+              return null;
+            }
           });
         });
       } else {
+        super.createPoolElement(force: force);
         return _createPoolElementImpl();
       }
     } else {
@@ -1123,13 +1175,18 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (id == null) return null;
 
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
+    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
+
     var op = TransactionOperationSelect(
-        name, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher, transaction);
 
     try {
       return repositoryAdapter.doSelectByID<O?>(op, id, preFinish: (results) {
         return resolveEntities(op.transaction, [results],
-                resolutionRules: resolutionRules)
+                resolutionRules: resolutionRulesResolved)
             .resolveMapped((os) => os.firstOrNull);
       });
     } catch (e, s) {
@@ -1150,13 +1207,18 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var ids = matcher.idsValues.whereNotNull().toList();
     if (ids.isEmpty) return <O>[];
 
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
+    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
+
     var op = TransactionOperationSelect(
-        name, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher, transaction);
 
     try {
       return repositoryAdapter.doSelectByIDs<O>(op, ids, preFinish: (results) {
         return resolveEntities(op.transaction, results,
-            resolutionRules: resolutionRules);
+            resolutionRules: resolutionRulesResolved);
       });
     } catch (e, s) {
       var message = '_selectByIDs> '
@@ -1170,13 +1232,18 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   FutureOr<List<O>> _selectAll(Transaction? transaction, ConditionANY matcher,
       EntityResolutionRules? resolutionRules) {
+    final resolutionRulesResolved =
+        resolveEntityResolutionRules(resolutionRules);
+
+    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
+
     var op = TransactionOperationSelect(
-        name, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher, transaction);
 
     try {
       return repositoryAdapter.doSelectAll<O>(op, preFinish: (results) {
         return resolveEntities(op.transaction, results,
-            resolutionRules: resolutionRules);
+            resolutionRules: resolutionRulesResolved);
       });
     } catch (e, s) {
       var message = '_selectAll> '
@@ -1193,6 +1260,52 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           int? limit,
           EntityResolutionRules? resolutionRules}) =>
       select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
+
+  @override
+  bool hasReferencedEntities([EntityResolutionRulesResolved? resolutionRules]) {
+    final fieldsEntity = _fieldsEntity;
+    final fieldsEntityRef = _fieldsEntityRef;
+
+    final fieldsListEntity = _fieldsListEntity;
+    final fieldsListEntityRef = _fieldsListEntityRef;
+
+    if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
+
+    var fieldsEntityNoRef = fieldsEntity.length - fieldsEntityRef.length;
+    if (fieldsEntityNoRef > 0) return true;
+
+    var fieldsListEntityNoRef =
+        fieldsListEntity.length - fieldsListEntityRef.length;
+    if (fieldsListEntityNoRef > 0) return true;
+
+    if (resolutionRules == null || resolutionRules.isInnocuous) return false;
+
+    if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isNotEmpty) return false;
+
+    var allEager = resolutionRules.allEager ?? false;
+    var eagerEntityTypes = resolutionRules.eagerEntityTypes;
+    var lazyEntityTypes = resolutionRules.lazyEntityTypes;
+
+    if (allEager) {
+      if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty) {
+        var anyEager = CombinedIterableView(
+          [fieldsEntityRef.values, fieldsListEntityRef.values],
+        ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+        return anyEager;
+      } else {
+        return true;
+      }
+    }
+
+    if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty) {
+      var anyEager = CombinedIterableView(
+        [fieldsEntityRef.values, fieldsListEntityRef.values],
+      ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+      return anyEager;
+    }
+
+    return false;
+  }
 
   FutureOr<List<O>> resolveEntities(
       Transaction transaction, Iterable<Map<String, dynamic>?>? results,
@@ -1211,7 +1324,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       entries = results;
     }
 
-    var fieldsListEntity = entityHandler.fieldsWithTypeListEntityOrReference();
+    var fieldsListEntity = _fieldsListEntity;
 
     if (fieldsListEntity.isNotEmpty) {
       var retTableScheme = repositoryAdapter.getTableScheme();
@@ -1365,6 +1478,15 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   Map<String, TypeInfo> get _fieldsEntity =>
       entityHandler.fieldsWithTypeEntityOrReference();
 
+  Map<String, TypeInfo> get _fieldsEntityRef =>
+      entityHandler.fieldsWithEntityReference();
+
+  Map<String, TypeInfo> get _fieldsListEntity =>
+      entityHandler.fieldsWithTypeListEntityOrReference();
+
+  Map<String, TypeInfo> get _fieldsListEntityRef =>
+      entityHandler.fieldsWithEntityReferenceList();
+
   Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
 
   Map<String, EntityRepository<Object>> _fieldsEntityRepositoriesAll() =>
@@ -1492,30 +1614,60 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         return tableField;
       });
 
+  final Expando<
+          MapEntry<Map<String, TypeInfo>,
+              Map<String, TableRelationshipReference>>>
+      _relationshipFieldsCache = Expando();
+
   FutureOr<Map<String, TableRelationshipReference>> _getRelationshipFields(
       Map<String, TypeInfo> fieldsListEntity,
       [FutureOr<TableScheme>? retTableScheme]) {
     retTableScheme ??= repositoryAdapter.getTableScheme();
 
     return retTableScheme.resolveMapped((tableScheme) {
-      var databaseAdapter = repositoryAdapter.databaseAdapter;
+      var cached = _relationshipFieldsCache[tableScheme];
 
-      var entries = fieldsListEntity.entries.map((e) {
-        var fieldName = e.key;
-        var targetType = e.value.arguments0!.type;
-        var targetRepositoryAdapter =
-            databaseAdapter.getRepositoryAdapterByType(targetType);
-        if (targetRepositoryAdapter == null) return null;
-        var relationship = tableScheme.getTableRelationshipReference(
-            sourceTable: tableName,
-            sourceField: fieldName,
-            targetTable: targetRepositoryAdapter.name);
-        if (relationship == null) return null;
-        return MapEntry(e.key, relationship);
-      }).whereNotNull();
+      if (cached != null) {
+        if (identical(cached.key, fieldsListEntity)) {
+          return cached.value;
+        }
+      }
 
-      return Map<String, TableRelationshipReference>.fromEntries(entries);
+      var relationshipFields =
+          _getRelationshipFieldsImpl(fieldsListEntity, tableScheme);
+
+      _relationshipFieldsCache[tableScheme] =
+          MapEntry(fieldsListEntity, relationshipFields);
+
+      return relationshipFields;
     });
+  }
+
+  Map<String, TableRelationshipReference> _getRelationshipFieldsImpl(
+      Map<String, TypeInfo<dynamic>> fieldsListEntity,
+      TableScheme tableScheme) {
+    var databaseAdapter = repositoryAdapter.databaseAdapter;
+
+    var entries = fieldsListEntity.entries.map((e) {
+      var fieldName = e.key;
+      var targetType = e.value.arguments0!.type;
+
+      var targetRepositoryAdapter =
+          databaseAdapter.getRepositoryAdapterByType(targetType);
+      if (targetRepositoryAdapter == null) return null;
+
+      var relationship = tableScheme.getTableRelationshipReference(
+          sourceTable: tableName,
+          sourceField: fieldName,
+          targetTable: targetRepositoryAdapter.name);
+      if (relationship == null) return null;
+
+      return MapEntry(e.key, relationship);
+    }).whereNotNull();
+
+    var relationshipFields =
+        Map<String, TableRelationshipReference>.fromEntries(entries);
+    return relationshipFields;
   }
 
   @override
@@ -1541,7 +1693,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       return _update(o, transaction, true);
     }
 
-    var op = TransactionOperationStore(name, operationExecutor, o, transaction);
+    var canPropagate = hasReferencedEntities(
+        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+
+    var op = TransactionOperationStore(
+        name, canPropagate, operationExecutor, o, transaction);
 
     try {
       var idFieldsName = entityHandler.idFieldName(o);
@@ -1566,8 +1722,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   FutureOr<dynamic> _update(
       O o, Transaction? transaction, bool allowAutoInsert) {
-    var op =
-        TransactionOperationUpdate(name, operationExecutor, o, transaction);
+    var canPropagate = hasReferencedEntities(
+        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+
+    var op = TransactionOperationUpdate(
+        name, canPropagate, operationExecutor, o, transaction);
 
     var idFieldsName = entityHandler.idFieldName(o);
     var id = entityHandler.getID(o);
@@ -1659,8 +1818,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       Transaction? transaction}) {
     checkNotClosed();
 
+    var canPropagate =
+        hasReferencedEntities(resolveEntityResolutionRules(null));
+
     var op = TransactionOperationDelete(
-        name, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher, transaction);
 
     try {
       return repositoryAdapter.doDelete(op, matcher,

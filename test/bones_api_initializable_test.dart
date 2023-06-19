@@ -56,13 +56,16 @@ void main() {
       expect(initC.isInitializing, isFalse);
     });
 
-    test('with recursive dependency (sync)', () {
+    test('with recursive dependency (sync)', () async {
       var initD = _InitD();
 
       expect(initD.isInitialized, isFalse);
       expect(initD.isInitializing, isFalse);
 
-      var result = initD.doInitialization() as InitializationResult;
+      var resultAsync = initD.doInitialization();
+      expect(resultAsync, isA<Future>());
+
+      var result = await resultAsync;
 
       expect(result.ok, isTrue);
 

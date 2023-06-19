@@ -158,8 +158,10 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectDirectoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBObjectDirectoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -245,19 +247,30 @@ class DBObjectDirectoryAdapter
 
     _openTransactionsContexts[conn] = DateTime.now();
 
-    // ignore: discarded_futures
-    transaction.transactionFuture.catchError((e, s) {
-      cancelTransaction(transaction, conn, e, s);
-      throw e;
-    });
+    transaction.transactionFuture
+        // ignore: discarded_futures
+        .then(
+      // ignore: discarded_futures
+      (res) => resolveTransactionResult(res, transaction, conn),
+      onError: (e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      },
+    );
 
     return conn;
   }
 
   @override
+  bool get cancelTransactionResultWithError => true;
+
+  @override
+  bool get throwTransactionResultWithError => false;
+
+  @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectDirectoryAdapterContext connection,
+      DBObjectDirectoryAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -685,7 +698,7 @@ class DBObjectDirectoryAdapter
       FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 && !transaction.isExecuting) {
+    if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -695,7 +708,15 @@ class DBObjectDirectoryAdapter
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, DBObjectDirectoryAdapterContext>(
+        (c) => f(c),
+        errorResolver: resolveError,
+        debugInfo: () => op.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired

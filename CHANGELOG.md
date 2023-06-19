@@ -1,3 +1,48 @@
+## 1.4.9
+
+- New `WeakList`.
+- Added `DBAdapter.instances`.
+- `Transaction`:
+  - `_onErrorZoneUncaughtError`: get the `error`'s `Transaction` and pass it to `printZoneError` as message.
+  - Added `Transaction.openInstances`.
+  - Added `canPropagate` to indicated that a `Transaction` can have multiple operations.
+  - Added `initTime`, `endTime` and `duration` getters.
+  - Log slow and long transactions.
+  - `_onExecutionError`: only logs and rethrows the error in the 1st error notification.
+  - `_abortImpl`:
+    - call `_transactionCompleter.complete` instead of `completeError` to avoid issues with hidden error `Zone`.
+- `TransactionOperation`:
+  - Added `initTime`, `endTime` and `duration` getters.
+- `TransactionAbortedError`:
+  - Renamed `abortError` to `error`.
+  - Renamed `abortStackTrace` to `errorStackTrace`.
+- Added `APIRouteConfig`.
+- `APIRouteHandler.call`: log response time.
+- `DBMySQLAdapter` and `DBPostgreSQLAdapter`.
+  - Allow `minConnections` and `maxConnections` from config.
+  - `getTableSchemeImpl` and `getTableFieldsTypesImpl`: fix `releaseIntoPool` and `disposePoolElement` behavior.
+- `DBEntityRepository`: optimize `_getRelationshipFields`.
+- `DBAdapter`:
+  - added `isTransactionWithSingleOperation`.
+  - Fix `executeTransactionOperation`: identify single operation transactions.
+  - Fix `createPoolElement`: respect `maxConnections` with correct `poolAliveElementsSize` calculation.
+  - Added `cancelTransactionResultWithError, `throwTransactionResultWithError` and `resolveTransactionResult`.
+    - Used by `openTransaction` result resolution.
+- `Pool`:
+  - Fix `poolDisposedElementsCount` to also count `_invalidatedElementsCount`.
+  - Fix `_catchFromEmptyPool`:
+    - allow `createPoolElement(force: true)` if reached the limit and can't catch a reused element. 
+- `InitializationStatus`:
+  - New `finalizing` status.
+- `InitializationChain`:
+  - Fix `_isParent`
+    - Avoid analyzing dependencies of `initializable` if it exists in the parent's tree.
+- `Initializable`
+  - `_doInitializationImpl`: allow circular initialization with timeout.
+
+- lints: ^2.1.1
+- build_runner: ^2.4.5
+
 ## 1.4.8
 
 - `DBEntityRepository`

@@ -3,8 +3,11 @@ import 'dart:collection';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:statistics/statistics.dart';
+import 'package:logging/logging.dart' as logging;
 
 import 'bones_api_utils.dart';
+
+final _logPool = logging.Logger('Pool');
 
 mixin Closable {
   bool _closed = false;
@@ -32,6 +35,17 @@ class PoolTimeoutError extends Error {
   @override
   String toString() {
     return 'PoolTimeoutError: $message';
+  }
+}
+
+class PoolFullError extends Error {
+  final String message;
+
+  PoolFullError(this.message);
+
+  @override
+  String toString() {
+    return 'PoolFullError: $message';
   }
 }
 
@@ -75,11 +89,14 @@ mixin Pool<O> {
     return elements;
   }
 
+  int _invalidatedElementsCount = 0;
+
   FutureOr<bool> removeInvalidElementsFromPool() {
     FutureOr<List<O>> ret = invalidPoolElements();
 
     return ret.resolveMapped((l) {
       for (var o in l) {
+        ++_invalidatedElementsCount;
         removeFromPool(o);
       }
       return true;
@@ -106,14 +123,16 @@ mixin Pool<O> {
   int get poolCreatedElementsCount => _createElementCount;
 
   int get poolDisposedElementsCount =>
-      _closedElementsCount + _unrecycledElementCount;
+      _closedElementsCount +
+      _unrecycledElementsCount +
+      _invalidatedElementsCount;
 
   int get poolAliveElementsSize =>
       poolCreatedElementsCount - poolDisposedElementsCount;
 
   int _createElementCount = 0;
 
-  FutureOr<O?> createPoolElement() {
+  FutureOr<O?> createPoolElement({bool force = false}) {
     ++_createElementCount;
     return null;
   }
@@ -138,18 +157,30 @@ mixin Pool<O> {
 
   int get poolSizeDesiredLimit;
 
-  static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 100);
+  static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 60);
 
   Duration get poolYieldTimeout => _defaultPoolYieldTimeout;
+
+  static final Duration _defaultPoolFullYieldTimeout =
+      Duration(milliseconds: 120);
+
+  Duration get poolFullYieldTimeout => _defaultPoolFullYieldTimeout;
+
+  static final Duration _defaultPoolFullWaitTimeout =
+      Duration(milliseconds: 240);
+
+  Duration get poolFullWaitTimeout => _defaultPoolFullWaitTimeout;
 
   final QueueList<Completer<bool>> _yields = QueueList(8);
 
   FutureOr<O> _catchFromEmptyPool(Duration? timeout) {
+    final catchInitTime = DateTime.now();
+
     var alive = poolAliveElementsSize;
 
     FutureOr<O?> created;
 
-    if (alive > poolSizeDesiredLimit) {
+    if (alive >= poolSizeDesiredLimit) {
       var yield = Completer<bool>();
       _yields.addLast(yield);
 
@@ -170,13 +201,32 @@ mixin Pool<O> {
     return created.resolveMapped((o) {
       if (o != null) return o;
 
-      var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
+      if (_pool.isNotEmpty) {
+        return _catchFromPopulatedPool();
+      }
 
-      var ret = waitingPoolElement.future.then((_) {
+      var alive = poolAliveElementsSize;
+
+      Future<bool> waiting;
+
+      if (alive >= poolSizeDesiredLimit) {
+        var yield = Completer<bool>();
+        _yields.addLast(yield);
+
+        waiting = yield.future.timeout(poolFullYieldTimeout, onTimeout: () {
+          _yields.remove(yield);
+          return false;
+        });
+      } else {
+        var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
+        waiting = waitingPoolElement.future;
+      }
+
+      var ret = waiting.then((_) {
         if (_pool.isNotEmpty) {
           return _catchFromPopulatedPool();
         } else {
-          return _waitElementInPool();
+          return _waitElementInPool(catchInitTime);
         }
       });
 
@@ -209,15 +259,33 @@ mixin Pool<O> {
     return preparePoolElement(o);
   }
 
-  FutureOr<O> _waitElementInPool() async {
+  FutureOr<O> _waitElementInPool(DateTime catchInitTime) async {
+    int retry = 0;
+
     while (true) {
       var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
 
-      await waitingPoolElement.future;
+      await waitingPoolElement.future
+          .timeout(poolFullWaitTimeout, onTimeout: () => false);
 
       if (_pool.isNotEmpty) {
         return _catchFromPopulatedPool();
       }
+
+      if (retry >= 2) {
+        final elapsedTime = DateTime.now().difference(catchInitTime);
+        _logPool.warning(
+            "Pool full ($poolAliveElementsSize / $poolSizeDesiredLimit) after trying to catch for ${elapsedTime.inMilliseconds} ms. Forcing createPoolElement<$O>() ...");
+        return createPoolElement(force: true).resolveMapped((o) {
+          if (o == null) {
+            throw PoolFullError(
+                "Can't create a new element `$O`! (force: true)");
+          }
+          return o;
+        });
+      }
+
+      ++retry;
     }
   }
 
@@ -264,33 +332,36 @@ mixin Pool<O> {
     return retValid.resolveMapped((valid) => valid ? o : null);
   }
 
-  int _unrecycledElementCount = 0;
+  int _unrecycledElementsCount = 0;
 
   FutureOr<bool> releaseIntoPool(O o) {
     var ret = recyclePoolElement(o);
 
     return ret.resolveMapped((recycled) {
-      if (recycled != null) {
-        checkPool();
-        _pool.addLast(recycled);
-
-        if (_yields.isNotEmpty) {
-          var yield = _yields.removeFirst();
-          if (!yield.isCompleted) {
-            yield.complete(true);
-          }
-        }
-
-        var waitingPoolElement = _waitingPoolElement;
-        if (waitingPoolElement != null && !waitingPoolElement.isCompleted) {
-          waitingPoolElement.complete(true);
-        }
-
-        return true;
-      } else {
-        ++_unrecycledElementCount;
+      if (recycled == null) {
+        ++_unrecycledElementsCount;
+        disposePoolElement(o);
         return false;
       }
+
+      checkPool();
+      _pool.addLast(recycled);
+
+      while (_yields.isNotEmpty) {
+        var yield = _yields.removeFirst();
+        if (!yield.isCompleted) {
+          yield.complete(true);
+          break;
+        }
+      }
+
+      var waitingPoolElement = _waitingPoolElement;
+      if (waitingPoolElement != null && !waitingPoolElement.isCompleted) {
+        waitingPoolElement.complete(true);
+        _waitingPoolElement = null;
+      }
+
+      return true;
     });
   }
 

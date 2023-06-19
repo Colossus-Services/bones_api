@@ -590,6 +590,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             ],
             null,
             const <String, __PR>{
+              'config': __PR(
+                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
               'parameters': __PR(
                   __TR<Map<String, TypeInfo<dynamic>>>(Map, <__TR>[
                     __TR.tString,
@@ -1604,6 +1606,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
             ],
             null,
             const <String, __PR>{
+              'config': __PR(
+                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
               'parameters': __PR(
                   __TR<Map<String, TypeInfo<dynamic>>>(Map, <__TR>[
                     __TR.tString,

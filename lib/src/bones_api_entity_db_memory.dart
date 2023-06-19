@@ -186,8 +186,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr<bool> closeConnection(DBSQLMemoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBSQLMemoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -1109,21 +1111,33 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     _openTransactionsContexts[conn] = DateTime.now();
 
-    // ignore: discarded_futures
-    transaction.transactionFuture.catchError((e, s) {
-      cancelTransaction(transaction, conn, e, s);
-      throw e;
-    });
+    transaction.transactionFuture
+        // ignore: discarded_futures
+        .then(
+      // ignore: discarded_futures
+      (res) => resolveTransactionResult(res, transaction, conn),
+      onError: (e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      },
+    );
 
     return conn;
   }
 
   @override
+  bool get cancelTransactionResultWithError => true;
+
+  @override
+  bool get throwTransactionResultWithError => false;
+
+  @override
   bool cancelTransaction(
       Transaction transaction,
-      DBSQLMemoryAdapterContext connection,
+      DBSQLMemoryAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
+    if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
     return true;

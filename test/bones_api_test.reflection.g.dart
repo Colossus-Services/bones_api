@@ -609,6 +609,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             ],
             null,
             const <String, __PR>{
+              'config': __PR(
+                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
               'parameters': __PR(
                   __TR<Map<String, TypeInfo<dynamic>>>(Map, <__TR>[
                     __TR.tString,

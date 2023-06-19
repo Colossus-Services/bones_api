@@ -246,8 +246,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectGCSAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBObjectGCSAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -334,19 +336,30 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     _openTransactionsContexts[conn] = DateTime.now();
 
-    // ignore: discarded_futures
-    transaction.transactionFuture.catchError((e, s) {
-      cancelTransaction(transaction, conn, e, s);
-      throw e;
-    });
+    transaction.transactionFuture
+        // ignore: discarded_futures
+        .then(
+      // ignore: discarded_futures
+      (res) => resolveTransactionResult(res, transaction, conn),
+      onError: (e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      },
+    );
 
     return conn;
   }
 
   @override
+  bool get cancelTransactionResultWithError => true;
+
+  @override
+  bool get throwTransactionResultWithError => false;
+
+  @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectGCSAdapterContext connection,
+      DBObjectGCSAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
     _openTransactionsContexts.remove(connection);
@@ -937,7 +950,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       FutureOr<R> Function(DBObjectGCSAdapterContext connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 && !transaction.isExecuting) {
+    if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -947,7 +960,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, DBObjectGCSAdapterContext>(
+        f,
+        errorResolver: resolveError,
+        debugInfo: () => op.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
@@ -959,7 +980,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     return transaction.onOpen<R>(() {
       return transaction.addExecution<R, DBObjectGCSAdapterContext>(
-        (c) => f(c),
+        f,
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
       );

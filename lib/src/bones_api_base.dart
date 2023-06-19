@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.8';
+  static const String VERSION = '1.4.9';
 
   static bool _boot = false;
 
@@ -723,6 +723,25 @@ class APIRootInfo {
   }
 }
 
+/// An API route config.
+class APIRouteConfig {
+  static const APIRouteConfig defaultConfig = APIRouteConfig();
+
+  /// If `true` logs calls to the route.
+  final bool log;
+
+  /// If `true` marks the route as a slow call,
+  /// and won't warn if the call response is slow.
+  final bool slowCall;
+
+  const APIRouteConfig({this.log = true, this.slowCall = false});
+
+  @override
+  String toString() {
+    return 'APIRouteConfig{log: $log, slowCall: $slowCall}';
+  }
+}
+
 /// An API route handler
 typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
     APIRequest request);
@@ -735,13 +754,22 @@ class APIRouteHandler<T> {
 
   APIRouteFunction<T> function;
 
-  List<APIRouteRule> rules;
-
   Map<String, TypeInfo>? parameters;
 
-  APIRouteHandler(this.module, this.requestMethod, this.routeName,
-      this.function, this.parameters, Iterable<APIRouteRule>? rules)
-      : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]);
+  List<APIRouteRule> rules;
+
+  APIRouteConfig config;
+
+  APIRouteHandler(
+      this.module,
+      this.requestMethod,
+      this.routeName,
+      this.function,
+      this.parameters,
+      Iterable<APIRouteRule>? rules,
+      APIRouteConfig? config)
+      : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]),
+        config = config ?? APIRouteConfig.defaultConfig;
 
   EntityResolutionRules? _entityResolutionRules;
 
@@ -817,9 +845,30 @@ class APIRouteHandler<T> {
           payloadDynamic: 'UNAUTHORIZED: Rules issues $rules');
     }
 
-    _log.info("CALL> ${module.name}.$routeName( $parameters )");
+    if (config.log && _log.isLoggable(logging.Level.INFO)) {
+      _log.info("CALL> ${module.name}.$routeName( $parameters )");
+    }
 
-    return function(request);
+    final initTime = DateTime.now();
+
+    return function(request)
+        .resolveMapped((response) => _callResponse(response, initTime));
+  }
+
+  APIResponse<T> _callResponse(APIResponse<T> response, DateTime initTime) {
+    if (config.log && _log.isLoggable(logging.Level.INFO)) {
+      final time = DateTime.now().difference(initTime);
+
+      if (time.inMilliseconds > 1000 && !config.slowCall) {
+        _log.warning(
+            "SLOW RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)");
+      } else {
+        _log.info(
+            "RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)");
+      }
+    }
+
+    return response;
   }
 
   /// Check the rules of this route.

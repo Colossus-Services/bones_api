@@ -347,3 +347,4 @@ export 'src/bones_api_utils_httpclient.dart';
 export 'src/bones_api_utils_instance_tracker.dart';
 export 'src/bones_api_utils_json.dart';
 export 'src/bones_api_utils_timedmap.dart';
+export 'src/bones_api_utils_weaklist.dart';

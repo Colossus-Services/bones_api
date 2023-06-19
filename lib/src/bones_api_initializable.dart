@@ -1,5 +1,6 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_utils.dart';
 
@@ -29,6 +30,7 @@ class InitializationStatus {
   void _setInitialized() {
     _initialized = true;
     _initializing = false;
+    _finalizing = false;
   }
 
   bool _initializing = false;
@@ -41,6 +43,15 @@ class InitializationStatus {
   /// Returns `true` if [initializable] is initializing.
 
   bool get initializing => _initializing;
+
+  bool _finalizing = false;
+
+  void _setFinalizing() {
+    _finalizing = true;
+  }
+
+  /// Returns `true` if [initializable] is finalizing.
+  bool get finalizing => _finalizing;
 
   bool _asynchronous = false;
 
@@ -66,6 +77,8 @@ class InitializationStatus {
 
     if (initialized) {
       return 'initialized$asyncStr';
+    } else if (_finalizing) {
+      return 'finalizing$asyncStr';
     } else if (initializing) {
       return 'initializing$asyncStr';
     } else {
@@ -137,39 +150,47 @@ class _InitializationChain {
     var parents = _parents;
     if (parents == null || parents.isEmpty) return false;
 
-    var allParents = <Initializable>{};
+    var allParents = <Initializable>{
+      // Avoid analyzing dependencies of `initializable`
+      // if it exists in the parent's tree:
+      initializable,
+    };
 
     var parents2 = <Initializable>{};
 
     for (var p in parents) {
       if (identical(p, o)) return true;
-
       parents2.addAllNew(p._chain.parents, allParents);
     }
+
+    if (parents2.isEmpty) return false;
 
     var parents3 = <Initializable>{};
 
     for (var p in parents2) {
       if (identical(p, o)) return true;
-
       parents3.addAllNew(p._chain.parents, allParents);
     }
+
+    if (parents3.isEmpty) return false;
 
     var parents4 = <Initializable>{};
 
     for (var p in parents3) {
       if (identical(p, o)) return true;
-
       parents4.addAllNew(p._chain.parents, allParents);
     }
+
+    if (parents4.isEmpty) return false;
 
     var parents5 = <Initializable>{};
 
     for (var p in parents4) {
       if (identical(p, o)) return true;
-
       parents5.addAllNew(p._chain.parents, allParents);
     }
+
+    if (parents5.isEmpty) return false;
 
     for (var p in parents5) {
       if (identical(p, o)) return true;
@@ -222,15 +243,30 @@ class _InitializationChain {
     }
   }
 
-  List<Initializable> _filterValidDependencies(
-      Iterable<Initializable> dependencies) {
-    var valids = dependencies
-        .where((e) =>
-            !identical(e, initializable) &&
-            !_isParent(e) &&
-            !e._chain._isParent(initializable))
-        .toList();
-    return valids;
+  ({
+    List<Initializable> valids,
+    List<Initializable> circular,
+    List<Initializable> finalizing
+  }) _filterValidDependencies(Iterable<Initializable> dependencies) {
+    var valids = <Initializable>[];
+    var circular = <Initializable>[];
+    var finalizing = <Initializable>[];
+
+    for (var e in dependencies) {
+      if (identical(e, initializable) || e._status.initialized) {
+        continue;
+      }
+
+      if (!_isParent(e) && !e._chain._isParent(initializable)) {
+        valids.add(e);
+      } else if (e._status.finalizing) {
+        finalizing.add(e);
+      } else {
+        circular.add(e);
+      }
+    }
+
+    return (valids: valids, circular: circular, finalizing: finalizing);
   }
 
   List<Initializable>? _initializedDependencies;
@@ -295,7 +331,7 @@ class _InitializationChain {
 
   bool _completeCircularDependency(
       Initializable dependency, List<Initializable> callChain) {
-    if (identical(this, dependency)) return false;
+    if (identical(initializable, dependency)) return false;
 
     if (callChain.containsIdentical(initializable)) return false;
     callChain.add(initializable);
@@ -445,23 +481,40 @@ mixin Initializable {
 
   FutureOr<InitializationResult> _doInitializationImpl(
       [Initializable? parent]) {
-    var status = _status;
-    if (status.initialized) return _resultOk();
+    if (_status.initialized) return _resultOk();
 
-    var chain = _chain;
+    final chain = _chain;
 
     if (parent != null) {
-      if (chain._isCircularParent(parent)) {
-        _log.warning('AVOIDING CIRCULAR INITIALIZATION: $this -> $parent');
-        chain._checkAllCircularDependencies();
-        return _resultOk();
-      }
-
       if (!chain._addParent(parent)) {
         chain._checkAllCircularDependencies();
         return _resultOk();
       }
+
+      if (!parent._status.initialized && chain._isCircularParent(parent)) {
+        _log.warning('AVOIDING CIRCULAR INITIALIZATION: $this -> $parent');
+        chain._checkAllCircularDependencies();
+
+        var initCircular = _doInitializationImpl2(parent);
+
+        if (initCircular is! Future<InitializationResult>) {
+          return initCircular;
+        }
+
+        return initCircular.timeout(Duration(milliseconds: 1000),
+            onTimeout: () {
+          _log.warning("Circular initialization timeout: $this");
+          return _resultOk();
+        });
+      }
     }
+
+    return _doInitializationImpl2(parent);
+  }
+
+  FutureOr<InitializationResult> _doInitializationImpl2(Initializable? parent) {
+    final chain = _chain;
+    final status = _status;
 
     var initializeAsync = _initializeAsync;
     if (initializeAsync != null) {
@@ -484,26 +537,24 @@ mixin Initializable {
     _log.info(
         '[$runtimeTypeNameUnsafe#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...');
 
-    var initDepsCall = initializeDependencies();
+    var initDeps = initializeDependencies();
 
-    if (initDepsCall is Future<List<Initializable>>) {
+    if (initDeps is Future<List<Initializable>>) {
       status._markAsynchronous(true);
 
-      return _initializeDependenciesAsync =
-          initDepsCall.then((dependencies) async {
-        return _doDependenciesInitialization(dependencies)
+      return _initializeDependenciesAsync = initDeps.then((initDeps) async {
+        return _doDependenciesInitialization(initDeps)
             .resolveMapped((depsInit) {
-          _checkAllDependenciesOk(depsInit);
+          _checkAllDependenciesOk(depsInit.results);
           return _callInitialize();
         });
       });
     } else {
-      var hasAsyncDep = initDepsCall.any((dep) => dep.isAsyncInitialization);
+      var hasAsyncDep = initDeps.any((dep) => dep.isAsyncInitialization);
       status._markAsynchronous(hasAsyncDep);
 
-      return _doDependenciesInitialization(initDepsCall)
-          .resolveMapped((depsInit) {
-        _checkAllDependenciesOk(depsInit);
+      return _doDependenciesInitialization(initDeps).resolveMapped((depsInit) {
+        _checkAllDependenciesOk(depsInit.results);
         return _callInitialize();
       });
     }
@@ -518,21 +569,90 @@ mixin Initializable {
   InitializationResult _resultOk() =>
       InitializationResult.ok(this, dependencies: _chain._dependencies);
 
-  FutureOr<List<InitializationResult>> _doDependenciesInitialization(
-      List<Initializable> dependencies) {
-    if (dependencies.isEmpty) return <InitializationResult>[];
+  FutureOr<_DependenciesInitialization> _doDependenciesInitialization(
+      List<Initializable> dependencies,
+      {bool forceCircular = false}) {
+    if (dependencies.isEmpty) {
+      return _DependenciesInitialization(<InitializationResult>[],
+          dependencies: null);
+    }
 
-    var chain = _chain;
+    final chain = _chain;
     chain._addAllDependencies(dependencies);
 
     dependencies = dependencies.where((e) => !e.isInitialized).toList();
 
-    var dependenciesValid = chain._filterValidDependencies(dependencies);
-    if (dependenciesValid.isEmpty) return <InitializationResult>[];
+    var depsStep1 = chain._filterValidDependencies(dependencies);
+    var initValids1 = _doDependenciesInitializationImpl(depsStep1.valids);
 
-    chain._markInitializedDependencies(dependenciesValid);
+    if (depsStep1.circular.isEmpty && depsStep1.finalizing.isEmpty) {
+      return _DependenciesInitialization.async(initValids1,
+          dependencies: dependencies);
+    }
 
-    var depsInits = dependenciesValid
+    if (forceCircular) {
+      return initValids1.resolveMapped((initValids1) {
+        var initCirculars1 =
+            _doDependenciesInitializationImpl(depsStep1.circular);
+
+        return initCirculars1.resolveMapped((initCirculars1) {
+          return _DependenciesInitialization(
+              [...initValids1, ...initCirculars1],
+              dependencies: dependencies);
+        });
+      });
+    }
+
+    // All dependencies are circular:
+    if (depsStep1.valids.isEmpty) {
+      return Future.delayed(Duration(milliseconds: 1), () {
+        var depsStep2 = chain._filterValidDependencies(depsStep1.circular);
+        var initValids2 = _doDependenciesInitializationImpl(depsStep2.valids);
+
+        return initValids2.resolveMapped((initValids2) {
+          return _DependenciesInitialization(initValids2,
+              dependencies: dependencies);
+        });
+      });
+    }
+
+    return initValids1.resolveMapped((initValids1) {
+      var depsStep2 = chain._filterValidDependencies(depsStep1.circular);
+      var initValids2 = _doDependenciesInitializationImpl(depsStep2.valids);
+
+      if (depsStep2.circular.isEmpty) {
+        return initValids2.resolveMapped((initValids2) {
+          return _DependenciesInitialization([...initValids1, ...initValids2],
+              dependencies: dependencies);
+        });
+      }
+
+      return Future.delayed(Duration(milliseconds: 1), () {
+        return initValids2.resolveMapped((initValids2) {
+          var depsStep3 = chain._filterValidDependencies(depsStep2.circular);
+          var initValids3 = _doDependenciesInitializationImpl(depsStep3.valids);
+
+          return initValids3.resolveMapped((initValids3) {
+            return _DependenciesInitialization(
+                [...initValids1, ...initValids2, ...initValids3],
+                dependencies: dependencies);
+          });
+        });
+      });
+    });
+  }
+
+  FutureOr<List<InitializationResult>> _doDependenciesInitializationImpl(
+      List<Initializable> dependencies) {
+    if (dependencies.isEmpty) {
+      return <InitializationResult>[];
+    }
+
+    final chain = _chain;
+
+    chain._markInitializedDependencies(dependencies);
+
+    var depsInits = dependencies
         .map((e) => MapEntry(e, e._doInitializationImpl(this)))
         .toList();
 
@@ -547,7 +667,7 @@ mixin Initializable {
 
     chain._setInitializedDependenciesCompleters(depsCompleters);
 
-    chain._checkCircularDependencies(dependenciesValid);
+    chain._checkCircularDependencies(dependencies);
 
     var depsInitsResolved =
         Map<Initializable, FutureOr<InitializationResult>>.fromEntries(
@@ -579,6 +699,8 @@ mixin Initializable {
       throw StateError("Error initializing (async): $this");
     }
 
+    _status._setFinalizing();
+
     var dependencies = result.dependencies.uniqueEntries();
 
     if (!identical(this, result.initializable)) {
@@ -587,20 +709,7 @@ mixin Initializable {
       result = InitializationResult.ok(this, dependencies: dependencies);
     }
 
-    if (dependencies.isNotEmpty) {
-      return _doDependenciesInitialization(dependencies)
-          .resolveMapped((depsResults) {
-        _checkAllDependenciesOk(depsResults);
-
-        _log.info(
-            '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.length})');
-
-        _status._setInitialized();
-        _initializeAsync = null;
-
-        return result;
-      });
-    } else {
+    if (dependencies.isEmpty) {
       _log.info('[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK');
 
       _status._setInitialized();
@@ -608,6 +717,50 @@ mixin Initializable {
 
       return result;
     }
+
+    return _doDependenciesInitialization(dependencies)
+        .resolveMapped((depsResults) {
+      if (depsResults.hasSkipped) {
+        var skipped = depsResults.skipped
+            ?.notInitialized(ignoreFinalizing: true)
+            .toList();
+
+        if (skipped?.isNotEmpty ?? false) {
+          return _doDependenciesInitialization(dependencies,
+                  forceCircular: true)
+              .resolveMapped((depsResults2) {
+            var allDepsResults =
+                depsResults.merge(depsResults2, dependencies: dependencies);
+            return _finalizeInitializationWithDeps(allDepsResults, result);
+          });
+        }
+      }
+
+      return _finalizeInitializationWithDeps(depsResults, result);
+    });
+  }
+
+  InitializationResult _finalizeInitializationWithDeps(
+      _DependenciesInitialization depsResults, InitializationResult result) {
+    if (depsResults.hasSkipped) {
+      var skipped =
+          depsResults.skipped?.notInitialized(ignoreFinalizing: true).toList();
+
+      if (skipped?.isNotEmpty ?? false) {
+        _log.warning(
+            'Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}');
+      }
+    }
+
+    _checkAllDependenciesOk(depsResults.results);
+
+    _log.info(
+        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.resultsLength})');
+
+    _status._setInitialized();
+    _initializeAsync = null;
+
+    return result;
   }
 
   /// Return a [List] of [Initializable] instances that need to be initialized
@@ -667,6 +820,68 @@ mixin Initializable {
   }
 }
 
+class _DependenciesInitialization {
+  final List<InitializationResult> results;
+
+  late final List<Initializable>? skipped;
+
+  _DependenciesInitialization(this.results,
+      {required List<Initializable>? dependencies}) {
+    List<Initializable>? skipped;
+
+    if (dependencies != null) {
+      var resultsDeps =
+          results.map((e) => e.initializable).toList(growable: false);
+      skipped = dependencies.where((e) => !resultsDeps.contains(e)).toList();
+
+      if (skipped.isNotEmpty) {
+        var skippedFinished = skipped.initialized;
+
+        if (skippedFinished.isNotEmpty) {
+          skipped.removeAll(skippedFinished);
+
+          var skippedFinishedResults =
+              skippedFinished.map((e) => e._resultOk());
+          results.addAll(skippedFinishedResults);
+        }
+      }
+
+      if (skipped.isEmpty) {
+        skipped = null;
+      }
+    }
+
+    this.skipped = skipped;
+  }
+
+  static FutureOr<_DependenciesInitialization> async(
+      FutureOr<List<InitializationResult>> results,
+      {required List<Initializable>? dependencies}) {
+    return results.resolveMapped((results) =>
+        _DependenciesInitialization(results, dependencies: dependencies));
+  }
+
+  bool get hasSkipped => skipped?.isNotEmpty ?? false;
+
+  int get resultsLength => results.length;
+
+  _DependenciesInitialization merge(_DependenciesInitialization other,
+      {required List<Initializable>? dependencies}) {
+    var allResults = [...results, ...other.results]
+        .groupBy((dep) => dep.initializable)
+        .map((dep, res) => MapEntry(dep, res.first))
+        .values
+        .toList();
+
+    return _DependenciesInitialization(allResults, dependencies: dependencies);
+  }
+
+  @override
+  String toString() {
+    return '_DependenciesInitialization{results: $results, skipped: $skipped}';
+  }
+}
+
 extension InitializableListExtension<T extends Initializable> on List<T> {
   void sortByInitializationOrder() {
     sort((a, b) => a._initializationID.compareTo(b._initializationID));
@@ -692,6 +907,19 @@ extension InitializableListExtension<T extends Initializable> on List<T> {
 
   List<InitializationStatus> toInitializationStatus() =>
       map((e) => e.initializationStatus).toList();
+
+  List<T> get initialized => where((e) => e._status.initialized).toList();
+
+  List<T> get finalizing => where((e) => e._status.finalizing).toList();
+
+  List<T> get initializing => where((e) => e._status.initializing).toList();
+
+  List<T> get idle =>
+      where((e) => !e._status.initialized && !e._status.initializing).toList();
+
+  List<T> notInitialized({bool ignoreFinalizing = false}) => where((e) =>
+      !e._status.initialized &&
+      (!ignoreFinalizing || !e._status.finalizing)).toList();
 }
 
 extension _ListExtension<T> on List<T> {

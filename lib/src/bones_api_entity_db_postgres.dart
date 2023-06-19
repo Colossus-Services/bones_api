@@ -134,8 +134,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
         config?['username'] ?? config?['user'] ?? defaultUsername;
     String? password = (config?['password'] ?? config?['pass'])?.toString();
 
-    minConnections ??= config?['minConnections'] ?? 1;
-    maxConnections ??= config?['maxConnections'] ?? 3;
+    int? confMinConnections = config?['minConnections'];
+    if (confMinConnections != null) {
+      minConnections = confMinConnections;
+    }
+
+    int? confMaxConnections = config?['maxConnections'];
+    if (confMaxConnections != null) {
+      maxConnections = confMaxConnections;
+    }
+
+    minConnections ??= 1;
+    maxConnections ??= 3;
 
     var retCheckTablesAndGenerateTables =
         DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
@@ -163,8 +173,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       password: password,
       host: host,
       port: port,
-      minConnections: minConnections!,
-      maxConnections: maxConnections!,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
@@ -303,17 +313,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  FutureOr<bool> closeConnection(PostgreSQLExecutionContext connection) {
+  bool closeConnection(PostgreSQLExecutionContext connection) {
     _log.info('closeConnection> $connection > poolSize: $poolSize');
-
     if (connection is PostgreSQLConnection) {
-      connection.close();
+      try {
+        // ignore: discarded_futures
+        connection.close();
+      } catch (_) {}
     }
     return true;
   }
 
   @override
-  FutureOr<bool> isConnectionValid(PostgreSQLExecutionContext connection) {
+  bool isConnectionValid(PostgreSQLExecutionContext connection) {
     return connection is PostgreSQLConnection && !connection.isClosed;
   }
 
@@ -321,26 +333,31 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableFieldsTypesImpl> $table');
+    try {
+      _log.info('getTableFieldsTypesImpl> $table');
 
-    var sql =
-        "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+      var sql =
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
 
-    var results = await connection.mappedResultsQuery(sql);
+      var results = await connection.mappedResultsQuery(sql);
 
-    if (results.isEmpty) return null;
+      var scheme = results.map((e) => e['']!).toList(growable: false);
 
-    var scheme = results.map((e) => e['']!).toList(growable: false);
+      await releaseIntoPool(connection);
 
-    if (scheme.isEmpty) return null;
+      if (scheme.isEmpty) return null;
 
-    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
-      var k = e['column_name'] as String;
-      var v = _toFieldType(e['data_type'] as String);
-      return MapEntry(k, v);
-    }));
+      var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+        var k = e['column_name'] as String;
+        var v = _toFieldType(e['data_type'] as String);
+        return MapEntry(k, v);
+      }));
 
-    return fieldsTypes;
+      return fieldsTypes;
+    } catch (_) {
+      await disposePoolElement(connection);
+      rethrow;
+    }
   }
 
   @override
@@ -348,47 +365,53 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       String table, TableRelationshipReference? relationship) async {
     var connection = await catchFromPool();
 
-    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+    try {
+      _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
-    var sql =
-        "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+      var sql =
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
 
-    var results = await connection.mappedResultsQuery(sql);
+      var results = await connection.mappedResultsQuery(sql);
 
-    if (results.isEmpty) return null;
+      var scheme = results.map((e) => e['']!).toList(growable: false);
 
-    var scheme = results.map((e) => e['']!).toList(growable: false);
+      if (scheme.isEmpty) {
+        await releaseIntoPool(connection);
+        return null;
+      }
 
-    if (scheme.isEmpty) return null;
+      var idFieldName = await _findIDField(connection, table, scheme);
 
-    var idFieldName = await _findIDField(connection, table, scheme);
+      var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
+        var k = e['column_name'] as String;
+        var v = _toFieldType(e['data_type'] as String);
+        return MapEntry(k, v);
+      }));
 
-    var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
-      var k = e['column_name'] as String;
-      var v = _toFieldType(e['data_type'] as String);
-      return MapEntry(k, v);
-    }));
+      notifyTableFieldTypes(table, fieldsTypes);
 
-    notifyTableFieldTypes(table, fieldsTypes);
+      var fieldsReferencedTables =
+          await _findFieldsReferencedTables(connection, table);
 
-    var fieldsReferencedTables =
-        await _findFieldsReferencedTables(connection, table);
+      var relationshipTables =
+          await _findRelationshipTables(connection, table, idFieldName);
 
-    var relationshipTables =
-        await _findRelationshipTables(connection, table, idFieldName);
+      await releaseIntoPool(connection);
 
-    await releaseIntoPool(connection);
+      var tableScheme = TableScheme(table,
+          relationship: relationship != null,
+          idFieldName: idFieldName,
+          fieldsTypes: fieldsTypes,
+          fieldsReferencedTables: fieldsReferencedTables,
+          relationshipTables: relationshipTables);
 
-    var tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes,
-        fieldsReferencedTables: fieldsReferencedTables,
-        relationshipTables: relationshipTables);
+      _log.info('$tableScheme');
 
-    _log.info('$tableScheme');
-
-    return tableScheme;
+      return tableScheme;
+    } catch (_) {
+      await disposePoolElement(connection);
+      rethrow;
+    }
   }
 
   Future<String> _findIDField(PostgreSQLExecutionContext connection,
@@ -843,13 +866,22 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
         return theConnection.transaction((c) {
           contextCompleter.complete(c);
 
-          return transaction.transactionFuture.catchError((e, s) {
-            cancelTransaction(transaction, c, e, s);
-            throw e;
-          });
+          return transaction.transactionFuture.then(
+            (res) => resolveTransactionResult(res, transaction, connection),
+            onError: (e, s) {
+              cancelTransaction(transaction, c, e, s);
+              throw e;
+            },
+          );
         });
       },
       validator: (c) => !transaction.isAborted,
+      onError: (e, s) => transaction.notifyExecutionError(
+        e,
+        s,
+        errorResolver: resolveError,
+        debugInfo: () => transaction.toString(),
+      ),
     );
 
     transaction.transactionResult = result;
@@ -858,12 +890,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
+  bool get cancelTransactionResultWithError => false;
+
+  @override
+  bool get throwTransactionResultWithError => true;
+
+  @override
   bool cancelTransaction(
       Transaction transaction,
-      PostgreSQLExecutionContext connection,
+      PostgreSQLExecutionContext? connection,
       Object? error,
       StackTrace? stackTrace) {
-    connection.cancelTransaction();
+    connection?.cancelTransaction();
     return true;
   }
 

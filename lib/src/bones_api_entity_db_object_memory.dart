@@ -148,8 +148,10 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<bool> closeConnection(DBObjectMemoryAdapterContext connection) {
-    connection.close();
+  bool closeConnection(DBObjectMemoryAdapterContext connection) {
+    try {
+      connection.close();
+    } catch (_) {}
     return true;
   }
 
@@ -285,21 +287,33 @@ class DBObjectMemoryAdapter
 
     _openTransactionsContexts[conn] = DateTime.now();
 
-    // ignore: discarded_futures
-    transaction.transactionFuture.catchError((e, s) {
-      cancelTransaction(transaction, conn, e, s);
-      throw e;
-    });
+    transaction.transactionFuture
+        // ignore: discarded_futures
+        .then(
+      // ignore: discarded_futures
+      (res) => resolveTransactionResult(res, transaction, conn),
+      onError: (e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      },
+    );
 
     return conn;
   }
 
   @override
+  bool get cancelTransactionResultWithError => true;
+
+  @override
+  bool get throwTransactionResultWithError => false;
+
+  @override
   bool cancelTransaction(
       Transaction transaction,
-      DBObjectMemoryAdapterContext connection,
+      DBObjectMemoryAdapterContext? connection,
       Object? error,
       StackTrace? stackTrace) {
+    if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
     return true;
@@ -698,7 +712,7 @@ class DBObjectMemoryAdapter
       FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f) {
     var transaction = op.transaction;
 
-    if (transaction.length == 1 && !transaction.isExecuting) {
+    if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(f,
           onError: (e, s) => transaction.notifyExecutionError(
                 e,
@@ -708,7 +722,15 @@ class DBObjectMemoryAdapter
               ));
     }
 
-    if (!transaction.isOpen && !transaction.isOpening) {
+    if (transaction.isOpen) {
+      return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
+        f,
+        errorResolver: resolveError,
+        debugInfo: () => op.toString(),
+      );
+    }
+
+    if (!transaction.isOpening) {
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
@@ -720,7 +742,7 @@ class DBObjectMemoryAdapter
 
     return transaction.onOpen<R>(() {
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
-        (c) => f(c),
+        f,
         errorResolver: resolveError,
         debugInfo: () => op.toString(),
       );
