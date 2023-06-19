@@ -866,18 +866,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
         return theConnection.transaction((c) {
           contextCompleter.complete(c);
 
-          return transaction.transactionFuture.then((ret) {
-            // When aborted `_transactionCompleter.complete` will be called
-            // with the error (not calling `completeError`), since it's
-            // running in another error zone (won't reach `onError`):
-            if (ret is TransactionAbortedError) {
-              throw ret;
-            }
-            return ret;
-          }, onError: (e, s) {
-            cancelTransaction(transaction, c, e, s);
-            throw e;
-          });
+          return transaction.transactionFuture.then(
+            (res) => resolveTransactionResult(res, transaction, connection),
+            onError: (e, s) {
+              cancelTransaction(transaction, c, e, s);
+              throw e;
+            },
+          );
         });
       },
       validator: (c) => !transaction.isAborted,
@@ -893,6 +888,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
     return contextCompleter.future;
   }
+
+  @override
+  bool get cancelTransactionResultWithError => false;
+
+  @override
+  bool get throwTransactionResultWithError => true;
 
   @override
   bool cancelTransaction(

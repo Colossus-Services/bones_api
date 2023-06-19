@@ -4027,30 +4027,30 @@ class TransactionAbortedError extends Error {
   String? reason;
   Object? payload;
 
-  Object? abortError;
-  StackTrace? abortStackTrace;
+  Object? error;
+  StackTrace? errorStackTrace;
 
   TransactionAbortedError(
-      {this.reason, this.payload, this.abortError, this.abortStackTrace});
+      {this.reason, this.payload, this.error, this.errorStackTrace});
 
-  TransactionAbortedError withAbortStackTrace(StackTrace? abortStackTrace) {
-    if (abortStackTrace == null ||
-        identical(this.abortStackTrace, abortStackTrace)) {
+  TransactionAbortedError withErrorStackTrace(StackTrace? errorStackTrace) {
+    if (errorStackTrace == null ||
+        identical(this.errorStackTrace, errorStackTrace)) {
       return this;
     }
 
     return TransactionAbortedError(
         reason: reason,
         payload: payload,
-        abortError: abortError,
-        abortStackTrace: abortStackTrace);
+        error: error,
+        errorStackTrace: errorStackTrace);
   }
 
   @override
   String toString() {
     var l = [
       if (reason != null) 'reason: $reason',
-      if (abortError != null) 'abortError: $abortError',
+      if (error != null) 'error: $error',
     ];
 
     return 'TransactionAbortedError> ${l.join(' ; ')}';
@@ -4164,8 +4164,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
           return r as R;
         } catch (e, s) {
           var abortError =
-              transaction!.abortedError ?? transaction._resolveAbortError(e, s);
-          var abortStackTrace = abortError.abortStackTrace;
+              transaction!.abortError ?? transaction._resolveAbortError(e, s);
+          var abortStackTrace = abortError.errorStackTrace;
           if (abortStackTrace != null) {
             Error.throwWithStackTrace(abortError, abortStackTrace);
           } else {
@@ -4584,10 +4584,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   /// Returns `true` if this transaction as aborted. See [abort].
   bool get isAborted => _aborted;
 
-  TransactionAbortedError? _abortedError;
+  TransactionAbortedError? _abortError;
 
   /// Returns the abort error ([TransactionAbortedError]).
-  TransactionAbortedError? get abortedError => _abortedError;
+  TransactionAbortedError? get abortError => _abortError;
 
   /// Aborts this transaction.
   FutureOr<TransactionAbortedError?> abort(
@@ -4600,14 +4600,14 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     if (_aborted) {
-      return _abortedError;
+      return _abortError;
     }
 
     payload ??= _lastResult;
 
     var abortError = _resolveAbortError(error, stackTrace, reason, payload);
 
-    _abortedError = abortError;
+    _abortError = abortError;
     _aborted = true;
 
     for (var op in _operations.whereNotIn(_executedOperations)) {
@@ -4622,9 +4622,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       [String? reason, Object? payload]) {
     if (error is TransactionAbortedError) {
       stackTrace ??=
-          error.abortStackTrace ?? error.stackTrace ?? StackTrace.current;
+          error.errorStackTrace ?? error.stackTrace ?? StackTrace.current;
 
-      var abortError = error.withAbortStackTrace(stackTrace);
+      var abortError = error.withErrorStackTrace(stackTrace);
       return abortError;
     } else {
       if (error is Error) {
@@ -4636,13 +4636,13 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       return TransactionAbortedError(
           reason: reason,
           payload: payload,
-          abortError: error,
-          abortStackTrace: stackTrace);
+          error: error,
+          errorStackTrace: stackTrace);
     }
   }
 
   FutureOr<TransactionAbortedError> _abortImpl() {
-    var abortError = _abortedError!;
+    var abortError = _abortError!;
 
     // Can't call `completeError` since the `Completer`
     // was created in a separated hidden error `Zone` (`_errorZone`).
@@ -4867,7 +4867,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       '  executing: $isExecuting\n',
       '  committed: ${isCommitted ? 'true' : (isCommitting ? 'committing...' : 'false')}\n',
       '  aborted: $isAborted\n',
-      '  abortedError: $abortedError\n',
+      '  abortError: $abortError\n',
       '  cachedEntities: $cachedEntitiesLength\n',
       '  external: $_external\n',
       if (duration != null) '  duration: ${duration.inMilliseconds} ms\n',

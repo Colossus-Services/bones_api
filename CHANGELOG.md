@@ -13,6 +13,9 @@
     - call `_transactionCompleter.complete` instead of `completeError` to avoid issues with hidden error `Zone`.
 - `TransactionOperation`:
   - Added `initTime`, `endTime` and `duration` getters.
+- `TransactionAbortedError`:
+  - Renamed `abortError` to `error`.
+  - Renamed `abortStackTrace` to `errorStackTrace`.
 - Added `APIRouteConfig`.
 - `APIRouteHandler.call`: log response time.
 - `DBMySQLAdapter` and `DBPostgreSQLAdapter`.
@@ -23,6 +26,8 @@
   - added `isTransactionWithSingleOperation`.
   - Fix `executeTransactionOperation`: identify single operation transactions.
   - Fix `createPoolElement`: respect `maxConnections` with correct `poolAliveElementsSize` calculation.
+  - Added `cancelTransactionResultWithError, `throwTransactionResultWithError` and `resolveTransactionResult`.
+    - Used by `openTransaction` result resolution.
 - `Pool`:
   - Fix `poolDisposedElementsCount` to also count `_invalidatedElementsCount`.
   - Fix `_catchFromEmptyPool`:

@@ -287,14 +287,25 @@ class DBObjectMemoryAdapter
 
     _openTransactionsContexts[conn] = DateTime.now();
 
-    // ignore: discarded_futures
-    transaction.transactionFuture.catchError((e, s) {
-      cancelTransaction(transaction, conn, e, s);
-      throw e;
-    });
+    transaction.transactionFuture
+        // ignore: discarded_futures
+        .then(
+      // ignore: discarded_futures
+      (res) => resolveTransactionResult(res, transaction, conn),
+      onError: (e, s) {
+        cancelTransaction(transaction, conn, e, s);
+        throw e;
+      },
+    );
 
     return conn;
   }
+
+  @override
+  bool get cancelTransactionResultWithError => true;
+
+  @override
+  bool get throwTransactionResultWithError => true;
 
   @override
   bool cancelTransaction(

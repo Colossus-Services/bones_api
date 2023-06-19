@@ -462,6 +462,33 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<C> openTransaction(Transaction transaction);
 
+  bool get cancelTransactionResultWithError;
+
+  bool get throwTransactionResultWithError;
+
+  FutureOr<dynamic> resolveTransactionResult(
+      dynamic result, Transaction transaction, C? connection) async {
+    // When aborted `_transactionCompleter.complete` will be called
+    // with the error (not calling `completeError`), since it's
+    // running in another error zone (won't reach `onError`):
+    if (result is TransactionAbortedError) {
+      if (cancelTransactionResultWithError) {
+        await cancelTransaction(
+            transaction, connection, result, result.stackTrace);
+
+        if (throwTransactionResultWithError) {
+          throw result;
+        } else {
+          return result;
+        }
+      } else if (throwTransactionResultWithError) {
+        throw result;
+      }
+    }
+
+    return result;
+  }
+
   FutureOr<bool> cancelTransaction(Transaction transaction, C? connection,
       Object? error, StackTrace? stackTrace);
 
