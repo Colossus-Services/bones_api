@@ -734,6 +734,32 @@ Future<bool> runAdapterTests(
           var transaction = Transaction();
 
           var result = await transaction.execute(() async {
+            var id = await userAPIRepository.store(userDuplicated);
+            return id as int?;
+          });
+
+          print(transaction);
+
+          expect(result, isNull);
+
+          expect(transaction.isAborted, isTrue);
+          expect(transaction.isCommitted, isFalse);
+          expect(transaction.abortError, isNotNull);
+          expect(transaction.abortError?.reason, isNull);
+
+          expect(transaction.abortError?.error, isA<EntityFieldInvalid>());
+          expect(
+            transaction.abortError?.error.toString(),
+            matches(RegExp(
+                r'Invalid entity\((?:User)?@table:user\) field(?:\(.*?email.*?\))?> reason: unique ; value: <.*?joe@[\w.+]+\.com.*?>.*',
+                dotAll: true)),
+          );
+        }
+
+        if (sqlAdapter.capability.transactionAbort) {
+          var transaction = Transaction();
+
+          var result = await transaction.execute(() async {
             var prevUsers = await userAPIRepository
                 .selectFirstByQuery('email == "${userDuplicated.email}"');
             expect(prevUsers, isNotNull);

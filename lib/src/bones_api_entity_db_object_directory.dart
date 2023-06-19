@@ -265,7 +265,7 @@ class DBObjectDirectoryAdapter
   bool get cancelTransactionResultWithError => true;
 
   @override
-  bool get throwTransactionResultWithError => true;
+  bool get throwTransactionResultWithError => false;
 
   @override
   bool cancelTransaction(
