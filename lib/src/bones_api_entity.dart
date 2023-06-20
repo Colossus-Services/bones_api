@@ -419,7 +419,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var id = map[idField];
     if (id != null) return id;
 
-    var idFieldSimple = StringUtils.toLowerCaseSimple(idField);
+    var idFieldSimple = StringUtils.toLowerCaseSimpleCached(idField);
 
     for (var k in map.keys) {
       if (k == idFieldSimple) {
@@ -1775,14 +1775,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             resolutionRules: resolutionRules)
         .resolveMapped((resolvedFields) {
       try {
-        var fieldsUnusedKeys = fields.keys
-            .whereNot((f) => returnFieldsUsedKeys.contains(f))
-            .toList();
-
         // Add unresolved fields, to allow non field parameters,
         // constructors with parameters different from class field name.
-        resolvedFields.addEntries(fieldsUnusedKeys
-            .map((f) => MapEntry<String, Object?>(f, fields[f])));
+        for (var f in fields.keys) {
+          if (!returnFieldsUsedKeys.contains(f)) {
+            resolvedFields[f] = fields[f];
+          }
+        }
 
         return instantiateFromMapImpl(resolvedFields, jsonDecoder: jsonDecoder)
             .resolveMapped((o) {

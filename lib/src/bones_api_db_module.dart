@@ -848,7 +848,7 @@ class APIDBModule extends APIModule {
   }
 
   List<Map<String, dynamic>> _entitiesToJsonMap(Iterable<Object> list) {
-    return list.map((e) => _entityToJsonMap(e)).toList();
+    return list.map(_entityToJsonMap).toList();
   }
 
   Map<String, dynamic> _entityToJsonMap(Object e) {

@@ -203,8 +203,7 @@ class _InitializationChain {
     return false;
   }
 
-  bool _isAnyParent(Iterable<Initializable> elems) =>
-      elems.any((e) => _isParent(e));
+  bool _isAnyParent(Iterable<Initializable> elems) => elems.any(_isParent);
 
   bool _isCircularParent(Initializable parent) {
     if (parent._chain._isParent(initializable)) {

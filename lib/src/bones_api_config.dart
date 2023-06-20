@@ -495,7 +495,7 @@ class APIConfig {
               MapEntry<String, dynamic>('${e.key}', _toMapValue(e.value)))
           .toList();
     } else if (o is Iterable) {
-      return o.expand((e) => _toMapEntry(e)).toList();
+      return o.expand(_toMapEntry).toList();
     } else if (o is String) {
       return APIConfig.parsePropertiesEncodedEntries(o);
     } else {

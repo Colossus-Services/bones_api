@@ -1,3 +1,12 @@
+## 1.4.10
+
+- Added `StringUtils.toLowerCaseSimpleCached`.
+- Optimize `Json.defaultFieldNameResolver`. 
+- Optimize `FieldsFromMap.getFieldsValuesFromMap`.
+
+- async_extension: ^1.1.1
+- reflection_factory: ^2.1.4
+
 ## 1.4.9
 
 - New `WeakList`.

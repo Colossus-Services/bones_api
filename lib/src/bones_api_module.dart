@@ -632,7 +632,7 @@ class APIRouteBuilder<M extends APIModule> {
 
       var arg0 = typeInfo.arguments0;
       if (value is List && arg0 != null && arg0.isPrimitiveType) {
-        var argParser = TypeParser.parserFor(typeInfo: arg0);
+        var argParser = TypeParser.parserForTypeInfo(arg0);
         if (argParser != null && !typeInfo.isCastedList(value)) {
           value =
               TypeParser.parseList(value, elementParser: argParser) ?? value;
@@ -654,7 +654,7 @@ class APIRouteBuilder<M extends APIModule> {
       }
 
       if (value is Set && arg0 != null && arg0.isPrimitiveType) {
-        var argParser = TypeParser.parserFor(typeInfo: arg0);
+        var argParser = TypeParser.parserForTypeInfo(arg0);
         if (argParser != null && !typeInfo.isCastedSet(value)) {
           value = TypeParser.parseSet(value, elementParser: argParser) ?? value;
         }
@@ -678,8 +678,8 @@ class APIRouteBuilder<M extends APIModule> {
           arg1 != null &&
           arg0.isPrimitiveType &&
           arg1.isPrimitiveType) {
-        var argParser0 = TypeParser.parserFor(typeInfo: arg0);
-        var argParser1 = TypeParser.parserFor(typeInfo: arg1);
+        var argParser0 = TypeParser.parserForTypeInfo(arg0);
+        var argParser1 = TypeParser.parserForTypeInfo(arg1);
 
         if ((argParser0 != null || argParser1 != null) &&
             !typeInfo.isCastedMap(value)) {

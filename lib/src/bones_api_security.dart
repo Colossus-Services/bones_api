@@ -535,8 +535,7 @@ abstract class APISecurity {
 
     var usernames = tokens.map((e) => e.username).toSet();
 
-    var validTokens =
-        usernames.expand((e) => getUsernameValidTokens(e)).toList();
+    var validTokens = usernames.expand(getUsernameValidTokens).toList();
 
     tokens.removeWhere((t) => !validTokens.contains(t));
 

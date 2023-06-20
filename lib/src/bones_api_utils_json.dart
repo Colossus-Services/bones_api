@@ -556,23 +556,23 @@ class Json {
       return field;
     }
 
-    var fieldLC = field.toLowerCase();
-    if (map.containsKey(fieldLC)) {
-      return fieldLC;
-    }
+    var fieldSimple = StringUtils.toLowerCaseSimpleCached(field);
 
-    var fieldSimple = StringUtils.toLowerCaseSimple(field);
-    if (map.containsKey(fieldSimple)) {
-      return fieldSimple;
-    }
-
-    for (var k in map.keys) {
-      if (equalsIgnoreAsciiCase(fieldLC, k)) {
-        return k;
+    if (field.length == fieldSimple.length) {
+      for (var k in map.keys) {
+        if (equalsIgnoreAsciiCase(fieldSimple, k)) {
+          return k;
+        }
       }
+    } else {
+      for (var k in map.keys) {
+        if (equalsIgnoreAsciiCase(fieldSimple, k)) {
+          return k;
+        }
 
-      if (equalsIgnoreAsciiCase(fieldSimple, k)) {
-        return k;
+        if (equalsIgnoreAsciiCase(field, k)) {
+          return k;
+        }
       }
     }
 
