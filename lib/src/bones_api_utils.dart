@@ -9,6 +9,12 @@ class StringUtils {
 
   static final RegExp _regexpNotLettersAndDigits = RegExp(r'[^a-zA-Z\d]+');
 
+  static final Map<String, String> _toLowerCaseSimpleCache = {};
+
+  /// Cached version of [toLowerCaseSimple].
+  static String toLowerCaseSimpleCached(String s) =>
+      _toLowerCaseSimpleCache[s] ??= toLowerCaseSimple(s);
+
   /// Transforms [s] to lower-case and removes non-letters and non-digits.
   static String toLowerCaseSimple(String s) =>
       s.toLowerCase().replaceAll(_regexpNotLettersAndDigits, '');
@@ -225,8 +231,7 @@ abstract class KeyMapper<K> {
   }
 
   List<K> setupKey(K key) {
-    var expandKeys =
-        expandedKeys(key).expand((k) => normalizedKeys(k)).toList();
+    var expandKeys = expandedKeys(key).expand(normalizedKeys).toList();
 
     var keysNorm = [...normalizedKeys(key), ...expandKeys].toDistinctList();
 
@@ -286,7 +291,7 @@ class FieldNameMapper extends KeyMapper<String> {
     exp.addAll(exp.map((k) => k.toUpperCase()).toList());
     exp.addAll(exp.map((k) => k.toLowerCase()).toList());
 
-    var norm = exp.expand((k) => normalizedKeys(k)).toList();
+    var norm = exp.expand(normalizedKeys).toList();
 
     var allExp = <String>[...exp, ...norm];
 
@@ -296,7 +301,7 @@ class FieldNameMapper extends KeyMapper<String> {
   @override
   List<String> normalizedKeys(String key) {
     var lc = StringUtils.toLowerCase(key);
-    var lcSimple = StringUtils.toLowerCaseSimple(key);
+    var lcSimple = StringUtils.toLowerCaseSimpleCached(key);
 
     return lc != lcSimple ? <String>[lcSimple, lc] : <String>[lc];
   }

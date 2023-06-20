@@ -419,11 +419,10 @@ mixin FieldsFromMap {
   }
 
   List<String> buildFieldsNamesLC(List<String> fieldsNames) =>
-      List<String>.unmodifiable(fieldsNames.map((f) => fieldToLCKey(f)));
+      List<String>.unmodifiable(fieldsNames.map(fieldToLCKey));
 
   List<String> buildFieldsNamesSimple(List<String> fieldsNames) {
-    return List<String>.unmodifiable(
-        fieldsNames.map((f) => fieldToSimpleKey(f)));
+    return List<String>.unmodifiable(fieldsNames.map(fieldToSimpleKey));
   }
 
   /// Resolves [fieldName] to one that matches a [fieldsNames] element.
@@ -475,7 +474,9 @@ mixin FieldsFromMap {
 
     var returnMapField = returnMapUsedKeys != null ? <String>[''] : null;
 
-    var entries = fieldsNames.map((f) {
+    var fields = <String, Object?>{};
+
+    for (var f in fieldsNames) {
       String? fLC, fSimple;
       if (fieldsNamesIndexes != null) {
         var idx = fieldsNamesIndexes[f]!;
@@ -488,17 +489,17 @@ mixin FieldsFromMap {
 
       if (entry == null) {
         if (includeAbsentFields) {
-          entry = MapEntry(f, null);
+          fields[f] = null;
         }
-      } else if (returnMapUsedKeys != null) {
-        var mapField = returnMapField![0];
-        returnMapUsedKeys.add(mapField);
+      } else {
+        if (returnMapUsedKeys != null) {
+          var mapField = returnMapField![0];
+          returnMapUsedKeys.add(mapField);
+        }
+
+        fields[entry.key] = entry.value;
       }
-
-      return entry;
-    }).whereNotNull();
-
-    var fields = Map<String, Object?>.fromEntries(entries);
+    }
 
     return fields;
   }
@@ -633,5 +634,6 @@ mixin FieldsFromMap {
 
   String fieldToLCKey(String key) => StringUtils.toLowerCase(key);
 
-  String fieldToSimpleKey(String key) => StringUtils.toLowerCaseSimple(key);
+  String fieldToSimpleKey(String key) =>
+      StringUtils.toLowerCaseSimpleCached(key);
 }

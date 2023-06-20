@@ -65,7 +65,7 @@ class PositionalFields {
 
   /// Converts [rows] to a list of [Map].
   List<Map<String, Object?>> toListOfMap(Iterable<Iterable<Object?>> rows) =>
-      rows.map((r) => toMap(r)).toList();
+      rows.map(toMap).toList();
 }
 
 typedef ValueEquality = bool Function(Object v1, Object v2);

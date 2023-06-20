@@ -50,12 +50,12 @@ class InstanceTracker<O extends Object, I extends Object> {
 
   /// Tracks instances [os].
   List<O> trackInstances(Iterable<O> os) {
-    return os.map((o) => trackInstance(o)).toList();
+    return os.map(trackInstance).toList();
   }
 
   /// Same as [trackInstanceNullable] with a nullable [os].
   List<O?> trackInstancesNullable(Iterable<O?> os) {
-    return os.map((o) => trackInstanceNullable(o)).toList();
+    return os.map(trackInstanceNullable).toList();
   }
 
   /// Untrack instances [os].

@@ -278,7 +278,7 @@ class APIAuthentication {
   List<APIPermission> enabledPermissionsWhere(
       bool Function(APIPermission permission) test,
       {DateTime? now}) {
-    return enabledPermissions(now: now).where((p) => test(p)).toList();
+    return enabledPermissions(now: now).where(test).toList();
   }
 
   List<APIPermission> enabledPermissionsOfType(String type, {DateTime? now}) {

@@ -24,7 +24,7 @@ void main() {
       expect(StringUtils.toLowerCase('someCamel-Case+Name'),
           equals('somecamel-case+name'));
 
-      expect(StringUtils.toLowerCaseSimple('someCamel-Case+Name'),
+      expect(StringUtils.toLowerCaseSimpleCached('someCamel-Case+Name'),
           equals('somecamelcasename'));
 
       expect(StringUtils.toLowerCaseUnderscore('someCamelCaseName'),

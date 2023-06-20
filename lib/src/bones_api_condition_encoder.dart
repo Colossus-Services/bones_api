@@ -240,7 +240,7 @@ class TableScheme with FieldsFromMap {
     var fieldsNames = this.fieldsNames;
 
     if (fields != null) {
-      var fieldsSimple = fields.map((e) => fieldToSimpleKey(e)).toList();
+      var fieldsSimple = fields.map(fieldToSimpleKey).toList();
 
       fieldsNames = fieldsNames
           .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
@@ -308,11 +308,12 @@ class TableScheme with FieldsFromMap {
       if (rels.length == 1) return rels.first;
 
       if (rels.isEmpty) {
-        var sourceTableSimple = StringUtils.toLowerCaseSimple(sourceTable);
+        var sourceTableSimple =
+            StringUtils.toLowerCaseSimpleCached(sourceTable);
 
         rels = l
             .where((rel) =>
-                StringUtils.toLowerCaseSimple(rel.sourceTable) ==
+                StringUtils.toLowerCaseSimpleCached(rel.sourceTable) ==
                 sourceTableSimple)
             .toList();
 
@@ -338,8 +339,9 @@ class TableScheme with FieldsFromMap {
 
       if (rels1.isEmpty) {
         rels1 = rels
-            .where((rel) => StringUtils.toLowerCaseSimple(rel.relationshipTable)
-                .contains(sourceFieldSimple))
+            .where((rel) =>
+                StringUtils.toLowerCaseSimpleCached(rel.relationshipTable)
+                    .contains(sourceFieldSimple))
             .toList();
       }
 
@@ -348,11 +350,11 @@ class TableScheme with FieldsFromMap {
         delimiter: '_',
         normalizer: (s) => StringUtils.toLowerCaseSimpleUnderscored(s),
         validator: (s) =>
-            !StringUtils.toLowerCaseSimple(s).contains(sourceFieldSimple),
+            !StringUtils.toLowerCaseSimpleCached(s).contains(sourceFieldSimple),
       );
 
-      var relsNamesSimple = relsNames.map(
-          (key, value) => MapEntry(key, StringUtils.toLowerCaseSimple(value)));
+      var relsNamesSimple = relsNames.map((key, value) =>
+          MapEntry(key, StringUtils.toLowerCaseSimpleCached(value)));
 
       var rels2 = rels1.where((rel) {
         var f = relsNamesSimple[rel.relationshipTable]!;
@@ -986,7 +988,7 @@ abstract class ConditionEncoder {
 
     var valueTypeInfo = TypeInfo.from(valueType);
 
-    var valueParser = TypeParser.parserFor(typeInfo: valueTypeInfo);
+    var valueParser = TypeParser.parserForTypeInfo(valueTypeInfo);
     if (valueParser != null) {
       if (value is Iterable && valueTypeInfo.isPrimitiveType) {
         var list = value.asList;

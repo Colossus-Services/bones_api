@@ -1732,7 +1732,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       return jsonList;
     }
 
-    var jsonList = entities.map((e) => _entityToJsonDefault(e)).toList();
+    var jsonList = entities.map(_entityToJsonDefault).toList();
 
     return jsonList;
   }
