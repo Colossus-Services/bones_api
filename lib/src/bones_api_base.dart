@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.10';
+  static const String VERSION = '1.4.11';
 
   static bool _boot = false;
 
@@ -55,6 +55,24 @@ class BonesAPI {
 
 /// Root class of an API.
 abstract class APIRoot with Initializable, Closable {
+  static bool _boot = false;
+
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+
+    BonesAPI.boot();
+
+    APIModuleProxyCaller.registerTargetResolver(
+        <T>(target, moduleName, responseAsJson) {
+      if (target is APIRoot) {
+        return APIModuleProxyDirectCaller(target, moduleName: moduleName ?? '')
+            as ClassProxyListener<T>;
+      }
+      return null;
+    });
+  }
+
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
 
   /// Returns the last [APIRoot] if instantiated.
@@ -169,7 +187,7 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
-    BonesAPI.boot();
+    boot();
     _instances[name] = this;
   }
 
@@ -469,13 +487,13 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
-    if (!externalCall) {
+    if (!externalCall && request.originalCredential != null) {
       var original = identical(request.credential, request.originalCredential);
 
-      var credential = request.credential =
-          request.credential?.copy(withUsernameEntity: false);
-
       if (original) {
+        var credential = request.credential =
+            request.credential?.copy(withUsernameEntity: false);
+
         request.originalCredential = credential;
       } else {
         request.originalCredential =

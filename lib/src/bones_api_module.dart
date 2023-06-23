@@ -875,13 +875,93 @@ class APIModuleProxy extends ClassProxy {
             });
 }
 
+typedef APIModuleProxyTargetResolver = ClassProxyListener<T>? Function<T>(
+    Object target, String? moduleName, bool responsesAsJson);
+
+/// A [APIModuleProxy] caller for a specific module ([moduleName]).
+///
+/// Extends a [ClassProxyDelegateListener] that delegates to [targetListener].
+class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
+  static final Set<APIModuleProxyTargetResolver> _targetResolvers = {};
+
+  /// Registers a target resolver.
+  /// See [registerTargetResolver] and [resolveTarget].
+  static bool registerTargetResolver(
+          APIModuleProxyTargetResolver targetResolver) =>
+      _targetResolvers.add(targetResolver);
+
+  /// Unregisters a target resolver.
+  /// See [registerTargetResolver] and [resolveTarget].
+  static bool unregisterTargetResolver(
+          APIModuleProxyTargetResolver targetResolver) =>
+      _targetResolvers.remove(targetResolver);
+
+  /// Resolves [target] to a [ClassProxyListener].
+  /// See [registerTargetResolver].
+  static ClassProxyListener<T> resolveTarget<T>(Object target,
+      {String? moduleName, bool responsesAsJson = true}) {
+    for (var resolver in _targetResolvers) {
+      var targetResolved = resolver<T>(target, moduleName, responsesAsJson);
+      if (targetResolved != null) return targetResolved;
+    }
+
+    if (target is ClassProxyListener<T>) return target;
+
+    if (target is HttpClient) {
+      return APIModuleProxyHttpCaller(target,
+          moduleRoute: moduleName,
+          responsesAsJson: responsesAsJson) as ClassProxyListener<T>;
+    }
+
+    throw StateError("Can't resolve `APIModuleProxyListener` target: $target");
+  }
+
+  /// The [APIModule] name.
+  final String moduleName;
+
+  APIModuleProxyCaller(Object target,
+      {required this.moduleName, bool responsesAsJson = true})
+      : super(resolveTarget(target,
+            moduleName: moduleName, responsesAsJson: responsesAsJson));
+}
+
+/// An [APIModuleProxy] caller with direct calls to an [api] instance,
+/// for a specific module ([moduleName]).
+class APIModuleProxyDirectCaller implements ClassProxyListener {
+  final APIRoot api;
+
+  final String moduleName;
+
+  APIModuleProxyDirectCaller(this.api,
+      {required this.moduleName, this.credential});
+
+  APICredential? credential;
+
+  @override
+  FutureOr onCall(instance, String methodName, Map<String, dynamic> parameters,
+      TypeReflection? returnType) async {
+    var response = api.call(APIRequest.get('$moduleName/$methodName',
+        parameters: parameters, credential: credential));
+
+    return response.resolveMapped((response) {
+      if (response.isNotOK) return null;
+      var payload = response.payload;
+      return payload;
+    });
+  }
+}
+
 typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
-    APIModuleHttpProxy proxy,
+    APIModuleProxyHttpCaller proxy,
     String methodName,
     Map<String, Object?> parameters);
 
+@Deprecated("Renamed to `APIModuleProxyHttpCaller`")
+typedef APIModuleHttpProxy = APIModuleProxyHttpCaller;
+
+/// An [APIModuleProxy] caller that performs HTTP requests.
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].
-class APIModuleHttpProxy implements ClassProxyListener {
+class APIModuleProxyHttpCaller implements ClassProxyListener {
   /// The [httpClient] ot perform the proxy calls.
   final HttpClient httpClient;
 
@@ -892,7 +972,7 @@ class APIModuleHttpProxy implements ClassProxyListener {
   /// If `false` will treat as response only of `Content-Type` is JSON or JavaScript ([HttpResponse.isBodyTypeJSON]).
   final bool responsesAsJson;
 
-  APIModuleHttpProxy(this.httpClient,
+  APIModuleProxyHttpCaller(this.httpClient,
       {String? moduleRoute, this.responsesAsJson = true})
       : modulePath = _normalizeModulePath(moduleRoute) {
     BonesAPI.boot();

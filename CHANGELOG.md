@@ -1,3 +1,9 @@
+## 1.4.11
+
+- Added `APIModuleProxyCaller` and `APIModuleProxyDirectCaller`.
+- Rename `APIModuleHttpProxy` to `APIModuleProxyHttpCaller`.
+- reflection_factory: ^2.1.6
+
 ## 1.4.10
 
 - Added `StringUtils.toLowerCaseSimpleCached`.
