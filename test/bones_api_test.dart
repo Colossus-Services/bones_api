@@ -570,7 +570,7 @@ class MyBaseModule extends APIModule {
 }
 
 @APIModuleProxy('MyInfoModule')
-class MyInfoModuleProxy extends APIModuleHttpProxy {
+class MyInfoModuleProxy extends APIModuleProxyHttpCaller {
   MyInfoModuleProxy(mercury_client.HttpClient httpClient)
       : super(httpClient, moduleRoute: 'info');
 }
