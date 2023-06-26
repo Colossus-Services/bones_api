@@ -1,3 +1,8 @@
+## 1.4.12
+
+- Fix `GroupConditionOR.cast`.
+- `ConditionSQLEncoder.keyFieldReferenceToSQL`: throw exception when a field can't by found in table.
+
 ## 1.4.11
 
 - Added `APIModuleProxyCaller` and `APIModuleProxyDirectCaller`.

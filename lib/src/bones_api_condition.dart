@@ -693,7 +693,7 @@ class GroupConditionOR<O> extends GroupCondition<O> {
     if (this is GroupConditionOR<T>) {
       return this as GroupConditionOR<T>;
     }
-    return GroupConditionOR<T>(conditions.map((e) => cast<T>()).toList())
+    return GroupConditionOR<T>(conditions.map((e) => e.cast<T>()).toList())
       .._markResolved(resolved);
   }
 

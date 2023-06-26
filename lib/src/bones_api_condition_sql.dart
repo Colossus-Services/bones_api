@@ -410,6 +410,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
               var q = sqlElementQuote;
               var targetFieldName =
                   targetTableScheme.resolveTableFieldName(key1.name);
+
+              if (targetFieldName == null) {
+                var errorMsg =
+                    "Can't find field `${key1.name}` for target `${targetTableScheme.name}`. relationship: $relationship";
+                _log.severe(errorMsg);
+                throw StateError(errorMsg);
+              }
+
               var targetFieldType =
                   targetTableScheme.fieldsTypes[targetFieldName]!;
               return MapEntry(
