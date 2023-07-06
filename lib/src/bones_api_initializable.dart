@@ -355,15 +355,14 @@ class _InitializationChain {
         if (dep._chain._isParent(dependency)) {
           var completer = e.value;
 
-          _log.warning(
-              '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
-              'in async initialization graph of `${initializable.initializationStatus}`.');
-
           if (!completer.isCompleted) {
-            completer.complete(dependency._resultOk());
-          }
+            _log.warning(
+                '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
+                'in async initialization graph of `${initializable.initializationStatus}`.');
 
-          completed = true;
+            completer.complete(dependency._resultOk());
+            completed = true;
+          }
         }
       }
     }
