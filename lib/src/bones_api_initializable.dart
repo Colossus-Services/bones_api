@@ -228,6 +228,24 @@ class _InitializationChain {
   List<Initializable> get dependencies =>
       _dependencies?.toList() ?? <Initializable>[];
 
+  List<Initializable> get dependenciesDeep {
+    var allDeps = <Initializable>{};
+    _dependenciesDeepImpl(allDeps);
+    allDeps.remove(initializable);
+    return allDeps.toList();
+  }
+
+  void _dependenciesDeepImpl(Set<Initializable> allDeps) {
+    if (!allDeps.add(initializable)) return;
+
+    var dependencies = _dependencies;
+    if (dependencies == null) return;
+
+    for (var dep in dependencies) {
+      dep._chain._dependenciesDeepImpl(allDeps);
+    }
+  }
+
   void _addAllDependencies(Iterable<Initializable> deps) {
     var depsValid = deps.where((dep) => !identical(dep, initializable));
 
@@ -493,7 +511,7 @@ mixin Initializable {
       }
 
       if (!parent._status.initialized && chain._isCircularParent(parent)) {
-        _log.warning('AVOIDING CIRCULAR INITIALIZATION: $this -> $parent');
+        // _log.warning('AVOIDING CIRCULAR INITIALIZATION: $this -> $parent');
         chain._checkAllCircularDependencies();
 
         var initCircular = _doInitializationImpl2(parent);
@@ -741,7 +759,52 @@ mixin Initializable {
     });
   }
 
-  InitializationResult _finalizeInitializationWithDeps(
+  FutureOr<InitializationResult> _finalizeInitializationWithDeps(
+      _DependenciesInitialization depsResults, InitializationResult result) {
+    var dependenciesDeep = _chain.dependenciesDeep;
+
+    var depsInitializing = dependenciesDeep
+        .where((e) => e.initializationStatus.initializing)
+        .toList();
+
+    if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
+      _log.info(
+          '[$initializationStatus] Waiting Still initializing dependencies: ${depsInitializing.length} ...');
+
+      var waitInitializingDeps = depsInitializing
+          .map((e) => e.ensureInitialized())
+          .toList()
+          .resolveAll()
+          .asFuture
+          .timeout(
+        Duration(minutes: 2),
+        onTimeout: () {
+          _log.warning(
+              '[$initializationStatus] Timeout waiting still initializing dependencies:');
+          for (var dep in depsInitializing) {
+            _log.warning('-- $dep (${dep.initializationStatus})');
+          }
+          return depsInitializing.map((e) => e._resultOk()).toList();
+        },
+      );
+
+      return waitInitializingDeps.then((depsInitializingResults) {
+        for (var result in depsInitializingResults) {
+          var initializable = result.initializable;
+          if (initializable.initializationStatus.initializing) {
+            _log.warning(
+                '[$initializationStatus] Still initializing: $initializable (${initializable.initializationStatus})');
+          }
+        }
+
+        return _finalizeInitializationWithDeps2(depsResults, result);
+      });
+    } else {
+      return _finalizeInitializationWithDeps2(depsResults, result);
+    }
+  }
+
+  FutureOr<InitializationResult> _finalizeInitializationWithDeps2(
       _DependenciesInitialization depsResults, InitializationResult result) {
     if (depsResults.hasSkipped) {
       var skipped =
@@ -749,14 +812,29 @@ mixin Initializable {
 
       if (skipped?.isNotEmpty ?? false) {
         _log.warning(
-            'Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}');
+            '[$initializationStatus] Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}');
       }
     }
 
     _checkAllDependenciesOk(depsResults.results);
 
+    var dependenciesDeep = _chain.dependenciesDeep;
+
+    var depsInitializing = dependenciesDeep
+        .where((e) => e.initializationStatus.initializing)
+        .toList();
+
     _log.info(
-        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.resultsLength})');
+        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})');
+
+    if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
+      _log.warning(
+          '[$initializationStatus] Still initializing dependencies: ${depsInitializing.length}');
+
+      for (var dep in depsInitializing) {
+        _log.warning('-- $dep (${dep.initializationStatus})');
+      }
+    }
 
     _status._setInitialized();
     _initializeAsync = null;

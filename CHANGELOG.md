@@ -1,5 +1,7 @@
 ## 1.4.13
 
+- `Initializable._finalizeInitializationWithDeps`:
+  - When finalizing root `Initializable`: wait for still initializing dependencies. 
 - Fix `InitializationChain._completeCircularDependency`:
   - Check if `Completer` is already completed before call `complete`.
 - build_runner: ^2.4.6
