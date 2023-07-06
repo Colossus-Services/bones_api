@@ -1,3 +1,9 @@
+## 1.4.13
+
+- Fix `InitializationChain._completeCircularDependency`:
+  - Check if `Completer` is already completed before call `complete`.
+- build_runner: ^2.4.6
+
 ## 1.4.12
 
 - Fix `GroupConditionOR.cast`.

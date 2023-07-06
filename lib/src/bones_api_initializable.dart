@@ -359,7 +359,10 @@ class _InitializationChain {
               '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
               'in async initialization graph of `${initializable.initializationStatus}`.');
 
-          completer.complete(dependency._resultOk());
+          if (!completer.isCompleted) {
+            completer.complete(dependency._resultOk());
+          }
+
           completed = true;
         }
       }
