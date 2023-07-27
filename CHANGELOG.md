@@ -1,3 +1,9 @@
+## 1.4.15
+
+- `SQLBuilderListExtension`:
+  - Optimize `bestOrder`:
+    - Use internal Quick Sort algorithm for better pivot selection (producing a better order of elements).
+
 ## 1.4.14
 
 - `APIRouteBuilder.apiMethod`:

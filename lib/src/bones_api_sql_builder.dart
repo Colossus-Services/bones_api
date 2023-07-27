@@ -1,5 +1,6 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
@@ -10,7 +11,6 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'package:logging/logging.dart' as logging;
 
 final _log = logging.Logger('SQLBuilder');
 
@@ -580,6 +580,9 @@ extension SQLBuilderIterableMapEntryExtension<K>
   }
 }
 
+typedef SQLBuilderComparator = int Function(SQLBuilder a, SQLBuilder b);
+typedef SQLBuilderSelector = bool Function(SQLBuilder o);
+
 extension SQLBuilderListExtension on List<SQLBuilder> {
   bool _headContainsReferenceTable(List<String> refTables, int length) {
     for (var t in refTables) {
@@ -619,14 +622,16 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   int? _indexWithAllReferenceTables(List<String> refTables, int offset) {
     var length = this.length;
 
-    var toFind = refTables.toSet().toList();
+    var toFind = refTables.toSet();
 
     for (var i = offset; i < length && toFind.isNotEmpty; ++i) {
-      var e = this[i];
+      final e = this[i];
       if (e is! CreateTableSQL) continue;
 
-      if (toFind.contains(e.table)) {
-        toFind.remove(e.table);
+      final table = e.table;
+
+      if (toFind.contains(table)) {
+        toFind.remove(table);
 
         if (toFind.isEmpty) {
           var foundIdx = i;
@@ -635,7 +640,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
             var o = this[j];
             if (o is! TableSQL) break;
 
-            if (o.parentTable == e.table) {
+            if (o.parentTable == table) {
               foundIdx = j;
             } else {
               break;
@@ -661,12 +666,29 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
           .toMapFromEntries();
 
   /// Sorts the SQLs by table name.
-  void sorteByName() => sort((a, b) => a.mainTable.compareTo(b.mainTable));
+  void sortByName() => sort((a, b) {
+        var cmp = a.mainTable.compareTo(b.mainTable);
+        if (cmp == 0) {
+          var create1 = a is CreateTableSQL;
+          var create2 = b is CreateTableSQL;
+
+          if (create1 && !create2) {
+            return -1;
+          } else if (!create1 && create2) {
+            return 1;
+          } else {
+            var sql1 = a.buildSQL();
+            var sql2 = b.buildSQL();
+            cmp = sql1.compareTo(sql2);
+          }
+        }
+        return cmp;
+      });
 
   /// Sorts the SQLs in the best execution order,
   /// to avoid reference issues.
   void bestOrder() {
-    sorteByName();
+    sortByName();
 
     var withParents =
         whereType<TableSQL>().where((e) => e.parentTable != null).toList();
@@ -822,7 +844,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   }
 
   void _sortByRefsSimple() {
-    sort((a, b) {
+    _quickSort((a, b) {
       if (a is TableSQL && b is TableSQL) {
         var ref1 = a.referenceTables.length;
         var ref2 = b.referenceTables.length;
@@ -834,12 +856,12 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
             (ref1 + rel1).clamp(0, 1).compareTo((ref2 + rel2).clamp(0, 1));
         return cmp;
       }
-      return 0;
-    });
+      return a.compareTo(b);
+    }, (o) => o is TableSQL);
   }
 
   void _sortByRels() {
-    sort((a, b) {
+    _quickSort((a, b) {
       if (a is TableSQL && b is TableSQL) {
         var rel1 = a is CreateTableSQL ? a.relationshipsTables.length : 0;
         var rel2 = b is CreateTableSQL ? b.relationshipsTables.length : 0;
@@ -847,12 +869,12 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         var cmp = rel1.clamp(0, 1).compareTo(rel2.clamp(0, 1));
         return cmp;
       }
-      return 0;
-    });
+      return a.compareTo(b);
+    }, (o) => o is TableSQL);
   }
 
   void _sortByRefs() {
-    sort((a, b) {
+    _quickSort((a, b) {
       if (a is TableSQL && b is TableSQL) {
         var ref1 = a.referenceTables.length;
         var ref2 = b.referenceTables.length;
@@ -874,8 +896,76 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
         return 0;
       }
-      return 0;
-    });
+      return a.compareTo(b);
+    }, (o) => o is TableSQL);
+  }
+
+  void _quickSort(
+          SQLBuilderComparator compare, SQLBuilderSelector pivotSelector) =>
+      _quickSortPart(compare, pivotSelector, 0, length - 1);
+
+  void _quickSortPart(SQLBuilderComparator compare,
+      SQLBuilderSelector pivotSelector, int lo, int hi) {
+    if (hi <= lo) {
+      return;
+    }
+
+    int j = _quickSortPartition(compare, pivotSelector, lo, hi);
+    _quickSortPart(compare, pivotSelector, lo, j - 1);
+    _quickSortPart(compare, pivotSelector, j + 1, hi);
+  }
+
+  int _quickSortPartition(SQLBuilderComparator compare,
+      SQLBuilderSelector pivotSelector, int lo, int hi) {
+    var i = lo;
+    var j = hi + 1;
+    var p = _quickSortSelectPivot(pivotSelector, lo, hi);
+    var pivot = this[p];
+
+    while (true) {
+      while (_less(compare, this[++i], pivot)) {
+        if (i == hi) {
+          break;
+        }
+      }
+
+      while (_less(compare, pivot, this[--j])) {
+        if (j == lo) {
+          break;
+        }
+      }
+
+      if (i >= j) {
+        break;
+      }
+
+      _swap(i, j);
+    }
+
+    if (_less(compare, this[j], pivot)) {
+      _swap(p, j);
+    }
+
+    return j;
+  }
+
+  int _quickSortSelectPivot(SQLBuilderSelector pivotSelector, int lo, int hi) {
+    for (var i = lo; i <= hi; ++i) {
+      var o = this[i];
+      if (pivotSelector(o)) {
+        return i;
+      }
+    }
+    return lo;
+  }
+
+  static bool _less(SQLBuilderComparator compare, SQLBuilder a, SQLBuilder b) =>
+      compare(a, b) < 0;
+
+  void _swap(int i, int j) {
+    var tmp = this[i];
+    this[i] = this[j];
+    this[j] = tmp;
   }
 }
 

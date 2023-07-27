@@ -91,12 +91,14 @@ class DBObjectDirectoryAdapter
     boot();
 
     if (!directory.existsSync()) {
-      throw ArgumentError("Directory doesn't exists: $directory");
+      throw ArgumentError(
+          "[DBObjectDirectoryAdapter]: Directory doesn't exists: $directory");
     }
 
     var modeString = directory.statSync().modeString();
     if (!modeString.contains('rw')) {
-      throw StateError("Can't read+write the directory: $directory");
+      throw StateError(
+          "[DBObjectDirectoryAdapter]: Can't read+write the directory: $directory");
     }
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
