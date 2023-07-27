@@ -295,9 +295,12 @@ abstract class APIModule with Initializable {
 /// Returned by `API-INFO`.
 class APIModuleInfo {
   final APIModule module;
+  final ClassReflection? moduleClassReflection;
   final APIRequest? apiRequest;
 
-  APIModuleInfo(this.module, [this.apiRequest]);
+  APIModuleInfo(this.module, [this.apiRequest])
+      : moduleClassReflection =
+            ReflectionFactory().getRegisterClassReflection(module.runtimeType);
 
   /// Returns the name of the [module].
   String get name => module.name;
@@ -308,11 +311,23 @@ class APIModuleInfo {
   /// Returns the routes of the [module].
   List<APIRouteInfo> get routes => module.routes.apiInfo(apiRequest);
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (version != null) 'version': version,
-        'routes': routes.map((e) => e.toJson()).toList()
-      };
+  /// Returns the module rules (through [moduleClassReflection]).
+  List<APIRouteRule> get rules =>
+      moduleClassReflection?.classAnnotations
+          .whereType<APIRouteRule>()
+          .toList() ??
+      [];
+
+  Map<String, dynamic> toJson() {
+    var rules = this.rules;
+
+    return {
+      'name': name,
+      if (version != null) 'version': version,
+      'routes': routes.map((e) => e.toJson()).toList(),
+      if (rules.isNotEmpty) 'rules': rules,
+    };
+  }
 }
 
 /// A route builder.
@@ -391,53 +406,67 @@ class APIRouteBuilder<M extends APIModule> {
   /// - [Iterable<MethodReflection>]: a list of many routes from [MethodReflection]. See [apiMethods].
   /// - [ClassReflection]: uses the API methods in the reflected class. See [apiReflection].
   /// - [Iterable]: a list of any of the provider types above.
-  void from(APIRequestMethod? requestMethod, Object? provider) {
-    if (provider == null) return;
+  bool from(APIRequestMethod? requestMethod, Object? provider) {
+    if (provider == null) return false;
 
     if (provider is MethodReflection) {
-      apiMethod(provider, requestMethod);
+      return apiMethod(provider, requestMethod);
     } else if (provider is Iterable<MethodReflection>) {
-      apiMethods(provider, requestMethod);
+      return apiMethods(provider, requestMethod);
     } else if (provider is ClassReflection) {
-      apiReflection(provider, requestMethod);
+      return apiReflection(provider, requestMethod);
     } else if (provider is Iterable) {
+      var addedAny = false;
       for (var e in provider) {
-        from(e, requestMethod);
+        var added = from(e, requestMethod);
+        addedAny |= added;
       }
+      return addedAny;
     }
+
+    return false;
   }
 
   /// Adds routes from a [reflection], one for each API method in the reflected class.
   /// See [ClassReflectionExtension.apiMethods].
   ///
   /// - [requestMethod] the route request method.
-  void apiReflection(ClassReflection reflection,
+  bool apiReflection(ClassReflection reflection,
       [APIRequestMethod? requestMethod]) {
     var methods = reflection.apiMethods();
-    apiMethods(methods, requestMethod);
+    return apiMethods(methods, requestMethod);
   }
 
   /// Adds the routes from [apiMethods]. See [apiMethod].
-  void apiMethods(Iterable<MethodReflection> apiMethods,
+  bool apiMethods(Iterable<MethodReflection> apiMethods,
       [APIRequestMethod? requestMethod]) {
+    var addedAny = false;
     for (var m in apiMethods) {
-      apiMethod(m, requestMethod);
+      var added = apiMethod(m, requestMethod);
+      addedAny |= added;
     }
+    return addedAny;
   }
 
   /// Adds a route from [apiMethod], using the same name of the methods as route.
   /// See [MethodReflectionExtension.isAPIMethod].
   ///
   /// - [requestMethod] the route request method.
-  void apiMethod(MethodReflection apiMethod,
+  bool apiMethod(MethodReflection apiMethod,
       [APIRequestMethod? requestMethod]) {
+    var classReflection = apiMethod.classReflection;
+
+    if (classReflection.supperTypes.contains(APIModule) &&
+        APIModule.interfaceMethodsNames.contains(apiMethod.name)) {
+      return false;
+    }
+
     var returnsAPIResponse = apiMethod.returnsAPIResponse;
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
 
     var methodRules = apiMethod.annotations.whereType<APIRouteRule>().toList();
-    var classRules = apiMethod.classReflection.classAnnotations
-        .whereType<APIRouteRule>()
-        .toList();
+    var classRules =
+        classReflection.classAnnotations.whereType<APIRouteRule>().toList();
 
     List<APIRouteRule> rules;
     if (methodRules.isEmpty) {
@@ -468,6 +497,8 @@ class APIRouteBuilder<M extends APIModule> {
         rules: rules,
         config: config,
       );
+
+      return true;
     } else if (receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
       var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
@@ -481,6 +512,8 @@ class APIRouteBuilder<M extends APIModule> {
         rules: rules,
         config: config,
       );
+
+      return true;
     } else if (returnsAPIResponse) {
       var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
           .map((p) => MapEntry(p.name, TypeInfo.from(p))));
@@ -494,7 +527,11 @@ class APIRouteBuilder<M extends APIModule> {
         rules: rules,
         config: config,
       );
+
+      return true;
     }
+
+    return false;
   }
 
   FutureOr<APIResponse> _apiMethodStandard(

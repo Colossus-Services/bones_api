@@ -142,6 +142,9 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
 
   SQLBuilder(this.dialect, this.q);
 
+  /// The main table of the SQL.
+  String get mainTable;
+
   /// Returns a list of referenced tables.
   List<String>? get referenceTables;
 
@@ -182,6 +185,9 @@ class CreateIndexSQL extends SQLBuilder {
   CreateIndexSQL(SQLDialect dialect, this.table, this.column, this.indexName,
       {String q = '"'})
       : super(dialect, q);
+
+  @override
+  String get mainTable => table;
 
   @override
   String buildSQL({bool multiline = true, bool ifNotExists = true}) {
@@ -247,6 +253,9 @@ abstract class TableSQL extends SQLBuilder {
   TableSQL(SQLDialect dialect, this.table, this.entries,
       {String q = '"', this.parentTable})
       : super(dialect, q);
+
+  @override
+  String get mainTable => table;
 
   @override
   List<String> get referenceTables;
@@ -652,14 +661,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
           .toMapFromEntries();
 
   /// Sorts the SQLs by table name.
-  void sorteByName() {
-    sort((a, b) {
-      if (a is TableSQL && b is TableSQL) {
-        return a.table.compareTo(b.table);
-      }
-      return 0;
-    });
-  }
+  void sorteByName() => sort((a, b) => a.mainTable.compareTo(b.mainTable));
 
   /// Sorts the SQLs in the best execution order,
   /// to avoid reference issues.

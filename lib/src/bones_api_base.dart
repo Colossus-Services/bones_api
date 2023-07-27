@@ -40,7 +40,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.13';
+  static const String VERSION = '1.4.14';
 
   static bool _boot = false;
 
@@ -969,7 +969,11 @@ class APIRouteInfo {
       var query = uri.query;
       return query.isEmpty ? path : '$path?$query';
     } else {
-      return uri.toString();
+      var uriStr = uri.toString();
+      if (uriStr.endsWith('?')) {
+        uriStr = uriStr.substring(0, uriStr.length - 1);
+      }
+      return uriStr;
     }
   }
 

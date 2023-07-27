@@ -1,3 +1,16 @@
+## 1.4.14
+
+- `APIRouteBuilder.apiMethod`:
+  - Ignores framework methods from `APIModule` that could be interpreted as routes.
+- `SQLBuilder`:
+  - Added `mainTable` getter.
+    - Used for better sorting using table name (`sorteByName`).
+
+- resource_portable: ^3.1.0
+- collection: ^1.17.2
+- test: ^1.24.4
+- vm_service: ^11.8.0
+
 ## 1.4.13
 
 - `Initializable._finalizeInitializationWithDeps`:
