@@ -12,12 +12,13 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('DBPostgreSQLAdapter');
+final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsSqlLogger();
 
 /// A PostgreSQL adapter.
 class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
@@ -219,7 +220,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
     if (error is DBPostgreSQLAdapterException) {
       return error;
     } else if (error is PostgreSQLException) {
@@ -238,7 +239,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     }
 
     return DBPostgreSQLAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace);
+        parentError: error, parentStackTrace: stackTrace, operation: operation);
   }
 
   @override
@@ -925,7 +926,6 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBPostgreSQLAdapterException';
 
   DBPostgreSQLAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

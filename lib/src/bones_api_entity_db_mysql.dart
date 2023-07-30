@@ -12,12 +12,13 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('DBMySQLAdapter');
+final _log = logging.Logger('DBMySQLAdapter')..registerAsSqlLogger();
 
 /// A MySQL adapter.
 class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
@@ -721,7 +722,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
     if (error is DBMySQLAdapterException) {
       return error;
     } else if (error is MySqlException) {
@@ -753,7 +754,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     }
 
     return DBMySQLAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace);
+        parentError: error, parentStackTrace: stackTrace, operation: operation);
   }
 
   @override
@@ -879,7 +880,6 @@ class DBMySQLAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBMySQLAdapterException';
 
   DBMySQLAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

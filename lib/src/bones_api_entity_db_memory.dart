@@ -13,11 +13,12 @@ import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
-final _log = logging.Logger('DBSQLMemoryAdapter');
+final _log = logging.Logger('DBSQLMemoryAdapter')..registerAsSqlLogger();
 
 class DBSQLMemoryAdapterContext
     implements Comparable<DBSQLMemoryAdapterContext> {
@@ -146,13 +147,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
     if (error is DBSQLMemoryAdapterException) {
       return error;
     }
 
     return DBSQLMemoryAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace);
+        parentError: error, parentStackTrace: stackTrace, operation: operation);
   }
 
   @override
@@ -702,7 +703,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
             entityHandler: entityHandler);
       }).toList();
 
-      _checkNotReferencedEntities(entries, table);
+      _checkNotReferencedEntities(entries, table, sql);
 
       return _removeEntries(entries, map);
     }
@@ -720,13 +721,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         .whereNotNull()
         .toList(growable: false);
 
-    _checkNotReferencedEntities(entries, table);
+    _checkNotReferencedEntities(entries, table, sql);
 
     return _removeEntries(entries, map);
   }
 
   void _checkNotReferencedEntities(
-      List<MapEntry<Object, Map<String, dynamic>>> entries, String table) {
+      List<MapEntry<Object, Map<String, dynamic>>> entries,
+      String table,
+      SQL sql) {
     for (var e in entries) {
       var id = e.key;
 
@@ -737,7 +740,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         var refFieldName = ref.value.value.key;
         var refFieldValue = ref.value.value.value;
         throw DBSQLMemoryAdapterException("delete.constraint",
-            "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue");
+            "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue",
+            operation: sql);
       }
     }
   }
@@ -1223,7 +1227,6 @@ class DBSQLMemoryAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBSQLMemoryAdapterException';
 
   DBSQLMemoryAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

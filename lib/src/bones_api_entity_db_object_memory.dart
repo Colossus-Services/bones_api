@@ -695,9 +695,11 @@ class DBObjectMemoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
       DBObjectMemoryAdapterException('error', '$error',
-          parentError: error, parentStackTrace: stackTrace);
+          parentError: error,
+          parentStackTrace: stackTrace,
+          operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
       TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
@@ -718,6 +720,7 @@ class DBObjectMemoryAdapter
                 e,
                 s,
                 errorResolver: resolveError,
+                operation: op,
                 debugInfo: () => op.toString(),
               ));
     }
@@ -726,6 +729,7 @@ class DBObjectMemoryAdapter
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     }
@@ -744,6 +748,7 @@ class DBObjectMemoryAdapter
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     });
@@ -759,7 +764,6 @@ class DBObjectMemoryAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
 
   DBObjectMemoryAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

@@ -933,9 +933,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
       DBObjectGCSAdapterException('error', '$error',
-          parentError: error, parentStackTrace: stackTrace);
+          parentError: error,
+          parentStackTrace: stackTrace,
+          operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
       TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
@@ -956,6 +958,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
                 e,
                 s,
                 errorResolver: resolveError,
+                operation: op,
                 debugInfo: () => op.toString(),
               ));
     }
@@ -964,6 +967,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       return transaction.addExecution<R, DBObjectGCSAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     }
@@ -982,6 +986,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       return transaction.addExecution<R, DBObjectGCSAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     });
@@ -994,9 +999,8 @@ class DBObjectGCSAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
   DBObjectGCSAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }
 
 extension _ObjectInfoExtension on gcs.ObjectInfo {

@@ -18,6 +18,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
@@ -40,7 +41,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.15';
+  static const String VERSION = '1.4.16';
 
   static bool _boot = false;
 
@@ -63,6 +64,8 @@ abstract class APIRoot with Initializable, Closable {
 
     BonesAPI.boot();
 
+    _setupLogger();
+
     APIModuleProxyCaller.registerTargetResolver(
         <T>(target, moduleName, responseAsJson) {
       if (target is APIRoot) {
@@ -71,6 +74,21 @@ abstract class APIRoot with Initializable, Closable {
       }
       return null;
     });
+  }
+
+  static _setupLogger() {
+    var apiRoot = APIRoot.get(singleton: false);
+    var apiConfig = apiRoot?.apiConfig;
+
+    var logAllDestiny = apiConfig?.getPath('log', 'all');
+    if (logAllDestiny != null) {
+      logAllTo(logDestiny: logAllDestiny);
+    }
+
+    var logErrorDestiny = apiConfig?.getPath('log', 'error');
+    if (logErrorDestiny != null) {
+      logErrorTo(logDestiny: logErrorDestiny);
+    }
   }
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
@@ -187,8 +205,8 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
-    boot();
     _instances[name] = this;
+    boot();
   }
 
   /// Logs to [logger], if present.
