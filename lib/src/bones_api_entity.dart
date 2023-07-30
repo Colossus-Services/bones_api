@@ -4725,7 +4725,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     if (error != null) {
       stackTrace ??= StackTrace.current;
-      _onExecutionError(error, stackTrace, null, null, null,
+
+      _onExecutionError(error, stackTrace, ['COMMIT', this], null, null,
           rethrowError: false);
     }
 
@@ -4803,7 +4804,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var info = debugInfo != null ? debugInfo() : null;
 
     if (errorResolver != null) {
-      error = errorResolver(error, stackTrace, operation) ?? error;
+      error = errorResolver(
+            error,
+            stackTrace,
+            debugInfo != null ? [operation, debugInfo] : operation,
+          ) ??
+          error;
     }
 
     _errorsTransactions[error] = this;
