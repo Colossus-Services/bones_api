@@ -198,6 +198,12 @@ abstract class LoggerHandler {
 
   void _logMsg(logging.LogRecord msg) {
     var level = msg.level;
+
+    if (_allMessageLogger == null &&
+        (level != logging.Level.SEVERE || _errorMessageLogger == null)) {
+      return;
+    }
+
     var logMsg = _buildMsg(msg);
 
     logAllMessage(level, logMsg);
@@ -215,6 +221,8 @@ abstract class LoggerHandler {
   }
 
   void _logSqlMsg(logging.LogRecord msg) {
+    if (_sqlMessageLogger == null) return;
+
     var level = msg.level;
     var logMsg = _buildMsg(msg);
 
