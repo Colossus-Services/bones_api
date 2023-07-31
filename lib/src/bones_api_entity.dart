@@ -23,6 +23,7 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_types.dart';
@@ -34,7 +35,7 @@ import 'bones_api_utils_weaklist.dart';
 
 final _log = logging.Logger('Entity');
 
-final _logTransaction = logging.Logger('Transaction');
+final _logTransaction = logging.Logger('Transaction')..registerAsDbLogger();
 
 typedef JsonToEncodable = Object? Function(dynamic object);
 
@@ -4725,7 +4726,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     if (error != null) {
       stackTrace ??= StackTrace.current;
-      _onExecutionError(error, stackTrace, null, null, rethrowError: false);
+
+      _onExecutionError(error, stackTrace, ['COMMIT', this], null, null,
+          rethrowError: false);
     }
 
     return asyncTry(commit, onFinally: () => _close(zone: zone));
@@ -4734,21 +4737,23 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
   FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
-      {Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
+          errorResolver,
+      Object? operation,
       String? Function()? debugInfo}) {
     if (isFinished) {
       throw StateError("Transaction already finished:\n$this");
     }
 
     if (_executionsFutures.isEmpty) {
-      var ret = _executeSafe(exec, errorResolver, debugInfo);
+      var ret = _executeSafe(exec, operation, errorResolver, debugInfo);
       _executionsFutures.add(ret);
       return ret;
     } else {
       var last = _executionsFutures.last;
 
       var ret = last.resolveWith(() {
-        return _executeSafe(exec, errorResolver, debugInfo);
+        return _executeSafe(exec, operation, errorResolver, debugInfo);
       });
 
       _executionsFutures.add(ret);
@@ -4758,26 +4763,31 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   FutureOr<R> _executeSafe<R, C>(
       TransactionExecution<R, C> exec,
-      Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      Object? operation,
+      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
+          errorResolver,
       String? Function()? debugInfo) {
     try {
       var ret = exec(context! as C);
       if (ret is Future<R>) {
         var future = ret;
-        return future.catchError(
-            (e, s) => _onExecutionError<R>(e, s, errorResolver, debugInfo));
+        return future.catchError((e, s) =>
+            _onExecutionError<R>(e, s, operation, errorResolver, debugInfo));
       } else {
         return ret;
       }
     } catch (e, s) {
-      return _onExecutionError<R>(e, s, errorResolver, debugInfo);
+      return _onExecutionError<R>(e, s, operation, errorResolver, debugInfo);
     }
   }
 
   FutureOr<R> notifyExecutionError<R>(Object error, StackTrace stackTrace,
-      {Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
+          errorResolver,
+      Object? operation,
       String? Function()? debugInfo}) {
-    return _onExecutionError<R>(error, stackTrace, errorResolver, debugInfo);
+    return _onExecutionError<R>(
+        error, stackTrace, operation, errorResolver, debugInfo);
   }
 
   Object? _error;
@@ -4787,13 +4797,20 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<R> _onExecutionError<R>(
       Object error,
       StackTrace stackTrace,
-      Object? Function(Object error, StackTrace stackTrace)? errorResolver,
+      Object? operation,
+      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
+          errorResolver,
       String? Function()? debugInfo,
       {bool rethrowError = true}) {
     var info = debugInfo != null ? debugInfo() : null;
 
     if (errorResolver != null) {
-      error = errorResolver(error, stackTrace) ?? error;
+      error = errorResolver(
+            error,
+            stackTrace,
+            debugInfo != null ? [operation, debugInfo] : operation,
+          ) ??
+          error;
     }
 
     _errorsTransactions[error] = this;

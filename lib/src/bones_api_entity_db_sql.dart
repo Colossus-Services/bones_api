@@ -16,13 +16,14 @@ import 'bones_api_entity_db_relational.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
 
-final _log = logging.Logger('SQLAdapter');
+final _log = logging.Logger('SQLAdapter')..registerAsDbLogger();
 
 /// [SQL] wrapper interface.
 abstract class SQLWrapper {
@@ -261,6 +262,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (_boot) return;
     _boot = true;
 
+    DBAdapter.boot();
+    DBRelationalAdapter.boot();
     DBSQLMemoryAdapter.boot();
   }
 
@@ -1053,7 +1056,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             namedParameters: namedParameters)
         .resolveMapped((sql) {
       return countSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -1595,9 +1598,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  Object resolveError(Object error, StackTrace stackTrace) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
       DBSQLAdapterException('error', '$error',
-          parentError: error, parentStackTrace: stackTrace);
+          parentError: error,
+          parentStackTrace: stackTrace,
+          operation: operation);
 
   @override
   bool isTransactionWithSingleOperation(TransactionOperation op,
@@ -1616,6 +1621,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
                 e,
                 s,
                 errorResolver: resolveError,
+                operation: op,
                 debugInfo: () => sql.mainSQL.toString(),
               ));
     }
@@ -1624,6 +1630,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       return transaction.addExecution<R, C>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => sql.mainSQL.toString(),
       );
     }
@@ -1641,6 +1648,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       return transaction.addExecution<R, C>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => sql.mainSQL.toString(),
       );
     });
@@ -2005,6 +2013,24 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
   }
 
+  FutureOr<R> _finishSQLOperation<T, R>(Object sql, TransactionOperation op,
+      T r, PreFinishDBOperation<T, R>? preFinish) {
+    var sqlTime = DateTime.now().difference(op.initTime);
+
+    String f() {
+      if (sql is Iterable) {
+        return '[tID: ${op.transactionId} ; time: ${sqlTime.inMilliseconds}:\n'
+            '-- ${sql.join('\n-- ')}';
+      } else {
+        return '[tID: ${op.transactionId} ; time: ${sqlTime.inMilliseconds} ms] $sql';
+      }
+    }
+
+    _log.logDB(logging.Level.INFO, f);
+
+    return _finishOperation<T, R>(op, r, preFinish);
+  }
+
   @override
   FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
       String table, EntityMatcher matcher,
@@ -2018,7 +2044,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             namedParameters: namedParameters)
         .resolveMapped((sql) {
       return deleteSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2030,7 +2056,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return generateInsertSQL(op.transaction, entityName, table, fields)
         .resolveMapped((sql) {
       return insertSQL(op, entityName, table, sql, fields)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2049,7 +2075,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sqls) {
       return insertRelationshipSQLs(
               op, entityName, table, sqls, id, otherTableName, otherIds)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sqls, op, r, preFinish));
     });
   }
 
@@ -2059,8 +2085,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) {
     return generateSelectSQL(op.transaction, entityName, table, ConditionID(id))
         .resolveMapped((sql) {
-      return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r.firstOrNull, preFinish));
+      return selectSQL(op, entityName, table, sql).resolveMapped(
+          (r) => _finishSQLOperation(sql, op, r.firstOrNull, preFinish));
     });
   }
 
@@ -2073,7 +2099,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             op.transaction, entityName, table, ConditionIdIN(ids))
         .resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2085,7 +2111,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return generateSelectSQL(op.transaction, entityName, table, ConditionANY())
         .resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2104,7 +2130,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             limit: limit)
         .resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2122,7 +2148,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return selectRelationshipSQL(
               op, entityName, table, sql, id, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2140,7 +2166,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return selectRelationshipsSQL(
               op, entityName, table, sql, ids, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2154,7 +2180,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return updateSQL(op, entityName, table, sql, id, fields,
               allowAutoInsert: allowAutoInsert)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 }
@@ -2397,7 +2423,6 @@ class DBSQLAdapterException extends DBAdapterException {
   String get runtimeTypeNameSafe => 'DBSQLAdapterException';
 
   DBSQLAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

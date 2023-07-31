@@ -14,6 +14,7 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
     if (_boot) return;
     _boot = true;
 
+    DBAdapter.boot();
     DBObjectMemoryAdapter.boot();
   }
 
@@ -107,7 +108,6 @@ class DBObjectAdapterException extends DBAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectAdapterException';
 
   DBObjectAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

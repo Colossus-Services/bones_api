@@ -13,8 +13,9 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_logging.dart';
 
-final _log = logging.Logger('DBObjectMemoryAdapter');
+final _log = logging.Logger('DBObjectMemoryAdapter')..registerAsDbLogger();
 
 class DBObjectMemoryAdapterContext
     implements Comparable<DBObjectMemoryAdapterContext> {
@@ -49,6 +50,8 @@ class DBObjectMemoryAdapter
   static void boot() {
     if (_boot) return;
     _boot = true;
+
+    DBObjectAdapter.boot();
 
     DBObjectAdapter.registerAdapter([
       'object.memory',
@@ -695,9 +698,11 @@ class DBObjectMemoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
       DBObjectMemoryAdapterException('error', '$error',
-          parentError: error, parentStackTrace: stackTrace);
+          parentError: error,
+          parentStackTrace: stackTrace,
+          operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
       TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
@@ -718,6 +723,7 @@ class DBObjectMemoryAdapter
                 e,
                 s,
                 errorResolver: resolveError,
+                operation: op,
                 debugInfo: () => op.toString(),
               ));
     }
@@ -726,6 +732,7 @@ class DBObjectMemoryAdapter
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     }
@@ -744,6 +751,7 @@ class DBObjectMemoryAdapter
       return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     });
@@ -759,7 +767,6 @@ class DBObjectMemoryAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
 
   DBObjectMemoryAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }

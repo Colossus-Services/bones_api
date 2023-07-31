@@ -6,7 +6,7 @@ import 'bones_api_test_entities.dart';
 part 'bones_api_test_modules.reflection.g.dart';
 
 class TestAPIRoot extends APIRoot {
-  TestAPIRoot() : super('Test', '1.0');
+  TestAPIRoot({super.apiConfig}) : super('Test', '1.0');
 
   @override
   Set<APIModule> loadModules() => {AboutModule(this), UserModule(this)};

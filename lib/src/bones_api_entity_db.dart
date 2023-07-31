@@ -1941,17 +1941,43 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
   Object? parentError;
   StackTrace? parentStackTrace;
 
+  /// The operation that caused the [Exception].
+  Object? operation;
+
   DBAdapterException(this.type, this.message,
-      {this.parentError, this.parentStackTrace})
+      {this.parentError, this.parentStackTrace, this.operation})
       : super();
+
+  String? resolveToString(Object? o, {String indent = '-- '}) {
+    if (o == null) {
+      return null;
+    } else if (o is Iterable) {
+      return '$indent${o.map(resolveToString).whereNotNull().join('\n$indent')}';
+    } else if (o is TransactionOperation) {
+      return o.toString();
+    } else if (o is Function()) {
+      return resolveToString(o());
+    } else if (o is TransactionOperation) {
+      return o.toString();
+    } else {
+      return o.toString();
+    }
+  }
 
   @override
   String toString() {
     var s = '$runtimeTypeNameSafe[$type]: $message';
+
+    if (operation != null) {
+      var operationStr = resolveToString(operation, indent: '    -- ');
+      s += '\n  -- Operation>>\n$operationStr';
+    }
+
     if (parentError != null) {
       s +=
           '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError';
     }
+
     return s;
   }
 }

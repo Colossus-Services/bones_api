@@ -18,6 +18,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
@@ -40,7 +41,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.15';
+  static const String VERSION = '1.4.16';
 
   static bool _boot = false;
 
@@ -187,8 +188,46 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
-    boot();
     _instances[name] = this;
+    boot();
+    _setupLogger();
+  }
+
+  void _setupLogger() {
+    var apiConfig = this.apiConfig;
+
+    if (LoggerHandler.getLogAllTo() == null) {
+      var logAllDestiny = apiConfig.getPath('log', 'all');
+      if (logAllDestiny != null) {
+        var db = apiConfig.getPath('log', 'all', 'db');
+        logAllTo(
+          logDestiny: logAllDestiny,
+          includeDBLogs: TypeParser.parseBool(db) ?? false,
+        );
+      }
+    }
+
+    var loggerHandlerRoot = LoggerHandler.root;
+
+    if (loggerHandlerRoot.getLogErrorTo() == null) {
+      var logErrorDestiny = apiConfig.getPath('log', 'error');
+      if (logErrorDestiny != null) {
+        logErrorTo(logDestiny: logErrorDestiny);
+      }
+    }
+
+    var logConsole =
+        TypeParser.parseBool(apiConfig.getPath('log', 'console')) ?? false;
+    if (logConsole) {
+      logToConsole();
+    }
+
+    if (loggerHandlerRoot.getLogDbTo() == null) {
+      var logSqlDestiny = apiConfig.getPath('log', 'db');
+      if (logSqlDestiny != null) {
+        logDbTo(logDestiny: logSqlDestiny);
+      }
+    }
   }
 
   /// Logs to [logger], if present.

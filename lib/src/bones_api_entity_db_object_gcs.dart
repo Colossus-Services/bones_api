@@ -21,8 +21,9 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_logging.dart';
 
-final _log = logging.Logger('DBObjectGCSAdapter');
+final _log = logging.Logger('DBObjectGCSAdapter')..registerAsDbLogger();
 
 class DBObjectGCSAdapterContext
     implements Comparable<DBObjectGCSAdapterContext> {
@@ -51,6 +52,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   static void boot() {
     if (_boot) return;
     _boot = true;
+
+    DBObjectAdapter.boot();
 
     DBObjectAdapter.registerAdapter([
       'object.gcs',
@@ -933,9 +936,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
       DBObjectGCSAdapterException('error', '$error',
-          parentError: error, parentStackTrace: stackTrace);
+          parentError: error,
+          parentStackTrace: stackTrace,
+          operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
       TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
@@ -956,6 +961,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
                 e,
                 s,
                 errorResolver: resolveError,
+                operation: op,
                 debugInfo: () => op.toString(),
               ));
     }
@@ -964,6 +970,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       return transaction.addExecution<R, DBObjectGCSAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     }
@@ -982,6 +989,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       return transaction.addExecution<R, DBObjectGCSAdapterContext>(
         f,
         errorResolver: resolveError,
+        operation: op,
         debugInfo: () => op.toString(),
       );
     });
@@ -994,9 +1002,8 @@ class DBObjectGCSAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
   DBObjectGCSAdapterException(String type, String message,
-      {Object? parentError, StackTrace? parentStackTrace})
-      : super(type, message,
-            parentError: parentError, parentStackTrace: parentStackTrace);
+      {super.parentError, super.parentStackTrace, super.operation})
+      : super(type, message);
 }
 
 extension _ObjectInfoExtension on gcs.ObjectInfo {

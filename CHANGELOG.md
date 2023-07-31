@@ -1,3 +1,15 @@
+## 1.4.16
+
+- API Config:
+  - Allow  `log.all`, `log.error` and `log.db` to files.
+- `DBAdapter`:
+  - Better `boot` hierarchy.
+  - `registerAsDbLogger` loggers of implementations of `DBAdapter`.
+- `LoggerHandler`:
+  - Added `resolveLogDestiny` and `logBuffered`.
+- `DBAdapterException`:
+  - Added field `operation`. 
+
 ## 1.4.15
 
 - `SQLBuilderListExtension`:
