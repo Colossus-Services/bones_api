@@ -1,8 +1,8 @@
 ## 1.4.16
 
 - API Config:
-  - Allow  `log.all`, `log.error` and `log.sql` to files. 
-- `DBSQLAdapter` implementations: `registerAsSqlLogger`.
+  - Allow  `log.all`, `log.error` and `log.db` to files. 
+- `DBSQLAdapter` implementations: `registerAsDbLogger`.
 - `LoggerHandler`:
   - Added `resolveLogDestiny` and `logBuffered`.
 - `DBAdapterException`:

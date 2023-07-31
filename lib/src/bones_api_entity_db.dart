@@ -1948,11 +1948,11 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
       {this.parentError, this.parentStackTrace, this.operation})
       : super();
 
-  String? resolveToString(Object? o) {
+  String? resolveToString(Object? o, {String indent = '-- '}) {
     if (o == null) {
       return null;
     } else if (o is Iterable) {
-      return o.map(resolveToString).whereNotNull().join(' >> ');
+      return '$indent${o.map(resolveToString).whereNotNull().join('\n$indent')}';
     } else if (o is TransactionOperation) {
       return o.toString();
     } else if (o is Function()) {
@@ -1969,8 +1969,8 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
     var s = '$runtimeTypeNameSafe[$type]: $message';
 
     if (operation != null) {
-      var operationStr = resolveToString(operation);
-      s += '\n  -- Operation>> $operationStr';
+      var operationStr = resolveToString(operation, indent: '    -- ');
+      s += '\n  -- Operation>>\n$operationStr';
     }
 
     if (parentError != null) {

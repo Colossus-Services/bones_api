@@ -18,7 +18,7 @@ import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsSqlLogger();
+final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
 
 /// A PostgreSQL adapter.
 class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>

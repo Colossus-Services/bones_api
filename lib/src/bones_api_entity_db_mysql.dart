@@ -18,7 +18,7 @@ import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_timedmap.dart';
 
-final _log = logging.Logger('DBMySQLAdapter')..registerAsSqlLogger();
+final _log = logging.Logger('DBMySQLAdapter')..registerAsDbLogger();
 
 /// A MySQL adapter.
 class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>

@@ -82,7 +82,11 @@ abstract class APIRoot with Initializable, Closable {
 
     var logAllDestiny = apiConfig?.getPath('log', 'all');
     if (logAllDestiny != null) {
-      logAllTo(logDestiny: logAllDestiny);
+      var db = apiConfig?.getPath('log', 'all', 'db');
+      logAllTo(
+        logDestiny: logAllDestiny,
+        includeDBLogs: TypeParser.parseBool(db) ?? false,
+      );
     }
 
     var logErrorDestiny = apiConfig?.getPath('log', 'error');

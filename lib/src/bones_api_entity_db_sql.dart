@@ -24,7 +24,7 @@ import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
 
-final _log = logging.Logger('SQLAdapter')..registerAsSqlLogger();
+final _log = logging.Logger('SQLAdapter')..registerAsDbLogger();
 
 /// [SQL] wrapper interface.
 abstract class SQLWrapper {
@@ -270,9 +270,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   static _setupSQLLogger() {
     var apiRoot = APIRoot.get(singleton: false);
     var apiConfig = apiRoot?.apiConfig;
-    var logSqlDestiny = apiConfig?.getPath('log', 'sql');
+
+    var logSqlDestiny = apiConfig?.getPath('log', 'db');
     if (logSqlDestiny != null) {
-      logSQLTo(logDestiny: logSqlDestiny);
+      logDbTo(logDestiny: logSqlDestiny);
     }
   }
 
@@ -1065,7 +1066,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             namedParameters: namedParameters)
         .resolveMapped((sql) {
       return countSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2022,11 +2023,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
   }
 
-  FutureOr<R> _finishSQLOperation<T, R>(SQL sql, TransactionOperation op, T r,
-      PreFinishDBOperation<T, R>? preFinish) {
+  FutureOr<R> _finishSQLOperation<T, R>(Object sql, TransactionOperation op,
+      T r, PreFinishDBOperation<T, R>? preFinish) {
     var sqlTime = DateTime.now().difference(op.initTime);
-    var msg = '[time: ${sqlTime.inMilliseconds} ms] $sql';
-    _log.log(logging.Level.INFO, msg);
+
+    String f() {
+      if (sql is Iterable) {
+        return '[tID: ${op.transactionId} ; time: ${sqlTime.inMilliseconds}:\n'
+            '-- ${sql.join('\n-- ')}';
+      } else {
+        return '[tID: ${op.transactionId} ; time: ${sqlTime.inMilliseconds} ms] $sql';
+      }
+    }
+
+    _log.logDB(logging.Level.INFO, f);
+
     return _finishOperation<T, R>(op, r, preFinish);
   }
 
@@ -2043,7 +2054,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             namedParameters: namedParameters)
         .resolveMapped((sql) {
       return deleteSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2074,7 +2085,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sqls) {
       return insertRelationshipSQLs(
               op, entityName, table, sqls, id, otherTableName, otherIds)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sqls, op, r, preFinish));
     });
   }
 
@@ -2147,7 +2158,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return selectRelationshipSQL(
               op, entityName, table, sql, id, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2165,7 +2176,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return selectRelationshipsSQL(
               op, entityName, table, sql, ids, otherTableName)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
@@ -2179,7 +2190,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return updateSQL(op, entityName, table, sql, id, fields,
               allowAutoInsert: allowAutoInsert)
-          .resolveMapped((r) => _finishOperation(op, r, preFinish));
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 }

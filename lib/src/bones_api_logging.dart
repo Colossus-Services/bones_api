@@ -18,69 +18,51 @@ void _boot() {
   if (_bootCalled) return;
   _bootCalled = true;
 
-  _logAll();
+  _setupRootLogger();
 }
 
-void _logAll() {
-  var loggerHandler = _log.handler;
-  logging.Logger.root.onRecord.listen(loggerHandler._logMsg);
+void _setupRootLogger() {
+  var loggerHandler = _resolveLoggerHandler();
+  var rootLogger = LoggerHandler.rootLogger;
+  rootLogger.onRecord.listen(loggerHandler._logRootMsg);
+}
+
+LoggerHandler _resolveLoggerHandler([LoggerHandler? loggerHandler]) {
+  _boot();
+  return loggerHandler ?? _log.handler;
 }
 
 void logAllTo(
     {MessageLogger? messageLogger,
     Object? logDestiny,
-    LoggerHandler? loggerHandler}) {
-  _boot();
-
-  loggerHandler ??= _log.handler;
-  loggerHandler.logAllTo(messageLogger: messageLogger, logDestiny: logDestiny);
+    bool includeDBLogs = false}) {
+  var loggerHandler = _resolveLoggerHandler();
+  loggerHandler.logAllTo(
+      messageLogger: messageLogger,
+      logDestiny: logDestiny,
+      includeDBLogs: includeDBLogs);
 }
 
-StreamSubscription<logging.LogRecord>? _logToConsoleSubscription;
-
-void logToConsole() => _logToConsole(null);
-
-void _logToConsole(LoggerHandler? loggerHandler) {
-  if (_logToConsoleSubscription != null) return;
-  _boot();
-
-  loggerHandler ??= _log.handler;
-
-  var listen =
-      logging.Logger.root.onRecord.listen(loggerHandler._logConsoleMsg);
-  _logToConsoleSubscription = listen;
-}
-
-void cancelLogToConsole() => _cancelLogToConsole();
-
-void _cancelLogToConsole() {
-  var listen = _logToConsoleSubscription;
-  if (listen != null) {
-    // ignore: discarded_futures
-    listen.cancel();
-    _logToConsoleSubscription = null;
-  }
+void logToConsole({bool enabled = true}) {
+  var loggerHandler = _resolveLoggerHandler();
+  loggerHandler.logToConsole(enabled: enabled);
 }
 
 void logErrorTo(
     {MessageLogger? messageLogger,
     Object? logDestiny,
     LoggerHandler? loggerHandler}) {
-  _boot();
-
-  loggerHandler ??= _log.handler;
+  loggerHandler = _resolveLoggerHandler(loggerHandler);
   loggerHandler.logErrorTo(
       messageLogger: messageLogger, logDestiny: logDestiny);
 }
 
-void logSQLTo(
+void logDbTo(
     {MessageLogger? messageLogger,
     Object? logDestiny,
     LoggerHandler? loggerHandler}) {
-  _boot();
-
-  loggerHandler ??= _log.handler;
-  loggerHandler.logSQLTo(messageLogger: messageLogger, logDestiny: logDestiny);
+  loggerHandler = _resolveLoggerHandler(loggerHandler);
+  loggerHandler.logDbTo(messageLogger: messageLogger, logDestiny: logDestiny);
 }
 
 extension LoggerExntesion on logging.Logger {
@@ -93,40 +75,68 @@ extension LoggerExntesion on logging.Logger {
     return handler;
   }
 
-  static final Set<logging.Logger> _sqlLoggers = {};
+  static final Set<logging.Logger> _dbLoggers = {};
 
-  List<logging.Logger> get sqlLoggers => _sqlLoggers.toList();
+  List<logging.Logger> get dbLoggers => _dbLoggers.toList();
 
-  bool registerAsSqlLogger() {
-    if (_sqlLoggers.add(this)) {
-      _setupSqlLogger(handler);
+  bool get isDbLogger => _dbLoggers.contains(this);
+
+  static final Set<String> _dbLoggersNames = {};
+
+  bool registerAsDbLogger() {
+    if (_dbLoggers.add(this)) {
+      _dbLoggersNames.add(name);
+      _setupDbLogger(handler);
       return true;
     }
     return false;
   }
 
-  Future<bool> unregisterAsSqlLogger() async {
-    if (_sqlLoggers.remove(this)) {
-      await _cancelSqlLogger();
+  Future<bool> unregisterAsDbLogger() async {
+    if (_dbLoggers.remove(this)) {
+      _dbLoggersNames.remove(name);
+      await _cancelDbLogger();
       return true;
     }
     return false;
   }
 
-  static final Map<logging.Logger, StreamSubscription>
-      _sqlLoggersSubscriptions = {};
+  static final Map<logging.Logger, StreamSubscription> _dbLoggersSubscriptions =
+      {};
 
-  void _setupSqlLogger(LoggerHandler loggerHandler) {
+  void _setupDbLogger(LoggerHandler loggerHandler) {
     _boot();
 
-    var subscription = onRecord.listen(loggerHandler._logSqlMsg);
+    var subscription = onRecord.listen(loggerHandler._logDBMsg);
 
-    _sqlLoggersSubscriptions[this] = subscription;
+    _dbLoggersSubscriptions[this] = subscription;
   }
 
-  Future<void> _cancelSqlLogger() async {
-    var subscription = _sqlLoggersSubscriptions.remove(this);
+  Future<void> _cancelDbLogger() async {
+    var subscription = _dbLoggersSubscriptions.remove(this);
     await subscription?.cancel();
+  }
+
+  void logDB(logging.Level logLevel, Object? message,
+      [Object? error, StackTrace? stackTrace, Zone? zone]) {
+    log(logLevel, DBLog(message));
+  }
+}
+
+class DBLog {
+  final Object? message;
+
+  DBLog(this.message);
+
+  @override
+  String toString() {
+    final message = this.message;
+    if (message is Function()) {
+      var s = message();
+      return s.toString();
+    } else {
+      return message.toString();
+    }
   }
 }
 
@@ -138,6 +148,20 @@ abstract class LoggerHandler {
   static LoggerHandler create(logging.Logger logger) =>
       createLoggerHandler(logger);
 
+  static String truncateString(String s, int limit) {
+    if (s.length > limit) {
+      s = '${s.substring(0, limit - 4)}..${s.substring(s.length - 2)}';
+    }
+    return s;
+  }
+
+  static bool isDbLoggerName(String name) =>
+      LoggerExntesion._dbLoggersNames.contains(name);
+
+  static logging.Logger get rootLogger => logging.Logger.root;
+
+  static LoggerHandler get root => rootLogger.handler;
+
   static int _idCount = 0;
 
   final int id = ++_idCount;
@@ -148,6 +172,8 @@ abstract class LoggerHandler {
     _boot();
   }
 
+  String get isolateDebugName;
+
   LoggerHandler? get parent {
     var l = logger.parent;
     if (l == null) return null;
@@ -156,14 +182,13 @@ abstract class LoggerHandler {
     return handler;
   }
 
-  void logAll() {
-    logging.hierarchicalLoggingEnabled = true;
-    logger.level = logging.Level.ALL;
+  String loggerName(logging.LogRecord msg) {
+    var name = msg.loggerName;
+    if (name == 'hotreloader') {
+      name = 'APIHotReload';
+    }
+    return name;
   }
-
-  void logToConsole() => _logToConsole(this);
-
-  void cancelLogToConsole() => _cancelLogToConsole();
 
   static final Map<String, QueueList<int>> _maxKeys =
       <String, QueueList<int>>{};
@@ -196,37 +221,54 @@ abstract class LoggerHandler {
     return max;
   }
 
-  void _logMsg(logging.LogRecord msg) {
+  void _logRootMsg(logging.LogRecord msg) {
     var level = msg.level;
 
-    if (_allMessageLogger == null &&
-        (level != logging.Level.SEVERE || _errorMessageLogger == null)) {
+    bool? isDBLog;
+
+    if (!_logToConsole &&
+        _allMessageLogger == null &&
+        (level != logging.Level.SEVERE || _errorMessageLogger == null) &&
+        (_dbMessageLogger == null || !(isDBLog = msg.object is DBLog))) {
       return;
     }
 
     var logMsg = _buildMsg(msg);
 
-    logAllMessage(level, logMsg);
+    isDBLog ??= msg.object is DBLog;
+
+    if (!isDBLog || _allMessageLoggerIncludeDBLogs) {
+      logAllMessage(level, logMsg);
+    }
 
     if (level == logging.Level.SEVERE) {
       logErrorMessage(level, logMsg);
     }
+
+    if (isDBLog) {
+      logDBMessage(level, logMsg);
+      if (level < logging.Level.WARNING) {
+        return;
+      }
+    }
+
+    var isFromDBLogger = isDbLoggerName(msg.loggerName);
+    if (isFromDBLogger) {
+      logDBMessage(level, logMsg);
+    }
+
+    if (_logToConsole) {
+      printMessage(level, logMsg);
+    }
   }
 
-  void _logConsoleMsg(logging.LogRecord msg) {
+  void _logDBMsg(logging.LogRecord msg) {
+    if (_dbMessageLogger == null) return;
+
     var level = msg.level;
     var logMsg = _buildMsg(msg);
 
-    printMessage(level, logMsg);
-  }
-
-  void _logSqlMsg(logging.LogRecord msg) {
-    if (_sqlMessageLogger == null) return;
-
-    var level = msg.level;
-    var logMsg = _buildMsg(msg);
-
-    logSQLMessage(level, logMsg);
+    logDBMessage(level, logMsg);
   }
 
   String _buildMsg(logging.LogRecord msg) {
@@ -277,56 +319,53 @@ abstract class LoggerHandler {
     return logMsg.toString();
   }
 
-  String loggerName(logging.LogRecord msg) {
-    var name = msg.loggerName;
-    if (name == 'hotreloader') {
-      name = 'APIHotReload';
-    }
-    return name;
-  }
-
-  static String truncateString(String s, int limit) {
-    if (s.length > limit) {
-      s = '${s.substring(0, limit - 4)}..${s.substring(s.length - 2)}';
-    }
-    return s;
-  }
-
-  String get isolateDebugName;
-
   void printMessage(logging.Level level, String message);
 
-  MessageLogger? _allMessageLogger;
+  void logAll() {
+    logging.hierarchicalLoggingEnabled = true;
+    logger.level = logging.Level.ALL;
+  }
 
-  void logAllTo({MessageLogger? messageLogger, Object? logDestiny}) {
+  static MessageLogger? _allMessageLogger;
+  static bool _allMessageLoggerIncludeDBLogs = false;
+
+  void logAllTo(
+      {MessageLogger? messageLogger,
+      Object? logDestiny,
+      bool includeDBLogs = false}) {
     messageLogger ??= resolveLogDestiny(logDestiny);
 
-    if (messageLogger != null) {
-      _allMessageLogger = messageLogger;
-    }
+    _allMessageLogger = messageLogger;
+    _allMessageLoggerIncludeDBLogs = includeDBLogs;
   }
 
-  void logAllMessage(logging.Level level, String message) {
-    var messageLogger = _allMessageLogger;
+  void logToConsole({bool enabled = true}) => _logToConsoleImpl(enabled);
 
-    if (messageLogger == null) {
-      var parent = this.parent;
-      messageLogger = parent?._allMessageLogger;
-      messageLogger ??= _log.handler._allMessageLogger;
-    }
+  static bool _logToConsole = false;
 
-    if (messageLogger != null) {
-      messageLogger(level, message);
-    }
-  }
+  static void _logToConsoleImpl(bool enabled) => _logToConsole = enabled;
 
   MessageLogger? _errorMessageLogger;
 
   void logErrorTo({MessageLogger? messageLogger, Object? logDestiny}) {
     messageLogger ??= resolveLogDestiny(logDestiny);
 
+    _errorMessageLogger = messageLogger;
+  }
+
+  MessageLogger? _dbMessageLogger;
+
+  void logDbTo({MessageLogger? messageLogger, Object? logDestiny}) {
+    messageLogger ??= resolveLogDestiny(logDestiny);
+
+    _dbMessageLogger = messageLogger;
+  }
+
+  void logAllMessage(logging.Level level, String message) {
+    var messageLogger = _allMessageLogger;
+
     if (messageLogger != null) {
-      _errorMessageLogger = messageLogger;
+      messageLogger(level, message);
     }
   }
 
@@ -344,23 +383,13 @@ abstract class LoggerHandler {
     }
   }
 
-  MessageLogger? _sqlMessageLogger;
-
-  void logSQLTo({MessageLogger? messageLogger, Object? logDestiny}) {
-    messageLogger ??= resolveLogDestiny(logDestiny);
-
-    if (messageLogger != null) {
-      _sqlMessageLogger = messageLogger;
-    }
-  }
-
-  void logSQLMessage(logging.Level level, String message) {
-    var messageLogger = _sqlMessageLogger;
+  void logDBMessage(logging.Level level, String message) {
+    var messageLogger = _dbMessageLogger;
 
     if (messageLogger == null) {
       var parent = this.parent;
-      messageLogger = parent?._sqlMessageLogger;
-      messageLogger ??= _log.handler._sqlMessageLogger;
+      messageLogger = parent?._dbMessageLogger;
+      messageLogger ??= _log.handler._dbMessageLogger;
     }
 
     if (messageLogger != null) {
@@ -368,8 +397,16 @@ abstract class LoggerHandler {
     }
   }
 
-  MessageLogger? resolveLogDestiny(Object? logDestiny) {
+  MessageLogger? resolveLogDestiny(final Object? logDestiny) {
     if (logDestiny == null) return null;
+
+    if (logDestiny is Map) {
+      var destiny =
+          logDestiny['to'] ?? logDestiny['path'] ?? logDestiny['file'];
+      if (destiny != null) {
+        return resolveLogDestiny(destiny);
+      }
+    }
 
     if (logDestiny is MessageLogger) return logDestiny;
 
@@ -394,27 +431,6 @@ abstract class LoggerHandler {
     }
 
     return null;
-  }
-
-  void _logToHttpClient(
-          HttpClient client, logging.Level level, String message) =>
-      logBuffered(
-        client,
-        (l, ms) async => _callHttpClientLog(client, l, ms),
-        level,
-        message,
-      );
-
-  Future<void> _callHttpClientLog(
-      HttpClient client, logging.Level level, List<String> messages) async {
-    await client.post(
-      'log',
-      body: {
-        'level': level.name,
-        'messages': messages,
-      },
-      contentType: 'json',
-    );
   }
 
   static final Expando<List<(logging.Level, String)>> _buffers = Expando();
@@ -450,5 +466,26 @@ abstract class LoggerHandler {
         _bufferedCalls[identifier] = null;
       }
     });
+  }
+
+  void _logToHttpClient(
+          HttpClient client, logging.Level level, String message) =>
+      logBuffered(
+        client,
+        (l, ms) async => _callHttpClientLog(client, l, ms),
+        level,
+        message,
+      );
+
+  Future<void> _callHttpClientLog(
+      HttpClient client, logging.Level level, List<String> messages) async {
+    await client.post(
+      'log',
+      body: {
+        'level': level.name,
+        'messages': messages,
+      },
+      contentType: 'json',
+    );
   }
 }

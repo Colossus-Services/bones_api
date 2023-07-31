@@ -18,7 +18,7 @@ import 'bones_api_sql_builder.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
 
-final _log = logging.Logger('DBSQLMemoryAdapter')..registerAsSqlLogger();
+final _log = logging.Logger('DBSQLMemoryAdapter')..registerAsDbLogger();
 
 class DBSQLMemoryAdapterContext
     implements Comparable<DBSQLMemoryAdapterContext> {

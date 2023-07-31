@@ -23,6 +23,7 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_platform.dart';
 import 'bones_api_types.dart';
@@ -34,7 +35,7 @@ import 'bones_api_utils_weaklist.dart';
 
 final _log = logging.Logger('Entity');
 
-final _logTransaction = logging.Logger('Transaction');
+final _logTransaction = logging.Logger('Transaction')..registerAsDbLogger();
 
 typedef JsonToEncodable = Object? Function(dynamic object);
 
