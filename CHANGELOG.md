@@ -1,3 +1,7 @@
+## 1.4.19
+
+- Update `bones_api_template.tar.gz`.
+
 ## 1.4.18
 
 - `ConditionEncoder`:
