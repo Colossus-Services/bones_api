@@ -1020,6 +1020,13 @@ Future<bool> runAdapterTests(
 
         {
           var user4 = await userAPIRepository
+              .selectFirstByQuery("roles =~ ?", parameters: {'roles': []});
+
+          expect(user4, isNull);
+        }
+
+        {
+          var user4 = await userAPIRepository
               .selectFirstByQuery("roles =~ ?", parameters: {
             'roles': [1]
           });

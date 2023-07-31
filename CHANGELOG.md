@@ -1,3 +1,8 @@
+### 1.4.18
+
+- `ConditionEncoder`:
+  - `encodeEncodingValueList`: fix SQL encoding of empty list as `( null )` and not `( )`.
+
 ## 1.4.17
 
 - `logErrorMessage` and `logDBMessage`: fix resolution of `MessageLogger`.

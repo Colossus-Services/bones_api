@@ -1038,8 +1038,12 @@ abstract class ConditionEncoder {
     return "'$valueStr'";
   }
 
-  String encodeEncodingValueList(EncodingValueList p) =>
-      '( ${p.list.map((e) => e.encode).join(' , ')} )';
+  String encodeEncodingValueList(EncodingValueList p) {
+    if (p.list.isEmpty) {
+      return '( null )';
+    }
+    return '( ${p.list.map((e) => e.encode).join(' , ')} )';
+  }
 
   String encodeEncodingPlaceholder(EncodingPlaceholder p) => p.placeholder;
 
