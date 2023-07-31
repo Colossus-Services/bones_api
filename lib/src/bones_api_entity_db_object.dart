@@ -14,6 +14,7 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
     if (_boot) return;
     _boot = true;
 
+    DBAdapter.boot();
     DBObjectMemoryAdapter.boot();
   }
 

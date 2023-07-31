@@ -5,7 +5,6 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart' show parseBool;
 
-import 'bones_api_base.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition_sql.dart';
@@ -263,18 +262,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (_boot) return;
     _boot = true;
 
+    DBAdapter.boot();
+    DBRelationalAdapter.boot();
     DBSQLMemoryAdapter.boot();
-    _setupSQLLogger();
-  }
-
-  static _setupSQLLogger() {
-    var apiRoot = APIRoot.get(singleton: false);
-    var apiConfig = apiRoot?.apiConfig;
-
-    var logSqlDestiny = apiConfig?.getPath('log', 'db');
-    if (logSqlDestiny != null) {
-      logDbTo(logDestiny: logSqlDestiny);
-    }
   }
 
   static final DBAdapterRegister<Object, DBSQLAdapter<Object>> adapterRegister =

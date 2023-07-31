@@ -11,9 +11,10 @@ import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_utils.dart';
 
-final _log = logging.Logger('DBRelationalAdapter');
+final _log = logging.Logger('DBRelationalAdapter')..registerAsDbLogger();
 
 /// Base class for Relational DB adapters.
 ///
@@ -28,6 +29,7 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
     if (_boot) return;
     _boot = true;
 
+    DBAdapter.boot();
     DBSQLAdapter.boot();
   }
 

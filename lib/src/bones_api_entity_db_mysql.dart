@@ -32,6 +32,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     if (_boot) return;
     _boot = true;
 
+    DBSQLAdapter.boot();
+
     Transaction.registerErrorFilter((e, s) => e is MySqlException);
 
     DBSQLAdapter.registerAdapter([

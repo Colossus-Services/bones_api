@@ -64,8 +64,6 @@ abstract class APIRoot with Initializable, Closable {
 
     BonesAPI.boot();
 
-    _setupLogger();
-
     APIModuleProxyCaller.registerTargetResolver(
         <T>(target, moduleName, responseAsJson) {
       if (target is APIRoot) {
@@ -74,25 +72,6 @@ abstract class APIRoot with Initializable, Closable {
       }
       return null;
     });
-  }
-
-  static _setupLogger() {
-    var apiRoot = APIRoot.get(singleton: false);
-    var apiConfig = apiRoot?.apiConfig;
-
-    var logAllDestiny = apiConfig?.getPath('log', 'all');
-    if (logAllDestiny != null) {
-      var db = apiConfig?.getPath('log', 'all', 'db');
-      logAllTo(
-        logDestiny: logAllDestiny,
-        includeDBLogs: TypeParser.parseBool(db) ?? false,
-      );
-    }
-
-    var logErrorDestiny = apiConfig?.getPath('log', 'error');
-    if (logErrorDestiny != null) {
-      logErrorTo(logDestiny: logErrorDestiny);
-    }
   }
 
   static final Map<String, APIRoot> _instances = <String, APIRoot>{};
@@ -211,6 +190,44 @@ abstract class APIRoot with Initializable, Closable {
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
     _instances[name] = this;
     boot();
+    _setupLogger();
+  }
+
+  void _setupLogger() {
+    var apiConfig = this.apiConfig;
+
+    if (LoggerHandler.getLogAllTo() == null) {
+      var logAllDestiny = apiConfig.getPath('log', 'all');
+      if (logAllDestiny != null) {
+        var db = apiConfig.getPath('log', 'all', 'db');
+        logAllTo(
+          logDestiny: logAllDestiny,
+          includeDBLogs: TypeParser.parseBool(db) ?? false,
+        );
+      }
+    }
+
+    var loggerHandlerRoot = LoggerHandler.root;
+
+    if (loggerHandlerRoot.getLogErrorTo() == null) {
+      var logErrorDestiny = apiConfig.getPath('log', 'error');
+      if (logErrorDestiny != null) {
+        logErrorTo(logDestiny: logErrorDestiny);
+      }
+    }
+
+    var logConsole =
+        TypeParser.parseBool(apiConfig.getPath('log', 'console')) ?? false;
+    if (logConsole) {
+      logToConsole();
+    }
+
+    if (loggerHandlerRoot.getLogDbTo() == null) {
+      var logSqlDestiny = apiConfig.getPath('log', 'db');
+      if (logSqlDestiny != null) {
+        logDbTo(logDestiny: logSqlDestiny);
+      }
+    }
   }
 
   /// Logs to [logger], if present.

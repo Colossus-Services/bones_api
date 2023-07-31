@@ -32,6 +32,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     if (_boot) return;
     _boot = true;
 
+    DBSQLAdapter.boot();
+
     Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
 
     DBSQLAdapter.registerAdapter([

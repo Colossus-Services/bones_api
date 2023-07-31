@@ -13,8 +13,9 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_logging.dart';
 
-final _log = logging.Logger('DBObjectMemoryAdapter');
+final _log = logging.Logger('DBObjectMemoryAdapter')..registerAsDbLogger();
 
 class DBObjectMemoryAdapterContext
     implements Comparable<DBObjectMemoryAdapterContext> {
@@ -49,6 +50,8 @@ class DBObjectMemoryAdapter
   static void boot() {
     if (_boot) return;
     _boot = true;
+
+    DBObjectAdapter.boot();
 
     DBObjectAdapter.registerAdapter([
       'object.memory',

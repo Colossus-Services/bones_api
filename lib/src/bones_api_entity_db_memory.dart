@@ -60,6 +60,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     if (_boot) return;
     _boot = true;
 
+    DBSQLAdapter.boot();
+
     DBSQLAdapter.registerAdapter([
       'sql.memory',
       'sql.mem',

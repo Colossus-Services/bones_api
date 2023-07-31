@@ -29,7 +29,7 @@ void _setupRootLogger() {
 
 LoggerHandler _resolveLoggerHandler([LoggerHandler? loggerHandler]) {
   _boot();
-  return loggerHandler ?? _log.handler;
+  return loggerHandler ?? LoggerHandler.root;
 }
 
 void logAllTo(
@@ -161,6 +161,9 @@ abstract class LoggerHandler {
   static logging.Logger get rootLogger => logging.Logger.root;
 
   static LoggerHandler get root => rootLogger.handler;
+
+  static List<logging.Logger> get dbLoggers =>
+      LoggerExntesion._dbLoggers.toList();
 
   static int _idCount = 0;
 
@@ -329,6 +332,8 @@ abstract class LoggerHandler {
   static MessageLogger? _allMessageLogger;
   static bool _allMessageLoggerIncludeDBLogs = false;
 
+  static MessageLogger? getLogAllTo() => _allMessageLogger;
+
   void logAllTo(
       {MessageLogger? messageLogger,
       Object? logDestiny,
@@ -343,9 +348,13 @@ abstract class LoggerHandler {
 
   static bool _logToConsole = false;
 
+  static bool getLogToConsole() => _logToConsole;
+
   static void _logToConsoleImpl(bool enabled) => _logToConsole = enabled;
 
   MessageLogger? _errorMessageLogger;
+
+  MessageLogger? getLogErrorTo() => _errorMessageLogger;
 
   void logErrorTo({MessageLogger? messageLogger, Object? logDestiny}) {
     messageLogger ??= resolveLogDestiny(logDestiny);
@@ -354,6 +363,8 @@ abstract class LoggerHandler {
   }
 
   MessageLogger? _dbMessageLogger;
+
+  MessageLogger? getLogDbTo() => _dbMessageLogger;
 
   void logDbTo({MessageLogger? messageLogger, Object? logDestiny}) {
     messageLogger ??= resolveLogDestiny(logDestiny);
