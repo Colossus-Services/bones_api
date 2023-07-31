@@ -11,8 +11,8 @@
 [![Code size](https://img.shields.io/github/languages/code-size/Colossus-Services/bones_api?logo=github&logoColor=white)](https://github.com/Colossus-Services/bones_api)
 [![License](https://img.shields.io/github/license/Colossus-Services/bones_api?logo=open-source-initiative&logoColor=green)](https://github.com/Colossus-Services/bones_api/blob/master/LICENSE)
 
-Bones_API - A Powerful API backend framework for Dart. Comes with a built-in HTTP Server,
-routes handler, entity handler, SQL translator, and DB adapters.
+Bones_API - A powerful API backend framework for Dart. It comes with a built-in HTTP Server,
+route handler, entity handler, SQL translator, and DB adapters.
 
 ## Usage
 
