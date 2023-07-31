@@ -1,3 +1,7 @@
+## 1.4.17
+
+- `logErrorMessage` and `logDBMessage`: fix resolution of `MessageLogger`.
+
 ## 1.4.16
 
 - API Config:

@@ -8,8 +8,6 @@ import 'bones_api_base.dart';
 import 'bones_api_logging_generic.dart'
     if (dart.library.io) 'bones_api_logging_io.dart';
 
-final _log = logging.Logger('LoggerHandler');
-
 final Expando<LoggerHandler> _loggerHandlers = Expando<LoggerHandler>();
 
 bool _bootCalled = false;
@@ -226,20 +224,9 @@ abstract class LoggerHandler {
 
   void _logRootMsg(logging.LogRecord msg) {
     var level = msg.level;
-
-    bool? isDBLog;
-
-    if (!_logToConsole &&
-        _allMessageLogger == null &&
-        (level != logging.Level.SEVERE || _errorMessageLogger == null) &&
-        (_dbMessageLogger == null || !(isDBLog = msg.object is DBLog))) {
-      return;
-    }
-
     var logMsg = _buildMsg(msg);
 
-    isDBLog ??= msg.object is DBLog;
-
+    var isDBLog = msg.object is DBLog;
     if (!isDBLog || _allMessageLoggerIncludeDBLogs) {
       logAllMessage(level, logMsg);
     }
@@ -253,11 +240,11 @@ abstract class LoggerHandler {
       if (level < logging.Level.WARNING) {
         return;
       }
-    }
-
-    var isFromDBLogger = isDbLoggerName(msg.loggerName);
-    if (isFromDBLogger) {
-      logDBMessage(level, logMsg);
+    } else {
+      var isFromDBLogger = isDbLoggerName(msg.loggerName);
+      if (isFromDBLogger) {
+        logDBMessage(level, logMsg);
+      }
     }
 
     if (_logToConsole) {
@@ -386,7 +373,7 @@ abstract class LoggerHandler {
     if (messageLogger == null) {
       var parent = this.parent;
       messageLogger = parent?._errorMessageLogger;
-      messageLogger ??= _log.handler._errorMessageLogger;
+      messageLogger ??= LoggerHandler.root._errorMessageLogger;
     }
 
     if (messageLogger != null) {
@@ -400,7 +387,7 @@ abstract class LoggerHandler {
     if (messageLogger == null) {
       var parent = this.parent;
       messageLogger = parent?._dbMessageLogger;
-      messageLogger ??= _log.handler._dbMessageLogger;
+      messageLogger ??= LoggerHandler.root._dbMessageLogger;
     }
 
     if (messageLogger != null) {
