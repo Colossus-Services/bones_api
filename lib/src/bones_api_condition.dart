@@ -13,9 +13,24 @@ abstract class ConditionElement {
 
   bool get resolved => _resolved;
 
-  void _markResolved([bool resolved = true]) {
+  void _markResolved([bool resolved = true, Condition? parent]) {
     _resolved = resolved;
+
+    if (parent != null) {
+      _parent = parent;
+    }
   }
+
+  Condition? _parent;
+
+  Condition? get parent => _parent;
+
+  /// Returns `true` if this conditions performs an "inner join" of related tables/repositories.
+  /// Returns `false` if an `outer join` is needed to not influence other conditions
+  /// in the query (usually when a condition is inside an `OR` group).
+  ///
+  /// - Uses [parent.isInner] to resolve it.
+  bool get isInner => parent?.isInner ?? true;
 
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters});
@@ -52,6 +67,8 @@ class ConditionParameter extends ConditionElement {
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     if (isPositional) {
       var positionalParametersSize =
           parameters.where((p) => p.isPositional).length;
@@ -606,11 +623,17 @@ abstract class GroupCondition<O> extends Condition<O> {
   GroupCondition(Iterable<Condition> conditions)
       : conditions =
             conditions is List<Condition> ? conditions : conditions.toList(),
-        super._();
+        super._() {
+    for (var c in conditions) {
+      c._parent = this;
+    }
+  }
 
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     var parametersSize0 = parameters.length;
 
     for (var c in conditions) {
@@ -632,7 +655,7 @@ class GroupConditionAND<O> extends GroupCondition<O> {
       return this as GroupConditionAND<T>;
     }
     return GroupConditionAND<T>(conditions.map((e) => e.cast<T>()).toList())
-      .._markResolved(resolved);
+      .._markResolved(resolved, _parent);
   }
 
   @override
@@ -689,12 +712,15 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   GroupConditionOR(Iterable<Condition> conditions) : super(conditions);
 
   @override
+  bool get isInner => false;
+
+  @override
   GroupConditionOR<T> cast<T>() {
     if (this is GroupConditionOR<T>) {
       return this as GroupConditionOR<T>;
     }
     return GroupConditionOR<T>(conditions.map((e) => e.cast<T>()).toList())
-      .._markResolved(resolved);
+      .._markResolved(resolved, _parent);
   }
 
   @override
@@ -753,11 +779,13 @@ class ConditionANY<O> extends Condition<O> {
   @override
   ConditionANY<T> cast<T>() =>
       this is ConditionANY<T> ? this as ConditionANY<T> : ConditionANY<T>()
-        .._markResolved(resolved);
+        .._markResolved(resolved, _parent);
 
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     _markResolved();
   }
 
@@ -791,11 +819,13 @@ class ConditionID<O> extends Condition<O> {
   @override
   ConditionID<T> cast<T>() =>
       this is ConditionID<T> ? this as ConditionID<T> : ConditionID<T>(idValue)
-        .._markResolved(resolved);
+        .._markResolved(resolved, _parent);
 
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     var idValue = this.idValue;
     if (idValue is ConditionParameter) {
       idValue.resolve(parent: this, parameters: parameters);
@@ -866,11 +896,13 @@ class ConditionIdIN<O> extends Condition<O> {
   ConditionIdIN<T> cast<T>() => this is ConditionIdIN<T>
       ? this as ConditionIdIN<T>
       : ConditionIdIN<T>(idsValues)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     var idsValues = this.idsValues;
 
     var params =
@@ -1014,6 +1046,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
+    _parent = parent;
+
     var value = this.value;
     if (value is ConditionParameter) {
       value.resolve(parent: this, parameters: parameters);
@@ -1215,7 +1249,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionEQ<T> cast<T>() => this is KeyConditionEQ<T>
       ? this as KeyConditionEQ<T>
       : KeyConditionEQ<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1261,7 +1295,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionNotEQ<T> cast<T>() => this is KeyConditionNotEQ<T>
       ? this as KeyConditionNotEQ<T>
       : KeyConditionNotEQ<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1307,7 +1341,7 @@ class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
   KeyConditionGreaterThan<T> cast<T>() => this is KeyConditionGreaterThan<T>
       ? this as KeyConditionGreaterThan<T>
       : KeyConditionGreaterThan<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1354,7 +1388,7 @@ class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
       this is KeyConditionGreaterThanOrEqual<T>
           ? this as KeyConditionGreaterThanOrEqual<T>
           : KeyConditionGreaterThanOrEqual<T>(keys, value)
-        .._markResolved(resolved);
+        .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1400,7 +1434,7 @@ class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
   KeyConditionLessThan<T> cast<T>() => this is KeyConditionLessThan<T>
       ? this as KeyConditionLessThan<T>
       : KeyConditionLessThan<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1447,7 +1481,7 @@ class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
       this is KeyConditionLessThanOrEqual<T>
           ? this as KeyConditionLessThanOrEqual<T>
           : KeyConditionLessThanOrEqual<T>(keys, value)
-        .._markResolved(resolved);
+        .._markResolved(resolved, _parent);
 
   @override
   bool matchesEntity(O o,
@@ -1553,7 +1587,7 @@ class KeyConditionIN<O> extends KeyConditionINBase<O> {
   KeyConditionIN<T> cast<T>() => this is KeyConditionIN<T>
       ? this as KeyConditionIN<T>
       : KeyConditionIN<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 }
 
 class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
@@ -1564,7 +1598,7 @@ class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
   KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>
       ? this as KeyConditionNotIN<T>
       : KeyConditionNotIN<T>(keys, value)
-    .._markResolved(resolved);
+    .._markResolved(resolved, _parent);
 }
 
 class ConditionParseCache<O> {

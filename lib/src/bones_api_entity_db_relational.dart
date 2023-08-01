@@ -608,6 +608,15 @@ class DBRelationalEntityRepository<O extends Object>
             var fieldIds =
                 fieldValue.map((e) => fieldEntityHandler.getID(e)).toList();
             return MapEntry(id, fieldIds);
+          } else if (fieldValue is EntityReferenceList) {
+            var fieldIds = fieldValue.entities
+                    ?.map((e) => fieldEntityHandler.getID(e))
+                    .toList() ??
+                [];
+            return MapEntry(id, fieldIds);
+          } else if (fieldValue is EntityReference) {
+            var fieldId = fieldEntityHandler.getID(fieldValue.entity);
+            return MapEntry(id, [fieldId]);
           } else {
             var fieldId = fieldEntityHandler.getID(fieldValue);
             return MapEntry(id, [fieldId]);
@@ -674,10 +683,9 @@ class DBRelationalEntityRepository<O extends Object>
 
         if (cachedRelationships != null && cachedRelationships.isNotEmpty) {
           relationships = Map<dynamic, List<dynamic>>.fromEntries(oIdsOrig.map(
-              (id) => MapEntry<dynamic, List<dynamic>>(
-                  id,
-                  relationships[id] ??
-                      cachedRelationships[id] as List<dynamic>)));
+            (id) => MapEntry<dynamic, List<dynamic>>(
+                id, relationships[id] ?? cachedRelationships[id] ?? []),
+          ));
         }
 
         return relationships;

@@ -1,3 +1,20 @@
+## 1.4.20
+
+- `ConditionElement`:
+  - Added field `parent`.
+  - Added `isInner`.
+- `EncodingContext`:
+  - `resolveEntityAlias`:
+    - Better alias naming for `_ref` and `_rel` tables.
+    - Better naming for long names.
+- `DBRelationalEntityRepository._getCachedEntitiesRelationships`:
+  - Fix issue with `EntityReferenceList` and `EntityReference` values.
+- New `LogFileRotate` (used by default when logging to files).
+- `APIServer`: log `Response.internalServerError` (error 500  responses) as severe.
+
+- shelf_letsencrypt: ^1.2.1
+- http: ^1.1.0
+
 ## 1.4.19
 
 - Update `bones_api_template.tar.gz`.

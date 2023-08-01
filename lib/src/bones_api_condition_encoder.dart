@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -570,6 +572,13 @@ class EncodingContext {
 
   String? tableName;
 
+  EncodingContext(this.entityName,
+      {this.parameters,
+      this.positionalParameters,
+      this.namedParameters,
+      this.transaction,
+      this.tableName});
+
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
 
@@ -579,28 +588,66 @@ class EncodingContext {
   final StringBuffer output = StringBuffer();
 
   /// The referenced tables fields in the encoded [Condition].
-  final Set<TableFieldReference> fieldsReferencedTables =
+  final Set<TableFieldReference> _fieldsReferencedTables =
       <TableFieldReference>{};
 
+  Set<TableFieldReference> get fieldsReferencedTables =>
+      UnmodifiableSetView(_fieldsReferencedTables);
+
+  /// The [Condition]s of each used [TableFieldReference].
+  final Map<TableFieldReference, List<Condition>> _fieldReferencesConditions =
+      {};
+
+  void addFieldReference(TableFieldReference ref, Condition? c) {
+    _fieldsReferencedTables.add(ref);
+
+    if (c != null) {
+      var l = _fieldReferencesConditions[ref] ??= [];
+      l.add(c);
+    }
+  }
+
+  bool isInnerFieldReference(TableFieldReference ref) {
+    var l = _fieldReferencesConditions[ref];
+    return l?.every((c) => c.isInner) ?? true;
+  }
+
   /// The relationship tables fields in the encoded [Condition].
-  final Map<String, TableRelationshipReference> relationshipTables =
+  final Map<String, TableRelationshipReference> _relationshipTables =
       <String, TableRelationshipReference>{};
 
-  EncodingContext(this.entityName,
-      {this.parameters,
-      this.positionalParameters,
-      this.namedParameters,
-      this.transaction,
-      this.tableName});
+  Map<String, TableRelationshipReference> get relationshipTables =>
+      UnmodifiableMapView(_relationshipTables);
+
+  /// The [Condition]s of each used [TableRelationshipReference].
+  final Map<TableRelationshipReference, List<Condition>>
+      _relationshipsConditions = {};
+
+  void addRelationshipTable(
+      String tableName, TableRelationshipReference relationship, Condition? c) {
+    _relationshipTables[tableName] ??= relationship;
+
+    if (c != null) {
+      var l = _relationshipsConditions[relationship] ??= [];
+      l.add(c);
+    }
+  }
+
+  bool isInnerRelationshipTable(TableRelationshipReference relationship) {
+    var l = _relationshipsConditions[relationship];
+    return l?.every((c) => c.isInner) ?? true;
+  }
 
   String get tableNameOrEntityName => tableName ?? entityName;
 
   String get outputString => output.toString();
 
   Map<String, List<TableFieldReference>> get referencedTablesFields =>
-      fieldsReferencedTables.groupListsBy((e) => e.targetTable);
+      _fieldsReferencedTables.groupListsBy((e) => e.targetTable);
 
   void write(Object o) => output.write(o);
+
+  static final RegExp _regExpTableNameDelimiter = RegExp(r'_+');
 
   String resolveEntityAlias(String entityName) {
     var alias = tableAliases[entityName];
@@ -618,11 +665,32 @@ class EncodingContext {
 
     var length = entityNameLC.length;
 
+    List<String>? entityNameParts;
+
     for (var sz = 2; sz <= length; ++sz) {
       alias = entityNameLC.substring(0, sz);
       if (!allAliases.contains(alias) && isValidAlias(alias)) {
         tableAliases[entityName] = alias;
         return alias;
+      }
+
+      if (sz == 2) {
+        entityNameParts ??= entityNameLC.split(_regExpTableNameDelimiter);
+
+        if (entityNameParts.length > 1) {
+          for (var partSz = 1; partSz < 3; ++partSz) {
+            var aliasFromParts = entityNameParts
+                .map((w) => w.substring(0, math.min(partSz, w.length)))
+                .join('_');
+
+            if (!allAliases.contains(aliasFromParts) &&
+                isValidAlias(aliasFromParts)) {
+              alias = aliasFromParts;
+              tableAliases[entityName] = alias;
+              return alias;
+            }
+          }
+        }
       }
     }
 
@@ -662,17 +730,36 @@ class EncodingContext {
   }
 
   bool isValidAlias(String alias) {
-    return alias != 'as' &&
-        alias != 'eq' &&
-        alias != 'null' &&
-        alias != 'not' &&
-        alias != 'def' &&
-        alias != 'default' &&
-        alias != 'alias' &&
-        alias != 'equals' &&
-        alias != 'count' &&
-        alias != 'sum' &&
-        alias != 'empty';
+    if (isReservedWord(alias)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool isReservedWord(String alias) {
+    return alias == 'as' ||
+        alias == 'eq' ||
+        alias == 'by' ||
+        alias == 'null' ||
+        alias == 'not' ||
+        alias == 'def' ||
+        alias == 'sum' ||
+        alias == 'add' ||
+        alias == 'from' ||
+        alias == 'default' ||
+        alias == 'alias' ||
+        alias == 'equals' ||
+        alias == 'count' ||
+        alias == 'order' ||
+        alias == 'table' ||
+        alias == 'column' ||
+        alias == 'select' ||
+        alias == 'alter' ||
+        alias == 'drop' ||
+        alias == 'delete' ||
+        alias == 'sql' ||
+        alias == 'empty';
   }
 
   String addEncodingParameter(String suggestedKey, Object? value,

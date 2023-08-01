@@ -281,7 +281,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
                 'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
-          context.relationshipTables[tableNameRef] ??= relationship;
+          context.addRelationshipTable(tableNameRef, relationship, c);
 
           var relationshipAlias =
               context.resolveEntityAlias(relationship.relationshipTable);
@@ -331,7 +331,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var fieldRef = tableScheme.getFieldReferencedTable(fieldName);
 
       if (fieldRef != null) {
-        context.fieldsReferencedTables.add(fieldRef);
+        context.addFieldReference(fieldRef, c);
+
         var entityAlias = context.resolveEntityAlias(fieldRef.targetTable);
 
         var key1 = keys[1];
@@ -388,7 +389,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
                 'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
           }
 
-          context.relationshipTables[tableNameRef] ??= relationship;
+          context.addRelationshipTable(tableNameRef, relationship, c);
 
           var targetAlias =
               context.resolveEntityAlias(relationship.targetTable);

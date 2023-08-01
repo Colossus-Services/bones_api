@@ -106,7 +106,7 @@ class APIServer {
       'private, no-transform, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
 
   /// If `true` log messages to [stdout] (console).
-  final bool logToConsole;
+  late final bool logToConsole;
 
   APIServer(
     this.apiRoot,
@@ -125,7 +125,7 @@ class APIServer {
     this.cookieless = false,
     String? apiCacheControl,
     String? staticFilesCacheControl,
-    this.logToConsole = true,
+    bool? logToConsole,
   })  : useSessionID = useSessionID && !cookieless,
         apiCacheControl =
             _normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
@@ -138,6 +138,11 @@ class APIServer {
             directory: letsEncryptDirectory, letsEncrypt: letsEncrypt),
         address = _normalizeAddress(address),
         domainsRoots = parseDomains(domains) ?? <Pattern, Directory>{} {
+    var isLoggingAll = LoggerHandler.getLogAllTo() != null;
+
+    // If `logToConsole` not defined and NOT logging all set `logToConsole = true`:
+    this.logToConsole = logToConsole ?? !isLoggingAll;
+
     _configureAPIRoot(apiRoot);
   }
 
@@ -437,6 +442,18 @@ class APIServer {
 
     if (logToConsole) {
       _log.handler.logToConsole();
+
+      _log.info("Activated `logToConsole` from `APIServer`.");
+    }
+
+    {
+      var isLoggingAll = LoggerHandler.getLogAllTo() != null;
+      var isLoggingToConsole = LoggerHandler.getLogToConsole();
+      var isLoggingError = LoggerHandler.root.getLogErrorTo() != null;
+      var isLoggingDB = LoggerHandler.root.getLogDbTo() != null;
+
+      _log.info(
+          "LOGGING> toConsole: $isLoggingToConsole ; all: $isLoggingAll ; error: $isLoggingError ; db: $isLoggingDB");
     }
 
     if (canUseLetsEncrypt) {
@@ -1117,6 +1134,7 @@ class APIServer {
           headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
 
           return retError.resolveMapped((error) {
+            _log.severe('500 Internal Server Error', error, stackTrace);
             return Response.internalServerError(body: error, headers: headers);
           });
         }
