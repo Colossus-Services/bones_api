@@ -1722,7 +1722,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           tablesAliases: encodedSQL.tableAliases,
         );
       } else {
-        var innerJoin = StringBuffer();
+        var join = StringBuffer();
 
         for (var e in encodedSQL.referencedTablesFields.entries) {
           var refTable = e.key;
@@ -1732,12 +1732,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               e.value.every((ref) => encodedSQL.isInnerFieldReference(ref));
 
           if (innerRef) {
-            innerJoin.write('INNER JOIN ');
+            join.write('INNER JOIN ');
           } else {
-            innerJoin.write('LEFT OUTER JOIN ');
+            join.write('LEFT OUTER JOIN ');
           }
 
-          innerJoin.write('$q$refTable$q as $q$refTableAlias$q ON ');
+          join.write('$q$refTable$q as $q$refTableAlias$q ON ');
 
           for (var fieldRef in e.value) {
             var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
@@ -1745,23 +1745,23 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
                 encodedSQL, fieldRef.targetTable);
 
-            innerJoin.write(q);
-            innerJoin.write(sourceTableAlias);
-            innerJoin.write(q);
-            innerJoin.write('.');
-            innerJoin.write(q);
-            innerJoin.write(fieldRef.sourceField);
-            innerJoin.write(q);
+            join.write(q);
+            join.write(sourceTableAlias);
+            join.write(q);
+            join.write('.');
+            join.write(q);
+            join.write(fieldRef.sourceField);
+            join.write(q);
 
-            innerJoin.write(' = ');
+            join.write(' = ');
 
-            innerJoin.write(q);
-            innerJoin.write(targetTableAlias);
-            innerJoin.write(q);
-            innerJoin.write('.');
-            innerJoin.write(q);
-            innerJoin.write(fieldRef.targetField);
-            innerJoin.write(q);
+            join.write(q);
+            join.write(targetTableAlias);
+            join.write(q);
+            join.write('.');
+            join.write(q);
+            join.write(fieldRef.targetField);
+            join.write(q);
           }
         }
 
@@ -1786,32 +1786,32 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           var innerRel = encodedSQL.isInnerRelationshipTable(relationship);
 
           if (innerRel) {
-            innerJoin.write('INNER JOIN ');
+            join.write('INNER JOIN ');
           } else {
-            innerJoin.write('LEFT OUTER JOIN ');
+            join.write('LEFT OUTER JOIN ');
           }
 
-          innerJoin.write('$q$relTable$q as $q$relTableAlias$q ON (');
+          join.write('$q$relTable$q as $q$relTableAlias$q ON (');
 
-          innerJoin.write(q);
-          innerJoin.write(relTableAlias);
-          innerJoin.write(q);
-          innerJoin.write('.');
-          innerJoin.write(q);
-          innerJoin.write(sourceRelationshipField);
-          innerJoin.write(q);
+          join.write(q);
+          join.write(relTableAlias);
+          join.write(q);
+          join.write('.');
+          join.write(q);
+          join.write(sourceRelationshipField);
+          join.write(q);
 
-          innerJoin.write(' = ');
+          join.write(' = ');
 
-          innerJoin.write(q);
-          innerJoin.write(tableAlias);
-          innerJoin.write(q);
-          innerJoin.write('.');
-          innerJoin.write(q);
-          innerJoin.write(sourceTableField);
-          innerJoin.write(q);
+          join.write(q);
+          join.write(tableAlias);
+          join.write(q);
+          join.write('.');
+          join.write(q);
+          join.write(sourceTableField);
+          join.write(q);
 
-          innerJoin.write(') ');
+          join.write(') ');
 
           var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
               encodedSQL, targetTable);
@@ -1828,36 +1828,36 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           }
 
           if (innerRel) {
-            innerJoin.write('INNER JOIN ');
+            join.write('INNER JOIN ');
           } else {
-            innerJoin.write('LEFT OUTER JOIN ');
+            join.write('LEFT OUTER JOIN ');
           }
 
-          innerJoin.write('$q$targetTable$q as $q$targetTableAlias$q ON (');
+          join.write('$q$targetTable$q as $q$targetTableAlias$q ON (');
 
-          innerJoin.write(q);
-          innerJoin.write(targetTableAlias);
-          innerJoin.write(q);
-          innerJoin.write('.');
-          innerJoin.write(q);
-          innerJoin.write(targetTableField);
-          innerJoin.write(q);
+          join.write(q);
+          join.write(targetTableAlias);
+          join.write(q);
+          join.write('.');
+          join.write(q);
+          join.write(targetTableField);
+          join.write(q);
 
-          innerJoin.write(' = ');
+          join.write(' = ');
 
-          innerJoin.write(q);
-          innerJoin.write(relTableAlias);
-          innerJoin.write(q);
-          innerJoin.write('.');
-          innerJoin.write(q);
-          innerJoin.write(targetRelationshipField);
-          innerJoin.write(q);
+          join.write(q);
+          join.write(relTableAlias);
+          join.write(q);
+          join.write('.');
+          join.write(q);
+          join.write(targetRelationshipField);
+          join.write(q);
 
-          innerJoin.write(') ');
+          join.write(') ');
         }
 
         var from =
-            'FROM $q$table$q as $q$tableAlias$q $innerJoin WHERE $conditionSQL';
+            'FROM $q$table$q as $q$tableAlias$q $join WHERE $conditionSQL';
         var sqlQuery = sqlBuilder(from, encodedSQL);
 
         return SQL(
