@@ -165,6 +165,35 @@ void main() {
           equals('( ( foo == 123 || foo == 321 ) && bar == 456 )'));
     });
 
+    test('group AND+OR', () {
+      var conditionParser = ConditionParser();
+
+      expect(
+          conditionParser
+              .parse(" level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+              .toString(),
+          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+
+      expect(
+          conditionParser
+              .parse(" level == 100 && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+              .toString(),
+          equals(
+              '( level == 100 && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+
+      expect(
+          conditionParser
+              .parse(" ( level == ? ) && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+              .toString(),
+          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+
+      expect(
+          conditionParser
+              .parse("( level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) )")
+              .toString(),
+          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+    });
+
     test('ConditionParameter single', () async {
       var conditionParser = ConditionParser();
 

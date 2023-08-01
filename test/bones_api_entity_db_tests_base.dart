@@ -1026,6 +1026,28 @@ Future<bool> runAdapterTests(
         }
 
         {
+          var user4 = await userAPIRepository.selectFirstByQuery(
+              "( roles =~ ?:rs1 || roles =~ ?:rs2 )",
+              parameters: {
+                'rs1': [3],
+                'rs2': []
+              });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
+          var user4 = await userAPIRepository.selectFirstByQuery(
+              " level == 100 && ( roles =~ ?:rs1 || roles =~ ?:rs2 )",
+              parameters: {
+                'rs1': [3],
+                'rs2': []
+              });
+
+          expect(user4?.id, equals(user3.id));
+        }
+
+        {
           var user4 = await userAPIRepository
               .selectFirstByQuery("roles =~ ?", parameters: {
             'roles': [1]
