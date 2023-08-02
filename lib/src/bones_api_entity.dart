@@ -3903,9 +3903,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     return ids.map((id) => id == oID ? o : null).toList();
   }
 
-  FutureOr<dynamic> ensureStored(O o, {Transaction? transaction});
+  FutureOr<dynamic> ensureStored(O o,
+      {Transaction? transaction, TransactionOperation? operation});
 
-  FutureOr<bool> ensureReferencesStored(O o, {Transaction? transaction});
+  FutureOr<bool> ensureReferencesStored(O o,
+      {Transaction? transaction, TransactionOperation? operation});
 
   @override
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
@@ -4133,6 +4135,16 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   factory Transaction.executingOrNew({required bool autoCommit}) {
     return executingTransaction ?? Transaction._(autoCommit, true);
   }
+
+  Iterable<T> operationsWithEntity<T extends TransactionOperationWithEntity>(
+          Object entity) =>
+      _operations.whereType<T>().where((op) => identical(op.entity, entity));
+
+  T? firstOperationWithEntity<T extends TransactionOperationWithEntity>(
+          Object entity) =>
+      _operations
+          .whereType<T>()
+          .firstWhereOrNull((op) => identical(op.entity, entity));
 
   /// Executes [block] inside a [Transaction] and [commit]s it.
   /// - If the parameter [transaction] is provided it will be used as the [Transaction] instance.
@@ -4391,7 +4403,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _markOperationExecuted(op, result, allowAutoCommit);
   }
 
-  Completer<bool>? _waitingExecutedOperation;
+  Completer<TransactionOperation>? _waitingExecutedOperation;
 
   Object? _lastResult;
 
@@ -4417,7 +4429,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var waitingExecutedOperation = _waitingExecutedOperation;
     if (waitingExecutedOperation != null &&
         !waitingExecutedOperation.isCompleted) {
-      waitingExecutedOperation.complete(true);
+      waitingExecutedOperation.complete(op);
       _waitingExecutedOperation = null;
     }
 
@@ -4438,10 +4450,46 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Future<bool> _waitAllExecutedImpl() async {
     while (_executedOperations.length < _operations.length) {
-      var completer = _waitingExecutedOperation ??= Completer<bool>();
+      var completer =
+          _waitingExecutedOperation ??= Completer<TransactionOperation>();
       await completer.future;
     }
     return true;
+  }
+
+  /// Waits [op] to be executed in this [Transaction].
+  Future<bool> waitOperation(TransactionOperation? op) async {
+    if (op == null) return false;
+
+    if (!identical(op.transaction, this)) {
+      throw StateError(
+          "Operation from different transaction: ${op.transaction.id} != $id");
+    }
+
+    if (!_operations.contains(op)) {
+      throw StateError(
+          "Operation not in transaction:\n-- Operation> $op\n-- $this");
+    }
+
+    if (_executedOperations.contains(op)) {
+      return true;
+    }
+
+    while (_executedOperations.length < _operations.length) {
+      var completer =
+          _waitingExecutedOperation ??= Completer<TransactionOperation>();
+      var executedOp = await completer.future;
+
+      if (executedOp == op) {
+        return true;
+      }
+
+      if (_executedOperations.contains(op)) {
+        return true;
+      }
+    }
+
+    return _executedOperations.contains(op);
   }
 
   FutureOr<Object?> _doAutoCommit() {
@@ -5003,6 +5051,8 @@ abstract class TransactionOperation {
 
   FutureOr<R> finish<R>(R result) => transaction.finishOperation(this, result);
 
+  Future<bool> waitFinish() => transaction.waitOperation(this);
+
   @override
   String toString();
 }
@@ -5053,14 +5103,25 @@ class TransactionOperationCount<O> extends TransactionOperation {
   }
 }
 
-class TransactionOperationStore<O> extends TransactionOperation {
+abstract class TransactionOperationWithEntity<O> extends TransactionOperation {
   final O entity;
 
+  TransactionOperationWithEntity(super.type, super.repositoryName,
+      super.canPropagate, super.executor, super.transaction, this.entity);
+}
+
+abstract class TransactionOperationSaveEntity<O>
+    extends TransactionOperationWithEntity<O> {
+  TransactionOperationSaveEntity(super.type, super.repositoryName,
+      super.canPropagate, super.executor, super.transaction, super.entity);
+}
+
+class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
   TransactionOperationStore(
-      String repositoryName, bool canPropagate, Object executor, this.entity,
+      String repositoryName, bool canPropagate, Object executor, O entity,
       [Transaction? transaction])
       : super(TransactionOperationType.store, repositoryName, canPropagate,
-            executor, transaction);
+            executor, transaction, entity);
 
   @override
   String toString() {
@@ -5068,14 +5129,12 @@ class TransactionOperationStore<O> extends TransactionOperation {
   }
 }
 
-class TransactionOperationUpdate<O> extends TransactionOperation {
-  final O entity;
-
+class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
   TransactionOperationUpdate(
-      String repositoryName, bool canPropagate, Object executor, this.entity,
+      String repositoryName, bool canPropagate, Object executor, O entity,
       [Transaction? transaction])
       : super(TransactionOperationType.update, repositoryName, canPropagate,
-            executor, transaction);
+            executor, transaction, entity);
 
   @override
   String toString() {
@@ -5083,15 +5142,15 @@ class TransactionOperationUpdate<O> extends TransactionOperation {
   }
 }
 
-class TransactionOperationStoreRelationship<O, E> extends TransactionOperation {
-  final O entity;
+class TransactionOperationStoreRelationship<O, E>
+    extends TransactionOperationWithEntity<O> {
   final List<E> others;
 
   TransactionOperationStoreRelationship(
-      String repositoryName, Object executor, this.entity, this.others,
+      String repositoryName, Object executor, O entity, this.others,
       [Transaction? transaction])
       : super(TransactionOperationType.storeRelationship, repositoryName, false,
-            executor, transaction);
+            executor, transaction, entity);
 
   @override
   String toString() {
@@ -5116,14 +5175,13 @@ class TransactionOperationConstrainRelationship<O, E>
   }
 }
 
-class TransactionOperationSelectRelationship<O> extends TransactionOperation {
-  final O entity;
-
+class TransactionOperationSelectRelationship<O>
+    extends TransactionOperationWithEntity<O> {
   TransactionOperationSelectRelationship(
-      String repositoryName, Object executor, this.entity,
+      String repositoryName, Object executor, O entity,
       [Transaction? transaction])
       : super(TransactionOperationType.selectRelationship, repositoryName,
-            false, executor, transaction);
+            false, executor, transaction, entity);
 
   @override
   String toString() {
@@ -5391,7 +5449,7 @@ abstract class IterableEntityRepository<O extends Object>
     var op =
         TransactionOperationStore(name, canPropagate, this, o, transaction);
 
-    return ensureReferencesStored(o, transaction: op.transaction)
+    return ensureReferencesStored(o, transaction: op.transaction, operation: op)
         .resolveWith(() {
       var oId = getID(o, entityHandler: entityHandler);
 
@@ -5534,7 +5592,8 @@ abstract class IterableEntityRepository<O extends Object>
   List<Object> getRelationship(Object oId, Type valuesType);
 
   @override
-  FutureOr<dynamic> ensureStored(O o, {Transaction? transaction}) {
+  FutureOr<dynamic> ensureStored(O o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     transaction ??= Transaction.executingOrNew(autoCommit: true);
@@ -5542,15 +5601,32 @@ abstract class IterableEntityRepository<O extends Object>
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null || entityHasChangedFields(o)) {
-      return store(o, transaction: transaction);
+      return _ensureStoredImpl(o, transaction, operation);
     } else {
       return ensureReferencesStored(o, transaction: transaction)
           .resolveWithValue(id);
     }
   }
 
+  FutureOr<dynamic> _ensureStoredImpl(
+      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    if (transaction != null) {
+      var storedOp = transaction
+          .firstOperationWithEntity<TransactionOperationSaveEntity>(o);
+
+      if (storedOp != null) {
+        return storedOp
+            .waitFinish()
+            .then((_) => getEntityID(storedOp.entity) ?? getEntityID(o));
+      }
+    }
+
+    return store(o, transaction: transaction);
+  }
+
   @override
-  FutureOr<bool> ensureReferencesStored(O o, {Transaction? transaction}) {
+  FutureOr<bool> ensureReferencesStored(O o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     transaction ??= Transaction.executingOrNew(autoCommit: true);
@@ -5575,7 +5651,8 @@ abstract class IterableEntityRepository<O extends Object>
         if (elementRepository == null) return null;
 
         var futures = value.map((e) {
-          return elementRepository.ensureStored(e, transaction: transaction);
+          return elementRepository.ensureStored(e,
+              transaction: transaction, operation: operation);
         }).toList();
 
         return futures.resolveAll();
@@ -5584,7 +5661,8 @@ abstract class IterableEntityRepository<O extends Object>
             provider.getEntityRepository(type: fieldType.type, obj: value);
         if (repository == null) return null;
 
-        return repository.ensureStored(value, transaction: transaction);
+        return repository.ensureStored(value,
+            transaction: transaction, operation: operation);
       }
     });
 

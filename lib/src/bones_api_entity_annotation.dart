@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_entity.dart';
 import 'bones_api_utils.dart';
 
 abstract class EntityAnnotation {
@@ -230,13 +231,17 @@ class EntityFieldInvalid extends Error {
   /// The [parentError] [StackTrace].
   final StackTrace? parentStackTrace;
 
+  /// The operation that caused the [Exception].
+  final Object? operation;
+
   EntityFieldInvalid(this.reason, this.value,
       {this.entityType,
       this.tableName,
       this.fieldName,
       this.subEntityErrors,
       this.parentError,
-      this.parentStackTrace});
+      this.parentStackTrace,
+      this.operation});
 
   EntityFieldInvalid copyWith(
           {String? reason,
@@ -271,6 +276,22 @@ class EntityFieldInvalid extends Error {
     return msg;
   }
 
+  String? resolveToString(Object? o, {String indent = '-- '}) {
+    if (o == null) {
+      return null;
+    } else if (o is Iterable) {
+      return '$indent${o.map(resolveToString).whereNotNull().join('\n$indent')}';
+    } else if (o is TransactionOperation) {
+      return o.toString();
+    } else if (o is Function()) {
+      return resolveToString(o());
+    } else if (o is TransactionOperation) {
+      return o.toString();
+    } else {
+      return o.toString();
+    }
+  }
+
   @override
   String toString() {
     var entityStr = entityType != null ? '$entityType' : '';
@@ -287,10 +308,14 @@ class EntityFieldInvalid extends Error {
     var fieldStr =
         fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
 
+    var operationStr = operation != null
+        ? '\n  -- Operation>>\n${resolveToString(operation, indent: '    -- ')}'
+        : '';
+
     var parentStr = parentError != null
         ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
         : '';
 
-    return 'Invalid entity$entityStr field$fieldStr> $message$parentStr';
+    return 'Invalid entity$entityStr field$fieldStr> $message$operationStr$parentStr';
   }
 }

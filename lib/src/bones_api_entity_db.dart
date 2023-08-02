@@ -1075,13 +1075,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+  FutureOr<dynamic> ensureStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null || entityHasChangedFields(o)) {
-      return store(o, transaction: transaction);
+      return _ensureStoredImpl(o, transaction, operation);
     } else {
       if (isTrackingEntity(o)) {
         return id;
@@ -1089,7 +1090,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
       return existsID(id, transaction: transaction).resolveMapped((exists) {
         if (!exists) {
-          return store(o, transaction: transaction);
+          return _ensureStoredImpl(o, transaction, operation);
         } else {
           return id;
         }
@@ -1097,8 +1098,26 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
+  FutureOr<dynamic> _ensureStoredImpl(
+      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    if (transaction != null) {
+      var storedOp = transaction
+          .firstOperationWithEntity<TransactionOperationSaveEntity>(o);
+
+      if (storedOp != null) {
+        return storedOp.waitFinish().then((_) {
+          var id = getEntityID(storedOp.entity) ?? getEntityID(o);
+          return id;
+        });
+      }
+    }
+
+    return store(o, transaction: transaction);
+  }
+
   @override
-  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+  FutureOr<bool> ensureReferencesStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     throw UnsupportedError("Relationships not supported for: $this");
   }
 
@@ -1938,11 +1957,11 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
 
   /// The parent error/exception.
   /// Usually the native [Exception] or [Error] of the database.
-  Object? parentError;
-  StackTrace? parentStackTrace;
+  final Object? parentError;
+  final StackTrace? parentStackTrace;
 
   /// The operation that caused the [Exception].
-  Object? operation;
+  final Object? operation;
 
   DBAdapterException(this.type, this.message,
       {this.parentError, this.parentStackTrace, this.operation})

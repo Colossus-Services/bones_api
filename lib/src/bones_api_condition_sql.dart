@@ -448,7 +448,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
   @override
   FutureOr<Object?> resolveValueToCompatibleType(Object? value) {
-    if (value is Decimal) {
+    if (value is DateTime) {
+      return value.toUtc();
+    } else if (value is Decimal) {
       return value.toDouble();
     } else if (value is DynamicInt) {
       return value.toBigInt();

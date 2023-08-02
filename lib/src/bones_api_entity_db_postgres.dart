@@ -231,11 +231,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
           return EntityFieldInvalid("unique", error.detail,
               fieldName: error.columnName,
               tableName: error.tableName,
-              parentError: error);
+              parentError: error,
+              operation: operation);
         } else if (error.code == '23503') {
           return DBPostgreSQLAdapterException("delete.constraint",
               '${error.message} ; Detail: ${error.detail} ; Table: ${error.tableName} ; Constraint: ${error.constraintName}',
-              parentError: error, parentStackTrace: stackTrace);
+              parentError: error,
+              parentStackTrace: stackTrace,
+              operation: operation);
         }
       }
     }

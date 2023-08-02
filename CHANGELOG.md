@@ -1,3 +1,19 @@
+## 1.4.21
+
+- `ConditionSQLEncoder`:
+  - `resolveValueToCompatibleType`: force `DateTime.toUtc()` to avoid DB adapter issues.
+- `Transaction`
+  - Added `waitOperation`.
+- `EntityRepository`:
+  - `ensureStored` implementations (`DBRelationalEntityRepository`, `DBEntityRepository`, `IterableEntityRepository`):
+    - Avoid multiple `store` of the same entity in the same [Transaction].
+      - Fix issue with unique fields. 
+- `EntityFieldInvalid`:
+  - Added field `operation`. 
+- `APIDBModule`:
+  - select: sort entities by id.
+  - update: fix enum selected option (`HTMLInput`).
+
 ## 1.4.20
 
 - `ConditionElement`:

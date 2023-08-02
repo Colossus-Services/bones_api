@@ -198,13 +198,14 @@ class DBRelationalEntityRepository<O extends Object>
             repositoryAdapter: repositoryAdapter, type: type);
 
   @override
-  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+  FutureOr<dynamic> ensureStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null || entityHasChangedFields(o)) {
-      return store(o, transaction: transaction);
+      return _ensureStoredImpl(o, transaction, operation);
     } else {
       if (isTrackingEntity(o)) {
         return ensureReferencesStored(o, transaction: transaction)
@@ -213,7 +214,7 @@ class DBRelationalEntityRepository<O extends Object>
 
       return existsID(id, transaction: transaction).resolveMapped((exists) {
         if (!exists) {
-          return store(o, transaction: transaction);
+          return _ensureStoredImpl(o, transaction, operation);
         } else {
           return ensureReferencesStored(o, transaction: transaction)
               .resolveWithValue(id);
@@ -222,8 +223,26 @@ class DBRelationalEntityRepository<O extends Object>
     }
   }
 
+  FutureOr<dynamic> _ensureStoredImpl(
+      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    if (transaction != null) {
+      var storedOp = transaction
+          .firstOperationWithEntity<TransactionOperationSaveEntity>(o);
+
+      if (storedOp != null) {
+        return storedOp.waitFinish().then((_) {
+          var id = getEntityID(storedOp.entity) ?? getEntityID(o);
+          return id;
+        });
+      }
+    }
+
+    return store(o, transaction: transaction);
+  }
+
   @override
-  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+  FutureOr<bool> ensureReferencesStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     transaction ??= Transaction.executingOrNew(autoCommit: true);
@@ -261,7 +280,7 @@ class DBRelationalEntityRepository<O extends Object>
             var futures = value.map((e) {
               if (!elementRepository.isOfEntityType(e)) return e;
               return elementRepository.ensureStored(e,
-                  transaction: transaction);
+                  transaction: transaction, operation: operation);
             }).toList();
 
             return futures.resolveAll().resolveMapped((ids) {
@@ -291,7 +310,7 @@ class DBRelationalEntityRepository<O extends Object>
             if (repository == null) return null;
 
             var stored = repository.ensureStored(entity as dynamic,
-                transaction: transaction);
+                transaction: transaction, operation: operation);
             return stored;
           }
         })
@@ -377,7 +396,8 @@ class DBRelationalEntityRepository<O extends Object>
         name, canPropagate, operationExecutor, o, transaction);
 
     try {
-      return ensureReferencesStored(o, transaction: op.transaction)
+      return ensureReferencesStored(o,
+              transaction: op.transaction, operation: op)
           .resolveWith(() {
         var idFieldsName = entityHandler.idFieldName(o);
         var fields = entityHandler.getFields(o);

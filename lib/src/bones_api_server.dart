@@ -663,7 +663,7 @@ class APIServer {
   FutureOr<APIRequest> toAPIRequest(Request request) {
     var requestTime = DateTime.now();
 
-    var method = parseAPIRequestMethod(request.method)!;
+    var method = parseAPIRequestMethod(request.method) ?? APIRequestMethod.GET;
 
     var headers = Map.fromEntries(request.headersAll.entries.map((e) {
       var values = e.value;
