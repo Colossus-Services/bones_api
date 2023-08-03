@@ -4,6 +4,7 @@
   - `resolveValueToCompatibleType`: force `DateTime.toUtc()` to avoid DB adapter issues.
 - `Transaction`
   - Added `waitOperation`.
+    - Added `timeout` parameter.
 - `EntityRepository`:
   - `ensureStored` implementations (`DBRelationalEntityRepository`, `DBEntityRepository`, `IterableEntityRepository`):
     - Avoid multiple `store` of the same entity in the same [Transaction].

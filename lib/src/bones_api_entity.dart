@@ -4439,7 +4439,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _markOperationExecuted(op, result, allowAutoCommit);
   }
 
-  Completer<TransactionOperation>? _waitingExecutedOperation;
+  Completer<TransactionOperation?>? _waitingExecutedOperation;
 
   Object? _lastResult;
 
@@ -4495,7 +4495,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   /// Waits [operation] to be executed in this [Transaction].
   Future<bool> waitOperation(TransactionOperation? operation,
-      {TransactionOperation? parentOperation}) async {
+      {TransactionOperation? parentOperation,
+      Duration timeout = const Duration(seconds: 40)}) async {
     if (operation == null) return false;
 
     if (!identical(operation.transaction, this)) {
@@ -4518,10 +4519,21 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       return false;
     }
 
+    var initTime = DateTime.now();
+
     while (_executedOperations.length < _operations.length) {
+      var elapsedTime = DateTime.now().difference(initTime);
+      var remainingTime = timeout - elapsedTime;
+
+      if (remainingTime.inMilliseconds <= 0) {
+        return false;
+      }
+
       var completer =
-          _waitingExecutedOperation ??= Completer<TransactionOperation>();
-      var executedOp = await completer.future;
+          _waitingExecutedOperation ??= Completer<TransactionOperation?>();
+
+      var executedOp =
+          await completer.future.timeout(remainingTime, onTimeout: () => null);
 
       if (executedOp == operation) {
         return true;
@@ -5132,8 +5144,11 @@ abstract class TransactionOperation {
 
   FutureOr<R> finish<R>(R result) => transaction.finishOperation(this, result);
 
-  Future<bool> waitFinish({TransactionOperation? parentOperation}) =>
-      transaction.waitOperation(this, parentOperation: parentOperation);
+  Future<bool> waitFinish(
+          {TransactionOperation? parentOperation,
+          Duration timeout = const Duration(seconds: 40)}) =>
+      transaction.waitOperation(this,
+          parentOperation: parentOperation, timeout: timeout);
 
   @override
   String toString();
