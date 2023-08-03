@@ -319,3 +319,46 @@ class EntityFieldInvalid extends Error {
     return 'Invalid entity$entityStr field$fieldStr> $message$operationStr$parentStr';
   }
 }
+
+/// Error thrown when a store of an entity with a recursive relationship loop
+/// is detected.
+///
+/// Example:
+/// - `A -> B -> C -> A`
+class RecursiveRelationshipLoopError extends Error
+    implements WithRuntimeTypeNameSafe {
+  @override
+  String get runtimeTypeNameSafe => 'RecursiveRelationshipLoopError';
+
+  final String message;
+
+  final Transaction? transaction;
+  final TransactionOperation? storeOp;
+  final TransactionOperation? parentOp;
+  final Object? entity;
+
+  RecursiveRelationshipLoopError(this.message,
+      {this.transaction, this.storeOp, this.parentOp, this.entity});
+
+  factory RecursiveRelationshipLoopError.fromTransaction(
+      Transaction transaction,
+      TransactionOperation storeOp,
+      TransactionOperation? parentOp,
+      Object entity) {
+    return RecursiveRelationshipLoopError(
+        "Can't store `Transaction#${transaction.id}` with recursive relationship loop:\n"
+        "-- Parent operation: $parentOp\n"
+        "-- Store operation: $storeOp\n"
+        "-- Entity: $entity\n"
+        "-- Transaction:\n${transaction.toString()}",
+        transaction: transaction,
+        storeOp: storeOp,
+        parentOp: parentOp,
+        entity: entity);
+  }
+
+  @override
+  String toString() {
+    return 'RecursiveRelationshipLoopError: $message';
+  }
+}

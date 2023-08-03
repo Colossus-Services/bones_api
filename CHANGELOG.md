@@ -7,9 +7,13 @@
 - `EntityRepository`:
   - `ensureStored` implementations (`DBRelationalEntityRepository`, `DBEntityRepository`, `IterableEntityRepository`):
     - Avoid multiple `store` of the same entity in the same [Transaction].
-      - Fix issue with unique fields. 
+      - Fix issue with unique fields.
+    - Throws `RecursiveRelationshipLoopError` if a loop is detected. 
 - `EntityFieldInvalid`:
   - Added field `operation`. 
+- Added missing `APIRequestMethod.HEAD`.
+- `EntityHandler`:
+  - Avoid recursive loop call to `_validateFieldValueImpl`.
 - `APIDBModule`:
   - select: sort entities by id.
   - update: fix enum selected option (`HTMLInput`).

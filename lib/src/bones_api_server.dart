@@ -1157,6 +1157,12 @@ class APIServer {
       });
     }
 
+    var apiRequestMethod = apiResponse.apiRequest?.method;
+
+    if (apiRequestMethod == APIRequestMethod.HEAD) {
+      return null;
+    }
+
     if (payload is String) {
       apiResponse.payloadMimeType ??=
           resolveBestTextMimeType(payload, apiResponse.payloadFileExtension);

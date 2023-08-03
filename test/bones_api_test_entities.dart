@@ -652,7 +652,9 @@ class Store extends Entity {
 
   int? number;
 
-  Store(this.name, this.number, {this.id});
+  User? owner;
+
+  Store(this.name, this.number, {this.id, this.owner});
 
   Store.empty() : this('', 0);
 
@@ -672,7 +674,8 @@ class Store extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames => const <String>['id', 'name', 'number'];
+  List<String> get fieldsNames =>
+      const <String>['id', 'name', 'number', 'owner'];
 
   @override
   V? getField<V>(String key) {
@@ -683,6 +686,8 @@ class Store extends Entity {
         return name as V?;
       case 'number':
         return number as V?;
+      case 'owner':
+        return owner as V?;
       default:
         return null;
     }
@@ -697,6 +702,8 @@ class Store extends Entity {
         return TypeInfo.tString;
       case 'number':
         return TypeInfo.tInt;
+      case 'owner':
+        return TypeInfo.fromType(User);
       default:
         return null;
     }
@@ -734,6 +741,12 @@ class Store extends Entity {
           break;
         }
 
+      case 'owner':
+        {
+          owner = value as User?;
+          break;
+        }
+
       default:
         return;
     }
@@ -744,6 +757,7 @@ class Store extends Entity {
         if (id != null) 'id': id,
         'name': name,
         'number': number,
+        'owner': owner?.toJson(),
       };
 }
 

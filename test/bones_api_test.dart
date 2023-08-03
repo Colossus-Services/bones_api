@@ -143,6 +143,11 @@ void main() {
       var res = await api.call(APIRequest.patch('/base/patch'));
       expect(res.toString(), equals('PATCH'));
     });
+
+    test('head', () async {
+      var res = await api.call(APIRequest.head('/base/head'));
+      expect(res.toString(), equals('HEAD'));
+    });
   });
 
   group('APIRootStarter', () {
@@ -250,63 +255,72 @@ void main() {
 
     test('foo[GET] /base', () async {
       var res = await _getURL('${apiServer.url}base/foo');
-      expect(res.toString(), equals('Hi[GET]!'));
+      expect(res.toString(), equals('(200, Hi[GET]!)'));
     });
 
     test('foo[POST] /base', () async {
       var res = await _getURL('${apiServer.url}base/foo',
           method: APIRequestMethod.POST, parameters: {'a': 1});
-      expect(res.toString(), equals('Hi[POST]! {a: 1}'));
+      expect(res.toString(), equals('(200, Hi[POST]! {a: 1})'));
     });
 
     test('time /base', () async {
       var res = await _getURL('${apiServer.url}base/time',
           method: APIRequestMethod.POST, expectedContentType: 'text/plain');
-      expect(res.toString(),
-          matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
+      expect(
+          res.toString(),
+          matches(
+              RegExp(r'^\(200, \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\)$')));
     });
 
     test('404 module /base', () async {
       var res = await _getURL('${apiServer.url}baseX/foo',
           method: APIRequestMethod.GET);
-      expect(
-          res.toString(), equals('NOT FOUND: No route for path "/baseX/foo"'));
+      expect(res.toString(),
+          equals('(404, NOT FOUND: No route for path "/baseX/foo")'));
     });
 
     test('404 route /base', () async {
       var res = await _getURL('${apiServer.url}base/bar',
           method: APIRequestMethod.GET);
-      expect(res.toString(), equals('404: /base/bar'));
+      expect(res.toString(), equals('(404, 404: /base/bar)'));
     });
 
     test('unauthorized /base', () async {
       var res = await _getURL('${apiServer.url}base/auth',
           method: APIRequestMethod.GET);
-      expect(res.toString(), equals('Forbidden'));
+      expect(res.toString(), equals('(403, Forbidden)'));
     });
 
     test('error /base', () async {
       var res = await _getURL('${apiServer.url}base/err',
           method: APIRequestMethod.GET);
+      expect(res.$1, equals(500));
       expect(res.toString(), contains('Bad state: Error!'));
     });
 
     test('put /base', () async {
       var res = await _getURL('${apiServer.url}base/put',
           method: APIRequestMethod.PUT);
-      expect(res.toString(), equals('PUT'));
+      expect(res.toString(), equals('(200, PUT)'));
     });
 
     test('delete /base', () async {
       var res = await _getURL('${apiServer.url}base/delete',
           method: APIRequestMethod.DELETE);
-      expect(res.toString(), equals('DELETE'));
+      expect(res.toString(), equals('(200, DELETE)'));
     });
 
     test('patch /base', () async {
       var res = await _getURL('${apiServer.url}base/patch',
           method: APIRequestMethod.PATCH);
-      expect(res.toString(), equals('PATCH'));
+      expect(res.toString(), equals('(200, PATCH)'));
+    });
+
+    test('head /base', () async {
+      var res = await _getURL('${apiServer.url}base/head',
+          method: APIRequestMethod.HEAD);
+      expect(res.toString(), equals('(200, )'));
     });
 
     test('get /info', () async {
@@ -314,13 +328,13 @@ void main() {
           method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
 
       expect(res.toString(),
-          equals('[method: GET ; msg: HELLO! ; agent: BonesAPI/Test]'));
+          equals('(200, [method: GET ; msg: HELLO! ; agent: BonesAPI/Test])'));
 
       var res2 = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.POST, parameters: {'msg': 'Hello!'});
 
       expect(res2.toString(),
-          equals('[method: POST ; msg: HELLO! ; agent: BonesAPI/Test]'));
+          equals('(200, [method: POST ; msg: HELLO! ; agent: BonesAPI/Test])'));
     });
 
     test('proxy: toUpperCase', () async {
@@ -337,7 +351,7 @@ void main() {
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
-      var expectedInfo = '{"name":"example","version":"1.0","modules":['
+      var expectedInfo = '(200, {"name":"example","version":"1.0","modules":['
           '{"name":"base","routes":['
           '{"name":"time","uri":"http://localhost:0/base/time"},'
           '{"name":"auth","uri":"http://localhost:0/base/auth"},'
@@ -353,7 +367,7 @@ void main() {
           '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"},'
           '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:0/info/toUpperCase?msg=String"}'
           ']}'
-          ']}';
+          ']})';
 
       expectedInfo = expectedInfo.replaceAll(
           'localhost:0', '${apiServer.address}:${apiServer.port}');
@@ -431,7 +445,7 @@ void main() {
 
     test('foo[GET]', () async {
       var res = await _getURL('${apiServer.url}base/foo');
-      expect(res.toString(), equals('Hi[GET]!'));
+      expect(res.toString(), equals('(200, Hi[GET]!)'));
     });
 
     tearDownAll(() async {
@@ -566,6 +580,7 @@ class MyBaseModule extends APIModule {
     routes.put('put', (request) => APIResponse.ok('PUT'));
     routes.delete('delete', (request) => APIResponse.ok('DELETE'));
     routes.patch('patch', (request) => APIResponse.ok('PATCH'));
+    routes.head('head', (request) => APIResponse.ok('HEAD'));
   }
 }
 
@@ -598,7 +613,7 @@ class MyInfoModule extends APIModule {
 }
 
 /// Simple HTTP get URL function.
-Future<String> _getURL(String url,
+Future<(int, String)> _getURL(String url,
     {APIRequestMethod? method,
     Map<String, dynamic>? parameters,
     String? expectedContentType}) async {
@@ -657,9 +672,16 @@ Future<String> _getURL(String url,
         future = httpClient.openUrl('OPTIONS', uri);
         break;
       }
+    case APIRequestMethod.HEAD:
+      {
+        future = httpClient.openUrl('HEAD', uri);
+        break;
+      }
   }
 
   response = await future.then((request) => request.close());
+
+  var status = response.statusCode;
 
   if (expectedContentType != null) {
     var contentType = response.headers['content-type'];
@@ -669,7 +691,7 @@ Future<String> _getURL(String url,
   var data = await response.transform(convert.Utf8Decoder()).toList();
   var body = data.join();
 
-  return body;
+  return (status, body);
 }
 
 class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
@@ -682,7 +704,8 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
       mercury_client.HttpRequest request,
       mercury_client.ProgressListener? progressListener,
       bool log) async {
-    var responseContent = await _getURL(request.requestURL);
+    var response = await _getURL(request.requestURL);
+    var responseContent = response.$2;
     return mercury_client.HttpResponse(
         mercury_client.getHttpMethod(request.method.name)!,
         request.url,
