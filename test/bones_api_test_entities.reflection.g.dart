@@ -2378,14 +2378,17 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             this,
             Store,
             '',
-            () => (String name, int? number, {int? id}) =>
-                Store(name, number, id: id),
+            () => (String name, int? number, {int? id, User? owner}) =>
+                Store(name, number, id: id, owner: owner),
             const <__PR>[
               __PR(__TR.tString, 'name', false, true),
               __PR(__TR.tInt, 'number', true, true)
             ],
             null,
-            const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
+            const <String, __PR>{
+              'id': __PR(__TR.tInt, 'id', true, false),
+              'owner': __PR(__TR<User>(User), 'owner', true, false)
+            },
             null);
       case 'empty':
         return ConstructorReflection<Store>(this, Store, 'empty',
@@ -2420,7 +2423,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     'id',
     'idFieldName',
     'name',
-    'number'
+    'number',
+    'owner'
   ];
 
   @override
@@ -2511,6 +2515,19 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           true,
           (o) => () => o!.number,
           (o) => (v) => o!.number = v,
+          obj,
+          false,
+          false,
+        );
+      case 'owner':
+        return FieldReflection<Store, User?>(
+          this,
+          Store,
+          __TR<User>(User),
+          'owner',
+          true,
+          (o) => () => o!.owner,
+          (o) => (v) => o!.owner = v,
           obj,
           false,
           false,

@@ -98,6 +98,9 @@ abstract class APIModule with Initializable {
   final Map<String, APIRouteHandler> _routesHandlersPATH =
       <String, APIRouteHandler>{};
 
+  final Map<String, APIRouteHandler> _routesHandlersHEAD =
+      <String, APIRouteHandler>{};
+
   /// Returns all the routes names.
   Set<String> get allRoutesNames => {
         ..._routesHandlers.keys,
@@ -106,6 +109,7 @@ abstract class APIModule with Initializable {
         ..._routesHandlersPUT.keys,
         ..._routesHandlersDELETE.keys,
         ..._routesHandlersPATH.keys,
+        ..._routesHandlersHEAD.keys,
       };
 
   /// Returns the routes names for [method].
@@ -115,6 +119,10 @@ abstract class APIModule with Initializable {
   }
 
   Map<String, APIRouteHandler> _getRoutesHandlers(APIRequestMethod? method) {
+    if (method == null) {
+      return _routesHandlers;
+    }
+
     switch (method) {
       case APIRequestMethod.GET:
         return _routesHandlersGET;
@@ -126,7 +134,9 @@ abstract class APIModule with Initializable {
         return _routesHandlersDELETE;
       case APIRequestMethod.PATCH:
         return _routesHandlersPATH;
-      default:
+      case APIRequestMethod.HEAD:
+        return _routesHandlersHEAD;
+      case APIRequestMethod.OPTIONS:
         return _routesHandlers;
     }
   }
@@ -372,6 +382,12 @@ class APIRouteBuilder<M extends APIModule> {
       add(APIRequestMethod.PATCH, name, function,
           parameters: parameters, rules: rules);
 
+  /// Adds a route of [name] with [handler] for `HEAD` request method.
+  APIModule head(String name, APIRouteFunction function,
+          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
+      add(APIRequestMethod.HEAD, name, function,
+          parameters: parameters, rules: rules);
+
   /// Adds a route of [name] with [handler] for the request [method].
   APIModule add(
           APIRequestMethod? method, String name, APIRouteFunction function,
@@ -398,6 +414,9 @@ class APIRouteBuilder<M extends APIModule> {
 
   /// Adds routes from [provider] for `PATCH` request method.
   void patchFrom(Object? provider) => from(APIRequestMethod.PATCH, provider);
+
+  /// Adds routes from [provider] for `HEAD` request method.
+  void headFrom(Object? provider) => from(APIRequestMethod.HEAD, provider);
 
   /// Adds routes from [provider] for the request [requestMethod].
   ///

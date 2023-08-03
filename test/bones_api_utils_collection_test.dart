@@ -25,4 +25,57 @@ void main() {
       expect(RoleType.values.parse(' X '), isNull);
     });
   });
+
+  group('IdenticalSet', () {
+    test('basic', () {
+      var s1 = IdenticalSet<String>();
+
+      expect(s1.isEmpty, isTrue);
+      expect(s1.length, equals(0));
+      expect(s1.toList(), equals([]));
+
+      expect(s1.contains('a'), isFalse);
+      expect(s1.add('a'), isTrue);
+      expect(s1.contains('a'), isTrue);
+
+      expect(s1.length, equals(1));
+      expect(s1.isEmpty, isFalse);
+      expect(s1.isNotEmpty, isTrue);
+
+      expect(s1.toList(), unorderedEquals(['a']));
+
+      expect(s1.contains('b'), isFalse);
+      expect(s1.add('b'), isTrue);
+      expect(s1.contains('b'), isTrue);
+
+      expect(s1.length, equals(2));
+      expect(s1.isEmpty, isFalse);
+      expect(s1.isNotEmpty, isTrue);
+
+      expect(s1.toList(), unorderedEquals(['a', 'b']));
+
+      expect(s1.contains('x'), isFalse);
+      expect(s1.remove('x'), isFalse);
+
+      expect(s1.contains('b'), isTrue);
+      expect(s1.add('b'), isFalse);
+      expect(s1.contains('b'), isTrue);
+
+      expect(s1.length, equals(2));
+      expect(s1.isEmpty, isFalse);
+      expect(s1.isNotEmpty, isTrue);
+
+      expect(s1.toList(), unorderedEquals(['a', 'b']));
+
+      expect(s1.contains('a'), isTrue);
+      expect(s1.remove('a'), isTrue);
+      expect(s1.contains('a'), isFalse);
+
+      expect(s1.length, equals(1));
+      expect(s1.isEmpty, isFalse);
+      expect(s1.isNotEmpty, isTrue);
+
+      expect(s1.toList(), unorderedEquals(['b']));
+    });
+  });
 }

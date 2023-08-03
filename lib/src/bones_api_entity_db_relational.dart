@@ -6,6 +6,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_reference.dart';
@@ -198,13 +199,14 @@ class DBRelationalEntityRepository<O extends Object>
             repositoryAdapter: repositoryAdapter, type: type);
 
   @override
-  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+  FutureOr<dynamic> ensureStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null || entityHasChangedFields(o)) {
-      return store(o, transaction: transaction);
+      return _ensureStoredImpl(o, transaction, operation);
     } else {
       if (isTrackingEntity(o)) {
         return ensureReferencesStored(o, transaction: transaction)
@@ -213,7 +215,7 @@ class DBRelationalEntityRepository<O extends Object>
 
       return existsID(id, transaction: transaction).resolveMapped((exists) {
         if (!exists) {
-          return store(o, transaction: transaction);
+          return _ensureStoredImpl(o, transaction, operation);
         } else {
           return ensureReferencesStored(o, transaction: transaction)
               .resolveWithValue(id);
@@ -222,21 +224,56 @@ class DBRelationalEntityRepository<O extends Object>
     }
   }
 
+  FutureOr<dynamic> _ensureStoredImpl(
+      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    if (transaction != null) {
+      var storeOp =
+          transaction.firstOperationWithEntity<TransactionOperationStore>(o);
+
+      if (storeOp != null) {
+        return storeOp.waitFinish(parentOperation: parentOperation).then((ok) {
+          var id = getEntityID(storeOp.entity) ?? getEntityID(o);
+          if (id == null && !ok) {
+            throw RecursiveRelationshipLoopError.fromTransaction(
+                transaction, storeOp, parentOperation, o);
+          }
+          return id;
+        });
+      }
+    }
+
+    return _storeImpl(o, transaction, parentOperation);
+  }
+
+  Map<String, TypeInfo>? _nonPrimitiveFields;
+
+  Map<String, TypeInfo> _getNonPrimitiveFields(O o) =>
+      _nonPrimitiveFields ??= entityHandler
+          .fieldsNames(o)
+          .map((fieldName) {
+            var fieldType = entityHandler.getFieldType(o, fieldName)!;
+            if (fieldType.isPrimitiveType) return null;
+            return MapEntry(fieldName, fieldType);
+          })
+          .whereNotNull()
+          .toMapFromEntries();
+
   @override
-  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+  FutureOr<bool> ensureReferencesStored(O o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     transaction ??= Transaction.executingOrNew(autoCommit: true);
 
-    var fieldsNames = entityHandler.fieldsNames(o);
+    var nonPrimitiveFields = _getNonPrimitiveFields(o);
 
-    var futures = fieldsNames
-        .map((fieldName) {
+    var futures = nonPrimitiveFields.entries
+        .map((entry) {
+          final fieldName = entry.key;
+          final fieldType = entry.value;
+
           var fieldValue = entityHandler.getField(o, fieldName) as Object?;
           if (fieldValue == null) return null;
-
-          var fieldType = entityHandler.getFieldType(o, fieldName)!;
-          if (fieldType.isPrimitiveType) return null;
 
           Object? value = fieldValue;
 
@@ -261,7 +298,7 @@ class DBRelationalEntityRepository<O extends Object>
             var futures = value.map((e) {
               if (!elementRepository.isOfEntityType(e)) return e;
               return elementRepository.ensureStored(e,
-                  transaction: transaction);
+                  transaction: transaction, operation: operation);
             }).toList();
 
             return futures.resolveAll().resolveMapped((ids) {
@@ -291,7 +328,7 @@ class DBRelationalEntityRepository<O extends Object>
             if (repository == null) return null;
 
             var stored = repository.ensureStored(entity as dynamic,
-                transaction: transaction);
+                transaction: transaction, operation: operation);
             return stored;
           }
         })
@@ -317,7 +354,8 @@ class DBRelationalEntityRepository<O extends Object>
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher,
+        transaction: transaction);
 
     try {
       return repositoryAdapter.doSelect(op, matcher,
@@ -361,23 +399,28 @@ class DBRelationalEntityRepository<O extends Object>
   }
 
   @override
-  FutureOr<dynamic> store(O o, {Transaction? transaction}) {
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
+      _storeImpl(o, transaction, null);
+
+  FutureOr<dynamic> _storeImpl(
+      O o, Transaction? transaction, TransactionOperation? parentOperation) {
     checkNotClosed();
 
     checkEntityFields(o);
 
     if (isStored(o, transaction: transaction)) {
-      return _update(o, transaction, true);
+      return _update(o, transaction, parentOperation, true);
     }
 
     var canPropagate = hasReferencedEntities(
         resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
 
-    var op = TransactionOperationStore(
-        name, canPropagate, operationExecutor, o, transaction);
+    var op = TransactionOperationStore(name, canPropagate, operationExecutor, o,
+        transaction: transaction, parentOperation: parentOperation);
 
     try {
-      return ensureReferencesStored(o, transaction: op.transaction)
+      return ensureReferencesStored(o,
+              transaction: op.transaction, operation: op)
           .resolveWith(() {
         var idFieldsName = entityHandler.idFieldName(o);
         var fields = entityHandler.getFields(o);
@@ -402,13 +445,14 @@ class DBRelationalEntityRepository<O extends Object>
     }
   }
 
-  FutureOr<dynamic> _update(
-      O o, Transaction? transaction, bool allowAutoInsert) {
+  FutureOr<dynamic> _update(O o, Transaction? transaction,
+      TransactionOperation? parentOperation, bool allowAutoInsert) {
     var canPropagate = hasReferencedEntities(
         resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
 
     var op = TransactionOperationUpdate(
-        name, canPropagate, operationExecutor, o, transaction);
+        name, canPropagate, operationExecutor, o,
+        transaction: transaction, parentOperation: parentOperation);
 
     return ensureReferencesStored(o, transaction: op.transaction)
         .resolveWith(() {
@@ -476,7 +520,8 @@ class DBRelationalEntityRepository<O extends Object>
     fieldType ??= entityHandler.getFieldType(o, field)!;
 
     var op = TransactionOperationStoreRelationship(
-        name, operationExecutor, o, values, transaction);
+        name, operationExecutor, o, values,
+        transaction: transaction);
 
     var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
@@ -519,7 +564,8 @@ class DBRelationalEntityRepository<O extends Object>
     }
 
     var op = TransactionOperationSelectRelationship(
-        name, operationExecutor, o ?? oId, transaction);
+        name, operationExecutor, o ?? oId,
+        transaction: transaction);
 
     var valuesType = fieldType.arguments0!.type;
     String valuesTableName = _resolveTableName(valuesType);
@@ -673,7 +719,8 @@ class DBRelationalEntityRepository<O extends Object>
     String valuesTableName = _resolveTableName(valuesType);
 
     var op = TransactionOperationSelectRelationships(
-        name, valuesTableName, operationExecutor, os ?? oIds, transaction);
+        name, valuesTableName, operationExecutor, os ?? oIds,
+        transaction: transaction);
 
     try {
       return repositoryAdapter

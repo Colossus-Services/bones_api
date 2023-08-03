@@ -1075,13 +1075,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<dynamic> ensureStored(o, {Transaction? transaction}) {
+  FutureOr<dynamic> ensureStored(o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
 
     if (id == null || entityHasChangedFields(o)) {
-      return store(o, transaction: transaction);
+      return _ensureStoredImpl(o, transaction, operation);
     } else {
       if (isTrackingEntity(o)) {
         return id;
@@ -1089,7 +1090,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
       return existsID(id, transaction: transaction).resolveMapped((exists) {
         if (!exists) {
-          return store(o, transaction: transaction);
+          return _ensureStoredImpl(o, transaction, operation);
         } else {
           return id;
         }
@@ -1097,8 +1098,30 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
+  FutureOr<dynamic> _ensureStoredImpl(
+      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    if (transaction != null) {
+      var storeOp =
+          transaction.firstOperationWithEntity<TransactionOperationStore>(o);
+
+      if (storeOp != null) {
+        return storeOp.waitFinish(parentOperation: parentOperation).then((ok) {
+          var id = getEntityID(storeOp.entity) ?? getEntityID(o);
+          if (id == null && !ok) {
+            throw RecursiveRelationshipLoopError.fromTransaction(
+                transaction, storeOp, parentOperation, o);
+          }
+          return id;
+        });
+      }
+    }
+
+    return _storeImpl(o, transaction, parentOperation);
+  }
+
   @override
-  FutureOr<bool> ensureReferencesStored(o, {Transaction? transaction}) {
+  FutureOr<bool> ensureReferencesStored(O o,
+      {Transaction? transaction, TransactionOperation? operation}) {
     throw UnsupportedError("Relationships not supported for: $this");
   }
 
@@ -1117,8 +1140,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       Transaction? transaction}) {
     checkNotClosed();
 
-    var op = TransactionOperationCount(
-        name, operationExecutor, matcher, transaction);
+    var op = TransactionOperationCount(name, operationExecutor,
+        matcher: matcher, transaction: transaction);
 
     try {
       return repositoryAdapter.doCount(op,
@@ -1181,7 +1204,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher,
+        transaction: transaction);
 
     try {
       return repositoryAdapter.doSelectByID<O?>(op, id, preFinish: (results) {
@@ -1213,7 +1237,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher,
+        transaction: transaction);
 
     try {
       return repositoryAdapter.doSelectByIDs<O>(op, ids, preFinish: (results) {
@@ -1238,7 +1263,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher,
+        transaction: transaction);
 
     try {
       return repositoryAdapter.doSelectAll<O>(op, preFinish: (results) {
@@ -1684,20 +1710,24 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<dynamic> store(O o, {Transaction? transaction}) {
+  FutureOr<dynamic> store(O o, {Transaction? transaction}) =>
+      _storeImpl(o, transaction, null);
+
+  FutureOr<dynamic> _storeImpl(
+      O o, Transaction? transaction, TransactionOperation? parentOperation) {
     checkNotClosed();
 
     checkEntityFields(o);
 
     if (isStored(o, transaction: transaction)) {
-      return _update(o, transaction, true);
+      return _update(o, transaction, parentOperation, true);
     }
 
     var canPropagate = hasReferencedEntities(
         resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
 
-    var op = TransactionOperationStore(
-        name, canPropagate, operationExecutor, o, transaction);
+    var op = TransactionOperationStore(name, canPropagate, operationExecutor, o,
+        transaction: transaction, parentOperation: parentOperation);
 
     try {
       var idFieldsName = entityHandler.idFieldName(o);
@@ -1720,13 +1750,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
-  FutureOr<dynamic> _update(
-      O o, Transaction? transaction, bool allowAutoInsert) {
+  FutureOr<dynamic> _update(O o, Transaction? transaction,
+      TransactionOperation? parentOperation, bool allowAutoInsert) {
     var canPropagate = hasReferencedEntities(
         resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
 
     var op = TransactionOperationUpdate(
-        name, canPropagate, operationExecutor, o, transaction);
+        name, canPropagate, operationExecutor, o,
+        transaction: transaction, parentOperation: parentOperation);
 
     var idFieldsName = entityHandler.idFieldName(o);
     var id = entityHandler.getID(o);
@@ -1822,7 +1853,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         hasReferencedEntities(resolveEntityResolutionRules(null));
 
     var op = TransactionOperationDelete(
-        name, canPropagate, operationExecutor, matcher, transaction);
+        name, canPropagate, operationExecutor, matcher,
+        transaction: transaction);
 
     try {
       return repositoryAdapter.doDelete(op, matcher,
@@ -1938,11 +1970,11 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
 
   /// The parent error/exception.
   /// Usually the native [Exception] or [Error] of the database.
-  Object? parentError;
-  StackTrace? parentStackTrace;
+  final Object? parentError;
+  final StackTrace? parentStackTrace;
 
   /// The operation that caused the [Exception].
-  Object? operation;
+  final Object? operation;
 
   DBAdapterException(this.type, this.message,
       {this.parentError, this.parentStackTrace, this.operation})

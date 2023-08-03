@@ -298,6 +298,25 @@ class APIDBModule extends APIModule {
       list = selectByQuery.toList();
     }
 
+    list.sort((a, b) {
+      var id1 = entityRepository.getEntityID(a);
+      var id2 = entityRepository.getEntityID(b);
+
+      if (id1 == null && id2 == null) {
+        return 0;
+      } else if (id1 == null) {
+        return 1;
+      } else if (id2 == null) {
+        return -1;
+      } else if (id1 is num && id2 is num) {
+        return id1.compareTo(id2);
+      } else if (id1 is String && id2 is String) {
+        return id1.compareTo(id2);
+      } else {
+        return 0;
+      }
+    });
+
     if (json) {
       var entitiesJson = _entitiesToJsonMap(list);
       return APIResponse.ok(entitiesJson, mimeType: 'json');

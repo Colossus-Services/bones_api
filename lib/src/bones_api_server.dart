@@ -663,7 +663,7 @@ class APIServer {
   FutureOr<APIRequest> toAPIRequest(Request request) {
     var requestTime = DateTime.now();
 
-    var method = parseAPIRequestMethod(request.method)!;
+    var method = parseAPIRequestMethod(request.method) ?? APIRequestMethod.GET;
 
     var headers = Map.fromEntries(request.headersAll.entries.map((e) {
       var values = e.value;
@@ -1155,6 +1155,12 @@ class APIServer {
       }, onError: (e, s) {
         return apiResponse.asError(error: 'ERROR: $e\n$s');
       });
+    }
+
+    var apiRequestMethod = apiResponse.apiRequest?.method;
+
+    if (apiRequestMethod == APIRequestMethod.HEAD) {
+      return null;
     }
 
     if (payload is String) {

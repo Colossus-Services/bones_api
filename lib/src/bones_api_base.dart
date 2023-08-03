@@ -41,7 +41,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.20';
+  static const String VERSION = '1.4.21';
 
   static bool _boot = false;
 
@@ -509,6 +509,7 @@ abstract class APIRoot with Initializable, Closable {
       }
     }).resolveMapped((response) {
       currentAPIRequest.remove(contextZone: callZone);
+      response._apiRequest = request;
 
       if (response.isError && response.headers[_callZonedErrorHeader] == true) {
         var stackTrace = response.stackTrace;
@@ -518,8 +519,6 @@ abstract class APIRoot with Initializable, Closable {
           throw response.error;
         }
       }
-
-      response._apiRequest = request;
 
       return response;
     });
@@ -1053,6 +1052,8 @@ enum APIRequestMethod {
   PATCH,
   // ignore: constant_identifier_names
   OPTIONS,
+  // ignore: constant_identifier_names
+  HEAD,
 }
 
 /// Extension of enum [APIRequestMethod].
@@ -1071,6 +1072,8 @@ extension APIRequestMethodExtension on APIRequestMethod {
         return 'PATCH';
       case APIRequestMethod.OPTIONS:
         return 'OPTIONS';
+      case APIRequestMethod.HEAD:
+        return 'HEAD';
       default:
         throw ArgumentError('Unknown method: $this');
     }
@@ -1101,6 +1104,9 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
     case 'optionS':
     case 'OPTIONS':
       return APIRequestMethod.OPTIONS;
+    case 'head':
+    case 'HEAD':
+      return APIRequestMethod.HEAD;
     default:
       return null;
   }
@@ -1482,6 +1488,19 @@ class APIRequest extends APIPayload {
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadMimeType: payloadMimeType,
+        credential: credential);
+  }
+
+  /// Creates a request of `HEAD` method.
+  factory APIRequest.head(String path,
+      {Map<String, dynamic>? parameters,
+      Map<String, dynamic>? headers,
+      dynamic payload,
+      APICredential? credential}) {
+    return APIRequest(APIRequestMethod.HEAD, path,
+        parameters: parameters ?? <String, dynamic>{},
+        headers: headers ?? <String, dynamic>{},
+        payload: payload,
         credential: credential);
   }
 

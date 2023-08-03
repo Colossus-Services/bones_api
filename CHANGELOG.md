@@ -1,3 +1,32 @@
+## 1.4.21
+
+- `ConditionSQLEncoder`:
+  - `resolveValueToCompatibleType`: force `DateTime.toUtc()` to avoid DB adapter issues.
+- `Transaction`
+  - Added `waitOperation`.
+    - Added `timeout` parameter.
+- `EntityRepository`:
+  - `ensureStored` implementations (`DBRelationalEntityRepository`, `DBEntityRepository`, `IterableEntityRepository`):
+    - Avoid multiple `store` of the same entity in the same [Transaction].
+      - Fix issue with unique fields.
+    - Throws `RecursiveRelationshipLoopError` if a loop is detected. 
+- `EntityFieldInvalid`:
+  - Added field `operation`. 
+- Added missing `APIRequestMethod.HEAD`.
+- `EntityHandler`:
+  - Avoid recursive loop call to `_validateFieldValueImpl`.
+- `APIDBModule`:
+  - select: sort entities by id.
+  - update: fix enum selected option (`HTMLInput`).
+- `LogFileRotate`:
+  - Fix `needRotation` for a log file not created yet.
+
+- async_events: ^1.0.12
+- stream_channel: ^2.1.2
+- gcloud: ^0.8.10
+- postgres: ^2.6.2
+- petitparser: ^5.4.0
+
 ## 1.4.20
 
 - `ConditionElement`:

@@ -386,3 +386,69 @@ extension ExtensionRuntimeTypeNameUnsafe on Object? {
     }
   }
 }
+
+/// A set that matches elements by [identical] function only.
+class IdenticalSet<O> {
+  final List<List<O>?> _groups;
+
+  IdenticalSet({int groups = 7})
+      : _groups = List.filled(groups.clamp(2, 1000), null);
+
+  List<O> _getGroup(o) {
+    var h = o.hashCode;
+    var gIdx = h % _groups.length;
+    var g = _groups[gIdx] ??= <O>[];
+    return g;
+  }
+
+  int get groupsLength => _groups.length;
+
+  int _size = 0;
+
+  int get length => _size;
+
+  bool get isEmpty => _size == 0;
+
+  bool get isNotEmpty => !isEmpty;
+
+  bool contains(O o) {
+    var g = _getGroup(o);
+    return g.any((e) => identical(e, o));
+  }
+
+  bool add(O o) {
+    var g = _getGroup(o);
+
+    if (g.any((e) => identical(e, o))) {
+      return false;
+    }
+
+    g.add(o);
+    ++_size;
+
+    return true;
+  }
+
+  bool remove(O o) {
+    var g = _getGroup(o);
+
+    var idx = g.indexWhere((e) => identical(e, o));
+
+    if (idx >= 0) {
+      g.removeAt(idx);
+      --_size;
+      return true;
+    }
+
+    return false;
+  }
+
+  Iterable<O> toIterable() => _groups.whereNotNull().expand((l) => l);
+
+  List<O> toList() => toIterable().toList();
+
+  @override
+  String toString() {
+    return 'IdenticalSet{groups: $groupsLength, length: $length}';
+  }
+}

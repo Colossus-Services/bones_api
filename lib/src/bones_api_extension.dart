@@ -89,7 +89,7 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
       entityHandler.checkFieldValue(obj ?? object!, key,
           value: value, nullValue: nullValue);
 
-  bool allFieldsValids<V>({O? obj}) =>
+  bool allFieldsValids({O? obj}) =>
       entityHandler.allFieldsValids(obj ?? object!);
 
   Map<String, EntityFieldInvalid>? validateAllFields<V>({O? obj}) =>

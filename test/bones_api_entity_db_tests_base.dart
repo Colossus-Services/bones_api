@@ -1092,17 +1092,6 @@ Future<bool> runAdapterTests(
           expect(user4, isNull);
         }
 
-        /*
-        {
-          var user4 = await userAPIRepository
-              .selectFirstByQuery("roles == ?", parameters: {
-            'roles': [3]
-          });
-
-          expect(user4?.id, equals(user3.id));
-        }
-         */
-
         {
           var user4 = await userAPIRepository
               .selectFirstByQuery("roles == ?", parameters: {
@@ -1701,6 +1690,53 @@ Future<bool> runAdapterTests(
 
         expect(sel[0]?.number, equals(201));
         expect(sel[1]?.number, equals(202));
+      }
+
+      // Test multiple sub-store of the same sub-entity:
+      //
+      //   User#2 -> Address#2 -> Store#1 -> User#1
+      //                       -> Store#2 -> User#1
+      //
+      {
+        var address1 = Address('EX', 'Extra', 'Street One', 101);
+        var user1 = User('user111@mail.com', '111', address1, []);
+
+        var store1 = Store('1x', 1, owner: user1);
+        var store2 = Store('2x', 2, owner: user1);
+        var address2 = Address('EX', 'Extra', 'Street Double', 202,
+            stores: [store1, store2]);
+
+        var role2 = Role(RoleType.admin, enabled: true);
+        var user2 = User('user222@mail.com', '222', address2, [role2]);
+
+        var id = await userAPIRepository.store(user2);
+
+        expect(id, isNotNull);
+        expect(id, equals(user2.id));
+
+        expect(user1.id, isNotNull);
+        expect(store1.id, isNotNull);
+        expect(store2.id, isNotNull);
+
+        expect(user2.id, isNotNull);
+        expect(address2.id, isNotNull);
+        expect(role2.id, isNotNull);
+      }
+
+      // Recursive Relationship Loop Error:
+      //
+      //   User#3 -> Address#3 -> Store#3 -> User#3
+      //
+      {
+        var store3 = Store('3x', 3);
+        var address3 =
+            Address('EX', 'Extra', 'Street Triple', 301, stores: [store3]);
+        var role3 = Role(RoleType.admin, enabled: true);
+        var user3 = User('user3@mail.com', '333', address3, [role3]);
+        store3.owner = user3;
+
+        await expectLater(() async => await userAPIRepository.store(user3),
+            throwsA(isA<RecursiveRelationshipLoopError>()));
       }
     });
 
