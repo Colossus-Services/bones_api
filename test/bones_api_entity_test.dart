@@ -72,6 +72,7 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
             'id': int,
             'name': String,
             'number': int,
+            'owner': User,
           },
         ),
         TableScheme(

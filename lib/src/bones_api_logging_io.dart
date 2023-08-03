@@ -298,6 +298,9 @@ class LogFileRotate {
   }
 
   Future<bool> needRotation() async {
+    var fileExists = await file.exists();
+    if (!fileExists) return false;
+
     if (await checkMaxLength()) return true;
     if (await checkMaxAge()) return true;
     return false;

@@ -1692,16 +1692,20 @@ Future<bool> runAdapterTests(
         expect(sel[1]?.number, equals(202));
       }
 
-      // Test multiple sub-store of the same sub-entity.
+      // Test multiple sub-store of the same sub-entity:
+      //
+      //   User#2 -> Address#2 -> Store#1 -> User#1
+      //                       -> Store#2 -> User#1
+      //
       {
         var address1 = Address('EX', 'Extra', 'Street One', 101);
-
         var user1 = User('user111@mail.com', '111', address1, []);
+
         var store1 = Store('1x', 1, owner: user1);
         var store2 = Store('2x', 2, owner: user1);
-
         var address2 = Address('EX', 'Extra', 'Street Double', 202,
             stores: [store1, store2]);
+
         var role2 = Role(RoleType.admin, enabled: true);
         var user2 = User('user222@mail.com', '222', address2, [role2]);
 
@@ -1720,6 +1724,9 @@ Future<bool> runAdapterTests(
       }
 
       // Recursive Relationship Loop Error:
+      //
+      //   User#3 -> Address#3 -> Store#3 -> User#3
+      //
       {
         var store3 = Store('3x', 3);
         var address3 =

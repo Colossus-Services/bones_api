@@ -17,6 +17,8 @@
 - `APIDBModule`:
   - select: sort entities by id.
   - update: fix enum selected option (`HTMLInput`).
+- `LogFileRotate`:
+  - Fix `needRotation` for a log file not created yet.
 
 ## 1.4.20
 
