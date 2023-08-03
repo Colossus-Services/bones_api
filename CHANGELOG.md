@@ -20,6 +20,12 @@
 - `LogFileRotate`:
   - Fix `needRotation` for a log file not created yet.
 
+- async_events: ^1.0.12
+- stream_channel: ^2.1.2
+- gcloud: ^0.8.10
+- postgres: ^2.6.2
+- petitparser: ^5.4.0
+
 ## 1.4.20
 
 - `ConditionElement`:
