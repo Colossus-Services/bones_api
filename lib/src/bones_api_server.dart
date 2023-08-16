@@ -723,8 +723,8 @@ class APIServer {
     var parsingDuration = DateTime.now().difference(requestTime);
 
     return _resolvePayload(request).resolveMapped((payloadResolved) {
-      var mimeType = payloadResolved?.key;
-      var payload = payloadResolved?.value;
+      var mimeType = payloadResolved?.$1;
+      var payload = payloadResolved?.$2;
 
       Map<String, dynamic> parametersResolved;
 
@@ -786,7 +786,7 @@ class APIServer {
   static final MimeType _mimeTypeTextPlain =
       MimeType.parse(MimeType.textPlain)!;
 
-  Future<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
+  Future<(MimeType, Object)?> _resolvePayload(Request request) {
     var contentLength = request.contentLength;
 
     var contentMimeType = _resolveContentMimeType(request);
@@ -797,12 +797,9 @@ class APIServer {
     var mimeType = contentMimeType ?? _mimeTypeTextPlain;
 
     if (mimeType.isStringType) {
-      return _resolvePayloadString(mimeType, request);
+      return _resolvePayloadFromString(mimeType, request);
     } else {
-      return request
-          .read()
-          .toList()
-          .then((bs) => _resolvePayloadBytes(mimeType, bs));
+      return _resolvePayloadBytes(mimeType, request);
     }
   }
 
@@ -834,28 +831,46 @@ class APIServer {
     return MimeType.byExtension(ext, defaultAsApplication: false);
   }
 
-  Future<MapEntry<MimeType, Object>?> _resolvePayloadString(
-      MimeType mimeType, Request request) {
-    var encoding = mimeType.charsetEncoding;
-    encoding ??= mimeType.isJSON ? utf8 : latin1;
+  Future<(MimeType, Object)?> _resolvePayloadFromString(
+          MimeType mimeType, Request request) =>
+      _loadPayloadString(mimeType, request).then((s) {
+        if (s == null) return null;
 
-    return request.readAsString(encoding).then((s) {
-      Object? payload = s;
-      if (mimeType.isJSON) {
-        payload = json.decode(s);
-      } else if (mimeType.isFormURLEncoded) {
-        payload = decodeQueryStringParameters(s, charset: mimeType.charset);
-      }
+        Object payload = s;
+        if (mimeType.isJSON) {
+          payload = json.decode(s);
+        } else if (mimeType.isFormURLEncoded) {
+          payload = decodeQueryStringParameters(s, charset: mimeType.charset);
+        }
 
-      return payload == null ? null : MapEntry(mimeType, payload);
-    });
-  }
+        return (mimeType, payload);
+      });
 
-  FutureOr<MapEntry<MimeType, Object>?> _resolvePayloadBytes(
-      MimeType mimeType, List<List<int>> bs) {
+  Future<String?> _loadPayloadString(MimeType mimeType, Request request) =>
+      request.read().toList().then((bs) {
+        var allBytes = _loadPayloadBytes(bs);
+
+        var encoding = mimeType.charsetEncoding ?? utf8;
+
+        try {
+          return encoding.decode(allBytes);
+        } catch (_) {
+          return latin1.decode(allBytes);
+        }
+      });
+
+  Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
+          MimeType mimeType, Request request) =>
+      request.read().toList().then((bs) {
+        var allBytes = _loadPayloadBytes(bs);
+        return (mimeType, allBytes);
+      });
+
+  Uint8List _loadPayloadBytes(List<List<int>> payloadBlocks) {
     Uint8List bytes;
-    if (bs.length == 1) {
-      final bs0 = bs[0];
+
+    if (payloadBlocks.length == 1) {
+      final bs0 = payloadBlocks[0];
       if (bs0 is Uint8List) {
         bytes = bs0;
       } else {
@@ -864,13 +879,13 @@ class APIServer {
 
       assert(bytes.length == bs0.length);
     } else {
-      var allBytesSz = bs.map((e) => e.length).sum;
+      var allBytesSz = payloadBlocks.map((e) => e.length).sum;
 
       bytes = Uint8List(allBytesSz);
       var bytesOffset = 0;
 
-      for (var i = 0; i < bs.length; ++i) {
-        var l = bs[i];
+      for (var i = 0; i < payloadBlocks.length; ++i) {
+        var l = payloadBlocks[i];
         var lng = l.length;
 
         bytes.setRange(bytesOffset, bytesOffset + lng, l);
@@ -880,7 +895,7 @@ class APIServer {
       assert(bytesOffset == allBytesSz);
     }
 
-    return MapEntry(mimeType, bytes);
+    return bytes;
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');
