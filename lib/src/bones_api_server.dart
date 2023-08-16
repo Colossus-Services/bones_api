@@ -13,7 +13,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_gzip/shelf_gzip.dart';
 import 'package:shelf_letsencrypt/shelf_letsencrypt.dart';
 import 'package:shelf_static/shelf_static.dart';
-import 'package:statistics/statistics.dart';
+import 'package:statistics/statistics.dart' hide IterableIntExtension;
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_authentication.dart';
@@ -788,30 +788,98 @@ class APIServer {
 
   Future<MapEntry<MimeType, Object>?> _resolvePayload(Request request) {
     var contentLength = request.contentLength;
-    var contentType = request.headers[HttpHeaders.contentTypeHeader];
 
-    if (contentLength == null && contentType == null) return Future.value(null);
-
-    var mimeType = MimeType.parse(contentType) ?? _mimeTypeTextPlain;
-
-    if (mimeType.isStringType) {
-      return request.readAsString().then((s) {
-        Object? payload = s;
-        if (mimeType.isJSON) {
-          payload = json.decode(s);
-        } else if (mimeType.isFormURLEncoded) {
-          payload = decodeQueryStringParameters(s, charset: mimeType.charset);
-        }
-
-        return payload == null ? null : MapEntry(mimeType, payload);
-      });
+    var contentMimeType = _resolveContentMimeType(request);
+    if (contentLength == null && contentMimeType == null) {
+      return Future.value(null);
     }
 
-    return request
-        .read()
-        .expand((bs) => bs)
-        .toList()
-        .then((bs) => MapEntry(mimeType, Uint8List.fromList(bs)));
+    var mimeType = contentMimeType ?? _mimeTypeTextPlain;
+
+    if (mimeType.isStringType) {
+      return _resolvePayloadString(mimeType, request);
+    } else {
+      return request
+          .read()
+          .toList()
+          .then((bs) => _resolvePayloadBytes(mimeType, bs));
+    }
+  }
+
+  MimeType? _resolveContentMimeType(Request request) {
+    var contentType = request.headers[HttpHeaders.contentTypeHeader];
+
+    var mimeType = MimeType.parse(contentType);
+
+    if (mimeType == null) {
+      var requestedUri = request.requestedUri;
+      mimeType = _resolveMimeTypeByExtension(requestedUri.path);
+
+      mimeType ??= requestedUri.queryParameters.entries
+          .map((e) => _resolveMimeTypeByExtension(e.value))
+          .whereNotNull()
+          .firstOrNull;
+    }
+
+    return mimeType;
+  }
+
+  MimeType? _resolveMimeTypeByExtension(String? path) {
+    if (path == null || path.isEmpty) return null;
+
+    var idx = path.lastIndexOf('.');
+    if (idx < 0) return null;
+
+    var ext = path.substring(idx + 1);
+    return MimeType.byExtension(ext, defaultAsApplication: false);
+  }
+
+  Future<MapEntry<MimeType, Object>?> _resolvePayloadString(
+      MimeType mimeType, Request request) {
+    var encoding = mimeType.charsetEncoding ?? latin1;
+
+    return request.readAsString(encoding).then((s) {
+      Object? payload = s;
+      if (mimeType.isJSON) {
+        payload = json.decode(s);
+      } else if (mimeType.isFormURLEncoded) {
+        payload = decodeQueryStringParameters(s, charset: mimeType.charset);
+      }
+
+      return payload == null ? null : MapEntry(mimeType, payload);
+    });
+  }
+
+  FutureOr<MapEntry<MimeType, Object>?> _resolvePayloadBytes(
+      MimeType mimeType, List<List<int>> bs) {
+    Uint8List bytes;
+    if (bs.length == 1) {
+      final bs0 = bs[0];
+      if (bs0 is Uint8List) {
+        bytes = bs0;
+      } else {
+        bytes = Uint8List.fromList(bs0);
+      }
+
+      assert(bytes.length == bs0.length);
+    } else {
+      var allBytesSz = bs.map((e) => e.length).sum;
+
+      bytes = Uint8List(allBytesSz);
+      var bytesOffset = 0;
+
+      for (var i = 0; i < bs.length; ++i) {
+        var l = bs[i];
+        var lng = l.length;
+
+        bytes.setRange(bytesOffset, bytesOffset + lng, l);
+        bytesOffset += lng;
+      }
+
+      assert(bytesOffset == allBytesSz);
+    }
+
+    return MapEntry(mimeType, bytes);
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');

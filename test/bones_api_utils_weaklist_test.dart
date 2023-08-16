@@ -10,6 +10,7 @@ void main() async {
   final serverUri = (await Service.getInfo()).serverUri;
 
   if (serverUri == null) {
+    print('** Test needs Dart VM Service to trigger the GC.\n');
     print('** Please run the test with the `--enable-vm-service` parameter:\n');
     print(
         '     dart --enable-vm-service test test/bones_api_utils_weaklist_test.dart\n');
