@@ -836,7 +836,8 @@ class APIServer {
 
   Future<MapEntry<MimeType, Object>?> _resolvePayloadString(
       MimeType mimeType, Request request) {
-    var encoding = mimeType.charsetEncoding ?? latin1;
+    var encoding = mimeType.charsetEncoding;
+    encoding ??= mimeType.isJSON ? utf8 : latin1;
 
     return request.readAsString(encoding).then((s) {
       Object? payload = s;
