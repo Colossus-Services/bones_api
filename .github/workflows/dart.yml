@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dart-lang/setup-dart@v1
       - name: Dart version
         run: |
@@ -29,8 +29,6 @@ jobs:
         run: dart run dependency_validator
       - name: Run tests (VM)
         run: dart test --platform vm
-      - name: Run tests (Chrome)
-        run: dart test --platform chrome
 #      - name: dart doc
 #        run: dart doc --dry-run
       - name: Generate coverage report
@@ -39,7 +37,7 @@ jobs:
           dart run test --coverage=./coverage
           dart pub global run coverage:format_coverage --packages=.dart_tool/package_config.json --report-on=lib --lcov -o ./coverage/lcov.info -i ./coverage
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           directory: ./coverage/
           flags: unittests
@@ -49,3 +47,19 @@ jobs:
       - name: dart pub publish --dry-run
         run: dart pub publish --dry-run
 
+  test_chrome:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+      - name: Dart version
+        run: |
+          dart --version
+          uname -a
+      - name: Install dependencies
+        run: dart pub get
+      - name: Upgrade dependencies
+        run: dart pub upgrade
+      - name: Run tests (Chrome)
+        run: dart test --platform chrome
