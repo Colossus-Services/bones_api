@@ -1,3 +1,13 @@
+## 1.4.22
+
+- `APIServer`:
+  - `_resolvePayload`:
+    - Better resolution of `MimeType` when `content-type` header is not provided.
+    - String `MimeType`s: use `charsetEncoding` to decode the `String`.
+    - Optimize load of payload bytes as `Uint8List`.
+
+- data_serializer: ^1.0.10
+
 ## 1.4.21
 
 - `ConditionSQLEncoder`:

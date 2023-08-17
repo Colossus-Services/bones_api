@@ -323,6 +323,64 @@ void main() {
       expect(res.toString(), equals('(200, )'));
     });
 
+    test('upload(bytes) /base', () async {
+      var res = await _getURL('${apiServer.url}base/upload',
+          method: APIRequestMethod.POST,
+          payload: List.generate(64, (i) => i),
+          payloadType: 'application/octet-stream');
+      expect(
+          res.toString(),
+          equals(
+              '(200, Payload> mimeType: application/octet-stream ; length: 64)'));
+    });
+
+    test('upload(json) /base', () async {
+      var res = await _getURL('${apiServer.url}base/upload',
+          method: APIRequestMethod.POST,
+          payload: convert.JsonUtf8Encoder().convert({
+            'á': 1,
+            'b': [2, 20]
+          }),
+          payloadType: 'application/json');
+      expect(
+          res.toString(),
+          equals(
+              '(200, Payload> mimeType: application/json ; length: 19<<{á: 1, b: [2, 20]}>>)'));
+    });
+
+    test('upload(text:utf8) /base', () async {
+      var res = await _getURL('${apiServer.url}base/upload',
+          method: APIRequestMethod.POST,
+          payload: convert.utf8.encode('utf8: áÁ'),
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          equals(
+              '(200, Payload> mimeType: text/plain ; length: 10<<utf8: áÁ>>)'));
+    });
+
+    test('upload(text:latin1) /base', () async {
+      var res = await _getURL('${apiServer.url}base/upload',
+          method: APIRequestMethod.POST,
+          payload: convert.utf8.encode('utf8: áÁ'),
+          payloadType: 'text/plain; charset=latin1');
+      expect(
+          res.toString(),
+          equals(
+              '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 14<<utf8: Ã¡Ã>>)'));
+    });
+
+    test('upload(text:latin1) /base', () async {
+      var res = await _getURL('${apiServer.url}base/upload',
+          method: APIRequestMethod.POST,
+          payload: convert.latin1.encode('utf8: áÁ'),
+          payloadType: 'text/plain; charset=latin1');
+      expect(
+          res.toString(),
+          equals(
+              '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: áÁ>>)'));
+    });
+
     test('get /info', () async {
       var res = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
@@ -359,6 +417,7 @@ void main() {
           '{"name":"err","uri":"http://localhost:0/base/err"},'
           '{"name":"foo","method":"GET","uri":"http://localhost:0/base/foo"},'
           '{"name":"foo","method":"POST","uri":"http://localhost:0/base/foo"},'
+          '{"name":"upload","method":"POST","uri":"http://localhost:5544/base/upload"},'
           '{"name":"patch","method":"PATCH","uri":"http://localhost:0/base/patch"},'
           '{"name":"put","method":"PUT","uri":"http://localhost:0/base/put"},'
           '{"name":"delete","method":"DELETE","uri":"http://localhost:0/base/delete"}'
@@ -581,6 +640,13 @@ class MyBaseModule extends APIModule {
     routes.delete('delete', (request) => APIResponse.ok('DELETE'));
     routes.patch('patch', (request) => APIResponse.ok('PATCH'));
     routes.head('head', (request) => APIResponse.ok('HEAD'));
+
+    routes.post(
+        'upload',
+        (request) => APIResponse.ok('Payload> '
+            'mimeType: ${request.payloadMimeType} ; '
+            'length: ${request.payloadAsBytes?.length}'
+            '${(request.payloadMimeType?.isStringType ?? false) ? '<<${request.payload}>>' : ''}'));
   }
 }
 
@@ -616,6 +682,8 @@ class MyInfoModule extends APIModule {
 Future<(int, String)> _getURL(String url,
     {APIRequestMethod? method,
     Map<String, dynamic>? parameters,
+    List<int>? payload,
+    String? payloadType,
     String? expectedContentType}) async {
   method ??= APIRequestMethod.GET;
 
@@ -679,7 +747,17 @@ Future<(int, String)> _getURL(String url,
       }
   }
 
-  response = await future.then((request) => request.close());
+  response = await future.then((request) {
+    if (payload != null) {
+      if (payloadType != null) {
+        request.headers.set(HttpHeaders.contentTypeHeader, payloadType);
+      }
+
+      request.add(payload);
+    }
+
+    return request.close();
+  });
 
   var status = response.statusCode;
 
