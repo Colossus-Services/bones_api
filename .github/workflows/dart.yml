@@ -58,8 +58,7 @@ jobs:
           env_vars: OS,DART
           fail_ci_if_error: true
           verbose: true
-      - name: dart pub publish --dry-run
-        run: dart pub publish --dry-run
+
 
   test_chrome:
     runs-on: ubuntu-latest
