@@ -27,10 +27,25 @@ jobs:
         run: dart analyze --fatal-infos --fatal-warnings .
       - name: dependency_validator
         run: dart run dependency_validator
+      - name: dart pub publish --dry-run
+        run: dart pub publish --dry-run
+
+  test_vm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+      - name: Dart version
+        run: |
+          dart --version
+          uname -a
+      - name: Install dependencies
+        run: dart pub get
+      - name: Upgrade dependencies
+        run: dart pub upgrade
       - name: Run tests (VM) +coverage
         run: dart test --coverage=./coverage --platform vm
-#      - name: dart doc
-#        run: dart doc --dry-run
       - name: Generate coverage report
         run: |
           dart pub global activate coverage
