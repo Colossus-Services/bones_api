@@ -27,14 +27,14 @@ jobs:
         run: dart analyze --fatal-infos --fatal-warnings .
       - name: dependency_validator
         run: dart run dependency_validator
-      - name: Run tests (VM)
-        run: dart test --platform vm
+      - name: Run tests (VM) +coverage
+        run: dart test --coverage=./coverage --platform vm
 #      - name: dart doc
 #        run: dart doc --dry-run
       - name: Generate coverage report
         run: |
           dart pub global activate coverage
-          dart run test --coverage=./coverage
+#          dart run test --coverage=./coverage
           dart pub global run coverage:format_coverage --packages=.dart_tool/package_config.json --report-on=lib --lcov -o ./coverage/lcov.info -i ./coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
