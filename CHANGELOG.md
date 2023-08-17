@@ -6,7 +6,11 @@
     - String `MimeType`s: use `charsetEncoding` to decode the `String`.
     - Optimize load of payload bytes as `Uint8List`.
 
+- async_extension: ^1.2.0
 - data_serializer: ^1.0.10
+- gcloud: ^0.8.11
+- test: ^1.24.6
+- vm_service: ^11.9.0
 
 ## 1.4.21
 

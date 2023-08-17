@@ -14,7 +14,7 @@ dependencies:
   shelf_gzip: ^4.0.1
   shelf_static: ^1.1.2
   shelf_letsencrypt: ^1.2.1
-  async_extension: ^1.1.1
+  async_extension: ^1.2.0
   dart_spawner: ^1.0.6
   args: ^2.4.2
   reflection_factory: ^2.1.6
@@ -27,7 +27,7 @@ dependencies:
   mime: ^1.0.4
   postgres: ^2.6.2
   mysql1: ^0.20.0
-  gcloud: ^0.8.10
+  gcloud: ^0.8.11
   yaml: ^3.1.2
   yaml_writer: ^1.0.3
   mercury_client: ^2.1.8
@@ -50,11 +50,11 @@ dev_dependencies:
   lints: ^2.1.1
   build_runner: ^2.4.6
   build_verify: ^3.1.0
-  test: ^1.24.4
+  test: ^1.24.6
   pubspec: ^2.3.0
   dependency_validator: ^3.2.2
   coverage: ^1.6.3
-  vm_service: ^11.8.0
+  vm_service: ^11.9.0
 
 #dependency_overrides:
 #  data_serializer:
