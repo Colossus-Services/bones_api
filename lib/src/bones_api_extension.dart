@@ -1007,3 +1007,43 @@ extension ListOfStringExtension on List<String> {
     return false;
   }
 }
+
+extension FutureOrAPIResponseExtension<T> on FutureOr<APIResponse<T>> {
+  FutureOr<T?> get payloadAsync => then((r) => r.payload);
+
+  FutureOr<APIResponseStatus> get statusAsync => then((r) => r.status);
+
+  FutureOr<Map<String, dynamic>> get headersAsync => then((r) => r.headers);
+
+  FutureOr<bool> get isOKAsync => then((r) => r.isOK);
+
+  FutureOr<bool> get isNotOKAsync => then((r) => r.isNotOK);
+
+  FutureOr<bool> get isErrorAsync => then((r) => r.isError);
+
+  FutureOr<dynamic> get errorAsync => then((r) => r.error);
+
+  FutureOr<StackTrace?> get stackTraceAsync => then((r) => r.stackTrace);
+
+  FutureOr<APIRequest?> get apiRequestAsync => then((r) => r.apiRequest);
+}
+
+extension FutureAPIResponseExtension<T> on Future<APIResponse<T>> {
+  Future<T?> get payloadAsync => then((r) => r.payload);
+
+  Future<APIResponseStatus> get statusAsync => then((r) => r.status);
+
+  Future<Map<String, dynamic>> get headersAsync => then((r) => r.headers);
+
+  Future<bool> get isOKAsync => then((r) => r.isOK);
+
+  Future<bool> get isNotOKAsync => then((r) => r.isNotOK);
+
+  Future<bool> get isErrorAsync => then((r) => r.isError);
+
+  Future<dynamic> get errorAsync => then((r) => r.error);
+
+  Future<StackTrace?> get stackTraceAsync => then((r) => r.stackTrace);
+
+  Future<APIRequest?> get apiRequestAsync => then((r) => r.apiRequest);
+}
