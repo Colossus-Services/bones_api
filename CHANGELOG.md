@@ -1,5 +1,7 @@
 ## 1.4.23
 
+- New `FutureOrAPIResponseExtension` and `FutureAPIResponseExtension`.
+
 - async_extension: ^1.2.2
 - reflection_factory: ^2.2.0
 
