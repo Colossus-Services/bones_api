@@ -1,3 +1,8 @@
+## 1.4.24
+
+- async_extension: ^1.2.3
+- docker_commander: ^2.1.0 
+
 ## 1.4.23
 
 - New `FutureOrAPIResponseExtension` and `FutureAPIResponseExtension`.
