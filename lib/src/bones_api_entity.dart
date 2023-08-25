@@ -3381,9 +3381,43 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       EntityResolutionRules? resolutionRules}) async {
     var results = <String, List<Object>>{};
 
-    for (var e in entries.entries) {
+    var allRepositoriesBuildOrder =
+        allRepositories().values.toList(growable: false);
+
+    var entriesRepositoriesOrdered = entries.entries.map((e) {
       var typeName = e.key;
-      var typeEntries = e.value;
+      var entities = e.value;
+      var entityRepository = getEntityRepository(name: typeName);
+      return MapEntry(typeName, (entities, entityRepository));
+    }).sorted((a, b) {
+      var rep1 = a.value.$2;
+      var rep2 = b.value.$2;
+
+      var idx1 = rep1 != null ? allRepositoriesBuildOrder.indexOf(rep1) : -1;
+      var idx2 = rep2 != null ? allRepositoriesBuildOrder.indexOf(rep2) : -1;
+
+      if (idx1 < 0) {
+        idx1 = 9999999;
+      }
+
+      if (idx2 < 0) {
+        idx2 = 9999999;
+      }
+
+      return idx1.compareTo(idx2);
+    }).toMapFromEntries();
+
+    _log.info('Repositories build order:');
+    for (var e in entriesRepositoriesOrdered.entries) {
+      var typeName = e.key;
+      _log.info('  -- $typeName');
+    }
+
+    for (var e in entriesRepositoriesOrdered.entries) {
+      var typeName = e.key;
+      var typeEntries = e.value.$1;
+      var entityRepository = e.value.$2;
+
       if (typeEntries.isEmpty) {
         results[typeName] = [];
         continue;
@@ -3392,7 +3426,6 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       _log.info(
           'Populating `$typeName`: ${typeEntries.length} JSON entries...$_logSectionOpen');
 
-      var entityRepository = getEntityRepository(name: typeName);
       if (entityRepository == null) {
         throw StateError(
             "Can't find `EntityRepository` for type name: $typeName");

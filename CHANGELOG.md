@@ -1,3 +1,10 @@
+## 1.4.25
+
+- `SQLBuilderListExtension`:
+  - `bestOrder`: fix dependencies order of table relationships.
+- `EntityRepositoryProviderExtension`:
+  - `storeAllFromJson`: store by `allRepositories` orders.
+
 ## 1.4.24
 
 - async_extension: ^1.2.3

@@ -555,9 +555,6 @@ class AlterTableSQL extends TableSQL {
 
 extension SQLBuilderMapExtension<K> on Map<K, CreateTableSQL> {
   Map<K, CreateTableSQL> bestOrder() {
-    var allSQLs = values.expand((e) => e.allSQLBuilders).toList();
-    allSQLs.bestOrder();
-
     var ordered = entries.bestOrder().toMapFromEntries();
     return ordered;
   }
@@ -661,8 +658,14 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         : refTables.where((r) => _indexOfTable(r, 0) != null).toList();
   }
 
-  Map<SQLBuilder, List<String>> _entriesRefsInList() =>
+  Map<SQLBuilder, List<String>> _entriesReferences() =>
       map((e) => MapEntry(e, _referenceTablesInList(e.referenceTables)))
+          .toMapFromEntries();
+
+  Map<SQLBuilder, List<String>> _entriesRelationships() =>
+      whereType<CreateTableSQL>()
+          .map(
+              (e) => MapEntry(e, _referenceTablesInList(e.relationshipsTables)))
           .toMapFromEntries();
 
   /// Sorts the SQLs by table name.
@@ -690,6 +693,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   void bestOrder() {
     sortByName();
 
+    final entriesReferences = _entriesReferences();
+    final entriesRelationships = _entriesRelationships();
+
     var withParents =
         whereType<TableSQL>().where((e) => e.parentTable != null).toList();
     removeAll(withParents);
@@ -705,9 +711,17 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     }).toList();
     removeAll(withReference);
 
-    withParents._bestOrderLoop();
-    withReference._bestOrderLoop();
-    withRelationship._bestOrderLoop();
+    withParents._bestOrderLoop(
+        entriesReferences: entriesReferences,
+        entriesRelationships: entriesRelationships);
+
+    withReference._bestOrderLoop(
+        entriesReferences: entriesReferences,
+        entriesRelationships: entriesRelationships);
+
+    withRelationship._bestOrderLoop(
+        entriesReferences: entriesReferences,
+        entriesRelationships: entriesRelationships);
 
     _bestOrderLoop();
 
@@ -750,7 +764,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     withParents.clear();
 
-    _bestOrderLoop();
+    _bestOrderLoop(
+        entriesReferences: entriesReferences,
+        entriesRelationships: entriesRelationships);
   }
 
   int _addByRefPos(List<SQLBuilder> list,
@@ -796,31 +812,52 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     return count;
   }
 
-  void _bestOrderLoop() {
-    var entriesRefsInList = _entriesRefsInList();
+  void _bestOrderLoop(
+      {Map<SQLBuilder, List<String>>? entriesReferences,
+      Map<SQLBuilder, List<String>>? entriesRelationships}) {
+    entriesReferences ??= _entriesReferences();
+    entriesRelationships ??= _entriesRelationships();
 
     while (true) {
-      if (!_bestOrderImpl(entriesRefsInList)) {
+      if (!_bestOrderImpl(entriesReferences, entriesRelationships)) {
         break;
       }
     }
   }
 
-  bool _bestOrderImpl(Map<SQLBuilder, List<String>> entriesRefsInList) {
+  bool _bestOrderImpl(final Map<SQLBuilder, List<String>> entriesReferences,
+      final Map<SQLBuilder, List<String>> entriesRelationships) {
     final length = this.length;
 
     var moved = false;
 
     for (var i = 0; i < length;) {
       var e = this[i];
-      var refsInList = entriesRefsInList[e]!;
-      if (refsInList.isEmpty) {
+
+      var references = entriesReferences[e] ?? [];
+      var relationships = entriesRelationships[e] ?? [];
+
+      if (references.isEmpty && relationships.isEmpty) {
         ++i;
         continue;
       }
 
-      if (!_headContainsReferenceTable(refsInList, i)) {
-        var idx = _indexWithAllReferenceTables(refsInList, 0);
+      if (!_headContainsReferenceTable(references, i) ||
+          !_headContainsReferenceTable(relationships, i)) {
+        var idx1 = _indexWithAllReferenceTables(references, 0);
+        var idx2 = _indexWithAllReferenceTables(relationships, 0);
+
+        var idx = idx1 ?? idx2;
+
+        if (idx != null) {
+          if (idx1 != null && idx1 > idx) {
+            idx = idx1;
+          }
+
+          if (idx2 != null && idx2 > idx) {
+            idx = idx2;
+          }
+        }
 
         if (idx != null && idx > i) {
           ++idx;
