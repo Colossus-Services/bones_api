@@ -764,9 +764,14 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     withParents.clear();
 
-    _bestOrderLoop(
+    var ok = _bestOrderLoop(
         entriesReferences: entriesReferences,
         entriesRelationships: entriesRelationships);
+
+    if (!ok) {
+      _log.info(
+          "`SQLBuilder.bestOrder`: sort loop detected: ${map((e) => e.mainTable).toList()}");
+    }
   }
 
   int _addByRefPos(List<SQLBuilder> list,
@@ -812,26 +817,45 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     return count;
   }
 
-  void _bestOrderLoop(
+  bool _bestOrderLoop(
       {Map<SQLBuilder, List<String>>? entriesReferences,
       Map<SQLBuilder, List<String>>? entriesRelationships}) {
     entriesReferences ??= _entriesReferences();
     entriesRelationships ??= _entriesRelationships();
 
-    while (true) {
-      if (!_bestOrderImpl(entriesReferences, entriesRelationships)) {
-        break;
+    var moveLoopCount = 0;
+
+    while (moveLoopCount < 10) {
+      var moveCount = _bestOrderImpl(entriesReferences, entriesRelationships);
+      if (moveCount == 0) {
+        return true;
+      } else if (moveCount > length) {
+        ++moveLoopCount;
       }
     }
+
+    moveLoopCount = 0;
+
+    while (moveLoopCount < 10) {
+      var moveCount = _bestOrderImpl(entriesReferences, {});
+      if (moveCount == 0) {
+        return true;
+      } else if (moveCount > length) {
+        ++moveLoopCount;
+      }
+    }
+
+    return false;
   }
 
-  bool _bestOrderImpl(final Map<SQLBuilder, List<String>> entriesReferences,
+  int _bestOrderImpl(final Map<SQLBuilder, List<String>> entriesReferences,
       final Map<SQLBuilder, List<String>> entriesRelationships) {
     final length = this.length;
 
-    var moved = false;
+    final moveLimit = length * 2;
+    var moveCount = 0;
 
-    for (var i = 0; i < length;) {
+    for (var i = 0; i < length && moveCount <= moveLimit;) {
       var e = this[i];
 
       var references = entriesReferences[e] ?? [];
@@ -867,7 +891,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
           insert(idx, e);
           var prev = removeAt(i);
-          moved = true;
+          ++moveCount;
 
           assert(identical(prev, e));
           continue;
@@ -877,7 +901,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
       ++i;
     }
 
-    return moved;
+    return moveCount;
   }
 
   void _sortByRefsSimple() {
