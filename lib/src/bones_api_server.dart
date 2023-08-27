@@ -32,6 +32,8 @@ import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIServer');
 
+final _logLetsEncrypt = logging.Logger('LetsEncrypt');
+
 /// An API HTTP Server
 class APIServer {
   /// The API root of this server.
@@ -500,6 +502,32 @@ class APIServer {
     server.autoCompress = true;
   }
 
+  void _letsEncryptLogger(
+      String level, Object? message, Object? error, StackTrace? stackTrace) {
+    switch (level) {
+      case 'INFO':
+        {
+          _logLetsEncrypt.info(message, error, stackTrace);
+        }
+      case 'WARNING':
+        {
+          _logLetsEncrypt.warning(message, error, stackTrace);
+        }
+      case 'ERROR':
+        {
+          _logLetsEncrypt.severe(message, error, stackTrace);
+        }
+      default:
+        {
+          var logLevel = logging.Level.LEVELS.firstWhereOrNull(
+                  (e) => equalsIgnoreAsciiCase(e.name, level)) ??
+              logging.Level.INFO;
+
+          _logLetsEncrypt.log(logLevel, message, error, stackTrace);
+        }
+    }
+  }
+
   Future<void> _startLetsEncrypt() async {
     var letsEncryptDirectory = this.letsEncryptDirectory;
 
@@ -514,8 +542,8 @@ class APIServer {
 
     final certificatesHandler = CertificatesHandlerIO(letsEncryptDirectory);
 
-    final LetsEncrypt letsEncrypt =
-        LetsEncrypt(certificatesHandler, production: letsEncryptProduction);
+    final LetsEncrypt letsEncrypt = LetsEncrypt(certificatesHandler,
+        production: letsEncryptProduction, log: _letsEncryptLogger);
 
     var pipeline = const Pipeline().addMiddleware(_redirectToHttpsMiddleware);
 

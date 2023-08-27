@@ -1,3 +1,11 @@
+## 1.4.26
+
+- `APIServer`:
+  - Integrate `LetsEncrypt` logger with `APIServer` logger.
+- shelf_letsencrypt: ^1.2.2
+- dart_spawner: ^1.1.0
+- vm_service: ^11.10.0
+
 ## 1.4.25
 
 - `SQLBuilderListExtension`:
