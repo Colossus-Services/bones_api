@@ -669,9 +669,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     final allSchemes = <EntityRepository<Object>, TableScheme?>{};
 
+    // Call `getTableSchemeForEntityRepository` with a `contextID` to allow
+    // shared internal cache between multiple calls:
+    final contextID = List.unmodifiable([this, "getRepositoriesSchemes"]);
+
     for (var block in reposBlocks) {
       var repositorySchemes = await block
-          .map((r) => MapEntry(r, getTableSchemeForEntityRepository(r)))
+          .map((r) => MapEntry(
+              r, getTableSchemeForEntityRepository(r, contextID: contextID)))
           .toMapFromEntries()
           .resolveAllValues();
 

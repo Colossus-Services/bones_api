@@ -289,7 +289,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
   @override
   Future<TableScheme?> getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship) async {
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID}) async {
     var connection = await catchFromPool();
 
     try {
@@ -305,7 +306,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         return null;
       }
 
-      var idFieldName = await _findIDField(connection, table, scheme);
+      var idFieldName = _findIDField(connection, table, scheme);
 
       var fieldsTypes = Map<String, Type>.fromEntries(scheme.map((e) {
         var k = e['Field'] as String;
@@ -315,11 +316,13 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
       notifyTableFieldTypes(table, fieldsTypes);
 
-      var fieldsReferencedTables =
-          await _findFieldsReferencedTables(connection, table);
+      var fieldsReferencedTables = await _findFieldsReferencedTables(
+          connection, table,
+          contextID: contextID);
 
-      var relationshipTables =
-          await _findRelationshipTables(connection, table, idFieldName);
+      var relationshipTables = await _findRelationshipTables(
+          connection, table, idFieldName,
+          contextID: contextID);
 
       await releaseIntoPool(connection);
 
@@ -339,12 +342,14 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     }
   }
 
-  FutureOr<String> _findIDField(DBMySqlConnectionWrapper connection,
-      String table, List<ResultRow> scheme) async {
-    var field = scheme.firstWhereOrNull((f) => f['Key'] == 'PRI');
-    var name = field?['Field'] ?? 'id';
+  String _findIDField(DBMySqlConnectionWrapper connection, String table,
+      List<ResultRow> scheme) {
+    var primaryFields = scheme.where((f) => f['Key'] == 'PRI');
 
-    return name;
+    var primaryFieldsNames =
+        primaryFields.map((e) => e['Field'].toString()).toList();
+
+    return selectIDFieldName(table, primaryFieldsNames);
   }
 
   static final RegExp _regExpSpaces = RegExp(r'\s+');
@@ -401,14 +406,17 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   Future<List<TableRelationshipReference>> _findRelationshipTables(
-      DBMySqlConnectionWrapper connection,
-      String table,
-      String idFieldName) async {
-    var tablesNames = await _listTablesNames(connection);
+      DBMySqlConnectionWrapper connection, String table, String idFieldName,
+      {Object? contextID}) async {
+    var tablesNames = await _listTablesNames(connection, contextID: contextID);
 
-    var tablesReferences = await tablesNames
-        .map((t) => _findFieldsReferencedTables(connection, t))
-        .resolveAll();
+    var tablesReferences = <Map<String, TableFieldReference>>[];
+
+    for (var t in tablesNames) {
+      var refs = await _findFieldsReferencedTables(connection, t,
+          contextID: contextID);
+      tablesReferences.add(refs);
+    }
 
     tablesReferences = tablesReferences.where((m) {
       return m.length > 1 &&
@@ -451,7 +459,15 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     return relationships;
   }
 
-  Future<List<String>> _listTablesNames(
+  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
+      Expando();
+
+  FutureOr<List<String>> _listTablesNames(DBMySqlConnectionWrapper connection,
+          {Object? contextID}) =>
+      _listTablesNamesContextCache.putIfAbsentAsync(
+          contextID, () => _listTablesNamesImpl(connection));
+
+  Future<List<String>> _listTablesNamesImpl(
       DBMySqlConnectionWrapper connection) async {
     var sql = '''
     SHOW TABLES
@@ -468,18 +484,24 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
+  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
+      _findFieldsReferencedTablesContextCache = Expando();
+
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-      DBMySqlConnectionWrapper connection, String table) {
-    var prev = _findFieldsReferencedTablesCache[table];
-    if (prev != null) return prev;
+      DBMySqlConnectionWrapper connection, String table,
+      {Object? contextID}) {
+    if (contextID != null) {
+      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
+      return cache[table] ??=
+          _findFieldsReferencedTablesImpl(connection, table).then((ret) {
+        cache[table] = ret;
+        _findFieldsReferencedTablesCache[table] = ret;
+        return ret;
+      });
+    }
 
-    var referencedTablesRet =
-        _findFieldsReferencedTablesImpl(connection, table);
-
-    return referencedTablesRet.resolveMapped((referencedTables) {
-      _findFieldsReferencedTablesCache[table] = referencedTables;
-      return referencedTables;
-    });
+    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
+        table, () => _findFieldsReferencedTablesImpl(connection, table));
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(

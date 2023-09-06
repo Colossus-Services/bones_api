@@ -22,8 +22,8 @@ import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_module.dart';
 import 'bones_api_security.dart';
-import 'bones_api_utils.dart';
 import 'bones_api_utils_arguments.dart';
+import 'bones_api_utils_call.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIRoot');
@@ -41,7 +41,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.4.27';
+  static const String VERSION = '1.4.28';
 
   static bool _boot = false;
 

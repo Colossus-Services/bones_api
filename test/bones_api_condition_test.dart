@@ -492,7 +492,8 @@ void main() {
 class _TestSchemeProvider extends SchemeProvider {
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship) {
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID}) {
     switch (table) {
       case 'account':
         return TableScheme(

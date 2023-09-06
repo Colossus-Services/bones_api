@@ -225,7 +225,8 @@ class DBObjectMemoryAdapter
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship) {
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID}) {
     _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];

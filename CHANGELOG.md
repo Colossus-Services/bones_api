@@ -1,3 +1,14 @@
+## 1.4.28
+
+- `getTableScheme`, `getTableSchemeImpl` and `getTableSchemeForEntityRepository`:
+  - Added optional `contextID` parameter to allow multiple calls with the
+    same `contextID` to share internal caches.
+- `DBMySQLAdapter` and `DBPostgreSQLAdapter`:
+  - Optimize `getTableScheme` and `getRepositoriesSchemes`
+    with use of `contextID` and internal shared caches.
+
+- async_extension: ^1.2.5
+
 ## 1.4.27
 
 - `DBSQLAdapter`:
