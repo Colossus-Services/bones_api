@@ -502,8 +502,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
     }
 
+    var schemeTableName = scheme.name;
+
     var entityHandler = repository.entityHandler;
-    var repoFieldsNames = entityHandler.fieldsNames();
+    var entityFields = entityHandler.fieldsNames();
+
+    var hiddenFields = entityFields
+        .map((f) {
+          var annotations = entityHandler.getFieldEntityAnnotations(null, f);
+          if (annotations == null) return null;
+          var hidden = annotations.any((a) => a is EntityField && a.isHidden);
+          return hidden ? f : null;
+        })
+        .whereNotNull()
+        .toList(growable: false);
+
+    if (hiddenFields.isNotEmpty) {
+      _log.info(
+          "Entity `$repoType` (table: `$schemeTableName`) hidden fields: $hiddenFields");
+    }
+
+    var repoFieldsNames = entityFields.whereNotIn(hiddenFields).toList();
 
     var repoFieldsMap =
         repoFieldsNames.map((f) => MapEntry(f, f)).toMapFromEntries();
@@ -554,8 +573,6 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .whereNot(
             (f) => fieldsInScheme.contains(f) || referenceFields.containsKey(f))
         .toList();
-
-    var schemeTableName = scheme.name;
 
     if (missingColumns.isNotEmpty || missingReferenceColumns.isNotEmpty) {
       _log.severe(

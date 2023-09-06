@@ -777,7 +777,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
             transaction, entityName, table, fields, connection);
       }
 
-      return _resolveResultID(results, table, sql, id);
+      return _resolveResultID(results, table, sql);
     });
   }
 
@@ -835,8 +835,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   dynamic _resolveResultID(
-      List<Map<String, Map<String, dynamic>>> results, String table, SQL sql,
-      [Object? entityId]) {
+      List<Map<String, Map<String, dynamic>>> results, String table, SQL sql) {
     if (results.isEmpty) {
       return null;
     }

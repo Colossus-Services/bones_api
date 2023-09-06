@@ -1,6 +1,6 @@
 name: bones_api
 description: Bones_API - A powerful API backend framework for Dart. It comes with a built-in HTTP Server, route handler, entity handler, SQL translator, and DB adapters.
-version: 1.4.26
+version: 1.4.27
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:
@@ -17,7 +17,7 @@ dependencies:
   async_extension: ^1.2.4
   dart_spawner: ^1.1.0
   args: ^2.4.2
-  reflection_factory: ^2.2.0
+  reflection_factory: ^2.2.1
   meta: ^1.9.1
   statistics: ^1.0.25
   petitparser: ^5.4.0
@@ -30,7 +30,7 @@ dependencies:
   gcloud: ^0.8.11
   yaml: ^3.1.2
   yaml_writer: ^1.0.3
-  mercury_client: ^2.1.8
+  mercury_client: ^2.2.0
   project_template: ^1.0.2
   resource_portable: ^3.1.0
   crypto: ^3.0.3
@@ -40,7 +40,7 @@ dependencies:
   docker_commander: ^2.1.0
   data_serializer: ^1.0.10
   async_events: ^1.0.12
-  archive: ^3.3.7
+  archive: ^3.3.8
   stream_channel: ^2.1.2
   http: ^1.1.0
   googleapis_auth: ^1.4.1

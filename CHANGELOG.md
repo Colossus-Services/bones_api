@@ -1,3 +1,11 @@
+## 1.4.27
+
+- `DBSQLAdapter`:
+  - `_checkDBTableScheme`: ignore fields annotated with `EntityField.hidden`.
+- reflection_factory: ^2.2.1
+- mercury_client: ^2.2.0
+- archive: ^3.3.8
+
 ## 1.4.26
 
 - `APIServer`:
