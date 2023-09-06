@@ -897,7 +897,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   TableScheme? getTableScheme(String table,
-      {TableRelationshipReference? relationship}) {
+      {TableRelationshipReference? relationship, Object? contextID}) {
     // ignore: discarded_futures
     var ret = super.getTableScheme(table, relationship: relationship);
 
@@ -910,7 +910,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship) {
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID}) {
     _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];

@@ -16,6 +16,7 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
+import 'bones_api_utils_call.dart';
 import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
@@ -368,7 +369,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   @override
   Future<TableScheme?> getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship) async {
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID}) async {
     var connection = await catchFromPool();
 
     try {
@@ -396,11 +398,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
       notifyTableFieldTypes(table, fieldsTypes);
 
-      var fieldsReferencedTables =
-          await _findFieldsReferencedTables(connection, table);
+      var fieldsReferencedTables = await _findFieldsReferencedTables(
+          connection, table,
+          contextID: contextID);
 
-      var relationshipTables =
-          await _findRelationshipTables(connection, table, idFieldName);
+      var relationshipTables = await _findRelationshipTables(
+          connection, table, idFieldName,
+          contextID: contextID);
 
       await releaseIntoPool(connection);
 
@@ -441,16 +445,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       return Map.fromEntries(r.values.expand((e) => e.entries));
     }).toList(growable: false);
 
-    var primaryFields = Map.fromEntries(
-        columns.map((m) => MapEntry(m['column_name'], m['data_type'])));
+    var primaryFields = Map.fromEntries(columns
+        .map((m) => MapEntry(m['column_name'].toString(), m['data_type'])));
 
-    if (primaryFields.length == 1) {
-      return primaryFields.keys.first;
-    } else if (primaryFields.length > 1) {
-      return primaryFields.keys.first;
-    }
+    var primaryFieldsNames = primaryFields.keys.toList(growable: false);
 
-    return 'id';
+    return selectIDFieldName(table, primaryFieldsNames);
   }
 
   static final RegExp _regExpSpaces = RegExp(r'\s+');
@@ -510,20 +510,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   Future<List<TableRelationshipReference>> _findRelationshipTables(
-      PostgreSQLExecutionContext connection,
-      String table,
-      String idFieldName) async {
-    var tablesNames = await _listTablesNames(connection);
-
-    var tablesReferences = await tablesNames
-        .map((t) => _findFieldsReferencedTables(connection, t))
-        .resolveAll();
-
-    tablesReferences = tablesReferences.where((m) {
-      return m.length > 1 &&
-          m.values.where((r) => r.targetTable == table).isNotEmpty &&
-          m.values.where((r) => r.targetTable != table).isNotEmpty;
-    }).toList();
+      PostgreSQLExecutionContext connection, String table, String idFieldName,
+      {Object? contextID}) async {
+    final tablesReferences = await _findAllTableFieldsReferences(
+        connection, table,
+        contextID: contextID);
 
     var relationships = tablesReferences
         .map((e) {
@@ -559,7 +550,37 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     return relationships;
   }
 
-  Future<List<String>> _listTablesNames(
+  FutureOr<List<Map<String, TableFieldReference>>>
+      _findAllTableFieldsReferences(
+          PostgreSQLExecutionContext connection, String table,
+          {Object? contextID}) async {
+    var tablesNames = await _listTablesNames(connection, contextID: contextID);
+
+    var tablesReferences = <Map<String, TableFieldReference>>[];
+
+    for (var t in tablesNames) {
+      var refs = await _findFieldsReferencedTables(connection, t,
+          contextID: contextID);
+      tablesReferences.add(refs);
+    }
+
+    tablesReferences = tablesReferences.where((m) {
+      return m.length > 1 &&
+          m.values.where((r) => r.targetTable == table).isNotEmpty &&
+          m.values.where((r) => r.targetTable != table).isNotEmpty;
+    }).toList();
+    return tablesReferences;
+  }
+
+  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
+      Expando();
+
+  FutureOr<List<String>> _listTablesNames(PostgreSQLExecutionContext connection,
+          {Object? contextID}) =>
+      _listTablesNamesContextCache.putIfAbsentAsync(
+          contextID, () => _listTablesNamesImpl(connection));
+
+  Future<List<String>> _listTablesNamesImpl(
       PostgreSQLExecutionContext connection) async {
     var sql = '''
     SELECT table_name FROM information_schema.tables WHERE table_schema='public'
@@ -582,10 +603,25 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
+  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
+      _findFieldsReferencedTablesContextCache = Expando();
+
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-          PostgreSQLExecutionContext connection, String table) =>
-      _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-          table, () => _findFieldsReferencedTablesImpl(connection, table));
+      PostgreSQLExecutionContext connection, String table,
+      {Object? contextID}) {
+    if (contextID != null) {
+      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
+      return cache[table] ??=
+          _findFieldsReferencedTablesImpl(connection, table).then((ret) {
+        cache[table] = ret;
+        _findFieldsReferencedTablesCache[table] = ret;
+        return ret;
+      });
+    }
+
+    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
+        table, () => _findFieldsReferencedTablesImpl(connection, table));
+  }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
       PostgreSQLExecutionContext connection, String table) async {

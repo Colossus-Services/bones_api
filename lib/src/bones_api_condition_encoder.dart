@@ -2,14 +2,19 @@ import 'dart:math' as math;
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_sql.dart';
+import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
 import 'bones_api_utils.dart';
+
+final _logSchemeProvider = logging.Logger('SchemeProvider')
+  ..registerAsDbLogger();
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
@@ -448,8 +453,12 @@ abstract class SchemeProvider {
   }
 
   /// Returns a [TableScheme] for [table].
+  /// Calls [getTableSchemeImpl] handling asynchronous calls.
+  /// - [contextID] should be [Expando] compatible. It informs that other
+  ///   calls to [getTableScheme] are in the same context and could have
+  ///   shared internal caches for the same [contextID] instance.
   FutureOr<TableScheme?> getTableScheme(String table,
-      {TableRelationshipReference? relationship}) {
+      {TableRelationshipReference? relationship, Object? contextID}) {
     var tablesScheme = _tablesSchemes[table];
     if (tablesScheme != null) return tablesScheme;
 
@@ -461,7 +470,7 @@ abstract class SchemeProvider {
     var completer = Completer<TableScheme?>();
     _tablesSchemesResolving[table] = completer;
 
-    var ret = getTableSchemeImpl(table, relationship);
+    var ret = getTableSchemeImpl(table, relationship, contextID: contextID);
 
     return ret.resolveMapped((tablesScheme) {
       if (tablesScheme == null) {
@@ -478,8 +487,55 @@ abstract class SchemeProvider {
   }
 
   /// Implementation that returns a [TableScheme] for [table].
+  /// - [contextID] should be [Expando] compatible. It informs that other
+  ///   calls to [getTableSchemeImpl] are in the same context and could have
+  ///   shared internal caches for the same [contextID] instance.
   FutureOr<TableScheme?> getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship);
+      String table, TableRelationshipReference? relationship,
+      {Object? contextID});
+
+  /// Selects the `ID` field name from [primaryKeyCandidates] candidates:
+  String selectIDFieldName(String table, List<String> primaryKeyCandidates) {
+    if (primaryKeyCandidates.isEmpty) {
+      return 'id';
+    }
+
+    if (primaryKeyCandidates.length == 1) {
+      return primaryKeyCandidates.first;
+    }
+
+    var idField = _selectIDFieldNameFromMultiple(table, primaryKeyCandidates);
+
+    _logSchemeProvider.info(
+        "Multiple PRIMARY KEY candidates for ID field at table `$table`> picked `$idField` from $primaryKeyCandidates");
+
+    return idField;
+  }
+
+  String _selectIDFieldNameFromMultiple(
+      String table, List<String> primaryFieldsCandidates) {
+    for (var pk in primaryFieldsCandidates) {
+      if (equalsIgnoreAsciiCase(pk, 'id')) {
+        return pk;
+      }
+    }
+
+    var pk = primaryFieldsCandidates
+        .firstWhereOrNull((k) => k.toLowerCase().endsWith('_id'));
+    if (pk != null) return pk;
+
+    var possibleIDFields = ['code', 'serial'];
+
+    for (var k in possibleIDFields) {
+      for (var pk in primaryFieldsCandidates) {
+        if (equalsIgnoreAsciiCase(pk, k)) {
+          return pk;
+        }
+      }
+    }
+
+    return primaryFieldsCandidates.first;
+  }
 
   final Map<String, Map<String, Type>> _tablesFieldsTypes =
       <String, Map<String, Type>>{};
@@ -527,9 +583,10 @@ abstract class SchemeProvider {
 
   /// Returns a [TableScheme] for [entityRepository].
   FutureOr<TableScheme?> getTableSchemeForEntityRepository(
-      EntityRepository entityRepository) {
+      EntityRepository entityRepository,
+      {Object? contextID}) {
     var table = getTableForEntityRepository(entityRepository);
-    return getTableScheme(table);
+    return getTableScheme(table, contextID: contextID);
   }
 
   /// Returns the table name for [type].
