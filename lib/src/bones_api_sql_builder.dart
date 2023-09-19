@@ -1139,6 +1139,13 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     var invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
 
+    // Order fallback:
+    if (invalidSQLsOrders.isNotEmpty) {
+      sqlBuildOrder.bestOrder();
+
+      invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
+    }
+
     if (verbose) {
       var msg = StringBuffer();
 
