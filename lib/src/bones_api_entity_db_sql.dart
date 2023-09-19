@@ -852,9 +852,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     _entityRepositoriesBuildOrderIn = repositories.toList();
 
-    var sqls = generateEntityRepositoresCreateTableSQLs();
+    var sqls = generateEntityRepositoresCreateTableSQLs(verbose: true);
 
-    var ordered = sqls.entries.bestOrder().map((e) => e.key).toList();
+    var ordered = sqls.entries.toHierarchicalOrder().map((e) => e.key).toList();
 
     repositories.sort((a, b) {
       var i1 = ordered.indexOf(a);
@@ -872,7 +872,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// See [entityRepositories].
   Map<EntityRepository, CreateTableSQL>
       generateEntityRepositoresCreateTableSQLs(
-              {bool ifNotExists = true, bool sortColumns = true}) =>
+              {bool ifNotExists = true,
+              bool sortColumns = true,
+              bool verbose = false}) =>
           entityRepositories
               .map((r) => MapEntry<EntityRepository, CreateTableSQL>(
                   r,
@@ -880,8 +882,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
                       entityRepository: r,
                       ifNotExists: ifNotExists,
                       sortColumns: sortColumns)))
-              .toMapFromEntries()
-              .bestOrder();
+              .toHierarchicalOrder(verbose: verbose)
+              .toMapFromEntries();
 
   /// Generate all the SQLs to create the tables.
   @override
@@ -890,8 +892,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var sqls = generateEntityRepositoresCreateTableSQLs(
         ifNotExists: ifNotExists, sortColumns: sortColumns);
 
-    var allSQLs = sqls.values.expand((e) => e.allSQLBuilders).toList();
-    allSQLs.bestOrder();
+    var allSQLs = sqls.values
+        .expand((e) => e.allSQLBuilders)
+        .toList()
+        .toHierarchicalOrder();
+
     return allSQLs;
   }
 

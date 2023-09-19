@@ -1,6 +1,6 @@
 name: bones_api
 description: Bones_API - A powerful API backend framework for Dart. It comes with a built-in HTTP Server, route handler, entity handler, SQL translator, and DB adapters.
-version: 1.4.28
+version: 1.4.29
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:
@@ -10,16 +10,27 @@ executables:
   bones_api:
 
 dependencies:
+  async_extension: ^1.2.5
+  async_events: ^1.0.12
+  reflection_factory: ^2.2.1
+  statistics: ^1.0.25
+  swiss_knife: ^3.1.5
+  data_serializer: ^1.0.10
+  graph_explorer: ^1.0.2
+  ascii_art_tree: ^1.0.6
+  map_history: ^1.0.3
+  dart_spawner: ^1.1.0
+  yaml_writer: ^1.0.3
+  mercury_client: ^2.2.0
+  project_template: ^1.0.2
+  resource_portable: ^3.1.0
+  docker_commander: ^2.1.0
+  shelf_letsencrypt: ^1.2.2
   shelf: ^1.4.1
   shelf_gzip: ^4.0.1
   shelf_static: ^1.1.2
-  shelf_letsencrypt: ^1.2.2
-  async_extension: ^1.2.5
-  dart_spawner: ^1.1.0
   args: ^2.4.2
-  reflection_factory: ^2.2.1
   meta: ^1.9.1
-  statistics: ^1.0.25
   petitparser: ^5.4.0
   hotreloader: ^3.0.6
   logging: ^1.1.0
@@ -29,18 +40,9 @@ dependencies:
   mysql1: ^0.20.0
   gcloud: ^0.8.11
   yaml: ^3.1.2
-  yaml_writer: ^1.0.3
-  mercury_client: ^2.2.0
-  project_template: ^1.0.2
-  resource_portable: ^3.1.0
   crypto: ^3.0.3
   path: ^1.8.3
-  swiss_knife: ^3.1.5
-  map_history: ^1.0.3
-  docker_commander: ^2.1.0
-  data_serializer: ^1.0.10
-  async_events: ^1.0.12
-  archive: ^3.3.8
+  archive: ^3.3.9
   stream_channel: ^2.1.2
   http: ^1.1.0
   googleapis_auth: ^1.4.1
@@ -57,6 +59,10 @@ dev_dependencies:
   vm_service: ^11.10.0
 
 #dependency_overrides:
+#  graph_explorer:
+#    path: ../graph_explorer
+#  ascii_art_tree:
+#    path: ../ascii_art_tree
 #  data_serializer:
 #    path: ../data_serializer
 #  async_events:

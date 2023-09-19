@@ -1,5 +1,7 @@
+import 'package:ascii_art_tree/ascii_art_tree.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:graph_explorer/graph_explorer.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
@@ -151,6 +153,9 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// Returns a number of referenced tables.
   int get referenceTablesLength => referenceTables?.length ?? 0;
 
+  /// Returns a list of dependent tables, usually referenced tables.
+  List<String>? get dependentTables;
+
   /// Some extra SQL related to this `SQL`.
   List<SQLBuilder>? get extraSQLBuilders;
 
@@ -236,6 +241,9 @@ class CreateIndexSQL extends SQLBuilder {
   List<String> get referenceTables => <String>[table];
 
   @override
+  List<String> get dependentTables => referenceTables;
+
+  @override
   String toString() => buildSQL(multiline: false, ifNotExists: false);
 }
 
@@ -305,6 +313,9 @@ class CreateTableSQL extends TableSQL {
   List<String> get referenceAndRelationshipTables =>
       _referenceAndRelationshipTables ??=
           <String>{...referenceTables, ...relationshipsTables}.toList();
+
+  @override
+  List<String> get dependentTables => referenceAndRelationshipTables;
 
   @override
   List<SQLBuilder> get extraSQLBuilders =>
@@ -473,6 +484,9 @@ class AlterTableSQL extends TableSQL {
       }.toList();
 
   @override
+  List<String> get dependentTables => referenceTables;
+
+  @override
   String buildSQL({bool multiline = true, bool ifNotExists = true}) {
     var ln = multiline ? '\n' : '';
 
@@ -558,6 +572,11 @@ extension SQLBuilderMapExtension<K> on Map<K, CreateTableSQL> {
     var ordered = entries.bestOrder().toMapFromEntries();
     return ordered;
   }
+
+  Map<K, CreateTableSQL> toHierarchicalOrder() {
+    var ordered = entries.toHierarchicalOrder().toMapFromEntries();
+    return ordered;
+  }
 }
 
 extension SQLBuilderIterableMapEntryExtension<K>
@@ -575,12 +594,61 @@ extension SQLBuilderIterableMapEntryExtension<K>
 
     return ordered;
   }
+
+  List<MapEntry<K, CreateTableSQL>> toHierarchicalOrder(
+      {bool verbose = false}) {
+    var allSQLs = expand((e) => e.value.allSQLBuilders)
+        .toList()
+        .toHierarchicalOrder(verbose: verbose);
+
+    var ordered = sorted((a, b) {
+      var i1 = allSQLs.indexOf(a.value);
+      var i2 = allSQLs.indexOf(b.value);
+      var cmp = i1.compareTo(i2);
+      return cmp;
+    }).toList();
+
+    return ordered;
+  }
 }
 
 typedef SQLBuilderComparator = int Function(SQLBuilder a, SQLBuilder b);
 typedef SQLBuilderSelector = bool Function(SQLBuilder o);
 
 extension SQLBuilderListExtension on List<SQLBuilder> {
+  CreateTableSQL? getCreateTable(String table) => whereType<CreateTableSQL>()
+      .firstWhereOrNull((sql) => sql.mainTable == table);
+
+  bool get isValidOrder => invalidSQLsOrder().isEmpty;
+
+  Map<SQLBuilder, List<SQLBuilder>> invalidSQLsOrder() {
+    final processed = <SQLBuilder>{};
+
+    final createTables = whereType<CreateTableSQL>().toList(growable: false);
+
+    var invalidSQLs = <SQLBuilder, List<SQLBuilder>>{};
+
+    for (var sql in this) {
+      if (processed.add(sql)) {
+        var dependentTables = sql.dependentTables;
+        var dependentSQLs = dependentTables
+            ?.map((t) => createTables.getCreateTable(t))
+            .whereNotNull()
+            .toList();
+
+        var unprocessedDependencies =
+            dependentSQLs?.where((s) => !processed.contains(s)).toList();
+
+        if (unprocessedDependencies != null &&
+            unprocessedDependencies.isNotEmpty) {
+          invalidSQLs[sql] = unprocessedDependencies;
+        }
+      }
+    }
+
+    return invalidSQLs;
+  }
+
   bool _headContainsReferenceTable(List<String> refTables, int length) {
     for (var t in refTables) {
       var found = false;
@@ -1027,6 +1095,78 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     var tmp = this[i];
     this[i] = this[j];
     this[j] = tmp;
+  }
+
+  /// Converts this [SQLBuilder] list to a [Graph].
+  Graph<SQLBuilder> toGraph() {
+    final graph = Graph<SQLBuilder>();
+
+    var sqlsByMainTable = groupBy(this, (sql) => sql.mainTable);
+
+    SQLBuilder? getCreateTable(String table) =>
+        sqlsByMainTable[table]?.whereType<CreateTableSQL>().firstOrNull;
+
+    List<SQLBuilder> getCreateTables(List<String>? tables) =>
+        tables?.map(getCreateTable).whereNotNull().toList() ?? [];
+
+    graph.populate(
+      this,
+      inputsProvider: (step, sql) => getCreateTables(sql.dependentTables),
+      outputsProvider: (step, sql) => [
+        ...?sql.extraSQLBuilders,
+        //if (sql is CreateTableSQL) ...getCreateTables(sql.relationshipsTables)
+      ],
+    );
+
+    return graph;
+  }
+
+  /// Returns the SQLs in hierarchical order, respecting the
+  /// dependencies of each [SQLBuilder]. See [toGraph].
+  List<SQLBuilder> toHierarchicalOrder({bool verbose = false}) {
+    sortByName();
+
+    var graph = toGraph();
+
+    var sqlBuildOrder = graph
+        .walkOutputsOrderFrom(
+          graph.rootValues,
+          sortByInputDependency: true,
+          expandSideRoots: true,
+          maxExpansion: 1,
+        )
+        .toListOfValues();
+
+    var invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
+
+    if (verbose) {
+      var asciiArtTree = graph.toASCIIArtTree(sortByInputDependency: true);
+
+      var treeText = asciiArtTree.generate(
+          expandGraphs: false, hideReferences: true, expandSideBranches: true);
+
+      _log.info("`SQLBuilder` graph:\n\n$treeText");
+
+      if (invalidSQLsOrders.isNotEmpty) {
+        var msg = StringBuffer();
+
+        msg.write("The `SQLBuilder` instances are not in a valid order!\n\n");
+        msg.write("** Listing `SQLBuilder` instances with an invalid order:\n");
+
+        for (var e in invalidSQLsOrders.entries) {
+          var sql = e.key;
+          var deps = e.value.map((e) => e.mainTable).toList();
+          msg.write("  -- $sql > dependencies: $deps\n");
+        }
+
+        _log.warning(msg);
+      }
+    } else if (invalidSQLsOrders.isNotEmpty) {
+      _log.warning(
+          "The `SQLBuilder` instances (${invalidSQLsOrders.length}) are not in a valid order!");
+    }
+
+    return sqlBuildOrder;
   }
 }
 

@@ -1,3 +1,12 @@
+## 1.4.29
+
+- Using `Graph` to resolve the correct order of `CreateTableSQL` and to populate samples.
+- Checking `SQLBuilder` order and warning invalid orders.
+
+- graph_explorer: ^1.0.2
+- ascii_art_tree: ^1.0.6
+- archive: ^3.3.9
+
 ## 1.4.28
 
 - `getTableScheme`, `getTableSchemeImpl` and `getTableSchemeForEntityRepository`:
