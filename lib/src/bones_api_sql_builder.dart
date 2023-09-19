@@ -1140,6 +1140,17 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     var invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
 
     if (verbose) {
+      var msg = StringBuffer();
+
+      msg.write("`SQLBuilder` execution order:\n\n");
+
+      for (var i = 0; i < sqlBuildOrder.length; ++i) {
+        var sql = sqlBuildOrder[i];
+        msg.write('  $i> $sql\n');
+      }
+
+      _log.info(msg);
+
       var asciiArtTree = graph.toASCIIArtTree(sortByInputDependency: true);
 
       var treeText = asciiArtTree.generate(
