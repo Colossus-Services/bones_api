@@ -502,6 +502,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   /// Creates a connection [C] for this adapte
   FutureOr<C> createConnection();
 
+  /// The maximum allowed duration of inactivity for a connection in the pool.
+  /// Default: 15min
+  Duration connectionInactivityLimit = Duration(minutes: 15);
+
   /// Returns `true` if [connection] is valid for usage.
   FutureOr<bool> isConnectionValid(C connection);
 
@@ -837,6 +841,76 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     return allRepositories;
+  }
+}
+
+/// Base class for a [DBAdapter] connection.
+abstract class DBConnectionWrapper<C extends Object>
+    implements WithRuntimeTypeNameSafe {
+  static final Map<Type, int> _idCounter = {};
+
+  static int _nextID(Type type) {
+    var count = _idCounter[type] ?? 1;
+    var id = _idCounter[type] = count + 1;
+    return id;
+  }
+
+  late final int id = _nextID(runtimeType);
+
+  final C nativeConnection;
+
+  DBConnectionWrapper(this.nativeConnection);
+
+  final DateTime creationTime = DateTime.now();
+
+  late DateTime _lastAccessTime = creationTime;
+
+  DateTime get lastAccessTime => _lastAccessTime;
+
+  void updateLastAccessTime({DateTime? now}) {
+    _lastAccessTime = now ?? DateTime.now();
+  }
+
+  Duration timeSinceAccess({DateTime? now}) {
+    now ??= DateTime.now();
+    return now.difference(_lastAccessTime);
+  }
+
+  bool isInactive(Duration inactivityLimit, {DateTime? now}) {
+    return timeSinceAccess(now: now) > inactivityLimit;
+  }
+
+  String get connectionURL;
+
+  bool _closed = false;
+
+  bool get isClosed {
+    if (_closed) {
+      return true;
+    } else {
+      var connClosed = isClosedImpl();
+      if (connClosed) {
+        _closed = connClosed;
+      }
+      return connClosed;
+    }
+  }
+
+  bool isClosedImpl();
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    closeImpl();
+  }
+
+  void closeImpl();
+
+  String get info => 'closed: $isClosed';
+
+  @override
+  String toString() {
+    return '$runtimeTypeNameSafe#$id{$info}@$nativeConnection';
   }
 }
 

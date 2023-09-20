@@ -1,5 +1,15 @@
 ## 1.4.29
 
+- New abstract class `DBConnectionWrapper`:
+  - Implementations `DBMySqlConnectionWrapper` and `PostgreSQLConnectionWrapper`.
+- `Pool`
+  - Added `createPoolElementForced` (non-nullable).
+  - `_catchFromPopulatedPool`: now can return null. 
+- `DBAdapter`:
+  - New `connectionInactivityLimit`.
+  - `isConnectionValid`:
+    - `MySQL` and `PostgreSQL`: checking `connection.isInactive`.
+ 
 - Using `Graph` to resolve the correct order of `CreateTableSQL` and to populate samples.
 - Checking `SQLBuilder` order and warning invalid orders.
 

@@ -235,7 +235,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     var connection = await _errorZone
         .runGuardedAsync(() => MySqlConnection.connect(connSettings));
 
-    var connWrapper = _DBMySqlConnectionWrapped(connection);
+    var connWrapper = _DBMySqlConnectionWrapped(connection, connSettings);
 
     var connUrl = getConnectionURL(connWrapper);
 
@@ -254,8 +254,16 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
+  bool isPoolElementValid(DBMySqlConnectionWrapper o) => isConnectionValid(o);
+
+  @override
+  FutureOr<bool> isPoolElementInvalid(DBMySqlConnectionWrapper o) =>
+      !isConnectionValid(o);
+
+  @override
   bool isConnectionValid(DBMySqlConnectionWrapper connection) {
-    return !connection.isClosed;
+    return !connection.isClosed &&
+        !connection.isInactive(connectionInactivityLimit);
   }
 
   @override
@@ -787,9 +795,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var result = executeWithPool(
       (connection) {
-        return connection.connection.transaction((t) {
-          var transactionWrap =
-              _DBMySqlConnectionTransaction(connection.connection, t);
+        return connection.openTransaction((transactionWrap) {
           contextCompleter.complete(transactionWrap);
 
           return transaction.transactionFuture.then(
@@ -844,49 +850,80 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 }
 
-abstract class DBMySqlConnectionWrapper {
-  MySqlConnection get connection;
+/// A [DBMySQLAdapter] connection wrapper.
+abstract class DBMySqlConnectionWrapper
+    extends DBConnectionWrapper<MySqlConnection> {
+  DBMySqlConnectionWrapper(super.nativeConnection);
 
   Future<Results> query(String sql, [List<Object?>? values]);
 
   Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values);
 
-  bool _closed = false;
+  Future openTransaction(
+      Future Function(DBMySqlConnectionWrapper connectionTransaction)
+          queryBlock);
 
-  bool get isClosed => _closed;
+  @override
+  bool isClosedImpl() => _nativeClose;
 
-  void close() {
-    _closed = true;
+  bool _nativeClose = false;
+
+  @override
+  void closeImpl() {
+    _nativeClose = true;
     try {
       // ignore: discarded_futures
-      connection.close();
+      nativeConnection.close();
     } catch (_) {}
   }
 }
 
 class _DBMySqlConnectionWrapped extends DBMySqlConnectionWrapper {
-  @override
-  final MySqlConnection connection;
+  final ConnectionSettings _connectionSettings;
 
-  _DBMySqlConnectionWrapped(this.connection);
-
-  @override
-  Future<Results> query(String sql, [List<Object?>? values]) =>
-      connection.query(sql, values?.cast<Object?>());
+  _DBMySqlConnectionWrapped(super.nativeConnection, this._connectionSettings);
 
   @override
-  Future<List<Results>> queryMulti(
-          String sql, Iterable<List<Object?>> values) =>
-      connection.queryMulti(sql, values.map((e) => e.cast<Object?>()));
+  String get connectionURL {
+    var settings = _connectionSettings;
+    return 'mysql://${settings.user}@${settings.host}:${settings.port}/${settings.db}';
+  }
+
+  @override
+  Future<Results> query(String sql, [List<Object?>? values]) {
+    updateLastAccessTime();
+    return nativeConnection.query(sql, values?.cast<Object?>());
+  }
+
+  @override
+  Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values) {
+    updateLastAccessTime();
+    return nativeConnection.queryMulti(
+        sql, values.map((e) => e.cast<Object?>()));
+  }
+
+  @override
+  Future openTransaction(
+      Future Function(_DBMySqlConnectionTransaction connectionTransaction)
+          queryBlock) {
+    updateLastAccessTime();
+    return nativeConnection
+        .transaction((t) => queryBlock(_DBMySqlConnectionTransaction(this, t)));
+  }
+
+  @override
+  String get runtimeTypeNameSafe => '_DBMySqlConnectionWrapped';
 }
 
 class _DBMySqlConnectionTransaction extends DBMySqlConnectionWrapper {
-  @override
-  final MySqlConnection connection;
-
+  final _DBMySqlConnectionWrapped parent;
   final TransactionContext transaction;
 
-  _DBMySqlConnectionTransaction(this.connection, this.transaction);
+  _DBMySqlConnectionTransaction(this.parent, this.transaction)
+      : super(parent.nativeConnection);
+
+  @override
+  String get connectionURL => parent.connectionURL;
 
   @override
   Future<Results> query(String sql, [List<Object?>? values]) =>
@@ -896,6 +933,15 @@ class _DBMySqlConnectionTransaction extends DBMySqlConnectionWrapper {
   Future<List<Results>> queryMulti(
           String sql, Iterable<List<Object?>> values) =>
       transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
+
+  @override
+  String get runtimeTypeNameSafe => '_DBMySqlConnectionTransaction';
+
+  @override
+  Future openTransaction(
+          Future Function(DBMySqlConnectionWrapper connectionTransaction)
+              queryBlock) =>
+      queryBlock(this);
 }
 
 /// Exception thrown by [DBMySQLAdapter] operations.

@@ -27,29 +27,32 @@ mixin Closable {
   }
 }
 
-class PoolTimeoutError extends Error {
+abstract class PoolError extends Error implements WithRuntimeTypeNameSafe {
   final String message;
 
-  PoolTimeoutError(this.message);
+  PoolError(this.message);
 
   @override
   String toString() {
-    return 'PoolTimeoutError: $message';
+    return '$runtimeTypeNameSafe: $message';
   }
 }
 
-class PoolFullError extends Error {
-  final String message;
-
-  PoolFullError(this.message);
+class PoolTimeoutError extends PoolError {
+  PoolTimeoutError(super.message);
 
   @override
-  String toString() {
-    return 'PoolFullError: $message';
-  }
+  String get runtimeTypeNameSafe => 'PoolTimeoutError';
 }
 
-mixin Pool<O> {
+class PoolFullError extends PoolError {
+  PoolFullError(super.message);
+
+  @override
+  String get runtimeTypeNameSafe => 'PoolFullError';
+}
+
+mixin Pool<O extends Object> {
   final ListQueue<O> _pool = ListQueue(8);
 
   Iterable<O> get poolElements => UnmodifiableListView<O>(_pool);
@@ -78,15 +81,28 @@ mixin Pool<O> {
   FutureOr<List<O>> validPoolElements() =>
       filterPoolElements(isPoolElementValid);
 
-  FutureOr<List<O>> invalidPoolElements() => filterPoolElements(
-      (o) => isPoolElementValid(o).resolveMapped((valid) => !valid));
+  FutureOr<List<O>> invalidPoolElements() =>
+      filterPoolElements(isPoolElementInvalid);
 
   FutureOr<List<O>> filterPoolElements(FutureOr<bool> Function(O o) filter) {
-    var elements = _pool.map((o) {
-      return filter(o).resolveMapped((valid) => valid ? o : null);
-    }).resolveAllNotNull();
+    var hasFuture = false;
 
-    return elements;
+    var elements = _pool.map<FutureOr<O?>>((o) {
+      var valid = filter(o);
+
+      if (valid is Future<bool>) {
+        hasFuture = true;
+        return valid.then((valid) => valid ? o : null);
+      }
+
+      return valid ? o : null;
+    }).toList();
+
+    if (hasFuture) {
+      return elements.resolveAllNotNull();
+    } else {
+      return elements.whereType<O>().toList();
+    }
   }
 
   int _invalidatedElementsCount = 0;
@@ -104,6 +120,16 @@ mixin Pool<O> {
   }
 
   FutureOr<bool> isPoolElementValid(O o);
+
+  FutureOr<bool> isPoolElementInvalid(O o) {
+    var valid = isPoolElementValid(o);
+
+    if (valid is Future<bool>) {
+      return valid.then((valid) => !valid);
+    } else {
+      return !valid;
+    }
+  }
 
   FutureOr<bool> clearPool() {
     var pool = _pool.toList();
@@ -137,13 +163,25 @@ mixin Pool<O> {
     return null;
   }
 
+  FutureOr<O> createPoolElementForced() {
+    return createPoolElement(force: true).resolveMapped((o) {
+      if (o == null) {
+        throw PoolFullError("Can't create a new element `$O`! (forced)");
+      }
+      return o;
+    });
+  }
+
   Completer<bool>? _waitingPoolElement;
 
   FutureOr<O> catchFromPool({Duration? timeout}) {
     if (_pool.isEmpty) {
       return _catchFromEmptyPool(timeout);
     } else {
-      return _catchFromPopulatedPool();
+      return _catchFromPopulatedPool().resolveMapped((o) {
+        if (o != null) return o;
+        return createPoolElementForced();
+      });
     }
   }
 
@@ -202,42 +240,53 @@ mixin Pool<O> {
       if (o != null) return o;
 
       if (_pool.isNotEmpty) {
-        return _catchFromPopulatedPool();
-      }
-
-      var alive = poolAliveElementsSize;
-
-      Future<bool> waiting;
-
-      if (alive >= poolSizeDesiredLimit) {
-        var yield = Completer<bool>();
-        _yields.addLast(yield);
-
-        waiting = yield.future.timeout(poolFullYieldTimeout, onTimeout: () {
-          _yields.remove(yield);
-          return false;
+        return _catchFromPopulatedPool().resolveMapped((o) {
+          if (o != null) return o;
+          return _catchFromEmptyPoolForced(catchInitTime, timeout);
         });
-      } else {
-        var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
-        waiting = waitingPoolElement.future;
       }
 
-      var ret = waiting.then((_) {
-        if (_pool.isNotEmpty) {
-          return _catchFromPopulatedPool();
-        } else {
-          return _waitElementInPool(catchInitTime);
-        }
-      });
-
-      if (timeout != null) {
-        return ret.timeout(timeout, onTimeout: () {
-          throw PoolTimeoutError("Catch from Pool timeout[$timeout]: $this");
-        });
-      } else {
-        return ret;
-      }
+      return _catchFromEmptyPoolForced(catchInitTime, timeout);
     });
+  }
+
+  FutureOr<O> _catchFromEmptyPoolForced(
+      DateTime catchInitTime, Duration? timeout) {
+    var alive = poolAliveElementsSize;
+
+    Future<bool> waiting;
+
+    if (alive >= poolSizeDesiredLimit) {
+      var yield = Completer<bool>();
+      _yields.addLast(yield);
+
+      waiting = yield.future.timeout(poolFullYieldTimeout, onTimeout: () {
+        _yields.remove(yield);
+        return false;
+      });
+    } else {
+      var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
+      waiting = waitingPoolElement.future;
+    }
+
+    var ret = waiting.then((_) {
+      if (_pool.isNotEmpty) {
+        return _catchFromPopulatedPool();
+      } else {
+        return _waitElementInPool(catchInitTime);
+      }
+    }).then((o) {
+      if (o != null) return o;
+      return createPoolElementForced();
+    });
+
+    if (timeout != null) {
+      return ret.timeout(timeout, onTimeout: () {
+        throw PoolTimeoutError("Catch from Pool timeout[$timeout]: $this");
+      });
+    } else {
+      return ret;
+    }
   }
 
   FutureOr<O?> catchFromPopulatedPool() {
@@ -245,7 +294,7 @@ mixin Pool<O> {
     return _catchFromPopulatedPool();
   }
 
-  FutureOr<O> _catchFromPopulatedPool() {
+  FutureOr<O?> _catchFromPopulatedPool() {
     var o = _pool.removeLast();
 
     var waitingPoolElement = _waitingPoolElement;
@@ -256,6 +305,18 @@ mixin Pool<O> {
       _waitingPoolElement = null;
     }
 
+    var valid = isPoolElementValid(o);
+
+    if (valid is Future<bool>) {
+      return valid.then((valid) {
+        if (!valid) return null;
+        return preparePoolElement(o);
+      });
+    }
+
+    if (!valid) {
+      return null;
+    }
     return preparePoolElement(o);
   }
 
@@ -269,27 +330,26 @@ mixin Pool<O> {
           .timeout(poolFullWaitTimeout, onTimeout: () => false);
 
       if (_pool.isNotEmpty) {
-        return _catchFromPopulatedPool();
+        var o = await _catchFromPopulatedPool();
+        if (o != null) return o;
       }
 
       if (retry >= 2) {
         final elapsedTime = DateTime.now().difference(catchInitTime);
+
         _logPool.warning(
-            "Pool full ($poolAliveElementsSize / $poolSizeDesiredLimit) after trying to catch for ${elapsedTime.inMilliseconds} ms. Forcing createPoolElement<$O>() ...");
-        return createPoolElement(force: true).resolveMapped((o) {
-          if (o == null) {
-            throw PoolFullError(
-                "Can't create a new element `$O`! (force: true)");
-          }
-          return o;
-        });
+            "Pool full ($poolAliveElementsSize / $poolSizeDesiredLimit) "
+            "after trying to catch for ${elapsedTime.inMilliseconds} ms. "
+            "Forcing createPoolElement<$O>() ...");
+
+        return createPoolElementForced();
       }
 
       ++retry;
     }
   }
 
-  FutureOr<O> preparePoolElement(O o) => o;
+  FutureOr<O?> preparePoolElement(O o) => o;
 
   DateTime _lastCheckPoolTime = DateTime.now();
 
@@ -328,8 +388,13 @@ mixin Pool<O> {
   }
 
   FutureOr<O?> recyclePoolElement(O o) {
-    var retValid = isPoolElementValid(o);
-    return retValid.resolveMapped((valid) => valid ? o : null);
+    var valid = isPoolElementValid(o);
+
+    if (valid is Future<bool>) {
+      return valid.then((valid) => valid ? o : null);
+    }
+
+    return valid ? o : null;
   }
 
   int _unrecycledElementsCount = 0;

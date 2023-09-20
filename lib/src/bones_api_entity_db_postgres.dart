@@ -22,7 +22,7 @@ import 'bones_api_utils_timedmap.dart';
 final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
 
 /// A PostgreSQL adapter.
-class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
+class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     implements WithRuntimeTypeNameSafe {
   @override
   String get runtimeTypeNameSafe => 'DBPostgreSQLAdapter';
@@ -249,15 +249,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  String getConnectionURL(PostgreSQLExecutionContext connection) {
-    var c = connection as PostgreSQLConnection;
-    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
-  }
+  String getConnectionURL(PostgreSQLConnectionWrapper connection) =>
+      connection.connectionURL;
 
   int _connectionCount = 0;
 
   @override
-  FutureOr<PostgreSQLConnection> createConnection() async {
+  FutureOr<PostgreSQLConnectionWrapper> createConnection() async {
     var password = await _getPassword();
 
     var count = ++_connectionCount;
@@ -276,9 +274,10 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
       if (poolSize > 0) {
         var poolConn = peekFromPool();
+
         if (poolConn != null) {
           return poolConn.resolveMapped((conn) {
-            if (conn is PostgreSQLConnection) {
+            if (conn != null) {
               var connUrl = getConnectionURL(conn);
               _log.severe(
                   "Skipping connection retry. Returning connection from pool: $connUrl");
@@ -310,30 +309,52 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     throw error;
   }
 
-  Future<PostgreSQLConnection?> _createConnectionImpl(
+  Future<PostgreSQLConnectionWrapper?> _createConnectionImpl(
       String password, int timeout) async {
     var connection = PostgreSQLConnection(host, port, databaseName,
         username: username, password: password, timeoutInSeconds: timeout);
     var ok = await tryCallMapped(() => connection.open(),
         onSuccessValue: true, onErrorValue: false);
-    return ok != null && ok ? connection : null;
+
+    if (ok == null || !ok) return null;
+
+    return PostgreSQLConnectionWrapper(connection);
   }
 
   @override
-  bool closeConnection(PostgreSQLExecutionContext connection) {
+  bool closeConnection(PostgreSQLConnectionWrapper connection) {
     _log.info('closeConnection> $connection > poolSize: $poolSize');
-    if (connection is PostgreSQLConnection) {
-      try {
-        // ignore: discarded_futures
-        connection.close();
-      } catch (_) {}
-    }
+    connection.close();
     return true;
   }
 
   @override
-  bool isConnectionValid(PostgreSQLExecutionContext connection) {
-    return connection is PostgreSQLConnection && !connection.isClosed;
+  bool isPoolElementValid(PostgreSQLConnectionWrapper o) =>
+      isConnectionValid(o);
+
+  @override
+  FutureOr<bool> isPoolElementInvalid(PostgreSQLConnectionWrapper o) =>
+      !isConnectionValid(o);
+
+  @override
+  bool isConnectionValid(PostgreSQLConnectionWrapper connection) {
+    return !connection.isClosed &&
+        !connection.isInactive(connectionInactivityLimit);
+  }
+
+  @override
+  PostgreSQLConnectionWrapper? recyclePoolElement(
+      PostgreSQLConnectionWrapper o) {
+    if (o is PostgreSQLConnectionTransactionWrapper) {
+      return null;
+    }
+
+    var valid = isPoolElementValid(o);
+    if (!valid) {
+      return null;
+    }
+
+    return o;
   }
 
   @override
@@ -424,7 +445,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
     }
   }
 
-  Future<String> _findIDField(PostgreSQLExecutionContext connection,
+  Future<String> _findIDField(PostgreSQLConnectionWrapper connection,
       String table, List<Map<String, dynamic>> scheme) async {
     var sql = '''
     SELECT
@@ -510,7 +531,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   Future<List<TableRelationshipReference>> _findRelationshipTables(
-      PostgreSQLExecutionContext connection, String table, String idFieldName,
+      PostgreSQLConnectionWrapper connection, String table, String idFieldName,
       {Object? contextID}) async {
     final tablesReferences = await _findAllTableFieldsReferences(
         connection, table,
@@ -552,7 +573,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   FutureOr<List<Map<String, TableFieldReference>>>
       _findAllTableFieldsReferences(
-          PostgreSQLExecutionContext connection, String table,
+          PostgreSQLConnectionWrapper connection, String table,
           {Object? contextID}) async {
     var tablesNames = await _listTablesNames(connection, contextID: contextID);
 
@@ -575,13 +596,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
       Expando();
 
-  FutureOr<List<String>> _listTablesNames(PostgreSQLExecutionContext connection,
+  FutureOr<List<String>> _listTablesNames(
+          PostgreSQLConnectionWrapper connection,
           {Object? contextID}) =>
       _listTablesNamesContextCache.putIfAbsentAsync(
           contextID, () => _listTablesNamesImpl(connection));
 
   Future<List<String>> _listTablesNamesImpl(
-      PostgreSQLExecutionContext connection) async {
+      PostgreSQLConnectionWrapper connection) async {
     var sql = '''
     SELECT table_name FROM information_schema.tables WHERE table_schema='public'
     ''';
@@ -607,7 +629,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       _findFieldsReferencedTablesContextCache = Expando();
 
   FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-      PostgreSQLExecutionContext connection, String table,
+      PostgreSQLConnectionWrapper connection, String table,
       {Object? contextID}) {
     if (contextID != null) {
       var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
@@ -624,7 +646,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
-      PostgreSQLExecutionContext connection, String table) async {
+      PostgreSQLConnectionWrapper connection, String table) async {
     var sql = '''
     SELECT
       o.conname AS constraint_name,
@@ -719,7 +741,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   @override
   FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, PostgreSQLExecutionContext connection) {
+      Transaction transaction, PostgreSQLConnectionWrapper connection) {
     return connection
         .mappedResultsQuery(sql.sql,
             substitutionValues: sql.parametersByPlaceholder)
@@ -742,7 +764,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       String table,
       SQL sql,
       Transaction transaction,
-      PostgreSQLExecutionContext connection) {
+      PostgreSQLConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -764,7 +786,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       String table,
       SQL sql,
       Transaction transaction,
-      PostgreSQLExecutionContext connection) {
+      PostgreSQLConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return connection
@@ -782,7 +804,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   @override
   FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, PostgreSQLExecutionContext connection) {
+      Transaction transaction, PostgreSQLConnectionWrapper connection) {
     if (sql.isDummy) return null;
 
     return connection
@@ -793,7 +815,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   @override
   FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, PostgreSQLExecutionContext connection,
+      Transaction transaction, PostgreSQLConnectionWrapper connection,
       {bool allowAutoInsert = false}) {
     if (sql.isFullyDummy) return id;
 
@@ -822,7 +844,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       String entityName,
       String table,
       Map<String, dynamic> fields,
-      PostgreSQLExecutionContext connection) {
+      PostgreSQLConnectionWrapper connection) {
     return getTableScheme(table).resolveMapped((tableScheme) {
       if (tableScheme == null) {
         throw StateError("Can't find `TableScheme` for table `$table`");
@@ -855,7 +877,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
       String table,
       String idFieldName,
       Type idFieldType,
-      PostgreSQLExecutionContext connection,
+      PostgreSQLConnectionWrapper connection,
       Object? lastInsertResult) {
     if (!idFieldType.isEntityIDType &&
         !idFieldType.isNumericOrDynamicNumberType) {
@@ -897,20 +919,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   }
 
   @override
-  Future<PostgreSQLExecutionContext> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<PostgreSQLExecutionContext>();
+  Future<PostgreSQLConnectionTransactionWrapper> openTransaction(
+      Transaction transaction) {
+    var contextCompleter = Completer<PostgreSQLConnectionTransactionWrapper>();
 
     var result = executeWithPool(
       (connection) {
-        var theConnection = connection as PostgreSQLConnection;
-
-        return theConnection.transaction((c) {
-          contextCompleter.complete(c);
+        return connection.openTransaction((connTransaction) {
+          contextCompleter.complete(connTransaction);
 
           return transaction.transactionFuture.then(
             (res) => resolveTransactionResult(res, transaction, connection),
             onError: (e, s) {
-              cancelTransaction(transaction, c, e, s);
+              cancelTransaction(transaction, connTransaction, e, s);
               throw e;
             },
           );
@@ -939,10 +960,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
   @override
   bool cancelTransaction(
       Transaction transaction,
-      PostgreSQLExecutionContext? connection,
+      PostgreSQLConnectionWrapper? connection,
       Object? error,
       StackTrace? stackTrace) {
-    connection?.cancelTransaction();
+    var connTransaction = connection as PostgreSQLConnectionTransactionWrapper?;
+    connTransaction?.cancelTransaction();
     return true;
   }
 
@@ -951,13 +973,101 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLExecutionContext>
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, PostgreSQLExecutionContext? connection) {}
+      Transaction transaction, PostgreSQLConnectionWrapper? connection) {}
 
   @override
   String toString() {
     var closedStr = isClosed ? ', closed' : '';
     return 'DBPostgreSQLAdapter#$instanceID{$databaseName@$host:$port$closedStr}';
   }
+}
+
+/// A [DBPostgreSQLAdapter] connection wrapper.
+class PostgreSQLConnectionWrapper
+    extends DBConnectionWrapper<PostgreSQLExecutionContext> {
+  PostgreSQLConnectionWrapper(super.nativeConnection);
+
+  @override
+  String get connectionURL {
+    var c = nativeConnection as PostgreSQLConnection;
+    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
+  }
+
+  Future<List<Map<String, Map<String, dynamic>>>> mappedResultsQuery(String sql,
+      {Map<String, dynamic>? substitutionValues}) {
+    updateLastAccessTime();
+    return nativeConnection.mappedResultsQuery(sql,
+        substitutionValues: substitutionValues);
+  }
+
+  Future<PostgreSQLResult> query(String sql,
+      {Map<String, dynamic>? substitutionValues}) {
+    updateLastAccessTime();
+    return nativeConnection.query(sql, substitutionValues: substitutionValues);
+  }
+
+  Future<int> execute(String sql, {Map<String, dynamic>? substitutionValues}) {
+    updateLastAccessTime();
+    return nativeConnection.execute(sql,
+        substitutionValues: substitutionValues);
+  }
+
+  Future openTransaction(
+    Future Function(PostgreSQLConnectionTransactionWrapper connection)
+        queryBlock, {
+    int? commitTimeoutInSeconds,
+  }) {
+    var conn = nativeConnection as PostgreSQLConnection;
+    updateLastAccessTime();
+    return conn.transaction((transactionContext) => queryBlock(
+        PostgreSQLConnectionTransactionWrapper(this, transactionContext)));
+  }
+
+  @override
+  bool isClosedImpl() {
+    final nativeConnection = this.nativeConnection;
+    return nativeConnection is PostgreSQLConnection &&
+        nativeConnection.isClosed;
+  }
+
+  @override
+  void closeImpl() {
+    final nativeConnection = this.nativeConnection;
+    if (nativeConnection is PostgreSQLConnection) {
+      try {
+        // ignore: discarded_futures
+        nativeConnection.close();
+      } catch (_) {}
+    }
+  }
+
+  @override
+  String get runtimeTypeNameSafe => 'PostgreSQLConnectionWrapper';
+}
+
+/// A [DBPostgreSQLAdapter] connection transaction wrapper.
+class PostgreSQLConnectionTransactionWrapper
+    extends PostgreSQLConnectionWrapper {
+  final PostgreSQLConnectionWrapper parent;
+
+  PostgreSQLConnectionTransactionWrapper(this.parent, super.nativeConnection);
+
+  @override
+  Future openTransaction(
+          Future Function(
+                  PostgreSQLConnectionTransactionWrapper connectionTransaction)
+              queryBlock,
+          {int? commitTimeoutInSeconds}) =>
+      queryBlock(this);
+
+  void cancelTransaction({String? reason}) =>
+      nativeConnection.cancelTransaction(reason: reason);
+
+  @override
+  String get runtimeTypeNameSafe => 'PostgreSQLConnectionTransactionWrapper';
+
+  @override
+  String get info => '${super.info}, parent: #${parent.id}';
 }
 
 /// Exception thrown by [DBPostgreSQLAdapter] operations.
