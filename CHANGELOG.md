@@ -15,6 +15,8 @@
 
 - graph_explorer: ^1.0.2
 - ascii_art_tree: ^1.0.6
+- docker_commander: ^2.1.1
+- petitparser: ^6.0.1
 - archive: ^3.3.9
 
 ## 1.4.28
