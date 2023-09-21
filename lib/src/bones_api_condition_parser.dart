@@ -390,7 +390,7 @@ class JsonParser {
   dynamic parse(String code) {
     var result = _grammarParser.parse(code);
 
-    if (result.isFailure || !result.isSuccess) {
+    if ((result is Failure) || (result is! Success)) {
       throw FormatException(result.message);
     }
 
@@ -413,7 +413,7 @@ class ConditionParser {
   Condition<O> parse<O>(String code) {
     var result = _grammarParser.parse(code);
 
-    if (result.isFailure || !result.isSuccess) {
+    if ((result is Failure) || (result is! Success)) {
       throw FormatException(result.message);
     }
 
