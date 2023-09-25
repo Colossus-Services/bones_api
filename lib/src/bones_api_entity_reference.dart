@@ -1227,15 +1227,13 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entities = json['entities'];
 
       if (entities != null && entities is List) {
-        var entitiesMaps = entities is List<Map<String, dynamic>>
+        var entitiesMaps = entities is List<Map<String, dynamic>?>
             ? entities
             : entities.map((e) {
-                var m = e is Map
-                    ? e
-                    : TypeParser.parseMap(e) ?? <String, dynamic>{};
+                var m = e is Map ? e : TypeParser.parseMap(e);
                 return m is Map<String, dynamic>
                     ? m
-                    : m.map((key, value) => MapEntry('$key', value));
+                    : m?.map((key, value) => MapEntry('$key', value));
               }).toList(growable: false);
 
         return EntityReferenceList<T>.fromEntitiesMaps(entitiesMaps,

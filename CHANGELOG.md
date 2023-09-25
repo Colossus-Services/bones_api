@@ -13,6 +13,9 @@
 - Using `Graph` to resolve the correct order of `CreateTableSQL` and to populate samples.
 - Checking `SQLBuilder` order and warning invalid orders.
 
+- `EntityReferenceList.fromJson`:
+  - Fix issue with some entities null in the JSON.
+
 - graph_explorer: ^1.0.2
 - ascii_art_tree: ^1.0.6
 - docker_commander: ^2.1.1
