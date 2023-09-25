@@ -566,7 +566,37 @@ class APIRouteBuilder<M extends APIModule> {
   FutureOr<APIResponse> _apiMethodInvocation(
       MethodReflection apiMethod, APIRequest request) {
     var methodInvocation = _resolveMethodInvocation(apiMethod, request);
-    return methodInvocation.invoke(apiMethod.method);
+    var ret = methodInvocation.invoke(apiMethod.method);
+
+    if (ret == null) {
+      return APIResponse.error(
+          error: "Call returned `null` (not an `APIResponse`): $apiMethod");
+    } else if (ret is Future && ret is! Future<APIResponse>) {
+      return ret.then((ret) {
+        if (ret == null) {
+          return APIResponse.error(
+              error: "Call returned `null` (not an `APIResponse`): $apiMethod");
+        } else {
+          try {
+            return ret as APIResponse;
+          } catch (e, s) {
+            return APIResponse.error(
+                error:
+                    "Call didn't returned an `APIResponse`. Returned type: ${ret.runtimeType} > $apiMethod\n$e",
+                stackTrace: s);
+          }
+        }
+      });
+    } else {
+      try {
+        return ret as FutureOr<APIResponse>;
+      } catch (e, s) {
+        return APIResponse.error(
+            error:
+                "Call didn't returned a `FutureOr<APIResponse>`. Returned type: ${ret.runtimeType} > $apiMethod\n$e",
+            stackTrace: s);
+      }
+    }
   }
 
   MethodInvocation _resolveMethodInvocation(

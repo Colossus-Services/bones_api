@@ -15,6 +15,8 @@
 
 - `EntityReferenceList.fromJson`:
   - Fix issue with some entities null in the JSON.
+- `APIRouteBuilder._apiMethodInvocation`:
+  - Check if returned value is a `FutureOr<APIResponse>` or return an `APIResponse.error`.
 
 - graph_explorer: ^1.0.2
 - ascii_art_tree: ^1.0.6
