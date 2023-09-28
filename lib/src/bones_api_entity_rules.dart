@@ -725,6 +725,93 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
         allEager = false,
         super(false);
 
+  factory EntityResolutionRules.fetchTypes(
+      {bool? allEager,
+      bool? allLazy,
+      Map<Object, bool?>? eagerTypes,
+      Map<Object, bool?>? lazyTypes,
+      bool mergeTolerant = false}) {
+    var eagerTypesNotNull = eagerTypes?.entries.map((e) {
+      var eager = e.value;
+      return eager != null ? MapEntry(e.key, eager) : null;
+    }).whereNotNull();
+
+    var lazyTypesNotNull = lazyTypes?.entries.map((e) {
+      var lazy = e.value;
+      return lazy != null ? MapEntry(e.key, lazy) : null;
+    }).whereNotNull();
+
+    var fetchEager = eagerTypesNotNull?.map((e) {
+      var t = e.key;
+      var eager = e.value;
+      return eager ? t : null;
+    });
+
+    var fetchNotEager = eagerTypesNotNull?.map((e) {
+      var t = e.key;
+      var eager = e.value;
+      return !eager ? t : null;
+    });
+
+    var fetchLazy = lazyTypesNotNull?.map((e) {
+      var t = e.key;
+      var lazy = e.value;
+      return lazy ? t : null;
+    });
+
+    var fetchNotLazy = lazyTypesNotNull?.map((e) {
+      var t = e.key;
+      var lazy = e.value;
+      return !lazy ? t : null;
+    });
+
+    var eagerEntityTypes = [
+      ...?fetchEager,
+      ...?fetchNotLazy,
+    ]
+        .whereNotNull()
+        .expand((e) => e is Iterable ? e : [e])
+        .whereType<Type>()
+        .toList();
+
+    var lazyEntityTypes = [
+      ...?fetchLazy,
+      ...?fetchNotEager,
+    ]
+        .whereNotNull()
+        .expand((e) => e is Iterable ? e : [e])
+        .whereType<Type>()
+        .toList();
+
+    if (allEager != null && allEager) {
+      return lazyEntityTypes.isNotEmpty
+          ? EntityResolutionRules(
+              allEager: true,
+              lazyEntityTypes: lazyEntityTypes,
+              mergeTolerant: mergeTolerant,
+            )
+          : EntityResolutionRules.fetchEagerAll(
+              mergeTolerant: mergeTolerant,
+            );
+    } else if (allLazy != null && allLazy) {
+      return eagerEntityTypes.isNotEmpty
+          ? EntityResolutionRules(
+              allLazy: true,
+              eagerEntityTypes: eagerEntityTypes,
+              mergeTolerant: mergeTolerant,
+            )
+          : EntityResolutionRules.fetchLazyAll(
+              mergeTolerant: mergeTolerant,
+            );
+    }
+
+    return EntityResolutionRules(
+      eagerEntityTypes: eagerEntityTypes,
+      lazyEntityTypes: lazyEntityTypes,
+      mergeTolerant: mergeTolerant,
+    );
+  }
+
   /// Returns `true` if this instance is equivalent to [innocuous] instance (no resolution rules to apply).
   @override
   bool get isInnocuous {
@@ -993,6 +1080,31 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
 
     return merge;
   }
+
+  static final ListEquality<Type> _listEqualityType = ListEquality();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntityResolutionRules &&
+          runtimeType == other.runtimeType &&
+          allEager == other.allEager &&
+          allLazy == other.allLazy &&
+          _allowEntityFetch == other._allowEntityFetch &&
+          allowReadFile == other.allowReadFile &&
+          mergeTolerant == other.mergeTolerant &&
+          _listEqualityType.equals(lazyEntityTypes, other.lazyEntityTypes) &&
+          _listEqualityType.equals(eagerEntityTypes, other.eagerEntityTypes);
+
+  @override
+  int get hashCode =>
+      allEager.hashCode ^
+      allLazy.hashCode ^
+      _allowEntityFetch.hashCode ^
+      allowReadFile.hashCode ^
+      mergeTolerant.hashCode ^
+      _listEqualityType.hash(lazyEntityTypes) ^
+      _listEqualityType.hash(eagerEntityTypes);
 
   @override
   String toString() {

@@ -598,6 +598,116 @@ void main() {
       expect(r3.isLazyEntityType(Account), isTrue);
     });
 
+    test('fetchTypes', () {
+      {
+        var r1 = EntityResolutionRules.fetchTypes(eagerTypes: {
+          User: true,
+          Account: true,
+        });
+        expect(r1.allLazy, isNull);
+        expect(r1.allEager, isNull);
+        expect(r1.allowReadFile, isFalse);
+        expect(r1.mergeTolerant, isFalse);
+        expect(r1.allowEntityFetch, isTrue);
+        expect(r1.eagerEntityTypes, equals([User, Account]));
+
+        var r2 = EntityResolutionRules.fetchTypes(eagerTypes: {
+          [User, Account]: true,
+        });
+        expect(r2.allLazy, isNull);
+        expect(r2.allEager, isNull);
+        expect(r2.allowReadFile, isFalse);
+        expect(r2.mergeTolerant, isFalse);
+        expect(r2.allowEntityFetch, isTrue);
+        expect(r2.eagerEntityTypes, equals([User, Account]));
+
+        expect(r2, equals(r1));
+      }
+
+      {
+        var r1 = EntityResolutionRules.fetchTypes(eagerTypes: {
+          User: true,
+          Account: true,
+          UserInfo: false,
+        });
+        expect(r1.eagerEntityTypes, equals([User, Account]));
+        expect(r1.lazyEntityTypes, equals([UserInfo]));
+
+        var r2 = EntityResolutionRules.fetchTypes(eagerTypes: {
+          [User, Account]: true,
+          [UserInfo]: false,
+        });
+        expect(r2.eagerEntityTypes, equals([User, Account]));
+        expect(r2.lazyEntityTypes, equals([UserInfo]));
+
+        expect(r2, equals(r1));
+      }
+
+      {
+        var r1 = EntityResolutionRules.fetchTypes(allEager: true, eagerTypes: {
+          UserInfo: false,
+        });
+        expect(r1.eagerEntityTypes, isNull);
+        expect(r1.lazyEntityTypes, equals([UserInfo]));
+
+        var r2 = EntityResolutionRules.fetchTypes(allEager: true, eagerTypes: {
+          [UserInfo]: false,
+        });
+        expect(r2.eagerEntityTypes, isNull);
+        expect(r2.lazyEntityTypes, equals([UserInfo]));
+
+        expect(r2, equals(r1));
+      }
+
+      {
+        var r1 = EntityResolutionRules.fetchTypes(allEager: true, lazyTypes: {
+          UserInfo: true,
+        });
+        expect(r1.eagerEntityTypes, isNull);
+        expect(r1.lazyEntityTypes, equals([UserInfo]));
+
+        var r2 = EntityResolutionRules.fetchTypes(allEager: true, lazyTypes: {
+          [UserInfo]: true,
+        });
+        expect(r2.eagerEntityTypes, isNull);
+        expect(r2.lazyEntityTypes, equals([UserInfo]));
+
+        expect(r2, equals(r1));
+      }
+
+      {
+        var r1 = EntityResolutionRules.fetchTypes(allLazy: true, eagerTypes: {
+          UserInfo: true,
+        });
+        expect(r1.eagerEntityTypes, equals([UserInfo]));
+        expect(r1.lazyEntityTypes, isNull);
+
+        var r2 = EntityResolutionRules.fetchTypes(allLazy: true, eagerTypes: {
+          [UserInfo]: true,
+        });
+        expect(r2.eagerEntityTypes, equals([UserInfo]));
+        expect(r2.lazyEntityTypes, isNull);
+
+        expect(r2, equals(r1));
+      }
+
+      {
+        var r1 = EntityResolutionRules.fetchTypes(allLazy: true, lazyTypes: {
+          UserInfo: false,
+        });
+        expect(r1.eagerEntityTypes, equals([UserInfo]));
+        expect(r1.lazyEntityTypes, isNull);
+
+        var r2 = EntityResolutionRules.fetchTypes(allLazy: true, lazyTypes: {
+          [UserInfo]: false,
+        });
+        expect(r2.eagerEntityTypes, equals([UserInfo]));
+        expect(r2.lazyEntityTypes, isNull);
+
+        expect(r2, equals(r1));
+      }
+    });
+
     test('merge: fetchEager + fetchLazy', () {
       var r1 = EntityResolutionRules.fetchEager([User]);
       var r2 = EntityResolutionRules.fetchLazy([Account]);

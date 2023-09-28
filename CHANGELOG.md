@@ -1,3 +1,8 @@
+## 1.4.30
+
+- `EntityResolutionRules`:
+  - New factory constructor `fetchTypes`.
+
 ## 1.4.29
 
 - New abstract class `DBConnectionWrapper`:
