@@ -3,6 +3,8 @@
 - `EntityResolutionRules`:
   - New factory constructor `fetchTypes`.
 
+- docker_commander: ^2.1.2
+
 ## 1.4.29
 
 - New abstract class `DBConnectionWrapper`:

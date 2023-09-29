@@ -24,7 +24,7 @@ dependencies:
   mercury_client: ^2.2.0
   project_template: ^1.0.2
   resource_portable: ^3.1.0
-  docker_commander: ^2.1.1
+  docker_commander: ^2.1.2
   shelf_letsencrypt: ^1.2.2
   shelf: ^1.4.1
   shelf_gzip: ^4.0.1
