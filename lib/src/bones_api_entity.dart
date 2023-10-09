@@ -1766,6 +1766,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return null;
   }
 
+  /// The constructors of the Entity. If not implemented returns `null`.
+  Map<String, Map<String, TypeInfo>>? constructors([O? o]) => null;
+
   FutureOr<O?> createDefault();
 
   /// Synchronous version of [createFromMap].
@@ -1852,8 +1855,31 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       EntityResolutionRules? resolutionRules) {
     return createDefault().resolveMapped((o) {
       if (o == null) {
-        throw StateError(
-            "Can't instantiate entity `$type` by default constructor!");
+        var parameters = fields.keys.toList();
+
+        var msgParameters = '\n  Parameters: $parameters';
+
+        var constructors = this.constructors();
+
+        var msgConstructors = '';
+        if (constructors != null && constructors.isNotEmpty) {
+          var list = constructors.entries.map((e) {
+            var name = e.key;
+            var args = e.value.entries.map((e) {
+              var argName = e.key;
+              var argType = e.value.toString(withT: false);
+              return '$argType $argName';
+            }).join(', ');
+
+            return '$type${name.isNotEmpty ? '.$name' : ''}($args)';
+          }).toList();
+
+          msgConstructors =
+              '\n  `$type` constructors:\n    -- ${list.join('\n    -- ')}';
+        }
+
+        throw UnsupportedError(
+            "Can't instantiate entity `$type` by default constructor!$msgParameters$msgConstructors");
       }
 
       return setFieldsFromMap(o, fields,
@@ -2423,6 +2449,27 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
           Map<String, TypeInfo>.fromEntries(types.whereNotNull()));
     }
     return _fieldsTypes!;
+  }
+
+  Map<String, Map<String, TypeInfo>>? _constructors;
+
+  @override
+  Map<String, Map<String, TypeInfo>>? constructors([O? o]) {
+    if (_constructors == null) {
+      var reflection = reflectionWithObject(o);
+
+      var map = reflection.allConstructors().map((c) {
+        var name = c.name;
+        var args = c.allParameters
+            .map((p) => MapEntry(p.name, p.type.typeInfo))
+            .toMapFromEntries();
+        return MapEntry(name, UnmodifiableMapView(args));
+      }).toMapFromEntries();
+
+      _constructors = UnmodifiableMapView(map);
+    }
+
+    return _constructors!;
   }
 
   @override

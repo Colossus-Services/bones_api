@@ -1,3 +1,18 @@
+## 1.4.31
+
+- Added `EntityHandler.constructors`.
+- `EntityHandler._createFromMapDefaultImpl`: improve `UnsupportedError` message.
+
+- statistics: ^1.0.26
+- data_serializer: ^1.0.11
+- docker_commander: ^2.1.5
+- postgres: ^2.6.3
+- archive: ^3.4.5
+- collection: ^1.18.0
+- dependency_validator: ^3.2.3
+- coverage: ^1.6.4
+- test: ^1.24.7
+
 ## 1.4.30
 
 - `EntityResolutionRules`:
