@@ -1863,6 +1863,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
         var msgConstructors = '';
         if (constructors != null && constructors.isNotEmpty) {
+          var allParameters =
+              constructors.entries.expand((c) => c.value.keys).toSet();
+
+          var missingParameters =
+              allParameters.where((p) => !parameters.contains(p)).toList();
+
           var list = constructors.entries.map((e) {
             var name = e.key;
             var args = e.value.entries.map((e) {
@@ -1874,8 +1880,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             return '$type${name.isNotEmpty ? '.$name' : ''}($args)';
           }).toList();
 
-          msgConstructors =
-              '\n  `$type` constructors:\n    -- ${list.join('\n    -- ')}';
+          msgConstructors = '\n  Missing parameters: $missingParameters'
+              '\n  Constructors:\n    -- ${list.join('\n    -- ')}';
         }
 
         throw UnsupportedError(
