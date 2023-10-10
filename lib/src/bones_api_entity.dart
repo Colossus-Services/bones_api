@@ -2467,7 +2467,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       var map = reflection.allConstructors().map((c) {
         var name = c.name;
         var args = c.allParameters
-            .map((p) => MapEntry(p.name, p.type.typeInfo))
+            .map((p) => MapEntry(p.jsonName, p.type.typeInfo))
             .toMapFromEntries();
         return MapEntry(name, UnmodifiableMapView(args));
       }).toMapFromEntries();
