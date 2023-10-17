@@ -1,3 +1,8 @@
+## 1.4.32
+
+- `APIModuleProxy`: added `ignoreMethods`.
+- reflection_factory: ^2.2.3
+
 ## 1.4.31
 
 - Added `EntityHandler.constructors`.

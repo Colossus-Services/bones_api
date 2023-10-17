@@ -946,10 +946,12 @@ class APIModuleProxy extends ClassProxy {
     String moduleClassName, {
     String libraryName = '',
     String libraryPath = '',
+    Set<String> ignoreMethods = const <String>{},
   }) : super(moduleClassName,
             libraryName: libraryName,
             libraryPath: libraryPath,
             ignoreMethods: APIModule.interfaceMethodsNames,
+            ignoreMethods2: ignoreMethods,
             alwaysReturnFuture: true,
             traverseReturnTypes: const {
               APIResponse
