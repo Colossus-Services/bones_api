@@ -301,6 +301,9 @@ abstract class EntityReferenceBase<T> {
   /// Returns `true` if this reference is `null`.
   bool get isNull;
 
+  /// Returns `true` if this reference is NOT `null`.
+  bool get isNotNull => !isNull;
+
   /// Returns the current entity/entities or fetches.
   FutureOr<Object?> get();
 
@@ -2275,6 +2278,93 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     if (isEntitiesSet) return _entitiesEquality.hash(_entities);
 
     return -1;
+  }
+}
+
+extension NullEntityReferenceBaseExtension<T> on EntityReferenceBase<T>? {
+  bool get isNull {
+    var self = this;
+    return self == null || self.isNull;
+  }
+
+  bool get isNotNull {
+    var self = this;
+    return self != null && self.isNotNull;
+  }
+
+  bool get isLoaded {
+    var self = this;
+    return self?.isLoaded ?? false;
+  }
+}
+
+extension NullEntityReferenceExtension<T> on EntityReference<T>? {
+  T? get entity {
+    var self = this;
+    if (self == null) return null;
+    return self.entity;
+  }
+
+  Object? get id {
+    var self = this;
+    if (self == null) return null;
+    return self.id;
+  }
+
+  Object? get entityOrID {
+    var self = this;
+    if (self == null) return null;
+    return self.entityOrID;
+  }
+
+  FutureOr<T?> get() {
+    var self = this;
+    if (self == null) return null;
+    return self.get();
+  }
+
+  FutureOr<T?> getNotNull() {
+    var self = this;
+    if (self == null) return null;
+    return self.getNotNull();
+  }
+}
+
+extension NullEntityReferenceListExtension<T> on EntityReferenceList<T>? {
+  List<T?>? get entities {
+    var self = this;
+    if (self == null) return null;
+    return self.entities;
+  }
+
+  List<T>? get entitiesNotNull {
+    var self = this;
+    if (self == null) return null;
+    return self.entitiesNotNull;
+  }
+
+  List<Object?>? get ids {
+    var self = this;
+    if (self == null) return null;
+    return self.ids;
+  }
+
+  List<Object?>? get entitiesOrIDs {
+    var self = this;
+    if (self == null) return null;
+    return self.entitiesOrIDs;
+  }
+
+  FutureOr<List<T?>?> get() {
+    var self = this;
+    if (self == null) return null;
+    return self.get();
+  }
+
+  FutureOr<List<T?>?> getNotNull() {
+    var self = this;
+    if (self == null) return null;
+    return self.getNotNull();
   }
 }
 

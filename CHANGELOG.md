@@ -1,3 +1,11 @@
+## 1.4.33
+
+- `EntityReferenceBase`: added `isNotNull`.
+- New `NullEntityReferenceBaseExtension` and `NullEntityReferenceExtension`.
+- meta: ^1.11.0
+- hotreloader: ^4.0.0
+- archive: ^3.4.6
+
 ## 1.4.32
 
 - `APIModuleProxy`: added `ignoreMethods`.
