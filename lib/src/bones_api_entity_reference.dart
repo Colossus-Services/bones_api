@@ -2294,78 +2294,34 @@ extension NullEntityReferenceBaseExtension<T> on EntityReferenceBase<T>? {
 
   bool get isLoaded {
     var self = this;
-    return self?.isLoaded ?? false;
+    return self != null && self.isLoaded;
   }
 }
 
 extension NullEntityReferenceExtension<T> on EntityReference<T>? {
-  T? get entity {
-    var self = this;
-    if (self == null) return null;
-    return self.entity;
-  }
+  T? get entity => this?.entity;
 
-  Object? get id {
-    var self = this;
-    if (self == null) return null;
-    return self.id;
-  }
+  Object? get id => this?.id;
 
-  Object? get entityOrID {
-    var self = this;
-    if (self == null) return null;
-    return self.entityOrID;
-  }
+  Object? get entityOrID => this?.entityOrID;
 
-  FutureOr<T?> get() {
-    var self = this;
-    if (self == null) return null;
-    return self.get();
-  }
+  FutureOr<T?> get() => this?.get();
 
-  FutureOr<T?> getNotNull() {
-    var self = this;
-    if (self == null) return null;
-    return self.getNotNull();
-  }
+  FutureOr<T?> getNotNull() => this?.getNotNull();
 }
 
 extension NullEntityReferenceListExtension<T> on EntityReferenceList<T>? {
-  List<T?>? get entities {
-    var self = this;
-    if (self == null) return null;
-    return self.entities;
-  }
+  List<T?>? get entities => this?.entities;
 
-  List<T>? get entitiesNotNull {
-    var self = this;
-    if (self == null) return null;
-    return self.entitiesNotNull;
-  }
+  List<T>? get entitiesNotNull => this?.entitiesNotNull;
 
-  List<Object?>? get ids {
-    var self = this;
-    if (self == null) return null;
-    return self.ids;
-  }
+  List<Object?>? get ids => this?.ids;
 
-  List<Object?>? get entitiesOrIDs {
-    var self = this;
-    if (self == null) return null;
-    return self.entitiesOrIDs;
-  }
+  List<Object?>? get entitiesOrIDs => this?.entitiesOrIDs;
 
-  FutureOr<List<T?>?> get() {
-    var self = this;
-    if (self == null) return null;
-    return self.get();
-  }
+  FutureOr<List<T?>?> get() => this?.get();
 
-  FutureOr<List<T?>?> getNotNull() {
-    var self = this;
-    if (self == null) return null;
-    return self.getNotNull();
-  }
+  FutureOr<List<T?>?> getNotNull() => this?.getNotNull();
 }
 
 extension _ListExtension<T> on List<T> {
