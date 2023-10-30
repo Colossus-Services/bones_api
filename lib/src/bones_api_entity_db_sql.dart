@@ -546,8 +546,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var f = e.key;
       var schemeType = e.value;
       var fieldType = entityHandler.getFieldType(null, f);
+      var columnName = normalizeColumnName(f);
 
-      if (!checkDBTableField(repoType, f, schemeType, fieldType)) {
+      if (!checkDBTableField(repoType, columnName, schemeType, fieldType)) {
         return _DBTableCheck.error(
             "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
       }
@@ -637,7 +638,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (fieldEntityType != null) {
       if (schemeType != fieldEntityType &&
           !schemeType.isEntityIDType &&
-          !fieldType.isEntityReferenceType) {
+          !fieldType.isEntityReferenceBaseType) {
         throw StateError(
             "Invalid scheme field(`$fieldName`) type> fieldEntityType: $fieldEntityType ; schemeType: $schemeType (invalid ID type) > $this");
       }

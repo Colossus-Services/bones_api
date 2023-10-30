@@ -22,12 +22,18 @@ class APIConfig {
   /// If `true` indicates development environment.
   late final bool development;
 
+  /// If `true` indicates test environment.
+  late final bool test;
+
   APIConfig([Map<String, dynamic> properties = const <String, dynamic>{}]) {
     BonesAPI.boot();
     _properties.addAll(properties);
 
     var dev = _properties['development'];
     development = TypeParser.parseBool(dev, false)!;
+
+    var test = _properties['test'];
+    test = TypeParser.parseBool(test, false)!;
   }
 
   /// The source of this configuration.

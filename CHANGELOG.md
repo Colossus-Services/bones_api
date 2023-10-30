@@ -1,3 +1,15 @@
+## 1.4.34
+
+- `APIConfig`: added field `test`.
+- `DBSQLMemoryAdapter`:
+  - Fix `_findFieldsReferencedTables`:
+    - Normalize entity field to table column name.
+- `DBSQLAdapter`:
+  - Fix`_checkDBTableScheme`:
+    - Normalize entity field to table column name.
+  - Fix `checkDBTableField`:
+    - Allow `EntityReferenceList` fields.
+
 ## 1.4.33
 
 - `EntityReferenceBase`: added `isNotNull`.
