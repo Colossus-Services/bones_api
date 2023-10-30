@@ -1,3 +1,7 @@
+## 1.4.35
+
+- `DBSQLMemoryAdapter._findFieldsReferencedTables`: Fix referenced field name.
+
 ## 1.4.34
 
 - `APIConfig`: added field `test`.

@@ -1013,10 +1013,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       targetIdField ??= 'id';
       targetIdType ??= int;
 
-      var columnName = normalizeColumnName(field);
-
-      var tableRef = TableFieldReference(table, columnName, targetIdType,
-          targetName, targetIdField, targetIdType);
+      var tableRef = TableFieldReference(
+          table, field, targetIdType, targetName, targetIdField, targetIdType);
       return MapEntry(field, tableRef);
     });
     return fieldsReferencedTables;
