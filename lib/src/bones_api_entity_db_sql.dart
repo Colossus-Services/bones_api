@@ -543,14 +543,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .toMapFromEntries();
 
     for (var e in schemesTypes.entries) {
-      var f = e.key;
+      var field = e.key;
       var schemeType = e.value;
-      var fieldType = entityHandler.getFieldType(null, f);
-      var columnName = normalizeColumnName(f);
+      var fieldType = entityHandler.getFieldType(null, field);
 
-      if (!checkDBTableField(repoType, columnName, schemeType, fieldType)) {
+      if (!checkDBTableField(repoType, field, schemeType, fieldType)) {
         return _DBTableCheck.error(
-            "Invalid scheme type> entityType: schemeType: $schemeType ; fieldType: $fieldType");
+            "Invalid scheme type> entityType: $repoType; field: $field ; schemeType: $schemeType ; fieldType: $fieldType");
       }
     }
 
