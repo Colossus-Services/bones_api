@@ -3540,7 +3540,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     }
 
     var source2 = source.map(
-      (table, entries) => MapEntry(
+      (table, entries) => MapEntry<String, Iterable<Map<String, dynamic>>>(
         table,
         entries.map((e) => resolveEntitySourceVariables(e, variables)).toList(),
       ),
@@ -3557,7 +3557,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
 
     var entity2 = entity.map((k, v) {
       var val = resolveEntitySourceValueVariables(k, v, variables);
-      return MapEntry(k, val);
+      return MapEntry<String, dynamic>(k, val);
     });
 
     return entity2;
@@ -3565,29 +3565,42 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
 
   Object? resolveEntitySourceValueVariables(
       String key, Object? value, Map<String, dynamic> variables) {
+    if (value == null) return null;
+
     if (variables.isEmpty) {
       return value;
     }
 
-    if (value is Map) {
-      return value.map((k, v) {
-        var val = resolveEntitySourceValueVariables(k, v, variables);
-        return MapEntry(k, val);
-      });
+    if (value is String) {
+      if (value.startsWith('%') && value.endsWith('%')) {
+        var varName = value.substring(1, value.length - 1);
+        var varValue = variables[varName] ?? value;
+        return varValue;
+      } else {
+        return value;
+      }
+    } else if (value is num || value is bool) {
+      return value;
+    } else if (value is Map) {
+      if (value is Map<String, dynamic>) {
+        return value.map((k, v) {
+          var val = resolveEntitySourceValueVariables(k, v, variables);
+          return MapEntry<String, dynamic>(k, val);
+        });
+      } else {
+        return value.map((k, v) {
+          var val = resolveEntitySourceValueVariables(k, v, variables);
+          return MapEntry(k, val);
+        });
+      }
     } else if (value is List) {
       return value.map((e) {
         var val = resolveEntitySourceValueVariables(key, e, variables);
         return val;
       }).toList();
-    } else if (value is String) {
-      if (value.startsWith('%') && value.endsWith('%')) {
-        var varName = value.substring(1, value.length - 1);
-        var varValue = variables[varName] ?? value;
-        return varValue;
-      }
+    } else {
+      return value;
     }
-
-    return value;
   }
 
   FutureOr<Map<String, Iterable<Map<String, dynamic>>>> resolveEntitiesSource(
