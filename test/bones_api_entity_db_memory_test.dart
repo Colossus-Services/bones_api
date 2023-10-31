@@ -19,26 +19,33 @@ class MemoryTestConfig extends APITestConfigDBSQLMemory {
 }
 
 Future<void> main() async {
-  await _runTest(true, false, false);
-  await _runTest(false, false, false);
+  await _runTest(true, false, false, false);
+  await _runTest(false, false, false, false);
 
-  await _runTest(true, true, false);
-  await _runTest(true, true, true);
+  await _runTest(true, true, false, false);
+  await _runTest(true, true, false, true);
+  await _runTest(true, true, true, false);
 
-  await _runTest(false, true, false);
-  await _runTest(false, true, true);
+  await _runTest(false, true, false, false);
+  await _runTest(false, true, true, false);
+  await _runTest(false, true, true, true);
 }
 
-Future<bool> _runTest(
-    bool useReflection, bool generateTables, bool checkTables) {
+Future<bool> _runTest(bool useReflection, bool generateTables, bool checkTables,
+    bool populateSource) {
   return runAdapterTests(
     'DBSQLMemory',
     MemoryTestConfig(generateTables: generateTables, checkTables: checkTables),
-    (provider, dbPort, dbConfig) => DBSQLMemoryAdapter(
-      parentRepositoryProvider: provider,
-      generateTables: generateTables,
-      checkTables: checkTables,
-    ),
+    (provider, dbPort, dbConfig) {
+      var populate = dbConfig?['populate'] as Map?;
+      return DBSQLMemoryAdapter(
+        parentRepositoryProvider: provider,
+        generateTables: generateTables,
+        checkTables: checkTables,
+        populateSource: populate?['source'],
+        populateSourceVariables: populate?['variables'],
+      );
+    },
     (provider, dbPort, dbConfig) =>
         DBObjectMemoryAdapter(parentRepositoryProvider: provider),
     '"',
@@ -46,5 +53,6 @@ Future<bool> _runTest(
     entityByReflection: useReflection,
     generateTables: generateTables,
     checkTables: checkTables,
+    populateSource: populateSource,
   );
 }

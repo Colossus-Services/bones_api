@@ -423,6 +423,11 @@ class User extends Entity {
         if (photo != null) 'photo': photo?.toJson(),
         'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
       };
+
+  @override
+  String toString() {
+    return 'User{id: $id, email: $email, password: $password, level: $level, wakeUpTime: $wakeUpTime, creationTime: $creationTime, userInfo: $userInfo, address: $address, roles: $roles, photo: $photo}';
+  }
 }
 
 @EnableReflection()
@@ -446,6 +451,11 @@ class UserInfo extends Entity {
 
   @override
   int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'UserInfo{id: $id, info: $info}';
+  }
 
   @override
   String get idFieldName => 'id';

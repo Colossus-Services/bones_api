@@ -371,6 +371,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       Object? populateTables,
       super.parentRepositoryProvider,
       super.populateSource,
+      super.populateSourceVariables,
       super.workingPath,
       this.logSQL = false})
       : _generateTables = generateTables,

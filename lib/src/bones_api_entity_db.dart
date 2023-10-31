@@ -136,8 +136,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       this.name, this.minConnections, this.maxConnections, this.capability,
       {this.parentRepositoryProvider,
       Object? populateSource,
+      Object? populateSourceVariables,
       String? workingPath})
       : _populateSource = populateSource,
+        _populateSourceVariables = populateSourceVariables,
         _workingPath = workingPath {
     boot();
 
@@ -255,12 +257,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   FutureOr<bool> checkDB() => true;
 
   Object? _populateSource;
+  Object? _populateSourceVariables;
 
   FutureOr<InitializationResult> populateImpl() =>
-      _populateSourceImpl(_populateSource);
+      _populateSourceImpl(_populateSource, _populateSourceVariables);
 
-  FutureOr<InitializationResult> _populateSourceImpl(Object? populateSource) {
+  FutureOr<InitializationResult> _populateSourceImpl(
+      Object? populateSource, Object? populateSourceVariables) {
     _populateSource = null;
+    _populateSourceVariables = null;
 
     if (populateSource == null) {
       return InitializationResult.ok(this, dependencies: [
@@ -270,7 +275,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     return populateFromSource(populateSource,
             workingPath: _workingPath,
-            resolutionRules: EntityResolutionRules(allowReadFile: true))
+            resolutionRules: EntityResolutionRules(allowReadFile: true),
+            variables: populateSourceVariables)
         .resolveMapped((val) {
       var result = InitializationResult.ok(this, dependencies: [
         if (parentRepositoryProvider != null) parentRepositoryProvider!,

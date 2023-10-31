@@ -63,7 +63,10 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
 
   DBRelationalAdapter(String name, int minConnections, int maxConnections,
       DBAdapterCapability capability,
-      {super.parentRepositoryProvider, super.populateSource, super.workingPath})
+      {super.parentRepositoryProvider,
+      super.populateSource,
+      super.populateSourceVariables,
+      super.workingPath})
       : super(name, minConnections, maxConnections, capability) {
     boot();
   }

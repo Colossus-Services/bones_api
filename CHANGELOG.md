@@ -1,3 +1,13 @@
+## 1.4.36
+
+- `APIConfig`: fix resolution of variables keys.
+- `DBAdapter`:
+  - Added parameter `populateSourceVariables`: allow variables in populate source.
+- Improved related tests.
+
+- data_serializer: ^1.0.12
+- hotreloader: ^4.1.0
+
 ## 1.4.35
 
 - `DBSQLMemoryAdapter._findFieldsReferencedTables`: Fix referenced field name.
