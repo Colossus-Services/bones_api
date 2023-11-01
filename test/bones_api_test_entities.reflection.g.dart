@@ -3230,7 +3230,8 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
+    'toString'
   ];
 
   @override
@@ -3353,6 +3354,20 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             __TR.tMapStringDynamic,
             false,
             (o) => o!.toJson,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            const [override]);
+      case 'tostring':
+        return MethodReflection<User, String>(
+            this,
+            User,
+            'toString',
+            __TR.tString,
+            false,
+            (o) => o!.toString,
             obj,
             false,
             null,
@@ -3720,7 +3735,8 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
+    'toString'
   ];
 
   @override
@@ -3776,6 +3792,20 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     var lc = methodName.trim().toLowerCase();
 
     switch (lc) {
+      case 'tostring':
+        return MethodReflection<UserInfo, String>(
+            this,
+            UserInfo,
+            'toString',
+            __TR.tString,
+            false,
+            (o) => o!.toString,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            const [override]);
       case 'getfield':
         return MethodReflection<UserInfo, dynamic>(
             this,
