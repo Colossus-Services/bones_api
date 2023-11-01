@@ -79,6 +79,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       super.checkTables,
       super.populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       super.logSQL})
@@ -155,10 +156,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
+    Object? populateSourceVariables;
 
     if (populate is Map) {
       populateTables = populate['tables'];
       populateSource = populate['source'];
+      populateSourceVariables = populate['variables'];
     }
 
     if (database == null) throw ArgumentError.notNull('database');
@@ -178,6 +181,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      populateSourceVariables: populateSourceVariables,
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
       logSQL: logSql,

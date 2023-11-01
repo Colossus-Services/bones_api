@@ -3412,7 +3412,8 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
   FutureOr<Map<String, List<Object>>> storeAllFromJsonEncoded(
       String jsonEncoded,
       {Transaction? transaction,
-      EntityResolutionRules? resolutionRules}) {
+      EntityResolutionRules? resolutionRules,
+      Map<String, dynamic>? variables}) {
     var json = Json.decode(jsonEncoded);
     if (json == null) return <String, List<Object>>{};
 
@@ -3426,13 +3427,16 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     });
 
     return storeAllFromJson(map,
-        transaction: transaction, resolutionRules: resolutionRules);
+        transaction: transaction,
+        resolutionRules: resolutionRules,
+        variables: variables);
   }
 
   FutureOr<Map<String, List<Object>>> storeAllFromJson(
       Map<String, Iterable<Map<String, dynamic>>> entries,
       {Transaction? transaction,
-      EntityResolutionRules? resolutionRules}) async {
+      EntityResolutionRules? resolutionRules,
+      Map<String, dynamic>? variables}) async {
     var results = <String, List<Object>>{};
 
     var allRepositoriesBuildOrder =
@@ -3507,18 +3511,121 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       '\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>';
 
   FutureOr<Map<String, List<Object>>> populateFromSource(Object? source,
-      {String? workingPath, EntityResolutionRules? resolutionRules}) {
-    if (source == null) {
-      return <String, List<Object>>{};
-    } else if (source is Map<String, Iterable<Map<String, dynamic>>>) {
-      _log.info(
-          'Populating adapter ($this) [Map entries: ${source.length}]...$_logSectionOpen');
+      {String? workingPath,
+      EntityResolutionRules? resolutionRules,
+      Object? variables}) {
+    var sourceMap = resolveEntitiesSource(source);
+    var variablesMap = resolveSource(variables);
 
-      return storeAllFromJson(source, resolutionRules: resolutionRules)
+    return sourceMap.resolveOther(variablesMap, (sourceMap, variablesMap) {
+      sourceMap = resolveEntitiesSourceVariables(sourceMap, variablesMap);
+
+      _log.info(
+          'Populating adapter ($this) [entries: ${sourceMap.length}; variables: ${variablesMap.length}]...$_logSectionOpen');
+
+      return storeAllFromJson(sourceMap,
+              resolutionRules: resolutionRules, variables: variablesMap)
           .resolveMapped((res) {
         _log.info('Populate source finished. $_logSectionClose');
         return res;
       });
+    });
+  }
+
+  Map<String, Iterable<Map<String, dynamic>>> resolveEntitiesSourceVariables(
+      Map<String, Iterable<Map<String, dynamic>>> source,
+      Map<String, dynamic> variables) {
+    if (variables.isEmpty) {
+      return source;
+    }
+
+    var source2 = source.map(
+      (table, entries) => MapEntry<String, Iterable<Map<String, dynamic>>>(
+        table,
+        entries.map((e) => resolveEntitySourceVariables(e, variables)).toList(),
+      ),
+    );
+
+    return source2;
+  }
+
+  Map<String, dynamic> resolveEntitySourceVariables(
+      Map<String, dynamic> entity, Map<String, dynamic> variables) {
+    if (variables.isEmpty) {
+      return entity;
+    }
+
+    var entity2 = entity.map((k, v) {
+      var val = resolveEntitySourceValueVariables(k, v, variables);
+      return MapEntry<String, dynamic>(k, val);
+    });
+
+    return entity2;
+  }
+
+  Object? resolveEntitySourceValueVariables(
+      String key, Object? value, Map<String, dynamic> variables) {
+    if (value == null) return null;
+
+    if (variables.isEmpty) {
+      return value;
+    }
+
+    if (value is String) {
+      if (value.startsWith('%') && value.endsWith('%')) {
+        var varName = value.substring(1, value.length - 1);
+        var varValue = variables[varName] ?? value;
+        return varValue;
+      } else {
+        return value;
+      }
+    } else if (value is num || value is bool) {
+      return value;
+    } else if (value is Map) {
+      if (value is Map<String, dynamic>) {
+        return value.map((k, v) {
+          var val = resolveEntitySourceValueVariables(k, v, variables);
+          return MapEntry<String, dynamic>(k, val);
+        });
+      } else {
+        return value.map((k, v) {
+          var val = resolveEntitySourceValueVariables(k, v, variables);
+          return MapEntry(k, val);
+        });
+      }
+    } else if (value is List) {
+      return value.map((e) {
+        var val = resolveEntitySourceValueVariables(key, e, variables);
+        return val;
+      }).toList();
+    } else {
+      return value;
+    }
+  }
+
+  FutureOr<Map<String, Iterable<Map<String, dynamic>>>> resolveEntitiesSource(
+          Object? source,
+          {String? workingPath}) =>
+      resolveSource(source, workingPath: workingPath).resolveMapped((json) {
+        return json.map((k, v) {
+          var key = k.toString();
+          var values = v is Iterable ? v : [v];
+
+          var entities = values
+              .map((e) => (e as Map).map((key, value) =>
+                  MapEntry<String, dynamic>(key.toString(), value as dynamic)))
+              .toList();
+
+          return MapEntry(key, entities);
+        });
+      });
+
+  FutureOr<Map<String, dynamic>> resolveSource(Object? source,
+      {String? workingPath}) {
+    if (source == null) {
+      return <String, dynamic>{};
+    } else if (source is Map<String, dynamic>) {
+      return source;
     } else if (source is String) {
       if (RegExp(r'^\S+\.json$').hasMatch(source)) {
         var apiPlatform = APIPlatform.get();
@@ -3530,36 +3637,21 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
           throw StateError("Can't resolve source file path: $source");
         }
 
-        _log.info('Reading $this populate source file: $filePath');
+        _log.info('Reading $this source file: $filePath');
 
         var fileData = apiPlatform.readFileAsString(filePath);
 
         if (fileData != null) {
           return fileData.resolveMapped((data) {
             if (data != null) {
-              _log.info(
-                  'Populating $this source [encoded JSON length: ${data.length}]...$_logSectionOpen');
-
-              return storeAllFromJsonEncoded(data,
-                      resolutionRules: resolutionRules)
-                  .resolveMapped((res) {
-                _log.info('Populate source finished. $_logSectionClose');
-                return res;
-              });
+              return Json.decode<dynamic>(data);
             } else {
-              return <String, List<Object>>{};
+              return <String, dynamic>{};
             }
           });
         }
       } else {
-        _log.info(
-            'Populating $this source [encoded JSON length: ${source.length}]...$_logSectionOpen');
-
-        return storeAllFromJsonEncoded(source, resolutionRules: resolutionRules)
-            .resolveMapped((res) {
-          _log.info('Populate source finished. $_logSectionClose');
-          return res;
-        });
+        return Json.decode<dynamic>(source);
       }
     }
 

@@ -84,6 +84,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       super.checkTables,
       super.populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       super.logSQL})
@@ -160,10 +161,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
+    Object? populateSourceVariables;
 
     if (populate is Map) {
       populateTables = populate['tables'];
       populateSource = populate['source'];
+      populateSourceVariables = populate['variables'];
     }
 
     if (database == null) throw ArgumentError.notNull('database');
@@ -183,6 +186,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      populateSourceVariables: populateSourceVariables,
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
       logSQL: logSql,

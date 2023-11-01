@@ -173,7 +173,8 @@ Future<bool> runAdapterTests(
     String serialIntType,
     {required bool entityByReflection,
     required bool checkTables,
-    required bool generateTables}) async {
+    required bool generateTables,
+    required bool populateSource}) async {
   _log.handler.logToConsole();
 
   User$reflection.boot();
@@ -193,7 +194,7 @@ Future<bool> runAdapterTests(
   var testDomain = '${dbName.toLowerCase()}.com';
 
   group(
-      'SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}${generateTables ? '+generateTables' : ''}${checkTables ? '+checkTables' : ''}]',
+      'SQLAdapter[$dbName${entityByReflection ? '+reflection' : ''}${generateTables ? '+generateTables' : ''}${checkTables ? '+checkTables' : ''}${populateSource ? '+populateSource' : ''}]',
       () {
     late final TestEntityRepositoryProvider entityRepositoryProvider;
     late final TestEntityRepositoryProvider2 entityRepositoryProvider2;
@@ -211,6 +212,20 @@ Future<bool> runAdapterTests(
           .info('Container start: $startOk > dbPort: $dbPort > $testConfigDB');
 
       var dbConfig = testConfigDB.apiConfigMap['db'] as Map<String, dynamic>?;
+
+      if (populateSource) {
+        dbConfig?['populate'] ??= {
+          'source': {
+            'user_info': {
+              'info': '%SECRET_KEY%',
+              'id': 1,
+            }
+          },
+          'variables': {
+            'SECRET_KEY': 'abc123xyz',
+          },
+        };
+      }
 
       entityRepositoryProvider = createEntityRepositoryProvider(
           entityByReflection, sqlAdapterCreator, dbPort, dbConfig);
@@ -439,6 +454,22 @@ Future<bool> runAdapterTests(
       expect(sqlAdapter.isInitialized, isTrue);
       expect(await userAPIRepository.length(), equals(0));
 
+      final int userInfoInitID;
+
+      {
+        var userInfo = await userInfoAPIRepository.selectByID(1);
+        print('userInfo> $userInfo');
+
+        if (populateSource) {
+          userInfoInitID = 1;
+          expect(userInfo, isNotNull);
+          expect(userInfo!.info, equals('abc123xyz'));
+        } else {
+          userInfoInitID = 0;
+          expect(userInfo, isNull);
+        }
+      }
+
       {
         var user = await userAPIRepository.selectByID(1);
         expect(user, isNull);
@@ -528,7 +559,8 @@ Future<bool> runAdapterTests(
 
         expect((await storeAPIRepository.selectAll()).length, equals(0));
         expect((await addressAPIRepository.selectAll()).length, equals(0));
-        expect((await userInfoAPIRepository.selectAll()).length, equals(0));
+        expect((await userInfoAPIRepository.selectAll()).length,
+            equals(userInfoInitID));
         expect((await userAPIRepository.selectAll()).length, equals(0));
 
         expect((await photoAPIRepository.count()), equals(0));
@@ -547,11 +579,11 @@ Future<bool> runAdapterTests(
         user1Id = id;
 
         expect(user.id, equals(1));
-        expect(user.userInfo.id, equals(1));
+        expect(user.userInfo.id, equals(userInfoInitID + 1));
         expect(address.id, equals(1));
         expect(role.id, equals(1));
-        expect(user.userInfo.id, equals(1));
-        expect(user.userInfo.entity?.id, equals(1));
+        expect(user.userInfo.id, equals(userInfoInitID + 1));
+        expect(user.userInfo.entity?.id, equals(userInfoInitID + 1));
 
         expect(user.address.isEntityReference, isFalse);
         expect(user.userInfo.isEntityReference, isTrue);
@@ -560,7 +592,8 @@ Future<bool> runAdapterTests(
         expect(user.userInfo.resolveEntityInstance, isA<UserInfo>());
         expect(user.photo.resolveEntityInstance, isA<Photo>());
 
-        expect((await userInfoAPIRepository.selectAll()).length, equals(1));
+        expect((await userInfoAPIRepository.selectAll()).length,
+            equals(userInfoInitID + 1));
         expect((await userAPIRepository.selectAll()).length, equals(1));
         expect((await addressAPIRepository.selectAll()).length, equals(1));
         expect((await storeAPIRepository.selectAll()).length, equals(3));
@@ -630,7 +663,7 @@ Future<bool> runAdapterTests(
           expect(user!.email, equals('joe@$testDomain'));
 
           expect(user.userInfo.isNull, isFalse);
-          expect(user.userInfo.id, equals(1));
+          expect(user.userInfo.id, equals(userInfoInitID + 1));
           expect(user.userInfo.isEntitySet, isFalse);
 
           expect(user.photo?.id, equals(png1PixelSha256));
@@ -665,10 +698,12 @@ Future<bool> runAdapterTests(
           expect(user!.email, equals('joe@$testDomain'));
 
           expect(user.userInfo.isNull, isFalse);
-          expect(user.userInfo.id, equals(1));
+          expect(user.userInfo.id, equals(userInfoInitID + 1));
           expect(user.userInfo.isEntitySet, isTrue);
-          expect(user.userInfo.entityToJson(),
-              equals(UserInfo('The user joe', id: 1).toJson()));
+          expect(
+              user.userInfo.entityToJson(),
+              equals(
+                  UserInfo('The user joe', id: userInfoInitID + 1).toJson()));
         }
 
         expect((await addressAPIRepository.selectByID(1))?.city,

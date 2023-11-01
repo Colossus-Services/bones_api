@@ -57,6 +57,7 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
       {bool generateTables = false,
       Object? populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       this.log = false})

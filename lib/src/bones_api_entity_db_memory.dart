@@ -88,6 +88,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       super.checkTables,
       super.populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       super.logSQL})
@@ -124,10 +125,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var populate = config?['populate'];
     Object? populateTables;
     Object? populateSource;
+    Object? populateSourceVariables;
 
     if (populate is Map) {
       populateTables = populate['tables'];
       populateSource = populate['source'];
+      populateSourceVariables = populate['variables'];
     }
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
@@ -138,6 +141,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       checkTables: checkTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      populateSourceVariables: populateSourceVariables,
       workingPath: workingPath,
       logSQL: logSql,
     );

@@ -79,6 +79,7 @@ class DBObjectDirectoryAdapter
       {super.generateTables,
       super.populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       super.log})
@@ -124,6 +125,7 @@ class DBObjectDirectoryAdapter
     var generateTables = false;
     Object? populateTables;
     Object? populateSource;
+    Object? populateSourceVariables;
 
     if (populate is Map) {
       generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
@@ -133,6 +135,7 @@ class DBObjectDirectoryAdapter
 
       populateTables = populate['tables'];
       populateSource = populate['source'];
+      populateSourceVariables = populate['variables'];
     }
 
     var directory = Directory(directoryPath);
@@ -143,6 +146,7 @@ class DBObjectDirectoryAdapter
       generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      populateSourceVariables: populateSourceVariables,
       workingPath: workingPath,
     );
 

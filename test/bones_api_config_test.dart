@@ -70,8 +70,10 @@ y=zzz
       print('Test dir: $testDir');
 
       var apiConfig1 = APIConfig.fromSync('$testDir/api-test.conf');
-      expect(apiConfig1?.toJson(),
-          equals({'foo': 123, 'bar': 'abc', 'password': 123456}));
+      expect(
+          apiConfig1?.toJson(),
+          equals(
+              {'foo': 123, 'bar': 'abc', 'password': 123456, 'baz': '%bar%'}));
 
       var apiConfig2 = APIConfig.fromSync({'foo': 12, 'bar': 'ab'});
       expect(apiConfig2?.toJson(), equals({'foo': 12, 'bar': 'ab'}));
@@ -98,45 +100,52 @@ y=zzz
 
       expect(apiConfig.isEmpty, isFalse);
       expect(apiConfig.isNotEmpty, isTrue);
-      expect(apiConfig.length, 3);
+      expect(apiConfig.length, 4);
 
       expect(apiConfig.properties,
-          equals({'foo': 123, 'bar': 'abc', 'password': 123456}));
+          equals({'foo': 123, 'bar': 'abc', 'password': 123456, 'baz': 'abc'}));
       expect(Map.fromEntries(apiConfig.entries),
-          equals({'foo': 123, 'bar': 'abc', 'password': 123456}));
-      expect(apiConfig.keys, equals(['foo', 'bar', 'password']));
-      expect(apiConfig.values, equals([123, 'abc', 123456]));
+          equals({'foo': 123, 'bar': 'abc', 'password': 123456, 'baz': 'abc'}));
+      expect(apiConfig.keys, equals(['foo', 'bar', 'password', 'baz']));
+      expect(apiConfig.values, equals([123, 'abc', 123456, 'abc']));
 
-      expect(apiConfig.toJson(),
-          equals({'foo': 123, 'bar': 'abc', 'password': 123456}));
+      expect(
+          apiConfig.toJson(),
+          equals(
+              {'foo': 123, 'bar': 'abc', 'password': 123456, 'baz': '%bar%'}));
 
       expect(apiConfig['foo'], equals(123));
       expect(apiConfig['bar'], equals('abc'));
       expect(apiConfig['password'], equals(123456));
+      expect(apiConfig['baz'], equals('abc'));
       expect(apiConfig['BaR'], isNull);
 
       expect(apiConfig.getIgnoreCase('FoO'), equals(123));
-      expect(apiConfig.getIgnoreCase('Baz'), isNull);
+      expect(apiConfig.getIgnoreCase('Baz'), equals('abc'));
+      expect(apiConfig.getIgnoreCase('Bazz'), isNull);
 
       expect(
           apiConfig.toJsonEncoded(),
           equals('{\n'
               '  "foo": 123,\n'
               '  "bar": "abc",\n'
-              '  "password": 123456\n'
+              '  "password": 123456,\n'
+              '  "baz": "%bar%"\n'
               '}'));
 
       expect(
           apiConfig.toYAMLEncoded(),
           equals('foo: 123\n'
               'bar: \'abc\'\n'
-              'password: 123456\n'));
+              'password: 123456\n'
+              'baz: \'%bar%\'\n'));
 
       expect(
           apiConfig.toPropertiesEncoded(),
           equals('foo=123\n'
               'bar="abc"\n'
-              'password=123456\n'));
+              'password=123456\n'
+              'baz="%bar%"\n'));
 
       expect(
           apiConfig.toString(),
@@ -144,7 +153,8 @@ y=zzz
             r'APIConfig\[.*?/api-test.conf\]\{\s*'
             r'"foo": 123,\s*'
             r'"bar": "abc",\s*'
-            r'"password": "\*\*\*"\s*'
+            r'"password": "\*\*\*",\s*'
+            r'"baz": "%bar%"\s*'
             r'\}',
           )));
     });

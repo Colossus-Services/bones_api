@@ -100,7 +100,7 @@ class APIConfig {
   dynamic _getImpl(String key, Object? defaultValue) =>
       _resolveValue(key, _properties[key], defaultValue);
 
-  static final RegExp _regexpValueVariable = RegExp(r'%\w+%');
+  static final RegExp _regexpValueVariable = RegExp(r'%(\w+)%');
 
   dynamic _resolveValue(String key, Object? value, Object? defaultValue) {
     if (value == null) return defaultValue;

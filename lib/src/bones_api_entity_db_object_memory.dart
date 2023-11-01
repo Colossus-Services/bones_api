@@ -78,6 +78,7 @@ class DBObjectMemoryAdapter
       {super.generateTables,
       super.populateTables,
       super.populateSource,
+      super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
       super.log})
@@ -106,6 +107,7 @@ class DBObjectMemoryAdapter
     var generateTables = false;
     Object? populateTables;
     Object? populateSource;
+    Object? populateSourceVariables;
 
     if (populate is Map) {
       generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
@@ -115,6 +117,7 @@ class DBObjectMemoryAdapter
 
       populateTables = populate['tables'];
       populateSource = populate['source'];
+      populateSourceVariables = populate['variables'];
     }
 
     var adapter = DBObjectMemoryAdapter(
@@ -122,6 +125,7 @@ class DBObjectMemoryAdapter
       generateTables: generateTables,
       populateTables: populateTables,
       populateSource: populateSource,
+      populateSourceVariables: populateSourceVariables,
       workingPath: workingPath,
     );
 

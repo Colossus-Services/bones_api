@@ -21,24 +21,29 @@ class MemoryTestConfig extends APITestConfigDBSQLMemory {
 }
 
 Future<void> main() async {
-  await _runTest(true);
-  await _runTest(false);
-  await _runTest(true);
-  await _runTest(false);
+  await _runTest(true, false);
+  await _runTest(false, false);
+  await _runTest(true, true);
+  await _runTest(false, true);
 }
 
-Future<bool> _runTest(bool useReflection) {
+Future<bool> _runTest(bool useReflection, bool populateSource) {
   final tempObjectDir =
       Directory.systemTemp.createTempSync("bones_api_tests_object_dir");
 
   return runAdapterTests(
     'DBSQLMemory+obj.dir',
     MemoryTestConfig(),
-    (provider, dbPort, dbConfig) => DBSQLMemoryAdapter(
-      parentRepositoryProvider: provider,
-      generateTables: false,
-      checkTables: false,
-    ),
+    (provider, dbPort, dbConfig) {
+      var populate = dbConfig?['populate'] as Map?;
+      return DBSQLMemoryAdapter(
+        parentRepositoryProvider: provider,
+        generateTables: false,
+        checkTables: false,
+        populateSource: populate?['source'],
+        populateSourceVariables: populate?['variables'],
+      );
+    },
     (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(tempObjectDir,
         parentRepositoryProvider: provider)
       ..onClose.listen((_) {
@@ -49,5 +54,6 @@ Future<bool> _runTest(bool useReflection) {
     entityByReflection: useReflection,
     generateTables: false,
     checkTables: false,
+    populateSource: populateSource,
   );
 }
