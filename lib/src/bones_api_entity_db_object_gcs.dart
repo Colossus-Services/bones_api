@@ -646,6 +646,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     if (cacheFile != null) {
       _checkCacheDirectoryLimit();
+      _checkCacheFileParent(cacheFile);
       cacheFile.writeAsBytesSync(jsonBytes);
       _checkCacheDirectoryLimitUntrackedTotal += jsonBytes.length;
     }
@@ -674,13 +675,24 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
     }
 
-    cacheFile?.writeAsBytesSync(bytes);
+    if (cacheFile != null) {
+      _checkCacheFileParent(cacheFile);
+      cacheFile.writeAsBytesSync(bytes);
+    }
+
     _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
 
     var json = _utf8Decoder.convert(bytes);
 
     var obj = _jsonDecoder.convert(json) as Map<String, dynamic>;
     return obj;
+  }
+
+  void _checkCacheFileParent(File cacheFile) {
+    var parent = cacheFile.parent;
+    if (!parent.existsSync()) {
+      parent.createSync(recursive: true);
+    }
   }
 
   Future<Map<String, dynamic>?> _deleteObject(String table, Object? id) async {

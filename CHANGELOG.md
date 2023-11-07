@@ -1,3 +1,8 @@
+## 1.4.37
+
+- `DBObjectGCSAdapter`:
+  - Fix cached file parent directory creation. 
+
 ## 1.4.36
 
 - `APIConfig`: fix resolution of variables keys.
