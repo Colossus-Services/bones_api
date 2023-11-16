@@ -3,6 +3,8 @@
 - sdk: '>=3.2.0 <4.0.0'
   - Simple workaround for Kernel/Fasta issue https://github.com/dart-lang/sdk/issues/54062
 
+- reflection_factory: ^2.2.4
+
 ## 1.4.37
 
 - `DBObjectGCSAdapter`:
