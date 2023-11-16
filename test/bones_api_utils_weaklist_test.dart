@@ -18,7 +18,7 @@ void main() async {
   }
 
   Future<void> gc() async {
-    final isolateId = Service.getIsolateID(Isolate.current)!;
+    final isolateId = Service.getIsolateId(Isolate.current)!;
     final vmService = await vmServiceConnectUri(_toWebSocket(serverUri));
     final profile = await vmService.getAllocationProfile(isolateId, gc: true);
 

@@ -141,8 +141,8 @@ class HTMLDocument {
   }
 
   String get bodyStyles {
-    var styles = (_bodyStyles != null && _bodyStyles!.trim().isNotEmpty
-            ? _bodyStyles!
+    var styles = (_bodyStyles != null && _bodyStyles.trim().isNotEmpty
+            ? _bodyStyles
             : '')
         .split(RegExp(r'\s*;\s*'));
 

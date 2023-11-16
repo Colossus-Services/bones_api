@@ -198,7 +198,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
   FutureOr<String> _getPassword() {
     if (_password != null) {
-      return _password!;
+      return _password;
     } else {
       return _passwordProvider!(username);
     }
