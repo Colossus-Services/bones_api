@@ -349,14 +349,18 @@ extension MapGetterExtension<K, V> on Map<K, V> {
   T? getParsed<T>(K key, TypeElementParser<T>? parser,
       {T? defaultValue, bool ignoreCase = false}) {
     var value = ignoreCase ? getIgnoreCase(key) : this[key];
+
+    T? v;
+
     if (parser != null) {
-      var val2 = parser(value);
-      return val2 ?? defaultValue;
+      v = parser(value);
     } else if (value is T?) {
-      return value ?? defaultValue;
+      v = value;
     } else {
       throw ArgumentError("Can't parse key('$key') value as `$T`: $value");
     }
+
+    return v ?? defaultValue;
   }
 
   /// Same as [getParsed] but accepts multiple [keys].
@@ -375,15 +379,17 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       }
     }
 
+    T? v;
     if (parser != null) {
-      var val2 = parser(value);
-      return val2 ?? defaultValue;
+      v = parser(value);
     } else if (value is T?) {
-      return value ?? defaultValue;
+      v = value;
     } else {
       throw ArgumentError(
           "Can't parse key('${keys.join("','")}') value as `$T`: $value");
     }
+
+    return v ?? defaultValue;
   }
 }
 

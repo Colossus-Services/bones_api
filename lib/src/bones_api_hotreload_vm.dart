@@ -49,7 +49,7 @@ class APIHotReloadVM extends APIHotReload {
   @override
   String? getIsolateID(Object isolate) {
     if (isolate is Isolate) {
-      return Service.getIsolateID(isolate);
+      return Service.getIsolateId(isolate);
     }
     return null;
   }
