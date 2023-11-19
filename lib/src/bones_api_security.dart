@@ -18,10 +18,18 @@ abstract class APISecurity {
   final Duration tokenDuration;
   final int tokenLength;
 
+  late final APITokenStore _tokenStore;
+
   APISecurity({Duration? tokenDuration, int? tokenLength})
       : tokenDuration = tokenDuration ?? Duration(hours: 3),
         tokenLength =
-            tokenLength != null && tokenLength > 32 ? tokenLength : 512;
+            tokenLength != null && tokenLength > 32 ? tokenLength : 512 {
+    _tokenStore = resolveTokensStore();
+  }
+
+  APITokenStore resolveTokensStore() {
+    return APITokenStore();
+  }
 
   String generateToken(String username) => APIToken.generateToken(512,
       variableLength: 48, prefix: 'TK', random: secureRandom());
@@ -124,36 +132,6 @@ abstract class APISecurity {
     });
   }
 
-  final Map<String, MapEntry<Object?, List<APIPermission>>> _tokensInfo =
-      <String, MapEntry<Object?, List<APIPermission>>>{};
-
-  void _storeTokenInfo(
-      String token, Object? data, List<APIPermission> permissions) {
-    permissions = permissions.asUnmodifiableView;
-
-    if (data is List) {
-      if (data is! UnmodifiableListView) {
-        data = UnmodifiableListView(data);
-      }
-    } else if (data is Map) {
-      if (data is! UnmodifiableMapView) {
-        if (data is Map<String, Object?>) {
-          data = UnmodifiableMapView<String, Object?>(data);
-        } else if (data is Map<String, Object>) {
-          data = UnmodifiableMapView<String, Object>(data);
-        } else {
-          data = UnmodifiableMapView(data);
-        }
-      }
-    } else if (data is Set) {
-      if (data is! UnmodifiableSetView) {
-        data = UnmodifiableSetView(data);
-      }
-    }
-
-    _tokensInfo[token] = MapEntry(data, permissions);
-  }
-
   FutureOr<APIAuthentication?> _resolveAuthentication(
       APICredential credential, bool resumed) {
     var token = credential.token;
@@ -162,11 +140,11 @@ abstract class APISecurity {
     List<APIPermission>? prevPermissions;
 
     if (token != null) {
-      var prevInfo = _tokensInfo[token];
+      var prevToken = _tokenStore.get(token);
 
-      if (prevInfo != null) {
-        prevData = prevInfo.key;
-        prevPermissions = prevInfo.value;
+      if (prevToken != null) {
+        prevData = prevToken.data;
+        prevPermissions = prevToken.permissions;
       }
     }
 
@@ -175,7 +153,7 @@ abstract class APISecurity {
       return getAuthenticationData(credential, prevData).resolveMapped((data) {
         var authentication = createAuthentication(credential, permissions,
             data: data, resumed: resumed);
-        _storeTokenInfo(authentication.tokenKey, data, permissions);
+        _tokenStore.storeToken(authentication.tokenKey, data, permissions);
         return authentication;
       });
     });
@@ -303,7 +281,7 @@ abstract class APISecurity {
 
       var expired = tokens.removeExpiredTokens(now: now);
 
-      _onInvalidateTokens(expired);
+      _tokenStore.invalidateTokens(expired);
 
       if (tokens.isEmpty) {
         emptyUsers.add(user);
@@ -311,16 +289,6 @@ abstract class APISecurity {
     }
 
     _usersTokens.removeKeys(emptyUsers);
-  }
-
-  void _onInvalidateTokens(List<APIToken> tokens) {
-    for (var t in tokens) {
-      _onInvalidateToken(t);
-    }
-  }
-
-  void _onInvalidateToken(APIToken apiToken) {
-    _tokensInfo.remove(apiToken.token);
   }
 
   bool invalidateUserTokens(String username) {
@@ -332,7 +300,7 @@ abstract class APISecurity {
     userTokens.clear();
     _usersTokens.remove(username);
 
-    _onInvalidateTokens(tokens);
+    _tokenStore.invalidateTokens(tokens);
 
     return true;
   }
@@ -348,7 +316,7 @@ abstract class APISecurity {
         _usersTokens.remove(username);
       }
 
-      _onInvalidateToken(apiToken);
+      _tokenStore.invalidateAPIToken(apiToken);
       return true;
     } else {
       return false;
@@ -387,8 +355,8 @@ abstract class APISecurity {
     var token = credential.token;
 
     if (token != null) {
-      var prevInfo = _tokensInfo.remove(token);
-      disposeTokenInfo = prevInfo != null;
+      var prevToken = _tokenStore.invalidateToken(token);
+      disposeTokenInfo = prevToken != null;
     }
 
     return disposeUsernameEntity || disposeTokenInfo;
@@ -646,6 +614,52 @@ abstract class APISecurity {
                 'username', 'user', 'email', 'account') ??
             '')
         .toString();
+  }
+}
+
+typedef APITokenInfo = ({Object? data, List<APIPermission> permissions});
+
+/// The tokens store for the [APISecurity].
+class APITokenStore {
+  final Map<String, APITokenInfo> _tokens = {};
+
+  APITokenInfo? get(String token) => _tokens[token];
+
+  void invalidateTokens(List<APIToken> tokens) {
+    for (var t in tokens) {
+      invalidateAPIToken(t);
+    }
+  }
+
+  APITokenInfo? invalidateAPIToken(APIToken apiToken) =>
+      invalidateToken(apiToken.token);
+
+  APITokenInfo? invalidateToken(String token) => _tokens.remove(token);
+
+  void storeToken(String token, Object? data, List<APIPermission> permissions) {
+    permissions = permissions.asUnmodifiableView;
+
+    if (data is List) {
+      if (data is! UnmodifiableListView) {
+        data = UnmodifiableListView(data);
+      }
+    } else if (data is Map) {
+      if (data is! UnmodifiableMapView) {
+        if (data is Map<String, Object?>) {
+          data = UnmodifiableMapView<String, Object?>(data);
+        } else if (data is Map<String, Object>) {
+          data = UnmodifiableMapView<String, Object>(data);
+        } else {
+          data = UnmodifiableMapView(data);
+        }
+      }
+    } else if (data is Set) {
+      if (data is! UnmodifiableSetView) {
+        data = UnmodifiableSetView(data);
+      }
+    }
+
+    _tokens[token] = (data: data, permissions: permissions);
   }
 }
 

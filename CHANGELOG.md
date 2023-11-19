@@ -25,6 +25,8 @@
 
 - `SQLGenerator.generateCreateTableSQL`: skip annotated hidden fields.
 
+- New `APITokenStore`.
+
 - args_simple: ^1.0.0
 - coverage: ^1.7.1
 - vm_service: ^13.0.0
