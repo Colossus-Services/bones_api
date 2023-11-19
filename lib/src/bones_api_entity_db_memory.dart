@@ -104,7 +104,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
               ),
               transactions: true,
               transactionAbort: true,
-              tableSQL: false),
+              tableSQL: false,
+              multiIsolateSupport: false),
         ) {
     boot();
 
@@ -916,7 +917,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   TableScheme? getTableSchemeImpl(
       String table, TableRelationshipReference? relationship,
       {Object? contextID}) {
-    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+    //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
     if (tableScheme != null) return tableScheme;

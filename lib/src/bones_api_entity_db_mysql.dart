@@ -103,7 +103,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
               ),
               transactions: true,
               transactionAbort: true,
-              tableSQL: true),
+              tableSQL: true,
+              multiIsolateSupport: true),
         ) {
     boot();
 
@@ -306,7 +307,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     var connection = await catchFromPool();
 
     try {
-      _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+      //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
       var sql = "SHOW COLUMNS FROM `$table`";
       var results = await connection.query(sql);

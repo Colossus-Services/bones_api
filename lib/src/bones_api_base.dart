@@ -188,6 +188,24 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+    _setupInstance(fromConstructor: true);
+  }
+
+  bool _isolateCopy = false;
+
+  /// Returns `true` if this instance is a copy passed to another `Isolate` (usually an [APIServerWorker]).
+  bool get isIsolateCopy => _isolateCopy;
+
+  void _setupInstance({bool fromConstructor = false}) {
+    var prev = _instances[name];
+    if (identical(prev, this)) {
+      return;
+    }
+
+    if (!fromConstructor) {
+      _isolateCopy = true;
+    }
+
     _instances[name] = this;
     boot();
     _setupLogger();
@@ -241,6 +259,8 @@ abstract class APIRoot with Initializable, Closable {
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() {
+    _setupInstance();
+
     var lAsync1 = loadEntityProviders();
     var lAsync2 = loadEntityRepositoryProviders();
     var lAsync3 = loadDependencies();
@@ -281,7 +301,7 @@ abstract class APIRoot with Initializable, Closable {
 
     tryCallSync(() => onClose());
 
-    _instances.remove(this);
+    _instances.removeWhere((name, api) => identical(api, this));
 
     return true;
   }
@@ -309,6 +329,8 @@ abstract class APIRoot with Initializable, Closable {
   Future<InitializationResult>? _modulesLoading;
 
   FutureOr<InitializationResult> _ensureModulesLoaded() {
+    _setupInstance();
+
     if (_modules != null) {
       return InitializationResult.ok(this, dependencies: _modules!.values);
     }
@@ -703,7 +725,8 @@ abstract class APIRoot with Initializable, Closable {
       modulesNames = _modules?.keys.toSet().toString() ?? '{loading...}';
     }
 
-    return '$name[$version]$modulesNames#$_instanceId';
+    var isolateInfo = isIsolateCopy ? '(Isolate copy)' : '';
+    return '$name[$version]#$_instanceId$isolateInfo$modulesNames';
   }
 }
 

@@ -235,14 +235,17 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
   final bool tableSQL;
 
   const DBSQLAdapterCapability(
-      {required SQLDialect dialect,
-      required bool transactions,
-      required bool transactionAbort,
-      required this.tableSQL})
-      : super(
-            dialect: dialect,
-            transactions: transactions,
-            transactionAbort: transactionAbort);
+      {required super.dialect,
+      required super.transactions,
+      required super.transactionAbort,
+      required this.tableSQL,
+      required super.multiIsolateSupport});
+
+  @override
+  String get info => '${super.info}, tableSQL: $tableSQL';
+
+  @override
+  String get runtimeTypeNameSafe => 'DBSQLAdapterCapability';
 }
 
 typedef DBSQLAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>
@@ -415,7 +418,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   @override
   FutureOr<bool> checkDB() {
-    if (_generateTables) {
+    if (_generateTables && !DBAdapter.auxiliaryMode) {
       _generateTables = false;
 
       return generateTables().resolveMapped((tables) {
@@ -425,6 +428,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       });
     }
 
+    _generateTables = false;
     return checkDBTables();
   }
 
@@ -853,7 +857,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     _entityRepositoriesBuildOrderIn = repositories.toList();
 
-    var sqls = generateEntityRepositoresCreateTableSQLs(verbose: true);
+    var sqls = generateEntityRepositoresCreateTableSQLs(
+        verbose: !DBAdapter.auxiliaryMode);
 
     var ordered = sqls.entries.toHierarchicalOrder().map((e) => e.key).toList();
 

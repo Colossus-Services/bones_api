@@ -89,7 +89,8 @@ class DBObjectMemoryAdapter
           const DBAdapterCapability(
               dialect: DBDialect('object'),
               transactions: true,
-              transactionAbort: true),
+              transactionAbort: true,
+              multiIsolateSupport: false),
         ) {
     boot();
 
@@ -231,7 +232,7 @@ class DBObjectMemoryAdapter
   TableScheme? getTableSchemeImpl(
       String table, TableRelationshipReference? relationship,
       {Object? contextID}) {
-    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+    //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
     if (tableScheme != null) return tableScheme;
@@ -390,9 +391,9 @@ class DBObjectMemoryAdapter
   @override
   String toString() {
     var tablesSizes = _tables.map((key, value) => MapEntry(key, value.length));
-    var tablesStr = tablesSizes.isNotEmpty ? ', tables: $tablesSizes' : '';
+    var tablesStr = tablesSizes.isNotEmpty ? 'tables: $tablesSizes' : '';
     var closedStr = isClosed ? ', closed' : '';
-    return 'DBObjectMemoryAdapter#$instanceID{$tablesStr$closedStr}';
+    return 'DBObjectMemoryAdapter#$instanceID{$tablesStr$closedStr}+$capability';
   }
 
   @override

@@ -1,3 +1,34 @@
+## 1.5.1
+
+- new `APIServerConfig`:
+  - Holds the configuration need for `APIServer` and `APIServerWorker`.
+  - Can be created from command-line arguments or a JSON object.
+
+- Created an abstract base class `_APIServerBase` for  `APIServer` and `APIServerWorker`.
+  - `start` and `stop` methods, delegating to `startImpl` and `stopImpl`.
+
+- `APIServer`
+  - Support for spawning auxiliary workers in separate isolates when needed.
+  - Starting and stopping of auxiliary `APIServerWorker` instances using isolates. Main worker starts normally.
+
+- New `APIServerWorker` to handle multi-worker `APIServer`.
+
+- `APIRoot:`
+  - Added `isIsolateCopy`.
+
+- `DBAdapterCapability`:
+  - Added `multiIsolateSupport`;
+
+- `DBAdapter`
+  - Added `auxiliaryMode` and `enableAuxiliaryMode`.
+  - `DBSQLMemoryAdapter` and `DBObjectMemoryAdapter` don't support `auxiliaryMode`, since they don't support `multiIsolateSupport`.
+
+- `SQLGenerator.generateCreateTableSQL`: skip annotated hidden fields.
+
+- args_simple: ^1.0.0
+- coverage: ^1.7.1
+- vm_service: ^13.0.0
+
 ## 1.5.0
 
 - sdk: '>=3.2.0 <4.0.0'

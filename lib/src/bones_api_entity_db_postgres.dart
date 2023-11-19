@@ -110,7 +110,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               ),
               transactions: true,
               transactionAbort: true,
-              tableSQL: true),
+              tableSQL: true,
+              multiIsolateSupport: true),
         ) {
     boot();
 
@@ -399,7 +400,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     var connection = await catchFromPool();
 
     try {
-      _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+      //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
       var sql =
           "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
