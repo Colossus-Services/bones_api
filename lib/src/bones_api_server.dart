@@ -149,7 +149,9 @@ class APIServerConfig {
         securePort = resolveSecurePort(securePort,
             apiConfig: apiConfig, letsEncrypt: letsEncrypt),
         domainsRoots = parseDomains(domains,
-            apiConfig: apiConfig, documentRoot: documentRoot),
+            apiConfig: apiConfig,
+            documentRoot: documentRoot,
+            checkDirectoryExistence: true),
         letsEncryptProduction = resolveLetsEncryptProduction(
             letsEncryptProduction,
             apiConfig: apiConfig),
@@ -431,12 +433,16 @@ class APIServerConfig {
   ///
   /// - See: [APIServer.domainsRoots], [parseDomainPattern], [parseDomainDirectory].
   static Map<Pattern, Directory> parseDomains(Object? o,
-      {APIConfig? apiConfig, Object? documentRoot}) {
+      {APIConfig? apiConfig,
+      Object? documentRoot,
+      bool checkDirectoryExistence = false}) {
     o ??= apiConfig?.get('domains');
 
-    var documentRootDir = parseDomainDirectory(documentRoot);
+    var documentRootDir = parseDomainDirectory(documentRoot,
+        checkDirectoryExistence: checkDirectoryExistence);
 
-    var domains = _parseDomains(o);
+    var domains =
+        _parseDomains(o, checkDirectoryExistence: checkDirectoryExistence);
 
     var domains2 = {
       ...domains,
@@ -446,12 +452,15 @@ class APIServerConfig {
     return domains2;
   }
 
-  static Map<Pattern, Directory> _parseDomains(Object? o) {
+  static Map<Pattern, Directory> _parseDomains(Object? o,
+      {bool checkDirectoryExistence = false}) {
     if (o == null) return {};
 
     if (o is Map) {
-      var map = o.map((key, value) =>
-          MapEntry(parseDomainPattern(key), parseDomainDirectory(value)));
+      var map = o.map((key, value) => MapEntry(
+          parseDomainPattern(key),
+          parseDomainDirectory(value,
+              checkDirectoryExistence: checkDirectoryExistence)));
       return _removeInvalidDomains(map);
     }
 
@@ -465,7 +474,11 @@ class APIServerConfig {
       values = [o];
     }
 
-    var entries = values.map(parseDomainEntry).whereNotNull().toList();
+    var entries = values
+        .map((e) => parseDomainEntry(e,
+            checkDirectoryExistence: checkDirectoryExistence))
+        .whereNotNull()
+        .toList();
     if (entries.isEmpty) return {};
 
     var map =
@@ -492,10 +505,14 @@ class APIServerConfig {
   /// Parses a domain entry as [MapEntry].
   ///
   /// - See [APIServer.domainsRoots].
-  static MapEntry<Pattern, Directory?>? parseDomainEntry(Object? o) {
+  static MapEntry<Pattern, Directory?>? parseDomainEntry(Object? o,
+      {bool checkDirectoryExistence = false}) {
     if (o == null) return null;
     if (o is MapEntry) {
-      return MapEntry(parseDomainPattern(o.key), parseDomainDirectory(o.value));
+      return MapEntry(
+          parseDomainPattern(o.key),
+          parseDomainDirectory(o.value,
+              checkDirectoryExistence: checkDirectoryExistence));
     }
 
     var s = o.toString();
@@ -504,7 +521,10 @@ class APIServerConfig {
     var domain = parts[0].trim();
     var path = parts.length > 1 ? parts[1].trim() : '';
 
-    return MapEntry(parseDomainPattern(domain), parseDomainDirectory(path));
+    return MapEntry(
+        parseDomainPattern(domain),
+        parseDomainDirectory(path,
+            checkDirectoryExistence: checkDirectoryExistence));
   }
 
   /// Parses a domain pattern.
@@ -531,12 +551,13 @@ class APIServerConfig {
   /// Parses a domain [Directory].
   ///
   /// - See [APIServer.domainsRoots].
-  static Directory? parseDomainDirectory(Object? dirPath) {
+  static Directory? parseDomainDirectory(Object? dirPath,
+      {bool checkDirectoryExistence = false}) {
     if (dirPath == null) return null;
     if (dirPath is Directory) return dirPath;
     var p = dirPath.toString();
     var dir = Directory(p);
-    return dir.existsSync() ? dir : null;
+    return !checkDirectoryExistence || dir.existsSync() ? dir : null;
   }
 
   Map<String, dynamic> toJson() => {

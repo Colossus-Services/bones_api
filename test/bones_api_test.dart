@@ -221,7 +221,7 @@ void main() {
     });
 
     test('parseDomains', () async {
-      expect(APIServerConfig.parseDomains(MapEntry('', '')), isNull);
+      expect(APIServerConfig.parseDomains(MapEntry('', '')), isEmpty);
 
       expect(
           APIServerConfig.parseDomains(MapEntry('foo.com', '/var/www'))
