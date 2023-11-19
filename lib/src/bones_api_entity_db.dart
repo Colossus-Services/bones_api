@@ -272,7 +272,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
       if (auxiliaryMode) {
         _disposePopulateData();
-        return _initializationResultOK();
+        return _initializationResultOK(withEntityRepositories: false);
       }
 
       return populateImpl();
@@ -315,14 +315,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     _disposePopulateData();
 
     if (populateSource == null) {
-      return _initializationResultOK();
+      return _initializationResultOK(withEntityRepositories: false);
     }
 
     return populateFromSource(populateSource,
             workingPath: _workingPath,
             resolutionRules: EntityResolutionRules(allowReadFile: true),
             variables: populateSourceVariables)
-        .resolveMapped((val) => _initializationResultOK());
+        .resolveMapped(
+            (val) => _initializationResultOK(withEntityRepositories: true));
   }
 
   void _disposePopulateData() {
@@ -330,10 +331,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     _populateSourceVariables = null;
   }
 
-  InitializationResult _initializationResultOK() =>
+  InitializationResult _initializationResultOK(
+          {required bool withEntityRepositories}) =>
       InitializationResult.ok(this, dependencies: [
         if (parentRepositoryProvider != null) parentRepositoryProvider!,
-        ...entityRepositories,
+        if (withEntityRepositories) ...entityRepositories,
       ]);
 
   @override
