@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -32,6 +31,7 @@ import 'bones_api_session.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_httpclient.dart';
+import 'bones_api_utils_isolate.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIServer');
@@ -2221,48 +2221,5 @@ extension _APIRequestExtension on APIRequest {
     }
 
     return Request(method.name, requestedUri);
-  }
-}
-
-class PortListener {
-  final ReceivePort port;
-
-  late final StreamSubscription _subscription;
-
-  PortListener(this.port) {
-    _subscription = port.listen(_onData, cancelOnError: true);
-  }
-
-  Future<void> close() async {
-    await _subscription.cancel();
-  }
-
-  final ListQueue<Completer> _waitingQueue = ListQueue();
-
-  final ListQueue _unflushedQueue = ListQueue();
-
-  void _onData(o) {
-    if (_waitingQueue.isEmpty) {
-      _unflushedQueue.addLast(o);
-      return;
-    }
-
-    var completer = _waitingQueue.removeFirst();
-    if (!completer.isCompleted) {
-      completer.complete(o);
-    } else {
-      _unflushedQueue.addLast(o);
-    }
-  }
-
-  Future next() {
-    if (_unflushedQueue.isNotEmpty) {
-      var o = _unflushedQueue.removeFirst();
-      return Future.value(o);
-    }
-
-    var completer = Completer();
-    _waitingQueue.addLast(completer);
-    return completer.future;
   }
 }
