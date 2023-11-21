@@ -176,7 +176,8 @@ class APISessionSet {
     });
   }
 
-  FutureOr<List<APISession>> expiredSessions(DateTime now) {
+  FutureOr<List<APISession>> expiredSessions([DateTime? now]) {
+    now ??= DateTime.now();
     return _resolveSharedSessions()
         .where((id, session) => session.isExpired(timeout, now: now))
         .resolveMapped((entries) => entries.map((e) => e.value).toList());
