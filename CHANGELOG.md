@@ -25,10 +25,12 @@
 
 - `SQLGenerator.generateCreateTableSQL`: skip annotated hidden fields.
 
+- `APISessionSet`: using `SharedStoreField` and `SharedMapField` to store the the sessions.
+
 - New `APITokenStore`:
   - Shared tokens among `Isolate`s. 
 
-- shared_map: ^1.0.6
+- shared_map: ^1.0.8
 - args_simple: ^1.0.0
 - coverage: ^1.7.1
 - vm_service: ^13.0.0

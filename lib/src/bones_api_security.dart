@@ -404,17 +404,21 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
       {bool allowLogout = false}) {
-    return resolveRequestCredentials(request).resolveMapped((credentials) =>
-        _authenticateByRequestImpl(credentials, request, allowLogout));
+    return resolveRequestCredentials(request).resolveMapped((credentials) {
+      if (credentials.isEmpty) {
+        return resolveSessionCredential(request)
+            .resolveMapped((sessionCredential) {
+          if (sessionCredential != null) credentials.add(sessionCredential);
+          return _authenticateByRequestImpl(credentials, request, allowLogout);
+        });
+      } else {
+        return _authenticateByRequestImpl(credentials, request, allowLogout);
+      }
+    });
   }
 
   FutureOr<APIAuthentication?> _authenticateByRequestImpl(
       List<APICredential> credentials, APIRequest request, bool allowLogout) {
-    if (credentials.isEmpty) {
-      var sessionCredential = resolveSessionCredential(request);
-      if (sessionCredential != null) credentials.add(sessionCredential);
-    }
-
     if (credentials.isEmpty) {
       return null;
     }
@@ -471,37 +475,39 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
       APIRequest request) {
-    var apiToken = getSessionAPIToken(request);
-    if (apiToken != null) {
-      return resumeAuthentication(apiToken, request: request);
-    }
-
-    var credential = request.credential;
-    if (credential != null && credential.hasToken) {
-      var token = credential.token!;
-
-      return getAPIToken(token).resolveMapped((apiToken) {
+    return getSessionAPIToken(request).resolveMapped((apiToken) {
+      if (apiToken != null) {
         return resumeAuthentication(apiToken, request: request);
-      });
-    }
+      }
 
-    return null;
-  }
+      var credential = request.credential;
+      if (credential != null && credential.hasToken) {
+        var token = credential.token!;
 
-  APICredential? resolveSessionCredential(APIRequest request) {
-    APIToken? recentToken = getSessionAPIToken(request);
+        return getAPIToken(token).resolveMapped((apiToken) {
+          return resumeAuthentication(apiToken, request: request);
+        });
+      }
 
-    if (recentToken != null) {
-      return APICredential(recentToken.username, token: recentToken.token);
-    } else {
       return null;
-    }
+    });
   }
 
-  APIToken? getSessionAPIToken(APIRequest request) {
-    var tokens = getSessionValidTokens(request);
-    var recentToken = getMostRecentToken(tokens);
-    return recentToken;
+  FutureOr<APICredential?> resolveSessionCredential(APIRequest request) {
+    return getSessionAPIToken(request).resolveMapped((recentToken) {
+      if (recentToken != null) {
+        return APICredential(recentToken.username, token: recentToken.token);
+      } else {
+        return null;
+      }
+    });
+  }
+
+  FutureOr<APIToken?> getSessionAPIToken(APIRequest request) {
+    return getSessionValidTokens(request).resolveMapped((tokens) {
+      var recentToken = getMostRecentToken(tokens);
+      return recentToken;
+    });
   }
 
   APIToken? getMostRecentToken(Set<APIToken>? tokens) {
@@ -527,41 +533,40 @@ abstract class APISecurity {
 
       var sessionID = request.sessionID;
       if (sessionID != null) {
-        var session = _sessionSet.getMarkingAccess(sessionID);
-        if (session == null) {
-          session = APISession(sessionID);
-          _sessionSet.put(session);
-        }
-
-        session.tokens.add(token);
+        // ignore: discarded_futures
+        _sessionSet.getOrCreate(sessionID).resolveMapped((session) {
+          session.tokens.add(token);
+          return session;
+        });
       }
     }
   }
 
-  Set<APIToken>? getSessionValidTokens(APIRequest request) {
+  FutureOr<Set<APIToken>?> getSessionValidTokens(APIRequest request) {
     var sessionID = request.sessionID;
     if (sessionID == null) return null;
 
-    var session = _sessionSet.getMarkingAccess(sessionID);
-    var tokens = session?.validateTokens();
-    if (tokens == null || tokens.isEmpty) return null;
+    return _sessionSet.getMarkingAccess(sessionID).resolveMapped((session) {
+      var tokens = session?.validateTokens();
+      if (tokens == null || tokens.isEmpty) return null;
 
-    var usernames = tokens.map((e) => e.username).toSet();
+      var usernames = tokens.map((e) => e.username).toSet();
 
-    var validTokens = usernames.expand(getUsernameValidTokens).toList();
+      var validTokens = usernames.expand(getUsernameValidTokens).toList();
 
-    tokens.removeWhere((t) => !validTokens.contains(t));
+      tokens.removeWhere((t) => !validTokens.contains(t));
 
-    if (request.credential != null) {
-      var credentialUsername = request.credential!.username;
-      if (!usernames.contains(credentialUsername)) return null;
+      if (request.credential != null) {
+        var credentialUsername = request.credential!.username;
+        if (!usernames.contains(credentialUsername)) return null;
 
-      var tokensUsername =
-          tokens.where((t) => t.username == credentialUsername).toSet();
-      return tokensUsername;
-    } else {
-      return tokens;
-    }
+        var tokensUsername =
+            tokens.where((t) => t.username == credentialUsername).toSet();
+        return tokensUsername;
+      } else {
+        return tokens;
+      }
+    });
   }
 
   FutureOr<APIResponse<T>> doRequestAuthentication<T>(APIRequest request) {
@@ -590,37 +595,49 @@ abstract class APISecurity {
   FutureOr<List<APICredential>> resolveRequestCredentials(APIRequest request) {
     var credential = request.credential;
     if (credential == null) {
-      return _resolveRequestCredentialsImpl(request, []);
+      return _resolveRequestCredentialsImpl2(request, []);
     }
 
     if (credential.username.isEmpty && credential.hasToken) {
       var tokenKey = credential.token!;
       var sessionID = request.sessionID;
 
-      APIToken? validToken;
       if (sessionID != null && sessionID.isNotEmpty) {
-        validToken = _sessionSet.get(sessionID)?.getValidToken(tokenKey);
-      }
-
-      if (validToken != null) {
-        var username = validToken.username;
-        credential = credential.withUsername(username);
-        return _resolveRequestCredentialsImpl(request, [credential]);
-      } else {
-        return getAPIToken(tokenKey).resolveMapped((validToken) {
-          if (validToken != null) {
-            var username = validToken.username;
-            credential = credential!.withUsername(username);
-          }
-          return _resolveRequestCredentialsImpl(request, [credential!]);
+        return _sessionSet.get(sessionID).resolveMapped((session) {
+          var validToken = session?.getValidToken(tokenKey);
+          return _resolveRequestCredentialsImpl1(
+              request, credential, tokenKey, validToken);
         });
       }
+
+      return _resolveRequestCredentialsImpl1(
+          request, credential, tokenKey, null);
     }
 
-    return _resolveRequestCredentialsImpl(request, [credential]);
+    return _resolveRequestCredentialsImpl2(request, [credential]);
   }
 
-  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl(
+  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl1(
+      APIRequest request,
+      APICredential credential,
+      String tokenKey,
+      APIToken? validToken) {
+    if (validToken != null) {
+      var username = validToken.username;
+      credential = credential.withUsername(username);
+      return _resolveRequestCredentialsImpl2(request, [credential]);
+    } else {
+      return getAPIToken(tokenKey).resolveMapped((validToken) {
+        if (validToken != null) {
+          var username = validToken.username;
+          credential = credential.withUsername(username);
+        }
+        return _resolveRequestCredentialsImpl2(request, [credential]);
+      });
+    }
+  }
+
+  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl2(
       APIRequest request, List<APICredential> credentials) {
     var username = getRequestParameterUsername(request).trim();
     var token = getRequestParameterToken(request).trim();

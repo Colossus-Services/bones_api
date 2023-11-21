@@ -225,7 +225,7 @@ void main() {
       }
     });
 
-    test('resumeAuthenticationByRequest', () {
+    test('resumeAuthenticationByRequest', () async {
       var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
@@ -237,7 +237,7 @@ void main() {
         expect(request.authentication, isNotNull);
         expect(request.authentication!.username, equals('foo'));
 
-        var credential = apiSecurity.resolveSessionCredential(request);
+        var credential = await apiSecurity.resolveSessionCredential(request);
         expect(credential, isNotNull);
         expect(credential!.username, equals('foo'));
       }
