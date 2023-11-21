@@ -9,6 +9,7 @@ import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' show sha256, sha384, sha512;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:shared_map/shared_map.dart';
 import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
@@ -188,25 +189,33 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
-    _setupInstance(fromConstructor: true);
+    _setupInstance();
   }
 
-  bool _isolateCopy = false;
+  /// The global ID of the [sharedStore].
+  String get sharedStoreID => 'SharedStore[$name/$version]';
+
+  late final SharedStoreField _sharedStoreField =
+      SharedStoreField(sharedStoreID);
+
+  /// The [SharedStore] of this [APIRoot]. This [SharedStore] will be
+  /// automatically shared among `Isolate` copies.
+  ///
+  /// See [isIsolateCopy].
+  SharedStore get sharedStore => _sharedStoreField.sharedStore;
 
   /// Returns `true` if this instance is a copy passed to another `Isolate` (usually an [APIServerWorker]).
-  bool get isIsolateCopy => _isolateCopy;
+  bool get isIsolateCopy => _sharedStoreField.isIsolateCopy;
 
-  void _setupInstance({bool fromConstructor = false}) {
+  void _setupInstance() {
     var prev = _instances[name];
     if (identical(prev, this)) {
       return;
     }
 
-    if (!fromConstructor) {
-      _isolateCopy = true;
-    }
-
+    _sharedStoreField.sharedStore;
     _instances[name] = this;
+
     boot();
     _setupLogger();
   }

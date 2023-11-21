@@ -2031,6 +2031,8 @@ final class APIServerWorker extends _APIServerBase {
 
     headers['X-APIServer-Worker'] = '$workerIndex/$totalWorkers';
 
+    // headers['X-APIToken'] = apiRequest.credential?.token ?? '?';
+
     var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
 
     return retPayload.resolveMapped((payload) {
