@@ -1,3 +1,5 @@
+@TestOn('vm')
+@Timeout(Duration(seconds: 180))
 import 'dart:isolate';
 
 import 'package:bones_api/src/bones_api_utils_isolate.dart';
