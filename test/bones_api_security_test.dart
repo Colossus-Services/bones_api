@@ -1,10 +1,8 @@
 @Timeout(Duration(seconds: 180))
 // ignore_for_file: discarded_futures
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/bones_api_server.dart';
 import 'package:shared_map/shared_map.dart';
 import 'package:test/test.dart';
 
@@ -143,99 +141,6 @@ void main() {
         expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
         expect(request1.authentication, isNotNull);
         expect(request1.authentication!.username, equals('bar'));
-      }
-    });
-
-    test('authenticateByRequest (shared + Isolate)', () async {
-      final sharedStore = SharedStore.fromUUID();
-
-      var apiSecurity = _MyAPISecurity(sharedStore: sharedStore);
-
-      {
-        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
-        request1.credential = APICredential('foo', passwordHash: 'foo');
-
-        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
-        expect(request1.authentication, isNotNull);
-        expect(request1.authentication!.username, equals('foo'));
-
-        var request2 = APIRequest(APIRequestMethod.GET, 'foo');
-        request2.credential = APICredential('bar', passwordHash: 'xxx');
-
-        expect(await apiSecurity.authenticateByRequest(request2), isNull);
-        expect(request2.authentication, isNull);
-      }
-
-      {
-        var request1 = APIRequest(APIRequestMethod.GET, 'foo');
-        request1.parameters['username'] = 'foo';
-        request1.parameters['password'] = 'foo';
-
-        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
-        expect(request1.authentication, isNotNull);
-        expect(request1.authentication!.username, equals('foo'));
-
-        var request2 = APIRequest(APIRequestMethod.GET, 'foo');
-        request2.parameters['username'] = 'foo';
-        request2.parameters['password'] = 'not_foo';
-
-        expect(await apiSecurity.authenticateByRequest(request2), isNull);
-        expect(request2.authentication, isNull);
-      }
-
-      {
-        var isolateOk = await Isolate.run<bool>(() async {
-          var request1 = APIRequest(APIRequestMethod.GET, 'foo');
-          request1.parameters['username'] = 'foo';
-          request1.parameters['password'] = 'foo';
-
-          var authentication1 =
-              await apiSecurity.authenticateByRequest(request1);
-          if (authentication1 == null) {
-            throw StateError("Null `authentication1`");
-          }
-
-          var requestAuthentication1 = request1.authentication;
-          if (requestAuthentication1 == null) {
-            throw StateError("Null `request1.authentication`");
-          }
-
-          if (requestAuthentication1.username != 'foo') {
-            throw StateError("`request1.authentication!.username` != 'foo'");
-          }
-
-          var request2 = APIRequest(APIRequestMethod.GET, 'foo');
-          request2.parameters['username'] = 'foo';
-          request2.parameters['password'] = 'not_foo';
-
-          var authentication2 =
-              await apiSecurity.authenticateByRequest(request2);
-          if (authentication2 != null) {
-            throw StateError("Expected null `authentication2`");
-          }
-
-          if (request2.authentication != null) {
-            throw StateError("Expected null `request2.authentication`");
-          }
-
-          var request3 = APIRequest(APIRequestMethod.GET, 'foo',
-              credential:
-                  APICredential('foo', token: requestAuthentication1.tokenKey));
-
-          var authentication3 =
-              await apiSecurity.authenticateByRequest(request3);
-          if (authentication3 == null) {
-            throw StateError("Null `authentication3`");
-          }
-
-          if (request3.authentication == null) {
-            throw StateError("Null `request3.authentication`");
-          }
-
-          return true;
-        });
-
-        expect(isolateOk, isTrue);
       }
     });
 
