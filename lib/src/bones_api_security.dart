@@ -702,12 +702,8 @@ class APITokenStore {
 
   String get sharedTokensID => 'APITokenStore';
 
-  SharedMapField<String, APITokenInfo>? _sharedTokensField;
-
-  FutureOr<SharedMapField<String, APITokenInfo>> _resolveSharedTokensField() {
-    return _sharedTokensField ??=
-        SharedMapField(sharedTokensID, sharedStore: sharedStore);
-  }
+  late final SharedMapField<String, APITokenInfo> _sharedTokensField =
+      SharedMapField(sharedTokensID, sharedStore: sharedStore);
 
   static const Duration _cacheTimeout = Duration(seconds: 5);
 
@@ -718,19 +714,9 @@ class APITokenStore {
     var sharedTokens = _sharedTokens[this];
     if (sharedTokens != null) return sharedTokens;
 
-    var sharedTokensField = _resolveSharedTokensField();
-
-    FutureOr<SharedMap<String, APITokenInfo>> sharedTokensAsync;
-
-    if (sharedTokensField is Future<SharedMapField<String, APITokenInfo>>) {
-      sharedTokensAsync = sharedTokensField.then((sharedTokensField) =>
-          sharedTokensField.sharedMapCached(timeout: _cacheTimeout));
-    } else {
-      sharedTokensAsync =
-          sharedTokensField.sharedMapCached(timeout: _cacheTimeout);
-    }
-
-    return sharedTokensAsync.resolveMapped((sharedTokens) {
+    return _sharedTokensField
+        .sharedMapCached(timeout: _cacheTimeout)
+        .resolveMapped((sharedTokens) {
       _sharedTokens[this] = sharedTokens;
       return sharedTokens;
     });
