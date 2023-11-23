@@ -30,8 +30,8 @@
 - New `APITokenStore`:
   - Shared tokens among `Isolate`s. 
 
-- shared_map: ^1.0.8
-- args_simple: ^1.0.0
+- shared_map: ^1.0.9
+- args_simple: ^1.1.0
 - coverage: ^1.7.1
 - vm_service: ^13.0.0
 
