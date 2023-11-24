@@ -16,7 +16,7 @@ dependencies:
   statistics: ^1.0.26
   swiss_knife: ^3.1.5
   data_serializer: ^1.0.12
-  shared_map: ^1.0.9
+  shared_map: ^1.0.10
   graph_explorer: ^1.0.2
   ascii_art_tree: ^1.0.6
   map_history: ^1.0.3

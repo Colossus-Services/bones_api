@@ -6,12 +6,15 @@
 
 - Created an abstract base class `_APIServerBase` for  `APIServer` and `APIServerWorker`.
   - `start` and `stop` methods, delegating to `startImpl` and `stopImpl`.
+  - Add a new boolean property `isStarting` to determine if the server is in the process of starting.
 
 - `APIServer`
   - Support for spawning auxiliary workers in separate isolates when needed.
   - Starting and stopping of auxiliary `APIServerWorker` instances using isolates. Main worker starts normally.
 
 - New `APIServerWorker` to handle multi-worker `APIServer`.
+  - Add `_processWhileInitializing` to handle API requests while the server is still initializing,
+    including a timeout for initialization.
 
 - `APIRoot:`
   - Added `isIsolateCopy`.
@@ -30,7 +33,7 @@
 - New `APITokenStore`:
   - Shared tokens among `Isolate`s. 
 
-- shared_map: ^1.0.9
+- shared_map: ^1.0.10
 - args_simple: ^1.1.0
 - coverage: ^1.7.1
 - vm_service: ^13.0.0

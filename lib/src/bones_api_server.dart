@@ -700,12 +700,29 @@ abstract class _APIServerBase extends APIServerConfig {
   /// Returns `true` if this servers is started.
   bool get isStarted => _started;
 
+  bool _starting = false;
+
+  /// Returns `true` if this instance is currently in the process of starting.
+  bool get isStarting => _starting;
+
+  Future<bool>? _startAsync;
+
   /// Starts this server.
   Future<bool> start() async {
     if (_started) return true;
     _started = true;
-    var ok = await _startImpl();
-    return ok;
+    _starting = true;
+
+    return _startAsync = _startImpl().then((ok) {
+      _starting = false;
+      _startAsync = null;
+      return ok;
+    }, onError: (e, s) {
+      _starting = false;
+      _startAsync = null;
+      _log.severe("Initialization error", e, s);
+      throw e;
+    });
   }
 
   Future<bool> _startImpl();
@@ -1894,6 +1911,10 @@ final class APIServerWorker extends _APIServerBase {
 
   FutureOr<Response> _processAPIRequest(
       Request request, APIRequest apiRequest) {
+    if (_starting) {
+      return _processWhileInitializing(request, apiRequest);
+    }
+
     try {
       if (apiRequest.method == APIRequestMethod.OPTIONS) {
         return _processOPTIONSRequest(request, apiRequest);
@@ -1903,6 +1924,32 @@ final class APIServerWorker extends _APIServerBase {
     } catch (e, s) {
       return _errorProcessing(request, apiRequest, e, s);
     }
+  }
+
+  static const initializationTimeout = Duration(seconds: 20);
+
+  FutureOr<Response> _processWhileInitializing(
+      Request request, APIRequest apiRequest) {
+    final startAsync = _startAsync;
+
+    // If is starting and there's no `_startAsync`,
+    // he server failed to initialize and to handle its error.
+    if (startAsync == null) {
+      return Response.internalServerError(body: 'Server not available.');
+    }
+
+    return startAsync
+        .timeout(initializationTimeout, onTimeout: () => false)
+        .then((ok) {
+      if (ok && !_starting) {
+        return _processAPIRequest(request, apiRequest);
+      }
+
+      return Response(
+        HttpStatus.serviceUnavailable,
+        body: 'Server is still initializing. Please try again later.',
+      );
+    });
   }
 
   Response _errorProcessing(
