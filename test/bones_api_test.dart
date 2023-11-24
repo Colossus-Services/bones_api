@@ -221,35 +221,36 @@ void main() {
     });
 
     test('parseDomains', () async {
-      expect(APIServer.parseDomains(MapEntry('', '')), isNull);
+      expect(APIServerConfig.parseDomains(MapEntry('', '')), isEmpty);
 
       expect(
-          APIServer.parseDomains(MapEntry('foo.com', '/var/www'))
-              ?.map((key, value) => MapEntry(key, value.path)),
+          APIServerConfig.parseDomains(MapEntry('foo.com', '/var/www'))
+              .map((key, value) => MapEntry(key, value.path)),
           equals({'foo.com': '/var/www'}));
 
       expect(
-          APIServer.parseDomains(MapEntry('foo.com', Directory('/var/www0')))
-              ?.map((key, value) => MapEntry(key, value.path)),
+          APIServerConfig.parseDomains(
+                  MapEntry('foo.com', Directory('/var/www0')))
+              .map((key, value) => MapEntry(key, value.path)),
           equals({'foo.com': '/var/www0'}));
 
       expect(
-          APIServer.parseDomains('foo.com=/var/www&bar.com=/var/www2')
-              ?.map((key, value) => MapEntry(key, value.path)),
+          APIServerConfig.parseDomains('foo.com=/var/www&bar.com=/var/www2')
+              .map((key, value) => MapEntry(key, value.path)),
           equals({'foo.com': '/var/www', 'bar.com': '/var/www2'}));
 
       expect(
-          APIServer.parseDomains(
+          APIServerConfig.parseDomains(
                   r'r/(\w+\.)?foo.com/=/var/www&bar.com=/var/www2')
-              ?.map((key, value) => MapEntry(key, value.path)),
+              .map((key, value) => MapEntry(key, value.path)),
           equals({
             RegExp(r'(\w+\.)?foo.com'): '/var/www',
             'bar.com': '/var/www2'
           }));
 
       expect(
-          APIServer.parseDomains('bar.com=/var/www2')
-              ?.map((key, value) => MapEntry(key, value.path)),
+          APIServerConfig.parseDomains('bar.com=/var/www2')
+              .map((key, value) => MapEntry(key, value.path)),
           equals({'bar.com': '/var/www2'}));
     });
 

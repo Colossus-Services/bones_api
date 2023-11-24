@@ -9,6 +9,7 @@ import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' show sha256, sha384, sha512;
 import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:shared_map/shared_map.dart';
 import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
@@ -41,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.0';
+  static const String VERSION = '1.5.1';
 
   static bool _boot = false;
 
@@ -93,6 +94,29 @@ abstract class APIRoot with Initializable, Closable {
     } else {
       return null;
     }
+  }
+
+  /// Returns the [APIRoot] by associated [APIRequest] [zone].
+  static ({APIRoot? apiRoot, APIRequest? apiRequest}) getByAPIRequestZone(
+      Zone zone) {
+    var lng = _instances.length;
+
+    if (lng == 1) {
+      var apiRoot = _instances.values.first;
+      var apiRequest = apiRoot.currentAPIRequest.get(zone);
+      if (apiRequest != null) {
+        return (apiRoot: apiRoot, apiRequest: apiRequest);
+      }
+    } else if (lng > 1) {
+      for (var apiRoot in _instances.values) {
+        var apiRequest = apiRoot.currentAPIRequest.get(zone);
+        if (apiRequest != null) {
+          return (apiRoot: apiRoot, apiRequest: apiRequest);
+        }
+      }
+    }
+
+    return (apiRoot: null, apiRequest: null);
   }
 
   /// Returns an [APIRoot] instance with [name].
@@ -188,7 +212,33 @@ abstract class APIRoot with Initializable, Closable {
             LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
         apiConfig =
             APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+    _setupInstance();
+  }
+
+  /// The global ID of the [sharedStore].
+  String get sharedStoreID => 'SharedStore[$name/$version]';
+
+  late final SharedStoreField _sharedStoreField =
+      SharedStoreField(sharedStoreID);
+
+  /// The [SharedStore] of this [APIRoot]. This [SharedStore] will be
+  /// automatically shared among `Isolate` copies.
+  ///
+  /// See [isIsolateCopy].
+  SharedStore get sharedStore => _sharedStoreField.sharedStore;
+
+  /// Returns `true` if this instance is a copy passed to another `Isolate` (usually an [APIServerWorker]).
+  bool get isIsolateCopy => _sharedStoreField.isIsolateCopy;
+
+  void _setupInstance() {
+    var prev = _instances[name];
+    if (identical(prev, this)) {
+      return;
+    }
+
+    _sharedStoreField.sharedStore;
     _instances[name] = this;
+
     boot();
     _setupLogger();
   }
@@ -241,6 +291,8 @@ abstract class APIRoot with Initializable, Closable {
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() {
+    _setupInstance();
+
     var lAsync1 = loadEntityProviders();
     var lAsync2 = loadEntityRepositoryProviders();
     var lAsync3 = loadDependencies();
@@ -281,7 +333,7 @@ abstract class APIRoot with Initializable, Closable {
 
     tryCallSync(() => onClose());
 
-    _instances.remove(this);
+    _instances.removeWhere((name, api) => identical(api, this));
 
     return true;
   }
@@ -309,6 +361,8 @@ abstract class APIRoot with Initializable, Closable {
   Future<InitializationResult>? _modulesLoading;
 
   FutureOr<InitializationResult> _ensureModulesLoaded() {
+    _setupInstance();
+
     if (_modules != null) {
       return InitializationResult.ok(this, dependencies: _modules!.values);
     }
@@ -703,7 +757,8 @@ abstract class APIRoot with Initializable, Closable {
       modulesNames = _modules?.keys.toSet().toString() ?? '{loading...}';
     }
 
-    return '$name[$version]$modulesNames#$_instanceId';
+    var isolateInfo = isIsolateCopy ? '(Isolate copy)' : '';
+    return '$name[$version]#$_instanceId$isolateInfo$modulesNames';
   }
 }
 
@@ -1113,7 +1168,7 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
 }
 
 /// Base class for payload.
-abstract class APIPayload {
+mixin APIPayload {
   static MimeType? resolveMimeType(Object? mimeType) {
     if (mimeType == null) return null;
     if (mimeType is MimeType) return mimeType;
@@ -1176,8 +1231,111 @@ extension APIRequesterSourceExtension on APIRequesterSource {
   }
 }
 
+/// An API metric.
+///
+/// - Used by [APIRequest] nad [APIResponse].
+class APIMetric {
+  final String name;
+
+  final Duration? duration;
+
+  final String? description;
+  final int? n;
+
+  APIMetric(this.name, {this.duration, this.description, this.n});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is APIMetric &&
+          runtimeType == other.runtimeType &&
+          name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+
+  @override
+  String toString() => 'APIMetric[$name]{${[
+        if (duration != null) 'duration: $duration',
+        if (n != null) 'n: $n',
+        if (description != null) 'description: "$description"'
+      ].join(', ')}';
+}
+
+/// Base class for an [APIMetric] set.
+///
+/// - Used by [APIRequest] nad [APIResponse].
+abstract class APIMetricSet {
+  Map<String, APIMetric>? _metrics;
+
+  APIMetricSet({Map<String, APIMetric>? metrics}) : _metrics = metrics;
+
+  /// Returns `true` if any metric is set. See [metrics].
+  bool get hasMetrics => _metrics != null && _metrics!.isNotEmpty;
+
+  /// Returns the current metrics.
+  Map<String, APIMetric> get metrics => _metrics ??= <String, APIMetric>{};
+
+  /// Set a metric.
+  ///
+  /// This usually is transformed to a `Server-Timing` header.
+  APIMetric setMetric(String name,
+          {Duration? duration, String? description, int? n}) =>
+      metrics[name] =
+          APIMetric(name, duration: duration, description: description, n: n);
+
+  /// Returns a metric.
+  APIMetric? getMetric(String name) => metrics[name];
+
+  Map<String, ({DateTime start, String? description})>? _startedMetrics;
+
+  void _copyStartedMetrics(APIResponse other) {
+    var otherStartedMetrics = other._startedMetrics;
+
+    if (otherStartedMetrics != null && otherStartedMetrics.isNotEmpty) {
+      var startedMetrics = _startedMetrics ??= {};
+      startedMetrics.addAll(otherStartedMetrics);
+    }
+  }
+
+  /// Starts a metric chronometer.
+  DateTime startMetric(String name, {String? description}) {
+    var startedMetrics = _startedMetrics ??= {};
+
+    var time = startedMetrics.putIfAbsent(
+        name, () => (start: DateTime.now(), description: description));
+    return time.start;
+  }
+
+  /// Stops a metric previously started and adds it to [metrics].
+  /// See [startMetric].
+  Duration? stopMetric(String name, {DateTime? now}) {
+    var metric = _startedMetrics?[name];
+    if (metric == null) return null;
+
+    now ??= DateTime.now();
+
+    var duration = now.difference(metric.start);
+    setMetric(name, duration: duration, description: metric.description);
+
+    return duration;
+  }
+
+  void stopAllMetrics({DateTime? now}) {
+    var startedMetrics = _startedMetrics;
+
+    if (startedMetrics != null) {
+      now ??= DateTime.now();
+
+      for (var k in startedMetrics.keys) {
+        stopMetric(k, now: now);
+      }
+    }
+  }
+}
+
 /// Represents an API request.
-class APIRequest extends APIPayload {
+class APIRequest extends APIMetricSet with APIPayload {
   static final TypeInfo typeInfo = TypeInfo.from(APIRequest);
 
   static int _idCount = 0;
@@ -1303,7 +1461,8 @@ class APIRequest extends APIPayload {
       DateTime? time,
       this.parsingDuration,
       Uri? requestedUri,
-      this.originalRequest})
+      this.originalRequest,
+      Map<String, APIMetric>? metrics})
       : parameters = parameters ?? <String, dynamic>{},
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         headers = headers ?? <String, dynamic>{},
@@ -1323,7 +1482,8 @@ class APIRequest extends APIPayload {
                     value is List
                         ? value.map((e) => '$e').toList()
                         : '$value'))),
-        time = time ?? DateTime.now();
+        time = time ?? DateTime.now(),
+        super(metrics: metrics);
 
   static APIRequesterSource _resolveRestSource(String? requestAddress) {
     if (requestAddress == null) return APIRequesterSource.unknown;
@@ -1852,6 +2012,21 @@ class APIRequest extends APIPayload {
     return origin;
   }
 
+  final List<Transaction> _transactions = [];
+
+  /// Returns the transactions associated with this request.
+  List<Transaction> get transactions => UnmodifiableListView(_transactions);
+
+  /// Associate a [Transaction] to this request.
+  void addTransaction(Transaction t) {
+    if (!_transactions.contains(t)) {
+      _transactions.add(t);
+    }
+  }
+
+  /// Disassociate a [Transaction] from this request.
+  bool removeTransaction(Transaction t) => _transactions.remove(t);
+
   @override
   String toString({bool withHeaders = true, bool withPayload = true}) {
     var headersStr = withHeaders ? ', headers: $headers' : '';
@@ -2285,7 +2460,7 @@ extension _IntExtension on int {
 }
 
 /// Represents an API response.
-class APIResponse<T> extends APIPayload {
+class APIResponse<T> extends APIMetricSet with APIPayload {
   static final TypeInfo typeInfo = TypeInfo.from(APIResponse);
 
   /// The response status.
@@ -2375,13 +2550,13 @@ class APIResponse<T> extends APIPayload {
       int? keepAliveMaxRequests,
       this.error,
       this.stackTrace,
-      Map<String, Duration>? metrics})
+      Map<String, APIMetric>? metrics})
       : headers = headers ?? <String, dynamic>{},
         payload = _resolvePayload(payload, payloadDynamic),
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
         keepAliveMaxRequests = keepAliveMaxRequests ?? 1000,
-        _metrics = metrics;
+        super(metrics: metrics);
 
   static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) {
     if (payload != null) return payload;
@@ -2425,7 +2600,7 @@ class APIResponse<T> extends APIPayload {
       int? keepAliveMaxRequests,
       Object? error,
       StackTrace? stackTrace,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(status ?? this.status,
         payload: nullPayload
             ? null
@@ -2454,7 +2629,7 @@ class APIResponse<T> extends APIPayload {
       String? fileExtension,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.OK,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
@@ -2479,7 +2654,7 @@ class APIResponse<T> extends APIPayload {
       CacheControl? cacheControl,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.ok(
         payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
@@ -2502,7 +2677,7 @@ class APIResponse<T> extends APIPayload {
       Object? mimeType,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_FOUND,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
@@ -2521,7 +2696,7 @@ class APIResponse<T> extends APIPayload {
       Object? mimeType,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.notFound(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
@@ -2543,7 +2718,7 @@ class APIResponse<T> extends APIPayload {
       CacheControl? cacheControl,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.NOT_MODIFIED,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
@@ -2566,7 +2741,7 @@ class APIResponse<T> extends APIPayload {
       CacheControl? cacheControl,
       Duration? keepAliveTimeout,
       int? keepAliveMaxRequests,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.notModified(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
@@ -2586,7 +2761,7 @@ class APIResponse<T> extends APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
@@ -2601,7 +2776,7 @@ class APIResponse<T> extends APIPayload {
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.unauthorized(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
@@ -2611,11 +2786,20 @@ class APIResponse<T> extends APIPayload {
       .._copyStartedMetrics(this);
   }
 
-  /// Creates a response of status `REDIRECT`.
+  @Deprecated("Use `redirect`")
   factory APIResponse.redirecy(Uri location,
       {Map<String, dynamic>? headers,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
+    return APIResponse.redirect(location,
+        headers: headers, mimeType: mimeType, metrics: metrics);
+  }
+
+  /// Creates a response of status `REDIRECT`.
+  factory APIResponse.redirect(Uri location,
+      {Map<String, dynamic>? headers,
+      Object? mimeType,
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.REDIRECT,
         headers: headers ?? <String, dynamic>{},
         payloadDynamic: location,
@@ -2623,13 +2807,26 @@ class APIResponse<T> extends APIPayload {
         metrics: metrics);
   }
 
-  /// Transform this response to an `REDIRECT` response.
+  @Deprecated("Use `asRedirect`")
   APIResponse<T> asRedirecy(
       {Uri? location,
       Map<String, dynamic>? headers,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
-    return APIResponse.redirecy(location ?? Uri.parse('$payload'.trim()),
+      Map<String, APIMetric>? metrics}) {
+    return asRedirect(
+        location: location,
+        headers: headers,
+        mimeType: mimeType,
+        metrics: metrics);
+  }
+
+  /// Transform this response to an `REDIRECT` response.
+  APIResponse<T> asRedirect(
+      {Uri? location,
+      Map<String, dynamic>? headers,
+      Object? mimeType,
+      Map<String, APIMetric>? metrics}) {
+    return APIResponse.redirect(location ?? Uri.parse('$payload'.trim()),
         headers: headers ?? this.headers,
         mimeType: mimeType ?? payloadMimeType,
         metrics: metrics ?? _metrics)
@@ -2642,7 +2839,7 @@ class APIResponse<T> extends APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.BAD_REQUEST,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
@@ -2657,7 +2854,7 @@ class APIResponse<T> extends APIPayload {
       Object? payloadDynamic,
       Map<String, dynamic>? headers,
       Object? mimeType,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.badRequest(
         payload: payload ?? (payloadDynamic == null ? this.payload : null),
         payloadDynamic: payloadDynamic,
@@ -2672,7 +2869,7 @@ class APIResponse<T> extends APIPayload {
       {Map<String, dynamic>? headers,
       dynamic error,
       StackTrace? stackTrace,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.ERROR,
         headers: headers ?? <String, dynamic>{},
         error: error,
@@ -2685,7 +2882,7 @@ class APIResponse<T> extends APIPayload {
       {Map<String, dynamic>? headers,
       dynamic error,
       StackTrace? stackTrace,
-      Map<String, Duration>? metrics}) {
+      Map<String, APIMetric>? metrics}) {
     return APIResponse.error(
         headers: headers ?? this.headers,
         error: error ?? this.error,
@@ -2752,67 +2949,6 @@ class APIResponse<T> extends APIPayload {
 
   /// Returns `true` if [status] is a [APIResponseStatus.BAD_REQUEST].
   bool get isBadRequest => status == APIResponseStatus.BAD_REQUEST;
-
-  Map<String, Duration>? _metrics;
-
-  /// Returns `true` if any metric is set. See [metrics].
-  bool get hasMetrics => _metrics != null && _metrics!.isNotEmpty;
-
-  /// Returns the current metrics.
-  Map<String, Duration> get metrics => _metrics ??= <String, Duration>{};
-
-  /// Set a metric.
-  ///
-  /// This usually is transformed to a `Server-Timing` header.
-  setMetric(String name, Duration duration) => metrics[name] = duration;
-
-  /// Returns a metric.
-  getMetric(String name) => metrics[name];
-
-  Map<String, DateTime>? _startedMetrics;
-
-  void _copyStartedMetrics(APIResponse other) {
-    var otherStartedMetrics = other._startedMetrics;
-
-    if (otherStartedMetrics != null && otherStartedMetrics.isNotEmpty) {
-      var startedMetrics = _startedMetrics ??= <String, DateTime>{};
-      startedMetrics.addAll(otherStartedMetrics);
-    }
-  }
-
-  /// Starts a metric chronometer.
-  DateTime startMetric(String name) {
-    var startedMetrics = _startedMetrics ??= <String, DateTime>{};
-
-    var time = startedMetrics.putIfAbsent(name, () => DateTime.now());
-    return time;
-  }
-
-  /// Stops a metric previously started and adds it to [metrics].
-  /// See [startMetric].
-  Duration? stopMetric(String name, {DateTime? now}) {
-    var start = _startedMetrics?[name];
-    if (start == null) return null;
-
-    now ??= DateTime.now();
-
-    var duration = now.difference(start);
-    setMetric(name, duration);
-
-    return duration;
-  }
-
-  void stopAllMetrics({DateTime? now}) {
-    var startedMetrics = _startedMetrics;
-
-    if (startedMetrics != null) {
-      now ??= DateTime.now();
-
-      for (var k in startedMetrics.keys) {
-        stopMetric(k, now: now);
-      }
-    }
-  }
 
   String? getHeader(String headerKey, {String? def}) {
     var val = headers[headerKey];

@@ -158,35 +158,42 @@ class APIConfig {
 
   /// Returns the final value from a path of keys as [E].
   E? getPath<E>(String k0, [Object? k1, Object? k2, Object? k3, Object? k4]) {
+    Object key = k0;
     Object? val = get(k0);
     if (val == null) return null;
 
     if (k1 != null) {
+      key = k1;
       val = val is Map ? val[k1] : (k1 is int && val is List ? val[k1] : null);
       if (val == null) return null;
     }
 
     if (k2 != null) {
+      key = k2;
       val = val is Map ? val[k2] : (k2 is int && val is List ? val[k2] : null);
       if (val == null) return null;
     }
 
     if (k3 != null) {
+      key = k3;
       val = val is Map ? val[k3] : (k3 is int && val is List ? val[k3] : null);
       if (val == null) return null;
     }
 
     if (k4 != null) {
+      key = k4;
       val = val is Map ? val[k4] : (k4 is int && val is List ? val[k4] : null);
       if (val == null) return null;
     }
+
+    val = _resolveValue(key.toString(), val, null);
 
     if (val is! E) {
       var keyPath = [k0, k1, k2, k3, k4].whereNotNull().join('/');
       throw StateError("Can't return key `$keyPath` as `$E`: $val");
     }
 
-    return val as E;
+    return val;
   }
 
   /// Alias to [get] returning a [Map].

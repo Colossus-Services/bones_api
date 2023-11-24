@@ -1550,6 +1550,10 @@ abstract mixin class SQLGenerator {
           ?.whereType<EntityField>()
           .toList();
 
+      if (entityFieldAnnotations != null && entityFieldAnnotations.hasHidden) {
+        continue;
+      }
+
       var columnName = normalizeColumnName(fieldName);
       var comment = '${fieldType.toString(withT: false)} $fieldName';
 

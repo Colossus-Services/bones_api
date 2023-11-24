@@ -1,3 +1,51 @@
+## 1.5.1
+
+- new `APIServerConfig`:
+  - Holds the configuration need for `APIServer` and `APIServerWorker`.
+  - Can be created from command-line arguments or a JSON object.
+
+- Created an abstract base class `_APIServerBase` for  `APIServer` and `APIServerWorker`.
+  - `start` and `stop` methods, delegating to `startImpl` and `stopImpl`.
+  - Add a new boolean property `isStarting` to determine if the server is in the process of starting.
+
+- `APIServer`
+  - Support for spawning auxiliary workers in separate isolates when needed.
+  - Starting and stopping of auxiliary `APIServerWorker` instances using isolates. Main worker starts normally.
+
+- New `APIServerWorker` to handle multi-worker `APIServer`.
+  - Add `_processWhileInitializing` to handle API requests while the server is still initializing,
+    including a timeout for initialization.
+
+- `APIRequest`:
+  - Can also handle metrics.
+  - Added `transactions` field, automatically populated with all the `Transactions` of the request.
+
+- `APIRequest` and `APIResponse`:
+  - Improved metrics: added `description` parameter.
+  - Added `Transaction`s duration to `Server-Timing`.
+
+- `APIRoot:`
+  - Added `isIsolateCopy`.
+
+- `DBAdapterCapability`:
+  - Added `multiIsolateSupport`;
+
+- `DBAdapter`
+  - Added `auxiliaryMode` and `enableAuxiliaryMode`.
+  - `DBSQLMemoryAdapter` and `DBObjectMemoryAdapter` don't support `auxiliaryMode`, since they don't support `multiIsolateSupport`.
+
+- `SQLGenerator.generateCreateTableSQL`: skip annotated hidden fields.
+
+- `APISessionSet`: using `SharedStoreField` and `SharedMapField` to store the the sessions.
+
+- New `APITokenStore`:
+  - Shared tokens among `Isolate`s. 
+
+- shared_map: ^1.0.10
+- args_simple: ^1.1.0
+- coverage: ^1.7.1
+- vm_service: ^13.0.0
+
 ## 1.5.0
 
 - sdk: '>=3.2.0 <4.0.0'

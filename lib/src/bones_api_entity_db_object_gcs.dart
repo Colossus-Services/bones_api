@@ -104,7 +104,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
           const DBAdapterCapability(
               dialect: DBDialect('object'),
               transactions: true,
-              transactionAbort: true),
+              transactionAbort: true,
+              multiIsolateSupport: true),
         ) {
     boot();
 
@@ -280,7 +281,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   TableScheme? getTableSchemeImpl(
       String table, TableRelationshipReference? relationship,
       {Object? contextID}) {
-    _log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+    //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
     if (tableScheme != null) return tableScheme;

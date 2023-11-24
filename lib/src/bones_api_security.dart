@@ -1,10 +1,11 @@
-import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:statistics/statistics.dart';
+import 'package:shared_map/shared_map.dart';
+import 'package:statistics/statistics.dart' hide IterableIntExtension;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -15,13 +16,37 @@ import 'bones_api_session.dart';
 final _log = logging.Logger('APISecurity');
 
 abstract class APISecurity {
+  final SharedStoreField _sharedStoreField;
+
   final Duration tokenDuration;
   final int tokenLength;
 
-  APISecurity({Duration? tokenDuration, int? tokenLength})
+  late final APITokenStore _tokenStore;
+
+  APISecurity(
+      {Duration? tokenDuration,
+      int? tokenLength,
+      APIRoot? apiRoot,
+      SharedStoreField? sharedStoreField,
+      SharedStoreReference? sharedStoreReference,
+      SharedStore? sharedStore,
+      String? sharedStoreID,
+      SharedStoreProviderSync? storeProvider})
       : tokenDuration = tokenDuration ?? Duration(hours: 3),
         tokenLength =
-            tokenLength != null && tokenLength > 32 ? tokenLength : 512;
+            tokenLength != null && tokenLength > 32 ? tokenLength : 512,
+        _sharedStoreField = SharedStoreField.tryFrom(
+                sharedStoreField: sharedStoreField,
+                sharedStoreReference: sharedStoreReference,
+                sharedStore: sharedStore ?? apiRoot?.sharedStore,
+                sharedStoreID: sharedStoreID,
+                storeProvider: storeProvider) ??
+            SharedStoreField.fromSharedStore(SharedStore.notShared()) {
+    _tokenStore = resolveTokensStore();
+  }
+
+  APITokenStore resolveTokensStore() =>
+      APITokenStore(sharedStoreField: _sharedStoreField);
 
   String generateToken(String username) => APIToken.generateToken(512,
       variableLength: 48, prefix: 'TK', random: secureRandom());
@@ -70,10 +95,10 @@ abstract class APISecurity {
         return invalidateUserTokens(credential.username);
       }
 
-      var apiToken = getTokenByKey(credential.token);
-      if (apiToken == null) return false;
-
-      return invalidateToken(apiToken);
+      return getAPIToken(credential.token).resolveMapped((apiToken) {
+        if (apiToken == null) return false;
+        return invalidateToken(apiToken);
+      });
     });
   }
 
@@ -117,93 +142,112 @@ abstract class APISecurity {
       return _resolveAuthentication(credential, resume)
           .resolveMapped((authentication) {
         if (request != null) {
-          resolveRequestAuthentication(request, authentication);
+          return resolveRequestAuthentication(request, authentication);
+        } else {
+          return authentication;
         }
-        return authentication;
       });
     });
-  }
-
-  final Map<String, MapEntry<Object?, List<APIPermission>>> _tokensInfo =
-      <String, MapEntry<Object?, List<APIPermission>>>{};
-
-  void _storeTokenInfo(
-      String token, Object? data, List<APIPermission> permissions) {
-    permissions = permissions.asUnmodifiableView;
-
-    if (data is List) {
-      if (data is! UnmodifiableListView) {
-        data = UnmodifiableListView(data);
-      }
-    } else if (data is Map) {
-      if (data is! UnmodifiableMapView) {
-        if (data is Map<String, Object?>) {
-          data = UnmodifiableMapView<String, Object?>(data);
-        } else if (data is Map<String, Object>) {
-          data = UnmodifiableMapView<String, Object>(data);
-        } else {
-          data = UnmodifiableMapView(data);
-        }
-      }
-    } else if (data is Set) {
-      if (data is! UnmodifiableSetView) {
-        data = UnmodifiableSetView(data);
-      }
-    }
-
-    _tokensInfo[token] = MapEntry(data, permissions);
   }
 
   FutureOr<APIAuthentication?> _resolveAuthentication(
       APICredential credential, bool resumed) {
     var token = credential.token;
 
+    APIToken? prevAPIToken;
     Object? prevData;
     List<APIPermission>? prevPermissions;
 
-    if (token != null) {
-      var prevInfo = _tokensInfo[token];
-
-      if (prevInfo != null) {
-        prevData = prevInfo.key;
-        prevPermissions = prevInfo.value;
-      }
+    if (token == null) {
+      return _resolveAuthenticationImpl(
+          credential, resumed, prevAPIToken, prevData, prevPermissions);
     }
 
-    return getCredentialPermissions(credential, prevPermissions)
-        .resolveMapped((permissions) {
-      return getAuthenticationData(credential, prevData).resolveMapped((data) {
-        var authentication = createAuthentication(credential, permissions,
-            data: data, resumed: resumed);
-        _storeTokenInfo(authentication.tokenKey, data, permissions);
-        return authentication;
+    var prevToken = _tokenStore.get(token);
+
+    return prevToken.resolveMapped((prevToken) {
+      if (prevToken != null) {
+        prevAPIToken = prevToken.apiToken;
+        prevData = prevToken.data;
+        prevPermissions = prevToken.permissions;
+      }
+
+      return _resolveAuthenticationImpl(
+          credential, resumed, prevAPIToken, prevData, prevPermissions);
+    });
+  }
+
+  FutureOr<APIAuthentication?> _resolveAuthenticationImpl(
+      APICredential credential,
+      bool resumed,
+      APIToken? prevAPIToken,
+      Object? prevData,
+      List<APIPermission>? prevPermissions) {
+    var permissions = getCredentialPermissions(credential, prevPermissions);
+    var data = getAuthenticationData(credential, prevData);
+
+    return permissions.resolveOther(data, (permissions, data) {
+      return createAuthentication(credential, permissions,
+              data: data, resumed: resumed)
+          .resolveMapped((authentication) {
+        var changedAPIToken = prevAPIToken != authentication.token;
+        var changedData = !identical(prevData, data);
+        var changedPermissions = !identical(prevPermissions, permissions);
+
+        var changed = changedAPIToken || changedData || changedPermissions;
+
+        if (!changed) {
+          return authentication;
+        }
+
+        return _tokenStore
+            .storeAPIToken(authentication.token, data, permissions)
+            .resolveWithValue(authentication);
       });
     });
   }
 
-  APIAuthentication createAuthentication(
+  FutureOr<APIAuthentication> createAuthentication(
       APICredential credential, List<APIPermission> permissions,
       {Object? data, bool resumed = false}) {
-    APIToken? token;
-    if (credential.token != null) {
-      token =
-          validateToken(APIToken(credential.username, token: credential.token));
+    if (credential.token == null) {
+      return _createAuthenticationImpl(credential, permissions, data, resumed);
     }
 
-    token ??= getValidToken(credential.username)!;
+    return validateToken(APIToken(credential.username,
+            token: credential.token, duration: tokenDuration))
+        .resolveMapped((token) {
+      if (token != null) {
+        return APIAuthentication(token,
+            permissions: permissions,
+            data: data,
+            resumed: resumed,
+            credential: credential);
+      }
 
-    return APIAuthentication(token,
-        permissions: permissions,
-        data: data,
-        resumed: resumed,
-        credential: credential);
+      return _createAuthenticationImpl(credential, permissions, data, resumed);
+    });
   }
 
-  FutureOr<APIAuthentication?> resumeAuthentication(APIToken? token,
-      {APIRequest? request}) {
-    if (token == null) return null;
+  FutureOr<APIAuthentication> _createAuthenticationImpl(
+          APICredential credential,
+          List<APIPermission> permissions,
+          Object? data,
+          bool resumed) =>
+      getValidToken(credential.username, autoCreate: true)
+          .resolveMapped((token) {
+        return APIAuthentication(token!,
+            permissions: permissions,
+            data: data,
+            resumed: resumed,
+            credential: credential);
+      });
 
-    var credential = APICredential(token.username, token: token.token);
+  FutureOr<APIAuthentication?> resumeAuthentication(APIToken? apiToken,
+      {APIRequest? request}) {
+    if (apiToken == null) return null;
+
+    var credential = APICredential(apiToken.username, token: apiToken.token);
 
     return prepareCredential(credential)
         .resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
@@ -214,70 +258,57 @@ abstract class APISecurity {
           {APIRequest? request}) =>
       _authenticateImpl(credential, request: request, resume: true);
 
-  APIToken? getValidToken(String username, {bool autoCreate = true}) {
-    List<APIToken> tokens = getUsernameValidTokens(username);
+  FutureOr<APIToken?> getValidToken(String username,
+      {required bool autoCreate}) {
+    return getUsernameValidTokens(username).resolveMapped((userTokens) {
+      if (userTokens.isEmpty) {
+        if (!autoCreate) return null;
 
-    if (tokens.isEmpty) {
-      if (!autoCreate) return null;
+        var token = createToken(username);
+        userTokens.add(token);
 
-      autoValidateAllTokens();
+        autoValidateAllTokens();
 
-      var token = createToken(username);
-      tokens.add(token);
-
-      return token;
-    }
-
-    if (tokens.length == 1) {
-      return tokens.first;
-    }
-
-    tokens.sort();
-    var token = tokens.last;
-
-    return token;
-  }
-
-  APIToken? validateToken(APIToken token) {
-    List<APIToken> tokens = getUsernameValidTokens(token.username);
-    if (tokens.isEmpty) return null;
-
-    var idx = tokens.indexOf(token);
-    if (idx < 0) return null;
-
-    token = tokens[idx];
-    return token;
-  }
-
-  final Map<String, List<APIToken>> _usersTokens = <String, List<APIToken>>{};
-
-  APIToken? getTokenByKey(String? tokenKey) {
-    if (tokenKey == null || tokenKey.isEmpty) return null;
-
-    for (var l in _usersTokens.values) {
-      for (var t in l) {
-        if (t.token == tokenKey) {
-          return t;
-        }
+        return token;
       }
-    }
 
-    return null;
+      if (userTokens.length == 1) {
+        return userTokens.first;
+      }
+
+      userTokens.sort();
+      var token = userTokens.last;
+      return token;
+    });
   }
 
-  List<APIToken> getUsernameValidTokens(String username) {
-    var tokens = _usersTokens.putIfAbsent(username, () => <APIToken>[]);
-    tokens.removeExpiredTokens();
-    return tokens;
+  FutureOr<APIToken?> validateToken(APIToken token) {
+    return getUsernameValidTokens(token.username).resolveMapped((userTokens) {
+      if (userTokens.isEmpty) return null;
+
+      var idx = userTokens.indexOf(token);
+      if (idx < 0) return null;
+
+      token = userTokens[idx];
+      return token;
+    });
   }
 
-  bool isValidToken(String username, String token) {
-    var tokens = _usersTokens[username];
-    if (tokens == null || tokens.isEmpty) {
-      return false;
-    }
+  FutureOr<APIToken?> getAPIToken(String? token) {
+    if (token == null || token.isEmpty) return null;
+    return _tokenStore.get(token).resolveMapped((token) => token?.apiToken);
+  }
 
-    return tokens.where((t) => t.token == token && !t.isExpired()).isNotEmpty;
+  FutureOr<List<APIToken>> getUsernameValidTokens(String username) {
+    return _tokenStore.getByUsername(username, checkExpiredTokens: true);
+  }
+
+  FutureOr<bool> isValidToken(String username, String token) {
+    return _tokenStore
+        .getByUsername(username, checkExpiredTokens: true)
+        .resolveMapped((userTokens) {
+      return userTokens.where((t) => t.token == token).isNotEmpty;
+    });
   }
 
   DateTime _autoValidateAllTokensLastTime = DateTime.now();
@@ -289,71 +320,20 @@ abstract class APISecurity {
     if (elapsedTime.inMinutes < 5) return;
     _autoValidateAllTokensLastTime = now;
 
+    // ignore: discarded_futures
     validateAllTokens(now);
   }
 
-  void validateAllTokens([DateTime? now]) {
-    now ??= DateTime.now();
+  FutureOr<int> validateAllTokens([DateTime? now]) =>
+      _tokenStore.validateAllTokens(now).resolveMapped((l) => l.length);
 
-    var emptyUsers = <String>[];
+  FutureOr<bool> invalidateUserTokens(String username) => _tokenStore
+      .removeUsernameTokens(username, checkExpiredTokens: true)
+      .resolveMapped((removed) => removed.isNotEmpty);
 
-    for (var e in _usersTokens.entries) {
-      var user = e.key;
-      var tokens = e.value;
-
-      var expired = tokens.removeExpiredTokens(now: now);
-
-      _onInvalidateTokens(expired);
-
-      if (tokens.isEmpty) {
-        emptyUsers.add(user);
-      }
-    }
-
-    _usersTokens.removeKeys(emptyUsers);
-  }
-
-  void _onInvalidateTokens(List<APIToken> tokens) {
-    for (var t in tokens) {
-      _onInvalidateToken(t);
-    }
-  }
-
-  void _onInvalidateToken(APIToken apiToken) {
-    _tokensInfo.remove(apiToken.token);
-  }
-
-  bool invalidateUserTokens(String username) {
-    var userTokens = _usersTokens[username];
-    if (userTokens == null || userTokens.isEmpty) return false;
-
-    var tokens = userTokens.toList();
-
-    userTokens.clear();
-    _usersTokens.remove(username);
-
-    _onInvalidateTokens(tokens);
-
-    return true;
-  }
-
-  bool invalidateToken(APIToken apiToken) {
-    var username = apiToken.username;
-
-    var userTokens = _usersTokens[username];
-    if (userTokens == null || userTokens.isEmpty) return false;
-
-    if (userTokens.remove(apiToken)) {
-      if (userTokens.isEmpty) {
-        _usersTokens.remove(username);
-      }
-
-      _onInvalidateToken(apiToken);
-      return true;
-    } else {
-      return false;
-    }
-  }
+  FutureOr<bool> invalidateToken(APIToken apiToken) => _tokenStore
+      .removeAPIToken(apiToken)
+      .resolveMapped((removed) => removed != null);
 
   FutureOr<bool> checkCredential(APICredential credential) {
     if (credential.hasToken) {
@@ -378,31 +358,41 @@ abstract class APISecurity {
           APICredential credential, Object? previousData) =>
       null;
 
-  bool disposeAuthenticationData(APICredential credential) {
+  FutureOr<bool> disposeAuthenticationData(APICredential credential) {
     var disposeUsernameEntity = credential.usernameEntity != null;
     credential.usernameEntity = null;
 
-    var disposeTokenInfo = false;
-
     var token = credential.token;
 
-    if (token != null) {
-      var prevInfo = _tokensInfo.remove(token);
-      disposeTokenInfo = prevInfo != null;
+    if (token == null) {
+      return disposeUsernameEntity;
     }
 
-    return disposeUsernameEntity || disposeTokenInfo;
+    var prevToken = _tokenStore.removeToken(token);
+
+    return prevToken.resolveMapped((prevToken) {
+      var disposeTokenInfo = prevToken != null;
+      return disposeUsernameEntity || disposeTokenInfo;
+    });
   }
 
   FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
       {bool allowLogout = false}) {
-    var credentials = resolveRequestCredentials(request);
+    return resolveRequestCredentials(request).resolveMapped((credentials) {
+      if (credentials.isEmpty) {
+        return resolveSessionCredential(request)
+            .resolveMapped((sessionCredential) {
+          if (sessionCredential != null) credentials.add(sessionCredential);
+          return _authenticateByRequestImpl(credentials, request, allowLogout);
+        });
+      } else {
+        return _authenticateByRequestImpl(credentials, request, allowLogout);
+      }
+    });
+  }
 
-    if (credentials.isEmpty) {
-      var sessionCredential = resolveSessionCredential(request);
-      if (sessionCredential != null) credentials.add(sessionCredential);
-    }
-
+  FutureOr<APIAuthentication?> _authenticateByRequestImpl(
+      List<APICredential> credentials, APIRequest request, bool allowLogout) {
     if (credentials.isEmpty) {
       return null;
     }
@@ -459,36 +449,39 @@ abstract class APISecurity {
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
       APIRequest request) {
-    var token = getSessionToken(request);
-    if (token == null) {
-      var credential = request.credential;
+    return getSessionAPIToken(request).resolveMapped((apiToken) {
+      if (apiToken != null) {
+        return resumeAuthentication(apiToken, request: request);
+      }
 
+      var credential = request.credential;
       if (credential != null && credential.hasToken) {
-        var tokenKey = credential.token!;
-        token = getTokenByKey(tokenKey);
-        if (token == null) return null;
+        var token = credential.token!;
+
+        return getAPIToken(token).resolveMapped((apiToken) {
+          return resumeAuthentication(apiToken, request: request);
+        });
+      }
+
+      return null;
+    });
+  }
+
+  FutureOr<APICredential?> resolveSessionCredential(APIRequest request) {
+    return getSessionAPIToken(request).resolveMapped((recentToken) {
+      if (recentToken != null) {
+        return APICredential(recentToken.username, token: recentToken.token);
       } else {
         return null;
       }
-    }
-
-    return resumeAuthentication(token, request: request);
+    });
   }
 
-  APICredential? resolveSessionCredential(APIRequest request) {
-    APIToken? recentToken = getSessionToken(request);
-
-    if (recentToken != null) {
-      return APICredential(recentToken.username, token: recentToken.token);
-    } else {
-      return null;
-    }
-  }
-
-  APIToken? getSessionToken(APIRequest request) {
-    var tokens = getSessionValidTokens(request);
-    var recentToken = getMostRecentToken(tokens);
-    return recentToken;
+  FutureOr<APIToken?> getSessionAPIToken(APIRequest request) {
+    return getSessionValidTokens(request).resolveMapped((tokens) {
+      var recentToken = getMostRecentToken(tokens);
+      return recentToken;
+    });
   }
 
   APIToken? getMostRecentToken(Set<APIToken>? tokens) {
@@ -504,51 +497,51 @@ abstract class APISecurity {
 
   final APISessionSet _sessionSet = APISessionSet(Duration(hours: 3));
 
-  void resolveRequestAuthentication(
+  FutureOr<APIAuthentication?> resolveRequestAuthentication(
       APIRequest request, APIAuthentication? authentication) {
     request.authentication = authentication;
+    if (authentication == null) return null;
 
-    if (authentication != null) {
-      var token = authentication.token;
-      token.markAccessTime();
+    var token = authentication.token;
+    token.markAccessTime();
 
-      var sessionID = request.sessionID;
-      if (sessionID != null) {
-        var session = _sessionSet.getMarkingAccess(sessionID);
-        if (session == null) {
-          session = APISession(sessionID);
-          _sessionSet.put(session);
-        }
+    var sessionID = request.sessionID;
+    if (sessionID == null) return authentication;
 
-        session.tokens.add(token);
-      }
-    }
+    return _sessionSet.getOrCreate(sessionID).resolveMapped((session) {
+      session.tokens.add(token);
+      return authentication;
+    });
   }
 
-  Set<APIToken>? getSessionValidTokens(APIRequest request) {
+  FutureOr<Set<APIToken>?> getSessionValidTokens(APIRequest request) {
     var sessionID = request.sessionID;
     if (sessionID == null) return null;
 
-    var session = _sessionSet.getMarkingAccess(sessionID);
-    var tokens = session?.validateTokens();
-    if (tokens == null || tokens.isEmpty) return null;
+    return _sessionSet.getMarkingAccess(sessionID).resolveMapped((session) {
+      var sessionTokens = session?.validateTokens();
+      if (sessionTokens == null || sessionTokens.isEmpty) return null;
 
-    var usernames = tokens.map((e) => e.username).toSet();
+      var usernames = sessionTokens.map((e) => e.username);
 
-    var validTokens = usernames.expand(getUsernameValidTokens).toList();
+      return _tokenStore
+          .getByUsernames(usernames, checkExpiredTokens: true)
+          .resolveMapped((validTokens) {
+        sessionTokens.removeWhere((t) => !validTokens.contains(t));
 
-    tokens.removeWhere((t) => !validTokens.contains(t));
+        if (request.credential != null) {
+          var credentialUsername = request.credential!.username;
+          if (!usernames.contains(credentialUsername)) return null;
 
-    if (request.credential != null) {
-      var credentialUsername = request.credential!.username;
-      if (!usernames.contains(credentialUsername)) return null;
-
-      var tokensUsername =
-          tokens.where((t) => t.username == credentialUsername).toSet();
-      return tokensUsername;
-    } else {
-      return tokens;
-    }
+          var tokensWithUsername = sessionTokens
+              .where((t) => t.username == credentialUsername)
+              .toSet();
+          return tokensWithUsername;
+        } else {
+          return sessionTokens;
+        }
+      });
+    });
   }
 
   FutureOr<APIResponse<T>> doRequestAuthentication<T>(APIRequest request) {
@@ -574,51 +567,74 @@ abstract class APISecurity {
     });
   }
 
-  List<APICredential> resolveRequestCredentials(APIRequest request) {
-    var credentials = <APICredential>[];
-
+  FutureOr<List<APICredential>> resolveRequestCredentials(APIRequest request) {
     var credential = request.credential;
+    if (credential == null) {
+      return _resolveRequestCredentialsImpl2(request, []);
+    }
 
-    if (credential != null) {
-      if (credential.username.isEmpty && credential.hasToken) {
-        var tokenKey = credential.token!;
-        var sessionID = request.sessionID;
+    if (credential.username.isEmpty && credential.hasToken) {
+      var tokenKey = credential.token!;
+      var sessionID = request.sessionID;
 
-        APIToken? validToken;
-        if (sessionID != null && sessionID.isNotEmpty) {
-          validToken = _sessionSet.get(sessionID)?.getValidToken(tokenKey);
-        }
+      if (sessionID != null && sessionID.isNotEmpty) {
+        return _sessionSet.get(sessionID).resolveMapped((session) {
+          var validToken = session?.getValidToken(tokenKey);
+          return _resolveRequestCredentialsImpl1(
+              request, credential, tokenKey, validToken);
+        });
+      }
 
-        validToken ??= getTokenByKey(tokenKey);
+      return _resolveRequestCredentialsImpl1(
+          request, credential, tokenKey, null);
+    }
 
+    return _resolveRequestCredentialsImpl2(request, [credential]);
+  }
+
+  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl1(
+      APIRequest request,
+      APICredential credential,
+      String tokenKey,
+      APIToken? validToken) {
+    if (validToken != null) {
+      var username = validToken.username;
+      credential = credential.withUsername(username);
+      return _resolveRequestCredentialsImpl2(request, [credential]);
+    } else {
+      return getAPIToken(tokenKey).resolveMapped((validToken) {
         if (validToken != null) {
           var username = validToken.username;
           credential = credential.withUsername(username);
         }
-      }
-
-      credentials.add(credential);
+        return _resolveRequestCredentialsImpl2(request, [credential]);
+      });
     }
+  }
 
+  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl2(
+      APIRequest request, List<APICredential> credentials) {
     var username = getRequestParameterUsername(request).trim();
-    var tokenKey = getRequestParameterToken(request).trim();
+    var token = getRequestParameterToken(request).trim();
 
     if (username.isNotEmpty) {
-      if (tokenKey.isNotEmpty) {
-        var credential = APICredential(username, token: tokenKey);
+      if (token.isNotEmpty) {
+        var credential = APICredential(username, token: token);
         credentials.add(credential);
       } else {
         var password = getRequestParameterPassword(request).trim();
-
         var credential = APICredential(username, passwordHash: password);
         credentials.add(credential);
       }
-    } else if (tokenKey.isNotEmpty) {
-      var token = getTokenByKey(tokenKey);
-      if (token != null && !token.isExpired()) {
-        var credential = APICredential(token.username, token: token.token);
-        credentials.add(credential);
-      }
+    } else if (token.isNotEmpty) {
+      return getAPIToken(token).resolveMapped((apiToken) {
+        if (apiToken != null && !apiToken.isExpired()) {
+          var credential =
+              APICredential(apiToken.username, token: apiToken.token);
+          credentials.add(credential);
+        }
+        return credentials;
+      });
     }
 
     return credentials;
@@ -646,6 +662,225 @@ abstract class APISecurity {
                 'username', 'user', 'email', 'account') ??
             '')
         .toString();
+  }
+}
+
+typedef APITokenInfo = ({
+  APIToken apiToken,
+  Object? data,
+  List<APIPermission> permissions
+});
+
+/// The tokens store for the [APISecurity].
+class APITokenStore {
+  final SharedStoreField _sharedStoreField;
+
+  APITokenStore(
+      {SharedStoreField? sharedStoreField,
+      SharedStore? sharedStore,
+      String? sharedStoreID,
+      SharedStoreProviderSync? storeProvider})
+      : _sharedStoreField = SharedStoreField.from(
+          sharedStoreField: sharedStoreField,
+          sharedStore: sharedStore,
+          sharedStoreID: sharedStoreID,
+          storeProvider: storeProvider,
+        ) {
+    // ignore: discarded_futures
+    _resolveSharedTokens();
+  }
+
+  SharedStore get sharedStore => _sharedStoreField.sharedStore;
+
+  String get sharedTokensID => 'APITokenStore';
+
+  late final SharedMapField<String, APITokenInfo> _sharedTokensField =
+      SharedMapField(
+    sharedTokensID,
+    sharedStore: sharedStore,
+    onPut: _sharedTokensOnPut,
+    onRemove: _sharedTokensOnRemove,
+  );
+
+  late final SharedMapField<String, List<APIToken>>
+      _sharedTokensByUsernameField =
+      SharedMapField('$sharedTokensID:byUsername', sharedStore: sharedStore);
+
+  FutureOr<void> _sharedTokensOnPut(String token, APITokenInfo? tokenInfo) {
+    _resolveSharedTokensByUsername().resolveMapped((sharedTokensByUsername) {
+      if (tokenInfo == null) return;
+      final apiToken = tokenInfo.apiToken;
+      final username = apiToken.username;
+
+      sharedTokensByUsername
+          .putIfAbsent(username, []).resolveMapped((userTokens) {
+        if (!userTokens!.contains(apiToken)) {
+          userTokens.add(apiToken);
+        }
+      });
+    });
+  }
+
+  FutureOr<void> _sharedTokensOnRemove(String token, APITokenInfo? tokenInfo) {
+    _resolveSharedTokensByUsername().resolveMapped((sharedTokensByUsername) {
+      if (tokenInfo == null) return;
+      final apiToken = tokenInfo.apiToken;
+      final username = apiToken.username;
+
+      sharedTokensByUsername.get(username).resolveMapped((userTokens) {
+        if (userTokens != null) {
+          userTokens.remove(apiToken);
+          if (userTokens.isEmpty) {
+            sharedTokensByUsername.remove(username);
+          }
+        }
+      });
+    });
+  }
+
+  static const Duration _cacheTimeout = Duration(seconds: 5);
+
+  static final Expando<SharedMap<String, APITokenInfo>> _sharedTokens =
+      Expando();
+
+  static final Expando<SharedMap<String, List<APIToken>>>
+      _sharedTokensByUsername = Expando();
+
+  FutureOr<SharedMap<String, APITokenInfo>> _resolveSharedTokens() {
+    var sharedTokens = _sharedTokens[this];
+    if (sharedTokens != null) return sharedTokens;
+
+    return _sharedTokensField
+        .sharedMapCached(timeout: _cacheTimeout)
+        .resolveMapped((sharedTokens) => _sharedTokens[this] = sharedTokens);
+  }
+
+  FutureOr<SharedMap<String, List<APIToken>>> _resolveSharedTokensByUsername() {
+    var sharedTokensByUsername = _sharedTokensByUsername[this];
+    if (sharedTokensByUsername != null) return sharedTokensByUsername;
+
+    return _sharedTokensByUsernameField
+        .sharedMapCached(timeout: _cacheTimeout)
+        .resolveMapped((sharedTokensByUsername) =>
+            _sharedTokensByUsername[this] = sharedTokensByUsername);
+  }
+
+  FutureOr<APITokenInfo?> get(String token) => _resolveSharedTokens()
+      .resolveMapped((sharedTokens) => sharedTokens.get(token));
+
+  FutureOr<List<APIToken>> getByUsername(String username,
+      {required bool checkExpiredTokens}) {
+    return _resolveSharedTokensByUsername()
+        .resolveMapped((sharedTokensByUsername) {
+      return sharedTokensByUsername.get(username).resolveMapped((userTokens) {
+        if (userTokens == null) return [];
+
+        if (!checkExpiredTokens) return userTokens;
+
+        var expiredTokens = userTokens.removeExpiredTokens();
+        if (expiredTokens.isEmpty) return userTokens;
+
+        return removeTokens(expiredTokens, removeFromUsernames: true)
+            .resolveWithValue(userTokens);
+      });
+    });
+  }
+
+  FutureOr<List<APIToken>> getByUsernames(Iterable<String> usernames,
+          {required bool checkExpiredTokens}) =>
+      usernames
+          .toSet()
+          .map((username) =>
+              getByUsername(username, checkExpiredTokens: checkExpiredTokens))
+          .resolveAllJoined((l) => l.expand((l) => l).toList());
+
+  FutureOr<List<APIToken>> allTokens() =>
+      _resolveSharedTokens().resolveMapped((sharedTokens) {
+        return sharedTokens
+            .values()
+            .resolveMapped((l) => l.map((e) => e.apiToken).toList());
+      });
+
+  FutureOr<List<APIToken>> validateAllTokens([DateTime? now]) {
+    now ??= DateTime.now();
+
+    return allTokens().resolveMapped((allTokens) {
+      if (allTokens.isEmpty) return [];
+
+      var expiredTokens = allTokens.removeExpiredTokens();
+      if (expiredTokens.isEmpty) return allTokens;
+
+      return removeTokens(expiredTokens, removeFromUsernames: true)
+          .resolveWithValue(allTokens);
+    });
+  }
+
+  FutureOr<List<APIToken>> removeUsernameTokens(String username,
+      {required bool checkExpiredTokens}) {
+    return _resolveSharedTokensByUsername()
+        .resolveMapped((sharedTokensByUsername) {
+      return sharedTokensByUsername
+          .remove(username)
+          .resolveMapped((userTokens) {
+        if (userTokens == null) return [];
+        return removeTokens(userTokens, removeFromUsernames: true)
+            .resolveWithValue(userTokens);
+      });
+    });
+  }
+
+  FutureOr<int> removeTokens(List<APIToken> apiTokens,
+      {required bool removeFromUsernames}) {
+    if (apiTokens.isEmpty) return 0;
+
+    var tokens = apiTokens.map((e) => e.token).toList();
+
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.removeAll(tokens).then((removed) => removed.length);
+    });
+  }
+
+  FutureOr<APITokenInfo?> removeAPIToken(APIToken apiToken) =>
+      removeToken(apiToken.token);
+
+  FutureOr<APITokenInfo?> removeToken(String token) {
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.remove(token);
+    });
+  }
+
+  FutureOr<APITokenInfo?> storeAPIToken(
+      APIToken apiToken, Object? data, List<APIPermission> permissions) {
+    data = _toUnmodifiableData(data);
+    permissions = permissions.asUnmodifiableView;
+
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.put(apiToken.token,
+          (apiToken: apiToken, data: data, permissions: permissions));
+    });
+  }
+
+  Object? _toUnmodifiableData(Object? data) {
+    if (data is List) {
+      if (data is! UnmodifiableListView) {
+        data = UnmodifiableListView(data);
+      }
+    } else if (data is Map) {
+      if (data is! UnmodifiableMapView) {
+        if (data is Map<String, Object?>) {
+          data = UnmodifiableMapView<String, Object?>(data);
+        } else if (data is Map<String, Object>) {
+          data = UnmodifiableMapView<String, Object>(data);
+        } else {
+          data = UnmodifiableMapView(data);
+        }
+      }
+    } else if (data is Set) {
+      if (data is! UnmodifiableSetView) {
+        data = UnmodifiableSetView(data);
+      }
+    }
+    return data;
   }
 }
 

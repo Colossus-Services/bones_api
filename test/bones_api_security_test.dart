@@ -1,8 +1,9 @@
+@Timeout(Duration(seconds: 180))
 // ignore_for_file: discarded_futures
 import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';
-import 'package:bones_api/bones_api_server.dart';
+import 'package:shared_map/shared_map.dart';
 import 'package:test/test.dart';
 
 final fooSha256 =
@@ -23,13 +24,13 @@ void main() {
   });
 
   group('APISecurity.secureRandom', () {
-    var apiSecurity = _MyAPISecurity();
+    var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
     _testSecureRandom(apiSecurity.secureRandom());
   });
 
   group('APISecurity', () {
     test('createToken', () {
-      var apiSecurity = _MyAPISecurity();
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       var token = apiSecurity.createToken('foo');
 
@@ -52,7 +53,7 @@ void main() {
     });
 
     test('authenticate', () {
-      var apiSecurity = _MyAPISecurity();
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         var credential = APICredential('foo', passwordHash: 'foo');
@@ -86,20 +87,20 @@ void main() {
     });
 
     test('authenticateByRequest', () async {
-      var apiSecurity = _MyAPISecurity();
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         var request1 = APIRequest(APIRequestMethod.GET, 'foo');
         request1.credential = APICredential('foo', passwordHash: 'foo');
 
-        expect(apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
         expect(request1.authentication, isNotNull);
         expect(request1.authentication!.username, equals('foo'));
 
         var request2 = APIRequest(APIRequestMethod.GET, 'foo');
         request2.credential = APICredential('bar', passwordHash: 'xxx');
 
-        expect(apiSecurity.authenticateByRequest(request2), isNull);
+        expect(await apiSecurity.authenticateByRequest(request2), isNull);
         expect(request2.authentication, isNull);
       }
 
@@ -108,7 +109,7 @@ void main() {
         request1.parameters['username'] = 'foo';
         request1.parameters['password'] = 'foo';
 
-        expect(apiSecurity.authenticateByRequest(request1), isNotNull);
+        expect(await apiSecurity.authenticateByRequest(request1), isNotNull);
         expect(request1.authentication, isNotNull);
         expect(request1.authentication!.username, equals('foo'));
 
@@ -116,7 +117,7 @@ void main() {
         request2.parameters['username'] = 'foo';
         request2.parameters['password'] = 'not_foo';
 
-        expect(apiSecurity.authenticateByRequest(request2), isNull);
+        expect(await apiSecurity.authenticateByRequest(request2), isNull);
         expect(request2.authentication, isNull);
       }
 
@@ -143,14 +144,14 @@ void main() {
       }
     });
 
-    test('resolveRequestCredential', () {
-      var apiSecurity = _MyAPISecurity();
+    test('resolveRequestCredential', () async {
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         var request = APIRequest(APIRequestMethod.GET, 'foo');
         request.credential = APICredential('foo', passwordHash: 'foo');
 
-        var credentials = apiSecurity.resolveRequestCredentials(request);
+        var credentials = await apiSecurity.resolveRequestCredentials(request);
         expect(credentials, isNotEmpty);
         expect(credentials.length, equals(1));
         expect(credentials[0].username, equals('foo'));
@@ -171,7 +172,7 @@ void main() {
             APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
         request.credential = APICredential('', token: fooSha256);
 
-        var credentials = apiSecurity.resolveRequestCredentials(request);
+        var credentials = await apiSecurity.resolveRequestCredentials(request);
         expect(credentials, isNotEmpty);
         expect(credentials.length, equals(1));
         expect(credentials[0].username, equals('foo'));
@@ -181,7 +182,7 @@ void main() {
         var request = APIRequest(APIRequestMethod.GET, 'foo',
             parameters: {'user': 'foo', 'pass': '123456'});
 
-        var credentials = apiSecurity.resolveRequestCredentials(request);
+        var credentials = await apiSecurity.resolveRequestCredentials(request);
         expect(credentials, isNotEmpty);
         expect(credentials.length, equals(1));
         expect(credentials[0].username, equals('foo'));
@@ -190,7 +191,7 @@ void main() {
     });
 
     test('doRequestAuthentication', () async {
-      var apiSecurity = _MyAPISecurity();
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         var request =
@@ -224,8 +225,8 @@ void main() {
       }
     });
 
-    test('resumeAuthenticationByRequest', () {
-      var apiSecurity = _MyAPISecurity();
+    test('resumeAuthenticationByRequest', () async {
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         var request =
@@ -236,7 +237,7 @@ void main() {
         expect(request.authentication, isNotNull);
         expect(request.authentication!.username, equals('foo'));
 
-        var credential = apiSecurity.resolveSessionCredential(request);
+        var credential = await apiSecurity.resolveSessionCredential(request);
         expect(credential, isNotNull);
         expect(credential!.username, equals('foo'));
       }
@@ -297,7 +298,7 @@ void main() {
     });
 
     test('APIRouteRule', () {
-      var apiSecurity = _MyAPISecurity();
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
         expect(APIRoutePublicRule().toJson(), equals({'rule': 'public'}));
@@ -407,6 +408,8 @@ void _testSecureRandom(SecureRandom random) {
 }
 
 class _MyAPISecurity extends APISecurity {
+  _MyAPISecurity({super.sharedStore});
+
   @override
   String generateToken(String username) {
     if (username == 'foo') {

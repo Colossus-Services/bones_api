@@ -30,7 +30,7 @@ class DBDialect {
 }
 
 /// [DBAdapter] capabilities.
-class DBAdapterCapability {
+class DBAdapterCapability implements WithRuntimeTypeNameSafe {
   /// The dialect of the DB.
   final DBDialect dialect;
 
@@ -43,11 +43,25 @@ class DBAdapterCapability {
   /// `true` if the DB fully supports [transactions] and [transactionAbort].
   bool get fullTransaction => transactions && transactionAbort;
 
+  /// `true` if the [DBAdapter] supports execution in multiple [Isolate]s.
+  /// - If an adapter tries to initialize inside an auxiliary [Isolate] ([DBAdapter.auxiliaryMode]), it will fail.
+  final bool multiIsolateSupport;
+
   const DBAdapterCapability({
     required this.dialect,
     required this.transactions,
     required this.transactionAbort,
+    required this.multiIsolateSupport,
   });
+
+  String get info =>
+      'transactions: $transactions, transactionAbort: $transactionAbort, multiIsolateSupport: $multiIsolateSupport';
+
+  @override
+  String get runtimeTypeNameSafe => 'DBAdapterCapability';
+
+  @override
+  String toString() => 'DBAdapterCapability[${dialect.name}]{$info}@$dialect';
 }
 
 typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>>
@@ -106,6 +120,29 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   static final WeakList<DBAdapter> _instances = WeakList<DBAdapter>();
 
   static List<DBAdapter> get instances => _instances.toList();
+
+  static bool _auxiliaryMode = false;
+
+  /// Returns `true` if auxiliary mode is enabled.
+  ///
+  /// This mode is activated when an auxiliary isolate is spawned. In this state,
+  /// the DBAdapters within this `Isolate` exclusively function as auxiliary adapters.
+  /// Operations, such as table creation and "populate" ([populateImpl]),
+  /// are exclusively managed by the adapters in the main isolate.
+  ///
+  /// See `APIServerWorker`.
+  static bool get auxiliaryMode => _auxiliaryMode;
+
+  static bool enableAuxiliaryMode() {
+    if (_auxiliaryMode) {
+      return true;
+    }
+
+    _auxiliaryMode = true;
+    _log.info("Enabled `DBAdapter` auxiliary mode.");
+
+    return true;
+  }
 
   /// The name of the adapter.
   final String name;
@@ -222,9 +259,20 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   @override
   FutureOr<InitializationResult> initialize() {
+    if (auxiliaryMode && !capability.multiIsolateSupport) {
+      _log.severe(
+          "Can't initialize adapter in `DBAdapter.auxiliaryMode`: $this");
+      return InitializationResult.error(this);
+    }
+
     return checkDB().resolveMapped((dbOK) {
       if (!dbOK) {
         throw StateError("Can't initialize `DBAdapter`: Table check failed!");
+      }
+
+      if (auxiliaryMode) {
+        _disposePopulateData();
+        return _initializationResultOK(withEntityRepositories: false);
       }
 
       return populateImpl();
@@ -264,28 +312,31 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<InitializationResult> _populateSourceImpl(
       Object? populateSource, Object? populateSourceVariables) {
-    _populateSource = null;
-    _populateSourceVariables = null;
+    _disposePopulateData();
 
     if (populateSource == null) {
-      return InitializationResult.ok(this, dependencies: [
-        if (parentRepositoryProvider != null) parentRepositoryProvider!
-      ]);
+      return _initializationResultOK(withEntityRepositories: false);
     }
 
     return populateFromSource(populateSource,
             workingPath: _workingPath,
             resolutionRules: EntityResolutionRules(allowReadFile: true),
             variables: populateSourceVariables)
-        .resolveMapped((val) {
-      var result = InitializationResult.ok(this, dependencies: [
-        if (parentRepositoryProvider != null) parentRepositoryProvider!,
-        ...entityRepositories,
-      ]);
-
-      return result;
-    });
+        .resolveMapped(
+            (val) => _initializationResultOK(withEntityRepositories: true));
   }
+
+  void _disposePopulateData() {
+    _populateSource = null;
+    _populateSourceVariables = null;
+  }
+
+  InitializationResult _initializationResultOK(
+          {required bool withEntityRepositories}) =>
+      InitializationResult.ok(this, dependencies: [
+        if (parentRepositoryProvider != null) parentRepositoryProvider!,
+        if (withEntityRepositories) ...entityRepositories,
+      ]);
 
   @override
   FutureOr<O?> getEntityByID<O>(dynamic id,

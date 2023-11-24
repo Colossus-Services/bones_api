@@ -1,6 +1,8 @@
 import 'dart:math';
 
+import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
+import 'package:shared_map/shared_map.dart';
 
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
@@ -82,12 +84,28 @@ class APISession {
 
 /// Handles a set of [APISession].
 class APISessionSet {
+  final SharedStoreField _sharedStoreField;
+
   /// The session timeout.
   final Duration timeout;
 
   late final Duration autoCheckInterval;
 
-  APISessionSet(this.timeout, {Duration? autoCheckInterval}) {
+  APISessionSet(this.timeout,
+      {Duration? autoCheckInterval,
+      APIRoot? apiRoot,
+      SharedStoreField? sharedStoreField,
+      SharedStoreReference? sharedStoreReference,
+      SharedStore? sharedStore,
+      String? sharedStoreID,
+      SharedStoreProviderSync? storeProvider})
+      : _sharedStoreField = SharedStoreField.tryFrom(
+                sharedStoreField: sharedStoreField,
+                sharedStoreReference: sharedStoreReference,
+                sharedStore: sharedStore ?? apiRoot?.sharedStore,
+                sharedStoreID: sharedStoreID,
+                storeProvider: storeProvider) ??
+            SharedStoreField.fromSharedStore(SharedStore.notShared()) {
     var autoCheckIntervalResolved = autoCheckInterval;
     if (autoCheckIntervalResolved == null) {
       autoCheckIntervalResolved =
@@ -98,38 +116,82 @@ class APISessionSet {
     }
 
     this.autoCheckInterval = autoCheckIntervalResolved;
+
+    // ignore: discarded_futures
+    _resolveSharedSessions();
   }
 
-  final Map<String, APISession> _sessions = <String, APISession>{};
+  SharedStore get sharedStore => _sharedStoreField.sharedStore;
 
-  int get length => _sessions.length;
+  String get sharedSessionsID => 'APISessionSet';
 
-  APISession? get(String sessionID) {
+  late final SharedMapField<String, APISession> _sharedSessionsField =
+      SharedMapField(sharedSessionsID, sharedStore: sharedStore);
+
+  static const Duration _cacheTimeout = Duration(seconds: 1);
+
+  static final Expando<SharedMap<String, APISession>> _sharedSessions =
+      Expando();
+
+  FutureOr<SharedMap<String, APISession>> _resolveSharedSessions() {
+    var sharedSessions = _sharedSessions[this];
+    if (sharedSessions != null) return sharedSessions;
+
+    return _sharedSessionsField
+        .sharedMapCached(timeout: _cacheTimeout)
+        .resolveMapped((sharedSessions) {
+      _sharedSessions[this] = sharedSessions;
+      return sharedSessions;
+    });
+  }
+
+  FutureOr<int> get length => _resolveSharedSessions().length();
+
+  FutureOr<APISession?> get(String sessionID) {
     autoCheckSessions();
-    return _sessions[sessionID];
+    return _resolveSharedSessions().get(sessionID);
   }
 
-  APISession? getMarkingAccess(String sessionID) {
-    var session = get(sessionID);
-    session?.markAccessTime();
-    return session;
+  FutureOr<APISession?> getMarkingAccess(String sessionID) {
+    return get(sessionID).resolveMapped((session) {
+      session?.markAccessTime();
+      return session;
+    });
   }
 
-  put(APISession session) {
+  FutureOr<APISession> put(APISession session) {
     autoCheckSessions();
-    return _sessions[session.id] = session;
+    return _resolveSharedSessions()
+        .put(session.id, session)
+        .resolveMapped((s) => s ?? session);
   }
 
-  List<APISession> expiredSessions(DateTime now) =>
-      _sessions.values.where((e) => e.isExpired(timeout, now: now)).toList();
+  FutureOr<APISession> getOrCreate(String sessionID) {
+    return getMarkingAccess(sessionID).resolveMapped((session) {
+      if (session == null) {
+        session = APISession(sessionID);
+        return put(session);
+      }
+      return session;
+    });
+  }
 
-  void checkSessions() {
+  FutureOr<List<APISession>> expiredSessions([DateTime? now]) {
+    now ??= DateTime.now();
+    return _resolveSharedSessions()
+        .where((id, session) => session.isExpired(timeout, now: now))
+        .resolveMapped((entries) => entries.map((e) => e.value).toList());
+  }
+
+  FutureOr<int> checkSessions() {
     var now = DateTime.now();
-    var expired = expiredSessions(now);
 
-    for (var e in expired) {
-      _sessions.remove(e.id);
-    }
+    return expiredSessions(now).resolveMapped((expired) {
+      var expiredIDs = expired.map((e) => e.id).toList();
+      return _resolveSharedSessions()
+          .removeAll(expiredIDs)
+          .resolveWithValue(expired.length);
+    });
   }
 
   DateTime _autoCheckSessionsLastTime = DateTime.now();
@@ -141,8 +203,9 @@ class APISessionSet {
     if (elapsedTime.inMilliseconds < autoCheckInterval.inMilliseconds) return;
     _autoCheckSessionsLastTime = now;
 
+    // ignore: discarded_futures
     checkSessions();
   }
 
-  void clear() => _sessions.clear();
+  FutureOr<int> clear() => _resolveSharedSessions().clear();
 }
