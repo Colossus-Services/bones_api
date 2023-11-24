@@ -16,6 +16,7 @@ import 'package:statistics/statistics.dart'
         IterableExtension;
 import 'package:swiss_knife/swiss_knife.dart' show EventStream, DataURLBase64;
 
+import 'bones_api_base.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_reference.dart';
@@ -4505,6 +4506,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _initTime ??= DateTime.now();
 
+    _addToAPIRequest();
+
     _opening = true;
     _transactionCloser = closer;
 
@@ -4586,6 +4589,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     _initTime ??= DateTime.now();
+
+    if (_operations.isEmpty) {
+      _addToAPIRequest();
+    }
 
     _operations.add(op);
     op.id = _operations.length;
@@ -4827,6 +4834,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _endTime ??= DateTime.now();
 
+    _addToAPIRequest();
+
     _committed = true;
 
     _close();
@@ -4849,6 +4858,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     return result as R?;
+  }
+
+  void _addToAPIRequest() {
+    var (apiRoot: _, apiRequest: apiRequest) =
+        APIRoot.getByAPIRequestZone(Zone.current);
+    apiRequest?.addTransaction(this);
   }
 
   void _close({Zone? zone}) {
@@ -5149,6 +5164,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var parentTransaction = this.parentTransaction;
     if (parentTransaction != null) {
       parentTransaction.cacheEntities(entities, idGetter);
+    }
+  }
+
+  String get info {
+    final mainOperation = this.mainOperation;
+
+    if (mainOperation != null) {
+      var typeName = mainOperation.type.name;
+      var repositoryName = mainOperation.repositoryName;
+      return 'T#$id $typeName@$repositoryName';
+    } else {
+      return 'Transaction#$id';
     }
   }
 

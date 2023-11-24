@@ -1527,17 +1527,39 @@ class APIServer extends _APIServerBase {
     return def;
   }
 
-  static String resolveServerTiming(Map<String, Duration> metrics) {
+  static String resolveServerTiming(Map<String, APIMetric> metrics) {
     var s = StringBuffer();
 
     for (var e in metrics.entries) {
+      var metric = e.value;
+
       if (s.isNotEmpty) {
         s.write(', ');
       }
+
       s.write(e.key);
-      s.write(';dur=');
-      var ms = e.value.inMicroseconds / 1000;
-      s.write(ms);
+
+      var duration = metric.duration;
+      if (duration != null) {
+        s.write(';dur=');
+        var ms = duration.inMicroseconds / 1000;
+        s.write(ms);
+      }
+
+      var description = metric.description;
+      if (description != null &&
+          description.isNotEmpty &&
+          !description.contains('"')) {
+        s.write(';desc="');
+        s.write(description);
+        s.write('"');
+      }
+
+      var n = metric.n;
+      if (n != null) {
+        s.write(';int=');
+        s.write(n);
+      }
     }
 
     return s.toString();
@@ -1942,6 +1964,8 @@ final class APIServerWorker extends _APIServerBase {
         .timeout(initializationTimeout, onTimeout: () => false)
         .then((ok) {
       if (ok && !_starting) {
+        apiRequest.setMetric('APIServerWorker-initialization',
+            duration: apiRequest.elapsedTime);
         return _processAPIRequest(request, apiRequest);
       }
 
@@ -2127,13 +2151,16 @@ final class APIServerWorker extends _APIServerBase {
 
   FutureOr<Response> _sendAPIResponse(Request request, APIRequest apiRequest,
       APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
-    apiResponse.setMetric('API-call', apiRequest.elapsedTime);
+    _setTransactionsMetrics(apiRequest, apiResponse);
+
+    apiResponse.setMetric('API-call', duration: apiRequest.elapsedTime);
 
     var parsingDuration = apiRequest.parsingDuration;
     if (parsingDuration != null) {
-      apiResponse.setMetric('API-request-parsing', parsingDuration);
+      apiResponse.setMetric('API-request-parsing', duration: parsingDuration);
     }
 
+    apiRequest.stopAllMetrics();
     apiResponse.stopAllMetrics();
 
     var contentType = apiResponse.payloadMimeType;
@@ -2159,8 +2186,11 @@ final class APIServerWorker extends _APIServerBase {
       headers['keep-alive'] = 'timeout=$timeout, max=$max';
     }
 
-    headers['server-timing'] =
-        APIServer.resolveServerTiming(apiResponse.metrics);
+    var allMetrics = apiRequest.hasMetrics
+        ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
+        : apiResponse.metrics;
+
+    headers['server-timing'] = APIServer.resolveServerTiming(allMetrics);
 
     if (cookieless) {
       headers.remove(HttpHeaders.setCookieHeader);
@@ -2224,6 +2254,36 @@ final class APIServerWorker extends _APIServerBase {
         return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',
             headers: headers);
     }
+  }
+
+  void _setTransactionsMetrics(
+      APIRequest apiRequest, APIResponse<dynamic> apiResponse) {
+    var transactions = apiRequest.transactions;
+    if (transactions.isEmpty) return;
+
+    var total = Duration.zero;
+
+    if (transactions.length > 50) {
+      transactions = transactions.toList();
+      transactions.sort((t1, t2) {
+        var d1 = t1.duration ?? Duration.zero;
+        var d2 = t2.duration ?? Duration.zero;
+        return d2.compareTo(d1);
+      });
+      transactions = transactions.sublist(0, 50);
+    }
+
+    for (var t in transactions) {
+      var duration = t.duration;
+      if (duration != null) {
+        apiResponse.setMetric('Transaction#${t.id}',
+            duration: duration, description: t.info);
+        total = total + duration;
+      }
+    }
+
+    apiResponse.setMetric('All-Transactions',
+        duration: total, n: transactions.length);
   }
 
   @override

@@ -16,6 +16,14 @@
   - Add `_processWhileInitializing` to handle API requests while the server is still initializing,
     including a timeout for initialization.
 
+- `APIRequest`:
+  - Can also handle metrics.
+  - Added `transactions` field, automatically populated with all the `Transactions` of the request.
+
+- `APIRequest` and `APIResponse`:
+  - Improved metrics: added `description` parameter.
+  - Added `Transaction`s duration to `Server-Timing`.
+
 - `APIRoot:`
   - Added `isIsolateCopy`.
 
