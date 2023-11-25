@@ -1,3 +1,8 @@
+## 1.5.2
+
+- `APIServerConfig`:
+  - Fix `name` and `version` resolution
+
 ## 1.5.1
 
 - new `APIServerConfig`:

@@ -124,8 +124,8 @@ class APIServerConfig {
   final ArgsSimple args;
 
   APIServerConfig({
-    required this.name,
-    required this.version,
+    String? name,
+    String? version,
     String? address,
     int? port,
     int? securePort,
@@ -144,7 +144,11 @@ class APIServerConfig {
     this.apiConfig,
     bool? logToConsole,
     Object? args,
-  })  : address = normalizeAddress(address, apiConfig: apiConfig),
+  })  : name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
+        version = version != null && version.trim().isNotEmpty
+            ? version
+            : BonesAPI.VERSION,
+        address = normalizeAddress(address, apiConfig: apiConfig),
         port = resolvePort(port, apiConfig: apiConfig),
         securePort = resolveSecurePort(securePort,
             apiConfig: apiConfig, letsEncrypt: letsEncrypt),
@@ -186,8 +190,8 @@ class APIServerConfig {
   factory APIServerConfig.fromArgs(List<String> args) {
     var a = ArgsSimple.parse(args);
 
-    var name = a.optionAsString('name', 'Bones_API')!;
-    var version = a.optionAsString('version', '0.0.0')!;
+    var name = a.optionAsString('name');
+    var version = a.optionAsString('version');
 
     var port = a.optionAsInt('port');
     var securePort = a.optionAsInt('secure-port');
@@ -624,8 +628,8 @@ abstract class _APIServerBase extends APIServerConfig {
 
   _APIServerBase(
     this.apiRoot, {
-    required super.name,
-    required super.version,
+    super.name,
+    super.version,
     super.address,
     super.port,
     super.securePort,
