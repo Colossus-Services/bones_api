@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.2';
+  static const String VERSION = '1.5.3';
 
   static bool _boot = false;
 
@@ -227,8 +227,8 @@ abstract class APIRoot with Initializable, Closable {
   /// See [isIsolateCopy].
   SharedStore get sharedStore => _sharedStoreField.sharedStore;
 
-  /// Returns `true` if this instance is a copy passed to another `Isolate` (usually an [APIServerWorker]).
-  bool get isIsolateCopy => _sharedStoreField.isIsolateCopy;
+  /// Returns `true` if this instance is a copy passed to another `Isolate` (usually through [APIServerWorker]).
+  bool get isAuxiliaryInstance => _sharedStoreField.isAuxiliaryInstance;
 
   void _setupInstance() {
     var prev = _instances[name];
@@ -757,7 +757,7 @@ abstract class APIRoot with Initializable, Closable {
       modulesNames = _modules?.keys.toSet().toString() ?? '{loading...}';
     }
 
-    var isolateInfo = isIsolateCopy ? '(Isolate copy)' : '';
+    var isolateInfo = isAuxiliaryInstance ? '(auxiliary)' : '';
     return '$name[$version]#$_instanceId$isolateInfo$modulesNames';
   }
 }

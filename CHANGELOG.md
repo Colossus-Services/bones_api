@@ -1,3 +1,7 @@
+## 1.5.3
+
+- shared_map: ^1.1.0
+
 ## 1.5.2
 
 - `APIServerConfig`:
