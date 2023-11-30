@@ -61,13 +61,12 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
               A extends DBRelationalAdapter<C>>(Map<String, dynamic> config) =>
           adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
-  DBRelationalAdapter(String name, int minConnections, int maxConnections,
-      DBAdapterCapability capability,
+  DBRelationalAdapter(
+      super.name, super.minConnections, super.maxConnections, super.capability,
       {super.parentRepositoryProvider,
       super.populateSource,
       super.populateSourceVariables,
-      super.workingPath})
-      : super(name, minConnections, maxConnections, capability) {
+      super.workingPath}) {
     boot();
   }
 
@@ -146,9 +145,8 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
       super.databaseAdapter as DBRelationalAdapter;
 
   DBRelationalRepositoryAdapter(
-      DBRelationalAdapter databaseAdapter, String name,
-      {String? tableName, Type? type})
-      : super(databaseAdapter, name, tableName: tableName, type: type);
+      DBRelationalAdapter super.databaseAdapter, super.name,
+      {super.tableName, super.type});
 
   FutureOr<R> doSelect<R>(TransactionOperation op, EntityMatcher matcher,
           {Object? parameters,
@@ -196,10 +194,8 @@ class DBRelationalEntityRepository<O extends Object>
       super.repositoryAdapter as DBRelationalRepositoryAdapter<O>;
 
   DBRelationalEntityRepository(
-      DBRelationalAdapter adapter, String name, EntityHandler<O> entityHandler,
-      {DBRelationalRepositoryAdapter<O>? repositoryAdapter, Type? type})
-      : super(adapter, name, entityHandler,
-            repositoryAdapter: repositoryAdapter, type: type);
+      DBRelationalAdapter super.adapter, super.name, super.entityHandler,
+      {DBRelationalRepositoryAdapter<O>? super.repositoryAdapter, super.type});
 
   @override
   FutureOr<dynamic> ensureStored(o,

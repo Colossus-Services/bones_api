@@ -757,7 +757,6 @@ class DBObjectDirectoryAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
 
-  DBObjectDirectoryAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBObjectDirectoryAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

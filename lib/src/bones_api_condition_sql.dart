@@ -11,9 +11,8 @@ final _log = logging.Logger('ConditionSQLEncoder');
 class ConditionSQLEncoder extends ConditionEncoder {
   final String sqlElementQuote;
 
-  ConditionSQLEncoder(SchemeProvider schemeProvider,
-      {required this.sqlElementQuote})
-      : super(schemeProvider);
+  ConditionSQLEncoder(SchemeProvider super.schemeProvider,
+      {required this.sqlElementQuote});
 
   @override
   String get groupOpener => '(';

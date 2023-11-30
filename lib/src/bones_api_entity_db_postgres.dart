@@ -1080,7 +1080,6 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBPostgreSQLAdapterException';
 
-  DBPostgreSQLAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBPostgreSQLAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

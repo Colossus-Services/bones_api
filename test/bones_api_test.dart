@@ -653,8 +653,7 @@ class MyBaseModule extends APIModule {
 
 @APIModuleProxy('MyInfoModule')
 class MyInfoModuleProxy extends APIModuleProxyHttpCaller {
-  MyInfoModuleProxy(mercury_client.HttpClient httpClient)
-      : super(httpClient, moduleRoute: 'info');
+  MyInfoModuleProxy(super.httpClient) : super(moduleRoute: 'info');
 }
 
 @EnableReflection()

@@ -15,10 +15,8 @@ class DBSQLEntityRepository<O extends Object>
       super.repositoryAdapter as DBSQLRepositoryAdapter<O>;
 
   DBSQLEntityRepository(
-      DBSQLAdapter adapter, String name, EntityHandler<O> entityHandler,
-      {DBSQLRepositoryAdapter<O>? repositoryAdapter, Type? type})
-      : super(adapter, name, entityHandler,
-            repositoryAdapter: repositoryAdapter, type: type);
+      DBSQLAdapter super.adapter, super.name, super.entityHandler,
+      {DBSQLRepositoryAdapter<O>? super.repositoryAdapter, super.type});
 
   @override
   FutureOr<InitializationResult> initialize() => provider

@@ -1163,12 +1163,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     with EntityFieldAccessor<O> {
   final DBRepositoryAdapter<O> repositoryAdapter;
 
-  DBEntityRepository(
-      DBAdapter adapter, String name, EntityHandler<O> entityHandler,
-      {DBRepositoryAdapter<O>? repositoryAdapter, Type? type})
+  DBEntityRepository(DBAdapter super.adapter, super.name, super.entityHandler,
+      {DBRepositoryAdapter<O>? repositoryAdapter, super.type})
       : repositoryAdapter =
-            repositoryAdapter ?? adapter.createRepositoryAdapter<O>(name)!,
-        super(adapter, name, entityHandler, type: type);
+            repositoryAdapter ?? adapter.createRepositoryAdapter<O>(name)!;
 
   @override
   FutureOr<InitializationResult> initialize() => provider

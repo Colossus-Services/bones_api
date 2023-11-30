@@ -772,7 +772,6 @@ class DBObjectMemoryAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
 
-  DBObjectMemoryAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBObjectMemoryAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

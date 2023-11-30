@@ -647,7 +647,7 @@ abstract class GroupCondition<O> extends Condition<O> {
 }
 
 class GroupConditionAND<O> extends GroupCondition<O> {
-  GroupConditionAND(Iterable<Condition> conditions) : super(conditions);
+  GroupConditionAND(super.conditions);
 
   @override
   GroupConditionAND<T> cast<T>() {
@@ -709,7 +709,7 @@ class GroupConditionAND<O> extends GroupCondition<O> {
 }
 
 class GroupConditionOR<O> extends GroupCondition<O> {
-  GroupConditionOR(Iterable<Condition> conditions) : super(conditions);
+  GroupConditionOR(super.conditions);
 
   @override
   bool get isInner => false;
@@ -1243,7 +1243,7 @@ class KeyConditionValue {
 }
 
 class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
-  KeyConditionEQ(List<ConditionKey> keys, dynamic value) : super(keys, value);
+  KeyConditionEQ(super.keys, dynamic super.value);
 
   @override
   KeyConditionEQ<T> cast<T>() => this is KeyConditionEQ<T>
@@ -1288,8 +1288,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
-  KeyConditionNotEQ(List<ConditionKey> keys, dynamic value)
-      : super(keys, value);
+  KeyConditionNotEQ(super.keys, dynamic super.value);
 
   @override
   KeyConditionNotEQ<T> cast<T>() => this is KeyConditionNotEQ<T>
@@ -1334,8 +1333,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
-  KeyConditionGreaterThan(List<ConditionKey> keys, dynamic value)
-      : super(keys, value);
+  KeyConditionGreaterThan(super.keys, dynamic super.value);
 
   @override
   KeyConditionGreaterThan<T> cast<T>() => this is KeyConditionGreaterThan<T>
@@ -1380,8 +1378,7 @@ class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
-  KeyConditionGreaterThanOrEqual(List<ConditionKey> keys, dynamic value)
-      : super(keys, value);
+  KeyConditionGreaterThanOrEqual(super.keys, dynamic super.value);
 
   @override
   KeyConditionGreaterThanOrEqual<T> cast<T>() =>
@@ -1427,8 +1424,7 @@ class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
-  KeyConditionLessThan(List<ConditionKey> keys, dynamic value)
-      : super(keys, value);
+  KeyConditionLessThan(super.keys, dynamic super.value);
 
   @override
   KeyConditionLessThan<T> cast<T>() => this is KeyConditionLessThan<T>
@@ -1473,8 +1469,7 @@ class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
 }
 
 class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
-  KeyConditionLessThanOrEqual(List<ConditionKey> keys, dynamic value)
-      : super(keys, value);
+  KeyConditionLessThanOrEqual(super.keys, dynamic super.value);
 
   @override
   KeyConditionLessThanOrEqual<T> cast<T>() =>
@@ -1581,7 +1576,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 }
 
 class KeyConditionIN<O> extends KeyConditionINBase<O> {
-  KeyConditionIN(List<ConditionKey> keys, dynamic values) : super(keys, values);
+  KeyConditionIN(super.keys, super.values);
 
   @override
   KeyConditionIN<T> cast<T>() => this is KeyConditionIN<T>
@@ -1591,8 +1586,7 @@ class KeyConditionIN<O> extends KeyConditionINBase<O> {
 }
 
 class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
-  KeyConditionNotIN(List<ConditionKey> keys, List values)
-      : super(keys, values, not: true);
+  KeyConditionNotIN(super.keys, List super.values) : super(not: true);
 
   @override
   KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>

@@ -781,11 +781,9 @@ class APIServer extends _APIServerBase {
     super.logToConsole,
   }) : super(address: address, port: port);
 
-  APIServer.fromConfig(APIRoot apiRoot, APIServerConfig serverConfig)
-      : super.fromConfig(apiRoot, serverConfig);
+  APIServer.fromConfig(super.apiRoot, super.serverConfig) : super.fromConfig();
 
-  APIServer.fromArgs(APIRoot apiRoot, List<String> args)
-      : super.fromArgs(apiRoot, args);
+  APIServer.fromArgs(super.apiRoot, super.args) : super.fromArgs();
 
   final List<APIServerWorker> _auxiliaryWorkers = [];
 

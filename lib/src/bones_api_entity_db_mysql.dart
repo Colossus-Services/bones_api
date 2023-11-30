@@ -954,7 +954,6 @@ class DBMySQLAdapterException extends DBSQLAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBMySQLAdapterException';
 
-  DBMySQLAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBMySQLAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

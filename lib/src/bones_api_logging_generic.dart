@@ -3,7 +3,7 @@ import 'package:logging/logging.dart';
 import 'bones_api_logging.dart';
 
 class LoggerHandlerGeneric extends LoggerHandler {
-  LoggerHandlerGeneric(Logger logger) : super(logger);
+  LoggerHandlerGeneric(super.logger);
 
   @override
   String get isolateDebugName => '';

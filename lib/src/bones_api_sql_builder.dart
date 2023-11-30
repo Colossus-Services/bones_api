@@ -107,7 +107,7 @@ class SQLDialect extends DBDialect {
   final bool acceptsVarcharWithoutMaximumSize;
 
   const SQLDialect(
-    String name, {
+    super.name, {
     this.elementQuote = '',
     this.acceptsOutputSyntax = false,
     this.acceptsReturningSyntax = false,
@@ -116,7 +116,7 @@ class SQLDialect extends DBDialect {
     this.acceptsInsertIgnore = false,
     this.acceptsInsertOnConflict = false,
     this.acceptsVarcharWithoutMaximumSize = false,
-  }) : super(name);
+  });
 
   @override
   bool operator ==(Object other) =>
@@ -283,14 +283,13 @@ class CreateTableSQL extends TableSQL {
   /// The associated [EntityRepository] of this table.
   EntityRepository? entityRepository;
 
-  CreateTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
-      {String q = '"',
+  CreateTableSQL(super.dialect, super.table, super.entries,
+      {super.q,
       this.indexes,
       this.alterTables,
       this.relationships,
-      String? parentTable,
-      this.entityRepository})
-      : super(dialect, table, entries, q: q, parentTable: parentTable);
+      super.parentTable,
+      this.entityRepository});
 
   List<String>? _referenceTables;
 
@@ -472,9 +471,8 @@ class AlterTableSQL extends TableSQL {
   List<SQLBuilder> get extraSQLBuilders =>
       <SQLBuilder>[...?indexes, ...?constraints];
 
-  AlterTableSQL(SQLDialect dialect, String table, List<SQLEntry> entries,
-      {String q = '"', this.indexes, this.constraints, String? parentTable})
-      : super(dialect, table, entries, q: q, parentTable: parentTable);
+  AlterTableSQL(super.dialect, super.table, super.entries,
+      {super.q, this.indexes, this.constraints, super.parentTable});
 
   List<String>? _referenceTables;
 

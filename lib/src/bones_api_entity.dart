@@ -2579,7 +2579,7 @@ abstract class EntityAccessor<O extends Object> {
 }
 
 abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
-  EntitySource(String name) : super(name);
+  EntitySource(super.name);
 
   bool hasReferencedEntities();
 
@@ -2674,7 +2674,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
 }
 
 abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
-  EntityStorage(String name) : super(name);
+  EntityStorage(super.name);
 
   bool isStored(O o, {Transaction? transaction});
 
@@ -6075,9 +6075,7 @@ abstract class IterableEntityRepository<O extends Object>
 
 class SetEntityRepository<O extends Object>
     extends IterableEntityRepository<O> {
-  SetEntityRepository(String name, EntityHandler<O> entityHandler,
-      {EntityRepositoryProvider? provider})
-      : super(name, entityHandler, provider: provider);
+  SetEntityRepository(super.name, super.entityHandler, {super.provider});
 
   final Set<O> _entries = <O>{};
 

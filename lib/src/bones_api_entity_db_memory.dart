@@ -1234,7 +1234,6 @@ class DBSQLMemoryAdapterException extends DBSQLAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBSQLMemoryAdapterException';
 
-  DBSQLMemoryAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBSQLMemoryAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }
