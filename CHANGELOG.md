@@ -1,3 +1,8 @@
+## 1.5.7
+
+- `SQLGenerator`:
+  - `generateCreateTableSQL`: fix `CONSTRAINT` of fields with `EntityReference`.
+
 ## 1.5.6
 
 - `APIRepository`:

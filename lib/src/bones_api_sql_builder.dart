@@ -1565,7 +1565,9 @@ abstract mixin class SQLGenerator {
         var entityType = entityTypeToSQLType(fieldType, columnName,
             entityFieldAnnotations: entityFieldAnnotations);
         if (entityType != null) {
-          if (isSiblingEntityType(entityRepository, fieldType.type)) {
+          var fieldEntityType = fieldType.entityType;
+          if (fieldEntityType != null &&
+              isSiblingEntityType(entityRepository, fieldEntityType)) {
             referenceFields[columnName] = entityType;
           }
 
