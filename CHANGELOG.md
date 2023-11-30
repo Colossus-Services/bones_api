@@ -5,7 +5,7 @@
 - `APITokenStore`:
   - Also call `_resolveSharedTokensByUsername` from constructor, to fully pre-initialize it.
 
-- shared_map: ^1.1.3
+- shared_map: ^1.1.4
 
 ## 1.5.3
 
