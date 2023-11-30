@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.4';
+  static const String VERSION = '1.5.5';
 
   static bool _boot = false;
 
@@ -1462,7 +1462,7 @@ class APIRequest extends APIMetricSet with APIPayload {
       this.parsingDuration,
       Uri? requestedUri,
       this.originalRequest,
-      Map<String, APIMetric>? metrics})
+      super.metrics})
       : parameters = parameters ?? <String, dynamic>{},
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         headers = headers ?? <String, dynamic>{},
@@ -1482,8 +1482,7 @@ class APIRequest extends APIMetricSet with APIPayload {
                     value is List
                         ? value.map((e) => '$e').toList()
                         : '$value'))),
-        time = time ?? DateTime.now(),
-        super(metrics: metrics);
+        time = time ?? DateTime.now();
 
   static APIRequesterSource _resolveRestSource(String? requestAddress) {
     if (requestAddress == null) return APIRequesterSource.unknown;
@@ -2550,13 +2549,12 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
       int? keepAliveMaxRequests,
       this.error,
       this.stackTrace,
-      Map<String, APIMetric>? metrics})
+      super.metrics})
       : headers = headers ?? <String, dynamic>{},
         payload = _resolvePayload(payload, payloadDynamic),
         _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
         keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
-        keepAliveMaxRequests = keepAliveMaxRequests ?? 1000,
-        super(metrics: metrics);
+        keepAliveMaxRequests = keepAliveMaxRequests ?? 1000;
 
   static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) {
     if (payload != null) return payload;

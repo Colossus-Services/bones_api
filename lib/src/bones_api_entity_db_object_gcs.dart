@@ -1019,9 +1019,8 @@ class DBObjectGCSAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
-  DBObjectGCSAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBObjectGCSAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }
 
 extension _ObjectInfoExtension on gcs.ObjectInfo {

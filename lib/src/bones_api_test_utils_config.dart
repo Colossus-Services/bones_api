@@ -390,8 +390,7 @@ mixin APITestConfigDBSQLMixin on APITestConfigDBMixin {
 
 /// A base class for [APITestConfig] with database with SQL.
 abstract class APITestConfigDBSQL extends APITestConfigDB {
-  APITestConfigDBSQL(String dbType, Map<String, dynamic> apiConfig)
-      : super(dbType, apiConfig);
+  APITestConfigDBSQL(super.dbType, super.apiConfig);
 
   /// Runs a SQL in the DB. The SQL shouldn't have multiple lines.
   Future<String?> runSQL(String sqlInline);
@@ -450,9 +449,6 @@ abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
     extends APITestConfigDockerDB<C>
     with APITestConfigDBSQLMixin
     implements APITestConfigDBSQL, WithRuntimeTypeNameSafe {
-  APITestConfigDockerDBSQL(
-      DockerHost dockerHost, String dbType, Map<String, dynamic> apiConfig,
-      {String? containerNamePrefix})
-      : super(dockerHost, dbType, apiConfig,
-            containerNamePrefix: containerNamePrefix);
+  APITestConfigDockerDBSQL(super.dockerHost, super.dbType, super.apiConfig,
+      {super.containerNamePrefix});
 }

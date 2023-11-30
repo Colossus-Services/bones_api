@@ -367,8 +367,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  DBSQLAdapter(String name, int minConnections, int maxConnections,
-      DBSQLAdapterCapability capability,
+  DBSQLAdapter(super.name, super.minConnections, super.maxConnections,
+      DBSQLAdapterCapability super.capability,
       {bool generateTables = false,
       bool checkTables = true,
       Object? populateTables,
@@ -379,8 +379,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       this.logSQL = false})
       : _generateTables = generateTables,
         _checkTables = checkTables,
-        _populateTables = populateTables,
-        super(name, minConnections, maxConnections, capability) {
+        _populateTables = populateTables {
     boot();
 
     _conditionSQLGenerator =
@@ -2344,9 +2343,8 @@ class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
   @override
   DBSQLAdapter get databaseAdapter => super.databaseAdapter as DBSQLAdapter;
 
-  DBSQLRepositoryAdapter(DBSQLAdapter databaseAdapter, String name,
-      {String? tableName, Type? type})
-      : super(databaseAdapter, name, tableName: tableName, type: type);
+  DBSQLRepositoryAdapter(DBSQLAdapter super.databaseAdapter, super.name,
+      {super.tableName, super.type});
 
   @override
   SQLDialect get dialect => super.dialect as SQLDialect;
@@ -2476,7 +2474,6 @@ class DBSQLAdapterException extends DBAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBSQLAdapterException';
 
-  DBSQLAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBSQLAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

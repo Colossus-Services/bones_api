@@ -1,3 +1,9 @@
+## 1.5.5
+
+- lints: ^3.0.0
+  - Apply new lints fixes.
+- shared_map: ^1.1.5
+
 ## 1.5.4
 
 - `APISecurity`:

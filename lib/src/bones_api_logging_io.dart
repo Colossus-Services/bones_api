@@ -10,7 +10,7 @@ import 'bones_api_logging.dart';
 final _log = logging.Logger('LogFileRotate');
 
 class LoggerHandlerIO extends LoggerHandler {
-  LoggerHandlerIO(logging.Logger logger) : super(logger);
+  LoggerHandlerIO(super.logger);
 
   @override
   String get isolateDebugName {

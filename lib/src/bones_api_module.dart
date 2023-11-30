@@ -943,13 +943,11 @@ class APIRouteBuilder<M extends APIModule> {
 @Target({TargetKind.classType})
 class APIModuleProxy extends ClassProxy {
   const APIModuleProxy(
-    String moduleClassName, {
-    String libraryName = '',
-    String libraryPath = '',
+    super.moduleClassName, {
+    super.libraryName,
+    super.libraryPath,
     Set<String> ignoreMethods = const <String>{},
-  }) : super(moduleClassName,
-            libraryName: libraryName,
-            libraryPath: libraryPath,
+  }) : super(
             ignoreMethods: APIModule.interfaceMethodsNames,
             ignoreMethods2: ignoreMethods,
             alwaysReturnFuture: true,

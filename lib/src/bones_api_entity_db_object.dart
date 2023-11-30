@@ -52,21 +52,15 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
 
   final bool log;
 
-  DBObjectAdapter(String name, int minConnections, int maxConnections,
-      DBAdapterCapability capability,
+  DBObjectAdapter(
+      super.name, super.minConnections, super.maxConnections, super.capability,
       {bool generateTables = false,
       Object? populateTables,
       super.populateSource,
       super.populateSourceVariables,
       super.parentRepositoryProvider,
       super.workingPath,
-      this.log = false})
-      : super(
-          name,
-          minConnections,
-          maxConnections,
-          capability,
-        ) {
+      this.log = false}) {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
@@ -108,7 +102,6 @@ class DBObjectAdapterException extends DBAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectAdapterException';
 
-  DBObjectAdapterException(String type, String message,
-      {super.parentError, super.parentStackTrace, super.operation})
-      : super(type, message);
+  DBObjectAdapterException(super.type, super.message,
+      {super.parentError, super.parentStackTrace, super.operation});
 }

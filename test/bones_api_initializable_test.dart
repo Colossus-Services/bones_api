@@ -137,7 +137,7 @@ class _Init with Initializable {
 class _InitAsync extends _Init {
   final Duration delay = Duration(milliseconds: 200);
 
-  _InitAsync(Map<Type, _Init> context) : super(context);
+  _InitAsync(super.context);
 
   @override
   Future<InitializationResult> initialize() => Future.delayed(delay, () {

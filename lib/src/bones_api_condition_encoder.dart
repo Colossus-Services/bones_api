@@ -1229,7 +1229,7 @@ abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
 
 abstract class EncodingValueResolved<E, T extends EncodingValueResolved<E, T>>
     extends EncodingValue<E, T> {
-  EncodingValueResolved(String key, Type? type) : super(key, type);
+  EncodingValueResolved(super.key, super.type);
 
   Object? get resolvedValue;
 }
@@ -1238,8 +1238,7 @@ class EncodingValueNull<E>
     extends EncodingValueResolved<E, EncodingValueNull<E>> {
   final ValueEncoder<E, EncodingValueNull<E>> valueEncoder;
 
-  EncodingValueNull(String key, Type? type, this.valueEncoder)
-      : super(key, type);
+  EncodingValueNull(super.key, super.type, this.valueEncoder);
 
   @override
   Object? get resolvedValue => null;
@@ -1256,8 +1255,7 @@ class EncodingValuePrimitive<E, T>
   final T resolvedValue;
 
   EncodingValuePrimitive(
-      String key, Type? type, this.resolvedValue, this.valueEncoder)
-      : super(key, type);
+      super.key, super.type, this.resolvedValue, this.valueEncoder);
 
   @override
   E get encode => valueEncoder(this);
@@ -1271,8 +1269,7 @@ class EncodingValueText<E>
   final String resolvedValue;
 
   EncodingValueText(
-      String key, Type? type, this.resolvedValue, this.valueEncoder)
-      : super(key, type);
+      super.key, super.type, this.resolvedValue, this.valueEncoder);
 
   @override
   E get encode => valueEncoder(this);
@@ -1284,8 +1281,7 @@ class EncodingPlaceholder<E> extends EncodingValue<E, EncodingPlaceholder<E>> {
   final String placeholder;
 
   EncodingPlaceholder(
-      String key, Type? type, this.placeholder, this.valueEncoder)
-      : super(key, type);
+      super.key, super.type, this.placeholder, this.valueEncoder);
 
   @override
   E get encode => valueEncoder(this);
@@ -1299,8 +1295,7 @@ class EncodingPlaceholderIndex<E>
   final int index;
 
   EncodingPlaceholderIndex(
-      String key, Type? type, this.placeholder, this.index, this.valueEncoder)
-      : super(key, type);
+      super.key, super.type, this.placeholder, this.index, this.valueEncoder);
 
   @override
   E get encode => valueEncoder(this);
@@ -1311,8 +1306,7 @@ class EncodingValueList<E> extends EncodingValue<E, EncodingValueList<E>> {
 
   final List<EncodingValue<E, Object?>> list;
 
-  EncodingValueList(String key, Type? type, this.list, this.valueEncoder)
-      : super(key, type);
+  EncodingValueList(super.key, super.type, this.list, this.valueEncoder);
 
   @override
   List<EncodingValue<E, Object?>> get asList =>
