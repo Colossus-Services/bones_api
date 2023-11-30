@@ -62,8 +62,29 @@ abstract class APIRepository<O extends Object> with Initializable {
 
   EventStream<O> get onDelete => entityRepository.onDelete;
 
-  FutureOr<int> count({Transaction? transaction}) =>
-      entityRepository.count(transaction: transaction);
+  FutureOr<int> countByQuery(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
+      entityRepository.countByQuery(query,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction);
+
+  FutureOr<int> count(
+          {EntityMatcher<O>? matcher,
+          Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          Transaction? transaction}) =>
+      entityRepository.count(
+          matcher: matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction);
 
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) =>
       entityRepository.existsID(id, transaction: transaction);

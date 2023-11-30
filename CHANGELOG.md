@@ -1,3 +1,8 @@
+## 1.5.6
+
+- `APIRepository`:
+  - Expose `countByQuery`.
+
 ## 1.5.5
 
 - lints: ^3.0.0
