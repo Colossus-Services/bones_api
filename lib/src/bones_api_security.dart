@@ -495,7 +495,8 @@ abstract class APISecurity {
     return list.last;
   }
 
-  final APISessionSet _sessionSet = APISessionSet(Duration(hours: 3));
+  late final APISessionSet _sessionSet =
+      APISessionSet(Duration(hours: 3), sharedStoreField: _sharedStoreField);
 
   FutureOr<APIAuthentication?> resolveRequestAuthentication(
       APIRequest request, APIAuthentication? authentication) {
@@ -687,7 +688,9 @@ class APITokenStore {
           storeProvider: storeProvider,
         ) {
     // ignore: discarded_futures
-    _resolveSharedTokens();
+    _resolveSharedTokens().then((_) async {
+      _resolveSharedTokensByUsername();
+    });
   }
 
   SharedStore get sharedStore => _sharedStoreField.sharedStore;

@@ -847,6 +847,7 @@ class APIServer extends _APIServerBase {
 
     Map<APIServerWorker, (Isolate?, PortListener?, SendPort?, Future<bool>?)>?
         workersSpawns;
+
     if (totalAuxiliaryWorkers >= 1) {
       _log.info("Spawning $totalAuxiliaryWorkers parallel workers...");
 

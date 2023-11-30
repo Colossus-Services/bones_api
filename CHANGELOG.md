@@ -1,3 +1,12 @@
+## 1.5.4
+
+- `APISecurity`:
+  - Ensure that `_sessionSet` (`APISessionSet`) is using `_sharedStoreField`.
+- `APITokenStore`:
+  - Also call `_resolveSharedTokensByUsername` from constructor, to fully pre-initialize it.
+
+- shared_map: ^1.1.3
+
 ## 1.5.3
 
 - shared_map: ^1.1.1
