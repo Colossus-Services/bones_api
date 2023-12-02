@@ -201,6 +201,17 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     return true;
   }
 
+  @override
+  DBSQLMemoryAdapterContext catchFromPool({Duration? timeout}) {
+    if (poolSize > 0) {
+      // If the pool has elements, it won't return a `Future`:
+      // ignore: discarded_futures
+      return super.catchFromPool(timeout: timeout) as DBSQLMemoryAdapterContext;
+    } else {
+      return createConnection();
+    }
+  }
+
   final Map<String, MapHistory<Object, Map<String, dynamic>>> _tables =
       <String, MapHistory<Object, Map<String, dynamic>>>{};
 
@@ -1119,7 +1130,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   DBSQLMemoryAdapterContext openTransaction(Transaction transaction) {
-    var conn = createConnection();
+    var conn = catchFromPool();
 
     _openTransactionsContexts[conn] = DateTime.now();
 
@@ -1127,7 +1138,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         // ignore: discarded_futures
         .then(
       // ignore: discarded_futures
-      (res) => resolveTransactionResult(res, transaction, conn),
+      (res) => resolveTransactionResult(res, transaction, conn,
+          releaseConnection: true),
       onError: (e, s) {
         cancelTransaction(transaction, conn, e, s);
         throw e;
@@ -1152,6 +1164,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
+    // ignore: discarded_futures
+    disposePoolElement(connection);
     return true;
   }
 

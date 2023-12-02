@@ -1,3 +1,11 @@
+## 1.5.8
+
+- `EntityHandler`:
+  - Added `_resolveTransaction`: improve current `Transaction` resolution.
+- `DBSQLMemoryAdapter`:
+  - Using `catchFromPool`/`releaseIntoPool` to simulate connection/context usage
+    and indicate heavy use of connections in tests.
+
 ## 1.5.7
 
 - `SQLGenerator`:

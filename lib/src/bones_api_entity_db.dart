@@ -524,7 +524,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   bool get throwTransactionResultWithError;
 
   FutureOr<dynamic> resolveTransactionResult(
-      dynamic result, Transaction transaction, C? connection) async {
+      dynamic result, Transaction transaction, C? connection,
+      {bool releaseConnection = false}) async {
     // When aborted `_transactionCompleter.complete` will be called
     // with the error (not calling `completeError`), since it's
     // running in another error zone (won't reach `onError`):
@@ -541,6 +542,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       } else if (throwTransactionResultWithError) {
         throw result;
       }
+    }
+
+    if (releaseConnection && connection != null) {
+      releaseIntoPool(connection);
     }
 
     return result;
@@ -1703,6 +1708,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
       // ignore: discarded_futures
       var retRelationships = relationshipsAsync.resolveMapped((relationships) {
+        if (relationships.isEmpty) {
+          return <dynamic, List>{};
+        }
+
         var allTargetIds =
             relationships.values.expand((e) => e).toSet().toList();
 

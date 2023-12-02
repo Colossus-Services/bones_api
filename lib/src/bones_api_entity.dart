@@ -1013,7 +1013,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
       if (entityRepository != null) {
         var id = valEntityHandler?.resolveID(value) ?? value;
-        var transaction = entityProvider is Transaction ? entityProvider : null;
+        var transaction = _resolveTransaction(entityProvider, entityCache);
+
         var retEntity = entityRepository.selectByID(id,
             transaction: transaction, resolutionRules: resolutionRulesResolved);
         return retEntity.resolveMapped((val) {
@@ -1060,6 +1061,17 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     } catch (e) {
       return value as T?;
     }
+  }
+
+  Transaction? _resolveTransaction(
+      EntityProvider? entityProvider, EntityCache entityCache) {
+    if (entityProvider is Transaction) {
+      return entityProvider;
+    } else if (entityCache is Transaction) {
+      return entityCache;
+    }
+
+    return null;
   }
 
   List? castList(List list, Type type) {
