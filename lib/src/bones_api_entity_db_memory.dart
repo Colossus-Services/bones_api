@@ -1138,8 +1138,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         // ignore: discarded_futures
         .then(
       // ignore: discarded_futures
-      (res) => resolveTransactionResult(res, transaction, conn,
-          releaseConnection: true),
+      (res) => resolveTransactionResult(res, transaction, conn),
       onError: (e, s) {
         cancelTransaction(transaction, conn, e, s);
         throw e;
@@ -1147,6 +1146,24 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     );
 
     return conn;
+  }
+
+  @override
+  FutureOr<dynamic> resolveTransactionResult(
+      result, Transaction transaction, DBSQLMemoryAdapterContext? connection) {
+    var result2 =
+        super.resolveTransactionResult(result, transaction, connection);
+
+    if (connection != null && result2 is! TransactionAbortedError) {
+      var consolidated = _consolidateTransactionContext(connection);
+      if (consolidated != null && consolidated) {
+        releaseIntoPool(connection);
+      } else {
+        disposePoolElement(connection);
+      }
+    }
+
+    return result2;
   }
 
   @override
@@ -1183,12 +1200,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   final ListQueue<DBSQLMemoryAdapterContext> _consolidateContextQueue =
       ListQueue<DBSQLMemoryAdapterContext>();
 
-  void _consolidateTransactionContext(DBSQLMemoryAdapterContext context) {
-    _openTransactionsContexts.remove(context);
+  bool? _consolidateTransactionContext(DBSQLMemoryAdapterContext context) {
+    var open = _openTransactionsContexts.remove(context);
+    if (open == null) return null;
 
     if (_openTransactionsContexts.isNotEmpty) {
       _consolidateContextQueue.add(context);
-      return;
+      return false;
     }
 
     if (_consolidateContextQueue.isEmpty) {
@@ -1201,6 +1219,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         _consolidateTables(c.tablesVersions);
       }
     }
+
+    return true;
   }
 
   void _consolidateTables(Map<String, int> tablesVersions) {
