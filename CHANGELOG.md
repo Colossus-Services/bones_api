@@ -1,3 +1,8 @@
+## 1.5.9
+
+- reflection_factory: ^2.2.5
+- shared_map: ^1.1.6
+
 ## 1.5.8
 
 - `EntityHandler`:
