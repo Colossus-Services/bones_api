@@ -1,3 +1,10 @@
+## 1.5.10
+
+- `printZoneError`: reduce print calls.
+
+- shared_map: ^1.1.7
+- petitparser: ^6.0.2
+
 ## 1.5.9
 
 - reflection_factory: ^2.2.5

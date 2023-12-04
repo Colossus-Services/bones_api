@@ -88,24 +88,34 @@ void _handleUncaughtError(
 /// See [printToZoneStderr].
 void printZoneError(Object error, StackTrace stackTrace,
     {String? title, String? message, bool printErrorToStderr = true}) {
-  var p = printErrorToStderr ? printToZoneStderr : print;
+  var s = StringBuffer();
 
-  p('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+  s.write(
+      '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n');
 
   if (title != null) {
-    p('$title\n');
+    s.write('$title\n\n');
   }
 
-  p(error);
-  p('');
-  p(stackTrace);
+  var errorMsg = error.toString().trim();
+  s.write('$errorMsg\n\n');
+
+  s.write('StackTrace:\n$stackTrace\n');
 
   if (message != null && message.isNotEmpty) {
-    p('------------------------------------------------------------------------------\n');
-    p(message);
+    s.write(
+        '------------------------------------------------------------------------------\n\n');
+    s.write('$message\n');
   }
 
-  p('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+  s.write(
+      '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n');
+
+  if (printErrorToStderr) {
+    printToZoneStderr(s);
+  } else {
+    print(s);
+  }
 }
 
 /// Similar to [print] but prints to `STDERR`.
