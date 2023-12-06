@@ -157,6 +157,7 @@ class APIConfig {
   }
 
   /// Returns the final value from a path of keys as [E].
+  /// If not null, it attempts to parse the value into [E] or throws a [StateError].
   E? getPath<E>(String k0, [Object? k1, Object? k2, Object? k3, Object? k4]) {
     Object key = k0;
     Object? val = get(k0);
@@ -189,6 +190,9 @@ class APIConfig {
     val = _resolveValue(key.toString(), val, null);
 
     if (val is! E) {
+      var val2 = _parseValue<E>(val);
+      if (val2 != null) return val2;
+
       var keyPath = [k0, k1, k2, k3, k4].whereNotNull().join('/');
       throw StateError("Can't return key `$keyPath` as `$E`: $val");
     }
@@ -218,15 +222,32 @@ class APIConfig {
     return l is List<E> ? l : l.cast<E>();
   }
 
-  /// Alias to [get] returning a [List].
+  /// Alias to [get] returning as [T].
+  /// If not null, it attempts to parse the value into [T] or throws a [StateError].
   T? getAs<T>(String key, {T? defaultValue, bool caseSensitive = false}) {
     var val =
         get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
     if (val == null) return null;
     if (val is! T) {
+      var val2 = _parseValue<T>(val);
+      if (val2 != null) return val2;
+
       throw StateError("Can't return key `$key` as `$T`: $val");
     }
     return val;
+  }
+
+  T? _parseValue<T>(Object? val) {
+    if (val == null) return null;
+
+    if (T != Object && T != dynamic) {
+      var parser = TypeParser.parserFor<T>();
+      if (parser != null) {
+        return parser(val);
+      }
+    }
+
+    return null;
   }
 
   /// Constructs an [APIConfig] instance from [o], returning [def] if [o] is invalid.

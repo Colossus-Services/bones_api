@@ -22,22 +22,24 @@ const _headerAPIServerCache = 'X-API-Server-Cache';
 class APIServerResponseCache {
   static const int defaultMaxContentLength = 1024 * 1024 * 10;
 
-  /// The maximum `Content-Length` to cache.
+  /// The maximum `Content-Length` allowed for a cached [Response].
   final int maxContentLength;
 
   static const int defaultMaxMemorySize = 1024 * 1024 * 50;
 
-  /// The maximum cache memory size.
+  /// The maximum memory size for storing all cached [Response]s.
   final int maxMemorySize;
 
   /// The timeout of a resolved [File.stat].
   final Duration fileStatTimeout;
 
   APIServerResponseCache({
-    this.maxContentLength = defaultMaxContentLength,
-    this.maxMemorySize = defaultMaxMemorySize,
+    int maxContentLength = defaultMaxContentLength,
+    int maxMemorySize = defaultMaxMemorySize,
     this.fileStatTimeout = _FileStat.defaultStatTimeout,
-  });
+  })  : maxContentLength = maxContentLength.clamp(0, 1024 * 1024 * 1024 * 8),
+        maxMemorySize =
+            maxMemorySize.clamp(1024 * 1024, 1024 * 1024 * 1024 * 32);
 
   final Map<_CachedResponseKey, Object> _cachedResponses = {};
 
@@ -471,6 +473,15 @@ class APIServerResponseCache {
     }
     return all;
   }
+
+  @override
+  String toString() => 'APIServerResponseCache{ '
+      'maxContentLength: ${maxContentLength.asBestUnit}, '
+      'maxMemorySize: ${maxMemorySize.asBestUnit}, '
+      'fileStatTimeout: ${fileStatTimeout.asBestUnit}, '
+      'cachedResponses: ${_cachedResponses.length}, '
+      'totalMemorySize: $_totalCachedResponsesMemorySize '
+      '}';
 }
 
 class _CachedResponseKey {

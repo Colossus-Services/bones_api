@@ -115,6 +115,15 @@ class APIServerConfig {
   static const String defaultStaticFilesCacheControl =
       'private, no-transform, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
 
+  /// If `true` will cache static files. Default: true
+  final bool cacheStaticFilesResponses;
+
+  /// The maximum memory size (in bytes) for storing all cached [Response]s. Default: 50M
+  final int staticFilesCacheMaxMemorySize;
+
+  /// The maximum `Content-Length` (in bytes) allowed for a cached [Response]. Default: 10M
+  final int staticFilesCacheMaxContentLength;
+
   /// If `true` log messages to [stdout] (console).
   late final bool logToConsole;
 
@@ -142,6 +151,9 @@ class APIServerConfig {
     bool? useSessionID,
     String? apiCacheControl,
     String? staticFilesCacheControl,
+    bool? cacheStaticFilesResponses,
+    int? staticFilesCacheMaxMemorySize,
+    int? staticFilesCacheMaxContentLength,
     this.apiConfig,
     bool? logToConsole,
     Object? args,
@@ -170,6 +182,16 @@ class APIServerConfig {
             normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
         staticFilesCacheControl = normalizeHeaderValue(
             staticFilesCacheControl, defaultStaticFilesCacheControl),
+        cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
+            cacheStaticFilesResponses,
+            apiConfig: apiConfig),
+        staticFilesCacheMaxMemorySize = resolveStaticFilesCacheMaxMemorySize(
+            staticFilesCacheMaxMemorySize,
+            apiConfig: apiConfig),
+        staticFilesCacheMaxContentLength =
+            resolveStaticFilesCacheMaxContentLength(
+                staticFilesCacheMaxContentLength,
+                apiConfig: apiConfig),
         useSessionID = resolveUseSessionID(cookieless, useSessionID),
         totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
         logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
@@ -215,6 +237,13 @@ class APIServerConfig {
     var staticFilesCacheControl =
         a.optionAsString('static-files-cache-control');
 
+    var cacheStaticFilesResponses =
+        a.optionAsBool('cache-static-files-responses');
+    var staticFilesCacheMaxMemorySize =
+        a.optionAsInt('static-files-cache-max-memory-size');
+    var staticFilesCacheMaxContentLength =
+        a.optionAsInt('static-files-cache-max-content-length');
+
     var logToConsole = a.flagOr('log-toConsole', null);
 
     var documentRoot = a.optionAsDirectory('document-root');
@@ -252,6 +281,9 @@ class APIServerConfig {
       useSessionID: useSessionID,
       apiCacheControl: apiCacheControl,
       staticFilesCacheControl: staticFilesCacheControl,
+      cacheStaticFilesResponses: cacheStaticFilesResponses,
+      staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
+      staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
       apiConfig: apiConfig,
       logToConsole: logToConsole,
       args: a,
@@ -427,6 +459,54 @@ class APIServerConfig {
     return cookieless ? false : (useSessionID ?? true);
   }
 
+  static bool resolveCacheStaticFilesResponses(bool? cache,
+      {APIConfig? apiConfig}) {
+    if (cache != null) return cache;
+
+    if (apiConfig != null) {
+      cache ??= apiConfig.getAs('cache-static-files-responses');
+      cache ??= apiConfig.getAs('cache_static_files_responses');
+
+      var entryCacheStaticFiles = apiConfig.getPath('cache', 'static_files');
+      if (entryCacheStaticFiles is bool) {
+        cache = entryCacheStaticFiles;
+      }
+
+      cache ??= apiConfig.getPath('cache', 'static_files', 'enabled');
+    }
+
+    cache ??= true;
+    return cache;
+  }
+
+  static int resolveStaticFilesCacheMaxMemorySize(int? max,
+      {APIConfig? apiConfig}) {
+    if (max != null) return max;
+
+    if (apiConfig != null) {
+      max ??= apiConfig.getAs('static-files-cache-max-memory-size');
+      max ??= apiConfig.getAs('static_files_cache_max_memory_size');
+      max ??= apiConfig.getPath('cache', 'static_files', 'max_memory_size');
+    }
+
+    max ??= APIServerResponseCache.defaultMaxMemorySize;
+    return max;
+  }
+
+  static int resolveStaticFilesCacheMaxContentLength(int? max,
+      {APIConfig? apiConfig}) {
+    if (max != null) return max;
+
+    if (apiConfig != null) {
+      max ??= apiConfig.getAs('static-files-cache-max-content-length');
+      max ??= apiConfig.getAs('static_files_cache_max_content_length');
+      max ??= apiConfig.getPath('cache', 'static_files', 'max_content_length');
+    }
+
+    max ??= APIServerResponseCache.defaultMaxContentLength;
+    return max;
+  }
+
   // If `logToConsole` not defined and NOT logging all, set `logToConsole = true`:
   static bool resolveLogToConsole(bool? logToConsole, {APIConfig? apiConfig}) {
     logToConsole ??= apiConfig?.getPath('log', 'console');
@@ -582,6 +662,9 @@ class APIServerConfig {
         'totalWorkers': totalWorkers,
         'apiCacheControl': apiCacheControl,
         'staticFilesCacheControl': staticFilesCacheControl,
+        'cacheStaticFilesResponses': cacheStaticFilesResponses,
+        'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
+        'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
         'logToConsole': logToConsole,
         if (args.isNotEmpty) 'args': args.toList(),
       };
@@ -603,6 +686,7 @@ class APIServerConfig {
       totalWorkers: json['totalWorkers'],
       apiCacheControl: json['apiCacheControl'],
       staticFilesCacheControl: json['staticFilesCacheControl'],
+      cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
       logToConsole: json['logToConsole'],
       args: json['args'],
     );
@@ -646,6 +730,9 @@ abstract class _APIServerBase extends APIServerConfig {
     super.useSessionID,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.cacheStaticFilesResponses,
+    super.staticFilesCacheMaxMemorySize,
+    super.staticFilesCacheMaxContentLength,
     super.logToConsole,
   });
 
@@ -668,6 +755,11 @@ abstract class _APIServerBase extends APIServerConfig {
           useSessionID: apiServerConfig.useSessionID,
           apiCacheControl: apiServerConfig.apiCacheControl,
           staticFilesCacheControl: apiServerConfig.staticFilesCacheControl,
+          cacheStaticFilesResponses: apiServerConfig.cacheStaticFilesResponses,
+          staticFilesCacheMaxMemorySize:
+              apiServerConfig.staticFilesCacheMaxMemorySize,
+          staticFilesCacheMaxContentLength:
+              apiServerConfig.staticFilesCacheMaxContentLength,
           logToConsole: apiServerConfig.logToConsole,
         );
 
@@ -781,6 +873,7 @@ class APIServer extends _APIServerBase {
     super.totalWorkers,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.cacheStaticFilesResponses,
     super.logToConsole,
   }) : super(address: address, port: port);
 
@@ -794,51 +887,14 @@ class APIServer extends _APIServerBase {
 
   @override
   Future<bool> _startImpl() async {
-    var mainWorker = APIServerWorker(0, apiRoot,
-        address: address,
-        domains: domainsRoots,
-        apiCacheControl: apiCacheControl,
-        staticFilesCacheControl: staticFilesCacheControl,
-        letsEncryptDirectory: letsEncryptDirectory,
-        securePort: securePort,
-        useSessionID: useSessionID,
-        logToConsole: this.logToConsole,
-        port: port,
-        letsEncrypt: letsEncrypt,
-        letsEncryptProduction: letsEncryptProduction,
-        allowRequestLetsEncryptCertificate: allowRequestLetsEncryptCertificate,
-        name: name,
-        version: version,
-        hotReload: hotReload,
-        cookieless: cookieless,
-        totalWorkers: totalWorkers);
+    var mainWorker = _createWorker(0);
 
     var auxiliaryWorkers = <APIServerWorker>[];
     var totalAuxiliaryWorkers = totalWorkers - 1;
 
     if (totalAuxiliaryWorkers >= 1) {
-      auxiliaryWorkers = List.generate(
-        totalAuxiliaryWorkers,
-        (i) => APIServerWorker(1 + i, apiRoot,
-            address: address,
-            domains: domainsRoots,
-            apiCacheControl: apiCacheControl,
-            staticFilesCacheControl: staticFilesCacheControl,
-            letsEncryptDirectory: letsEncryptDirectory,
-            securePort: securePort,
-            useSessionID: useSessionID,
-            logToConsole: this.logToConsole,
-            port: port,
-            letsEncrypt: letsEncrypt,
-            letsEncryptProduction: letsEncryptProduction,
-            allowRequestLetsEncryptCertificate:
-                allowRequestLetsEncryptCertificate,
-            name: name,
-            version: version,
-            hotReload: hotReload,
-            cookieless: cookieless,
-            totalWorkers: totalWorkers),
-      );
+      auxiliaryWorkers =
+          List.generate(totalAuxiliaryWorkers, (i) => _createWorker(i + 1));
     }
 
     _mainWorker = mainWorker;
@@ -892,6 +948,33 @@ class APIServer extends _APIServerBase {
     }
 
     return true;
+  }
+
+  APIServerWorker _createWorker(int workerIndex) {
+    return APIServerWorker(
+      workerIndex,
+      apiRoot,
+      address: address,
+      domains: domainsRoots,
+      apiCacheControl: apiCacheControl,
+      staticFilesCacheControl: staticFilesCacheControl,
+      cacheStaticFilesResponses: cacheStaticFilesResponses,
+      staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
+      staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
+      letsEncryptDirectory: letsEncryptDirectory,
+      securePort: securePort,
+      useSessionID: useSessionID,
+      logToConsole: this.logToConsole,
+      port: port,
+      letsEncrypt: letsEncrypt,
+      letsEncryptProduction: letsEncryptProduction,
+      allowRequestLetsEncryptCertificate: allowRequestLetsEncryptCertificate,
+      name: name,
+      version: version,
+      hotReload: hotReload,
+      cookieless: cookieless,
+      totalWorkers: totalWorkers,
+    );
   }
 
   @override
@@ -1420,7 +1503,7 @@ class APIServer extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, totalWorkers: $totalWorkers, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, totalWorkers: $totalWorkers, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].
@@ -1600,6 +1683,9 @@ final class APIServerWorker extends _APIServerBase {
     super.useSessionID,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.cacheStaticFilesResponses,
+    super.staticFilesCacheMaxMemorySize,
+    super.staticFilesCacheMaxContentLength,
     super.logToConsole,
   }) {
     _configureAPIRoot(apiRoot);
@@ -1636,12 +1722,30 @@ final class APIServerWorker extends _APIServerBase {
       _directoriesStaticHandlers[rootDirectory.path] ??=
           _createDirectoryHandler(rootDirectory);
 
+  APIServerResponseCache? _responseCache;
+
   Handler _createDirectoryHandler(Directory rootDirectory) {
     rootDirectory = Directory(pack_path.normalize(rootDirectory.absolute.path));
 
-    var pipeline = const Pipeline()
-        .addMiddleware(_responseCache.middleware)
-        .addMiddleware(gzipMiddleware)
+    var pipeline = const Pipeline();
+
+    var gzipCompressionLevel = 4;
+
+    if (cacheStaticFilesResponses) {
+      var responseCache = _responseCache = APIServerResponseCache(
+        maxMemorySize: staticFilesCacheMaxMemorySize,
+        maxContentLength: staticFilesCacheMaxContentLength,
+      );
+
+      pipeline = pipeline.addMiddleware(responseCache.middleware);
+
+      // Allow higher compression if the `Response`s are being cached:
+      gzipCompressionLevel = 7;
+    }
+
+    pipeline = pipeline
+        .addMiddleware(
+            createGzipMiddleware(compressionLevel: gzipCompressionLevel))
         .addMiddleware((innerHandler) =>
             _staticFilesHeadersMiddleware(rootDirectory, innerHandler));
 
@@ -1650,8 +1754,6 @@ final class APIServerWorker extends _APIServerBase {
 
     return handler;
   }
-
-  final APIServerResponseCache _responseCache = APIServerResponseCache();
 
   Handler _staticFilesHeadersMiddleware(
           Directory rootDirectory, Handler innerHandler) =>
@@ -1989,6 +2091,8 @@ final class APIServerWorker extends _APIServerBase {
     if (_httpSecureServer != null) {
       await _httpSecureServer!.close();
     }
+
+    _responseCache?.clear();
   }
 
   FutureOr<Response> _process(Request request) {
@@ -2378,7 +2482,7 @@ final class APIServerWorker extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServerWorker{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 }
 

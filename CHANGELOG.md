@@ -1,3 +1,10 @@
+## 1.5.12
+
+- `APIServerConfig`:
+  - Added properties: `cacheStaticFilesResponses`, `staticFilesCacheMaxMemorySize` and `staticFilesCacheMaxContentLength`.
+- `APIConfig`:
+  - `getAs` and `getPath`: also tries to parse the value to the returned type.
+
 ## 1.5.11
 
 - New `APIServerResponseCache`.
