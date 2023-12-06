@@ -55,33 +55,36 @@ class APIServerResponseCache {
 
   Handler middleware(Handler innerHandler) {
     return (request) {
+      final requestInit = DateTime.now();
       var cachedResponse = getCachedResponse(request);
 
       if (cachedResponse is Future<Response?>) {
         return cachedResponse.then((cachedResponse) =>
-            _middlewareCachedResponse(innerHandler, request, cachedResponse));
+            _middlewareCachedResponse(
+                innerHandler, request, requestInit, cachedResponse));
       } else {
-        return _middlewareCachedResponse(innerHandler, request, cachedResponse);
+        return _middlewareCachedResponse(
+            innerHandler, request, requestInit, cachedResponse);
       }
     };
   }
 
-  FutureOr<Response> _middlewareCachedResponse(
-      Handler innerHandler, Request request, Response? cachedResponse) {
+  FutureOr<Response> _middlewareCachedResponse(Handler innerHandler,
+      Request request, DateTime requestInit, Response? cachedResponse) {
     if (cachedResponse != null) {
       _log.info(() =>
-          "File Response (cached) [${cachedResponse.statusCode}]> /${request.url.path} (${cachedResponse.contentLengthHeader})");
+          "CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${cachedResponse.statusCode}]> /${request.url.path} (${cachedResponse.contentLengthHeader})");
       return cachedResponse;
     }
 
-    return _middlewareUncachedResponse(innerHandler, request);
+    return _middlewareUncachedResponse(innerHandler, request, requestInit);
   }
 
   Future<Response> _middlewareUncachedResponse(
-      Handler innerHandler, Request request) {
+      Handler innerHandler, Request request, DateTime requestInit) {
     return Future.sync(() => innerHandler(request)).then((response) {
       _log.info(() =>
-          "File Response [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})");
+          "UN-CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})");
 
       var cachedResponse = cacheResponse(request, response);
       if (cachedResponse != null) {
@@ -566,7 +569,7 @@ class _FileStat implements WithMemorySize {
     return stat;
   }
 
-  static const Duration defaultStatTimeout = Duration(seconds: 10);
+  static const Duration defaultStatTimeout = Duration(minutes: 5);
 
   bool isStatExpired({Duration timeout = defaultStatTimeout}) {
     var statTime = _statTime;
@@ -1306,5 +1309,16 @@ extension _FutureOrResponseExtension on FutureOr<Response?> {
     }
 
     return alternative(request);
+  }
+}
+
+extension on DateTime {
+  Duration get elapsedTime => DateTime.now().difference(this);
+}
+
+extension on Duration {
+  String toMillisecondsFormatted() {
+    var ms = (inMicroseconds / 1000).toStringAsFixed(3);
+    return '$ms ms';
   }
 }
