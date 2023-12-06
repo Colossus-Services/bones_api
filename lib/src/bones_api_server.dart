@@ -2428,7 +2428,7 @@ final class APIServerWorker extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServerWorker{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 }
 
