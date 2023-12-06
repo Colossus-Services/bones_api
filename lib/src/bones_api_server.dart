@@ -27,6 +27,7 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
+import 'bones_api_server_cache.dart';
 import 'bones_api_session.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
@@ -1630,40 +1631,108 @@ final class APIServerWorker extends _APIServerBase {
   final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
 
   Handler _getDirectoryStaticHandler(Directory rootDirectory) =>
-      _directoriesStaticHandlers.putIfAbsent(
-          rootDirectory.path, () => _createDirectoryHandler(rootDirectory));
+      _directoriesStaticHandlers[rootDirectory.path] ??=
+          _createDirectoryHandler(rootDirectory);
 
   Handler _createDirectoryHandler(Directory rootDirectory) {
-    rootDirectory = rootDirectory.absolute;
+    rootDirectory = Directory(pack_path.normalize(rootDirectory.absolute.path));
 
     var pipeline = const Pipeline()
+        .addMiddleware(_responseCache.middleware)
         .addMiddleware(gzipMiddleware)
-        .addMiddleware(_staticFilesHeadersMiddleware);
+        .addMiddleware((innerHandler) =>
+            _staticFilesHeadersMiddleware(rootDirectory, innerHandler));
 
     var handler = pipeline.addHandler(
         createStaticHandler(rootDirectory.path, defaultDocument: 'index.html'));
+
     return handler;
   }
 
-  Handler _staticFilesHeadersMiddleware(Handler innerHandler) => (request) {
-        return Future.sync(() => innerHandler(request)).then(
-            (response) => _configureStaticFilesHeaders(request, response));
+  final APIServerResponseCache _responseCache = APIServerResponseCache();
+
+  Handler _staticFilesHeadersMiddleware(
+          Directory rootDirectory, Handler innerHandler) =>
+      (request) {
+        return Future.sync(() => innerHandler(request)).then((response) =>
+            _configureStaticFilesHeaders(rootDirectory, request, response));
       };
 
-  Response _configureStaticFilesHeaders(Request request, Response response,
-      {Map<String, String>? headers}) {
-    headers ??= <String, String>{};
-
+  Response _configureStaticFilesHeaders(
+      Directory rootDirectory, Request request, Response response) {
     var statusCode = response.statusCode;
     if (statusCode < 200 || statusCode > 299) {
-      return response.change(headers: headers);
+      return response.change(
+        context: _buildResponseContext(rootDirectory, request, response),
+      );
     }
 
+    var headers = <String, String>{};
     headers[HttpHeaders.cacheControlHeader] = staticFilesCacheControl;
 
     headers[HttpHeaders.serverHeader] ??= serverName;
 
-    return response.change(headers: headers);
+    return response.change(
+      headers: headers,
+      context: _buildResponseContext(rootDirectory, request, response),
+    );
+  }
+
+  Map<String, Object>? _buildResponseContext(
+      Directory rootDirectory, Request request, Response response) {
+    var fileResolved = _resolveStaticFile(rootDirectory, request, response);
+    if (fileResolved == null) return null;
+
+    var file = fileResolved.file;
+    var fileNotFound = fileResolved.fileNotFound;
+
+    return {
+      if (file != null) 'file': file,
+      if (fileNotFound != null) 'file_not_found': fileNotFound,
+    };
+  }
+
+  ({File? file, File? fileNotFound})? _resolveStaticFile(
+      Directory rootDirectory, Request request, Response response) {
+    final responseContext = response.context;
+
+    var contextFile = responseContext['shelf_static:file'];
+    var contextFileNotFound = responseContext['shelf_static:file_not_found'];
+
+    if (contextFile is File) {
+      return (file: contextFile, fileNotFound: null);
+    } else if (contextFileNotFound is File) {
+      return (file: null, fileNotFound: contextFileNotFound);
+    }
+
+    var filePath = pack_path.join(rootDirectory.path, request.url.path);
+    filePath = pack_path.normalize(filePath);
+
+    var file = File(filePath).absolute;
+    var stat = file.statSync();
+    var fileFound = false;
+
+    if (stat.type == FileSystemEntityType.file) {
+      fileFound = true;
+    } else if (stat.type == FileSystemEntityType.directory) {
+      var file2 = File(pack_path.join(file.path, 'index.html'));
+      var stat2 = file2.statSync();
+
+      if (stat2.type == FileSystemEntityType.file) {
+        file = file2;
+        fileFound = true;
+      }
+    }
+
+    if (!pack_path.isWithin(rootDirectory.path, file.path)) {
+      return null;
+    }
+
+    if (fileFound) {
+      return (file: file, fileNotFound: null);
+    } else {
+      return (file: null, fileNotFound: file);
+    }
   }
 
   bool get hasMultipleWorkers => totalWorkers > 1;
