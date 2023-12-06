@@ -151,11 +151,9 @@ class APIServerConfig {
     bool? useSessionID,
     String? apiCacheControl,
     String? staticFilesCacheControl,
-    this.cacheStaticFilesResponses = true,
-    this.staticFilesCacheMaxMemorySize =
-        APIServerResponseCache.defaultMaxMemorySize,
-    this.staticFilesCacheMaxContentLength =
-        APIServerResponseCache.defaultMaxContentLength,
+    bool? cacheStaticFilesResponses,
+    int? staticFilesCacheMaxMemorySize,
+    int? staticFilesCacheMaxContentLength,
     this.apiConfig,
     bool? logToConsole,
     Object? args,
@@ -184,6 +182,16 @@ class APIServerConfig {
             normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
         staticFilesCacheControl = normalizeHeaderValue(
             staticFilesCacheControl, defaultStaticFilesCacheControl),
+        cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
+            cacheStaticFilesResponses,
+            apiConfig: apiConfig),
+        staticFilesCacheMaxMemorySize = resolveStaticFilesCacheMaxMemorySize(
+            staticFilesCacheMaxMemorySize,
+            apiConfig: apiConfig),
+        staticFilesCacheMaxContentLength =
+            resolveStaticFilesCacheMaxContentLength(
+                staticFilesCacheMaxContentLength,
+                apiConfig: apiConfig),
         useSessionID = resolveUseSessionID(cookieless, useSessionID),
         totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
         logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
@@ -230,13 +238,11 @@ class APIServerConfig {
         a.optionAsString('static-files-cache-control');
 
     var cacheStaticFilesResponses =
-        a.flagOr('cache-static-files-responses', true)!;
-    var staticFilesCacheMaxMemorySize = a.optionAsInt(
-        'static-files-cache-max-memory-size',
-        APIServerResponseCache.defaultMaxMemorySize)!;
-    var staticFilesCacheMaxContentLength = a.optionAsInt(
-        'static-files-cache-max-content-length',
-        APIServerResponseCache.defaultMaxContentLength)!;
+        a.optionAsBool('cache-static-files-responses');
+    var staticFilesCacheMaxMemorySize =
+        a.optionAsInt('static-files-cache-max-memory-size');
+    var staticFilesCacheMaxContentLength =
+        a.optionAsInt('static-files-cache-max-content-length');
 
     var logToConsole = a.flagOr('log-toConsole', null);
 
@@ -451,6 +457,54 @@ class APIServerConfig {
 
   static bool resolveUseSessionID(bool cookieless, bool? useSessionID) {
     return cookieless ? false : (useSessionID ?? true);
+  }
+
+  static bool resolveCacheStaticFilesResponses(bool? cache,
+      {APIConfig? apiConfig}) {
+    if (cache != null) return cache;
+
+    if (apiConfig != null) {
+      cache ??= apiConfig.getAs('cache-static-files-responses');
+      cache ??= apiConfig.getAs('cache_static_files_responses');
+
+      var entryCacheStaticFiles = apiConfig.getPath('cache', 'static_files');
+      if (entryCacheStaticFiles is bool) {
+        cache = entryCacheStaticFiles;
+      }
+
+      cache ??= apiConfig.getPath('cache', 'static_files', 'enabled');
+    }
+
+    cache ??= true;
+    return cache;
+  }
+
+  static int resolveStaticFilesCacheMaxMemorySize(int? max,
+      {APIConfig? apiConfig}) {
+    if (max != null) return max;
+
+    if (apiConfig != null) {
+      max ??= apiConfig.getAs('static-files-cache-max-memory-size');
+      max ??= apiConfig.getAs('static_files_cache_max_memory_size');
+      max ??= apiConfig.getPath('cache', 'static_files', 'max_memory_size');
+    }
+
+    max ??= APIServerResponseCache.defaultMaxMemorySize;
+    return max;
+  }
+
+  static int resolveStaticFilesCacheMaxContentLength(int? max,
+      {APIConfig? apiConfig}) {
+    if (max != null) return max;
+
+    if (apiConfig != null) {
+      max ??= apiConfig.getAs('static-files-cache-max-content-length');
+      max ??= apiConfig.getAs('static_files_cache_max_content_length');
+      max ??= apiConfig.getPath('cache', 'static_files', 'max_content_length');
+    }
+
+    max ??= APIServerResponseCache.defaultMaxContentLength;
+    return max;
   }
 
   // If `logToConsole` not defined and NOT logging all, set `logToConsole = true`:
