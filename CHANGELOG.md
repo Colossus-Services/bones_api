@@ -1,3 +1,7 @@
+## 1.5.11
+
+- New `APIServerResponseCache`.
+
 ## 1.5.10
 
 - `printZoneError`: reduce print calls.

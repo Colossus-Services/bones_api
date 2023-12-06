@@ -16,16 +16,22 @@ final tokens = users.map((key, value) => MapEntry(value, key));
 
 void main() {
   group('SecureRandom', () {
-    _testSecureRandom(SecureRandom());
+    for (var i = 0; i < 3; ++i) {
+      _testSecureRandom(SecureRandom(), i);
+    }
   });
 
   group('SecureRandom(fallback)', () {
-    _testSecureRandom(SecureRandom(forceFallbackSecureRandom: true));
+    for (var i = 0; i < 3; ++i) {
+      _testSecureRandom(SecureRandom(forceFallbackSecureRandom: true), i);
+    }
   });
 
   group('APISecurity.secureRandom', () {
-    var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
-    _testSecureRandom(apiSecurity.secureRandom());
+    for (var i = 0; i < 3; ++i) {
+      var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
+      _testSecureRandom(apiSecurity.secureRandom(), i);
+    }
   });
 
   group('APISecurity', () {
@@ -351,21 +357,21 @@ void main() {
   });
 }
 
-void _testSecureRandom(SecureRandom random) {
-  test('nextInt', () {
+void _testSecureRandom(SecureRandom random, int i) {
+  test('[$i] nextInt', () {
     for (var i = 0; i < 1000; ++i) {
       expect(
           random.nextInt(100), allOf(greaterThanOrEqualTo(0), lessThan(100)));
     }
   });
 
-  test('nextDouble', () {
+  test('[$i] nextDouble', () {
     for (var i = 0; i < 1000; ++i) {
       expect(random.nextDouble(), allOf(greaterThanOrEqualTo(0), lessThan(1)));
     }
   });
 
-  test('nextBool', () {
+  test('[$i] nextBool', () {
     var total = 10000;
     var count = 0;
 
@@ -381,13 +387,13 @@ void _testSecureRandom(SecureRandom random) {
     expect((0.50 - ratio).abs(), lessThan(0.05));
   });
 
-  test('nextSeed', () {
+  test('[$i] nextSeed', () {
     for (var i = 0; i < 1000; ++i) {
       expect(random.nextSeed(layers: 3), isNot(0));
     }
   });
 
-  test('nextBytes', () {
+  test('[$i] nextBytes', () {
     for (var i = 0; i < 1000; ++i) {
       var bs = Uint8List(10);
       expect(bs.toString(), equals('[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]'));
@@ -397,7 +403,7 @@ void _testSecureRandom(SecureRandom random) {
     }
   });
 
-  test('nextBytes', () {
+  test('[$i] nextBytes', () {
     for (var i = 0; i < 1000; ++i) {
       var bs = random.randomBytes(10);
 

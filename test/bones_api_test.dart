@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:mercury_client/mercury_client.dart' as mercury_client;
+import 'package:path/path.dart' as pack_path;
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';
@@ -527,6 +528,57 @@ void main() {
     });
   });
 
+  group('APIServer + docRoot', () {
+    final api = MyAPI();
+
+    final apiServer = APIServer(
+      api,
+      'localhost',
+      5544,
+      documentRoot: _resolveServerDocRoot(),
+    );
+
+    setUp(() async {
+      await apiServer.start();
+    });
+
+    test('foo[GET] /foo (404)', () async {
+      var res = await _getURL('${apiServer.url}/foo');
+      expect(res.toString(), equals('(404, Not Found)'));
+    });
+
+    test('foo[GET] /index.html', () async {
+      var (status, data, headers) =
+          await _getUrlAndHeaders('${apiServer.url}/index.html');
+      expect(status, equals(200));
+      expect(data, equals('<html>Hello World!</html>\n'));
+
+      var lastModified = headers[HttpHeaders.lastModifiedHeader]?.firstOrNull;
+      expect(lastModified, isNotEmpty);
+
+      expect(headers['x-api-server-cache'], isNull);
+
+      var (status2, data2, headers2) = await _getUrlAndHeaders(
+          '${apiServer.url}/index.html',
+          headers: {'If-Modified-Since': lastModified!});
+
+      expect(status2, equals(304));
+      expect(data2, equals(''));
+      expect(headers2['x-api-server-cache'], isNotEmpty);
+
+      var (status3, data3, headers3) =
+          await _getUrlAndHeaders('${apiServer.url}/index.html');
+
+      expect(status3, equals(200));
+      expect(data3, equals(data));
+      expect(headers3['x-api-server-cache'], isNotEmpty);
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+    });
+  });
+
   group('APIConsole', () {
     final api = MyAPI();
 
@@ -678,10 +730,26 @@ class MyInfoModule extends APIModule {
   }
 }
 
-/// Simple HTTP get URL function.
 Future<(int, String)> _getURL(String url,
     {APIRequestMethod? method,
     Map<String, dynamic>? parameters,
+    List<int>? payload,
+    String? payloadType,
+    String? expectedContentType}) async {
+  var (status, content, _) = await _getUrlAndHeaders(url,
+      method: method,
+      parameters: parameters,
+      payload: payload,
+      payloadType: payloadType,
+      expectedContentType: expectedContentType);
+  return (status, content);
+}
+
+/// Simple HTTP get URL function.
+Future<(int, String, HttpHeaders)> _getUrlAndHeaders(String url,
+    {APIRequestMethod? method,
+    Map<String, dynamic>? parameters,
+    Map<String, String>? headers,
     List<int>? payload,
     String? payloadType,
     String? expectedContentType}) async {
@@ -748,6 +816,12 @@ Future<(int, String)> _getURL(String url,
   }
 
   response = await future.then((request) {
+    if (headers != null && headers.isNotEmpty) {
+      for (var e in headers.entries) {
+        request.headers.add(e.key, e.value);
+      }
+    }
+
     if (payload != null) {
       if (payloadType != null) {
         request.headers.set(HttpHeaders.contentTypeHeader, payloadType);
@@ -761,15 +835,17 @@ Future<(int, String)> _getURL(String url,
 
   var status = response.statusCode;
 
+  var responseHeaders = response.headers;
+
   if (expectedContentType != null) {
-    var contentType = response.headers['content-type'];
+    var contentType = responseHeaders['content-type'];
     expect(contentType![0], expectedContentType);
   }
 
   var data = await response.transform(convert.Utf8Decoder()).toList();
   var body = data.join();
 
-  return (status, body);
+  return (status, body, responseHeaders);
 }
 
 class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
@@ -791,4 +867,19 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
         200,
         mercury_client.HttpBody.from(responseContent));
   }
+}
+
+Directory? _resolveServerDocRoot() {
+  final dirName = 'server-doc-root';
+  var possiblePaths = ['test', '.', '..', '../test'];
+
+  for (var p in possiblePaths) {
+    var dir = Directory(pack_path.join(p, dirName));
+    if (dir.existsSync() &&
+        dir.statSync().type == FileSystemEntityType.directory) {
+      return dir;
+    }
+  }
+
+  return null;
 }

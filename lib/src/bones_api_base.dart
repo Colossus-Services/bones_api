@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.10';
+  static const String VERSION = '1.5.11';
 
   static bool _boot = false;
 
@@ -286,6 +286,14 @@ abstract class APIRoot with Initializable, Closable {
     var logger = this.logger;
     if (logger != null) {
       logger(this, type, message, error, stackTrace);
+    }
+
+    if (error != null) {
+      _log.severe(message, error, stackTrace);
+    } else if (type == 'WARN') {
+      _log.warning(message);
+    } else {
+      _log.info(message);
     }
   }
 
