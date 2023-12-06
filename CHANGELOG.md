@@ -1,3 +1,8 @@
+## 1.5.12
+
+- `APIServerConfig`:
+  - Added properties: `cacheStaticFilesResponses`, `staticFilesCacheMaxMemorySize` and `staticFilesCacheMaxContentLength`.
+
 ## 1.5.11
 
 - New `APIServerResponseCache`.
