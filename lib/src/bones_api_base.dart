@@ -287,6 +287,14 @@ abstract class APIRoot with Initializable, Closable {
     if (logger != null) {
       logger(this, type, message, error, stackTrace);
     }
+
+    if (error != null) {
+      _log.severe(message, error, stackTrace);
+    } else if (type == 'WARN') {
+      _log.warning(message);
+    } else {
+      _log.info(message);
+    }
   }
 
   @override

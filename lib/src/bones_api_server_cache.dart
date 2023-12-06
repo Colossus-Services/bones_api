@@ -15,6 +15,9 @@ import 'package:shelf_gzip/shelf_gzip.dart';
 
 final _log = logging.Logger('APIServerResponseCache');
 
+const _headerServerTime = 'server-timing';
+const _headerAPIServerCache = 'X-API-Server-Cache';
+
 /// An [APIServer] in-memory [Response] cache.
 class APIServerResponseCache {
   static const int defaultMaxContentLength = 1024 * 1024 * 10;
@@ -56,7 +59,8 @@ class APIServerResponseCache {
   Handler middleware(Handler innerHandler) {
     return (request) {
       final requestInit = DateTime.now();
-      var cachedResponse = getCachedResponse(request);
+      var cachedResponse =
+          getCachedResponse(request, requestInitTime: requestInit);
 
       if (cachedResponse is Future<Response?>) {
         return cachedResponse.then((cachedResponse) =>
@@ -235,42 +239,51 @@ class APIServerResponseCache {
     return true;
   }
 
-  FutureOr<Response?> getCachedResponse(Request request) {
+  FutureOr<Response?> getCachedResponse(Request request,
+      {DateTime? requestInitTime}) {
     var method = request.method;
     if (method != 'GET') {
       return null;
     }
 
-    var cached304 = _getCachedResponse304(request);
+    var cached304 = _getCachedResponse304(request, requestInitTime);
 
     return cached304.resolveResponseAsync(
-        request, _getCachedResponse200Then404);
+        request, requestInitTime, _getCachedResponse200Then404);
   }
 
-  FutureOr<Response?> _getCachedResponse304(Request request) {
+  FutureOr<Response?> _getCachedResponse304(
+      Request request, DateTime? requestInitTime) {
     final key304 = _CachedResponseKey.status304(request);
     if (key304 == null) return null;
 
     var cached304 = _getAsync(key304);
-    return cached304.toValidResponseAsync(request);
+    return cached304.toValidResponseAsync(request, requestInitTime);
   }
 
-  FutureOr<Response?> _getCachedResponse200Then404(Request request) {
-    return _getCachedResponse200(request)
-        .resolveResponseAsync(request, _getCachedResponse404);
+  FutureOr<Response?> _getCachedResponse200Then404(
+      Request request, DateTime? requestInitTime) {
+    return _getCachedResponse200(request, requestInitTime)
+        .resolveResponseAsync(request, requestInitTime, _getCachedResponse404);
   }
 
-  FutureOr<Response?> _getCachedResponse200(Request request) {
+  FutureOr<Response?> _getCachedResponse200(
+      Request request, DateTime? requestInitTime) {
     final key200 = _CachedResponseKey.status200(request);
 
     var cached200 = _getAsync(key200);
 
-    return cached200.toValidResponseAsync(request).resolveResponseAsync(request,
-        (request) => _getCachedResponse200Alternative(request, cached200));
+    return cached200
+        .toValidResponseAsync(request, requestInitTime)
+        .resolveResponseAsync(
+            request,
+            requestInitTime,
+            (request, requestInitTime) => _getCachedResponse200Alternative(
+                request, requestInitTime, cached200));
   }
 
   FutureOr<Response?> _getCachedResponse200Alternative(
-      Request request, FutureOr<Object?> cached200) {
+      Request request, DateTime? requestInitTime, FutureOr<Object?> cached200) {
     if (cached200 == null) return null;
 
     return cached200.resolveMapped((cached200) {
@@ -293,11 +306,12 @@ class APIServerResponseCache {
     });
   }
 
-  FutureOr<Response?> _getCachedResponse404(Request request) {
+  FutureOr<Response?> _getCachedResponse404(
+      Request request, DateTime? requestInitTime) {
     final key404 = _CachedResponseKey.status404(request);
 
     var cached404 = _getAsync(key404);
-    return cached404.toValidResponseAsync(request);
+    return cached404.toValidResponseAsync(request, requestInitTime);
   }
 
   Future<Response>? cacheResponse(Request request, Response response) {
@@ -329,6 +343,7 @@ class APIServerResponseCache {
 
   Future<Response> _cacheResponse200Impl(String path, Response response) async {
     var headers = _copyHeaders(response.headersAll);
+
     var (content, contentEncoding, encoding) = await _copyBody(response);
 
     var file = response.context['file'];
@@ -417,17 +432,17 @@ class APIServerResponseCache {
     return response.change(body: cachedResponse.createBody());
   }
 
-  Map<String, Object> _copyHeaders(Map<String, List<String>> headers) {
+  Map<String, List<String>> _copyHeaders(Map<String, List<String>> headers) {
     var headers2 = headers.map((key, value) {
       var length = value.length;
 
-      Object val;
+      List<String> val;
       if (length == 0) {
-        val = '';
+        val = [];
       } else if (length == 1) {
-        val = value[0];
+        val = [value[0]];
       } else {
-        val = value;
+        val = value.toList();
       }
 
       return MapEntry(key, val);
@@ -711,14 +726,48 @@ abstract class _CachedResponse
 
   _CachedResponse? resolveAlternative(Request request) => null;
 
-  Response? toValidResponse(Request request) {
+  Response? toValidResponse(Request request, DateTime? requestInitTime) {
     if (validate(request)) {
-      return toResponse(request);
+      return toResponse(request, requestInitTime: requestInitTime);
     }
     return null;
   }
 
-  Response toResponse(Request request);
+  void configureMetricsHeaders(Map<String, List<String>> headers,
+      {DateTime? requestInitTime}) {
+    var cacheTime = date.elapsedTime;
+
+    if (requestInitTime != null) {
+      var info =
+          'api-server-response;dur=${requestInitTime.elapsedTime.inMicroseconds / 1000}';
+      var serverTime = headers[_headerServerTime]?.firstOrNull;
+
+      String? serverTimeInfo;
+
+      if (serverTime != null) {
+        var idx = serverTime.indexOf('api-server-response;');
+        if (idx > 0) {
+          serverTime = serverTime.substring(0, idx).trim();
+
+          if (serverTime.isNotEmpty) {
+            serverTimeInfo = '$serverTime, $info';
+          } else {
+            serverTimeInfo = info;
+          }
+        } else {
+          serverTimeInfo = info;
+        }
+      } else {
+        serverTimeInfo = info;
+      }
+
+      headers[_headerServerTime] = [serverTimeInfo];
+    }
+
+    headers[_headerAPIServerCache] = [cacheTime.asBestUnit];
+  }
+
+  Response toResponse(Request request, {DateTime? requestInitTime});
 
   bool validate(Request request);
 
@@ -827,13 +876,13 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
 }
 
 class _CachedResponse200 extends _CachedResponseWithBody {
-  final Map<String, Object>? headers;
+  final Map<String, List<String>> headers;
 
   _CachedResponse200({
     required super.path,
     required super.file,
     super.fileStat,
-    this.headers,
+    required this.headers,
     super.content,
     super.contentEncoding,
     super.encoding,
@@ -847,14 +896,11 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     var decompressContent = this.decompressContent();
     if (decompressContent == null) return null;
 
-    final headers = this.headers;
-    var headers2 = headers != null
-        ? Map<String, Object>.from(headers)
-        : <String, Object>{};
+    var headers2 = Map<String, List<String>>.from(headers);
 
     headers2.remove(HttpHeaders.contentEncodingHeader);
 
-    headers2[HttpHeaders.contentLengthHeader] = '${decompressContent.length}';
+    headers2[HttpHeaders.contentLengthHeader] = ['${decompressContent.length}'];
 
     return _CachedResponse200(
         path: path,
@@ -870,14 +916,11 @@ class _CachedResponse200 extends _CachedResponseWithBody {
 
     var (compressContent, compressedEncoding) = compressed;
 
-    final headers = this.headers;
-    var headers2 = headers != null
-        ? Map<String, Object>.from(headers)
-        : <String, Object>{};
+    var headers2 = Map<String, List<String>>.from(headers);
 
-    headers2[HttpHeaders.contentEncodingHeader] = compressedEncoding;
+    headers2[HttpHeaders.contentEncodingHeader] = [compressedEncoding];
 
-    headers2[HttpHeaders.contentLengthHeader] = '${compressContent.length}';
+    headers2[HttpHeaders.contentLengthHeader] = ['${compressContent.length}'];
 
     return _CachedResponse200(
         path: path,
@@ -913,7 +956,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       return false;
     }
 
-    var contentType = headers?[HttpHeaders.contentTypeHeader] as String?;
+    var contentType = headers[HttpHeaders.contentTypeHeader]?.firstOrNull;
     if (contentType == null || isAlreadyCompressedContentType(contentType)) {
       return false;
     }
@@ -935,15 +978,18 @@ class _CachedResponse200 extends _CachedResponseWithBody {
   }
 
   @override
-  Response toResponse(Request request) {
+  Response toResponse(Request request, {DateTime? requestInitTime}) {
     markUsage();
+
+    configureMetricsHeaders(headers, requestInitTime: requestInitTime);
+
     var response = Response(statusCode, headers: headers, body: createBody());
     return response;
   }
 
   @override
   String toString() => '[200]{ '
-      'headers: ${headers?.length}, '
+      'headers: ${headers.length}, '
       'content: $contentLength, '
       '${contentEncoding != null ? 'Content-Encoding: $contentEncoding, ' : ''}'
       'memory: ${memorySize.asBestUnit} '
@@ -952,8 +998,8 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       '@${file?.path ?? '?'}';
 
   _CachedResponse304? get asCachedResponse304 {
-    var lastModifiedHeader = headers?[HttpHeaders.lastModifiedHeader];
-    if (lastModifiedHeader is! String || lastModifiedHeader.isEmpty) {
+    var lastModified = headers[HttpHeaders.lastModifiedHeader]?.firstOrNull;
+    if (lastModified is! String || lastModified.isEmpty) {
       return null;
     }
 
@@ -961,7 +1007,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       path: path,
       file: file,
       fileStat: fileStat,
-      requestIfModifiableSince: lastModifiedHeader,
+      requestIfModifiableSince: lastModified,
     );
 
     assert(cachedResponse304.statusCode == 304);
@@ -1000,9 +1046,13 @@ class _CachedResponse304 extends _CachedResponse {
   }
 
   @override
-  Response toResponse(Request request) {
+  Response toResponse(Request request, {DateTime? requestInitTime}) {
     markUsage();
-    return Response(statusCode);
+
+    var headers = <String, List<String>>{};
+    configureMetricsHeaders(headers, requestInitTime: requestInitTime);
+
+    return Response(statusCode, headers: headers);
   }
 
   @override
@@ -1029,9 +1079,13 @@ class _CachedResponse404 extends _CachedResponseWithBody {
   }
 
   @override
-  Response toResponse(Request request) {
+  Response toResponse(Request request, {DateTime? requestInitTime}) {
     markUsage();
-    return Response(statusCode, body: Body(content));
+
+    var headers = <String, List<String>>{};
+    configureMetricsHeaders(headers, requestInitTime: requestInitTime);
+
+    return Response(statusCode, headers: headers, body: Body(content));
   }
 
   @override
@@ -1137,16 +1191,16 @@ extension _ObjectExtension on Object? {
     }
   }
 
-  Response? toValidResponse(Request request) {
+  Response? toValidResponse(Request request, DateTime? requestInitTime) {
     final self = this;
     if (self == null) return null;
 
     if (self is _CachedResponse) {
-      return self.toValidResponse(request);
+      return self.toValidResponse(request, requestInitTime);
     } else if (self is List<_CachedResponse>) {
       for (var cached in self) {
         if (cached.validate(request)) {
-          return cached.toResponse(request);
+          return cached.toResponse(request, requestInitTime: requestInitTime);
         }
       }
     }
@@ -1221,14 +1275,15 @@ extension _ObjectExtension on Object? {
 }
 
 extension _FutureOrObjectExtension on FutureOr<Object?> {
-  FutureOr<Response?> toValidResponseAsync(Request request) {
+  FutureOr<Response?> toValidResponseAsync(
+      Request request, DateTime? requestInitTime) {
     final self = this;
     if (self == null) return null;
 
     if (self is Future<Object?>) {
-      return self.then((e) => e.toValidResponse(request));
+      return self.then((e) => e.toValidResponse(request, requestInitTime));
     } else {
-      return self.toValidResponse(request);
+      return self.toValidResponse(request, requestInitTime);
     }
   }
 }
@@ -1295,20 +1350,22 @@ extension _ResponseExtension on Response {
 extension _FutureOrResponseExtension on FutureOr<Response?> {
   FutureOr<Response?> resolveResponseAsync(
     Request request,
-    FutureOr<Response?> Function(Request request) alternative,
+    DateTime? requestInitTime,
+    FutureOr<Response?> Function(Request request, DateTime? requestInitTime)
+        alternative,
   ) {
     final self = this;
 
     if (self is Future<Response?>) {
       return self.then((response) {
         if (response != null) return response;
-        return alternative(request);
+        return alternative(request, requestInitTime);
       });
     } else if (self != null) {
       return self;
     }
 
-    return alternative(request);
+    return alternative(request, requestInitTime);
   }
 }
 
@@ -1321,4 +1378,28 @@ extension on Duration {
     var ms = (inMicroseconds / 1000).toStringAsFixed(3);
     return '$ms ms';
   }
+
+  String get asBestUnit {
+    if (inDays >= 1) {
+      return asDay;
+    } else if (inHours >= 1) {
+      return asHour;
+    } else if (inMinutes >= 1) {
+      return asMin;
+    } else if (inSeconds >= 1) {
+      return asSec;
+    } else {
+      return asMs;
+    }
+  }
+
+  String get asDay => '$inDays d';
+
+  String get asHour => '$inHours h';
+
+  String get asMin => '$inMinutes min';
+
+  String get asSec => '$inSeconds sec';
+
+  String get asMs => toMillisecondsFormatted();
 }

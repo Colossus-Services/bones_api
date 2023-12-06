@@ -634,6 +634,7 @@ abstract class _APIServerBase extends APIServerConfig {
     super.address,
     super.port,
     super.securePort,
+    super.documentRoot,
     super.domains,
     super.letsEncrypt,
     super.letsEncryptProduction,
@@ -773,6 +774,7 @@ class APIServer extends _APIServerBase {
     super.allowRequestLetsEncryptCertificate,
     super.letsEncryptDirectory,
     super.hotReload,
+    super.documentRoot,
     super.domains,
     super.cookieless,
     super.useSessionID,
@@ -2172,7 +2174,7 @@ final class APIServerWorker extends _APIServerBase {
 
     headers[HttpHeaders.cacheControlHeader] = apiCacheControl;
 
-    headers['X-APIServer-Worker'] = '$workerIndex/$totalWorkers';
+    headers['X-API-Server-Worker'] = '$workerIndex/$totalWorkers';
 
     // headers['X-APIToken'] = apiRequest.credential?.token ?? '?';
 

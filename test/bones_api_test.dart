@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:mercury_client/mercury_client.dart' as mercury_client;
+import 'package:path/path.dart' as pack_path;
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';
@@ -527,6 +528,40 @@ void main() {
     });
   });
 
+  group('APIServer + docRoot', () {
+    final api = MyAPI();
+
+    final apiServer = APIServer(
+      api,
+      'localhost',
+      5544,
+      documentRoot: _resolveServerDocRoot(),
+    );
+
+    setUp(() async {
+      await apiServer.start();
+    });
+
+    test('foo[GET] /index.html', () async {
+      var res = await _getURL('${apiServer.url}/index.html');
+      expect(res.toString(), equals('(200, <html>Hello World!</html>\n)'));
+    });
+
+    test('foo[GET] /foo (404)', () async {
+      var res = await _getURL('${apiServer.url}/foo');
+      expect(res.toString(), equals('(404, Not Found)'));
+    });
+
+    test('foo[GET] /index.html', () async {
+      var res = await _getURL('${apiServer.url}/index.html');
+      expect(res.toString(), equals('(200, <html>Hello World!</html>\n)'));
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+    });
+  });
+
   group('APIConsole', () {
     final api = MyAPI();
 
@@ -791,4 +826,19 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
         200,
         mercury_client.HttpBody.from(responseContent));
   }
+}
+
+Directory? _resolveServerDocRoot() {
+  final dirName = 'server-doc-root';
+  var possiblePaths = ['test', '.', '..', '../test'];
+
+  for (var p in possiblePaths) {
+    var dir = Directory(pack_path.join(p, dirName));
+    if (dir.existsSync() &&
+        dir.statSync().type == FileSystemEntityType.directory) {
+      return dir;
+    }
+  }
+
+  return null;
 }
