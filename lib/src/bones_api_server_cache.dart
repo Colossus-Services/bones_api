@@ -739,13 +739,13 @@ abstract class _CachedResponse
 
     if (requestInitTime != null) {
       var info =
-          'api-server-response;dur=${requestInitTime.elapsedTime.inMicroseconds / 1000}';
+          'API-Server-Response;dur=${requestInitTime.elapsedTime.inMicroseconds / 1000}';
       var serverTime = headers[_headerServerTime]?.firstOrNull;
 
       String? serverTimeInfo;
 
       if (serverTime != null) {
-        var idx = serverTime.indexOf('api-server-response;');
+        var idx = serverTime.indexOf('API-Server-Response;');
         if (idx > 0) {
           serverTime = serverTime.substring(0, idx).trim();
 
