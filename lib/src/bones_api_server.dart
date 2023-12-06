@@ -1449,7 +1449,7 @@ class APIServer extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, totalWorkers: $totalWorkers, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, totalWorkers: $totalWorkers, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].

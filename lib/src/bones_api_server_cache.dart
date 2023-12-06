@@ -475,9 +475,13 @@ class APIServerResponseCache {
   }
 
   @override
-  String toString() {
-    return 'APIServerResponseCache{maxContentLength: $maxContentLength, maxMemorySize: $maxMemorySize, fileStatTimeout: ${fileStatTimeout.asBestUnit}, cachedResponses: ${_cachedResponses.length}, totalCachedResponsesMemorySize: $_totalCachedResponsesMemorySize}';
-  }
+  String toString() => 'APIServerResponseCache{ '
+      'maxContentLength: ${maxContentLength.asBestUnit}, '
+      'maxMemorySize: ${maxMemorySize.asBestUnit}, '
+      'fileStatTimeout: ${fileStatTimeout.asBestUnit}, '
+      'cachedResponses: ${_cachedResponses.length}, '
+      'totalMemorySize: $_totalCachedResponsesMemorySize '
+      '}';
 }
 
 class _CachedResponseKey {
