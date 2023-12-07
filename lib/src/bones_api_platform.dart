@@ -87,7 +87,7 @@ abstract class APIPlatform {
   /// Reads a [filePath] data as [Uint8List].
   FutureOr<Uint8List?> readFileAsBytes(String filePath);
 
-  /// Returns a platform property.
+  /// Returns a platform property. See [setProperty].
   ///
   /// Depending on the [APIPlatform] implementation this
   /// can be an `environment` variable or an URL `queryParameters`.
@@ -112,6 +112,14 @@ abstract class APIPlatform {
 
     return val as T;
   }
+
+  /// Overwrites a platform property. Returns the previous value.
+  /// See [getProperty].
+  String? setProperty(String key, String value);
+
+  /// Returns the platform properties keys.
+  /// See [getProperty] and [setProperty].
+  Iterable<String> get propertiesKeys;
 }
 
 class APIPlatformCapability {

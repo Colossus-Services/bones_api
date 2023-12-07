@@ -109,10 +109,28 @@ class APIPlatformVM extends APIPlatform {
     return file.readAsBytesSync();
   }
 
+  final Map<String, String> _properties = {};
+
+  @override
+  Iterable<String> get propertiesKeys {
+    return {..._properties.keys, ...io.Platform.environment.keys};
+  }
+
+  @override
+  String? setProperty(String key, String value) {
+    var prev = getProperty(key);
+    _properties[key] = value;
+    return prev;
+  }
+
   @override
   String? getProperty(String? key,
       {String? defaultValue, bool caseSensitive = false}) {
     if (key == null) return defaultValue;
+
+    var prev = _properties[key];
+    if (prev != null) return prev;
+
     var value = io.Platform.environment.get(key, ignoreCase: !caseSensitive);
     return value ?? defaultValue;
   }

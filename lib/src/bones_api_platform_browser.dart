@@ -126,15 +126,37 @@ class APIPlatformBrowser extends APIPlatform {
     return data is Uint8List ? data : Uint8List.fromList(data);
   }
 
+  final Map<String, String> _properties = {};
+
+  @override
+  Iterable<String> get propertiesKeys {
+    var location = window.location.href.trim();
+    var uri = location.isNotEmpty ? Uri.tryParse(location) : null;
+
+    return {..._properties.keys, ...?uri?.queryParameters.keys};
+  }
+
+  @override
+  String? setProperty(String key, String value) {
+    var prev = getProperty(key);
+    _properties[key] = value;
+    return prev;
+  }
+
   @override
   String? getProperty(String? key,
       {String? defaultValue, bool caseSensitive = false}) {
     if (key == null) return defaultValue;
 
+    var prev = _properties[key];
+    if (prev != null) return prev;
+
     var location = window.location.href.trim();
     if (location.isEmpty) return defaultValue;
 
-    var uri = Uri.parse(location);
+    var uri = Uri.tryParse(location);
+    if (uri == null) return defaultValue;
+
     return uri.queryParameters.getIgnoreCase(key, defaultValue: defaultValue);
   }
 }
