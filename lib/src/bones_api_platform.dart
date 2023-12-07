@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:args_simple/args_simple.dart';
+
 import 'bones_api_platform_generic.dart'
     if (dart.library.html) 'bones_api_platform_browser.dart'
     if (dart.library.io) 'bones_api_platform_io.dart';
@@ -85,8 +87,31 @@ abstract class APIPlatform {
   /// Reads a [filePath] data as [Uint8List].
   FutureOr<Uint8List?> readFileAsBytes(String filePath);
 
+  /// Returns a platform property.
+  ///
+  /// Depending on the [APIPlatform] implementation this
+  /// can be an `environment` variable or an URL `queryParameters`.
   String? getProperty(String? key,
       {String? defaultValue, bool caseSensitive = false});
+
+  /// Alias to [getProperty] with a casting to [T].
+  T? getPropertyAs<T>(String? key,
+      {String? defaultValue, bool caseSensitive = false}) {
+    var val = getProperty(key,
+        defaultValue: defaultValue, caseSensitive: caseSensitive);
+    if (val == null) return null;
+
+    if (val is! T) {
+      var parser = TypeParser.parserFor<T>();
+      if (parser != null) {
+        return parser(val);
+      }
+
+      throw StateError("Can't return key `$key` as `$T`: $val");
+    }
+
+    return val as T;
+  }
 }
 
 class APIPlatformCapability {

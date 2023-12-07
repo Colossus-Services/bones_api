@@ -1,3 +1,13 @@
+## 1.5.13
+
+- `LoggerHandlerIO`:
+  - Added `APIPlatform` properties:
+    - `bones_api.log.max_file_length`, `bones_api.log.max_rotation_files`.
+- `LogFileRotate`:
+  - Optimize `needRotation`.
+- `APIPlatform`:
+  - Added `getPropertyAs`.
+
 ## 1.5.12
 
 - `APIServerConfig`:

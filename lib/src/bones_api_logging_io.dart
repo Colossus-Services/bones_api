@@ -6,11 +6,26 @@ import 'package:logging/logging.dart' as logging;
 import 'package:path/path.dart' as pack_path;
 
 import 'bones_api_logging.dart';
+import 'bones_api_platform.dart';
 
 final _log = logging.Logger('LogFileRotate');
 
 class LoggerHandlerIO extends LoggerHandler {
-  LoggerHandlerIO(super.logger);
+  /// [APIPlatform] property: `bones_api.log.max_file_length`
+  late final int? logMaxFileLength;
+
+  /// [APIPlatform] property: `bones_api.log.max_rotation_files`
+  late final int? logMaxRotationFiles;
+
+  LoggerHandlerIO(super.logger) {
+    var apiPlatform = APIPlatform.get();
+
+    logMaxFileLength =
+        apiPlatform.getPropertyAs<int>('bones_api.log.max_file_length');
+
+    logMaxRotationFiles =
+        apiPlatform.getPropertyAs<int>('bones_api.log.max_rotation_files');
+  }
 
   @override
   String get isolateDebugName {
@@ -84,13 +99,21 @@ class LogFileRotate {
   late final String fileName;
   late final String fileExt;
 
+  static const defaultMaxLength = 1024 * 1024 * 100;
+  static const defaultMaxAge = Duration(days: 7);
+  static const defaultCheckInterval = Duration(seconds: 30);
+  static const defaultMaxRotationFiles = 10;
+
   LogFileRotate(
     this.file, {
-    this.maxLength = 1024 * 1024 * 100,
-    this.maxAge = const Duration(days: 7),
-    this.checkInterval = const Duration(minutes: 1),
-    this.maxRotationFiles = 10,
-  }) {
+    int? maxLength,
+    int? maxRotationFiles = defaultMaxRotationFiles,
+    Duration? maxAge,
+    Duration? checkInterval,
+  })  : maxLength = maxLength ?? defaultMaxLength,
+        maxRotationFiles = maxRotationFiles ?? defaultMaxRotationFiles,
+        maxAge = maxAge ?? defaultMaxAge,
+        checkInterval = checkInterval ?? defaultCheckInterval {
     parentPath = file.parent.path;
     var filePath = file.path;
 
@@ -298,21 +321,34 @@ class LogFileRotate {
   }
 
   Future<bool> needRotation() async {
-    var fileExists = await file.exists();
-    if (!fileExists) return false;
+    var stat = await file.stat();
+    if (stat.type == FileSystemEntityType.notFound) return false;
 
-    if (await checkMaxLength()) return true;
-    if (await checkMaxAge()) return true;
+    if (await checkMaxLength(stat: stat)) return true;
+    if (await checkMaxAge(stat: stat)) return true;
+
     return false;
   }
 
-  Future<bool> checkMaxLength() async {
-    var lng = await file.length();
+  Future<bool> checkMaxLength({FileStat? stat}) async {
+    int lng;
+    if (stat != null) {
+      lng = stat.size;
+    } else {
+      lng = await file.length();
+    }
+
     return lng > maxLength;
   }
 
-  Future<bool> checkMaxAge() async {
-    var fileTime = await file.lastModified();
+  Future<bool> checkMaxAge({FileStat? stat}) async {
+    DateTime fileTime;
+    if (stat != null) {
+      fileTime = stat.modified;
+    } else {
+      fileTime = await file.lastModified();
+    }
+
     var elapsedTime = DateTime.now().difference(fileTime);
     return elapsedTime > maxAge;
   }
