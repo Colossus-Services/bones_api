@@ -7,6 +7,8 @@
   - Optimize `needRotation`.
 - `APIPlatform`:
   - Added `getPropertyAs`.
+- `DBAdapter`:
+  - `isConnectionValid`: added parameter `checkUsage`.
 
 ## 1.5.12
 

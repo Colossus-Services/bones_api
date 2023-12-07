@@ -564,7 +564,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   Duration connectionInactivityLimit = Duration(minutes: 15);
 
   /// Returns `true` if [connection] is valid for usage.
-  FutureOr<bool> isConnectionValid(C connection);
+  FutureOr<bool> isConnectionValid(C connection, {bool checkUsage = true});
 
   FutureOr<bool> closeConnection(C connection);
 
@@ -573,7 +573,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   /// Defaults: calls [isConnectionValid].
   @override
-  FutureOr<bool> isPoolElementValid(C o) => isConnectionValid(o);
+  FutureOr<bool> isPoolElementValid(C o, {bool checkUsage = true}) =>
+      isConnectionValid(o, checkUsage: checkUsage);
 
   /// Checks the pool connections and limits.
   @override

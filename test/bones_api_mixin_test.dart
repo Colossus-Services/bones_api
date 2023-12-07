@@ -194,7 +194,7 @@ class _PoolTest with Pool<_PoolElement> {
   }
 
   @override
-  FutureOr<bool> isPoolElementValid(_PoolElement o) {
+  FutureOr<bool> isPoolElementValid(_PoolElement o, {bool checkUsage = false}) {
     return !o.isClosed;
   }
 

@@ -1123,7 +1123,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr<bool> isConnectionValid(connection) => true;
+  FutureOr<bool> isConnectionValid(connection, {bool checkUsage = true}) =>
+      true;
 
   final Map<DBSQLMemoryAdapterContext, DateTime> _openTransactionsContexts =
       <DBSQLMemoryAdapterContext, DateTime>{};

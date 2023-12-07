@@ -272,7 +272,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       if (connection != null) {
         var connUrl = getConnectionURL(connection);
-        _log.info('createConnection[$count]> $connUrl > $connection');
+        _log.info(
+            'createConnection[#$count $poolAliveElementsSize/$maxConnections]> $connUrl > $connection');
 
         return connection;
       }
@@ -334,17 +335,25 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   @override
-  bool isPoolElementValid(PostgreSQLConnectionWrapper o) =>
-      isConnectionValid(o);
+  bool isPoolElementValid(PostgreSQLConnectionWrapper o,
+          {bool checkUsage = true}) =>
+      isConnectionValid(o, checkUsage: checkUsage);
 
   @override
-  FutureOr<bool> isPoolElementInvalid(PostgreSQLConnectionWrapper o) =>
-      !isConnectionValid(o);
+  FutureOr<bool> isPoolElementInvalid(PostgreSQLConnectionWrapper o,
+          {bool checkUsage = true}) =>
+      !isConnectionValid(o, checkUsage: checkUsage);
 
   @override
-  bool isConnectionValid(PostgreSQLConnectionWrapper connection) {
-    return !connection.isClosed &&
-        !connection.isInactive(connectionInactivityLimit);
+  bool isConnectionValid(PostgreSQLConnectionWrapper connection,
+      {bool checkUsage = true}) {
+    if (connection.isClosed) return false;
+
+    if (checkUsage && connection.isInactive(connectionInactivityLimit)) {
+      return false;
+    }
+
+    return true;
   }
 
   @override

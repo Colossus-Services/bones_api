@@ -285,7 +285,8 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<bool> isConnectionValid(connection) => true;
+  FutureOr<bool> isConnectionValid(connection, {bool checkUsage = true}) =>
+      true;
 
   final Map<DBObjectMemoryAdapterContext, DateTime> _openTransactionsContexts =
       <DBObjectMemoryAdapterContext, DateTime>{};
