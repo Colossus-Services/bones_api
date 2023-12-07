@@ -6,7 +6,7 @@
 - `LogFileRotate`:
   - Optimize `needRotation`.
 - `APIPlatform`:
-  - Added `getPropertyAs`, `propertiesKeys` and `setProperty`.
+  - Added `getPropertyAs`, `propertiesKeys`, `setProperty` and `applyProperties`.
 - `DBAdapter`:
   - `isConnectionValid`: added parameter `checkUsage`.
 

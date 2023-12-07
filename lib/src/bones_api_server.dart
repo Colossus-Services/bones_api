@@ -734,7 +734,7 @@ abstract class _APIServerBase extends APIServerConfig {
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
     super.logToConsole,
-  });
+  }) : super(apiConfig: apiRoot.apiConfig);
 
   _APIServerBase.fromConfig(this.apiRoot, APIServerConfig apiServerConfig)
       : super(
@@ -1906,6 +1906,8 @@ final class APIServerWorker extends _APIServerBase {
 
   @override
   Future<bool> _startImpl() async {
+    var appliedProps = apiConfig?.applyProperties();
+
     if (this.logToConsole) {
       _log.handler.logToConsole();
 
@@ -1920,6 +1922,13 @@ final class APIServerWorker extends _APIServerBase {
 
       _log.info(
           "LOGGING> toConsole: $isLoggingToConsole ; all: $isLoggingAll ; error: $isLoggingError ; db: $isLoggingDB");
+    }
+
+    if (appliedProps != null && appliedProps.isNotEmpty) {
+      _log.info("Applied properties to `APIPlatform`:");
+      for (var e in appliedProps.entries) {
+        _log.info("  -- ${e.key}: ${e.value}");
+      }
     }
 
     _log.info("Starting...$_logSectionOpen");

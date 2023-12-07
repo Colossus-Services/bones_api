@@ -246,6 +246,8 @@ abstract class APIRoot with Initializable, Closable {
   void _setupLogger() {
     var apiConfig = this.apiConfig;
 
+    apiConfig.applyProperties();
+
     if (LoggerHandler.getLogAllTo() == null) {
       var logAllDestiny = apiConfig.getPath('log', 'all');
       if (logAllDestiny != null) {
