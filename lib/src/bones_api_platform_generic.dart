@@ -67,10 +67,28 @@ class APIPlatformGeneric extends APIPlatform {
   @override
   Uint8List? readFileAsBytes(String filePath) => null;
 
+  final Map<String, String> _properties = {};
+
+  @override
+  Iterable<String> get propertiesKeys {
+    var uri = Uri.base;
+    return {..._properties.keys, ...uri.queryParameters.keys};
+  }
+
+  @override
+  String? setProperty(String key, String value) {
+    var prev = getProperty(key);
+    _properties[key] = value;
+    return prev;
+  }
+
   @override
   String? getProperty(String? key,
       {String? defaultValue, bool caseSensitive = false}) {
     if (key == null) return defaultValue;
+
+    var prev = _properties[key];
+    if (prev != null) return prev;
 
     var uri = Uri.base;
     return uri.queryParameters.getIgnoreCase(key, defaultValue: defaultValue);

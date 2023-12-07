@@ -250,6 +250,32 @@ class APIConfig {
     return null;
   }
 
+  /// Apply the values in the `properties` entry to the [APIPlatform] properties.
+  Map<String, String>? applyProperties() {
+    var properties = get('properties');
+    if (properties is Map) {
+      var apiPlatform = APIPlatform.get();
+
+      var props = <String, String>{};
+
+      for (var e in properties.entries) {
+        var k = e.key?.toString();
+        var v = e.value;
+
+        if (k == null || (v is! String && v is! num && v is! bool)) continue;
+
+        var vStr = v.toString();
+        apiPlatform.setProperty(k, vStr);
+
+        props[k] = vStr;
+      }
+
+      return props;
+    }
+
+    return null;
+  }
+
   /// Constructs an [APIConfig] instance from [o], returning [def] if [o] is invalid.
   /// Calls [fromSync].
   static APIConfig? from(dynamic o, [dynamic def]) {

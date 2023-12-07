@@ -247,7 +247,8 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<bool> isConnectionValid(connection) => true;
+  FutureOr<bool> isConnectionValid(connection, {bool checkUsage = true}) =>
+      true;
 
   final Map<DBObjectDirectoryAdapterContext, DateTime>
       _openTransactionsContexts = <DBObjectDirectoryAdapterContext, DateTime>{};

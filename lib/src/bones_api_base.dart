@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.12';
+  static const String VERSION = '1.5.13';
 
   static bool _boot = false;
 
@@ -245,6 +245,8 @@ abstract class APIRoot with Initializable, Closable {
 
   void _setupLogger() {
     var apiConfig = this.apiConfig;
+
+    apiConfig.applyProperties();
 
     if (LoggerHandler.getLogAllTo() == null) {
       var logAllDestiny = apiConfig.getPath('log', 'all');

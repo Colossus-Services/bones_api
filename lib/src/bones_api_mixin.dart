@@ -81,8 +81,9 @@ mixin Pool<O extends Object> {
   FutureOr<List<O>> validPoolElements() =>
       filterPoolElements(isPoolElementValid);
 
-  FutureOr<List<O>> invalidPoolElements() =>
-      filterPoolElements(isPoolElementInvalid);
+  FutureOr<List<O>> invalidPoolElements({bool checkUsage = true}) =>
+      filterPoolElements(
+          (e) => isPoolElementInvalid(e, checkUsage: checkUsage));
 
   FutureOr<List<O>> filterPoolElements(FutureOr<bool> Function(O o) filter) {
     var hasFuture = false;
@@ -107,8 +108,8 @@ mixin Pool<O extends Object> {
 
   int _invalidatedElementsCount = 0;
 
-  FutureOr<bool> removeInvalidElementsFromPool() {
-    FutureOr<List<O>> ret = invalidPoolElements();
+  FutureOr<bool> removeInvalidElementsFromPool({bool checkUsage = true}) {
+    FutureOr<List<O>> ret = invalidPoolElements(checkUsage: checkUsage);
 
     return ret.resolveMapped((l) {
       for (var o in l) {
@@ -119,10 +120,10 @@ mixin Pool<O extends Object> {
     });
   }
 
-  FutureOr<bool> isPoolElementValid(O o);
+  FutureOr<bool> isPoolElementValid(O o, {bool checkUsage = true});
 
-  FutureOr<bool> isPoolElementInvalid(O o) {
-    var valid = isPoolElementValid(o);
+  FutureOr<bool> isPoolElementInvalid(O o, {bool checkUsage = true}) {
+    var valid = isPoolElementValid(o, checkUsage: checkUsage);
 
     if (valid is Future<bool>) {
       return valid.then((valid) => !valid);
@@ -195,7 +196,7 @@ mixin Pool<O extends Object> {
 
   int get poolSizeDesiredLimit;
 
-  static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 60);
+  static final Duration _defaultPoolYieldTimeout = Duration(milliseconds: 200);
 
   Duration get poolYieldTimeout => _defaultPoolYieldTimeout;
 
@@ -370,11 +371,19 @@ mixin Pool<O extends Object> {
       int minSize, int maxSize, int checkInvalidsIntervalMs) {
     var poolSize = this.poolSize;
 
-    if (poolSize <= minSize) return true;
+    if (poolSize <= minSize) {
+      if (lastCheckPoolElapsedTimeMs > checkInvalidsIntervalMs) {
+        return removeInvalidElementsFromPool(checkUsage: false);
+      } else {
+        return true;
+      }
+    }
 
     if (poolSize > maxSize) {
       return removeInvalidElementsFromPool().resolveMapped((_) {
         var excess = this.poolSize - maxSize;
+        _logPool.info(
+            "Removing excess> poolSize: $poolSize ; maxSize: $maxSize ; excess: $excess");
         removeElementsFromPool(excess);
         return true;
       });
@@ -409,7 +418,7 @@ mixin Pool<O extends Object> {
         return false;
       }
 
-      checkPool();
+      callCheckPool();
       _pool.addLast(recycled);
 
       while (_yields.isNotEmpty) {

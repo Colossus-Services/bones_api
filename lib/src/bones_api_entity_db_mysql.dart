@@ -244,7 +244,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var connUrl = getConnectionURL(connWrapper);
 
-    _log.info('createConnection[$count]> $connUrl > $connection');
+    _log.info(
+        'createConnection[#$count $poolAliveElementsSize/$maxConnections]> $connUrl > $connection');
 
     return connWrapper;
   }
@@ -259,16 +260,25 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  bool isPoolElementValid(DBMySqlConnectionWrapper o) => isConnectionValid(o);
+  bool isPoolElementValid(DBMySqlConnectionWrapper o,
+          {bool checkUsage = true}) =>
+      isConnectionValid(o, checkUsage: checkUsage);
 
   @override
-  FutureOr<bool> isPoolElementInvalid(DBMySqlConnectionWrapper o) =>
-      !isConnectionValid(o);
+  FutureOr<bool> isPoolElementInvalid(DBMySqlConnectionWrapper o,
+          {bool checkUsage = true}) =>
+      !isConnectionValid(o, checkUsage: checkUsage);
 
   @override
-  bool isConnectionValid(DBMySqlConnectionWrapper connection) {
-    return !connection.isClosed &&
-        !connection.isInactive(connectionInactivityLimit);
+  bool isConnectionValid(DBMySqlConnectionWrapper connection,
+      {bool checkUsage = true}) {
+    if (connection.isClosed) return false;
+
+    if (checkUsage && connection.isInactive(connectionInactivityLimit)) {
+      return false;
+    }
+
+    return true;
   }
 
   @override

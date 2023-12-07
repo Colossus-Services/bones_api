@@ -334,7 +334,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   @override
-  FutureOr<bool> isConnectionValid(connection) => true;
+  FutureOr<bool> isConnectionValid(connection, {bool checkUsage = true}) =>
+      true;
 
   final Map<DBObjectGCSAdapterContext, DateTime> _openTransactionsContexts =
       <DBObjectGCSAdapterContext, DateTime>{};
