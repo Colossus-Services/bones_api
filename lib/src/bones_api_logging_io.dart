@@ -63,7 +63,11 @@ class LoggerHandlerIO extends LoggerHandler {
 
     if (logDestiny is File) {
       if (logDestiny.existsSync() || logDestiny.parent.existsSync()) {
-        var logFileRotate = LogFileRotate(logDestiny);
+        var logFileRotate = LogFileRotate(
+          logDestiny,
+          maxLength: logMaxFileLength,
+          maxRotationFiles: logMaxRotationFiles,
+        );
         return (l, ms) => _logToFile(logFileRotate, l, ms);
       }
     }
@@ -107,7 +111,7 @@ class LogFileRotate {
   LogFileRotate(
     this.file, {
     int? maxLength,
-    int? maxRotationFiles = defaultMaxRotationFiles,
+    int? maxRotationFiles,
     Duration? maxAge,
     Duration? checkInterval,
   })  : maxLength = maxLength ?? defaultMaxLength,
