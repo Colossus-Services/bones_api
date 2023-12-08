@@ -1326,7 +1326,8 @@ class APIServer extends _APIServerBase {
     return origin;
   }
 
-  /// Resolves a [payload] to a HTTP body.
+  /// Resolves a [payload] to an HTTP body (accepts [payload] as a [Future]).
+  /// See [resolveBodySync].
   static FutureOr<Object?> resolveBody(
       dynamic payload, APIResponse apiResponse) {
     if (payload == null) return null;
@@ -1339,6 +1340,23 @@ class APIServer extends _APIServerBase {
       });
     }
 
+    return _resolveBodyImpl(payload, apiResponse);
+  }
+
+  /// Resolves a [payload] to an HTTP body (Does NOT accept [payload] as a [Future]).
+  /// See [resolveBody].
+  static Object? resolveBodySync(dynamic payload, APIResponse apiResponse) {
+    if (payload == null) return null;
+
+    if (payload is Future) {
+      throw ArgumentError(
+          "`payload` can't be a `Future`. Use `resolveBody` for asynchronous call.");
+    }
+
+    return _resolveBodyImpl(payload, apiResponse);
+  }
+
+  static Object? _resolveBodyImpl(Object payload, APIResponse apiResponse) {
     var apiRequestMethod = apiResponse.apiRequest?.method;
 
     if (apiRequestMethod == APIRequestMethod.HEAD) {
@@ -2296,32 +2314,34 @@ final class APIServerWorker extends _APIServerBase {
     return retPayload.resolveMapped((payload) {
       if (payload is APIResponse) {
         var apiResponse2 = payload;
+
         return APIServer.resolveBody(apiResponse2.payload, apiResponse2)
             .resolveMapped((payload2) {
           var response = _sendAPIResponse(
               request, apiRequest, apiResponse2, headers, payload2);
 
-          apiResponse2.dispose();
+          apiResponse.disposeAsync();
 
-          return _applyGzipEncoding(request, response);
+          return _processResponse(apiRequest, apiResponse2, request, response);
         });
       } else {
         var response = _sendAPIResponse(
             request, apiRequest, apiResponse, headers, payload);
 
-        apiResponse.dispose();
-
-        return _applyGzipEncoding(request, response);
+        return _processResponse(apiRequest, apiResponse, request, response);
       }
     });
   }
 
-  FutureOr<Response> _applyGzipEncoding(
-      Request request, FutureOr<Response> response) {
+  FutureOr<Response> _processResponse(APIRequest apiRequest,
+      APIResponse apiResponse, Request request, Response response) {
+    apiResponse.disposeAsync();
+    apiRequest.disposeAsync();
+
     if (!acceptsGzipEncoding(request)) {
       return response;
     } else {
-      return response.resolveMapped(gzipEncodeResponse);
+      return gzipEncodeResponse(response);
     }
   }
 
@@ -2342,7 +2362,7 @@ final class APIServerWorker extends _APIServerBase {
     return needToSendHeaderXAccessToken;
   }
 
-  FutureOr<Response> _sendAPIResponse(Request request, APIRequest apiRequest,
+  Response _sendAPIResponse(Request request, APIRequest apiRequest,
       APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
     _setTransactionsMetrics(apiRequest, apiResponse);
 
@@ -2434,14 +2454,12 @@ final class APIServerWorker extends _APIServerBase {
           var stackTrace = apiResponse.stackTrace;
           var errorContent = stackTrace != null ? '$error\n$stackTrace' : error;
 
-          var retError = APIServer.resolveBody(errorContent, apiResponse);
+          var retError = APIServer.resolveBodySync(errorContent, apiResponse);
 
           headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
 
-          return retError.resolveMapped((error) {
-            _log.severe('500 Internal Server Error', error, stackTrace);
-            return Response.internalServerError(body: error, headers: headers);
-          });
+          _log.severe('500 Internal Server Error', retError, stackTrace);
+          return Response.internalServerError(body: retError, headers: headers);
         }
       default:
         return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',

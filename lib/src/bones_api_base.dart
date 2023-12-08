@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.15';
+  static const String VERSION = '1.5.16';
 
   static bool _boot = false;
 
@@ -1347,6 +1347,9 @@ abstract class APIMetricSet {
     _startedMetrics = null;
     _metrics = null;
   }
+
+  /// Asynchronous call to [dispose].
+  Future<void> disposeAsync() => Future.microtask(dispose);
 }
 
 /// Represents an API request.

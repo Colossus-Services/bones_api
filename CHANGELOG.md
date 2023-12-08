@@ -1,3 +1,13 @@
+## 1.5.16
+
+- `APIServer`:
+  - added `resolveBodySync`
+-`APIRequest`, `APIResponse` and `Transaction`.
+  - Added `disposeAsync`.
+- `APIServerWorker`:
+  - `_processAPIResponse`: optimize `Response` resolution.
+  - Call `APIResponse.disposeAsync` instead of `.dispose`.
+
 ## 1.5.15
 
 -`APIRequest`, `APIResponse` and `Transaction`.
