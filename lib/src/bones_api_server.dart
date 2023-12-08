@@ -2300,11 +2300,17 @@ final class APIServerWorker extends _APIServerBase {
             .resolveMapped((payload2) {
           var response = _sendAPIResponse(
               request, apiRequest, apiResponse2, headers, payload2);
+
+          apiResponse2.dispose();
+
           return _applyGzipEncoding(request, response);
         });
       } else {
         var response = _sendAPIResponse(
             request, apiRequest, apiResponse, headers, payload);
+
+        apiResponse.dispose();
+
         return _applyGzipEncoding(request, response);
       }
     });

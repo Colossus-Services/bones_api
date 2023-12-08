@@ -1,3 +1,9 @@
+## 1.5.15
+
+-`APIRequest`, `APIResponse` and `Transaction`.
+  - Added `dispose`. 
+- `APIServerWorker._processAPIResponse`: call `APIResponse.dispose`.
+
 ## 1.5.14
 
 - `DBMySQLAdapter` and `DBPostgreSQLAdapter`:

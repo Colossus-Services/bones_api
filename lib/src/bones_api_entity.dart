@@ -5191,6 +5191,27 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
   }
 
+  /// Disposes of the internals of this [Transaction] (only when [isFinished]).
+  /// Returns `true` if it was successfully disposed.
+  bool dispose() {
+    if (!isFinished) {
+      return false;
+    }
+
+    _result = null;
+    _context = null;
+    _transactionCloser = null;
+    _lastResult = null;
+
+    _executionsFutures.clear();
+    _executedOperations.clear();
+    _operations.clear();
+
+    clearCachedEntities();
+
+    return true;
+  }
+
   @override
   String toString(
       {bool compact = false,
