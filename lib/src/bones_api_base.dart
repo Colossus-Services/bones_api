@@ -1342,6 +1342,11 @@ abstract class APIMetricSet {
       }
     }
   }
+
+  void dispose() {
+    _startedMetrics = null;
+    _metrics = null;
+  }
 }
 
 /// Represents an API request.
@@ -2035,6 +2040,18 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Disassociate a [Transaction] from this request.
   bool removeTransaction(Transaction t) => _transactions.remove(t);
+
+  /// Disposes the internals of this [APIResponse].
+  @override
+  void dispose() {
+    super.dispose();
+
+    for (var t in _transactions) {
+      t.dispose();
+    }
+
+    _transactions.clear();
+  }
 
   @override
   String toString({bool withHeaders = true, bool withPayload = true}) {
@@ -3050,5 +3067,13 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
     } else {
       return status.toString();
     }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+
+    this._apiRequest?.dispose();
+    this._apiRequest = null;
   }
 }
