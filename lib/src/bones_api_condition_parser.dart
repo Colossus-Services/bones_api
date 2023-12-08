@@ -289,6 +289,8 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
             return KeyConditionNotEQ(keys, value);
           case '=~':
             return KeyConditionIN(keys, value);
+          case '!~':
+            return KeyConditionNotIN(keys, value);
           case '>':
             return KeyConditionGreaterThan(keys, value);
           case '>=':
@@ -342,6 +344,7 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   Parser<String> conditionOperator() => (string('==') |
           string('!=') |
           string('=~') |
+          string('!~') |
           string('>=') |
           string('<=') |
           string('>') |

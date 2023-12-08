@@ -124,6 +124,12 @@ class ConditionSQLEncoder extends ConditionEncoder {
   }
 
   @override
+  FutureOr<EncodingContext> encodeKeyConditionNotIN(
+      KeyConditionNotIN c, EncodingContext context) {
+    return encodeKeyConditionOperator(c, context, 'NOT IN', valueAsList: true);
+  }
+
+  @override
   FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
       KeyConditionGreaterThan c, EncodingContext context) {
     return encodeKeyConditionOperator(c, context, '>');

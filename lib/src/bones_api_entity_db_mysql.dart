@@ -228,6 +228,18 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var count = ++_connectionCount;
 
+    var connWrapper = await _createConnectionImpl(password);
+
+    var connUrl = getConnectionURL(connWrapper);
+
+    _log.info(
+        'createConnection[#$count $poolAliveElementsSize/$maxConnections]> $connUrl > ${connWrapper.nativeConnection}');
+
+    return connWrapper;
+  }
+
+  Future<_DBMySqlConnectionWrapped> _createConnectionImpl(
+      String password) async {
     var connSettings = ConnectionSettings(
       host: host,
       port: port,
@@ -242,12 +254,19 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var connWrapper = _DBMySqlConnectionWrapped(connection, connSettings);
 
-    var connUrl = getConnectionURL(connWrapper);
-
-    _log.info(
-        'createConnection[#$count $poolAliveElementsSize/$maxConnections]> $connUrl > $connection');
+    _connectionFinalizer.attach(connWrapper, connection);
 
     return connWrapper;
+  }
+
+  late final Finalizer<MySqlConnection> _connectionFinalizer =
+      Finalizer(_finalizeConnection);
+
+  void _finalizeConnection(MySqlConnection connection) {
+    try {
+      // ignore: discarded_futures
+      connection.close();
+    } catch (_) {}
   }
 
   @override

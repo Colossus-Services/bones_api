@@ -1586,7 +1586,7 @@ class KeyConditionIN<O> extends KeyConditionINBase<O> {
 }
 
 class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
-  KeyConditionNotIN(super.keys, List super.values) : super(not: true);
+  KeyConditionNotIN(super.keys, super.values) : super(not: true);
 
   @override
   KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>

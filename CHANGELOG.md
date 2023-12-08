@@ -1,3 +1,9 @@
+## 1.5.14
+
+- `DBMySQLAdapter` and `DBPostgreSQLAdapter`:
+  - Add finalizer to ensure that the DB connection is closed when the wrapper is collected. 
+- Fix ˜KeyConditionNotIN`.
+
 ## 1.5.13
 
 - `LoggerHandlerIO`:

@@ -986,6 +986,8 @@ abstract class ConditionEncoder {
       return encodeKeyConditionNotEQ(c, context);
     } else if (c is KeyConditionIN) {
       return encodeKeyConditionIN(c, context);
+    } else if (c is KeyConditionNotIN) {
+      return encodeKeyConditionNotIN(c, context);
     } else if (c is KeyConditionGreaterThan) {
       return encodeKeyConditionGreaterThan(c, context);
     } else if (c is KeyConditionGreaterThanOrEqual) {
@@ -1007,6 +1009,9 @@ abstract class ConditionEncoder {
 
   FutureOr<EncodingContext> encodeKeyConditionIN(
       KeyConditionIN c, EncodingContext context);
+
+  FutureOr<EncodingContext> encodeKeyConditionNotIN(
+      KeyConditionNotIN c, EncodingContext context);
 
   FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
       KeyConditionGreaterThan c, EncodingContext context);

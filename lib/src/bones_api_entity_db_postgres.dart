@@ -324,7 +324,21 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     if (ok == null || !ok) return null;
 
-    return PostgreSQLConnectionWrapper(connection);
+    var connWrapper = PostgreSQLConnectionWrapper(connection);
+
+    _connectionFinalizer.attach(connWrapper, connection);
+
+    return connWrapper;
+  }
+
+  late final Finalizer<PostgreSQLConnection> _connectionFinalizer =
+      Finalizer(_finalizeConnection);
+
+  void _finalizeConnection(PostgreSQLConnection connection) {
+    try {
+      // ignore: discarded_futures
+      connection.close();
+    } catch (_) {}
   }
 
   @override
