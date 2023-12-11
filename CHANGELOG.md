@@ -1,3 +1,7 @@
+## 1.5.18
+
+- shelf_gzip: ^4.1.0
+
 ## 1.5.17
 
 - `APIServerWorker`:
