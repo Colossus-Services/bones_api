@@ -1762,8 +1762,11 @@ final class APIServerWorker extends _APIServerBase {
     }
 
     pipeline = pipeline
-        .addMiddleware(
-            createGzipMiddleware(compressionLevel: gzipCompressionLevel))
+        .addMiddleware(createGzipMiddleware(
+          compressionLevel: gzipCompressionLevel,
+          addCompressionRatioHeader: true,
+          addServerTiming: true,
+        ))
         .addMiddleware((innerHandler) =>
             _staticFilesHeadersMiddleware(rootDirectory, innerHandler));
 
@@ -2341,7 +2344,11 @@ final class APIServerWorker extends _APIServerBase {
     if (!acceptsGzipEncoding(request)) {
       return response;
     } else {
-      return gzipEncodeResponse(response);
+      return gzipEncodeResponse(
+        response,
+        addCompressionRatioHeader: true,
+        addServerTiming: true,
+      );
     }
   }
 
