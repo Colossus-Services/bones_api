@@ -1,3 +1,8 @@
+## 1.5.17
+
+- `APIServerWorker`:
+  - Improve error 500 logging.
+
 ## 1.5.16
 
 - `APIServer`:

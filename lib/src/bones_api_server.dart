@@ -2452,13 +2452,15 @@ final class APIServerWorker extends _APIServerBase {
         {
           var error = apiResponse.error ?? '';
           var stackTrace = apiResponse.stackTrace;
+
+          _log.severe('500 Internal Server Error', error, stackTrace);
+
           var errorContent = stackTrace != null ? '$error\n$stackTrace' : error;
 
           var retError = APIServer.resolveBodySync(errorContent, apiResponse);
 
           headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
 
-          _log.severe('500 Internal Server Error', retError, stackTrace);
           return Response.internalServerError(body: retError, headers: headers);
         }
       default:
