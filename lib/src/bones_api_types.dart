@@ -382,3 +382,19 @@ class Time implements Comparable<Time> {
 
   operator >=(Time other) => totalMicrosecond >= other.totalMicrosecond;
 }
+
+extension DateTimeToTimeExtension on DateTime {
+  Time toTime({
+    bool withMinute = true,
+    bool withSecond = true,
+    bool withMillisecond = true,
+    bool withMicrosecond = true,
+  }) =>
+      Time(
+        hour,
+        withMinute ? minute : 0,
+        withSecond ? second : 0,
+        withMillisecond ? millisecond : 0,
+        withMicrosecond ? microsecond : 0,
+      );
+}

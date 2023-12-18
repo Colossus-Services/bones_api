@@ -1,3 +1,11 @@
+## 1.5.19
+
+- New `DateTimeToTimeExtension`:
+  - New `toTime`.
+
+- reflection_factory: ^2.2.7
+- coverage: ^1.7.2
+
 ## 1.5.18
 
 - shelf_gzip: ^4.1.0
