@@ -1,4 +1,6 @@
 
+concurrency: 1
+
 tags:
   # Test the package version self-references.
   version:
