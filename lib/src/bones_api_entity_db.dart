@@ -1692,11 +1692,17 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var fieldType = fieldsListEntity[fieldName]!;
       var targetTable = e.value.targetTable;
 
-      var targetRepositoryAdapter =
-          databaseAdapter.getRepositoryAdapterByTableName(targetTable)!;
+      var targetRepositoryAdapter = databaseAdapter
+              .getRepositoryAdapterByTableName(targetTable) ??
+          (throw StateError(
+              "Can't find `DBRepositoryAdapter` for target table: $targetTable"));
+
       var targetType = targetRepositoryAdapter.type;
-      var targetEntityRepository =
-          provider.getEntityRepositoryByType(targetType)!;
+
+      var targetEntityRepository = provider
+              .getEntityRepositoryByType(targetType) ??
+          (throw StateError(
+              "Can't find `EntityRepository` for target type: $targetType (`$targetTable`)"));
 
       // ignore: discarded_futures
       var relationshipsAsync = selectRelationships(null, fieldName,
