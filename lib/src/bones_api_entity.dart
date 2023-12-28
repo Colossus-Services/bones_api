@@ -3212,7 +3212,7 @@ class EntityRepositoryProvider
     }
 
     _log.warning(
-        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type");
+        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type @ $this");
 
     return null;
   }
