@@ -1,11 +1,13 @@
 @TestOn('vm')
 import 'dart:convert' as convert;
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:mercury_client/mercury_client.dart' as mercury_client;
 import 'package:path/path.dart' as pack_path;
+import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
 
 part 'bones_api_test.reflection.g.dart';
@@ -408,6 +410,22 @@ void main() {
       expect(await infoProxy.toUpperCase('AAA'), equals('Upper case: AAA'));
     });
 
+    test('proxy: withPayload', () async {
+      var infoProxy = MyInfoModuleProxy(
+          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+
+      expect(await infoProxy.withPayload(null), equals('Payload length: -1'));
+
+      expect(await infoProxy.withPayload([0, 1, 2, 3].asUint8List),
+          equals('Payload length: 4'));
+
+      expect(await infoProxy.withPayload([0].asUint8List),
+          equals('Payload length: 1'));
+
+      expect(await infoProxy.withPayload(<int>[].asUint8List),
+          equals('Payload length: 0'));
+    });
+
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
@@ -426,7 +444,8 @@ void main() {
           ']},'
           '{"name":"info","routes":['
           '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"},'
-          '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:0/info/toUpperCase?msg=String"}'
+          '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:0/info/toUpperCase?msg=String"},'
+          '{"name":"withPayload","parameters":{"payload":"Uint8List"},"uri":"http://localhost:5544/info/withPayload?payload=Uint8List"}'
           ']}'
           ']})';
 
@@ -728,6 +747,11 @@ class MyInfoModule extends APIModule {
     var reply = 'Upper case: ${msg.toUpperCase()}';
     return APIResponse.ok(reply);
   }
+
+  FutureOr<APIResponse<String>> withPayload(Uint8List? payload) {
+    var reply = 'Payload length: ${payload?.length ?? -1}';
+    return APIResponse.ok(reply);
+  }
 }
 
 Future<(int, String)> _getURL(String url,
@@ -858,8 +882,21 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
       mercury_client.HttpRequest request,
       mercury_client.ProgressListener? progressListener,
       bool log) async {
-    var response = await _getURL(request.requestURL);
+    (int, String) response;
+
+    if (request.method == mercury_client.HttpMethod.POST) {
+      response = await _getURL(
+        request.requestURL,
+        method: APIRequestMethod.POST,
+        payload: request.sendData,
+        payloadType: request.headerContentType,
+      );
+    } else {
+      response = await _getURL(request.requestURL);
+    }
+
     var responseContent = response.$2;
+
     return mercury_client.HttpResponse(
         mercury_client.getHttpMethod(request.method.name)!,
         request.url,
