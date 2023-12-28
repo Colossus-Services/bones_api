@@ -814,6 +814,16 @@ class APIRouteBuilder<M extends APIModule> {
       var data = value.asUint8List;
       return data;
     } else if (value is String) {
+      if (value.startsWith("hex:")) {
+        var hexData = value.substring(4);
+        try {
+          var data = hex.decode(hexData);
+          return data;
+        } catch (_) {
+          // not a HEX data:
+        }
+      }
+
       var dataUrl = DataURLBase64.parse(value);
       if (dataUrl != null) {
         return dataUrl.payloadArrayBuffer;
@@ -832,6 +842,8 @@ class APIRouteBuilder<M extends APIModule> {
       } catch (_) {
         // not a HEX data:
       }
+
+      return utf8.encode(value);
     }
 
     return null;

@@ -1,3 +1,8 @@
+## 1.5.21
+
+- `APIRouteBuilder`:
+  - `_resolveRequestParameterValueAsBytes`: allow `hex:...` format.
+
 ## 1.5.20 
 
 - Better error message for null `getRepositoryAdapterByTableName` and `getEntityRepositoryByType`.

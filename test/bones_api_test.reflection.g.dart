@@ -437,7 +437,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'initialize',
     'initializeDependencies',
     'resolveRoute',
-    'toUpperCase'
+    'toUpperCase',
+    'withPayload'
   ];
 
   @override
@@ -540,6 +541,24 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             obj,
             false,
             const <__PR>[__PR(__TR.tString, 'msg', false, true)],
+            null,
+            null,
+            null);
+      case 'withpayload':
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
+            this,
+            MyInfoModule,
+            'withPayload',
+            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
+            ]),
+            false,
+            (o) => o!.withPayload,
+            obj,
+            false,
+            const <__PR>[
+              __PR(__TR<Uint8List>(Uint8List), 'payload', true, true)
+            ],
             null,
             null,
             null);
@@ -895,6 +914,17 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         'toUpperCase',
         <String, dynamic>{
           'msg': msg,
+        },
+        __TR.tFutureString);
+    return __retFut$<String>(ret);
+  }
+
+  Future<String> withPayload(Uint8List? payload) {
+    var ret = onCall(
+        this,
+        'withPayload',
+        <String, dynamic>{
+          'payload': payload,
         },
         __TR.tFutureString);
     return __retFut$<String>(ret);
