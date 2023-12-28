@@ -1,3 +1,7 @@
+## 1.5.20 
+
+- Better error message for null `getRepositoryAdapterByTableName` and `getEntityRepositoryByType`.
+
 ## 1.5.19
 
 - New `DateTimeToTimeExtension`:

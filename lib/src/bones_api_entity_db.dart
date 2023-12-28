@@ -357,7 +357,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     _log.warning(
-        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type");
+        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type @ $this");
 
     return null;
   }
@@ -1686,6 +1686,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var ids = results.map((e) => e[idFieldName]).toList();
 
     var databaseAdapter = repositoryAdapter.databaseAdapter;
+
+    if (databaseAdapter.isClosed) {
+      throw StateError("Closed `DBAdapter`: $databaseAdapter");
+    }
 
     return relationshipFields.entries.map((e) {
       var fieldName = e.key;

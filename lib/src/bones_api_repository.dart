@@ -20,7 +20,8 @@ abstract class APIRepository<O extends Object> with Initializable {
         .getEntityRepository<O>(type: type);
 
     if (entityRepository == null && required) {
-      throw StateError("Can't resolve `EntityRepository` for type: $type");
+      throw StateError(
+          "Can't resolve `EntityRepository` for type: $type @ $provider");
     }
 
     return entityRepository;
