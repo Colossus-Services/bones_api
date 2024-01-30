@@ -170,6 +170,9 @@ class TableScheme with FieldsFromMap {
   /// Fields types.
   final Map<String, Type> fieldsTypes;
 
+  /// Table constraints.
+  final Set<TableConstraint> constraints;
+
   /// Fields that are references to another table field.
   final Map<String, TableFieldReference> _fieldsReferencedTables;
 
@@ -191,9 +194,11 @@ class TableScheme with FieldsFromMap {
     Map<String, TableFieldReference> fieldsReferencedTables =
         const <String, TableFieldReference>{},
     Iterable<TableRelationshipReference>? relationshipTables,
+    Iterable<TableConstraint>? constraints,
     this.relationship = false,
   })  : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
         fieldsTypes = Map.unmodifiable(fieldsTypes),
+        constraints = ((constraints?.toList() ?? [])..sort()).toSet(),
         _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
             fieldsReferencedTables),
         _relationshipTables = Set<TableRelationshipReference>.unmodifiable(
@@ -433,12 +438,77 @@ class TableScheme with FieldsFromMap {
 
   @override
   String toString() {
+    var constraintNotPrimary =
+        constraints.where((e) => e is! TablePrimaryKeyConstraint).toList();
+
     return 'TableScheme{name: $name, '
         'idFieldName: $idFieldName, '
         'fieldsTypes: $fieldsTypes, '
         'fieldsReferencedTables: $_fieldsReferencedTables, '
-        'relationshipTables: $_relationshipTables}';
+        'relationshipTables: $_relationshipTables}${constraintNotPrimary.isNotEmpty ? '\n-- ${constraintNotPrimary.join('\n-- ')}' : ''}';
   }
+}
+
+/// Base class for table constraints.
+abstract class TableConstraint implements Comparable<TableConstraint> {
+  /// The constraint filed/column name.
+  final String field;
+
+  TableConstraint(this.field);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TableConstraint &&
+          runtimeType == other.runtimeType &&
+          field == other.field;
+
+  @override
+  int get hashCode => field.hashCode;
+
+  @override
+  int compareTo(TableConstraint other) {
+    return field.compareTo(other.field);
+  }
+}
+
+/// Table primary key field constraint.
+class TablePrimaryKeyConstraint extends TableConstraint {
+  TablePrimaryKeyConstraint(super.field);
+
+  @override
+  String toString() => 'TablePrimaryKeyConstraint($field)';
+
+  @override
+  int compareTo(TableConstraint other) {
+    if (other is! TablePrimaryKeyConstraint) {
+      return -1;
+    }
+    return super.compareTo(other);
+  }
+}
+
+/// Table enum field constraint.
+class TableEnumConstraint extends TableConstraint {
+  /// The possible values of the enum.
+  final Set<String> values;
+
+  TableEnumConstraint(super.field, Iterable<String> values)
+      : values = values.toSet();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is TableEnumConstraint &&
+          runtimeType == other.runtimeType &&
+          SetEquality<String>().equals(values, other.values);
+
+  @override
+  int get hashCode => super.hashCode ^ SetEquality<String>().hash(values);
+
+  @override
+  String toString() => 'TableEnumConstraint($field)$values';
 }
 
 /// Base class for [TableScheme] providers.
@@ -473,16 +543,14 @@ abstract class SchemeProvider {
     var ret = getTableSchemeImpl(table, relationship, contextID: contextID);
 
     return ret.resolveMapped((tablesScheme) {
-      if (tablesScheme == null) {
-        completer.complete(null);
-        _tablesSchemesResolving.remove(table);
-        return null;
-      } else {
+      if (tablesScheme != null) {
         _tablesSchemes[table] = tablesScheme;
-        completer.complete(tablesScheme);
-        _tablesSchemesResolving.remove(table);
-        return tablesScheme;
       }
+
+      completer.complete(tablesScheme);
+      _tablesSchemesResolving.remove(table);
+
+      return tablesScheme;
     });
   }
 

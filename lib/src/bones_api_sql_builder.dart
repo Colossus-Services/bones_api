@@ -1480,6 +1480,42 @@ abstract mixin class SQLGenerator {
     return alterTableSQL;
   }
 
+  AlterTableSQL generateAddEnumConstraintAlterTableSQL(
+      String table, String fieldName, TypeInfo fieldType,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var q = dialect.elementQuote;
+    var columnName = normalizeColumnName(fieldName);
+
+    var constraintName = '${table}_${fieldName}_check';
+
+    var fieldSQLType = typeToSQLType(fieldType, columnName,
+        entityFieldAnnotations: entityFieldAnnotations);
+
+    var enumType = enumTypeToSQLType(fieldType.type, columnName,
+        entityFieldAnnotations: entityFieldAnnotations);
+
+    if (enumType == null) {
+      throw StateError("Can't find `EnumReflection` for type: $fieldType");
+    }
+
+    var type = enumType.key;
+    var values = enumType.value;
+
+    fieldSQLType = _buildEnumSQLType(type, fieldSQLType, values, q, columnName,
+        withSqlType: false);
+
+    var comment =
+        '${fieldType.toString(withT: false)} $fieldName enum(${values.join(', ')})';
+
+    var columnEntry = SQLEntry(
+        'ADD', ' ADD CONSTRAINT $q$constraintName$q $fieldSQLType',
+        comment: comment);
+
+    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry]);
+
+    return alterTableSQL;
+  }
+
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
       {bool ifNotExists = true, bool sortColumns = true});
 
@@ -1744,16 +1780,17 @@ abstract mixin class SQLGenerator {
   }
 
   String? _buildEnumSQLType(String type, String? fieldSQLType,
-      List<String> values, String q, String columnName) {
+      List<String> values, String q, String columnName,
+      {bool withSqlType = true}) {
     if (type == 'ENUM') {
-      fieldSQLType = type;
+      fieldSQLType = withSqlType ? type : 'ENUM';
       fieldSQLType += '(${values.map((e) => "'$e'").join(',')})';
     } else if (type.endsWith(' CHECK')) {
-      fieldSQLType = type;
+      fieldSQLType = withSqlType ? type : 'CHECK';
       fieldSQLType +=
           '( $q$columnName$q IN (${values.map((e) => "'$e'").join(',')}) )';
     } else {
-      fieldSQLType = type;
+      fieldSQLType = withSqlType ? type : '';
     }
     return fieldSQLType;
   }

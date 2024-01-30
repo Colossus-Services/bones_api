@@ -1,3 +1,15 @@
+## 1.5.22
+
+- `DBAdapterCapability`:
+  - Added `constraintSupport`.
+- `TableScheme`:
+  - Added `constraints`.
+- New `TableConstraint`, `TablePrimaryKeyConstraint` and `TableEnumConstraint`.
+- `SQLGenerator`:
+  - Added `generateAddEnumConstraintAlterTableSQL`.
+- `MapAsCacheExtension`:
+  - Added internal `_checkCachedEntry` to handle `TimedMap.checkEntry`.
+
 ## 1.5.21
 
 - `APIRouteBuilder`:

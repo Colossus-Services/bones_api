@@ -104,6 +104,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
               transactions: true,
               transactionAbort: true,
               tableSQL: true,
+              constraintSupport: false,
               multiIsolateSupport: true),
         ) {
     boot();
