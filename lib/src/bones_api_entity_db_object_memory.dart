@@ -90,6 +90,7 @@ class DBObjectMemoryAdapter
               dialect: DBDialect('object'),
               transactions: true,
               transactionAbort: true,
+              constraintSupport: false,
               multiIsolateSupport: false),
         ) {
     boot();

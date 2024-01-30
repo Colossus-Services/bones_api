@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 
 import 'bones_api_entity.dart';
 import 'bones_api_entity_reference.dart';
+import 'bones_api_utils_timedmap.dart';
 
 /// Helper to work with positional fields.
 class PositionalFields {
@@ -351,14 +352,25 @@ extension IterableEnumExtension<E extends Enum> on Iterable<E> {
 
 /// Extension that ads cached methods to a [Map].
 extension MapAsCacheExtension<K, V> on Map<K, V> {
+  void _checkCachedEntry(K key) {
+    var self = this;
+    if (self is TimedMap<K, V>) {
+      self.checkEntry(key);
+    }
+  }
+
   /// Returns [key] value or computes it and caches it.
   /// See [checkCacheLimit] and [getCachedAsync].
   V getCached(K key, V Function() computer, {int? cacheLimit}) {
+    _checkCachedEntry(key);
     checkCacheLimit(cacheLimit);
+
     return putIfAbsent(key, computer);
   }
 
   V? getCachedNullable(K key, V? Function() computer, {int? cacheLimit}) {
+    _checkCachedEntry(key);
+
     var cached = this[key];
     if (cached != null) return cached;
 
@@ -375,6 +387,8 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
   /// See [checkCacheLimit] and [getCachedAsync].
   FutureOr<V> getCachedAsync(K key, FutureOr<V> Function() computer,
       {int? cacheLimit}) {
+    _checkCachedEntry(key);
+
     var cached = this[key];
     if (cached != null) return cached;
 
@@ -388,6 +402,8 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
 
   FutureOr<V?> getCachedAsyncNullable(K key, FutureOr<V?> Function() computer,
       {int? cacheLimit}) {
+    _checkCachedEntry(key);
+
     var cached = this[key];
     if (cached != null) return cached;
 

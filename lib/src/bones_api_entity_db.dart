@@ -43,6 +43,9 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
   /// `true` if the DB fully supports [transactions] and [transactionAbort].
   bool get fullTransaction => transactions && transactionAbort;
 
+  /// `true` if the DB supports constraints.
+  final bool constraintSupport;
+
   /// `true` if the [DBAdapter] supports execution in multiple [Isolate]s.
   /// - If an adapter tries to initialize inside an auxiliary [Isolate] ([DBAdapter.auxiliaryMode]), it will fail.
   final bool multiIsolateSupport;
@@ -51,11 +54,12 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
     required this.dialect,
     required this.transactions,
     required this.transactionAbort,
+    required this.constraintSupport,
     required this.multiIsolateSupport,
   });
 
   String get info =>
-      'transactions: $transactions, transactionAbort: $transactionAbort, multiIsolateSupport: $multiIsolateSupport';
+      'transactions: $transactions, transactionAbort: $transactionAbort, constraintSupport: $constraintSupport, multiIsolateSupport: $multiIsolateSupport';
 
   @override
   String get runtimeTypeNameSafe => 'DBAdapterCapability';

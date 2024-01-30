@@ -91,6 +91,7 @@ class DBObjectDirectoryAdapter
               dialect: DBDialect('object'),
               transactions: true,
               transactionAbort: true,
+              constraintSupport: false,
               multiIsolateSupport: true),
         ) {
     boot();

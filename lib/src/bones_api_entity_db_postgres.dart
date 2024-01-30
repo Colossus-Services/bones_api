@@ -111,6 +111,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               transactions: true,
               transactionAbort: true,
               tableSQL: true,
+              constraintSupport: true,
               multiIsolateSupport: true),
         ) {
     boot();
@@ -455,12 +456,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           connection, table, idFieldName,
           contextID: contextID);
 
+      var constraints = await _findConstraints(connection, table, fieldsTypes);
+
       await releaseIntoPool(connection);
 
       var tableScheme = TableScheme(table,
           relationship: relationship != null,
           idFieldName: idFieldName,
           fieldsTypes: fieldsTypes,
+          constraints: constraints,
           fieldsReferencedTables: fieldsReferencedTables,
           relationshipTables: relationshipTables);
 
@@ -471,6 +475,74 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       await disposePoolElement(connection);
       rethrow;
     }
+  }
+
+  Future<Set<TableConstraint>> _findConstraints(
+      PostgreSQLConnectionWrapper connection,
+      String table,
+      Map<String, Type> fieldsTypes) async {
+    var sql = '''
+    SELECT 
+      pg_get_constraintdef(con.oid) AS constraint_definition
+    FROM pg_constraint con
+      JOIN pg_class tbl ON con.conrelid = tbl.oid
+    WHERE
+      tbl.relname = '$table';
+    ''';
+
+    var results = await connection.mappedResultsQuery(sql);
+
+    var columns = results.map((r) {
+      return Map.fromEntries(r.values.expand((e) => e.entries));
+    }).toList(growable: false);
+
+    var constraintsDefinitions =
+        columns.map((m) => m['constraint_definition'].toString()).toList();
+
+    var constraints =
+        constraintsDefinitions.map(_parseConstraint).whereNotNull().toSet();
+
+    return constraints;
+  }
+
+  TableConstraint? _parseConstraint(String definition) {
+    if (definition.startsWith("PRIMARY KEY")) {
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(definition)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
+      return field == null ? null : TablePrimaryKeyConstraint(field);
+    } else if (definition.startsWith("CHECK")) {}
+
+    var idx1 = definition.indexOf('(');
+    var idx2 = definition.lastIndexOf(')');
+
+    var s = definition.substring(idx1 + 1, idx2);
+
+    var field = RegExp(r'\(([^()]+?)\)')
+        .firstMatch(s)
+        ?.group(1)
+        ?.replaceAll("'", '')
+        .replaceAll('"', '')
+        .trim();
+
+    if (field == null || field.isEmpty) return null;
+
+    var arrayDef = RegExp(r'ARRAY\[(.*?)]').firstMatch(s)?.group(1)?.trim();
+
+    if (arrayDef == null || arrayDef.isEmpty) return null;
+
+    var values = RegExp(r"\('(.*?)'")
+        .allMatches(arrayDef)
+        .map((m) => m.group(1))
+        .whereNotNull()
+        .toSet();
+
+    if (values.isEmpty) return null;
+
+    return TableEnumConstraint(field, values);
   }
 
   Future<String> _findIDField(PostgreSQLConnectionWrapper connection,

@@ -105,6 +105,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
               dialect: DBDialect('object'),
               transactions: true,
               transactionAbort: true,
+              constraintSupport: false,
               multiIsolateSupport: true),
         ) {
     boot();
@@ -243,7 +244,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   String getConnectionURL(DBObjectGCSAdapterContext connection) =>
-      'object.directory://${connection.id}';
+      'object.gcs://${connection.id}';
 
   int _connectionCount = 0;
 
