@@ -514,35 +514,37 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           .replaceAll('"', '')
           .trim();
       return field == null ? null : TablePrimaryKeyConstraint(field);
-    } else if (definition.startsWith("CHECK")) {}
+    } else if (definition.startsWith("CHECK")) {
+      var idx1 = definition.indexOf('(');
+      var idx2 = definition.lastIndexOf(')');
 
-    var idx1 = definition.indexOf('(');
-    var idx2 = definition.lastIndexOf(')');
+      var s = definition.substring(idx1 + 1, idx2);
 
-    var s = definition.substring(idx1 + 1, idx2);
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(s)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
 
-    var field = RegExp(r'\(([^()]+?)\)')
-        .firstMatch(s)
-        ?.group(1)
-        ?.replaceAll("'", '')
-        .replaceAll('"', '')
-        .trim();
+      if (field == null || field.isEmpty) return null;
 
-    if (field == null || field.isEmpty) return null;
+      var arrayDef = RegExp(r'ARRAY\[(.*?)]').firstMatch(s)?.group(1)?.trim();
 
-    var arrayDef = RegExp(r'ARRAY\[(.*?)]').firstMatch(s)?.group(1)?.trim();
+      if (arrayDef == null || arrayDef.isEmpty) return null;
 
-    if (arrayDef == null || arrayDef.isEmpty) return null;
+      var values = RegExp(r"'(.*?)'")
+          .allMatches(arrayDef)
+          .map((m) => m.group(1))
+          .whereNotNull()
+          .toSet();
 
-    var values = RegExp(r"\('(.*?)'")
-        .allMatches(arrayDef)
-        .map((m) => m.group(1))
-        .whereNotNull()
-        .toSet();
+      if (values.isEmpty) return null;
 
-    if (values.isEmpty) return null;
+      return TableEnumConstraint(field, values);
+    }
 
-    return TableEnumConstraint(field, values);
+    return null;
   }
 
   Future<String> _findIDField(PostgreSQLConnectionWrapper connection,
