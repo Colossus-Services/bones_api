@@ -1,3 +1,7 @@
+## 1.5.25
+
+- Fix `DBPostgreSQLAdapter._parseConstraint`.
+
 ## 1.5.24
 
 - `APIModuleProxyCallerListener`: fix `resolveResponse` for `null` response.
