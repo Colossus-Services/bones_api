@@ -1026,7 +1026,7 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
 abstract class APIModuleProxyCallerListener<T>
     implements ClassProxyListener<T> {
   Object? resolveResponse(TypeReflection? returnType, dynamic json) {
-    if (returnType == null) {
+    if (returnType == null || json == null) {
       return json;
     }
 

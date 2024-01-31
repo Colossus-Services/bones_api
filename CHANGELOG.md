@@ -1,3 +1,7 @@
+## 1.5.24
+
+- `APIModuleProxyCallerListener`: fix `resolveResponse` for `null` response.
+
 ## 1.5.23
 
 - `EntityAccessRules`:
