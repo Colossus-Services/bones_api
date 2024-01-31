@@ -1,3 +1,14 @@
+## 1.5.23
+
+- `EntityAccessRules`:
+  - Added `toJsonEncodable` (moved from `APIServer`).
+- New `APIModuleProxyCallerListener` base class.
+- `APIModuleProxyDirectCaller`:
+  - Added `responsesAsJson`.
+  - Now capable to simulate a JSON serialization/deserialization for unit tests.
+
+- reflection_factory: ^2.2.8
+
 ## 1.5.22
 
 - `DBAdapterCapability`:
