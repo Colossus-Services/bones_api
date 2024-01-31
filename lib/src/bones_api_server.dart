@@ -22,8 +22,6 @@ import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
 import 'bones_api_entity_db.dart';
-import 'bones_api_entity_reference.dart';
-import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
@@ -1415,73 +1413,13 @@ class APIServer extends _APIServerBase {
 
         if (!accessRules.isInnocuous) {
           return Json.encode(payload,
-              toEncodableProvider: (o) => _toJsonEncodableAccessRules(
-                  apiRequest,
-                  accessRules,
-                  Json.defaultToEncodableJsonProvider(),
-                  o));
+              toEncodableProvider: (o) => accessRules.toJsonEncodable(
+                  apiRequest, Json.defaultToEncodableJsonProvider(), o));
         }
       }
     }
 
     return Json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
-  }
-
-  static ToEncodableJson? _toJsonEncodableAccessRules(
-      APIRequest apiRequest,
-      EntityAccessRules accessRules,
-      ToEncodableJsonProvider encodableJsonProvider,
-      Object o) {
-    if (o is EntityReferenceList ||
-        o is DateTime ||
-        o is Time ||
-        o is Decimal ||
-        o is DynamicNumber) {
-      return null;
-    }
-
-    var t = o is EntityReference ? o.type : o.runtimeType;
-
-    // No rule for entity type. No `ToEncodableJson` filter: return null
-    if (!accessRules.hasRuleForEntityType(t)) return null;
-
-    var allowType = accessRules.isAllowedEntityType(t);
-
-    // Block not allowed type. Return `ToEncodableJson` filter: empty `Map`
-    if (allowType != null && !allowType) {
-      return (o, j) => <String, Object>{};
-    }
-
-    // No rule for entity field. No `ToEncodableJson` filter: return null
-    if (!accessRules.hasRuleForEntityTypeField(t)) {
-      return null;
-    }
-
-    return (o, j) {
-      if (o == null) return null;
-
-      var enc = encodableJsonProvider(o);
-
-      Object? map;
-      if (enc == null) {
-        map = Json.toJson(o, toEncodable: ReflectionFactory.toJsonEncodable);
-      } else {
-        map = enc(o, j);
-      }
-
-      if (map is! Map) return map;
-
-      var t = o.runtimeType;
-
-      var c = EntityAccessRulesContext(accessRules, o, context: apiRequest);
-
-      map.removeWhere((key, _) {
-        var allowed = accessRules.isAllowedEntityTypeField(t, key, context: c);
-        return allowed != null && !allowed;
-      });
-
-      return map;
-    };
   }
 
   static final RegExp _htmlTag = RegExp(r'<\w+.*?>');

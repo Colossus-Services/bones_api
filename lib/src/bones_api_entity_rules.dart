@@ -2,7 +2,11 @@ import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_base.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_types.dart';
+import 'bones_api_utils_json.dart';
 
 abstract class EntityRules<R extends EntityRules<R>> {
   final bool? _innocuous;
@@ -81,7 +85,7 @@ class EntityAccessRulesContext {
 /// Used by [APIServer] responses.
 class EntityAccessRules extends EntityRules<EntityAccessRules> {
   /// A `const` instance without any resolution rules to apply.
-  static const EntityAccessRules innocuous = _EntityAccessRulesInnocuos();
+  static const EntityAccessRules innocuous = _EntityAccessRulesInnocuous();
 
   final EntityAccessRuleType? ruleType;
   final Type? entityType;
@@ -424,6 +428,60 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
           if (rules != null && rules!.isNotEmpty)
             'rules': rules!.map((e) => e.toJson()).toList(),
         };
+
+  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
+      ToEncodableJsonProvider encodableJsonProvider, Object o) {
+    if (o is EntityReferenceList ||
+        o is DateTime ||
+        o is Time ||
+        o is Decimal ||
+        o is DynamicNumber) {
+      return null;
+    }
+
+    var t = o is EntityReference ? o.type : o.runtimeType;
+
+    // No rule for entity type. No `ToEncodableJson` filter: return null
+    if (!hasRuleForEntityType(t)) return null;
+
+    var allowType = isAllowedEntityType(t);
+
+    // Block not allowed type. Return `ToEncodableJson` filter: empty `Map`
+    if (allowType != null && !allowType) {
+      return (o, j) => <String, Object>{};
+    }
+
+    // No rule for entity field. No `ToEncodableJson` filter: return null
+    if (!hasRuleForEntityTypeField(t)) {
+      return null;
+    }
+
+    return (o, j) {
+      if (o == null) return null;
+
+      var enc = encodableJsonProvider(o);
+
+      Object? map;
+      if (enc == null) {
+        map = Json.toJson(o, toEncodable: ReflectionFactory.toJsonEncodable);
+      } else {
+        map = enc(o, j);
+      }
+
+      if (map is! Map) return map;
+
+      var t = o.runtimeType;
+
+      var c = EntityAccessRulesContext(this, o, context: apiRequest);
+
+      map.removeWhere((key, _) {
+        var allowed = isAllowedEntityTypeField(t, key, context: c);
+        return allowed != null && !allowed;
+      });
+
+      return map;
+    };
+  }
 }
 
 /// An [EntityAccessRules] with cache for some calls.
@@ -527,10 +585,15 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   @override
   Map<String, Object?> toJson() => accessRules.toJson();
+
+  @override
+  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
+          ToEncodableJsonProvider encodableJsonProvider, Object o) =>
+      accessRules.toJsonEncodable(apiRequest, encodableJsonProvider, o);
 }
 
-class _EntityAccessRulesInnocuos implements EntityAccessRules {
-  const _EntityAccessRulesInnocuos();
+class _EntityAccessRulesInnocuous implements EntityAccessRules {
+  const _EntityAccessRulesInnocuous();
 
   @override
   bool? get _innocuous => true;
@@ -621,6 +684,11 @@ class _EntityAccessRulesInnocuos implements EntityAccessRules {
 
   @override
   String toString() => 'EntityAccessRules{innocuous}';
+
+  @override
+  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
+          ToEncodableJsonProvider encodableJsonProvider, Object o) =>
+      null;
 }
 
 /// Rules to resolve entities.
