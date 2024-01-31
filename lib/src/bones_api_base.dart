@@ -66,10 +66,10 @@ abstract class APIRoot with Initializable, Closable {
     BonesAPI.boot();
 
     APIModuleProxyCaller.registerTargetResolver(
-        <T>(target, moduleName, responseAsJson) {
+        <T>(target, moduleName, responsesAsJson) {
       if (target is APIRoot) {
-        return APIModuleProxyDirectCaller(target, moduleName: moduleName ?? '')
-            as ClassProxyListener<T>;
+        return APIModuleProxyDirectCaller<T>(target,
+            moduleName: moduleName ?? '', responsesAsJson: responsesAsJson);
       }
       return null;
     });

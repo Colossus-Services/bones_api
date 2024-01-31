@@ -974,7 +974,7 @@ class APIModuleProxy extends ClassProxy {
 }
 
 typedef APIModuleProxyTargetResolver = ClassProxyListener<T>? Function<T>(
-    Object target, String? moduleName, bool responsesAsJson);
+    Object target, String? moduleName, bool? responsesAsJson);
 
 /// A [APIModuleProxy] caller for a specific module ([moduleName]).
 ///
@@ -997,7 +997,7 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   /// Resolves [target] to a [ClassProxyListener].
   /// See [registerTargetResolver].
   static ClassProxyListener<T> resolveTarget<T>(Object target,
-      {String? moduleName, bool responsesAsJson = true}) {
+      {String? moduleName, bool? responsesAsJson}) {
     for (var resolver in _targetResolvers) {
       var targetResolved = resolver<T>(target, moduleName, responsesAsJson);
       if (targetResolved != null) return targetResolved;
@@ -1018,34 +1018,83 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   final String moduleName;
 
   APIModuleProxyCaller(Object target,
-      {required this.moduleName, bool responsesAsJson = true})
+      {required this.moduleName, bool? responsesAsJson})
       : super(resolveTarget(target,
             moduleName: moduleName, responsesAsJson: responsesAsJson));
 }
 
+abstract class APIModuleProxyCallerListener<T>
+    implements ClassProxyListener<T> {
+  Object? resolveResponse(TypeReflection? returnType, dynamic json) {
+    if (returnType == null) {
+      return json;
+    }
+
+    var typeInfo = returnType.typeInfo;
+    var mainType =
+        typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
+
+    //var debugJsonPretty = Json.encode(json, pretty: true);
+
+    var jsonDecoder = Json.decoder(
+        entityHandlerProvider: EntityHandlerProvider.globalProvider);
+
+    return mainType.fromJson(json, jsonDecoder: jsonDecoder);
+  }
+}
+
 /// An [APIModuleProxy] caller with direct calls to an [api] instance,
 /// for a specific module ([moduleName]).
-class APIModuleProxyDirectCaller implements ClassProxyListener {
+class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
   final APIRoot api;
 
   final String moduleName;
 
+  final bool responsesAsJson;
+
   APIModuleProxyDirectCaller(this.api,
-      {required this.moduleName, this.credential});
+      {required this.moduleName, this.credential, bool? responsesAsJson})
+      : responsesAsJson = responsesAsJson ?? true;
 
   APICredential? credential;
 
   @override
-  FutureOr onCall(instance, String methodName, Map<String, dynamic> parameters,
-      TypeReflection? returnType) async {
+  FutureOr onCall(T instance, String methodName,
+      Map<String, dynamic> parameters, TypeReflection? returnType) async {
     var response = api.call(APIRequest.get('$moduleName/$methodName',
         parameters: parameters, credential: credential));
 
     return response.resolveMapped((response) {
       if (response.isNotOK) return null;
       var payload = response.payload;
+
+      if (responsesAsJson && returnType != null) {
+        var json = responseToJson(payload, apiResponse: response);
+        return resolveResponse(returnType, json);
+      }
+
       return payload;
     });
+  }
+
+  dynamic responseToJson(dynamic payload, {APIResponse<dynamic>? apiResponse}) {
+    if (apiResponse != null) {
+      final apiRequest = apiResponse.apiRequest;
+      if (apiRequest != null) {
+        final routeHandler = apiRequest.routeHandler;
+        if (routeHandler != null) {
+          var accessRules = routeHandler.entityAccessRules;
+
+          if (!accessRules.isInnocuous) {
+            return Json.toJson(payload,
+                toEncodableProvider: (o) => accessRules.toJsonEncodable(
+                    apiRequest, Json.defaultToEncodableJsonProvider(), o));
+          }
+        }
+      }
+    }
+
+    return Json.toJson(payload, toEncodable: ReflectionFactory.toJsonEncodable);
   }
 }
 
@@ -1059,7 +1108,7 @@ typedef APIModuleHttpProxy = APIModuleProxyHttpCaller;
 
 /// An [APIModuleProxy] caller that performs HTTP requests.
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].
-class APIModuleProxyHttpCaller implements ClassProxyListener {
+class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   /// The [httpClient] ot perform the proxy calls.
   final HttpClient httpClient;
 
@@ -1071,8 +1120,9 @@ class APIModuleProxyHttpCaller implements ClassProxyListener {
   final bool responsesAsJson;
 
   APIModuleProxyHttpCaller(this.httpClient,
-      {String? moduleRoute, this.responsesAsJson = true})
-      : modulePath = _normalizeModulePath(moduleRoute) {
+      {String? moduleRoute, bool? responsesAsJson})
+      : modulePath = _normalizeModulePath(moduleRoute),
+        responsesAsJson = responsesAsJson ?? true {
     BonesAPI.boot();
   }
 
@@ -1179,17 +1229,6 @@ class APIModuleProxyHttpCaller implements ClassProxyListener {
   Future onCall(dynamic instance, String methodName,
       Map<String, Object?> parameters, TypeReflection? returnType) async {
     var json = await doRequest(methodName, parameters);
-    if (returnType == null || json == null) return json;
-
-    var typeInfo = returnType.typeInfo;
-    var mainType =
-        typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
-
-    //var debugJsonPretty = Json.encode(json, pretty: true);
-
-    var jsonDecoder = Json.decoder(
-        entityHandlerProvider: EntityHandlerProvider.globalProvider);
-
-    return mainType.fromJson(json, jsonDecoder: jsonDecoder);
+    return resolveResponse(returnType, json);
   }
 }
