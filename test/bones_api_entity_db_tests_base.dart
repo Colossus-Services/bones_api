@@ -1624,6 +1624,30 @@ Future<bool> runAdapterTests(
       }
 
       {
+        var user1 = await userAPIRepository.selectFirstByQuery(' email == ? ',
+            parameters: {'email': 'joe@$testDomain'});
+        expect(user1, isNotNull);
+        expect(user1?.email, equals('joe@$testDomain'));
+        expect(user1?.roles.map((e) => e.id), unorderedEquals([1, 3]));
+
+        var userId = user1!.id;
+
+        var user2 = await userAPIRepository.selectByID(userId);
+        expect(user2, equals(user1));
+
+        expect(user2!.roles.length, equals(2));
+        user2.roles.removeWhere((e) => e.id == 3);
+        expect(user2.roles.length, equals(1));
+
+        var storedId = await userAPIRepository.store(user2);
+        expect(storedId, equals(userId));
+
+        var user3 = await userAPIRepository.selectByID(userId);
+        expect(user3, equals(user1));
+        expect(user3!.roles.map((e) => e.id), unorderedEquals([1]));
+      }
+
+      {
         var del1 = await userAPIRepository.delete(
             Condition.parse(' email == ? '),
             parameters: {'email': 'joex@$testDomain'});

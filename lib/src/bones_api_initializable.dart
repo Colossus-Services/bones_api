@@ -26,23 +26,37 @@ class InitializationStatus {
 
   /// Returns `true` if [initializable] is already initialized.
   bool get initialized => _initialized;
+  DateTime? _initializedTime;
 
   void _setInitialized() {
     _initialized = true;
+    _initializedTime = DateTime.now();
     _initializing = false;
     _finalizing = false;
   }
 
   bool _initializing = false;
+  DateTime? _initializingTime;
 
   void _setInitializing() {
     _initializing = true;
+    _initializingTime = DateTime.now();
     _id = ++_idCount;
   }
 
   /// Returns `true` if [initializable] is initializing.
-
   bool get initializing => _initializing;
+
+  DateTime? get initializingTime => _initializingTime;
+
+  DateTime? get initializedTime => _initializedTime;
+
+  Duration? get initializationTime {
+    var init = _initializingTime;
+    var end = _initializedTime;
+    if (init == null || end == null) return null;
+    return end.difference(init);
+  }
 
   bool _finalizing = false;
 
@@ -824,9 +838,6 @@ mixin Initializable {
         .where((e) => e.initializationStatus.initializing)
         .toList();
 
-    _log.info(
-        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})');
-
     if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
       _log.warning(
           '[$initializationStatus] Still initializing dependencies: ${depsInitializing.length}');
@@ -838,6 +849,11 @@ mixin Initializable {
 
     _status._setInitialized();
     _initializeAsync = null;
+
+    var initializationTime = _status.initializationTime;
+
+    _log.info(
+        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (${initializationTime != null ? '${initializationTime.toStringUnit()} ; ' : ''}result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})');
 
     return result;
   }
