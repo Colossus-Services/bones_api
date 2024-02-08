@@ -2035,7 +2035,8 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
+    'toString'
   ];
 
   @override
@@ -2143,6 +2144,20 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             __TR.tMapStringDynamic,
             false,
             (o) => o!.toJson,
+            obj,
+            false,
+            null,
+            null,
+            null,
+            const [override]);
+      case 'tostring':
+        return MethodReflection<Role, String>(
+            this,
+            Role,
+            'toString',
+            __TR.tString,
+            false,
+            (o) => o!.toString,
             obj,
             false,
             null,
