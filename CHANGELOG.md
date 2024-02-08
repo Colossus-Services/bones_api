@@ -1,3 +1,11 @@
+## 1.5.27
+
+- `SQLGenerator`:
+  - Added `generateAddUniqueConstraintAlterTableSQL`.
+- `DBSQLAdapter`:
+  - `_checkDBTablesImpl`: Added check for `missingUniqueConstraintsSQLs` and `missingEnumConstraintsSQLs`.
+- New `TableUniqueConstraint`.
+
 ## 1.5.26
 
 - `DBSQLMemoryAdapter`:

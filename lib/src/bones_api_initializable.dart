@@ -536,7 +536,7 @@ mixin Initializable {
 
         return initCircular.timeout(Duration(milliseconds: 1000),
             onTimeout: () {
-          _log.warning("Circular initialization timeout: $this");
+          _log.warning("Circular initialization timeout (1s): $this");
           return _resultOk();
         });
       }

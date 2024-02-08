@@ -1480,6 +1480,25 @@ abstract mixin class SQLGenerator {
     return alterTableSQL;
   }
 
+  AlterTableSQL generateAddUniqueConstraintAlterTableSQL(
+      String table, String fieldName, TypeInfo fieldType,
+      {List<EntityField>? entityFieldAnnotations}) {
+    var q = dialect.elementQuote;
+    var columnName = normalizeColumnName(fieldName);
+
+    var constraintName = '${table}_${fieldName}_unique';
+
+    var comment = '${fieldType.toString(withT: false)} $fieldName UNIQUE';
+
+    var columnEntry = SQLEntry(
+        'ADD', ' ADD CONSTRAINT $q$constraintName$q UNIQUE ($q$columnName$q)',
+        comment: comment);
+
+    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry]);
+
+    return alterTableSQL;
+  }
+
   AlterTableSQL generateAddEnumConstraintAlterTableSQL(
       String table, String fieldName, TypeInfo fieldType,
       {List<EntityField>? entityFieldAnnotations}) {

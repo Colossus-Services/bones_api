@@ -476,6 +476,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
           .toList();
 
+      var missingUniqueConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
+
+      var missingEnumConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingEnumConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingEnumConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
+
       var missingEnumValuesSQLs = repositoriesChecksErrors
           .where((e) => e.missingEnumValues?.isNotEmpty ?? false)
           .expand((e) => e.generateMissingEnumValuesSQLs(this))
@@ -485,6 +497,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var alterTablesSQLs = [
         ...missingColumnsSQLs,
         ...missingReferenceColumnsSQLs,
+        ...missingUniqueConstraintsSQLs,
+        ...missingEnumConstraintsSQLs,
         ...missingEnumValuesSQLs,
       ];
 
@@ -516,7 +530,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var schemeTableName = scheme.name;
 
-    var entityHandler = repository.entityHandler;
+    final entityHandler = repository.entityHandler;
     var entityFields = entityHandler.fieldsNames();
 
     var hiddenFields = entityFields
@@ -586,18 +600,57 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             (f) => fieldsInScheme.contains(f) || referenceFields.containsKey(f))
         .toList();
 
+    var missingUniqueConstraints = <String>{};
+
+    var missingEnumConstraints = <String>{};
     var missingEnumValues = <String, List<String>>{};
 
     if (capability.constraintSupport) {
+      final reflectionFactory = ReflectionFactory();
+
+      // UNIQUE CONSTRAINTS //
+
+      var uniqueConstraints =
+          scheme.constraints.whereType<TableUniqueConstraint>().toList();
+
+      var uniqueConstraintsFields = uniqueConstraints.toFields();
+
+      var entityUniqueFields = entityHandler
+              .getAllFieldsEntityAnnotations(null)
+              ?.entries
+              .where((e) =>
+                  e.value.whereType<EntityField>().any((e) => e.isUnique))
+              .map((e) => e.key)
+              .toList() ??
+          [];
+
+      missingUniqueConstraints =
+          entityUniqueFields.whereNotIn(uniqueConstraintsFields).toSet();
+
+      // ENUM CONSTRAINTS //
+
       var enumConstraints =
           scheme.constraints.whereType<TableEnumConstraint>().toList();
 
+      var enumConstraintsFields = enumConstraints.toFields();
+
+      var entityEnumFields = entityHandler
+          .getFieldsTypes()
+          .entries
+          .where((e) =>
+              reflectionFactory.getRegisterEnumReflection(e.value.type) != null)
+          .map((e) => e.key)
+          .toList();
+
+      missingEnumConstraints =
+          entityEnumFields.whereNotIn(enumConstraintsFields).toSet();
+
       for (var e in enumConstraints) {
-        var fieldType = repository.entityHandler.getFieldType(null, e.field);
+        var fieldType = entityHandler.getFieldType(null, e.field);
         if (fieldType == null) continue;
 
         var enumReflection =
-            ReflectionFactory().getRegisterEnumReflection(fieldType.type);
+            reflectionFactory.getRegisterEnumReflection(fieldType.type);
         if (enumReflection == null) continue;
 
         var valuesNames = enumReflection.valuesNames;
@@ -612,11 +665,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
+        missingUniqueConstraints.isNotEmpty ||
+        missingEnumConstraints.isNotEmpty ||
         missingEnumValues.isNotEmpty) {
       _log.severe(
           "ERROR Checking table `$schemeTableName`> entityType: `$repoType` "
           "${missingColumns.isNotEmpty ? '; missingColumns: $missingColumns ' : ''}"
           "${missingReferenceColumns.isNotEmpty ? '; missingReferenceColumns: $missingReferenceColumns' : ''}"
+          "${missingUniqueConstraints.isNotEmpty ? '; missingUniqueConstraints: $missingUniqueConstraints ' : ''}"
+          "${missingEnumConstraints.isNotEmpty ? '; missingEnumConstraints: $missingEnumConstraints ' : ''}"
           "${missingEnumValues.isNotEmpty ? '; missingEnumValues: $missingEnumValues ' : ''}");
 
       return _DBTableCheck.missing(
@@ -626,6 +683,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingReferenceColumns
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingUniqueConstraints
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingEnumConstraints
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingEnumValues.entries
@@ -2285,10 +2348,19 @@ class _DBTableCheck {
 
   List<_DBTableColumn>? missingReferenceColumns;
 
+  List<_DBTableColumn>? missingUniqueConstraints;
+
+  List<_DBTableColumn>? missingEnumConstraints;
   Map<_DBTableColumn, List<String>>? missingEnumValues;
 
-  _DBTableCheck.missing(this.repository, this.scheme, this.missingColumns,
-      this.missingReferenceColumns, this.missingEnumValues);
+  _DBTableCheck.missing(
+      this.repository,
+      this.scheme,
+      this.missingColumns,
+      this.missingReferenceColumns,
+      this.missingUniqueConstraints,
+      this.missingEnumConstraints,
+      this.missingEnumValues);
 
   String? error;
 
@@ -2310,9 +2382,19 @@ class _DBTableCheck {
           SQLGenerator sqlGenerator) =>
       _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
 
+  List<AlterTableSQL> generateMissingUniqueConstraintsSQLs(
+          SQLGenerator sqlGenerator) =>
+      _generateMissingUniqueConstraintsSQLs(
+          missingUniqueConstraints, sqlGenerator);
+
+  List<AlterTableSQL> generateMissingEnumConstraintsSQLs(
+          SQLGenerator sqlGenerator) =>
+      _generateMissingEnumConstraintsSQLs(missingEnumConstraints, sqlGenerator);
+
   List<AlterTableSQL> generateMissingEnumValuesSQLs(
           SQLGenerator sqlGenerator) =>
-      _generateMissingEnumValuesSQLs(missingEnumValues, sqlGenerator);
+      _generateMissingEnumConstraintsSQLs(
+          missingEnumValues?.keys, sqlGenerator);
 
   List<AlterTableSQL> _generateMissingSQLs(
       List<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
@@ -2330,15 +2412,30 @@ class _DBTableCheck {
     return sqls;
   }
 
-  List<AlterTableSQL> _generateMissingEnumValuesSQLs(
-      Map<_DBTableColumn, List<String>>? missing, SQLGenerator sqlGenerator) {
+  List<AlterTableSQL> _generateMissingUniqueConstraintsSQLs(
+      Iterable<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
     var scheme = this.scheme;
     if (missing == null || missing.isEmpty || scheme == null) {
       return [];
     }
 
-    var sqls = missing.entries.map((e) {
-      var f = e.key;
+    var sqls = missing.map((f) {
+      return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
+          scheme.name, f.name, f.type,
+          entityFieldAnnotations: f.annotations);
+    }).toList();
+
+    return sqls;
+  }
+
+  List<AlterTableSQL> _generateMissingEnumConstraintsSQLs(
+      Iterable<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
+    var scheme = this.scheme;
+    if (missing == null || missing.isEmpty || scheme == null) {
+      return [];
+    }
+
+    var sqls = missing.map((f) {
       return sqlGenerator.generateAddEnumConstraintAlterTableSQL(
           scheme.name, f.name, f.type,
           entityFieldAnnotations: f.annotations);

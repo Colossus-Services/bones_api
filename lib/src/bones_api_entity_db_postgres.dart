@@ -514,6 +514,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           .replaceAll('"', '')
           .trim();
       return field == null ? null : TablePrimaryKeyConstraint(field);
+    } else if (definition.startsWith("UNIQUE")) {
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(definition)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
+      return field == null ? null : TableUniqueConstraint(field);
     } else if (definition.startsWith("CHECK")) {
       var idx1 = definition.indexOf('(');
       var idx2 = definition.lastIndexOf(')');
