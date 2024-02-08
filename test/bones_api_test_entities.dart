@@ -1106,4 +1106,9 @@ class Role extends Entity {
         'type': type.enumName,
         'value': value?.toStringStandard(),
       };
+
+  @override
+  String toString() {
+    return 'Role{id: $id, type: $type, enabled: $enabled, value: $value}';
+  }
 }

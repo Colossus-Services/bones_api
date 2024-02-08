@@ -27,9 +27,11 @@ class DBSQLMemoryAdapterContext
   final DBSQLMemoryAdapter sqlAdapter;
 
   final Map<String, int> tablesVersions;
+  final Map<String, Map<String, int>> tablesIndexesVersions;
 
   DBSQLMemoryAdapterContext(this.id, this.sqlAdapter)
-      : tablesVersions = sqlAdapter.tablesVersions;
+      : tablesVersions = sqlAdapter.tablesVersions,
+        tablesIndexesVersions = sqlAdapter.tablesIndexesVersions;
 
   bool _closed = false;
 
@@ -224,7 +226,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   Map<String, int> get tablesVersions =>
       _tablesVersions ??= UnmodifiableMapView(
-          _tables.map((key, value) => MapEntry(key, value.version)));
+          _tables.map((table, map) => MapEntry(table, map.version)));
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
@@ -427,9 +429,68 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var id = nextID(table);
     map[id] = entry;
 
-    _onTablesModification();
+    for (var e in entry.entries) {
+      var field = e.key;
+      var value = e.value;
+      _indexAddEntry(table, id, field, value);
+    }
 
+    _onTablesModification();
     return id;
+  }
+
+  final _tablesIndexes =
+      <String, Map<String, MapHistory<Object, Set<Object>>>>{};
+
+  Map<String, Map<String, int>>? _tablesIndexesVersions;
+
+  Map<String, Map<String, int>> get tablesIndexesVersions =>
+      _tablesIndexesVersions ??= UnmodifiableMapView(_tablesIndexes.map(
+          (table, fieldIndex) => MapEntry(
+              table,
+              fieldIndex
+                  .map((field, index) => MapEntry(field, index.version)))));
+
+  Map<String, MapHistory<Object, Set<Object>>> _getTableIndexes(String table) {
+    var tableIndexes =
+        _tablesIndexes[table] ??= <String, MapHistory<Object, Set<Object>>>{};
+
+    return tableIndexes;
+  }
+
+  MapHistory<Object, Set<Object>> _getTableFieldIndex(
+      String table, String field) {
+    var tableIndexes = _getTableIndexes(table);
+
+    var fieldIndex = tableIndexes[field] ??= MapHistory<Object, Set<Object>>();
+    return fieldIndex;
+  }
+
+  void _indexAddEntry(String table, Object id, String field, Object value) {
+    var fieldIndex = _getTableFieldIndex(table, field);
+
+    var idsWithValue = fieldIndex[value] ??= {};
+    idsWithValue.add(id);
+  }
+
+  bool _indexDeleteEntry(String table, Object id, String field, Object value,
+      {Map<String, MapHistory<Object, Set<Object>>>? tableIndexes}) {
+    tableIndexes ??= _tablesIndexes[table];
+    if (tableIndexes == null) return false;
+
+    var fieldIndex = tableIndexes[field];
+    if (fieldIndex == null) return false;
+
+    var idsWithValue = fieldIndex[value];
+    if (idsWithValue == null) return false;
+
+    var rm = idsWithValue.remove(id);
+
+    if (idsWithValue.isEmpty) {
+      fieldIndex.remove(value);
+    }
+
+    return rm;
   }
 
   @override
@@ -724,7 +785,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
       _checkNotReferencedEntities(entries, table, sql);
 
-      return _removeEntries(entries, map);
+      return _removeEntries(table, entries, map);
     }
 
     var entries = map.entries
@@ -742,7 +803,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     _checkNotReferencedEntities(entries, table, sql);
 
-    return _removeEntries(entries, map);
+    return _removeEntries(table, entries, map);
   }
 
   void _checkNotReferencedEntities(
@@ -766,14 +827,32 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   List<Map<String, dynamic>> _removeEntries(
+      String table,
       List<MapEntry<Object, Map<String, dynamic>>> entries,
-      Map<Object, Map<String, dynamic>> map) {
+      Map<Object, Map<String, dynamic>> tableMap) {
     if (entries.isEmpty) return <Map<String, dynamic>>[];
 
     var del = entries.map((e) => e.value).toList();
 
     for (var e in entries) {
-      map.remove(e.key);
+      var id = e.key;
+      tableMap.remove(id);
+    }
+
+    var tableIndexes = _tablesIndexes[table];
+
+    if (tableIndexes != null) {
+      for (var e in entries) {
+        var id = e.key;
+        var values = e.value;
+
+        for (var e2 in values.entries) {
+          var field = e2.key;
+          var fieldValue = e2.value;
+
+          _indexDeleteEntry(table, id, field, fieldValue);
+        }
+      }
     }
 
     _onTablesModification();
@@ -858,6 +937,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
           "Async response not supported when calling `getTableForType`");
     }
 
+    //print('!!! ** _resolveEntityFieldRelationshipTable> $sourceTable -> $targetTable');
+
     var relationshipTable = tableScheme.getTableRelationshipReference(
         sourceTable: sourceTable,
         sourceField: fieldKey,
@@ -868,18 +949,30 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
           "Can't find relationship table for `$sourceTable`.`$fieldKey` -> `$targetTable`. Relationships tables: ${relationshipsTables.map((e) => e.relationshipTable).toList()}");
     }
 
-    var relMap = _getTableMap(relationshipTable.relationshipTable, false,
-        relationship: true);
+    final relTable = relationshipTable.relationshipTable;
+
+    var relMap = _getTableMap(relTable, false, relationship: true);
     if (relMap == null) {
       return null;
     }
 
-    var entries = relMap.values
-        .where((e) => e[relationshipTable.sourceRelationshipField] == id);
+    final sourceRelationshipField = relationshipTable.sourceRelationshipField;
+    final targetRelationshipField = relationshipTable.targetRelationshipField;
 
-    var targetIds = entries
-        .map((e) => e[relationshipTable.targetRelationshipField])
-        .toList();
+    var sourceFieldIndex =
+        _getTableFieldIndex(relTable, sourceRelationshipField);
+
+    var relWithID = sourceFieldIndex[id];
+    if (relWithID == null) {
+      return [];
+    }
+
+    var entries = relWithID.map((relId) => relMap[relId]).whereNotNull();
+
+    var targetIds = entries.map((e) => e[targetRelationshipField]).toList();
+    if (targetIds.isEmpty) {
+      return [];
+    }
 
     var targetObjs =
         targetIds.map((tId) => _getByID(targetTable, tId) ?? tId).toList();
@@ -1182,7 +1275,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       StackTrace? stackTrace) {
     if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
-    _rollbackTables(connection.tablesVersions);
+
+    _rollbackTables(
+        connection.tablesVersions, connection.tablesIndexesVersions);
+
     // ignore: discarded_futures
     disposePoolElement(connection);
     return true;
@@ -1212,44 +1308,91 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     }
 
     if (_consolidateContextQueue.isEmpty) {
-      _consolidateTables(context.tablesVersions);
+      _consolidateTables(context.tablesVersions, context.tablesIndexesVersions);
     } else {
       var list = [..._consolidateContextQueue, context];
       list.sort();
 
       for (var c in list) {
-        _consolidateTables(c.tablesVersions);
+        _consolidateTables(c.tablesVersions, c.tablesIndexesVersions);
       }
     }
 
     return true;
   }
 
-  void _consolidateTables(Map<String, int> tablesVersions) {
+  void _consolidateTables(
+    Map<String, int> tablesVersions,
+    Map<String, Map<String, int>> tablesIndexesVersions,
+  ) {
     for (var e in tablesVersions.entries) {
       var table = e.key;
       var version = e.value;
       _consolidateTable(table, version);
+    }
+
+    for (var e in tablesIndexesVersions.entries) {
+      var table = e.key;
+      var indexesVersions = e.value;
+      _consolidateTableIndexes(table, indexesVersions);
     }
   }
 
   void _consolidateTable(String table, int targetVersion) {
     var tableMap = _tables[table];
     tableMap?.consolidate(targetVersion);
+
     _onTablesModification();
   }
 
-  void _rollbackTables(Map<String, int> tablesVersions) {
+  void _consolidateTableIndexes(
+      String table, Map<String, int> indexesTargetVersion) {
+    var tableIndexes = _tablesIndexes[table];
+
+    for (var e in indexesTargetVersion.entries) {
+      var field = e.key;
+      var targetVersion = e.value;
+      var index = tableIndexes?[field];
+      index?.consolidate(targetVersion);
+    }
+
+    _onTablesModification();
+  }
+
+  void _rollbackTables(
+    Map<String, int> tablesVersions,
+    Map<String, Map<String, int>> tablesIndexesVersions,
+  ) {
     for (var e in tablesVersions.entries) {
       var table = e.key;
       var version = e.value;
       _rollbackTable(table, version);
+    }
+
+    for (var e in tablesIndexesVersions.entries) {
+      var table = e.key;
+      var indexesVersions = e.value;
+      _rollbackTableIndexes(table, indexesVersions);
     }
   }
 
   void _rollbackTable(String table, int targetVersion) {
     var tableMap = _tables[table];
     tableMap?.rollback(targetVersion);
+    _onTablesModification();
+  }
+
+  void _rollbackTableIndexes(
+      String table, Map<String, int> indexesTargetVersion) {
+    var tableIndexes = _tablesIndexes[table];
+
+    for (var e in indexesTargetVersion.entries) {
+      var field = e.key;
+      var targetVersion = e.value;
+      var index = tableIndexes?[field];
+      index?.rollback(targetVersion);
+    }
+
     _onTablesModification();
   }
 

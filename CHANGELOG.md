@@ -1,3 +1,11 @@
+## 1.5.26
+
+- `DBSQLMemoryAdapter`:
+  - Added index for relationship tables.
+- `InitializationStatus`:
+  - Added fields `_initializingTime` and `_initializedTime`.
+  - Logging initialization time.
+
 ## 1.5.25
 
 - Fix `DBPostgreSQLAdapter._parseConstraint`.
