@@ -480,7 +480,13 @@ abstract class TableConstraint implements Comparable<TableConstraint> {
 }
 
 extension IterableTableConstraintExtension on Iterable<TableConstraint> {
-  List<String> toFields() => map((e) => e.field).toList();
+  List<String> toFields({Map<String, String?>? fieldMap}) {
+    var fields = map((e) => e.field);
+    if (fieldMap != null) {
+      fields = fields.map((f) => fieldMap[f] ?? f);
+    }
+    return fields.toList();
+  }
 }
 
 /// Table primary key field constraint.

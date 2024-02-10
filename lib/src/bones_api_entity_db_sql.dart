@@ -613,7 +613,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var uniqueConstraints =
           scheme.constraints.whereType<TableUniqueConstraint>().toList();
 
-      var uniqueConstraintsFields = uniqueConstraints.toFields();
+      var uniqueConstraintsFields =
+          uniqueConstraints.toFields(fieldMap: schemeToRepoMap);
 
       var entityUniqueFields = entityHandler
               .getAllFieldsEntityAnnotations(null)
@@ -632,7 +633,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var enumConstraints =
           scheme.constraints.whereType<TableEnumConstraint>().toList();
 
-      var enumConstraintsFields = enumConstraints.toFields();
+      var enumConstraintsFields =
+          enumConstraints.toFields(fieldMap: schemeToRepoMap);
 
       var entityEnumFields = entityHandler
           .getFieldsTypes()
