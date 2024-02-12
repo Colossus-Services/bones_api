@@ -229,7 +229,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+      Object? previousError) {
     if (error is DBPostgreSQLAdapterException) {
       return error;
     } else if (error is PostgreSQLException) {
@@ -239,19 +240,24 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               fieldName: error.columnName,
               tableName: error.tableName,
               parentError: error,
+              previousError: previousError,
               operation: operation);
         } else if (error.code == '23503') {
           return DBPostgreSQLAdapterException("delete.constraint",
               '${error.message} ; Detail: ${error.detail} ; Table: ${error.tableName} ; Constraint: ${error.constraintName}',
               parentError: error,
               parentStackTrace: stackTrace,
+              previousError: previousError,
               operation: operation);
         }
       }
     }
 
     return DBPostgreSQLAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace, operation: operation);
+        parentError: error,
+        parentStackTrace: stackTrace,
+        previousError: previousError,
+        operation: operation);
   }
 
   @override
@@ -1052,7 +1058,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         e,
         s,
         errorResolver: resolveError,
-        debugInfo: () => transaction.toString(),
+        debugInfo: () => transaction.toString(withExecutedOperations: false),
       ),
     );
 
@@ -1186,5 +1192,8 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBPostgreSQLAdapterException';
 
   DBPostgreSQLAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }
