@@ -5,6 +5,15 @@
 - `DBSQLAdapter`:
   - `_checkDBTablesImpl`: Added check for `missingUniqueConstraintsSQLs` and `missingEnumConstraintsSQLs`.
 - New `TableUniqueConstraint`.
+- `EntityHandler`:
+  - Added `getFieldsEnumTypes`, `getFieldsEntityTypes` and `getAllFieldsWithEntityAnnotation`.
+- New `DBException` and `TransactionErrorResolver`.
+- `DBAdapterException`:
+  - Added field `previousError`.
+- `DBPostgreSQLAdapter`:
+  - `resolveError`: pass `previousError`.
+- `DBSQLAdapter`:
+  - `_checkDBTablesImpl`: Added `missingReferenceConstraintsSQLs`.
 
 ## 1.5.26
 
