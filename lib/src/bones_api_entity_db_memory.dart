@@ -157,13 +157,17 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+      Object? previousError) {
     if (error is DBSQLMemoryAdapterException) {
       return error;
     }
 
     return DBSQLMemoryAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace, operation: operation);
+        parentError: error,
+        parentStackTrace: stackTrace,
+        previousError: previousError,
+        operation: operation);
   }
 
   @override
@@ -1414,5 +1418,8 @@ class DBSQLMemoryAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBSQLMemoryAdapterException';
 
   DBSQLMemoryAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }

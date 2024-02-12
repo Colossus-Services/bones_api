@@ -103,5 +103,8 @@ class DBObjectAdapterException extends DBAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectAdapterException';
 
   DBObjectAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }

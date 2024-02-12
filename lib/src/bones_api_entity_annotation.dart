@@ -231,6 +231,10 @@ class EntityFieldInvalid extends Error {
   /// The [parentError] [StackTrace].
   final StackTrace? parentStackTrace;
 
+  /// The previous error in the same [Transaction].
+  /// - Note: Not always detected or supported.
+  final Object? previousError;
+
   /// The operation that caused the [Exception].
   final Object? operation;
 
@@ -241,6 +245,7 @@ class EntityFieldInvalid extends Error {
       this.subEntityErrors,
       this.parentError,
       this.parentStackTrace,
+      this.previousError,
       this.operation});
 
   EntityFieldInvalid copyWith(
