@@ -3,7 +3,7 @@
 - `SQLGenerator`:
   - Added `generateAddUniqueConstraintAlterTableSQL`.
 - `DBSQLAdapter`:
-  - `_checkDBTablesImpl`: Added check for `missingUniqueConstraintsSQLs` and `missingEnumConstraintsSQLs`.
+  - `_checkDBTablesImpl`: Added check for `missingReferenceConstraintsSQLs`, `missingUniqueConstraintsSQLs` and `missingEnumConstraintsSQLs`.
 - New `TableUniqueConstraint`.
 - `EntityHandler`:
   - Added `getFieldsEnumTypes`, `getFieldsEntityTypes` and `getAllFieldsWithEntityAnnotation`.
@@ -12,8 +12,8 @@
   - Added field `previousError`.
 - `DBPostgreSQLAdapter`:
   - `resolveError`: pass `previousError`.
-- `DBSQLAdapter`:
-  - `_checkDBTablesImpl`: Added `missingReferenceConstraintsSQLs`.
+- New `RecursiveToString`.
+- Add `RecursiveToString` interface to `EntityFieldInvalid` and `TransactionOperation`.
 
 ## 1.5.26
 
