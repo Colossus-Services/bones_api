@@ -184,39 +184,53 @@ class SQL implements SQLWrapper {
 
   @override
   String toString() {
-    var s =
-        'SQL<< $sql >>( ${Json.encode(parametersByPlaceholder, toEncodable: _toEncodable)} )';
+    var s = StringBuffer();
+
+    s.write('SQL<< ');
+    s.write(sql);
+    s.write(' >>( ');
+    s.write(Json.encode(parametersByPlaceholder, toEncodable: _toEncodable));
+    s.write(' )');
+
     if (condition != null) {
-      s += ' ; Condition<< $condition >>';
+      s.write(' ; Condition<< ');
+      s.write(condition);
+      s.write(' >>');
     }
     if (entityName != null) {
-      s += ' ; entityName: $entityName';
+      s.write(' ; entityName: ');
+      s.write(entityName);
     }
     if (mainTable != null) {
-      s += ' ; mainTable: $mainTable';
+      s.write(' ; mainTable: ');
+      s.write(mainTable);
     }
     if (relationship != null) {
-      s += ' ($relationship)';
+      s.write(' (');
+      s.write(relationship);
+      s.write(')');
     }
     if (returnColumns != null && returnColumns!.isNotEmpty) {
-      s += ' ; returnColumns: $returnColumns';
+      s.write(' ; returnColumns: ');
+      s.write(returnColumns);
     }
 
     if (returnColumnsAliases != null && returnColumnsAliases!.isNotEmpty) {
-      s += ' ; returnColumnsAliases: $returnColumnsAliases';
+      s.write(' ; returnColumnsAliases: ');
+      s.write(returnColumnsAliases);
     }
 
     if (preSQL != null) {
-      s += '\n - preSQL: ';
-      s += preSQL.toString();
+      s.write('\n - preSQL: ');
+      s.write(preSQL);
     }
 
     if (posSQL != null) {
-      s += '\n - posSQL: ';
-      s += posSQL.toString();
+      s.write('\n - posSQL: ');
+      s.write(posSQL);
     }
 
-    return s;
+    return s.toString();
   }
 
   Object? _toEncodable(dynamic o) {
