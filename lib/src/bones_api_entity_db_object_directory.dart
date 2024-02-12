@@ -694,10 +694,12 @@ class DBObjectDirectoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+          Object? previousError) =>
       DBObjectDirectoryAdapterException('error', '$error',
           parentError: error,
           parentStackTrace: stackTrace,
+          previousError: previousError,
           operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -760,5 +762,8 @@ class DBObjectDirectoryAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
 
   DBObjectDirectoryAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }

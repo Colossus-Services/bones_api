@@ -1224,9 +1224,55 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
   }
 
+  Map<String, TypeInfo>? _fieldsEnumTypes;
+
+  Map<String, TypeInfo> getFieldsEnumTypes([O? o]) {
+    var enumFields = _fieldsEnumTypes;
+    if (enumFields != null) return UnmodifiableMapView(enumFields);
+
+    final reflectionFactory = ReflectionFactory();
+
+    enumFields = getFieldsTypes(o)
+        .entries
+        .where((e) =>
+            reflectionFactory.getRegisterEnumReflection(e.value.type) != null)
+        .toMapFromEntries();
+
+    return UnmodifiableMapView(_fieldsEnumTypes = enumFields);
+  }
+
+  Map<String, TypeInfo>? _fieldsEntityTypes;
+
+  Map<String, TypeInfo> getFieldsEntityTypes([O? o]) {
+    var entityFields = _fieldsEntityTypes;
+    if (entityFields != null) return UnmodifiableMapView(entityFields);
+
+    var enumFields = getFieldsEnumTypes(o);
+
+    entityFields = getFieldsTypes()
+        .entries
+        .map((e) {
+          var field = e.key;
+          var typeInfo = e.value;
+
+          if (enumFields.containsKey(field)) return null;
+
+          if (typeInfo.isEntityReferenceListType) return null;
+
+          var entityType = typeInfo.entityType;
+          if (entityType == null) return null;
+
+          return MapEntry(field, typeInfo);
+        })
+        .whereNotNull()
+        .toMapFromEntries();
+
+    return UnmodifiableMapView(_fieldsEntityTypes = entityFields);
+  }
+
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
 
-  Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations(O? o) {
+  Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations([O? o]) {
     var fieldsNames = this.fieldsNames(o);
 
     var entries = fieldsNames.map((f) {
@@ -1237,6 +1283,29 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var map = Map<String, List<EntityAnnotation>>.fromEntries(entries);
 
     return map.isEmpty ? null : map;
+  }
+
+  Map<String, List<T>>
+      getAllFieldsWithEntityAnnotation<T extends EntityAnnotation>(
+          [O? o, bool Function(T e)? filter]) {
+    var annotations = getAllFieldsEntityAnnotations(o);
+    if (annotations == null) return {};
+
+    var entries = annotations.entries;
+
+    Iterable<MapEntry<String, List<T>>> entriesTyped;
+
+    if (filter != null) {
+      entriesTyped = entries.map((e) =>
+          MapEntry(e.key, e.value.whereType<T>().where(filter).toList()));
+    } else {
+      entriesTyped =
+          entries.map((e) => MapEntry(e.key, e.value.whereType<T>().toList()));
+    }
+
+    entriesTyped = entriesTyped.where((e) => e.value.isNotEmpty);
+
+    return entriesTyped.toMapFromEntries();
   }
 
   EntityFieldInvalid? validateFieldValue<V>(O o, String key,
@@ -4289,7 +4358,28 @@ class TransactionAbortedError extends Error {
 
 typedef ErrorFilter = bool Function(Object, StackTrace);
 
+typedef TransactionErrorResolver = Object? Function(Object error,
+    StackTrace stackTrace, Object? operation, Object? previousError);
+
 typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
+
+/// Base interface for DB [Exception]s.
+abstract class DBException implements Exception {
+  /// DB [Exception] message.
+  String get message;
+
+  /// DB [Exception] operation.
+  Object? get operation;
+}
+
+extension DBExceptionExtension on DBException {
+  /// [message] and [operation].
+  String get messageAndOperation {
+    var m = message;
+    var op = operation;
+    return op == null ? m : '$m->$op';
+  }
+}
 
 /// An [EntityRepository] transaction.
 class Transaction extends JsonEntityCacheSimple implements EntityProvider {
@@ -5046,8 +5136,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
   FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
-      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      {TransactionErrorResolver? errorResolver,
       Object? operation,
       String? Function()? debugInfo}) {
     if (isFinished) {
@@ -5073,8 +5162,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<R> _executeSafe<R, C>(
       TransactionExecution<R, C> exec,
       Object? operation,
-      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      TransactionErrorResolver? errorResolver,
       String? Function()? debugInfo) {
     try {
       var ret = exec(context! as C);
@@ -5091,8 +5179,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   FutureOr<R> notifyExecutionError<R>(Object error, StackTrace stackTrace,
-      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      {TransactionErrorResolver? errorResolver,
       Object? operation,
       String? Function()? debugInfo}) {
     return _onExecutionError<R>(
@@ -5103,52 +5190,62 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Object? get error => _error;
 
+  List<Object>? _extraErrors;
+
+  List<Object>? get extraErrors => _extraErrors;
+
   FutureOr<R> _onExecutionError<R>(
       Object error,
       StackTrace stackTrace,
       Object? operation,
-      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      TransactionErrorResolver? errorResolver,
       String? Function()? debugInfo,
       {bool rethrowError = true}) {
-    var info = debugInfo != null ? debugInfo() : null;
+    final previousError = _error;
 
-    if (errorResolver != null) {
-      error = errorResolver(
-            error,
-            stackTrace,
-            debugInfo != null ? [operation, debugInfo] : operation,
-          ) ??
-          error;
-    }
+    final errorResolved = errorResolver != null
+        ? errorResolver(
+              error,
+              stackTrace,
+              debugInfo != null ? [operation, debugInfo] : operation,
+              previousError,
+            ) ??
+            error
+        : error;
 
-    _errorsTransactions[error] = this;
+    _errorsTransactions[errorResolved] = this;
 
     var firstExecutionError = false;
+    var extraN = 0;
 
-    if (_error == null) {
-      _error = error;
+    if (previousError == null) {
+      _error = errorResolved;
       firstExecutionError = true;
-
-      if (info != null && info.isNotEmpty) {
-        _log.severe(
-            "Error executing transaction operation: $info", error, stackTrace);
-      } else {
-        _log.severe(
-            "Error executing transaction operation!", error, stackTrace);
-      }
+    } else {
+      var extraErrors = _extraErrors ??= [];
+      extraErrors.add(errorResolved);
+      extraN = extraErrors.length;
     }
 
+    final info = debugInfo != null ? debugInfo() : null;
+
+    _log.severe(
+        "${extraN > 0 ? 'EXTRA($extraN) ' : ''}"
+        "ERROR executing transaction operation:${operation != null ? ' $operation' : ''}"
+        "${info != null && info.isNotEmpty ? '\n$info' : ''}",
+        errorResolved,
+        stackTrace);
+
     if (!_aborted) {
-      abort(error: error, stackTrace: stackTrace);
+      abort(error: errorResolved, stackTrace: stackTrace);
     }
 
     _doAutoCommit();
 
     if (rethrowError && firstExecutionError) {
-      Error.throwWithStackTrace(error, stackTrace);
+      Error.throwWithStackTrace(errorResolved, stackTrace);
     } else {
-      return error as R;
+      return errorResolved as R;
     }
   }
 
@@ -5218,6 +5315,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       bool withOperations = true,
       bool withExecutedOperations = true}) {
     final duration = this.duration;
+    final error = this.error;
 
     return [
       'Transaction[#$id]{\n',
@@ -5225,7 +5323,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       '  executing: $isExecuting\n',
       '  committed: ${isCommitted ? 'true' : (isCommitting ? 'committing...' : 'false')}\n',
       '  aborted: $isAborted\n',
-      '  abortError: $abortError\n',
+      if (abortError != null) '  abortError: $abortError\n',
+      if (error != null)
+        '  error: ${error is DBException ? error.messageAndOperation : ''}\n',
+      if (extraErrors != null)
+        '  extraErrors:\n    -- ${extraErrors!.map((e) => e is DBException ? e.messageAndOperation : e).join('\n    -- ')}\n',
       '  cachedEntities: $cachedEntitiesLength\n',
       '  external: $_external\n',
       if (duration != null) '  duration: ${duration.inMilliseconds} ms\n',
@@ -5249,7 +5351,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 }
 
-abstract class TransactionOperation {
+abstract class TransactionOperation implements RecursiveToString {
   final TransactionOperationType type;
   final String repositoryName;
 
@@ -5368,6 +5470,8 @@ abstract class TransactionOperation {
 
   DateTime? get endTime => _endTime;
 
+  bool get isExecuted => _endTime != null;
+
   Duration? get duration => _endTime?.difference(initTime);
 
   String get durationMsInfo {
@@ -5389,8 +5493,10 @@ abstract class TransactionOperation {
       transaction.waitOperation(this,
           parentOperation: parentOperation, timeout: timeout);
 
+  String get _executedStatus => isExecuted ? '(executed)' : '';
+
   @override
-  String toString();
+  String toString({Set<Object>? processedObjects});
 }
 
 class TransactionOperationSubTransaction<O> extends TransactionOperation {
@@ -5404,9 +5510,16 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
             transaction: parentTransaction);
 
   @override
-  String toString() {
-    return 'TransactionOperationSubTransaction[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo')!;
 }
 
 class TransactionOperationSelect<O> extends TransactionOperation {
@@ -5419,9 +5532,16 @@ class TransactionOperationSelect<O> extends TransactionOperation {
             executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationCount<O> extends TransactionOperation {
@@ -5432,9 +5552,16 @@ class TransactionOperationCount<O> extends TransactionOperation {
       : super(TransactionOperationType.count, repositoryName, false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 abstract class TransactionOperationWithEntity<O> extends TransactionOperation {
@@ -5460,9 +5587,16 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
@@ -5473,9 +5607,16 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationStoreRelationship<O, E>
@@ -5489,9 +5630,16 @@ class TransactionOperationStoreRelationship<O, E>
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationConstrainRelationship<O, E>
@@ -5506,9 +5654,16 @@ class TransactionOperationConstrainRelationship<O, E>
             false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationSelectRelationship<O>
@@ -5520,9 +5675,16 @@ class TransactionOperationSelectRelationship<O>
             false, executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
@@ -5536,9 +5698,16 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
             false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationDelete<O> extends TransactionOperation {
@@ -5551,9 +5720,16 @@ class TransactionOperationDelete<O> extends TransactionOperation {
             executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 enum TransactionOperationType {

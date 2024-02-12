@@ -706,10 +706,12 @@ class DBObjectMemoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+          Object? previousError) =>
       DBObjectMemoryAdapterException('error', '$error',
           parentError: error,
           parentStackTrace: stackTrace,
+          previousError: previousError,
           operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -775,5 +777,8 @@ class DBObjectMemoryAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
 
   DBObjectMemoryAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }

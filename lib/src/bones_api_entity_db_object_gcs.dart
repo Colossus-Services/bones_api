@@ -956,10 +956,12 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+          Object? previousError) =>
       DBObjectGCSAdapterException('error', '$error',
           parentError: error,
           parentStackTrace: stackTrace,
+          previousError: previousError,
           operation: operation);
 
   FutureOr<R> _finishOperation<T, R>(
@@ -1022,7 +1024,10 @@ class DBObjectGCSAdapterException extends DBObjectAdapterException {
   String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
   DBObjectGCSAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }
 
 extension _ObjectInfoExtension on gcs.ObjectInfo {

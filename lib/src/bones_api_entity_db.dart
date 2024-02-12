@@ -2034,6 +2034,21 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 }
 
+extension EntityRepositoryDBExtension on EntityRepository {
+  bool isSameEntityManager(EntityRepository other) {
+    return entityManager == other.entityManager;
+  }
+
+  Object get entityManager {
+    final self = this;
+    if (self is DBEntityRepository) {
+      return self.repositoryAdapter.databaseAdapter;
+    } else {
+      return self.provider;
+    }
+  }
+}
+
 /// Base class for [EntityRepositoryProvider] with [DBAdapter]s.
 abstract class DBEntityRepositoryProvider<A extends DBAdapter>
     extends EntityRepositoryProvider {
@@ -2106,7 +2121,7 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
 }
 
 /// A [DBAdapter] [Exception].
-class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
+class DBAdapterException implements DBException, WithRuntimeTypeNameSafe {
   @override
   String get runtimeTypeNameSafe => 'DBAdapterException';
 
@@ -2114,6 +2129,7 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
   final String type;
 
   /// The exception message.
+  @override
   final String message;
 
   /// The parent error/exception.
@@ -2121,11 +2137,19 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
   final Object? parentError;
   final StackTrace? parentStackTrace;
 
+  /// The previous error in the same [Transaction].
+  /// - Note: Not always detected or supported.
+  final Object? previousError;
+
   /// The operation that caused the [Exception].
+  @override
   final Object? operation;
 
   DBAdapterException(this.type, this.message,
-      {this.parentError, this.parentStackTrace, this.operation})
+      {this.parentError,
+      this.parentStackTrace,
+      this.operation,
+      this.previousError})
       : super();
 
   String? resolveToString(Object? o, {String indent = '-- '}) {
@@ -2156,6 +2180,11 @@ class DBAdapterException implements Exception, WithRuntimeTypeNameSafe {
     if (parentError != null) {
       s +=
           '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError';
+    }
+
+    if (previousError != null) {
+      s +=
+          '\n  -- Previous ERROR>> [${previousError.runtimeTypeNameUnsafe}] $previousError';
     }
 
     return s;

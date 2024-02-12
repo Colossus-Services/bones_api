@@ -456,6 +456,9 @@ abstract class TableConstraint implements Comparable<TableConstraint> {
 
   TableConstraint(this.field);
 
+  /// The constraint priority to use in sorting.
+  int get priority;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -468,7 +471,21 @@ abstract class TableConstraint implements Comparable<TableConstraint> {
 
   @override
   int compareTo(TableConstraint other) {
-    return field.compareTo(other.field);
+    var cmp = priority.compareTo(other.priority);
+    if (cmp == 0) {
+      cmp = field.compareTo(other.field);
+    }
+    return cmp;
+  }
+}
+
+extension IterableTableConstraintExtension on Iterable<TableConstraint> {
+  List<String> toFields({Map<String, String?>? fieldMap}) {
+    var fields = map((e) => e.field);
+    if (fieldMap != null) {
+      fields = fields.map((f) => fieldMap[f] ?? f);
+    }
+    return fields.toList();
   }
 }
 
@@ -477,15 +494,21 @@ class TablePrimaryKeyConstraint extends TableConstraint {
   TablePrimaryKeyConstraint(super.field);
 
   @override
-  String toString() => 'TablePrimaryKeyConstraint($field)';
+  int get priority => 0;
 
   @override
-  int compareTo(TableConstraint other) {
-    if (other is! TablePrimaryKeyConstraint) {
-      return -1;
-    }
-    return super.compareTo(other);
-  }
+  String toString() => 'TablePrimaryKeyConstraint($field)';
+}
+
+/// Unique field constraint.
+class TableUniqueConstraint extends TableConstraint {
+  TableUniqueConstraint(super.field);
+
+  @override
+  int get priority => 1;
+
+  @override
+  String toString() => 'TableUniqueConstraint($field)';
 }
 
 /// Table enum field constraint.
@@ -495,6 +518,9 @@ class TableEnumConstraint extends TableConstraint {
 
   TableEnumConstraint(super.field, Iterable<String> values)
       : values = values.toSet();
+
+  @override
+  int get priority => 2;
 
   @override
   bool operator ==(Object other) =>

@@ -789,7 +789,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) {
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+      Object? previousError) {
     if (error is DBMySQLAdapterException) {
       return error;
     } else if (error is MySqlException) {
@@ -816,12 +817,16 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
             tableName: tableName,
             fieldName: fieldName,
             parentError: error,
-            parentStackTrace: stackTrace);
+            parentStackTrace: stackTrace,
+            previousError: previousError);
       }
     }
 
     return DBMySQLAdapterException('error', '$error',
-        parentError: error, parentStackTrace: stackTrace, operation: operation);
+        parentError: error,
+        parentStackTrace: stackTrace,
+        previousError: previousError,
+        operation: operation);
   }
 
   @override
@@ -847,7 +852,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         e,
         s,
         errorResolver: resolveError,
-        debugInfo: () => transaction.toString(),
+        debugInfo: () => transaction.toString(withExecutedOperations: false),
       ),
     );
 
@@ -985,5 +990,8 @@ class DBMySQLAdapterException extends DBSQLAdapterException {
   String get runtimeTypeNameSafe => 'DBMySQLAdapterException';
 
   DBMySQLAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }
