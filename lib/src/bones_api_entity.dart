@@ -1224,9 +1224,55 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
   }
 
+  Map<String, TypeInfo>? _fieldsEnumTypes;
+
+  Map<String, TypeInfo> getFieldsEnumTypes([O? o]) {
+    var enumFields = _fieldsEnumTypes;
+    if (enumFields != null) return UnmodifiableMapView(enumFields);
+
+    final reflectionFactory = ReflectionFactory();
+
+    enumFields = getFieldsTypes(o)
+        .entries
+        .where((e) =>
+            reflectionFactory.getRegisterEnumReflection(e.value.type) != null)
+        .toMapFromEntries();
+
+    return UnmodifiableMapView(_fieldsEnumTypes = enumFields);
+  }
+
+  Map<String, TypeInfo>? _fieldsEntityTypes;
+
+  Map<String, TypeInfo> getFieldsEntityTypes([O? o]) {
+    var entityFields = _fieldsEntityTypes;
+    if (entityFields != null) return UnmodifiableMapView(entityFields);
+
+    var enumFields = getFieldsEnumTypes(o);
+
+    entityFields = getFieldsTypes()
+        .entries
+        .map((e) {
+          var field = e.key;
+          var typeInfo = e.value;
+
+          if (enumFields.containsKey(field)) return null;
+
+          if (typeInfo.isEntityReferenceListType) return null;
+
+          var entityType = typeInfo.entityType;
+          if (entityType == null) return null;
+
+          return MapEntry(field, typeInfo);
+        })
+        .whereNotNull()
+        .toMapFromEntries();
+
+    return UnmodifiableMapView(_fieldsEntityTypes = entityFields);
+  }
+
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
 
-  Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations(O? o) {
+  Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations([O? o]) {
     var fieldsNames = this.fieldsNames(o);
 
     var entries = fieldsNames.map((f) {
@@ -1237,6 +1283,29 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var map = Map<String, List<EntityAnnotation>>.fromEntries(entries);
 
     return map.isEmpty ? null : map;
+  }
+
+  Map<String, List<T>>
+      getAllFieldsWithEntityAnnotation<T extends EntityAnnotation>(
+          [O? o, bool Function(T e)? filter]) {
+    var annotations = getAllFieldsEntityAnnotations(o);
+    if (annotations == null) return {};
+
+    var entries = annotations.entries;
+
+    Iterable<MapEntry<String, List<T>>> entriesTyped;
+
+    if (filter != null) {
+      entriesTyped = entries.map((e) =>
+          MapEntry(e.key, e.value.whereType<T>().where(filter).toList()));
+    } else {
+      entriesTyped =
+          entries.map((e) => MapEntry(e.key, e.value.whereType<T>().toList()));
+    }
+
+    entriesTyped = entriesTyped.where((e) => e.value.isNotEmpty);
+
+    return entriesTyped.toMapFromEntries();
   }
 
   EntityFieldInvalid? validateFieldValue<V>(O o, String key,
