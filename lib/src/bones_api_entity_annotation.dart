@@ -206,7 +206,7 @@ extension IterableEntityFieldExtension on Iterable<EntityField> {
 }
 
 /// An entity field validation error.
-class EntityFieldInvalid extends Error {
+class EntityFieldInvalid extends Error implements RecursiveToString {
   /// The reason of the invalid error.
   final String reason;
 
@@ -281,24 +281,30 @@ class EntityFieldInvalid extends Error {
     return msg;
   }
 
-  String? resolveToString(Object? o, {String indent = '-- '}) {
+  String? resolveToString(Object? o,
+      {String indent = '-- ', Set<Object>? processedObjects}) {
     if (o == null) {
       return null;
-    } else if (o is Iterable) {
-      return '$indent${o.map(resolveToString).whereNotNull().join('\n$indent')}';
-    } else if (o is TransactionOperation) {
-      return o.toString();
+    }
+
+    if (o is Iterable) {
+      var l = RecursiveToString.recursiveIterableToString(processedObjects, o,
+          (objs, e) => resolveToString(e, processedObjects: objs));
+
+      var s = l.join('\n$indent');
+      return '$indent$s';
+    } else if (o is RecursiveToString) {
+      return o.toString(processedObjects: processedObjects);
     } else if (o is Function()) {
-      return resolveToString(o());
-    } else if (o is TransactionOperation) {
-      return o.toString();
+      return RecursiveToString.recursiveToString(processedObjects, o,
+          () => resolveToString(o(), processedObjects: processedObjects));
     } else {
       return o.toString();
     }
   }
 
   @override
-  String toString() {
+  String toStringSimple() {
     var entityStr = entityType != null ? '$entityType' : '';
 
     var tableName = this.tableName;
@@ -313,9 +319,34 @@ class EntityFieldInvalid extends Error {
     var fieldStr =
         fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
 
-    var operationStr = operation != null
-        ? '\n  -- Operation>>\n${resolveToString(operation, indent: '    -- ')}'
-        : '';
+    var msg = 'reason: $reason';
+
+    return 'Invalid entity$entityStr field$fieldStr> $msg';
+  }
+
+  @override
+  String toString({Set<Object>? processedObjects}) {
+    var entityStr = entityType != null ? '$entityType' : '';
+
+    var tableName = this.tableName;
+    if (tableName != null && tableName.isNotEmpty) {
+      entityStr += '@table:$tableName';
+    }
+
+    if (entityStr.isNotEmpty) {
+      entityStr = '($entityStr)';
+    }
+
+    var fieldStr =
+        fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
+
+    var operationStr = '';
+    if (operation != null) {
+      var s = resolveToString(operation,
+          indent: '    -- ', processedObjects: processedObjects);
+
+      operationStr = '\n  -- Operation>>\n$s';
+    }
 
     var parentStr = parentError != null
         ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'

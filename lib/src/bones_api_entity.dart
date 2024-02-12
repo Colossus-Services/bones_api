@@ -5351,7 +5351,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 }
 
-abstract class TransactionOperation {
+abstract class TransactionOperation implements RecursiveToString {
   final TransactionOperationType type;
   final String repositoryName;
 
@@ -5496,7 +5496,7 @@ abstract class TransactionOperation {
   String get _executedStatus => isExecuted ? '(executed)' : '';
 
   @override
-  String toString();
+  String toString({Set<Object>? processedObjects});
 }
 
 class TransactionOperationSubTransaction<O> extends TransactionOperation {
@@ -5510,9 +5510,16 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
             transaction: parentTransaction);
 
   @override
-  String toString() {
-    return 'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo')!;
 }
 
 class TransactionOperationSelect<O> extends TransactionOperation {
@@ -5525,9 +5532,16 @@ class TransactionOperationSelect<O> extends TransactionOperation {
             executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationCount<O> extends TransactionOperation {
@@ -5538,9 +5552,16 @@ class TransactionOperationCount<O> extends TransactionOperation {
       : super(TransactionOperationType.count, repositoryName, false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 abstract class TransactionOperationWithEntity<O> extends TransactionOperation {
@@ -5566,9 +5587,16 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
@@ -5579,9 +5607,16 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationStoreRelationship<O, E>
@@ -5595,9 +5630,16 @@ class TransactionOperationStoreRelationship<O, E>
             executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationConstrainRelationship<O, E>
@@ -5612,9 +5654,16 @@ class TransactionOperationConstrainRelationship<O, E>
             false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationSelectRelationship<O>
@@ -5626,9 +5675,16 @@ class TransactionOperationSelectRelationship<O>
             false, executor, entity);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
@@ -5642,9 +5698,16 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
             false, executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo')!;
 }
 
 class TransactionOperationDelete<O> extends TransactionOperation {
@@ -5657,9 +5720,16 @@ class TransactionOperationDelete<O> extends TransactionOperation {
             executor);
 
   @override
-  String toString() {
-    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
-  }
+  String toStringSimple() =>
+      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]$durationMsInfo';
+
+  @override
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+          processedObjects,
+          this,
+          () =>
+              'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo')!;
 }
 
 enum TransactionOperationType {
