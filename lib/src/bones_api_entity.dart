@@ -4358,7 +4358,28 @@ class TransactionAbortedError extends Error {
 
 typedef ErrorFilter = bool Function(Object, StackTrace);
 
+typedef TransactionErrorResolver = Object? Function(Object error,
+    StackTrace stackTrace, Object? operation, Object? previousError);
+
 typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
+
+/// Base interface for DB [Exception]s.
+abstract class DBException implements Exception {
+  /// DB [Exception] message.
+  String get message;
+
+  /// DB [Exception] operation.
+  Object? get operation;
+}
+
+extension DBExceptionExtension on DBException {
+  /// [message] and [operation].
+  String get messageAndOperation {
+    var m = message;
+    var op = operation;
+    return op == null ? m : '$m->$op';
+  }
+}
 
 /// An [EntityRepository] transaction.
 class Transaction extends JsonEntityCacheSimple implements EntityProvider {
@@ -5115,8 +5136,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   final List<FutureOr> _executionsFutures = <FutureOr>[];
 
   FutureOr<R> addExecution<R, C>(TransactionExecution<R, C> exec,
-      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      {TransactionErrorResolver? errorResolver,
       Object? operation,
       String? Function()? debugInfo}) {
     if (isFinished) {
@@ -5142,8 +5162,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   FutureOr<R> _executeSafe<R, C>(
       TransactionExecution<R, C> exec,
       Object? operation,
-      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      TransactionErrorResolver? errorResolver,
       String? Function()? debugInfo) {
     try {
       var ret = exec(context! as C);
@@ -5160,8 +5179,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   FutureOr<R> notifyExecutionError<R>(Object error, StackTrace stackTrace,
-      {Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      {TransactionErrorResolver? errorResolver,
       Object? operation,
       String? Function()? debugInfo}) {
     return _onExecutionError<R>(
@@ -5172,52 +5190,62 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Object? get error => _error;
 
+  List<Object>? _extraErrors;
+
+  List<Object>? get extraErrors => _extraErrors;
+
   FutureOr<R> _onExecutionError<R>(
       Object error,
       StackTrace stackTrace,
       Object? operation,
-      Object? Function(Object error, StackTrace stackTrace, Object? operation)?
-          errorResolver,
+      TransactionErrorResolver? errorResolver,
       String? Function()? debugInfo,
       {bool rethrowError = true}) {
-    var info = debugInfo != null ? debugInfo() : null;
+    final previousError = _error;
 
-    if (errorResolver != null) {
-      error = errorResolver(
-            error,
-            stackTrace,
-            debugInfo != null ? [operation, debugInfo] : operation,
-          ) ??
-          error;
-    }
+    final errorResolved = errorResolver != null
+        ? errorResolver(
+              error,
+              stackTrace,
+              debugInfo != null ? [operation, debugInfo] : operation,
+              previousError,
+            ) ??
+            error
+        : error;
 
-    _errorsTransactions[error] = this;
+    _errorsTransactions[errorResolved] = this;
 
     var firstExecutionError = false;
+    var extraN = 0;
 
-    if (_error == null) {
-      _error = error;
+    if (previousError == null) {
+      _error = errorResolved;
       firstExecutionError = true;
-
-      if (info != null && info.isNotEmpty) {
-        _log.severe(
-            "Error executing transaction operation: $info", error, stackTrace);
-      } else {
-        _log.severe(
-            "Error executing transaction operation!", error, stackTrace);
-      }
+    } else {
+      var extraErrors = _extraErrors ??= [];
+      extraErrors.add(errorResolved);
+      extraN = extraErrors.length;
     }
 
+    final info = debugInfo != null ? debugInfo() : null;
+
+    _log.severe(
+        "${extraN > 0 ? 'EXTRA($extraN) ' : ''}"
+        "ERROR executing transaction operation:${operation != null ? ' $operation' : ''}"
+        "${info != null && info.isNotEmpty ? '\n$info' : ''}",
+        errorResolved,
+        stackTrace);
+
     if (!_aborted) {
-      abort(error: error, stackTrace: stackTrace);
+      abort(error: errorResolved, stackTrace: stackTrace);
     }
 
     _doAutoCommit();
 
     if (rethrowError && firstExecutionError) {
-      Error.throwWithStackTrace(error, stackTrace);
+      Error.throwWithStackTrace(errorResolved, stackTrace);
     } else {
-      return error as R;
+      return errorResolved as R;
     }
   }
 
@@ -5287,6 +5315,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       bool withOperations = true,
       bool withExecutedOperations = true}) {
     final duration = this.duration;
+    final error = this.error;
 
     return [
       'Transaction[#$id]{\n',
@@ -5294,7 +5323,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       '  executing: $isExecuting\n',
       '  committed: ${isCommitted ? 'true' : (isCommitting ? 'committing...' : 'false')}\n',
       '  aborted: $isAborted\n',
-      '  abortError: $abortError\n',
+      if (abortError != null) '  abortError: $abortError\n',
+      if (error != null)
+        '  error: ${error is DBException ? error.messageAndOperation : ''}\n',
+      if (extraErrors != null)
+        '  extraErrors:\n    -- ${extraErrors!.map((e) => e is DBException ? e.messageAndOperation : e).join('\n    -- ')}\n',
       '  cachedEntities: $cachedEntitiesLength\n',
       '  external: $_external\n',
       if (duration != null) '  duration: ${duration.inMilliseconds} ms\n',
@@ -5437,6 +5470,8 @@ abstract class TransactionOperation {
 
   DateTime? get endTime => _endTime;
 
+  bool get isExecuted => _endTime != null;
+
   Duration? get duration => _endTime?.difference(initTime);
 
   String get durationMsInfo {
@@ -5474,7 +5509,7 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperationSubTransaction[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
+    return 'TransactionOperationSubTransaction${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
   }
 }
 
@@ -5489,7 +5524,7 @@ class TransactionOperationSelect<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5502,7 +5537,7 @@ class TransactionOperationCount<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5530,7 +5565,7 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5543,7 +5578,7 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5559,7 +5594,7 @@ class TransactionOperationStoreRelationship<O, E>
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5576,7 +5611,7 @@ class TransactionOperationConstrainRelationship<O, E>
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5590,7 +5625,7 @@ class TransactionOperationSelectRelationship<O>
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5606,7 +5641,7 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5621,7 +5656,7 @@ class TransactionOperationDelete<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
