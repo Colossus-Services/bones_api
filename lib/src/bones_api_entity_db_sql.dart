@@ -476,6 +476,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
           .toList();
 
+      var missingReferenceConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingReferenceConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingReferenceConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
+
       var missingUniqueConstraintsSQLs = repositoriesChecksErrors
           .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
           .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
@@ -496,11 +502,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var alterTablesSQLs = [
         ...missingColumnsSQLs,
+        '',
         ...missingReferenceColumnsSQLs,
+        '',
+        ...missingReferenceConstraintsSQLs,
+        '',
         ...missingUniqueConstraintsSQLs,
+        '',
         ...missingEnumConstraintsSQLs,
+        '',
         ...missingEnumValuesSQLs,
       ];
+
+      alterTablesSQLs = alterTablesSQLs.expandIndexed((i, s) {
+        if (i > 0 && s.isEmpty) {
+          var prev = alterTablesSQLs[i - 1];
+          if (prev.isEmpty) {
+            return <String>[];
+          }
+        }
+        return [s];
+      }).toList();
+
+      while (alterTablesSQLs.isNotEmpty && alterTablesSQLs.first.isEmpty) {
+        alterTablesSQLs.removeAt(0);
+      }
 
       _log.info(
           'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
@@ -600,6 +626,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             (f) => fieldsInScheme.contains(f) || referenceFields.containsKey(f))
         .toList();
 
+    var missingFieldReferenceConstraints = <String>{};
+
     var missingUniqueConstraints = <String>{};
 
     var missingEnumConstraints = <String>{};
@@ -607,6 +635,50 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (capability.constraintSupport) {
       final reflectionFactory = ReflectionFactory();
+
+      // REF CONSTRAINTS //
+
+      var fieldEntityTypes = entityHandler
+          .getFieldsEntityTypes()
+          .entries
+          .map((e) {
+            var entityType = e.value.entityType;
+            if (entityType == null) return null;
+
+            var refRepository =
+                repository.provider.getEntityRepositoryByType(entityType);
+
+            if (refRepository == null ||
+                !refRepository.isSameEntityManager(repository)) {
+              return null;
+            }
+
+            return MapEntry(e.key, entityType);
+          })
+          .whereNotNull()
+          .toMapFromEntries();
+
+      if (fieldEntityTypes.isNotEmpty) {
+        var fieldsReferencedTables = scheme.fieldsReferencedTables;
+
+        var fieldsReferences = fieldsReferencedTables.entries
+            .map((e) {
+              var colum = e.key;
+              var field = schemeToRepoMap[colum] ?? colum;
+
+              var entityType = fieldEntityTypes[field];
+              if (entityType == null) return null;
+
+              var refTable = e.value.targetTable;
+              return MapEntry(field, refTable);
+            })
+            .whereNotNull()
+            .toMapFromEntries();
+
+        missingFieldReferenceConstraints = fieldEntityTypes.keys
+            .where((f) => !fieldsReferences.containsKey(f))
+            .toSet();
+      }
 
       // UNIQUE CONSTRAINTS //
 
@@ -617,13 +689,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           uniqueConstraints.toFields(fieldMap: schemeToRepoMap);
 
       var entityUniqueFields = entityHandler
-              .getAllFieldsEntityAnnotations(null)
-              ?.entries
-              .where((e) =>
-                  e.value.whereType<EntityField>().any((e) => e.isUnique))
-              .map((e) => e.key)
-              .toList() ??
-          [];
+          .getAllFieldsWithEntityAnnotation<EntityField>(
+              null, (a) => a.isUnique)
+          .keys
+          .toList();
 
       missingUniqueConstraints =
           entityUniqueFields.whereNotIn(uniqueConstraintsFields).toSet();
@@ -636,13 +705,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var enumConstraintsFields =
           enumConstraints.toFields(fieldMap: schemeToRepoMap);
 
-      var entityEnumFields = entityHandler
-          .getFieldsTypes()
-          .entries
-          .where((e) =>
-              reflectionFactory.getRegisterEnumReflection(e.value.type) != null)
-          .map((e) => e.key)
-          .toList();
+      var entityEnumFields = entityHandler.getFieldsEnumTypes().keys.toList();
 
       missingEnumConstraints =
           entityEnumFields.whereNotIn(enumConstraintsFields).toSet();
@@ -667,16 +730,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
+        missingFieldReferenceConstraints.isNotEmpty ||
         missingUniqueConstraints.isNotEmpty ||
         missingEnumConstraints.isNotEmpty ||
         missingEnumValues.isNotEmpty) {
       _log.severe(
-          "ERROR Checking table `$schemeTableName`> entityType: `$repoType` "
-          "${missingColumns.isNotEmpty ? '; missingColumns: $missingColumns ' : ''}"
-          "${missingReferenceColumns.isNotEmpty ? '; missingReferenceColumns: $missingReferenceColumns' : ''}"
-          "${missingUniqueConstraints.isNotEmpty ? '; missingUniqueConstraints: $missingUniqueConstraints ' : ''}"
-          "${missingEnumConstraints.isNotEmpty ? '; missingEnumConstraints: $missingEnumConstraints ' : ''}"
-          "${missingEnumValues.isNotEmpty ? '; missingEnumValues: $missingEnumValues ' : ''}");
+          "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
+          "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
+          "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
+          "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
+          "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
+          "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
+          "${missingEnumValues.isNotEmpty ? '-- missingEnumValues: $missingEnumValues\n' : ''}");
 
       return _DBTableCheck.missing(
         repository,
@@ -685,6 +750,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingReferenceColumns
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingFieldReferenceConstraints
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingUniqueConstraints
@@ -1735,10 +1803,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation) =>
+  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
+          Object? previousError) =>
       DBSQLAdapterException('error', '$error',
           parentError: error,
           parentStackTrace: stackTrace,
+          previousError: previousError,
           operation: operation);
 
   @override
@@ -2350,6 +2420,8 @@ class _DBTableCheck {
 
   List<_DBTableColumn>? missingReferenceColumns;
 
+  List<_DBTableColumn>? missingReferenceConstraints;
+
   List<_DBTableColumn>? missingUniqueConstraints;
 
   List<_DBTableColumn>? missingEnumConstraints;
@@ -2360,6 +2432,7 @@ class _DBTableCheck {
       this.scheme,
       this.missingColumns,
       this.missingReferenceColumns,
+      this.missingReferenceConstraints,
       this.missingUniqueConstraints,
       this.missingEnumConstraints,
       this.missingEnumValues);
@@ -2372,8 +2445,12 @@ class _DBTableCheck {
 
   bool get isOK =>
       error == null &&
-      missingColumns == null &&
-      missingReferenceColumns == null;
+      (missingColumns?.isEmpty ?? true) &&
+      (missingReferenceColumns?.isEmpty ?? true) &&
+      (missingReferenceConstraints?.isEmpty ?? true) &&
+      (missingUniqueConstraints?.isEmpty ?? true) &&
+      (missingEnumConstraints?.isEmpty ?? true) &&
+      (missingEnumValues?.isEmpty ?? true);
 
   bool get isError => !isOK;
 
@@ -2383,6 +2460,17 @@ class _DBTableCheck {
   List<AlterTableSQL> generateMissingReferenceColumnsSQLs(
           SQLGenerator sqlGenerator) =>
       _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
+
+  List<AlterTableSQL> generateMissingReferenceConstraintsSQLs(
+      SQLGenerator sqlGenerator) {
+    var columnsSQLs =
+        _generateMissingSQLs(missingReferenceConstraints, sqlGenerator);
+
+    var constraints =
+        columnsSQLs.expand((e) => e.constraints ?? <AlterTableSQL>[]).toList();
+
+    return constraints;
+  }
 
   List<AlterTableSQL> generateMissingUniqueConstraintsSQLs(
           SQLGenerator sqlGenerator) =>
@@ -2637,5 +2725,8 @@ class DBSQLAdapterException extends DBAdapterException {
   String get runtimeTypeNameSafe => 'DBSQLAdapterException';
 
   DBSQLAdapterException(super.type, super.message,
-      {super.parentError, super.parentStackTrace, super.operation});
+      {super.parentError,
+      super.parentStackTrace,
+      super.operation,
+      super.previousError});
 }
