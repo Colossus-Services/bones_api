@@ -5493,6 +5493,8 @@ abstract class TransactionOperation {
       transaction.waitOperation(this,
           parentOperation: parentOperation, timeout: timeout);
 
+  String get _executedStatus => isExecuted ? '(executed)' : '';
+
   @override
   String toString();
 }
@@ -5509,7 +5511,7 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperationSubTransaction${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
+    return 'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo';
   }
 }
 
@@ -5524,7 +5526,7 @@ class TransactionOperationSelect<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5537,7 +5539,7 @@ class TransactionOperationCount<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5565,7 +5567,7 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5578,7 +5580,7 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5594,7 +5596,7 @@ class TransactionOperationStoreRelationship<O, E>
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5611,7 +5613,7 @@ class TransactionOperationConstrainRelationship<O, E>
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5625,7 +5627,7 @@ class TransactionOperationSelectRelationship<O>
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5641,7 +5643,7 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo';
   }
 }
 
@@ -5656,7 +5658,7 @@ class TransactionOperationDelete<O> extends TransactionOperation {
 
   @override
   String toString() {
-    return 'TransactionOperation${isExecuted ? '(executed)' : ''}[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
+    return 'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo';
   }
 }
 
