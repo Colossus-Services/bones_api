@@ -329,6 +329,74 @@ extension ExtensionRuntimeTypeNameUnsafe on Object? {
   }
 }
 
+/// Class with a recursive/complex [toString].
+/// Use this interface to avoid [StackOverflowError] on complex [toString].
+abstract class RecursiveToString {
+  static Set<Object>? processedObjects(
+      Set<Object>? processedObjects, Object? o) {
+    processedObjects ??= Set<Object>.identity();
+
+    if (o != null && !processedObjects.add(o)) {
+      return null;
+    }
+
+    return processedObjects;
+  }
+
+  static final QueueList<Set<Object>> _processedObjectsStack =
+      QueueList<Set<Object>>();
+
+  static String? recursiveToString(
+      Set<Object>? processedObjects, Object? o, String? Function() str) {
+    processedObjects ??= _processedObjectsStack.lastOrNull;
+
+    processedObjects = RecursiveToString.processedObjects(processedObjects, o);
+    if (processedObjects == null) {
+      return o is RecursiveToString
+          ? o.toStringSimple()
+          : '(${o.runtimeType})...';
+    }
+
+    _processedObjectsStack.addLast(processedObjects);
+    try {
+      return str();
+    } finally {
+      var rm = _processedObjectsStack.removeLast();
+      assert(identical(rm, processedObjects));
+    }
+  }
+
+  static List<String> recursiveIterableToString(
+    Set<Object>? processedObjects,
+    Iterable o,
+    String? Function(Set<Object> processedObjects, Object? o) toStr,
+  ) {
+    processedObjects ??= _processedObjectsStack.lastOrNull;
+
+    processedObjects = RecursiveToString.processedObjects(processedObjects, o);
+    if (processedObjects == null) {
+      return [
+        '${o.map((e) => e is RecursiveToString ? e.toStringSimple() : e.runtimeType).toList()}...'
+      ];
+    }
+
+    _processedObjectsStack.addLast(processedObjects);
+
+    try {
+      var l = o.map((e) => toStr(processedObjects!, e)).whereNotNull().toList();
+      return l;
+    } finally {
+      var rm = _processedObjectsStack.removeLast();
+      assert(identical(rm, processedObjects));
+    }
+  }
+
+  @override
+  String toString({Set<Object>? processedObjects});
+
+  String toStringSimple();
+}
+
 /// A set that matches elements by [identical] function only.
 class IdenticalSet<O> {
   final List<List<O>?> _groups;
