@@ -2376,6 +2376,9 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   V? getField<V>(O o, String key) => reflection.getField<V?>(key, o);
 
   @override
+  Map<String, dynamic> getFields(O o) => reflection.getFieldsValues(o);
+
+  @override
   TypeInfo? getFieldType(O? o, String key) {
     var field = reflection.field(key, o);
     return field != null ? TypeInfo.from(field) : null;
@@ -2517,7 +2520,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   List<String> fieldsNames([O? o]) =>
-      _fieldsNames ??= fieldsTypes(o).keys.toList();
+      _fieldsNames ??= List.unmodifiable(fieldsTypes(o).keys);
 
   Map<String, TypeInfo>? _fieldsTypes;
 

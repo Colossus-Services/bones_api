@@ -384,7 +384,7 @@ class APIToken implements Comparable<APIToken> {
     'Z',
   ];
 
-  static List<String> tokenDefaultAlphabetPairsRandom = UnmodifiableListView(
+  static List<String> tokenDefaultAlphabetPairsRandom = List.unmodifiable(
       tokenDefaultAlphabet
           .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
           .toList()
