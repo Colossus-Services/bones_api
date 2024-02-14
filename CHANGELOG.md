@@ -1,3 +1,10 @@
+## 1.5.28
+
+- `ClassReflectionEntityHandler.getFields`: optimize using `reflection.getFieldsValues`.
+
+- async_events: ^1.1.0
+- reflection_factory: ^2.3.0
+
 ## 1.5.27
 
 - `SQLGenerator`:

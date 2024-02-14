@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.2.8
+// BUILDER: reflection_factory/2.3.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.2.8');
+  static final Version _version = Version.parse('2.3.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -102,7 +102,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<MyInfoModule>> _constructors =
-      <String, ConstructorReflection<MyInfoModule>>{};
+      {};
 
   @override
   ConstructorReflection<MyInfoModule>? constructor(String constructorName) {
@@ -171,10 +171,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<MyInfoModule, dynamic>>
-      _fieldsNoObject = <String, FieldReflection<MyInfoModule, dynamic>>{};
+      _fieldsNoObject = {};
 
-  final Map<String, FieldReflection<MyInfoModule, dynamic>> _fieldsObject =
-      <String, FieldReflection<MyInfoModule, dynamic>>{};
+  final Map<String, FieldReflection<MyInfoModule, dynamic>> _fieldsObject = {};
 
   @override
   FieldReflection<MyInfoModule, T>? field<T>(String fieldName,
@@ -231,7 +230,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.apiRoot,
           null,
           obj,
-          false,
           true,
         );
       case 'name':
@@ -244,7 +242,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.name,
           null,
           obj,
-          false,
           true,
         );
       case 'version':
@@ -257,7 +254,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.version,
           null,
           obj,
-          false,
           true,
         );
       case 'apiconfig':
@@ -271,7 +267,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'defaultroutename':
         return FieldReflection<MyInfoModule, String?>(
@@ -284,7 +279,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'allroutesnames':
         return FieldReflection<MyInfoModule, Set<String>>(
@@ -296,7 +290,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.allRoutesNames,
           null,
           obj,
-          false,
           false,
         );
       case 'routes':
@@ -311,7 +304,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'authenticationroute':
         return FieldReflection<MyInfoModule, String>(
@@ -323,7 +315,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.authenticationRoute,
           null,
           obj,
-          false,
           false,
         );
       case 'security':
@@ -337,7 +328,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'hashcode':
         return FieldReflection<MyInfoModule, int>(
@@ -349,7 +339,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.hashCode,
           null,
           obj,
-          false,
           false,
           const [override],
         );
@@ -364,7 +353,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isinitialized':
         return FieldReflection<MyInfoModule, bool>(
@@ -376,7 +364,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           (o) => () => o!.isInitialized,
           null,
           obj,
-          false,
           false,
         );
       case 'isinitializing':
@@ -390,7 +377,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isasyncinitialization':
         return FieldReflection<MyInfoModule, bool>(
@@ -403,11 +389,31 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           obj,
           false,
-          false,
         );
       default:
         return null;
     }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(MyInfoModule? obj,
+      {bool withHashCode = false}) {
+    return <String, dynamic>{
+      'apiRoot': obj?.apiRoot,
+      'name': obj?.name,
+      'version': obj?.version,
+      'apiConfig': obj?.apiConfig,
+      'defaultRouteName': obj?.defaultRouteName,
+      'allRoutesNames': obj?.allRoutesNames,
+      'routes': obj?.routes,
+      'authenticationRoute': obj?.authenticationRoute,
+      'security': obj?.security,
+      'initializationStatus': obj?.initializationStatus,
+      'isInitialized': obj?.isInitialized,
+      'isInitializing': obj?.isInitializing,
+      'isAsyncInitialization': obj?.isAsyncInitialization,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
   }
 
   static const List<String> _staticFieldsNames = const <String>[];
@@ -416,7 +422,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
-  FieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) => null;
+  StaticFieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) =>
+      null;
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
@@ -445,10 +452,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<MyInfoModule, dynamic>>
-      _methodsNoObject = <String, MethodReflection<MyInfoModule, dynamic>>{};
+      _methodsNoObject = {};
 
   final Map<String, MethodReflection<MyInfoModule, dynamic>> _methodsObject =
-      <String, MethodReflection<MyInfoModule, dynamic>>{};
+      {};
 
   @override
   MethodReflection<MyInfoModule, R>? method<R>(String methodName,
@@ -504,7 +511,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.configure,
             obj,
-            false,
             null,
             null,
             null,
@@ -520,7 +526,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.echo,
             obj,
-            false,
             const <__PR>[
               __PR(__TR.tString, 'msg', false, true),
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
@@ -539,7 +544,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.toUpperCase,
             obj,
-            false,
             const <__PR>[__PR(__TR.tString, 'msg', false, true)],
             null,
             null,
@@ -555,7 +559,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.withPayload,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<Uint8List>(Uint8List), 'payload', true, true)
             ],
@@ -571,7 +574,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.ensureConfigured,
             obj,
-            false,
             null,
             null,
             null,
@@ -586,7 +588,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.initialize,
             obj,
-            false,
             null,
             null,
             null,
@@ -600,7 +601,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -617,7 +617,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.addRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
                   true),
@@ -659,7 +658,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             true,
             (o) => o!.getRouteHandler,
             obj,
-            false,
             const <__PR>[__PR(__TR.tString, 'name', false, true)],
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
@@ -677,7 +675,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -693,7 +690,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.resolveRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -711,7 +707,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.call,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -727,7 +722,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.acceptsRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
             ],
@@ -743,7 +737,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.apiInfo,
             obj,
-            false,
             null,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
@@ -760,7 +753,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.ensureInitialized,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -778,7 +770,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -796,7 +787,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.doInitialization,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -816,7 +806,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.initializeDependencies,
             obj,
-            false,
             null,
             null,
             null,
@@ -830,7 +819,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.checkInitialized,
             obj,
-            false,
             null,
             null,
             null,
@@ -844,7 +832,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             false,
             (o) => o!.executeInitialized,
             obj,
-            false,
             const <__PR>[
               __PR(
                   __TR<ExecuteInitializedCallback<dynamic>>(
@@ -870,7 +857,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
-  MethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) => null;
+  StaticMethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) =>
+      null;
 }
 
 extension MyInfoModule$reflectionExtension on MyInfoModule {

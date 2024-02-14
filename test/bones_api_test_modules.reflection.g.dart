@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.2.8
+// BUILDER: reflection_factory/2.3.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.2.8');
+  static final Version _version = Version.parse('2.3.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -106,7 +106,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<AboutModule>> _constructors =
-      <String, ConstructorReflection<AboutModule>>{};
+      {};
 
   @override
   ConstructorReflection<AboutModule>? constructor(String constructorName) {
@@ -174,10 +174,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<AboutModule, dynamic>>
-      _fieldsNoObject = <String, FieldReflection<AboutModule, dynamic>>{};
+      _fieldsNoObject = {};
 
-  final Map<String, FieldReflection<AboutModule, dynamic>> _fieldsObject =
-      <String, FieldReflection<AboutModule, dynamic>>{};
+  final Map<String, FieldReflection<AboutModule, dynamic>> _fieldsObject = {};
 
   @override
   FieldReflection<AboutModule, T>? field<T>(String fieldName,
@@ -234,7 +233,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.apiRoot,
           null,
           obj,
-          false,
           true,
         );
       case 'name':
@@ -247,7 +245,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.name,
           null,
           obj,
-          false,
           true,
         );
       case 'version':
@@ -260,7 +257,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.version,
           null,
           obj,
-          false,
           true,
         );
       case 'apiconfig':
@@ -274,7 +270,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'defaultroutename':
         return FieldReflection<AboutModule, String?>(
@@ -287,7 +282,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'allroutesnames':
         return FieldReflection<AboutModule, Set<String>>(
@@ -299,7 +293,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.allRoutesNames,
           null,
           obj,
-          false,
           false,
         );
       case 'routes':
@@ -314,7 +307,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'authenticationroute':
         return FieldReflection<AboutModule, String>(
@@ -326,7 +318,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.authenticationRoute,
           null,
           obj,
-          false,
           false,
         );
       case 'security':
@@ -340,7 +331,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'hashcode':
         return FieldReflection<AboutModule, int>(
@@ -352,7 +342,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.hashCode,
           null,
           obj,
-          false,
           false,
           const [override],
         );
@@ -367,7 +356,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isinitialized':
         return FieldReflection<AboutModule, bool>(
@@ -379,7 +367,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => () => o!.isInitialized,
           null,
           obj,
-          false,
           false,
         );
       case 'isinitializing':
@@ -393,7 +380,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isasyncinitialization':
         return FieldReflection<AboutModule, bool>(
@@ -406,11 +392,31 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           null,
           obj,
           false,
-          false,
         );
       default:
         return null;
     }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(AboutModule? obj,
+      {bool withHashCode = false}) {
+    return <String, dynamic>{
+      'apiRoot': obj?.apiRoot,
+      'name': obj?.name,
+      'version': obj?.version,
+      'apiConfig': obj?.apiConfig,
+      'defaultRouteName': obj?.defaultRouteName,
+      'allRoutesNames': obj?.allRoutesNames,
+      'routes': obj?.routes,
+      'authenticationRoute': obj?.authenticationRoute,
+      'security': obj?.security,
+      'initializationStatus': obj?.initializationStatus,
+      'isInitialized': obj?.isInitialized,
+      'isInitializing': obj?.isInitializing,
+      'isAsyncInitialization': obj?.isAsyncInitialization,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
   }
 
   static const List<String> _staticFieldsNames = const <String>[];
@@ -419,7 +425,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
-  FieldReflection<AboutModule, T>? staticField<T>(String fieldName) => null;
+  StaticFieldReflection<AboutModule, T>? staticField<T>(String fieldName) =>
+      null;
 
   static const List<String> _methodsNames = const <String>[
     'about',
@@ -446,10 +453,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<AboutModule, dynamic>>
-      _methodsNoObject = <String, MethodReflection<AboutModule, dynamic>>{};
+      _methodsNoObject = {};
 
-  final Map<String, MethodReflection<AboutModule, dynamic>> _methodsObject =
-      <String, MethodReflection<AboutModule, dynamic>>{};
+  final Map<String, MethodReflection<AboutModule, dynamic>> _methodsObject = {};
 
   @override
   MethodReflection<AboutModule, R>? method<R>(String methodName,
@@ -505,7 +511,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.configure,
             obj,
-            false,
             null,
             null,
             null,
@@ -519,7 +524,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.about,
             obj,
-            false,
             null,
             null,
             null,
@@ -533,7 +537,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.ensureConfigured,
             obj,
-            false,
             null,
             null,
             null,
@@ -548,7 +551,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.initialize,
             obj,
-            false,
             null,
             null,
             null,
@@ -562,7 +564,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -579,7 +580,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.addRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
                   true),
@@ -621,7 +621,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             true,
             (o) => o!.getRouteHandler,
             obj,
-            false,
             const <__PR>[__PR(__TR.tString, 'name', false, true)],
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
@@ -639,7 +638,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -655,7 +653,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.resolveRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -673,7 +670,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.call,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -689,7 +685,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.acceptsRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
             ],
@@ -705,7 +700,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.apiInfo,
             obj,
-            false,
             null,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
@@ -722,7 +716,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.ensureInitialized,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -740,7 +733,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -758,7 +750,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.doInitialization,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -778,7 +769,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.initializeDependencies,
             obj,
-            false,
             null,
             null,
             null,
@@ -792,7 +782,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.checkInitialized,
             obj,
-            false,
             null,
             null,
             null,
@@ -806,7 +795,6 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             false,
             (o) => o!.executeInitialized,
             obj,
-            false,
             const <__PR>[
               __PR(
                   __TR<ExecuteInitializedCallback<dynamic>>(
@@ -832,7 +820,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
-  MethodReflection<AboutModule, R>? staticMethod<R>(String methodName) => null;
+  StaticMethodReflection<AboutModule, R>? staticMethod<R>(String methodName) =>
+      null;
 }
 
 class UserModule$reflection extends ClassReflection<UserModule>
@@ -901,7 +890,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   List<String> get constructorsNames => _constructorsNames;
 
   static final Map<String, ConstructorReflection<UserModule>> _constructors =
-      <String, ConstructorReflection<UserModule>>{};
+      {};
 
   @override
   ConstructorReflection<UserModule>? constructor(String constructorName) {
@@ -973,10 +962,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<UserModule, dynamic>>
-      _fieldsNoObject = <String, FieldReflection<UserModule, dynamic>>{};
+      _fieldsNoObject = {};
 
-  final Map<String, FieldReflection<UserModule, dynamic>> _fieldsObject =
-      <String, FieldReflection<UserModule, dynamic>>{};
+  final Map<String, FieldReflection<UserModule, dynamic>> _fieldsObject = {};
 
   @override
   FieldReflection<UserModule, T>? field<T>(String fieldName,
@@ -1033,7 +1021,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.apiRoot,
           null,
           obj,
-          false,
           true,
         );
       case 'name':
@@ -1046,7 +1033,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.name,
           null,
           obj,
-          false,
           true,
         );
       case 'version':
@@ -1059,7 +1045,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.version,
           null,
           obj,
-          false,
           true,
         );
       case 'apiconfig':
@@ -1073,7 +1058,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'defaultroutename':
         return FieldReflection<UserModule, String?>(
@@ -1086,7 +1070,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'allroutesnames':
         return FieldReflection<UserModule, Set<String>>(
@@ -1098,7 +1081,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.allRoutesNames,
           null,
           obj,
-          false,
           false,
         );
       case 'routes':
@@ -1113,7 +1095,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'authenticationroute':
         return FieldReflection<UserModule, String>(
@@ -1125,7 +1106,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.authenticationRoute,
           null,
           obj,
-          false,
           false,
         );
       case 'security':
@@ -1139,7 +1119,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'hashcode':
         return FieldReflection<UserModule, int>(
@@ -1151,7 +1130,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.hashCode,
           null,
           obj,
-          false,
           false,
           const [override],
         );
@@ -1166,7 +1144,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isinitialized':
         return FieldReflection<UserModule, bool>(
@@ -1178,7 +1155,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => () => o!.isInitialized,
           null,
           obj,
-          false,
           false,
         );
       case 'isinitializing':
@@ -1192,7 +1168,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       case 'isasyncinitialization':
         return FieldReflection<UserModule, bool>(
@@ -1205,11 +1180,31 @@ class UserModule$reflection extends ClassReflection<UserModule>
           null,
           obj,
           false,
-          false,
         );
       default:
         return null;
     }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(UserModule? obj,
+      {bool withHashCode = false}) {
+    return <String, dynamic>{
+      'apiRoot': obj?.apiRoot,
+      'name': obj?.name,
+      'version': obj?.version,
+      'apiConfig': obj?.apiConfig,
+      'defaultRouteName': obj?.defaultRouteName,
+      'allRoutesNames': obj?.allRoutesNames,
+      'routes': obj?.routes,
+      'authenticationRoute': obj?.authenticationRoute,
+      'security': obj?.security,
+      'initializationStatus': obj?.initializationStatus,
+      'isInitialized': obj?.isInitialized,
+      'isInitializing': obj?.isInitializing,
+      'isAsyncInitialization': obj?.isAsyncInitialization,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
   }
 
   static const List<String> _staticFieldsNames = const <String>[];
@@ -1218,7 +1213,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
   List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
-  FieldReflection<UserModule, T>? staticField<T>(String fieldName) => null;
+  StaticFieldReflection<UserModule, T>? staticField<T>(String fieldName) =>
+      null;
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
@@ -1257,10 +1253,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<UserModule, dynamic>>
-      _methodsNoObject = <String, MethodReflection<UserModule, dynamic>>{};
+      _methodsNoObject = {};
 
-  final Map<String, MethodReflection<UserModule, dynamic>> _methodsObject =
-      <String, MethodReflection<UserModule, dynamic>>{};
+  final Map<String, MethodReflection<UserModule, dynamic>> _methodsObject = {};
 
   @override
   MethodReflection<UserModule, R>? method<R>(String methodName,
@@ -1316,7 +1311,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.configure,
             obj,
-            false,
             null,
             null,
             null,
@@ -1330,7 +1324,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.notARoute,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'n', false, true)],
             null,
             null,
@@ -1344,7 +1337,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.notARouteAsync,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'n', false, true)],
             null,
             null,
@@ -1358,7 +1350,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getUser,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
             null,
             null,
@@ -1372,7 +1363,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.echoUser,
             obj,
-            false,
             const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
             null,
             null,
@@ -1388,7 +1378,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.echoListUser,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<List<User>>(List, <__TR>[__TR<User>(User)]), 'users',
                   false, true)
@@ -1407,7 +1396,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.echoListUser2,
             obj,
-            false,
             const <__PR>[
               __PR(__TR.tString, 'msg', false, true),
               __PR(__TR<List<User>>(List, <__TR>[__TR<User>(User)]), 'users',
@@ -1425,7 +1413,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getDynamic,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
             null,
             null,
@@ -1441,7 +1428,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getUserAsync,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
             null,
             null,
@@ -1457,7 +1443,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.geDynamicAsync,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
             null,
             null,
@@ -1471,7 +1456,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.geDynamicAsync2,
             obj,
-            false,
             const <__PR>[__PR(__TR.tInt, 'id', false, true)],
             null,
             null,
@@ -1491,7 +1475,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getContextEntityResolutionRules,
             obj,
-            false,
             null,
             null,
             null,
@@ -1511,7 +1494,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getRequestEntityResolutionRules,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -1533,7 +1515,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getRequestEntityAccessRules,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -1549,7 +1530,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.ensureConfigured,
             obj,
-            false,
             null,
             null,
             null,
@@ -1564,7 +1544,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.initialize,
             obj,
-            false,
             null,
             null,
             null,
@@ -1578,7 +1557,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -1595,7 +1573,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.addRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
                   true),
@@ -1637,7 +1614,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             true,
             (o) => o!.getRouteHandler,
             obj,
-            false,
             const <__PR>[__PR(__TR.tString, 'name', false, true)],
             const <__PR>[
               __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
@@ -1655,7 +1631,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             true,
             (o) => o!.getRouteHandlerByRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -1671,7 +1646,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.resolveRoute,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -1689,7 +1663,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.call,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
@@ -1705,7 +1678,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.acceptsRequest,
             obj,
-            false,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
             ],
@@ -1721,7 +1693,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.apiInfo,
             obj,
-            false,
             null,
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
@@ -1738,7 +1709,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.ensureInitialized,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -1756,7 +1726,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.ensureInitializedAsync,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -1774,7 +1743,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.doInitialization,
             obj,
-            false,
             null,
             null,
             const <String, __PR>{
@@ -1794,7 +1762,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.initializeDependencies,
             obj,
-            false,
             null,
             null,
             null,
@@ -1808,7 +1775,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.checkInitialized,
             obj,
-            false,
             null,
             null,
             null,
@@ -1822,7 +1788,6 @@ class UserModule$reflection extends ClassReflection<UserModule>
             false,
             (o) => o!.executeInitialized,
             obj,
-            false,
             const <__PR>[
               __PR(
                   __TR<ExecuteInitializedCallback<dynamic>>(
@@ -1848,7 +1813,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
-  MethodReflection<UserModule, R>? staticMethod<R>(String methodName) => null;
+  StaticMethodReflection<UserModule, R>? staticMethod<R>(String methodName) =>
+      null;
 }
 
 extension AboutModule$reflectionExtension on AboutModule {
