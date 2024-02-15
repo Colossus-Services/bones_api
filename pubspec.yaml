@@ -1,6 +1,6 @@
 name: bones_api
 description: Bones_API - A powerful API backend framework for Dart. It comes with a built-in HTTP Server, route handler, entity handler, SQL translator, and DB adapters.
-version: 1.6.0
+version: 1.6.1
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:
@@ -13,16 +13,16 @@ dependencies:
   async_extension: ^1.2.5
   async_events: ^1.1.0
   reflection_factory: ^2.3.0
-  statistics: ^1.0.26
-  swiss_knife: ^3.1.5
+  statistics: ^1.1.0
+  swiss_knife: ^3.2.0
   data_serializer: ^1.1.0
-  shared_map: ^1.1.7
+  shared_map: ^1.1.8
   graph_explorer: ^1.0.2
   ascii_art_tree: ^1.0.6
   map_history: ^1.0.3
   dart_spawner: ^1.1.0
   yaml_writer: ^2.0.0
-  mercury_client: ^2.2.0
+  mercury_client: ^2.2.1
   project_template: ^1.1.0
   resource_portable: ^3.1.0
   docker_commander: ^2.1.5
@@ -32,29 +32,29 @@ dependencies:
   shelf_gzip: ^4.1.0
   shelf_static: ^1.1.2
   args: ^2.4.2
-  meta: ^1.11.0
+  meta: ^1.12.0
   petitparser: ^6.0.2
   hotreloader: ^4.2.0
-  logging: ^1.1.0
+  logging: ^1.2.0
   collection: ^1.18.0
-  mime: ^1.0.4
+  mime: ^1.0.5
   postgres: ^2.6.3
   mysql1: ^0.20.0
-  gcloud: ^0.8.11
+  gcloud: ^0.8.12
   yaml: ^3.1.2
   crypto: ^3.0.3
-  path: ^1.8.3
-  archive: ^3.4.6
+  path: ^1.9.0
+  archive: ^3.4.10
   stream_channel: ^2.1.2
-  http: ^1.1.0
+  http: ^1.2.0
   googleapis_auth: ^1.4.1
   crclib: ^3.0.0
 
 dev_dependencies:
   lints: ^3.0.0
-  build_runner: ^2.4.6
+  build_runner: ^2.4.8
   build_verify: ^3.1.0
-  test: ^1.24.7
+  test: ^1.25.2
   pubspec: ^2.3.0
   dependency_validator: ^3.2.3
   coverage: ^1.7.2
