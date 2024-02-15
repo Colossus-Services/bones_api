@@ -855,7 +855,7 @@ class APITokenStore {
   FutureOr<APITokenInfo?> storeAPIToken(
       APIToken apiToken, Object? data, List<APIPermission> permissions) {
     data = _toUnmodifiableData(data);
-    permissions = permissions.asUnmodifiableView;
+    permissions = permissions.asUnmodifiableListView();
 
     return _resolveSharedTokens().resolveMapped((sharedTokens) {
       return sharedTokens.put(apiToken.token,
