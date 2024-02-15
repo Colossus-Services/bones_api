@@ -591,7 +591,7 @@ class APIConfig {
       Json.encode(_properties, pretty: pretty, maskField: maskField);
 
   /// Converts this configuration [properties] to an encoded YAML.
-  String toYAMLEncoded() => YAMLWriter().write(_properties);
+  String toYAMLEncoded() => YamlWriter().write(_properties);
 
   /// Converts this configuration [properties] to a Java properties format.
   String toPropertiesEncoded() {

@@ -64,7 +64,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
       DBSQLEntityRepository<UserInfo>(
           adapter, 'user_info', userInfoEntityHandler),
       DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler)
-    ].asUnmodifiableView;
+    ].asUnmodifiableListView();
   }
 
   @override
@@ -103,7 +103,7 @@ class TestEntityRepositoryProvider2 extends DBEntityRepositoryProvider {
       DBAdapter<Object> adapter) {
     return _repositories ??= [
       DBEntityRepository<Photo>(adapter, 'photo', photoEntityHandler),
-    ].asUnmodifiableView;
+    ].asUnmodifiableListView();
   }
 
   @override

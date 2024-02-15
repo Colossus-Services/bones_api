@@ -1,3 +1,14 @@
+## 1.6.0
+
+Dart 3.3.0 compatibility.
+
+- sdk: '>=3.3.0 <4.0.0'
+
+- data_serializer: ^1.1.0
+- yaml_writer: ^2.0.0
+- project_template: ^1.1.0
+- hotreloader: ^4.2.0
+
 ## 1.5.28
 
 - `ClassReflectionEntityHandler.getFields`: optimize using `reflection.getFieldsValues`.

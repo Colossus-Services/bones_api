@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.5.28';
+  static const String VERSION = '1.6.0';
 
   static bool _boot = false;
 
@@ -2258,7 +2258,7 @@ class WeakEtag extends Etag {
   final String delimiter;
 
   WeakEtag(List<String> values, {this.delimiter = ','})
-      : values = values.asUnmodifiableView;
+      : values = values.asUnmodifiableListView();
 
   factory WeakEtag.parse(String s, {String delimiter = ','}) {
     if (s.isEmpty) return WeakEtag([]);

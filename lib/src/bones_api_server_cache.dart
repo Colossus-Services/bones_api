@@ -826,7 +826,7 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
     List<int>? content,
     this.contentEncoding,
     this.encoding,
-  })  : content = content?.asUint8List.asUnmodifiableView,
+  })  : content = content?.asUint8List.asUnmodifiableView(),
         super();
 
   @override
