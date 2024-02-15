@@ -1,3 +1,20 @@
+## 1.6.1
+
+- statistics: ^1.1.0
+- swiss_knife: ^3.2.0
+- shared_map: ^1.1.8
+- mercury_client: ^2.2.1
+- meta: ^1.12.0
+- logging: ^1.2.0
+- mime: ^1.0.5
+- gcloud: ^0.8.12
+- path: ^1.9.0
+- archive: ^3.4.10
+- http: ^1.2.0
+
+- build_runner: ^2.4.8
+- test: ^1.25.2
+
 ## 1.6.0
 
 Dart 3.3.0 compatibility.
