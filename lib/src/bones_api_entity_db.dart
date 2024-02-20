@@ -1696,40 +1696,58 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     return relationshipFields.entries.map((e) {
-      var fieldName = e.key;
-      var fieldType = fieldsListEntity[fieldName]!;
-      var targetTable = e.value.targetTable;
+      final fieldName = e.key;
+      final fieldType = fieldsListEntity[fieldName]!;
+      final targetTable = e.value.targetTable;
 
-      var targetRepositoryAdapter = databaseAdapter
+      final targetRepositoryAdapter = databaseAdapter
               .getRepositoryAdapterByTableName(targetTable) ??
           (throw StateError(
               "Can't find `DBRepositoryAdapter` for target table: $targetTable"));
 
-      var targetType = targetRepositoryAdapter.type;
+      final targetType = targetRepositoryAdapter.type;
 
-      var targetEntityRepository = provider
+      final targetEntityRepository = provider
               .getEntityRepositoryByType(targetType) ??
           (throw StateError(
               "Can't find `EntityRepository` for target type: $targetType (`$targetTable`)"));
+
+      final targetEntityHandler = targetEntityRepository.entityHandler;
+
+      bool resolveRelationshipEntities(Map<dynamic, List> relationships) {
+        for (var r in results) {
+          var id = r[idFieldName];
+
+          var values = relationships[id] ??
+              targetEntityHandler.castList(<dynamic>[], targetType)!;
+
+          r[fieldName] = values;
+        }
+
+        return true;
+      }
 
       // ignore: discarded_futures
       var relationshipsAsync = selectRelationships(null, fieldName,
           oIds: ids, fieldType: fieldType, transaction: transaction);
 
       // ignore: discarded_futures
-      var retRelationships = relationshipsAsync.resolveMapped((relationships) {
+      return relationshipsAsync.resolveMapped((relationships) {
         if (relationships.isEmpty) {
-          return <dynamic, List>{};
+          return resolveRelationshipEntities({});
         }
-
-        var allTargetIds =
-            relationships.values.expand((e) => e).toSet().toList();
 
         if (fieldType.isEntityReferenceListType &&
             !resolutionRulesResolved
                 .isEagerEntityType(fieldType.arguments0!.type)) {
-          return relationships.map((key, value) => MapEntry(key, value.asList));
+          var relationshipsEntities =
+              relationships.map((key, value) => MapEntry(key, value.asList));
+
+          return resolveRelationshipEntities(relationshipsEntities);
         }
+
+        var allTargetIds =
+            relationships.values.expand((e) => e).toSet().toList();
 
         // ignore: discarded_futures
         var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
@@ -1741,28 +1759,21 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
               .whereNotNull()
               .map((e) => MapEntry(targetEntityRepository.getEntityID(e)!, e)));
 
-          return relationships.map((id, targetIds) {
+          var relationshipsEntities = relationships.map((id, targetIds) {
             var targetEntities = targetIds
                 .map((id) => allTargetsById[id])
                 .whereNotNull()
                 .toList();
-            var targetEntitiesCast = targetEntityRepository.entityHandler
-                .castList(targetEntities, targetType)!;
+
+            var targetEntitiesCast =
+                targetEntityHandler.castList(targetEntities, targetType)!;
+
             return MapEntry(id, targetEntitiesCast);
-          }).resolveAllValues(); // ignore: discarded_futures
+          });
+
+          return resolveRelationshipEntities(relationshipsEntities);
         });
       });
-
-      // ignore: discarded_futures
-      return retRelationships.resolveMapped((relationships) {
-        for (var r in results) {
-          var id = r[idFieldName];
-          var values = relationships[id];
-          values ??= targetEntityRepository.entityHandler
-              .castList(<dynamic>[], targetType)!;
-          r[fieldName] = values;
-        }
-      }).resolveWithValue(true); // ignore: discarded_futures
     }).toList(growable: false);
   }
 
