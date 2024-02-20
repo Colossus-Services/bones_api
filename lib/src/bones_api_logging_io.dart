@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -33,10 +34,47 @@ class LoggerHandlerIO extends LoggerHandler {
     return s != null ? '$s' : '?';
   }
 
+  final Queue<String> _printMessageQueue = Queue();
+  logging.Level? _printMessageQueueLevel;
+
+  void _flushPrintMessageQueue() {
+    var level = _printMessageQueueLevel;
+    if (level == null) {
+      assert(_printMessageQueue.isEmpty);
+      return;
+    }
+
+    var out = level < logging.Level.SEVERE ? stdout : stderr;
+
+    out.writeAll(_printMessageQueue);
+
+    _printMessageQueue.clear();
+    _printMessageQueueLevel = null;
+  }
+
+  Future? _scheduledFlushPrintMessageQueue;
+
+  void _scheduleFlushPrintMessageQueue(
+      {Duration delay = const Duration(milliseconds: 20)}) {
+    var scheduled = _scheduledFlushPrintMessageQueue;
+    if (scheduled != null) return;
+
+    _scheduledFlushPrintMessageQueue = Future.delayed(delay, () {
+      _flushPrintMessageQueue();
+      _scheduledFlushPrintMessageQueue = null;
+    });
+  }
+
   @override
   void printMessage(logging.Level level, String message) {
-    var out = (level < logging.Level.SEVERE ? stdout : stderr);
-    out.write(message);
+    if (_printMessageQueueLevel != level) {
+      _flushPrintMessageQueue();
+      _printMessageQueueLevel = level;
+    }
+
+    _printMessageQueue.add(message);
+
+    _scheduleFlushPrintMessageQueue();
   }
 
   @override

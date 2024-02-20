@@ -1,3 +1,13 @@
+## 1.6.2
+
+- `DBEntityRepository`:
+  - Optimize `_resolveRelationshipFields`.
+
+- `LoggerHandlerIO`:
+  - `printMessage`: add a message queue for printing log messages asynchronously.
+
+- http: ^1.2.1
+
 ## 1.6.1
 
 - statistics: ^1.1.0
