@@ -1,3 +1,16 @@
+## 1.6.4
+
+- `EntityReference`:
+  - Added `idNotNull`, `idAs` and `idNotNullAs`
+- `EntityReferenceList`:
+  - Added `idsAs` and `idsNotNullAs`.
+
+- `LoggerHandler`:
+  - Added `flushMessages`.
+
+- `APIServer` and `APIServerWorker`:
+  - `_startImpl`: call `flushMessages` before return.
+
 ## 1.6.3
 
 - `APIServer`: allow return of `List<int>` as JSON. 
