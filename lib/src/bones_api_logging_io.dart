@@ -37,11 +37,11 @@ class LoggerHandlerIO extends LoggerHandler {
   final Queue<String> _printMessageQueue = Queue();
   logging.Level? _printMessageQueueLevel;
 
-  void _flushPrintMessageQueue() {
+  bool _flushPrintMessageQueue() {
     var level = _printMessageQueueLevel;
     if (level == null) {
       assert(_printMessageQueue.isEmpty);
-      return;
+      return false;
     }
 
     var out = level < logging.Level.SEVERE ? stdout : stderr;
@@ -50,19 +50,28 @@ class LoggerHandlerIO extends LoggerHandler {
 
     _printMessageQueue.clear();
     _printMessageQueueLevel = null;
+
+    return true;
   }
 
-  Future? _scheduledFlushPrintMessageQueue;
+  Future<bool>? _scheduledFlushPrintMessageQueue;
 
-  void _scheduleFlushPrintMessageQueue(
+  Future<bool> _scheduleFlushPrintMessageQueue(
       {Duration delay = const Duration(milliseconds: 20)}) {
     var scheduled = _scheduledFlushPrintMessageQueue;
-    if (scheduled != null) return;
+    if (scheduled != null) return scheduled;
 
-    _scheduledFlushPrintMessageQueue = Future.delayed(delay, () {
-      _flushPrintMessageQueue();
+    return _scheduledFlushPrintMessageQueue = Future.delayed(delay, () {
+      var flushed = _flushPrintMessageQueue();
       _scheduledFlushPrintMessageQueue = null;
+      return flushed;
     });
+  }
+
+  @override
+  FutureOr<bool> flushMessages() {
+    if (_printMessageQueue.isEmpty) return false;
+    return _scheduleFlushPrintMessageQueue();
   }
 
   @override
@@ -74,6 +83,7 @@ class LoggerHandlerIO extends LoggerHandler {
 
     _printMessageQueue.add(message);
 
+    // ignore: discarded_futures
     _scheduleFlushPrintMessageQueue();
   }
 
