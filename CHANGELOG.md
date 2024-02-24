@@ -1,3 +1,7 @@
+## 1.6.3
+
+- `APIServer`: allow return of `List<int>` as JSON. 
+
 ## 1.6.2
 
 - `DBEntityRepository`:
