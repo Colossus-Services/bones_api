@@ -12,6 +12,9 @@ class LoggerHandlerGeneric extends LoggerHandler {
   void printMessage(Level level, String message) {
     print(message);
   }
+
+  @override
+  bool flushMessages() => false;
 }
 
 LoggerHandler createLoggerHandler(Logger logger) {

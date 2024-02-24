@@ -73,6 +73,8 @@ extension LoggerExntesion on logging.Logger {
     return handler;
   }
 
+  FutureOr<bool> flushMessages() => handler.flushMessages();
+
   static final Set<logging.Logger> _dbLoggers = {};
 
   List<logging.Logger> get dbLoggers => _dbLoggers.toList();
@@ -310,6 +312,8 @@ abstract class LoggerHandler {
   }
 
   void printMessage(logging.Level level, String message);
+
+  FutureOr<bool> flushMessages();
 
   void logAll() {
     logging.hierarchicalLoggingEnabled = true;

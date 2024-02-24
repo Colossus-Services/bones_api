@@ -945,6 +945,8 @@ class APIServer extends _APIServerBase {
       }
     }
 
+    await _log.flushMessages();
+
     return true;
   }
 
@@ -1895,7 +1897,8 @@ final class APIServerWorker extends _APIServerBase {
 
     return _startImpl2().then((ok) {
       _log.info("Started: ${ok ? 'OK' : 'Fail'}$_logSectionClose");
-      return ok;
+
+      return _log.flushMessages().then((_) => ok);
     });
   }
 

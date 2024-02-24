@@ -683,8 +683,22 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   @override
   String get typeName => super.typeName;
 
-  /// The entity ID.
+  /// The entity ID or null if not resolved.
   Object? get id => _resolveID();
+
+  /// Returns [id] as [Object] (NOT null).
+  Object get idNotNull => id!;
+
+  /// Returns [id] as [I] or null.
+  /// See [idNotNullAs].
+  I? idAs<I>() {
+    var id = this.id;
+    return id is I ? id : null;
+  }
+
+  /// Returns [id] as [I].
+  /// See [idAs].
+  I idNotNullAs<I>() => id as I;
 
   Object? _resolveID() {
     var id = _id;
@@ -1616,6 +1630,14 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Non-nullable versions of [ids].
   List<Object> get idsNotNull =>
       ids?.where((e) => e != null).whereType<Object>().toList() ?? <Object>[];
+
+  /// Returns the [ids] with type [I] or null.
+  /// See [idsNotNullAs].
+  List<I?> idsAs<I>() => ids?.map((e) => e is I ? e : null).toList() ?? [];
+
+  /// Returns the [ids] with type [I].
+  /// See [idsAs].
+  List<I> idsNotNullAs<I>() => ids?.whereType<I>().toList() ?? [];
 
   List<Object?>? _resolveIDs() {
     var ids = _ids;
