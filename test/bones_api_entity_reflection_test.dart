@@ -21,6 +21,9 @@ void main() {
       var ref1 = t.arguments0!.toEntityReference(UserInfo('info 1', id: 11));
       expect(ref1.isNull, isFalse);
       expect(ref1.id, equals(11));
+      expect(ref1.idNotNull, equals(11));
+      expect(ref1.idAs<int>(), equals(11));
+      expect(ref1.idNotNullAs<int>(), equals(11));
       expect(ref1.entity, equals(UserInfo('info 1', id: 11)));
 
       var ref2 = t.arguments0!.toEntityReference(null);
@@ -167,6 +170,9 @@ void main() {
           t.arguments0!.toEntityReferenceList(UserInfo('info 1', id: 11));
       expect(ref1.isNull, isFalse);
       expect(ref1.ids, equals([11]));
+      expect(ref1.idsNotNull, equals([11]));
+      expect(ref1.idsAs<int>(), equals([11]));
+      expect(ref1.idsNotNullAs<int>(), equals([11]));
       expect(ref1.entities, equals([UserInfo('info 1', id: 11)]));
 
       var ref2 = t.arguments0!.toEntityReferenceList(
