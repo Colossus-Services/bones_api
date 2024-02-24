@@ -1367,7 +1367,8 @@ class APIServer extends _APIServerBase {
       return payload;
     }
 
-    if (payload is List<int>) {
+    if (payload is List<int> &&
+        !(apiResponse.payloadMimeType?.isJSON ?? false)) {
       apiResponse.payloadMimeType ??= lookupMimeType(
               apiResponse.payloadFileExtension ?? 'bytes',
               headerBytes: payload) ??
