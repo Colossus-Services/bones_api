@@ -69,9 +69,19 @@ class LoggerHandlerIO extends LoggerHandler {
   }
 
   @override
-  FutureOr<bool> flushMessages() {
-    if (_printMessageQueue.isEmpty) return false;
-    return _scheduleFlushPrintMessageQueue();
+  FutureOr<bool> flushMessages(
+      {Duration? delay = const Duration(milliseconds: 20)}) {
+    if (_printMessageQueue.isEmpty) {
+      if (delay == null) return false;
+
+      return Future.delayed(delay).then((_) {
+        if (_printMessageQueue.isEmpty) return false;
+        return _scheduleFlushPrintMessageQueue();
+      });
+    }
+
+    return _scheduleFlushPrintMessageQueue(
+        delay: delay ?? Duration(milliseconds: 20));
   }
 
   @override

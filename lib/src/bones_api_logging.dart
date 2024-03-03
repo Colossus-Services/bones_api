@@ -73,7 +73,9 @@ extension LoggerExntesion on logging.Logger {
     return handler;
   }
 
-  FutureOr<bool> flushMessages() => handler.flushMessages();
+  FutureOr<bool> flushMessages(
+          {Duration? delay = const Duration(milliseconds: 20)}) =>
+      handler.flushMessages(delay: delay);
 
   static final Set<logging.Logger> _dbLoggers = {};
 
@@ -313,7 +315,8 @@ abstract class LoggerHandler {
 
   void printMessage(logging.Level level, String message);
 
-  FutureOr<bool> flushMessages();
+  FutureOr<bool> flushMessages(
+      {Duration? delay = const Duration(milliseconds: 20)});
 
   void logAll() {
     logging.hierarchicalLoggingEnabled = true;

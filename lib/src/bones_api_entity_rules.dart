@@ -6,7 +6,6 @@ import 'bones_api_base.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_types.dart';
-import 'bones_api_utils_json.dart';
 
 abstract class EntityRules<R extends EntityRules<R>> {
   final bool? _innocuous;
@@ -463,7 +462,14 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
       Object? map;
       if (enc == null) {
-        map = Json.toJson(o, toEncodable: ReflectionFactory.toJsonEncodable);
+        var classReflection =
+            ReflectionFactory().getRegisterClassReflection(o.runtimeType);
+
+        if (classReflection != null) {
+          map = classReflection.toMapFromFields(o);
+        } else {
+          map = j.toJson(o, autoResetEntityCache: false);
+        }
       } else {
         map = enc(o, j);
       }

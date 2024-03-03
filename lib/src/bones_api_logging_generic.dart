@@ -14,7 +14,8 @@ class LoggerHandlerGeneric extends LoggerHandler {
   }
 
   @override
-  bool flushMessages() => false;
+  bool flushMessages({Duration? delay = const Duration(milliseconds: 20)}) =>
+      false;
 }
 
 LoggerHandler createLoggerHandler(Logger logger) {
