@@ -6,6 +6,9 @@
 - `APIResponse` extension on `Future` and `FutureOr`:
   - Added `payloadAsyncOr`.
 
+- `LoggerHandler`:
+  - `flushMessages`: added parameter `delay`.
+
 - async_extension: ^1.2.7
 - reflection_factory: ^2.3.1
 - postgres: ^2.6.4

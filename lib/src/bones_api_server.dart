@@ -945,7 +945,7 @@ class APIServer extends _APIServerBase {
       }
     }
 
-    await _log.flushMessages();
+    await _log.flushMessages(delay: Duration(milliseconds: 50));
 
     return true;
   }
