@@ -1017,6 +1017,8 @@ extension ListOfStringExtension on List<String> {
 extension FutureOrAPIResponseExtension<T> on FutureOr<APIResponse<T>> {
   FutureOr<T?> get payloadAsync => then((r) => r.payload);
 
+  FutureOr<T?> payloadAsyncOr(T? def) => then((r) => r.payload ?? def);
+
   FutureOr<APIResponseStatus> get statusAsync => then((r) => r.status);
 
   FutureOr<Map<String, dynamic>> get headersAsync => then((r) => r.headers);
@@ -1036,6 +1038,8 @@ extension FutureOrAPIResponseExtension<T> on FutureOr<APIResponse<T>> {
 
 extension FutureAPIResponseExtension<T> on Future<APIResponse<T>> {
   Future<T?> get payloadAsync => then((r) => r.payload);
+
+  Future<T?> payloadAsyncOr(T? def) => then((r) => r.payload ?? def);
 
   Future<APIResponseStatus> get statusAsync => then((r) => r.status);
 

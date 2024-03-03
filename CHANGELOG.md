@@ -1,3 +1,16 @@
+## 1.6.5
+
+- `EntityAccessRules`:
+  - Fix `toJsonEncodable` to allow rules to be applied to sub-entities. 
+
+- `APIResponse` extension on `Future` and `FutureOr`:
+  - Added `payloadAsyncOr`.
+
+- async_extension: ^1.2.7
+- reflection_factory: ^2.3.1
+- postgres: ^2.6.4
+- googleapis_auth: ^1.5.0
+
 ## 1.6.4
 
 - `EntityReference`:
