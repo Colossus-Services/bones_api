@@ -1,3 +1,16 @@
+## 1.6.6
+
+- `APIServerConfig`:
+  - Added field `development` and `serverResponseDelay`.
+  - Added option `server-response-delay`.
+
+- `APISecurity`:
+  - Fixed `disposeAuthenticationData`.
+  - Added `disposeAuthenticationToken`.
+
+- `APITokenStore`:
+  - Added `removeTokenData`.
+
 ## 1.6.5
 
 - `EntityAccessRules`:
