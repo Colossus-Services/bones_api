@@ -368,6 +368,24 @@ abstract class APISecurity {
       return disposeUsernameEntity;
     }
 
+    var prevToken = _tokenStore.removeTokenData(token);
+
+    return prevToken.resolveMapped((prevToken) {
+      var disposeTokenData = prevToken != null;
+      return disposeUsernameEntity || disposeTokenData;
+    });
+  }
+
+  FutureOr<bool> disposeAuthenticationToken(APICredential credential) {
+    var disposeUsernameEntity = credential.usernameEntity != null;
+    credential.usernameEntity = null;
+
+    var token = credential.token;
+
+    if (token == null) {
+      return disposeUsernameEntity;
+    }
+
     var prevToken = _tokenStore.removeToken(token);
 
     return prevToken.resolveMapped((prevToken) {
@@ -849,6 +867,22 @@ class APITokenStore {
   FutureOr<APITokenInfo?> removeToken(String token) {
     return _resolveSharedTokens().resolveMapped((sharedTokens) {
       return sharedTokens.remove(token);
+    });
+  }
+
+  FutureOr<APITokenInfo?> removeTokenData(String token) {
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.get(token).resolveMapped((tokenInfo) {
+        if (tokenInfo != null) {
+          return sharedTokens.put(token, (
+            apiToken: tokenInfo.apiToken,
+            data: null,
+            permissions: tokenInfo.permissions
+          ));
+        }
+
+        return tokenInfo;
+      });
     });
   }
 
