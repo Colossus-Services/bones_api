@@ -39,6 +39,8 @@ final _logLetsEncrypt = logging.Logger('LetsEncrypt');
 
 /// API Server Config.
 class APIServerConfig {
+  final bool development;
+
   /// The bind address of this server.
   final String address;
 
@@ -125,6 +127,10 @@ class APIServerConfig {
   /// If `true` log messages to [stdout] (console).
   late final bool logToConsole;
 
+  /// A forced delay in each server response.
+  /// Only active if [development] is `true`.
+  final Duration? serverResponseDelay;
+
   /// The [APIConfig] of the [APIRoot].
   final APIConfig? apiConfig;
 
@@ -132,6 +138,7 @@ class APIServerConfig {
   final ArgsSimple args;
 
   APIServerConfig({
+    bool? development,
     String? name,
     String? version,
     String? address,
@@ -154,8 +161,10 @@ class APIServerConfig {
     int? staticFilesCacheMaxContentLength,
     this.apiConfig,
     bool? logToConsole,
+    this.serverResponseDelay,
     Object? args,
-  })  : name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
+  })  : development = development ?? false,
+        name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
         version = version != null && version.trim().isNotEmpty
             ? version
             : BonesAPI.VERSION,
@@ -211,6 +220,8 @@ class APIServerConfig {
   factory APIServerConfig.fromArgs(List<String> args) {
     var a = ArgsSimple.parse(args);
 
+    var development = a.flagOr('development', null);
+
     var name = a.optionAsString('name');
     var version = a.optionAsString('version');
 
@@ -261,7 +272,13 @@ class APIServerConfig {
 
     var apiConfig = apiConfigUri != null ? APIConfig.from(apiConfigUri) : null;
 
+    var serverResponseDelay = tryParseDuration(
+      a.optionAsString('server-response-delay') ??
+          apiConfig?.getPath<String>('server', 'response-delay'),
+    );
+
     return APIServerConfig(
+      development: development ?? apiConfig?.development,
       name: name,
       version: version,
       address: address,
@@ -282,6 +299,7 @@ class APIServerConfig {
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
+      serverResponseDelay: serverResponseDelay,
       apiConfig: apiConfig,
       logToConsole: logToConsole,
       args: a,
@@ -731,6 +749,7 @@ abstract class _APIServerBase extends APIServerConfig {
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
+    super.serverResponseDelay,
     super.logToConsole,
   }) : super(apiConfig: apiRoot.apiConfig);
 
@@ -758,6 +777,7 @@ abstract class _APIServerBase extends APIServerConfig {
               apiServerConfig.staticFilesCacheMaxMemorySize,
           staticFilesCacheMaxContentLength:
               apiServerConfig.staticFilesCacheMaxContentLength,
+          serverResponseDelay: apiServerConfig.serverResponseDelay,
           logToConsole: apiServerConfig.logToConsole,
         );
 
@@ -872,6 +892,7 @@ class APIServer extends _APIServerBase {
     super.apiCacheControl,
     super.staticFilesCacheControl,
     super.cacheStaticFilesResponses,
+    super.serverResponseDelay,
     super.logToConsole,
   }) : super(address: address, port: port);
 
@@ -974,6 +995,7 @@ class APIServer extends _APIServerBase {
       hotReload: hotReload,
       cookieless: cookieless,
       totalWorkers: totalWorkers,
+      serverResponseDelay: serverResponseDelay,
     );
   }
 
@@ -1446,6 +1468,10 @@ class APIServer extends _APIServerBase {
 
   @override
   String toString() {
+    var serverResponseDelayStr = serverResponseDelay != null
+        ? ', serverResponseDelay: ${serverResponseDelay!.toStringUnit()}'
+        : '';
+
     var domainsStr = domainsRoots.isNotEmpty
         ? ', domains: [${domainsRoots.entries.map((e) {
             var key = e.key;
@@ -1462,7 +1488,7 @@ class APIServer extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, totalWorkers: $totalWorkers, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$serverResponseDelayStr$secureStr, totalWorkers: $totalWorkers, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
 
   /// Creates an [APIServer] with [apiRoot].
@@ -1645,6 +1671,7 @@ final class APIServerWorker extends _APIServerBase {
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
+    super.serverResponseDelay,
     super.logToConsole,
   }) {
     _configureAPIRoot(apiRoot);
@@ -2255,6 +2282,19 @@ final class APIServerWorker extends _APIServerBase {
     // headers['X-APIToken'] = apiRequest.credential?.token ?? '?';
 
     var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
+
+    final serverResponseDelay = this.serverResponseDelay;
+    if (serverResponseDelay != null && !serverResponseDelay.isNegative) {
+      final retPayloadOrig = retPayload;
+
+      _log.info(
+          "[DEV] Response #${apiRequest.id} delayed in ${serverResponseDelay.toStringUnit()}: ${apiRequest.requestedUri}");
+
+      retPayload = Future.delayed(serverResponseDelay, () async {
+        var payload = await retPayloadOrig;
+        return payload;
+      });
+    }
 
     return retPayload.resolveMapped((payload) {
       if (payload is APIResponse) {
