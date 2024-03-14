@@ -1,3 +1,14 @@
+## 1.6.7
+
+- `LoggerHandler`:
+  - Added `useLogQueue`, `disableLogQueue` and `enableLogQueue`.
+
+- New `APIModuleProxyCallerError`:
+  - Implemented by `APIModuleProxyCallerResponseError`.
+
+- `APIModuleProxyDirectCaller`:
+  - Throw `APIModuleProxyCallerResponseError` for `APIResponse`s with `ERROR` status.
+
 ## 1.6.6
 
 - `APIServerConfig`:

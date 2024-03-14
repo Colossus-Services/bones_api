@@ -20,6 +20,7 @@ import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_security.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIModule');
@@ -1023,6 +1024,38 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
             moduleName: moduleName, responsesAsJson: responsesAsJson));
 }
 
+abstract class APIModuleProxyCallerError extends Error
+    implements WithRuntimeTypeNameSafe {
+  final String message;
+
+  APIModuleProxyCallerError(this.message);
+
+  List get extraInfo => [];
+
+  @override
+  String toString() {
+    var extraInfo = this.extraInfo;
+    var extra = extraInfo.isEmpty ? '' : '\n  -- ${extraInfo.join('\n  -- ')}';
+    return '$runtimeTypeNameSafe: $message$extra';
+  }
+}
+
+class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
+  final APIResponse? apiResponse;
+  final Object? error;
+
+  APIModuleProxyCallerResponseError(super.message,
+      {this.apiResponse, this.error});
+
+  @override
+  List get extraInfo => [
+        if (apiResponse != null) apiResponse,
+      ];
+
+  @override
+  String get runtimeTypeNameSafe => 'APIModuleProxyCallerResponseError';
+}
+
 abstract class APIModuleProxyCallerListener<T>
     implements ClassProxyListener<T> {
   Object? resolveResponse(TypeReflection? returnType, dynamic json) {
@@ -1065,7 +1098,12 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
         parameters: parameters, credential: credential));
 
     return response.resolveMapped((response) {
-      if (response.isNotOK) return null;
+      if (response.isError) {
+        throw APIModuleProxyCallerResponseError(
+            'Response ERROR> ${response.error}',
+            apiResponse: response);
+      }
+
       var payload = response.payload;
 
       if (responsesAsJson && returnType != null) {
