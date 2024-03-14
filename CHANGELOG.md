@@ -1,3 +1,19 @@
+## 1.6.7
+
+- `LoggerHandler`:
+  - Added `useLogQueue`, `disableLogQueue` and `enableLogQueue`.
+
+- New `APIModuleProxyCallerError`:
+  - Implemented by `APIModuleProxyCallerResponseError`.
+
+- `APIModuleProxyDirectCaller`:
+  - Throw `APIModuleProxyCallerResponseError` for `APIResponse`s with `ERROR` status.
+- `APIModuleProxyHttpCaller`:
+  - Throw `APIModuleProxyCallerResponseError` for error `HttpResponse`s.
+
+- mercury_client: ^2.2.2
+- async_extension: ^1.2.9
+
 ## 1.6.6
 
 - `APIServerConfig`:
