@@ -1030,7 +1030,7 @@ abstract class APIModuleProxyCallerError extends Error
 
   APIModuleProxyCallerError(this.message);
 
-  List get extraInfo => [];
+  List<Object> get extraInfo => [];
 
   @override
   String toString() {
@@ -1041,16 +1041,46 @@ abstract class APIModuleProxyCallerError extends Error
 }
 
 class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
-  final APIResponse? apiResponse;
-  final Object? error;
+  final Object? response;
+  final Object? responseError;
+  final StackTrace? responseStackTrace;
 
   APIModuleProxyCallerResponseError(super.message,
-      {this.apiResponse, this.error});
+      {this.response, this.responseError, this.responseStackTrace});
+
+  APIResponse? get apiResponse {
+    var response = this.response;
+    return response is APIResponse ? response : null;
+  }
 
   @override
-  List get extraInfo => [
-        if (apiResponse != null) apiResponse,
+  List<Object> get extraInfo {
+    final response = this.response;
+    final responseError = this.responseError;
+    final responseStackTrace = this.responseStackTrace;
+
+    if (response is APIResponse) {
+      return [
+        response,
+        if (responseError != null &&
+            !identical(response.error, responseError) &&
+            !message.contains('$responseError'))
+          responseError,
+        if (responseStackTrace != null &&
+            !identical(response.stackTrace, responseStackTrace))
+          responseStackTrace,
       ];
+    } else {
+      return [
+        if (response != null) response,
+        if (responseError != null &&
+            !identical(response, responseError) &&
+            !message.contains('$responseError'))
+          responseError,
+        if (responseStackTrace != null) responseStackTrace,
+      ];
+    }
+  }
 
   @override
   String get runtimeTypeNameSafe => 'APIModuleProxyCallerResponseError';
@@ -1101,8 +1131,12 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
       if (response.isError) {
         throw APIModuleProxyCallerResponseError(
             'Response ERROR> ${response.error}',
-            apiResponse: response);
+            response: response,
+            responseError: response.error,
+            responseStackTrace: response.stackTrace);
       }
+
+      if (response.isNotOK) return null;
 
       var payload = response.payload;
 
@@ -1222,8 +1256,18 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   }
 
   FutureOr<dynamic> parseResponse(HttpResponse response) {
+    if (response.isError) {
+      var error = parseResponseBody(response);
+      throw APIModuleProxyCallerResponseError('Response ERROR> $error',
+          response: response, responseError: error);
+    }
+
     if (response.isNotOK) return null;
 
+    return parseResponseBody(response);
+  }
+
+  FutureOr<dynamic> parseResponseBody(HttpResponse response) {
     var body = response.body;
     if (body == null) return null;
 
