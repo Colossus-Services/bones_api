@@ -8,6 +8,8 @@ import 'bones_api_base.dart';
 import 'bones_api_logging_generic.dart'
     if (dart.library.io) 'bones_api_logging_io.dart';
 
+final _log = logging.Logger('LoggerHandler');
+
 final Expando<LoggerHandler> _loggerHandlers = Expando<LoggerHandler>();
 
 bool _bootCalled = false;
@@ -315,6 +317,32 @@ abstract class LoggerHandler {
 
   void printMessage(logging.Level level, String message);
 
+  static bool _useLogQueue = true;
+
+  /// If `true` [printMessage] implementation can use a queue and delay
+  /// the message to the output.
+  ///
+  /// See [disableLogQueue], [enableLogQueue] and [flushMessages]
+  static bool get useLogQueue => _useLogQueue;
+
+  /// Sets [useLogQueue] to `false`.
+  static void disableLogQueue() {
+    if (_useLogQueue) {
+      _useLogQueue = false;
+      _log.info("DISABLED LOG QUEUE.");
+    }
+  }
+
+  /// Sets [useLogQueue] to `true`.
+  static void enableLogQueue() {
+    if (!_useLogQueue) {
+      _useLogQueue = true;
+      _log.info("ENABLED LOG QUEUE.");
+    }
+  }
+
+  /// Flushes the messages in the queue (if the implementation has one).
+  /// See [useLogQueue].
   FutureOr<bool> flushMessages(
       {Duration? delay = const Duration(milliseconds: 20)});
 
@@ -338,6 +366,9 @@ abstract class LoggerHandler {
     _allMessageLoggerIncludeDBLogs = includeDBLogs;
   }
 
+  /// [enabled]]/disable logs to the console.
+  /// - VM: logs to the STDOUT/STDERR.
+  /// - Browser: logs to the browser console.
   void logToConsole({bool enabled = true}) => _logToConsoleImpl(enabled);
 
   static bool _logToConsole = false;

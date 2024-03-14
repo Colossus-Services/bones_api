@@ -86,15 +86,24 @@ class LoggerHandlerIO extends LoggerHandler {
 
   @override
   void printMessage(logging.Level level, String message) {
-    if (_printMessageQueueLevel != level) {
-      _flushPrintMessageQueue();
-      _printMessageQueueLevel = level;
+    if (!LoggerHandler.useLogQueue) {
+      if (_printMessageQueueLevel != null) {
+        _flushPrintMessageQueue();
+      }
+
+      var out = level < logging.Level.SEVERE ? stdout : stderr;
+      out.write(message);
+    } else {
+      if (_printMessageQueueLevel != level) {
+        _flushPrintMessageQueue();
+        _printMessageQueueLevel = level;
+      }
+
+      _printMessageQueue.add(message);
+
+      // ignore: discarded_futures
+      _scheduleFlushPrintMessageQueue();
     }
-
-    _printMessageQueue.add(message);
-
-    // ignore: discarded_futures
-    _scheduleFlushPrintMessageQueue();
   }
 
   @override
