@@ -8,6 +8,10 @@
 
 - `APIModuleProxyDirectCaller`:
   - Throw `APIModuleProxyCallerResponseError` for `APIResponse`s with `ERROR` status.
+- `APIModuleProxyHttpCaller`:
+  - Throw `APIModuleProxyCallerResponseError` for error `HttpResponse`s.
+
+- mercury_client: ^2.2.2
 
 ## 1.6.6
 
