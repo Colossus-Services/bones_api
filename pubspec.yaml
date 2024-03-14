@@ -10,7 +10,7 @@ executables:
   bones_api:
 
 dependencies:
-  async_extension: ^1.2.7
+  async_extension: ^1.2.9
   async_events: ^1.1.0
   reflection_factory: ^2.3.1
   statistics: ^1.1.0
@@ -60,11 +60,11 @@ dev_dependencies:
   coverage: ^1.7.2
   vm_service: ^13.0.0
 
-#dependency_overrides:
-#  shared_map:
-#    path: ../shared_map
-#  shelf_letsencrypt:
-#    path: ../shelf_letsencrypt
+dependency_overrides:
+  shared_map:
+    path: ../shared_map
+  shelf_letsencrypt:
+    path: ../shelf_letsencrypt
 #  args_simple:
 #    path: ../args_simple
 #  graph_explorer:

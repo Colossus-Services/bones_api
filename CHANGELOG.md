@@ -12,6 +12,7 @@
   - Throw `APIModuleProxyCallerResponseError` for error `HttpResponse`s.
 
 - mercury_client: ^2.2.2
+- async_extension: ^1.2.9
 
 ## 1.6.6
 
