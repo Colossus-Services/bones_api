@@ -326,6 +326,47 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
   }
 
+  Object? normalizeID(Object? id, {O? obj}) {
+    if (id == null) return null;
+
+    var idType = this.idType(obj);
+
+    if (idType == int) {
+      return TypeParser.parseInt(id);
+    } else if (idType == String) {
+      return TypeParser.parseString(id);
+    } else {
+      return TypeParser.parseValueForType(idType, id);
+    }
+  }
+
+  List? normalizeIDs(Iterable? ids, {O? obj}) {
+    if (ids == null) return null;
+
+    var idType = this.idType(obj);
+
+    if (idType == int) {
+      if (ids is List<int?>) {
+        return ids;
+      } else if (ids is Iterable<int?>) {
+        return ids.toList();
+      }
+
+      return ids.map(TypeParser.parseInt).toList();
+    } else if (idType == String) {
+      if (ids is List<String?>) {
+        return ids;
+      } else if (ids is Iterable<String?>) {
+        return ids.toList();
+      }
+
+      return ids.map(TypeParser.parseString).toList();
+    } else {
+      var idParser = TypeParser.parserFor(type: idType);
+      return idParser == null ? ids.toList() : ids.map(idParser).toList();
+    }
+  }
+
   V? resolveID<V>(Object? value) {
     if (value == null) return null;
 

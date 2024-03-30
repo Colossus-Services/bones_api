@@ -1,4 +1,4 @@
-## 1.6.7
+## 1.6.8
 
 - `LoggerHandler`:
   - Added `useLogQueue`, `disableLogQueue` and `enableLogQueue`.
@@ -13,6 +13,13 @@
 
 - mercury_client: ^2.2.2
 - async_extension: ^1.2.9
+
+## 1.6.7
+
+- `EntityHandler`: added `normalizeID` and `normalizeIDs`.
+
+- `EntityReference.fromID`: use `_normalizeID`.
+- `EntityReferenceList.fromIDs`: use `_normalizeIDs`.
 
 ## 1.6.6
 
