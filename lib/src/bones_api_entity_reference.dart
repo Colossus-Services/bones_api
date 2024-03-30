@@ -363,7 +363,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       : this._(
             type,
             typeName,
-            id,
+            _normalizeID<T>(entityHandler, id),
             null,
             null,
             entityHandler,
@@ -372,6 +372,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             entityFetcher,
             entityCache,
             checkGenericType);
+
+  static Object? _normalizeID<T>(EntityHandler<T>? entityHandler, Object? id) {
+    return entityHandler != null ? entityHandler.normalizeID(id) : id;
+  }
 
   /// Creates an [EntityReference] with the [entity] instance.
   /// The [id] is resolved through the [entity] instance.
@@ -1161,7 +1165,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       : this._(
             type,
             typeName,
-            ids?.toList(),
+            _normalizeIDs<T>(entityHandler, ids),
             null,
             null,
             entityHandler,
@@ -1170,6 +1174,12 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
             entitiesFetcher,
             entityCache,
             checkGenericType);
+
+  static _normalizeIDs<T>(EntityHandler<T>? entityHandler, List<Object?>? ids) {
+    return entityHandler != null
+        ? entityHandler.normalizeIDs(ids)
+        : ids?.toList();
+  }
 
   /// Creates an [EntityReferenceList] with the [entities] instances list.
   /// The [ids] is resolved through the [entities] instance list.
