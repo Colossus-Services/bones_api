@@ -1,3 +1,10 @@
+## 1.6.7
+
+- `EntityHandler`: added `normalizeID` and `normalizeIDs`.
+
+- `EntityReference.fromID`: use `_normalizeID`.
+- `EntityReferenceList.fromIDs`: use `_normalizeIDs`.
+
 ## 1.6.6
 
 - `APIServerConfig`:
