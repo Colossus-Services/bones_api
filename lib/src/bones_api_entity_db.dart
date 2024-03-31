@@ -729,6 +729,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   final Map<Type, EntityRepository> _entityRepositories =
       <Type, EntityRepository>{};
 
+  final Map<String, EntityRepository> _entityRepositoriesByName =
+      <String, EntityRepository>{};
+
+  final Map<String, EntityRepository> _entityRepositoriesByNameSimplified =
+      <String, EntityRepository>{};
+
+  final Map<String, EntityRepository> _entityRepositoriesByDBTableName =
+      <String, EntityRepository>{};
+
   List<EntityRepository> get entityRepositories =>
       _entityRepositories.values.toList();
 
@@ -740,6 +749,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     checkNotClosed();
 
     _entityRepositories[entityRepository.type] = entityRepository;
+
+    _entityRepositoriesByName[entityRepository.name] = entityRepository;
+    _entityRepositoriesByNameSimplified[entityRepository.nameSimplified] =
+        entityRepository;
+
+    if (entityRepository is DBSQLEntityRepository<O>) {
+      _entityRepositoriesByDBTableName[entityRepository.tableName] =
+          entityRepository;
+    }
   }
 
   @override
@@ -789,24 +807,21 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
 
       if (name != null) {
-        var nameSimplified = EntityAccessor.simplifiedName(name);
+        entityRepository = _entityRepositoriesByName[name] ??
+            _entityRepositoriesByNameSimplified[
+                EntityAccessor.simplifiedName(name)];
 
-        entityRepository = _entityRepositories.values
-            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
-            .firstOrNull;
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
         }
       }
 
       if (tableName != null) {
-        entityRepository = _entityRepositories.values.where((e) {
-          if (e is DBSQLEntityRepository) {
-            return e.tableName == tableName;
-          } else {
-            return e.name == tableName;
-          }
-        }).firstOrNull;
+        entityRepository = _entityRepositoriesByDBTableName[tableName] ??
+            _entityRepositoriesByName[tableName] ??
+            _entityRepositoriesByNameSimplified[
+                EntityAccessor.simplifiedName(tableName)];
+
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
         }
@@ -1491,9 +1506,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var retRelationshipFields =
           _getRelationshipFields(fieldsListEntity, retTableScheme);
 
-      var ret = retTableScheme.resolveOther<List<FutureOr<O>>,
-              Map<String, TableRelationshipReference>>(retRelationshipFields,
-          (tableScheme, relationshipFields) {
+      var ret = retTableScheme
+          .resolveOther<List<O>, Map<String, TableRelationshipReference>>(
+              retRelationshipFields, (tableScheme, relationshipFields) {
         if (relationshipFields.isNotEmpty) {
           entries = entries is List ? entries : entries.toList();
 
@@ -1506,7 +1521,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             resolutionRulesResolved,
           );
 
-          return resolveRelationshipsFields.resolveAllWith(() =>
+          return resolveRelationshipsFields.resolveWith(() =>
               _resolveEntitiesSubEntities(
                   transaction, resolutionRulesResolved, entries));
         } else {
@@ -1524,7 +1539,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<List<O>> _resolveEntitiesFutures(
-      Transaction transaction, FutureOr<List<FutureOr<O>>> entitiesAsync) {
+      Transaction transaction, FutureOr<List<O>> entitiesAsync) {
     if (entitiesAsync is List<O>) {
       transaction.cacheEntities<O>(entitiesAsync, getEntityID);
       return trackEntities(entitiesAsync);
@@ -1537,14 +1552,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             }));
   }
 
-  List<FutureOr<O>> _resolveEntitiesSimple(
+  FutureOr<List<O>> _resolveEntitiesSimple(
       Transaction transaction,
       EntityResolutionRulesResolved resolutionRulesResolved,
       Iterable<Map<String, dynamic>> results) {
     final entityProvider = TransactionEntityProvider(
         transaction, provider, resolutionRulesResolved);
 
-    return results.map((e) {
+    return results.forEachAsync((e) {
       // ignore: discarded_futures
       return entityHandler.createFromMap(e,
           entityProvider: entityProvider,
@@ -1552,10 +1567,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           entityRepositoryProvider: provider,
           entityHandlerProvider: entityHandler.provider,
           resolutionRules: resolutionRulesResolved);
-    }).toList();
+    });
   }
 
-  FutureOr<List<FutureOr<O>>> _resolveEntitiesSubEntities(
+  FutureOr<List<O>> _resolveEntitiesSubEntities(
       Transaction transaction,
       EntityResolutionRulesResolved resolutionRulesResolved,
       Iterable<Map<String, dynamic>> results) {
@@ -1578,7 +1593,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     if (fieldsEntityRepositories.isNotEmpty) {
       var fieldsEntitiesAsync =
           _fieldsColumnsAll().resolveMapped((fieldsColumns) {
-        return fieldsEntityRepositories.map((field, repo) {
+        return fieldsEntityRepositories.entries.forEachAsync((e) {
+          var field = e.key;
+          var repo = e.value;
+
           var tableColumn = fieldsColumns[field]!;
 
           var ids = resultsList.map((e) => e[tableColumn]).toList();
@@ -1593,11 +1611,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
                   .toList());
 
           return MapEntry(tableColumn, entities);
-        }).resolveAllValues();
+        }).resolveMapped((l) => l.resolveAllValues());
       });
 
       return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
-        for (var e in fieldsEntities.entries) {
+        for (var e in fieldsEntities) {
           var field = e.key;
           var fieldEntities = Map.fromEntries(e.value);
 
@@ -1678,7 +1696,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         .toMapFromEntries();
   }
 
-  List<FutureOr<bool>> _resolveRelationshipFields(
+  FutureOr<List<bool>> _resolveRelationshipFields(
     Transaction transaction,
     TableScheme tableScheme,
     Iterable<Map<String, dynamic>> results,
@@ -1690,15 +1708,16 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var ids = results.map((e) => e[idFieldName]).toList();
 
     var databaseAdapter = repositoryAdapter.databaseAdapter;
-
     if (databaseAdapter.isClosed) {
       throw StateError("Closed `DBAdapter`: $databaseAdapter");
     }
 
-    return relationshipFields.entries.map((e) {
-      final fieldName = e.key;
+    return relationshipFields.entries.forEachAsync((e) {
+      final String fieldName = e.key;
+      final TableRelationshipReference tableRelationshipReference = e.value;
+
       final fieldType = fieldsListEntity[fieldName]!;
-      final targetTable = e.value.targetTable;
+      final targetTable = tableRelationshipReference.targetTable;
 
       final targetRepositoryAdapter = databaseAdapter
               .getRepositoryAdapterByTableName(targetTable) ??
@@ -1774,7 +1793,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           return resolveRelationshipEntities(relationshipsEntities);
         });
       });
-    }).toList(growable: false);
+    });
   }
 
   // ignore: unused_element

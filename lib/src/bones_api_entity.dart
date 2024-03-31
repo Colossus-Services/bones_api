@@ -579,7 +579,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var fieldsTypes = this.fieldsTypes(o);
 
-    var resolved = fields.map((f, v) {
+    var resolved = fields.entries.forEachAsync((e) {
+      var f = e.key;
+      var v = e.value;
       var t = fieldsTypes[f];
       var v2 = resolveFieldValue(f, t, v,
           entityProvider: entityProvider,
@@ -611,7 +613,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return MapEntry(f, v2);
     });
 
-    return resolved.resolveAllValuesNullable();
+    return resolved
+        .resolveMapped((l) => l.toMapFromEntries().resolveAllValuesNullable());
   }
 
   FutureOr<Object?> resolveFieldValue(

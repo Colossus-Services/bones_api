@@ -11,8 +11,13 @@
 - `APIModuleProxyHttpCaller`:
   - Throw `APIModuleProxyCallerResponseError` for error `HttpResponse`s.
 
+- Optimize `DBAdapter` and `DBEntityRepository`.
+
+- async_extension: ^1.2.12
 - mercury_client: ^2.2.2
 - async_extension: ^1.2.9
+- googleapis_auth: ^1.5.1
+- build_runner: ^2.4.9
 
 ## 1.6.7
 
