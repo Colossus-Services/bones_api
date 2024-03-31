@@ -20,6 +20,7 @@ import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_security.dart';
 import 'bones_api_types.dart';
+import 'bones_api_utils.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIModule');
@@ -1023,6 +1024,68 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
             moduleName: moduleName, responsesAsJson: responsesAsJson));
 }
 
+abstract class APIModuleProxyCallerError extends Error
+    implements WithRuntimeTypeNameSafe {
+  final String message;
+
+  APIModuleProxyCallerError(this.message);
+
+  List<Object> get extraInfo => [];
+
+  @override
+  String toString() {
+    var extraInfo = this.extraInfo;
+    var extra = extraInfo.isEmpty ? '' : '\n  -- ${extraInfo.join('\n  -- ')}';
+    return '$runtimeTypeNameSafe: $message$extra';
+  }
+}
+
+class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
+  final Object? response;
+  final Object? responseError;
+  final StackTrace? responseStackTrace;
+
+  APIModuleProxyCallerResponseError(super.message,
+      {this.response, this.responseError, this.responseStackTrace});
+
+  APIResponse? get apiResponse {
+    var response = this.response;
+    return response is APIResponse ? response : null;
+  }
+
+  @override
+  List<Object> get extraInfo {
+    final response = this.response;
+    final responseError = this.responseError;
+    final responseStackTrace = this.responseStackTrace;
+
+    if (response is APIResponse) {
+      return [
+        response,
+        if (responseError != null &&
+            !identical(response.error, responseError) &&
+            !message.contains('$responseError'))
+          responseError,
+        if (responseStackTrace != null &&
+            !identical(response.stackTrace, responseStackTrace))
+          responseStackTrace,
+      ];
+    } else {
+      return [
+        if (response != null) response,
+        if (responseError != null &&
+            !identical(response, responseError) &&
+            !message.contains('$responseError'))
+          responseError,
+        if (responseStackTrace != null) responseStackTrace,
+      ];
+    }
+  }
+
+  @override
+  String get runtimeTypeNameSafe => 'APIModuleProxyCallerResponseError';
+}
+
 abstract class APIModuleProxyCallerListener<T>
     implements ClassProxyListener<T> {
   Object? resolveResponse(TypeReflection? returnType, dynamic json) {
@@ -1065,7 +1128,16 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
         parameters: parameters, credential: credential));
 
     return response.resolveMapped((response) {
+      if (response.isError) {
+        throw APIModuleProxyCallerResponseError(
+            'Response ERROR> ${response.error}',
+            response: response,
+            responseError: response.error,
+            responseStackTrace: response.stackTrace);
+      }
+
       if (response.isNotOK) return null;
+
       var payload = response.payload;
 
       if (responsesAsJson && returnType != null) {
@@ -1184,8 +1256,18 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   }
 
   FutureOr<dynamic> parseResponse(HttpResponse response) {
+    if (response.isError) {
+      var error = parseResponseBody(response);
+      throw APIModuleProxyCallerResponseError('Response ERROR> $error',
+          response: response, responseError: error);
+    }
+
     if (response.isNotOK) return null;
 
+    return parseResponseBody(response);
+  }
+
+  FutureOr<dynamic> parseResponseBody(HttpResponse response) {
     var body = response.body;
     if (body == null) return null;
 
