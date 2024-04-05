@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.3.2
+// BUILDER: reflection_factory/2.3.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.3.2');
+  static final Version _version = Version.parse('2.3.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -367,6 +367,19 @@ class Account$reflection extends ClassReflection<Account>
       'userInfo': obj?.userInfo,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(Account? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'user': obj?.user,
+      'userInfo': obj?.userInfo,
+      'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -955,6 +968,25 @@ class Address$reflection extends ClassReflection<Address>
     };
   }
 
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(Address? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'state': obj?.state,
+      'city': obj?.city,
+      'street': obj?.street,
+      'number': obj?.number,
+      'latitude': obj?.latitude,
+      'longitude': obj?.longitude,
+      'stores': obj?.stores,
+      'closedStores': obj?.closedStores,
+      'idFieldName': obj?.idFieldName,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
   static const List<String> _staticFieldsNames = const <String>[];
 
   @override
@@ -1431,6 +1463,19 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
       'dataUrl': obj?.dataUrl,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(Photo? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'data': obj?.data,
+      'dataUrl': obj?.dataUrl,
+      'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -1977,6 +2022,20 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
       'value': obj?.value,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(Role? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'type': obj?.type,
+      'enabled': obj?.enabled,
+      'value': obj?.value,
+      'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -2541,6 +2600,20 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
       'owner': obj?.owner,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(Store? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'name': obj?.name,
+      'number': obj?.number,
+      'owner': obj?.owner,
+      'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -3160,6 +3233,26 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     };
   }
 
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(User? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'email': obj?.email,
+      'password': obj?.password,
+      'address': obj?.address,
+      'roles': obj?.roles,
+      'level': obj?.level,
+      'wakeUpTime': obj?.wakeUpTime,
+      'userInfo': obj?.userInfo,
+      'photo': obj?.photo,
+      'creationTime': obj?.creationTime,
+      'idFieldName': obj?.idFieldName,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
   static const List<String> _staticFieldsNames = const <String>[];
 
   @override
@@ -3645,6 +3738,18 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
       'info': obj?.info,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(UserInfo? obj,
+      {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'info': obj?.info,
+      'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
