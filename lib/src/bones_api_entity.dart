@@ -2420,7 +2420,8 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   V? getField<V>(O o, String key) => reflection.getField<V?>(key, o);
 
   @override
-  Map<String, dynamic> getFields(O o) => reflection.getFieldsValues(o);
+  Map<String, dynamic> getFields(O o) =>
+      reflection.getJsonFieldsVisibleValues(o);
 
   @override
   TypeInfo? getFieldType(O? o, String key) {
