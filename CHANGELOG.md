@@ -1,3 +1,7 @@
+## 1.6.9
+
+- reflection_factory: ^2.3.2
+
 ## 1.6.8
 
 - `LoggerHandler`:

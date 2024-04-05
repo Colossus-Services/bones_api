@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.3.1
+// BUILDER: reflection_factory/2.3.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.3.1');
+  static final Version _version = Version.parse('2.3.2');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -360,6 +360,7 @@ class Account$reflection extends ClassReflection<Account>
   @override
   Map<String, dynamic> getFieldsValues(Account? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'user': obj?.user,
@@ -937,6 +938,7 @@ class Address$reflection extends ClassReflection<Address>
   @override
   Map<String, dynamic> getFieldsValues(Address? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'state': obj?.state,
@@ -1422,6 +1424,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   @override
   Map<String, dynamic> getFieldsValues(Photo? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'data': obj?.data,
@@ -1966,6 +1969,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
 
   @override
   Map<String, dynamic> getFieldsValues(Role? obj, {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'type': obj?.type,
@@ -2529,6 +2533,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   @override
   Map<String, dynamic> getFieldsValues(Store? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'name': obj?.name,
@@ -3137,6 +3142,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
 
   @override
   Map<String, dynamic> getFieldsValues(User? obj, {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'email': obj?.email,
@@ -3633,6 +3639,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   @override
   Map<String, dynamic> getFieldsValues(UserInfo? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
       'info': obj?.info,
