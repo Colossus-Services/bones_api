@@ -1,3 +1,10 @@
+## 1.6.9
+
+- `ClassReflectionEntityHandler`:
+  - `getFields`: call `reflection.getJsonFieldsVisibleValues` (avoid issues with `JsonHidden.fields`).
+
+- reflection_factory: ^2.3.3
+
 ## 1.6.8
 
 - `LoggerHandler`:

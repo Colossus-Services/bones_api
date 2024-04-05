@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.3.1
+// BUILDER: reflection_factory/2.3.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.3.1');
+  static final Version _version = Version.parse('2.3.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -401,6 +401,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   @override
   Map<String, dynamic> getFieldsValues(AboutModule? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'apiRoot': obj?.apiRoot,
       'name': obj?.name,
@@ -1189,6 +1190,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   @override
   Map<String, dynamic> getFieldsValues(UserModule? obj,
       {bool withHashCode = false}) {
+    obj ??= object;
     return <String, dynamic>{
       'apiRoot': obj?.apiRoot,
       'name': obj?.name,
