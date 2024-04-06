@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.3.3
+// BUILDER: reflection_factory/2.3.4
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -20,7 +20,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.3.3');
+  static final Version _version = Version.parse('2.3.4');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -634,7 +634,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
               'config': __PR(
                   __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
               'parameters': __PR(
-                  __TR<Map<String, TypeInfo<dynamic>>>(Map, <__TR>[
+                  __TR<Map<String, TypeInfo>>(Map, <__TR>[
                     __TR.tString,
                     __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic])
                   ]),
@@ -702,7 +702,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'call',
-            __TR<FutureOr<APIResponse<dynamic>>>(FutureOr, <__TR>[
+            __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
               __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
             ]),
             false,

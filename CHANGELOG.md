@@ -1,3 +1,7 @@
+## 1.6.10
+
+- reflection_factory: ^2.3.4
+
 ## 1.6.9
 
 - `ClassReflectionEntityHandler`:
