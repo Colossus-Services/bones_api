@@ -1235,20 +1235,25 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   void _logTransactionOperationSQL(
       String method, TransactionOperation op, Object sql) {
-    if (logSQL) {
-      String s;
-      if (sql is List) {
-        if (sql.isEmpty) {
-          s = '<empty_sql>';
-        } else if (sql.length == 1) {
-          s = '${sql[0]}';
+    if (logSQL && _log.handler.isLoggingDB) {
+      String msg() {
+        String s;
+        if (sql is List) {
+          if (sql.isEmpty) {
+            s = '<empty_sql>';
+          } else if (sql.length == 1) {
+            s = '${sql[0]}';
+          } else {
+            s = '\n  -- ${sql.join('\n  -- ')}';
+          }
         } else {
-          s = '\n  -- ${sql.join('\n  -- ')}';
+          s = '$sql';
         }
-      } else {
-        s = '$sql';
+
+        return '[transaction:${op.transactionId}] $method> $s';
       }
-      _log.info('[transaction:${op.transactionId}] $method> $s');
+
+      _log.info(msg);
     }
   }
 
