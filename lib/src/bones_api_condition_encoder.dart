@@ -18,6 +18,9 @@ final _logSchemeProvider = logging.Logger('SchemeProvider')
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
+  static final TableFieldReference _dummy =
+      TableFieldReference('dummy', 'dummy', int, 'dummy', 'dummy', int);
+
   /// The source table name.
   final String sourceTable;
 
@@ -399,14 +402,36 @@ class TableScheme with FieldsFromMap {
         "${rels.map((r) => ' -- $r\n').join('\n')}\n");
   }
 
+  static final TableFieldReference _tableFieldReferenceDummy =
+      TableFieldReference._dummy;
+
+  final Map<String, TableFieldReference> _fieldsReferencedTablesResolved =
+      <String, TableFieldReference>{};
+
   /// Returns a [TableFieldReference] from [_fieldsReferencedTables] with a resolved [fieldKey].
   /// See [resolveTableFieldName].
   TableFieldReference? getFieldReferencedTable(String fieldKey) {
+    var resolvedRef = _fieldsReferencedTablesResolved[fieldKey];
+    if (resolvedRef != null) {
+      return identical(resolvedRef, _tableFieldReferenceDummy)
+          ? null
+          : resolvedRef;
+    }
+
+    var ref = _getFieldReferencedTableImpl(fieldKey);
+
+    _fieldsReferencedTablesResolved[fieldKey] =
+        ref ?? _tableFieldReferenceDummy;
+
+    return ref;
+  }
+
+  TableFieldReference? _getFieldReferencedTableImpl(String fieldKey) {
     var ref = _fieldsReferencedTables[fieldKey];
     if (ref != null) return ref;
 
     var resolvedName = resolveTableFieldName(fieldKey);
-    if (resolvedName == null) return null;
+    if (resolvedName == null || fieldKey == resolvedName) return null;
 
     ref = _fieldsReferencedTables[resolvedName];
     return ref;
