@@ -123,7 +123,9 @@ extension LoggerExntesion on logging.Logger {
 
   void logDB(logging.Level logLevel, Object? message,
       [Object? error, StackTrace? stackTrace, Zone? zone]) {
-    log(logLevel, DBLog(message));
+    if (handler.isLoggingDB) {
+      log(logLevel, DBLog(message));
+    }
   }
 }
 
@@ -162,9 +164,9 @@ abstract class LoggerHandler {
   static bool isDbLoggerName(String name) =>
       LoggerExntesion._dbLoggersNames.contains(name);
 
-  static logging.Logger get rootLogger => logging.Logger.root;
+  static final logging.Logger rootLogger = logging.Logger.root;
 
-  static LoggerHandler get root => rootLogger.handler;
+  static final LoggerHandler root = rootLogger.handler;
 
   static List<logging.Logger> get dbLoggers =>
       LoggerExntesion._dbLoggers.toList();
@@ -181,12 +183,16 @@ abstract class LoggerHandler {
 
   String get isolateDebugName;
 
+  LoggerHandler? _parent;
   LoggerHandler? get parent {
+    var p = _parent;
+    if (p != null) return p;
+
     var l = logger.parent;
     if (l == null) return null;
 
-    var handler = _loggerHandlers[this];
-    return handler;
+    p = _parent = _loggerHandlers[l];
+    return p;
   }
 
   String loggerName(logging.LogRecord msg) {
@@ -366,6 +372,8 @@ abstract class LoggerHandler {
     _allMessageLoggerIncludeDBLogs = includeDBLogs;
   }
 
+  bool get isLoggingAll => _allMessageLogger != null;
+
   /// [enabled]]/disable logs to the console.
   /// - VM: logs to the STDOUT/STDERR.
   /// - Browser: logs to the browser console.
@@ -397,6 +405,20 @@ abstract class LoggerHandler {
     _dbMessageLogger = messageLogger;
   }
 
+  MessageLogger? _resolveDBMessageLogger() {
+    var messageLogger = _dbMessageLogger;
+
+    if (messageLogger == null) {
+      var parent = this.parent;
+      messageLogger = parent?._dbMessageLogger;
+      messageLogger ??= LoggerHandler.root._dbMessageLogger;
+    }
+
+    return messageLogger;
+  }
+
+  bool get isLoggingDB => _resolveDBMessageLogger() != null;
+
   void logAllMessage(logging.Level level, String message) {
     var messageLogger = _allMessageLogger;
 
@@ -420,14 +442,7 @@ abstract class LoggerHandler {
   }
 
   void logDBMessage(logging.Level level, String message) {
-    var messageLogger = _dbMessageLogger;
-
-    if (messageLogger == null) {
-      var parent = this.parent;
-      messageLogger = parent?._dbMessageLogger;
-      messageLogger ??= LoggerHandler.root._dbMessageLogger;
-    }
-
+    var messageLogger = _resolveDBMessageLogger();
     if (messageLogger != null) {
       messageLogger(level, message);
     }
