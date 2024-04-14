@@ -713,13 +713,18 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var entityHandler = getEntityHandler(tableName: table);
 
+    final condition = sql.condition;
+
     List<Map<String, dynamic>> sel;
 
-    if (tableScheme == null ||
+    if (condition == null) {
+      sel = map.values.toList();
+    } else if (tableScheme == null ||
         (tableScheme.fieldsReferencedTablesLength == 0 &&
-            tableScheme.tableRelationshipReferenceLength == 0)) {
+            tableScheme.tableRelationshipReferenceLength == 0) ||
+        condition.isIDCondition) {
       sel = map.values.where((e) {
-        return sql.condition!.matchesEntityMap(e,
+        return condition.matchesEntityMap(e,
             positionalParameters: sql.positionalParameters,
             namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
             entityHandler: entityHandler);
@@ -728,12 +733,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       sel = map.values.where((obj) {
         obj = _resolveEntityMap(obj, entityHandler, tableScheme);
 
-        return sql.condition!.matchesEntityMap(obj,
+        return condition.matchesEntityMap(obj,
             positionalParameters: sql.positionalParameters,
             namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
             entityHandler: entityHandler);
       }).toList();
     }
+
     return sel;
   }
 

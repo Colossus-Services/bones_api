@@ -434,6 +434,8 @@ abstract class Condition<O> extends ConditionElement
     }
   }
 
+  bool get isIDCondition => false;
+
   bool greaterThanConditionValue(Object? value1, Object? value2,
       {Object? parameters,
       List? positionalParameters,
@@ -630,6 +632,9 @@ abstract class GroupCondition<O> extends Condition<O> {
   }
 
   @override
+  bool get isIDCondition => conditions.every((e) => e.isIDCondition);
+
+  @override
   void resolve(
       {Condition? parent, required List<ConditionParameter> parameters}) {
     _parent = parent;
@@ -817,6 +822,9 @@ class ConditionID<O> extends Condition<O> {
   ConditionID([this.idValue]) : super._();
 
   @override
+  bool get isIDCondition => true;
+
+  @override
   ConditionID<T> cast<T>() =>
       this is ConditionID<T> ? this as ConditionID<T> : ConditionID<T>(idValue)
         .._markResolved(resolved, _parent);
@@ -891,6 +899,9 @@ class ConditionIdIN<O> extends Condition<O> {
   ConditionIdIN([dynamic ids])
       : idsValues = KeyConditionINBase.valuesAsList(ids),
         super._();
+
+  @override
+  bool get isIDCondition => true;
 
   @override
   ConditionIdIN<T> cast<T>() => this is ConditionIdIN<T>
