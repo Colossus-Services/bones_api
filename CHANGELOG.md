@@ -1,3 +1,9 @@
+## 1.6.13
+
+- `Condition`: added `isIDCondition`
+
+- `DBSQLMemoryAdapter`: optimize `_selectEntries` for `Condition`s that only depends on IDs.
+
 ## 1.6.12
 
 - `LoggerHandler`:
