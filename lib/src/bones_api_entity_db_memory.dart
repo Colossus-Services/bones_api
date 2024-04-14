@@ -866,13 +866,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   Map<String, dynamic> _resolveEntityMap(Map<String, dynamic> obj,
       EntityHandler<dynamic>? entityHandler, TableScheme tableScheme) {
-    var obj2 = obj.map((key, value) {
+    var obj2 = HashMap.fromEntries(obj.entries.map((e) {
+      var key = e.key;
+      var value = e.value;
       var refField = tableScheme.getFieldReferencedTable(key);
       if (refField != null) {
         value = _resolveEntityFieldReferencedTable(obj, key, refField);
       }
       return MapEntry(key, value);
-    });
+    }));
 
     var relationshipsTables = tableScheme.tableRelationshipReference.values
         .expand((e) => e)
@@ -971,9 +973,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       return [];
     }
 
-    var entries = relWithID.map((relId) => relMap[relId]).whereNotNull();
+    var targetIds = relWithID
+        .map((relId) => relMap[relId]?[targetRelationshipField])
+        .whereNotNull()
+        .toList();
 
-    var targetIds = entries.map((e) => e[targetRelationshipField]).toList();
     if (targetIds.isEmpty) {
       return [];
     }

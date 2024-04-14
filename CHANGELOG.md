@@ -1,3 +1,15 @@
+## 1.6.11
+
+- `TableScheme`: optimize `getFieldReferencedTable`.
+
+- `DBSQLMemoryAdapter`:
+  - optimize `_resolveEntityMap` and `_resolveEntityFieldRelationshipTable`.
+
+- `APIServerConfig`: added `logQueue`.
+
+- `EntityRepository`:
+  - `_storeAllFromJsonImpl`: optimize loading of entities from JSON (split in blocks of 100 entries per store).
+
 ## 1.6.10
 
 - reflection_factory: ^2.3.4

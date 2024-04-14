@@ -3996,15 +3996,56 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           Transaction? transaction,
           EntityResolutionRules? resolutionRules) =>
       Transaction.executeBlock((transaction) {
-        var osAsync = entitiesJson
-            .map((e) => createFromMap(e,
-                entityCache: transaction,
-                entityProvider: provider,
-                resolutionRules: resolutionRules))
-            .resolveAll();
+        if (entitiesJson.length <= 100) {
+          var osAsync = entitiesJson
+              .map((e) => createFromMap(e,
+                  entityCache: transaction,
+                  entityProvider: provider,
+                  resolutionRules: resolutionRules))
+              .resolveAll();
 
-        return osAsync.resolveMapped((os) {
-          return storeAll(os, transaction: transaction).resolveWithValue(os);
+          return osAsync.resolveMapped((os) {
+            return storeAll(os, transaction: transaction).resolveWithValue(os);
+          });
+        }
+
+        var entitiesJsonBlocks =
+            entitiesJson.splitBeforeIndexed((i, e) => i % 50 == 0).toList();
+
+        final entitiesJsonLength = entitiesJson.length;
+        int processCount = 0;
+
+        final initTime = DateTime.now();
+
+        return entitiesJsonBlocks.forEachAsync((entitiesBlock) {
+          var count = processCount;
+          var progress = (processCount / entitiesJsonLength) * 100;
+          processCount += entitiesBlock.length;
+
+          final elapsedTime = DateTime.now().difference(initTime);
+
+          final estimatedTime = Duration(
+            milliseconds: count == 0
+                ? 0
+                : ((elapsedTime.inMilliseconds / count) * entitiesJsonLength)
+                    .toInt(),
+          );
+
+          _log.info(
+              'Populating `$name`...  $count / $entitiesJsonLength (${progress.toStringAsFixed(2)}%) -- ${elapsedTime.toHumanReadable()} / ${estimatedTime.toHumanReadable()}');
+
+          var osAsync = entitiesBlock
+              .map((e) => createFromMap(e,
+                  entityCache: transaction,
+                  entityProvider: provider,
+                  resolutionRules: resolutionRules))
+              .resolveAll();
+
+          return osAsync.resolveMapped((os) {
+            return storeAll(os, transaction: transaction).resolveWithValue(os);
+          });
+        }).resolveMapped((results) {
+          return results.expand((l) => l).toList();
         });
       }, transaction: transaction);
 
