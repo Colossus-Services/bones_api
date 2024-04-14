@@ -127,6 +127,11 @@ class APIServerConfig {
   /// If `true` log messages to [stdout] (console).
   late final bool logToConsole;
 
+  /// If `false` disables log flush queue.
+  /// - See [LoggerHandler.disableLogQueue()]
+  /// - Useful while debugging.
+  late final bool logQueue;
+
   /// A forced delay in each server response.
   /// Only active if [development] is `true`.
   final Duration? serverResponseDelay;
@@ -161,6 +166,7 @@ class APIServerConfig {
     int? staticFilesCacheMaxContentLength,
     this.apiConfig,
     bool? logToConsole,
+    bool? logQueue,
     this.serverResponseDelay,
     Object? args,
   })  : development = development ?? false,
@@ -202,6 +208,7 @@ class APIServerConfig {
         useSessionID = resolveUseSessionID(cookieless, useSessionID),
         totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
         logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
+        logQueue = resolveLogQueue(logQueue, apiConfig: apiConfig),
         args = resolveArgs(args);
 
   static ArgsSimple resolveArgs(Object? args) {
@@ -255,6 +262,8 @@ class APIServerConfig {
 
     var logToConsole = a.flagOr('log-toConsole', null);
 
+    var logQueue = a.flagOr('log-queue', null);
+
     var documentRoot = a.optionAsDirectory('document-root');
 
     var domains = a.optionAsList('domains');
@@ -302,6 +311,7 @@ class APIServerConfig {
       serverResponseDelay: serverResponseDelay,
       apiConfig: apiConfig,
       logToConsole: logToConsole,
+      logQueue: logQueue,
       args: a,
     );
   }
@@ -530,6 +540,12 @@ class APIServerConfig {
     return logToConsole ?? LoggerHandler.getLogAllTo() == null;
   }
 
+  static bool resolveLogQueue(bool? logQueue, {APIConfig? apiConfig}) {
+    logQueue ??= apiConfig?.getPath('log', 'queue');
+
+    return logQueue ?? true;
+  }
+
   /// Parses a set of domains to serve static files.
   ///
   /// - See: [APIServer.domainsRoots], [parseDomainPattern], [parseDomainDirectory].
@@ -682,6 +698,7 @@ class APIServerConfig {
         'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
         'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
         'logToConsole': logToConsole,
+        'logQueue': logQueue,
         if (args.isNotEmpty) 'args': args.toList(),
       };
 
@@ -704,6 +721,7 @@ class APIServerConfig {
       staticFilesCacheControl: json['staticFilesCacheControl'],
       cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
       logToConsole: json['logToConsole'],
+      logQueue: json['logQueue'],
       args: json['args'],
     );
   }
@@ -751,6 +769,7 @@ abstract class _APIServerBase extends APIServerConfig {
     super.staticFilesCacheMaxContentLength,
     super.serverResponseDelay,
     super.logToConsole,
+    super.logQueue,
   }) : super(apiConfig: apiRoot.apiConfig);
 
   _APIServerBase.fromConfig(this.apiRoot, APIServerConfig apiServerConfig)
@@ -779,6 +798,7 @@ abstract class _APIServerBase extends APIServerConfig {
               apiServerConfig.staticFilesCacheMaxContentLength,
           serverResponseDelay: apiServerConfig.serverResponseDelay,
           logToConsole: apiServerConfig.logToConsole,
+          logQueue: apiServerConfig.logQueue,
         );
 
   _APIServerBase.fromArgs(APIRoot apiRoot, List<String> args)
@@ -894,6 +914,7 @@ class APIServer extends _APIServerBase {
     super.cacheStaticFilesResponses,
     super.serverResponseDelay,
     super.logToConsole,
+    super.logQueue,
   }) : super(address: address, port: port);
 
   APIServer.fromConfig(super.apiRoot, super.serverConfig) : super.fromConfig();
@@ -986,6 +1007,7 @@ class APIServer extends _APIServerBase {
       securePort: securePort,
       useSessionID: useSessionID,
       logToConsole: this.logToConsole,
+      logQueue: logQueue,
       port: port,
       letsEncrypt: letsEncrypt,
       letsEncryptProduction: letsEncryptProduction,
@@ -1673,6 +1695,7 @@ final class APIServerWorker extends _APIServerBase {
     super.staticFilesCacheMaxContentLength,
     super.serverResponseDelay,
     super.logToConsole,
+    super.logQueue,
   }) {
     _configureAPIRoot(apiRoot);
   }
@@ -1901,6 +1924,12 @@ final class APIServerWorker extends _APIServerBase {
       _log.handler.logToConsole();
 
       _log.info("Activated `logToConsole` from `APIServer`.");
+    }
+
+    if (!logQueue) {
+      LoggerHandler.disableLogQueue();
+
+      _log.info("Disabled `LoggerHandler` flush queue.");
     }
 
     {
