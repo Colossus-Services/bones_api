@@ -183,7 +183,7 @@ abstract class LoggerHandler {
 
   String get isolateDebugName;
 
-  LoggerHandler? _parent ;
+  LoggerHandler? _parent;
   LoggerHandler? get parent {
     var p = _parent;
     if (p != null) return p;

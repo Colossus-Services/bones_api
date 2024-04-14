@@ -1,3 +1,9 @@
+## 1.6.12
+
+- `LoggerHandler`:
+  - Added `isLoggingAll` and `isLoggingDB`.
+  - Optimize `parent`, `rootLogger` and `root`.
+
 ## 1.6.11
 
 - `TableScheme`: optimize `getFieldReferencedTable`.
