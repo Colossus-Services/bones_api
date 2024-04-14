@@ -259,7 +259,7 @@ abstract class APIRoot with Initializable, Closable {
       }
     }
 
-    var loggerHandlerRoot = LoggerHandler.root;
+    var loggerHandlerRoot = LoggerHandler.rootLogger.handler;
 
     if (loggerHandlerRoot.getLogErrorTo() == null) {
       var logErrorDestiny = apiConfig.getPath('log', 'error');
