@@ -439,7 +439,7 @@ class APIToken implements Comparable<APIToken> {
       {String? token, DateTime? issueTime, Duration? duration})
       : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
         issueTime = issueTime ?? DateTime.now(),
-        duration = Duration(hours: 3);
+        duration = duration ?? Duration(hours: 3);
 
   DateTime get accessTime => _accessTime;
 
