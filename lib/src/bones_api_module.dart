@@ -975,7 +975,11 @@ class APIModuleProxy extends ClassProxy {
 }
 
 typedef APIModuleProxyTargetResolver = ClassProxyListener<T>? Function<T>(
-    Object target, String? moduleName, bool? responsesAsJson);
+  Object target,
+  String? moduleName,
+  bool? responsesAsJson,
+  APIModuleProxyResponseErrorHandler? errorHandler,
+);
 
 /// A [APIModuleProxy] caller for a specific module ([moduleName]).
 ///
@@ -998,18 +1002,24 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   /// Resolves [target] to a [ClassProxyListener].
   /// See [registerTargetResolver].
   static ClassProxyListener<T> resolveTarget<T>(Object target,
-      {String? moduleName, bool? responsesAsJson}) {
+      {String? moduleName,
+      bool? responsesAsJson,
+      APIModuleProxyResponseErrorHandler? errorHandler}) {
     for (var resolver in _targetResolvers) {
-      var targetResolved = resolver<T>(target, moduleName, responsesAsJson);
+      var targetResolved =
+          resolver<T>(target, moduleName, responsesAsJson, errorHandler);
       if (targetResolved != null) return targetResolved;
     }
 
     if (target is ClassProxyListener<T>) return target;
 
     if (target is HttpClient) {
-      return APIModuleProxyHttpCaller(target,
-          moduleRoute: moduleName,
-          responsesAsJson: responsesAsJson) as ClassProxyListener<T>;
+      return APIModuleProxyHttpCaller(
+        target,
+        moduleRoute: moduleName,
+        responsesAsJson: responsesAsJson,
+        errorHandler: errorHandler,
+      ) as ClassProxyListener<T>;
     }
 
     throw StateError("Can't resolve `APIModuleProxyListener` target: $target");
@@ -1019,9 +1029,13 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   final String moduleName;
 
   APIModuleProxyCaller(Object target,
-      {required this.moduleName, bool? responsesAsJson})
+      {required this.moduleName,
+      bool? responsesAsJson,
+      APIModuleProxyResponseErrorHandler? errorHandler})
       : super(resolveTarget(target,
-            moduleName: moduleName, responsesAsJson: responsesAsJson));
+            moduleName: moduleName,
+            responsesAsJson: responsesAsJson,
+            errorHandler: errorHandler));
 }
 
 abstract class APIModuleProxyCallerError extends Error
@@ -1041,12 +1055,25 @@ abstract class APIModuleProxyCallerError extends Error
 }
 
 class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
+  final Object? request;
   final Object? response;
+  final APIResponseStatus? responseStatus;
   final Object? responseError;
   final StackTrace? responseStackTrace;
 
+  final String? module;
+  final String? methodName;
+  final Map<String, Object?>? parameters;
+
   APIModuleProxyCallerResponseError(super.message,
-      {this.response, this.responseError, this.responseStackTrace});
+      {this.request,
+      this.response,
+      this.responseStatus,
+      this.responseError,
+      this.responseStackTrace,
+      this.module,
+      this.methodName,
+      this.parameters});
 
   APIResponse? get apiResponse {
     var response = this.response;
@@ -1058,6 +1085,7 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
     final response = this.response;
     final responseError = this.responseError;
     final responseStackTrace = this.responseStackTrace;
+    final responseStatus = this.responseStatus;
 
     if (response is APIResponse) {
       return [
@@ -1069,6 +1097,7 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
         if (responseStackTrace != null &&
             !identical(response.stackTrace, responseStackTrace))
           responseStackTrace,
+        if (responseStatus != null) responseStatus,
       ];
     } else {
       return [
@@ -1078,6 +1107,7 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
             !message.contains('$responseError'))
           responseError,
         if (responseStackTrace != null) responseStackTrace,
+        if (responseStatus != null) responseStatus,
       ];
     }
   }
@@ -1088,6 +1118,9 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
 
 abstract class APIModuleProxyCallerListener<T>
     implements ClassProxyListener<T> {
+  /// The default response error handler.
+  static APIModuleProxyResponseErrorHandler? defaultErrorHandler;
+
   Object? resolveResponse(TypeReflection? returnType, dynamic json) {
     if (returnType == null || json == null) {
       return json;
@@ -1113,10 +1146,20 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
 
   final String moduleName;
 
+  /// If `true` converts the response object to a JSON collection/data.
   final bool responsesAsJson;
 
+  /// The error handler to call when an HTTP response error happens.
+  final APIModuleProxyResponseErrorHandler? errorHandler;
+
+  /// The default response error handler. See [errorHandler].
+  static APIModuleProxyResponseErrorHandler? defaultErrorHandler;
+
   APIModuleProxyDirectCaller(this.api,
-      {required this.moduleName, this.credential, bool? responsesAsJson})
+      {required this.moduleName,
+      this.credential,
+      bool? responsesAsJson,
+      this.errorHandler})
       : responsesAsJson = responsesAsJson ?? true;
 
   APICredential? credential;
@@ -1129,11 +1172,30 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
 
     return response.resolveMapped((response) {
       if (response.isError) {
-        throw APIModuleProxyCallerResponseError(
-            'Response ERROR> ${response.error}',
-            response: response,
-            responseError: response.error,
-            responseStackTrace: response.stackTrace);
+        var responseError = APIModuleProxyCallerResponseError(
+          'Response ERROR> ${response.error}',
+          response: response,
+          responseStatus: APIResponseStatus.ERROR,
+          responseError: response.error,
+          responseStackTrace: response.stackTrace,
+          module: moduleName,
+          methodName: methodName,
+          parameters: parameters,
+        );
+
+        var errorHandler = this.errorHandler ??
+            defaultErrorHandler ??
+            APIModuleProxyCallerListener.defaultErrorHandler;
+
+        if (errorHandler != null) {
+          try {
+            errorHandler(responseError);
+          } catch (e, s) {
+            _log.severe("Error calling `errorHandler`!", e, s);
+          }
+        }
+
+        throw responseError;
       }
 
       if (response.isNotOK) return null;
@@ -1175,14 +1237,20 @@ typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
     String methodName,
     Map<String, Object?> parameters);
 
-@Deprecated("Renamed to `APIModuleProxyHttpCaller`")
-typedef APIModuleHttpProxy = APIModuleProxyHttpCaller;
+typedef APIModuleProxyResponseErrorHandler = void Function(
+    APIModuleProxyCallerResponseError responseError);
 
 /// An [APIModuleProxy] caller that performs HTTP requests.
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].
 class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   /// The [httpClient] ot perform the proxy calls.
   final HttpClient httpClient;
+
+  /// The error handler to call when an HTTP response error happens.
+  final APIModuleProxyResponseErrorHandler? errorHandler;
+
+  /// The default response error handler. See [errorHandler].
+  static APIModuleProxyResponseErrorHandler? defaultErrorHandler;
 
   /// The module path in the [httpClient] base URL.
   final String modulePath;
@@ -1192,7 +1260,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   final bool responsesAsJson;
 
   APIModuleProxyHttpCaller(this.httpClient,
-      {String? moduleRoute, bool? responsesAsJson})
+      {String? moduleRoute, bool? responsesAsJson, this.errorHandler})
       : modulePath = _normalizeModulePath(moduleRoute),
         responsesAsJson = responsesAsJson ?? true {
     BonesAPI.boot();
@@ -1242,24 +1310,68 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
       return MapEntry(key, val);
     });
 
+    final modulePath = this.modulePath;
+
     var path = modulePath.isNotEmpty ? '$modulePath/$methodName' : methodName;
 
+    HttpMethod method;
     HttpResponse response;
     if (needsJsonRequest) {
+      method = HttpMethod.POST;
       response = await httpClient.post(path,
           body: parameters, contentType: MimeType.json);
     } else {
+      method = HttpMethod.GET;
       response = await httpClient.get(path, parameters: parameters);
     }
 
-    return parseResponse(response);
+    return parseResponse(
+      response,
+      requestMethod: method,
+      requestPath: path,
+      methodName: methodName,
+      parameters: parameters,
+    );
   }
 
-  FutureOr<dynamic> parseResponse(HttpResponse response) {
+  FutureOr<dynamic> parseResponse(
+    HttpResponse response, {
+    HttpMethod? requestMethod,
+    String? requestPath,
+    String? methodName,
+    Map<String, Object?>? parameters,
+  }) {
     if (response.isError) {
-      var error = parseResponseBody(response);
-      throw APIModuleProxyCallerResponseError('Response ERROR> $error',
-          response: response, responseError: error);
+      return parseResponseBody(response).resolveMapped((error) {
+        var responseError = APIModuleProxyCallerResponseError(
+          'Response ERROR> $error',
+          request: {
+            'requestMethod': requestMethod?.name,
+            'requestPath': requestPath,
+            'responseStatus': response.status,
+          },
+          response: response,
+          responseStatus: parseAPIResponseStatus(response.status),
+          responseError: error,
+          module: modulePath,
+          methodName: methodName,
+          parameters: parameters,
+        );
+
+        final errorHandler = this.errorHandler ??
+            defaultErrorHandler ??
+            APIModuleProxyCallerListener.defaultErrorHandler;
+
+        if (errorHandler != null) {
+          try {
+            errorHandler(responseError);
+          } catch (e, s) {
+            _log.severe("Error calling `errorHandler`!", e, s);
+          }
+        }
+
+        throw responseError;
+      });
     }
 
     if (response.isNotOK) return null;

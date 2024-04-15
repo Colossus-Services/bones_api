@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.6.14';
+  static const String VERSION = '1.6.15';
 
   static bool _boot = false;
 
@@ -66,10 +66,12 @@ abstract class APIRoot with Initializable, Closable {
     BonesAPI.boot();
 
     APIModuleProxyCaller.registerTargetResolver(
-        <T>(target, moduleName, responsesAsJson) {
+        <T>(target, moduleName, responsesAsJson, errorHandler) {
       if (target is APIRoot) {
         return APIModuleProxyDirectCaller<T>(target,
-            moduleName: moduleName ?? '', responsesAsJson: responsesAsJson);
+            moduleName: moduleName ?? '',
+            responsesAsJson: responsesAsJson,
+            errorHandler: errorHandler);
       }
       return null;
     });

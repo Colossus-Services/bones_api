@@ -1,3 +1,20 @@
+## 1.6.15
+
+- `APIModuleProxyTargetResolver`: added parameter `errorHandler`.
+- `APIModuleProxyCaller.resolveTarget`: added parameter `errorHandler`.
+
+- `APIModuleProxyDirectCaller` and `APIModuleProxyHttpCaller`:
+  - Added field `errorHandler`.
+  - Added static field `defaultErrorHandler`.
+
+- `APIModuleProxyCallerListener`
+  - Added static field `defaultErrorHandler`.
+
+- `APIModuleProxyCallerResponseError`:
+  - Added fields: `request`, `responseStatus`, `module`, `methodName` and `parameters`.
+
+- Removed deprecated `APIModuleHttpProxy` (use `APIModuleProxyHttpCaller`).
+
 ## 1.6.14
 
 - `APIToken`: fix the constructor initialization of field `duration`.
