@@ -1,3 +1,7 @@
+## 1.6.14
+
+- `APIToken`: fix the constructor initialization of field `duration`.
+
 ## 1.6.13
 
 - `Condition`: added `isIDCondition`
