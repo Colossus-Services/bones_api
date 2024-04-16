@@ -4,7 +4,8 @@
   - Added `contextKeyPosition` with the parameters position of the key.
   - `getValue`: improve key and index resolution.
   - :boom: **Breaking Change**:
-    - `contextPosition`: the index is now resolved using all parameters, not only the positional ones.  
+    - `contextPosition`: the index is now resolved using all parameters, not only the positional ones.
+      - Now `baz` will resolve `contextPosition` as `2` and not `1`: ` foo == ? ||  bar == ?:x || baz == ? ` 
 
 - args: ^2.5.0
 - meta: ^1.14.0
