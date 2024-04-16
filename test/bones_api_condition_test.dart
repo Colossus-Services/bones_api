@@ -264,9 +264,10 @@ void main() {
       expect(
           c7.toString(), equals('( foo == ? || ( bar == ?:x || baz == ? ) )'));
       expect(c7.parameters.toString(), equals('[?, ?:x, ?]'));
-      expect(c7.parameters.map((e) => e.contextPosition), equals([0, null, 1]));
+      expect(c7.parameters.map((e) => e.contextPosition), equals([0, null, 2]));
       expect(c7.parameters.map((e) => e.contextKey),
           equals(['foo', 'bar', 'baz']));
+      expect(c7.parameters.map((e) => e.contextKeyPosition), equals([0, 1, 2]));
       expect(c7.parameters.map((e) => e.index), equals([null, null, null]));
       expect(c7.parameters.map((e) => e.key), equals([null, 'x', null]));
 
@@ -275,9 +276,10 @@ void main() {
       expect(
           c8.toString(), equals('( foo == ? || ( bar == ?#0 || baz == ? ) )'));
       expect(c8.parameters.toString(), equals('[?, ?#0, ?]'));
-      expect(c8.parameters.map((e) => e.contextPosition), equals([0, null, 1]));
+      expect(c8.parameters.map((e) => e.contextPosition), equals([0, null, 2]));
       expect(c8.parameters.map((e) => e.contextKey),
           equals(['foo', 'bar', 'baz']));
+      expect(c8.parameters.map((e) => e.contextKeyPosition), equals([0, 1, 2]));
       expect(c8.parameters.map((e) => e.index), equals([null, 0, null]));
       expect(c8.parameters.map((e) => e.key), equals([null, null, null]));
     });

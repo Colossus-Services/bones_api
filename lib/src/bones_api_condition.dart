@@ -55,6 +55,7 @@ class ConditionParameter extends ConditionElement {
 
   int? contextPosition;
   String? contextKey;
+  int? contextKeyPosition;
 
   ConditionParameter()
       : index = null,
@@ -70,13 +71,12 @@ class ConditionParameter extends ConditionElement {
     _parent = parent;
 
     if (isPositional) {
-      var positionalParametersSize =
-          parameters.where((p) => p.isPositional).length;
-      contextPosition = positionalParametersSize;
+      contextPosition = parameters.length;
     }
 
     if (parent is KeyCondition) {
       contextKey = parent.keys.whereType<ConditionKeyField>().last.name;
+      contextKeyPosition = parameters.length;
     }
 
     parameters.add(this);
@@ -122,9 +122,29 @@ class ConditionParameter extends ConditionElement {
       }
     }
 
+    var key = this.key;
+
+    if (key != null && key.isNotEmpty) {
+      var value = namedParameters?[key] ?? encodingParameters?[key];
+      if (value != null) {
+        return value;
+      }
+    }
+
     var index = this.index;
+
+    if (index == null) {
+      var key = contextKey;
+      if (key != null && key.isNotEmpty) {
+        var value = namedParameters?[key] ?? encodingParameters?[key];
+        if (value != null) {
+          return value;
+        }
+      }
+    }
+
     if (index == null || index < 0) {
-      index = contextPosition;
+      index = contextPosition ?? contextKeyPosition;
     }
 
     if (index != null) {
@@ -142,13 +162,12 @@ class ConditionParameter extends ConditionElement {
       return null;
     }
 
-    var key = this.key;
     if (key == null || key.isEmpty) {
       key = contextKey;
-    }
 
-    if (key != null) {
-      return namedParameters?[key] ?? encodingParameters?[key];
+      if (key != null && key.isNotEmpty) {
+        return namedParameters?[key] ?? encodingParameters?[key];
+      }
     }
 
     return null;
