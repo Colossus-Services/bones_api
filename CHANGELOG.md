@@ -1,3 +1,16 @@
+## 1.7.0
+
+- `ConditionParameter`:
+  - Added `contextKeyPosition` with the parameters position of the key.
+  - `getValue`: improve key and index resolution.
+  - :boom: **Breaking Change**:
+    - `contextPosition`: the index is now resolved using all parameters, not only the positional ones.  
+
+- args: ^2.5.0
+- meta: ^1.14.0
+- googleapis_auth: ^1.6.0
+- test: ^1.25.3
+
 ## 1.6.15
 
 - `APIModuleProxyTargetResolver`: added parameter `errorHandler`.
