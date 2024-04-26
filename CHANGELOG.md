@@ -1,3 +1,8 @@
+## 1.7.1
+
+- `DBPostgreSQLAdapter`:
+  - Fix `_parseConstraint` for enums with single values.
+
 ## 1.7.0
 
 - `ConditionParameter`:

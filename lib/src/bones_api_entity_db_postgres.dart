@@ -545,15 +545,24 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       var arrayDef = RegExp(r'ARRAY\[(.*?)]').firstMatch(s)?.group(1)?.trim();
 
-      if (arrayDef == null || arrayDef.isEmpty) return null;
+      Set<String>? values;
 
-      var values = RegExp(r"'(.*?)'")
-          .allMatches(arrayDef)
-          .map((m) => m.group(1))
-          .whereNotNull()
-          .toSet();
+      if (arrayDef != null && arrayDef.isNotEmpty) {
+        values = RegExp(r"'(.*?)'")
+            .allMatches(arrayDef)
+            .map((m) => m.group(1))
+            .whereNotNull()
+            .toSet();
+      } else {
+        var singleValue =
+            RegExp(r"\s+=\s+'(.*?)'").firstMatch(s)?.group(1)?.trim();
 
-      if (values.isEmpty) return null;
+        if (singleValue != null) {
+          values = {singleValue};
+        }
+      }
+
+      if (values == null || values.isEmpty) return null;
 
       return TableEnumConstraint(field, values);
     }
