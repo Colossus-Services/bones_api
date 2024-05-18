@@ -445,3 +445,341 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
     return deleted;
   }
 }
+
+extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
+    on Map<C, Map<K, V>> {
+  bool isEquivalentContext(C context1, C context2) {
+    if (context1 is (Object?,) && context2 is (Object?,)) {
+      return context1.$1 == context2.$1;
+    }
+
+    if (context1 is (Object?, Object?) && context2 is (Object?, Object?)) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true);
+    }
+
+    if (context1 is (Object?, Object?, Object?) &&
+        context2 is (Object?, Object?, Object?)) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true);
+    }
+
+    if (context1 is (Object?, Object?, Object?, Object?) &&
+        context2 is (Object?, Object?, Object?, Object?)) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true);
+    }
+
+    if (context1 is (Object?, Object?, Object?, Object?, Object?) &&
+        context2 is (Object?, Object?, Object?, Object?, Object?)) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true);
+    }
+
+    if (context1 is (Object?, Object?, Object?, Object?, Object?, Object?) &&
+        context2 is (Object?, Object?, Object?, Object?, Object?, Object?)) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true) &&
+          (context1.$6 == context2.$6 || context1.$6 == true);
+    }
+
+    if (context1 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        ) &&
+        context2 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        )) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true) &&
+          (context1.$6 == context2.$6 || context1.$6 == true) &&
+          (context1.$7 == context2.$7 || context1.$7 == true);
+    }
+
+    if (context1 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        ) &&
+        context2 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        )) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true) &&
+          (context1.$6 == context2.$6 || context1.$6 == true) &&
+          (context1.$7 == context2.$7 || context1.$7 == true) &&
+          (context1.$8 == context2.$8 || context1.$8 == true);
+    }
+
+    if (context1 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        ) &&
+        context2 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        )) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true) &&
+          (context1.$6 == context2.$6 || context1.$6 == true) &&
+          (context1.$7 == context2.$7 || context1.$7 == true) &&
+          (context1.$8 == context2.$8 || context1.$8 == true) &&
+          (context1.$9 == context2.$9 || context1.$9 == true);
+    }
+
+    if (context1 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        ) &&
+        context2 is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?
+        )) {
+      return context1.$1 == context2.$1 &&
+          (context1.$2 == context2.$2 || context1.$2 == true) &&
+          (context1.$3 == context2.$3 || context1.$3 == true) &&
+          (context1.$4 == context2.$4 || context1.$4 == true) &&
+          (context1.$5 == context2.$5 || context1.$5 == true) &&
+          (context1.$6 == context2.$6 || context1.$6 == true) &&
+          (context1.$7 == context2.$7 || context1.$7 == true) &&
+          (context1.$8 == context2.$8 || context1.$8 == true) &&
+          (context1.$9 == context2.$9 || context1.$9 == true) &&
+          (context1.$10 == context2.$10 || context1.$10 == true);
+    }
+
+    return false;
+  }
+
+  Iterable<M> equivalentCaches(C context) => entries.where((e) {
+        var context2 = e.key;
+        if (context2 == context) {
+          return false;
+        }
+        return isEquivalentContext(context2, context);
+      }).map((e) => e.value as M);
+
+  M getCache(C context, M Function() cacheInstantiator) =>
+      putIfAbsent(context, cacheInstantiator) as M;
+
+  V? getIfCached(K key, C context, M Function() cacheInstantiator) =>
+      _getIfCached(key, context, cacheInstantiator).$1;
+
+  (V?, M) _getIfCached(K key, C context, M Function() cacheInstantiator) {
+    var cache = getCache(context, cacheInstantiator);
+
+    var o = cache[key];
+    if (o != null) return (o, cache);
+
+    var cachesEq = equivalentCaches(context);
+
+    for (var cache in cachesEq) {
+      o = cache[key];
+      if (o != null) return (o, cache);
+    }
+
+    return (null, cache);
+  }
+
+  FutureOr<V> getMultiCachedAsync(K key, C context,
+      M Function() cacheInstantiator, FutureOr<V> Function() computer) {
+    var (o, cache) = _getIfCached(key, context, cacheInstantiator);
+    if (o != null) return o;
+
+    return cache.getCachedAsync(key, computer);
+  }
+
+  FutureOr<V?> getMultiCachedAsyncNullable(K key, C context,
+      M Function() cacheInstantiator, FutureOr<V?> Function() computer) {
+    var (o, cache) = _getIfCached(key, context, cacheInstantiator);
+    if (o != null) return o;
+
+    return cache.getCachedAsyncNullable(key, computer);
+  }
+
+  V getMultiCached(
+      K key, C context, M Function() cacheInstantiator, V Function() computer) {
+    var (o, cache) = _getIfCached(key, context, cacheInstantiator);
+    if (o != null) return o;
+
+    return cache.getCached(key, computer);
+  }
+
+  V? getMultiCachedNullable(K key, C context, M Function() cacheInstantiator,
+      V? Function() computer) {
+    var (o, cache) = _getIfCached(key, context, cacheInstantiator);
+    if (o != null) return o;
+
+    return cache.getCachedNullable(key, computer);
+  }
+
+  void populateMultiCache(
+      K key, C context, M Function() cacheInstantiator, V value) {
+    var cache = getCache(context, cacheInstantiator);
+    cache[key] = value;
+  }
+}
+
+extension RecordExtension on Record {
+  static final Map<Type, int> _positionalParametersLengthCache = {};
+
+  /// Returns the number of positional parameters in a [Record] type.
+  /// - Supports [Records] with up to 10 positional parameters and no named parameters.
+  int get positionalParametersLength =>
+      _positionalParametersLengthCache[runtimeType] ??=
+          _positionalParametersLengthImpl;
+
+  int get _positionalParametersLengthImpl {
+    final o = this;
+
+    if (o is (Object?,)) return 1;
+
+    if (o is (Object?, Object?)) return 2;
+
+    if (o is (Object?, Object?, Object?)) return 3;
+
+    if (o is (Object?, Object?, Object?, Object?)) return 4;
+
+    if (o is (Object?, Object?, Object?, Object?, Object?)) return 5;
+
+    if (o is (Object?, Object?, Object?, Object?, Object?, Object?)) return 6;
+
+    if (o is (Object?, Object?, Object?, Object?, Object?, Object?, Object?)) {
+      return 7;
+    }
+
+    if (o is (
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?
+    )) return 8;
+
+    if (o is (
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?
+    )) return 9;
+
+    if (o is (
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?,
+      Object?
+    )) return 10;
+
+    return -1;
+  }
+}
+
+extension PopulateMultiCacheExtension<V extends Object> on Future<V> {
+  Future<V> populateMultiCache<K, C extends Record, M extends Map<K, V>>(
+          Map<C, M> caches,
+          K key,
+          C context,
+          M Function() cacheInstantiator) async =>
+      then((o) {
+        caches.populateMultiCache(key, context, cacheInstantiator, o);
+        return o;
+      });
+}
+
+extension PopulateMultiCacheNullableExtension<V extends Object> on Future<V?> {
+  Future<V?> populateMultiCache<K, C extends Record, M extends Map<K, V>>(
+          Map<C, M> caches,
+          K key,
+          C context,
+          M Function() cacheInstantiator) async =>
+      then((o) {
+        if (o != null) {
+          caches.populateMultiCache(key, context, cacheInstantiator, o);
+        }
+        return o;
+      });
+}
