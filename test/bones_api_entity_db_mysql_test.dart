@@ -16,20 +16,24 @@ class MySQLTestConfig extends APITestConfigDockerMySQL {
   String get runtimeTypeNameSafe => 'MySQLTestConfig';
 
   MySQLTestConfig({required bool generateTables, required bool checkTables})
-      : super({
-          'db': {
-            'mysql': {
-              'username': dbUser,
-              'password': dbPass,
-              'database': dbName,
-              'port': -3306,
-              'generateTables': generateTables,
-              'checkTables': checkTables,
+      : super(
+          {
+            'db': {
+              'mysql': {
+                'username': dbUser,
+                'password': dbPass,
+                'database': dbName,
+                'port': -3306,
+                'generateTables': generateTables,
+                'checkTables': checkTables,
+              }
             }
-          }
-        },
-            containerNamePrefix: 'bones_api_test_mysql',
-            forceNativePasswordAuthentication: true);
+          },
+          containerNamePrefix: 'bones_api_test_mysql',
+          forceNativePasswordAuthentication: true,
+          // TODO: update package `mysql1` with support for MySQL 8.4.0
+          version: '8.0.37',
+        );
 }
 
 Future<void> main() async {

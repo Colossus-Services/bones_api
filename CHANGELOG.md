@@ -1,3 +1,15 @@
+## 1.7.2
+
+- New `MapOfCachesExtension` and `RecordExtension`.
+
+- reflection_factory: ^2.4.0
+- docker_commander: ^2.1.6
+- meta: ^1.15.0
+- archive: ^3.5.1
+- build_runner: ^2.4.10
+- test: ^1.25.5
+- coverage: ^1.8.0
+
 ## 1.7.1
 
 - `DBPostgreSQLAdapter`:
