@@ -3,6 +3,7 @@
 - New `MapOfCachesExtension` and `RecordExtension`.
 
 - reflection_factory: ^2.4.0
+- docker_commander: ^2.1.6
 - meta: ^1.15.0
 - archive: ^3.5.1
 - build_runner: ^2.4.10
