@@ -14,10 +14,13 @@ class APITestConfigDockerMySQL
 
   final bool forceNativePasswordAuthentication;
 
+  final String version;
+
   APITestConfigDockerMySQL(Map<String, dynamic> apiConfig,
       {DockerHost? dockerHost,
       String? containerNamePrefix,
-      this.forceNativePasswordAuthentication = true})
+      this.forceNativePasswordAuthentication = true,
+      this.version = 'latest'})
       : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
     DBMySQLAdapter.boot();
@@ -30,6 +33,7 @@ class APITestConfigDockerMySQL
   @override
   MySQLContainerConfig createDBContainerConfig(int dbPort) =>
       MySQLContainerConfig(
+        version: version,
         dbUser: dbUser,
         dbPassword: dbPass,
         dbName: dbName,

@@ -12,8 +12,12 @@ class APITestConfigDockerPostgreSQL
   @override
   String get runtimeTypeNameSafe => 'APITestConfigDockerPostgreSQL';
 
+  final String version;
+
   APITestConfigDockerPostgreSQL(Map<String, dynamic> apiConfig,
-      {DockerHost? dockerHost, String? containerNamePrefix})
+      {DockerHost? dockerHost,
+      String? containerNamePrefix,
+      this.version = 'latest'})
       : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
     DBPostgreSQLAdapter.boot();
@@ -26,6 +30,7 @@ class APITestConfigDockerPostgreSQL
   @override
   PostgreSQLContainerConfig createDBContainerConfig(int dbPort) =>
       PostgreSQLContainerConfig(
+        version: version,
         pgUser: dbUser,
         pgPassword: dbPass,
         pgDatabase: dbName,
