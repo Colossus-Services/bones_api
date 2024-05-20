@@ -433,6 +433,34 @@ void main() {
 
       expect(m.length, equals(0));
     });
+
+    test('keyTimeoutChecker', () async {
+      final checks = <String>[];
+
+      var m = TimedMap<String, int>(Duration(seconds: 1), null, (tm, k, t, to) {
+        checks.add('$k,${to.inMilliseconds}');
+        if (k == 'b') return false;
+        return null;
+      });
+
+      m.put('a', 1);
+      m.put('b', 2);
+
+      expect(m.length, equals(2));
+      expect(checks, isEmpty);
+
+      m.checkAllEntries();
+
+      expect(m.length, equals(2));
+      expect(checks, equals(['a,1000', 'b,1000']));
+
+      await Future.delayed(Duration(milliseconds: 1100));
+
+      m.checkAllEntries();
+
+      expect(m, equals({'b': 2}));
+      expect(checks, equals(['a,1000', 'b,1000', 'a,1000', 'b,1000']));
+    });
   });
 
   group('PositionalFields', () {
