@@ -1,3 +1,9 @@
+## 1.7.3
+
+- `MapAsCacheExtension`:
+  - Added `getIfCached`.
+  - Exposed `checkCachedEntry`.
+
 ## 1.7.2
 
 - New `MapOfCachesExtension` and `RecordExtension`.

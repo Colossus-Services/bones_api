@@ -352,24 +352,33 @@ extension IterableEnumExtension<E extends Enum> on Iterable<E> {
 
 /// Extension that ads cached methods to a [Map].
 extension MapAsCacheExtension<K, V> on Map<K, V> {
-  void _checkCachedEntry(K key) {
+  void checkCachedEntry(K key) {
     var self = this;
     if (self is TimedMap<K, V>) {
       self.checkEntry(key);
     }
   }
 
+  /// Returns [key] value, checking if it's still valid.
+  /// See [checkCachedEntry] and [checkCacheLimit].
+  V? getIfCached(K key, {int? cacheLimit}) {
+    checkCachedEntry(key);
+    checkCacheLimit(cacheLimit);
+
+    return this[key];
+  }
+
   /// Returns [key] value or computes it and caches it.
-  /// See [checkCacheLimit] and [getCachedAsync].
+  /// See [checkCachedEntry], [checkCacheLimit] and [getCachedAsync].
   V getCached(K key, V Function() computer, {int? cacheLimit}) {
-    _checkCachedEntry(key);
+    checkCachedEntry(key);
     checkCacheLimit(cacheLimit);
 
     return putIfAbsent(key, computer);
   }
 
   V? getCachedNullable(K key, V? Function() computer, {int? cacheLimit}) {
-    _checkCachedEntry(key);
+    checkCachedEntry(key);
 
     var cached = this[key];
     if (cached != null) return cached;
@@ -384,10 +393,10 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
   }
 
   /// Same as [getCached] but accepts a [computer] that returns a [Future].
-  /// See [checkCacheLimit] and [getCachedAsync].
+  /// See [checkCachedEntry], [checkCacheLimit] and [getCachedAsync].
   FutureOr<V> getCachedAsync(K key, FutureOr<V> Function() computer,
       {int? cacheLimit}) {
-    _checkCachedEntry(key);
+    checkCachedEntry(key);
 
     var cached = this[key];
     if (cached != null) return cached;
@@ -402,7 +411,7 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
 
   FutureOr<V?> getCachedAsyncNullable(K key, FutureOr<V?> Function() computer,
       {int? cacheLimit}) {
-    _checkCachedEntry(key);
+    checkCachedEntry(key);
 
     var cached = this[key];
     if (cached != null) return cached;
@@ -638,7 +647,7 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
   (V?, M) _getIfCached(K key, C context, M Function() cacheInstantiator) {
     var cache = getCache(context, cacheInstantiator);
 
-    var o = cache[key];
+    var o = cache.getIfCached(key);
     if (o != null) return (o, cache);
 
     var cachesEq = equivalentCaches(context);
