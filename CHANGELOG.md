@@ -1,3 +1,8 @@
+## 1.7.4
+
+- `TimedMap`:
+  - Added keyTimeoutChecker
+
 ## 1.7.3
 
 - `MapAsCacheExtension`:

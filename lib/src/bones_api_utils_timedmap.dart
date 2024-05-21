@@ -5,7 +5,10 @@ class TimedMap<K, V> implements Map<K, V> {
   /// The key timeout. When a key is put, it expires after the timeout [Duration].
   final Duration keyTimeout;
 
-  TimedMap(this.keyTimeout, [Map<K, V>? map]) {
+  final bool? Function(TimedMap timedMap, Object? key, Duration elapsedTime,
+      Duration keyTimeout)? keyTimeoutChecker;
+
+  TimedMap(this.keyTimeout, [Map<K, V>? map, this.keyTimeoutChecker]) {
     if (map != null) {
       addAll(map);
     }
@@ -132,7 +135,17 @@ class TimedMap<K, V> implements Map<K, V> {
     var elapsedTime = getElapsedTime(key, now: now);
     if (elapsedTime == null) return false;
 
+    final keyTimeoutChecker = this.keyTimeoutChecker;
+
     keyTimeout ??= this.keyTimeout;
+
+    if (keyTimeoutChecker != null) {
+      var expired = keyTimeoutChecker(this, key, elapsedTime, keyTimeout);
+      if (expired != null) {
+        return expired;
+      }
+    }
+
     return elapsedTime.inMilliseconds > keyTimeout.inMilliseconds;
   }
 
