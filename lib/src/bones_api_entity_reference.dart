@@ -704,6 +704,17 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// See [idAs].
   I idNotNullAs<I>() => id as I;
 
+  /// Returns [id] as [int] or null.
+  /// See [idNotNullAs].
+  int? get idAsInt {
+    var id = this.id;
+    return id is int ? id : null;
+  }
+
+  /// Returns [id] as [int].
+  /// See [idAsInt].
+  int get idNotNullAsInt => id as int;
+
   Object? _resolveID() {
     var id = _id;
     if (id != null) return id;
@@ -1649,6 +1660,15 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// See [idsAs].
   List<I> idsNotNullAs<I>() => ids?.whereType<I>().toList() ?? [];
 
+  /// Returns the [ids] with type [int] or null.
+  /// See [idsNotNullAs].
+  List<int?> get idsAsInt =>
+      ids?.map((e) => e is int ? e : null).toList() ?? [];
+
+  /// Returns the [ids] with type [int].
+  /// See [idsAsInt].
+  List<int> get idsNotNullAsInt => ids?.whereType<int>().toList() ?? [];
+
   List<Object?>? _resolveIDs() {
     var ids = _ids;
     if (ids != null) return ids;
@@ -2354,6 +2374,38 @@ extension NullEntityReferenceListExtension<T> on EntityReferenceList<T>? {
   FutureOr<List<T?>?> get() => this?.get();
 
   FutureOr<List<T?>?> getNotNull() => this?.getNotNull();
+}
+
+extension IterableEntityReferenceExtension<T> on Iterable<EntityReference<T>> {
+  List<Object> get allIDs => map((e) => e.id).whereNotNull().toList();
+
+  List<I> allIDsAs<I>() => map((e) => e.idAs<I>()).whereType<I>().toList();
+
+  List<int> get allIDsAsInt => map((e) => e.idNotNullAsInt).toList();
+
+  List<T> get allEntities => map((e) => e.entity).whereType<T>().toList();
+}
+
+extension IterableEntityReferenceListExtension<T>
+    on Iterable<EntityReferenceList<T>> {
+  List<Object> get allIDs => expand((e) => e.ids ?? []).whereNotNull().toList();
+
+  List<I> allIDsAs<I>() => expand((e) => e.idsAs<I>()).whereType<I>().toList();
+
+  List<int> get allIDsAsInt => expand((e) => e.idsNotNullAsInt).toList();
+
+  List<T> get allEntities => expand((e) => e.entitiesNotNull).toList();
+}
+
+extension IterableOfIterableEntityReferenceListExtension<T>
+    on Iterable<Iterable<EntityReferenceList<T>>> {
+  List<Object> get allIDs => expand((e) => e.allIDs).toList();
+
+  List<I> allIDsAs<I>() => expand((e) => e.allIDsAs<I>()).toList();
+
+  List<int> get allIDsAsInt => expand((e) => e.allIDsAsInt).toList();
+
+  List<T> get allEntities => expand((e) => e.allEntities).toList();
 }
 
 extension _ListExtension<T> on List<T> {
