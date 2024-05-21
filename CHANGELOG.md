@@ -1,3 +1,10 @@
+## 1.7.5
+
+- New `IterableEntityReferenceExtension` and `IterableEntityReferenceListExtension`.
+
+- `EntityReference`: added `idAsInt` and `idNotNullAsInt`.
+- `EntityReferenceList`: added `idsAsInt` and `idsNotNullAsInt`.
+
 ## 1.7.4
 
 - `TimedMap`:
