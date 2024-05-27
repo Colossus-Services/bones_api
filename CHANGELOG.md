@@ -1,3 +1,14 @@
+## 1.7.6
+
+- `EntityHandler`:
+  - Added `getIDs`.
+
+- `EntitySource`, `EntityRepository`:
+  - Added `existIDs`, `selectIDsBy` and `selectIDsByQuery`.
+
+- `DBRelationalAdapter`:
+  - Added `parseIDs`.
+
 ## 1.7.5
 
 - New `IterableEntityReferenceExtension` and `IterableEntityReferenceListExtension`.

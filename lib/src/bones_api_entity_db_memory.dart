@@ -7,6 +7,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db_sql.dart';
@@ -410,6 +411,28 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     } else {
       return map.length;
     }
+  }
+
+  @override
+  FutureOr<List<I>> doExistIDsSQL<I extends Object>(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      DBSQLMemoryAdapterContext connection) {
+    var map = _getTableMap(table, false);
+    if (map == null) return [];
+
+    var condition = sql.condition;
+    if (condition is! ConditionIdIN) {
+      return [];
+    }
+
+    var ids = condition.idsValues;
+
+    var existIDs = map.keys.whereIn(ids).whereType<I>().toList();
+
+    return existIDs;
   }
 
   @override

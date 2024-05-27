@@ -141,6 +141,32 @@ abstract class APIRepository<O extends Object> with Initializable {
           transaction: transaction,
           resolutionRules: resolutionRules);
 
+  FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(String query,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          int? limit,
+          Transaction? transaction}) =>
+      entityRepository.selectIDsByQuery<I>(query,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit,
+          transaction: transaction);
+
+  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher<O> matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          int? limit,
+          Transaction? transaction}) =>
+      entityRepository.selectIDsBy(matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit,
+          transaction: transaction);
+
   FutureOr<Iterable<O>> select(EntityMatcher<O> matcher,
           {Object? parameters,
           List? positionalParameters,

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart' hide IterableIntegerExtension;
 import 'package:crclib/catalog.dart';
 import 'package:crclib/crclib.dart';
 import 'package:gcloud/storage.dart' as gcs;
@@ -441,6 +442,25 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var listAll = await entries.map((e) => e.name).toList();
     return listAll;
+  }
+
+  @override
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+      TransactionOperation op, String entityName, String table, List<I> ids) {
+    return executeTransactionOperation(
+        op,
+        (conn) => _doExistIDsImpl(op, table, ids)
+            .resolveMapped((res) => _finishOperation(op, res, null)));
+  }
+
+  FutureOr<List<I>> _doExistIDsImpl<I extends Object>(
+      TransactionOperation op, String table, List<I> ids) {
+    return ids.forEachAsync((id) async {
+      var objFile = _resolveObjectFilePath(table, id);
+
+      var objInfo = await _getObjectInfo(objFile);
+      return objInfo != null && objInfo.length > 0 ? id : null;
+    }).resolveMapped((ids) => ids.whereNotNull().toList());
   }
 
   @override

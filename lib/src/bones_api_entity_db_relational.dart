@@ -101,6 +101,15 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
       super.createRepositoryAdapter<O>(name, tableName: tableName, type: type)
           as DBRelationalRepositoryAdapter<O>?;
 
+  List<I> parseIDs<I extends Object>(Iterable<dynamic> ids) {
+    var idParser = TypeParser.parserFor<I>(type: I);
+    if (idParser != null) {
+      return ids.map(idParser).whereNotNull().toList();
+    } else {
+      return ids.whereType<I>().toList();
+    }
+  }
+
   FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
       String table, EntityMatcher matcher,
       {Object? parameters,
@@ -108,6 +117,13 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
       Map<String, Object?>? namedParameters,
       int? limit,
       PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
+
+  FutureOr<List<I>> doSelectIDsBy<I extends Object>(TransactionOperation op,
+      String entityName, String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      int? limit});
 
   FutureOr<bool> doInsertRelationship(
       TransactionOperation op,
@@ -161,6 +177,18 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
           namedParameters: namedParameters,
           limit: limit,
           preFinish: preFinish);
+
+  FutureOr<List<I>> doSelectIDsBy<I extends Object>(
+          TransactionOperation op, EntityMatcher matcher,
+          {Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+          int? limit}) =>
+      databaseAdapter.doSelectIDsBy<I>(op, name, tableName, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit);
 
   FutureOr<bool> doInsertRelationship(TransactionOperation op, String field,
           dynamic id, String otherTableName, List otherIds,
@@ -335,6 +363,42 @@ class DBRelationalEntityRepository<O extends Object>
         .toList(growable: false);
 
     return futures.resolveAllWithValue(true);
+  }
+
+  @override
+  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
+      {Transaction? transaction}) {
+    return selectIDsBy(ConditionIdIN(ids), transaction: transaction);
+  }
+
+  @override
+  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    checkNotClosed();
+
+    var op = TransactionOperationSelect(name, false, operationExecutor, matcher,
+        transaction: transaction);
+
+    try {
+      return repositoryAdapter.doSelectIDsBy(op, matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          limit: limit);
+    } catch (e, s) {
+      var message = 'selectIDsBy> '
+          'matcher: $matcher ; '
+          'parameters: $parameters ; '
+          'positionalParameters: $positionalParameters ; '
+          'namedParameters: $namedParameters ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
   }
 
   @override

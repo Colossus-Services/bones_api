@@ -644,6 +644,27 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
+  FutureOr<List<I>> doExistIDsSQL<I extends Object>(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      DBMySqlConnectionWrapper connection) {
+    if (sql.isDummy) return <I>[];
+
+    return connection
+        .query(sql.sqlPositional, sql.parametersValuesByPosition)
+        .resolveMapped((results) {
+      var ids = results
+          .map((e) => e.fields)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => e['id']);
+
+      return parseIDs<I>(ids);
+    });
+  }
+
+  @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
       String entityName,
       String table,
