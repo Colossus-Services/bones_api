@@ -90,6 +90,10 @@ abstract class APIRepository<O extends Object> with Initializable {
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) =>
       entityRepository.existsID(id, transaction: transaction);
 
+  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
+          {Transaction? transaction}) =>
+      entityRepository.existIDs(ids, transaction: transaction);
+
   FutureOr<O?> selectByID(dynamic id,
           {Transaction? transaction, EntityResolutionRules? resolutionRules}) =>
       entityRepository.selectByID(id,

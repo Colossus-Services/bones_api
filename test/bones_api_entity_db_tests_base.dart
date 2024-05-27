@@ -176,6 +176,7 @@ Future<bool> runAdapterTests(
     required bool generateTables,
     required bool populateSource}) async {
   _log.handler.logToConsole();
+  LoggerHandler.disableLogQueue();
 
   User$reflection.boot();
 
@@ -565,6 +566,9 @@ Future<bool> runAdapterTests(
 
         expect((await photoAPIRepository.count()), equals(0));
 
+        expect(await userAPIRepository.existsID(1), isFalse);
+        expect(await userAPIRepository.existIDs([1]), equals([]));
+
         var user = User('joe@$testDomain', '123', address, [role],
             level: 100,
             userInfo: UserInfo('The user joe'),
@@ -575,6 +579,19 @@ Future<bool> runAdapterTests(
 
         var id = await userAPIRepository.store(user);
         expect(id, equals(1));
+
+        expect(await userAPIRepository.existsID(1), isTrue);
+        expect(await userAPIRepository.existIDs([1]), equals([1]));
+
+        expect(
+            await userAPIRepository.selectIDsByQuery(' email == ? ',
+                parameters: {'email': 'joe@$testDomain'}),
+            equals([1]));
+
+        expect(
+            await userAPIRepository.selectIDsByQuery(' email == ? ',
+                parameters: {'email': 'inexistent.user@$testDomain'}),
+            isEmpty);
 
         user1Id = id;
 
@@ -842,6 +859,29 @@ Future<bool> runAdapterTests(
         user2Id = id;
 
         expect((await userAPIRepository.selectAll()).length, equals(2));
+
+        expect(await userAPIRepository.existsID(1), isTrue);
+        expect(await userAPIRepository.existsID(id), isTrue);
+        expect(await userAPIRepository.existsID(123123123123), isFalse);
+        expect(await userAPIRepository.existIDs([1, id, 123123123123]),
+            equals([1, id]));
+
+        expect(
+            await userAPIRepository.selectIDsByQuery(' email == ? ',
+                parameters: {'email': 'smith@$testDomain'}),
+            equals([id]));
+
+        expect(
+            await userAPIRepository.selectIDsByQuery(' email == ? ',
+                parameters: {'email': 'inexistent.user@$testDomain'}),
+            isEmpty);
+
+        expect(
+            await userAPIRepository
+                .selectIDsByQuery(' email =~ ? ', parameters: {
+              'email': ['joe@$testDomain', 'smith@$testDomain']
+            }),
+            unorderedEquals([1, id]));
 
         var user2 = await userAPIRepository.selectByID(id);
 

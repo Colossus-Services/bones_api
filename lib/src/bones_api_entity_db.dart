@@ -1223,9 +1223,6 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
-    var cachedEntityByID = transaction?.getCachedEntityByID(id, type: type);
-    if (cachedEntityByID != null) return true;
-
     return count(matcher: ConditionID(id), transaction: transaction)
         .resolveMapped((count) => count > 0);
   }

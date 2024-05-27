@@ -366,12 +366,6 @@ class DBRelationalEntityRepository<O extends Object>
   }
 
   @override
-  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
-      {Transaction? transaction}) {
-    return selectIDsBy(ConditionIdIN(ids), transaction: transaction);
-  }
-
-  @override
   FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher matcher,
       {Object? parameters,
       List? positionalParameters,

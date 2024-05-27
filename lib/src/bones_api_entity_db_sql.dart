@@ -1288,45 +1288,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       Transaction transaction, String entityName, String table, List<I> ids) {
     if (ids.isEmpty) return SQL.dummy;
 
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var idFieldName = tableScheme.idFieldName!;
-      var idFieldType = tableScheme.fieldsTypes[idFieldName]!;
-
-      var idsSQLValues = ids
-          .map((id) => _conditionSQLGenerator.valueToSQLPlain(id, idFieldType,
-              key: 'id'))
-          .toList();
-
+    return _generateSQLFrom(transaction, entityName, table, ConditionIdIN(ids),
+        sqlBuilder: (String from, EncodingContext context) {
+      var tableFieldID = context.tableFieldID ?? 'id';
+      var tableAlias = context.resolveEntityAlias(table);
       var q = dialect.elementQuote;
-      var sql = StringBuffer();
-
-      sql.write('SELECT $q');
-      sql.write(idFieldName);
-      sql.write('$q as ${q}id$q ');
-
-      sql.write('FROM $q');
-      sql.write(table);
-      sql.write('$q ');
-
-      sql.write(' WHERE ');
-
-      var conditionSQL = '$idFieldName IN ( ${idsSQLValues.join(',')} )';
-      sql.write(conditionSQL);
-
-      return SQL(sql.toString(), null, null, {},
-          condition: ConditionIdIN(ids),
-          sqlCondition: conditionSQL,
-          entityName: table,
-          idFieldName: idFieldName,
-          mainTable: table);
+      var sql = 'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from';
+      return sql;
     });
   }
 
@@ -1353,8 +1321,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       TransactionOperation op, String entityName, String table, List<I> ids) {
     return generateExistIDsSQL(op.transaction, entityName, table, ids)
         .resolveMapped((sql) {
-      return existIDsSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, null));
+      return existIDsSQL(op, entityName, table, sql).resolveMapped(
+          (r) => _finishSQLOperation(sql, op, r, (ids) => parseIDs<I>(ids)));
     });
   }
 
