@@ -362,6 +362,28 @@ class DBObjectDirectoryAdapter
       _listTablesDirs().map((d) => pack_path.split(d.path).last).toList();
 
   @override
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+      TransactionOperation op, String entityName, String table, List<I> ids) {
+    return executeTransactionOperation(
+        op,
+        (conn) => _doExistIDsImpl(op, table, ids)
+            .resolveMapped((res) => _finishOperation(op, res, null)));
+  }
+
+  List<I> _doExistIDsImpl<I extends Object>(
+      TransactionOperation op, String table, List<I> ids) {
+    var tableDir = _resolveTableDirectory(table);
+    if (!tableDir.existsSync()) return [];
+
+    var existIDs = ids.where((id) {
+      var objFile = _resolveObjectFile(table, id);
+      return objFile.existsSync();
+    }).toList();
+
+    return existIDs;
+  }
+
+  @override
   FutureOr<R?> doSelectByID<R>(
           TransactionOperation op, String entityName, String table, Object id,
           {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>

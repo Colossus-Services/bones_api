@@ -480,6 +480,15 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return null;
   }
 
+  List<V?> getIDs<V>(List<O> os) {
+    if (os.isEmpty) return [];
+
+    var o = os.first;
+    var fieldID = idFieldName(o);
+
+    return os.map((o) => getField<V?>(o, fieldID)).toList();
+  }
+
   V? getID<V>(O o) => getField<V?>(o, idFieldName(o));
 
   void setID<V>(O o, V id) => setField<V>(o, idFieldName(o), id);
@@ -2280,6 +2289,16 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
+  List<V?> getIDs<V>(List<O> os) {
+    if (os.isEmpty) return [];
+
+    var o = os.first;
+    inspectObject(o);
+
+    return os.map((o) => o.getID<V>()).toList();
+  }
+
+  @override
   V? getID<V>(O o) {
     inspectObject(o);
     return o.getID();
@@ -2714,6 +2733,9 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
 
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction});
 
+  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
+      {Transaction? transaction});
+
   FutureOr<O?> selectByID(dynamic id, {Transaction? transaction}) {
     return select(ConditionID(id)).resolveMapped((sel) {
       return sel.isNotEmpty ? sel.first : null;
@@ -2788,6 +2810,29 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       Transaction? transaction,
       int? limit,
       EntityResolutionRules? resolutionRules});
+
+  FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    var condition = _parseCache.parseQuery(query);
+
+    return selectIDsBy(condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        transaction: transaction,
+        limit: limit);
+  }
+
+  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher<O> matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit});
 
   FutureOr<Iterable<O>> selectAll(
       {Transaction? transaction,
@@ -4350,6 +4395,25 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         transaction: transaction,
         limit: limit,
         resolutionRules: resolutionRules);
+  }
+
+  @override
+  FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(String query,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    checkNotClosed();
+
+    var condition = _parseCache.parseQuery(query);
+
+    return selectIDsBy(condition,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        transaction: transaction,
+        limit: limit);
   }
 
   @override
@@ -5990,6 +6054,20 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   @override
+  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
+      {Transaction? transaction}) {
+    checkNotClosed();
+
+    var osIDs = iterable().map((o) {
+      var oId = getID(o, entityHandler: entityHandler);
+      var matches = ids.contains(oId);
+      return matches ? oId as I : null;
+    }).whereNotNull();
+
+    return osIDs;
+  }
+
+  @override
   Iterable<O> select(EntityMatcher<O> matcher,
       {Object? parameters,
       List? positionalParameters,
@@ -6006,6 +6084,26 @@ abstract class IterableEntityRepository<O extends Object>
         limit: limit);
 
     return trackEntities(os);
+  }
+
+  @override
+  Iterable<I> selectIDsBy<I extends Object>(EntityMatcher<O> matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    checkNotClosed();
+
+    var os = matches(matcher,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        limit: limit);
+
+    var ids = entityHandler.getIDs<I>(os);
+
+    return ids.whereNotNull().toList();
   }
 
   @override

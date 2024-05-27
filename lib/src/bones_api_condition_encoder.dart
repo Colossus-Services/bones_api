@@ -748,12 +748,15 @@ class EncodingContext {
 
   String? tableName;
 
+  String? tableFieldID;
+
   EncodingContext(this.entityName,
       {this.parameters,
       this.positionalParameters,
       this.namedParameters,
       this.transaction,
-      this.tableName});
+      this.tableName,
+      this.tableFieldID});
 
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
@@ -974,13 +977,15 @@ abstract class ConditionEncoder {
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
       Transaction? transaction,
-      String? tableName}) {
+      String? tableName,
+      String? tableFieldID}) {
     var context = EncodingContext(entityName,
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         transaction: transaction,
-        tableName: tableName);
+        tableName: tableName,
+        tableFieldID: tableFieldID);
 
     if (condition is ConditionANY) {
       return context;

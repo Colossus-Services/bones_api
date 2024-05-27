@@ -884,6 +884,28 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   @override
+  FutureOr<List<I>> doExistIDsSQL<I extends Object>(
+      String entityName,
+      String table,
+      SQL sql,
+      Transaction transaction,
+      PostgreSQLConnectionWrapper connection) {
+    if (sql.isDummy) return <I>[];
+
+    return connection
+        .mappedResultsQuery(sql.sql,
+            substitutionValues: sql.parametersByPlaceholder)
+        .resolveMapped((results) {
+      var ids = results
+          .map((e) => e[table])
+          .whereType<Map<String, dynamic>>()
+          .map((e) => e['id']);
+
+      return parseIDs<I>(ids);
+    });
+  }
+
+  @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
       String entityName,
       String table,

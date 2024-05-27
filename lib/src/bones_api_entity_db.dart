@@ -481,6 +481,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       Map<String, Object?>? namedParameters,
       PreFinishDBOperation<int, int>? preFinish});
 
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+      TransactionOperation op, String entityName, String table, List<I> ids);
+
   FutureOr<R?> doSelectByID<R>(
       TransactionOperation op, String entityName, String table, Object id,
       {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish});
@@ -1129,6 +1132,10 @@ class DBRepositoryAdapter<O> with Initializable {
           namedParameters: namedParameters,
           preFinish: preFinish);
 
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+          TransactionOperation op, List<I> ids) =>
+      databaseAdapter.doExistIDs<I>(op, name, tableName, ids);
+
   FutureOr<R?> doSelectByID<R>(TransactionOperation op, Object id,
           {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>
       databaseAdapter.doSelectByID<R>(op, name, tableName, id,
@@ -1216,11 +1223,53 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
-    var cachedEntityByID = transaction?.getCachedEntityByID(id, type: type);
-    if (cachedEntityByID != null) return false;
-
     return count(matcher: ConditionID(id), transaction: transaction)
         .resolveMapped((count) => count > 0);
+  }
+
+  @override
+  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
+      {Transaction? transaction}) {
+    var idsNotNull = ids is List<I> ? ids : ids.whereNotNull().toList();
+    if (idsNotNull.isEmpty) return <I>[];
+
+    var cachedEntityByIDs =
+        transaction?.getCachedEntitiesByIDs(idsNotNull, type: type);
+
+    var cachedIDs = cachedEntityByIDs?.keys.whereType<I>().toList();
+
+    List<I> notCachedIDs;
+    if (cachedIDs != null) {
+      notCachedIDs = idsNotNull.whereNotIn(cachedIDs).toList();
+      if (notCachedIDs.isEmpty) {
+        return idsNotNull;
+      }
+    } else {
+      notCachedIDs = idsNotNull;
+    }
+
+    checkNotClosed();
+
+    var op = TransactionOperationCount(name, operationExecutor,
+        matcher: ConditionIdIN(notCachedIDs), transaction: transaction);
+
+    try {
+      return repositoryAdapter
+          .doExistIDs(op, notCachedIDs)
+          .resolveMapped((ids) {
+        return [
+          ...?cachedIDs,
+          ...ids,
+        ];
+      });
+    } catch (e, s) {
+      var message = 'existIDs> '
+          'cachedIDs: $cachedIDs ; '
+          'notCachedIDs: $notCachedIDs ; '
+          'op: $op';
+      _log.severe(message, e, s);
+      rethrow;
+    }
   }
 
   @override
@@ -1331,6 +1380,28 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (matcher is ConditionANY) {
       return _selectAll(transaction, matcher, resolutionRules);
+    }
+
+    throw UnsupportedError(
+        "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)");
+  }
+
+  @override
+  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      Transaction? transaction,
+      int? limit}) {
+    if (matcher is ConditionID) {
+      var id = matcher.idValue;
+      return existsID(id, transaction: transaction)
+          .resolveMapped((exists) => exists ? [id] : []);
+    }
+
+    if (matcher is ConditionIdIN) {
+      var ids = matcher.idsValues.whereType<I>().toList();
+      return existIDs(ids, transaction: transaction);
     }
 
     throw UnsupportedError(

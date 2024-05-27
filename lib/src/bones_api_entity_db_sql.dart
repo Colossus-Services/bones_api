@@ -1284,6 +1284,48 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  FutureOr<SQL> generateExistIDsSQL<I extends Object>(
+      Transaction transaction, String entityName, String table, List<I> ids) {
+    if (ids.isEmpty) return SQL.dummy;
+
+    return _generateSQLFrom(transaction, entityName, table, ConditionIdIN(ids),
+        sqlBuilder: (String from, EncodingContext context) {
+      var tableFieldID = context.tableFieldID ?? 'id';
+      var tableAlias = context.resolveEntityAlias(table);
+      var q = dialect.elementQuote;
+      var sql = 'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from';
+      return sql;
+    });
+  }
+
+  FutureOr<List<I>> existIDsSQL<I extends Object>(
+      TransactionOperation op, String entityName, String table, SQL sql) {
+    if (sql.isDummy) return [];
+
+    return executeTransactionOperation(op, sql, (connection) {
+      _logTransactionOperationSQL('existIDsSQL', op, sql);
+      return doExistIDsSQL(entityName, table, sql, op.transaction, connection);
+    });
+  }
+
+  FutureOr<List<I>> doExistIDsSQL<I extends Object>(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    C connection,
+  );
+
+  @override
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+      TransactionOperation op, String entityName, String table, List<I> ids) {
+    return generateExistIDsSQL(op.transaction, entityName, table, ids)
+        .resolveMapped((sql) {
+      return existIDsSQL(op, entityName, table, sql).resolveMapped(
+          (r) => _finishSQLOperation(sql, op, r, (ids) => parseIDs<I>(ids)));
+    });
+  }
+
   FutureOr<SQL> generateInsertSQL(Transaction transaction, String entityName,
       String table, Map<String, Object?> fields) {
     var retTableScheme = getTableScheme(table);
@@ -1296,7 +1338,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       var context = EncodingContext(entityName,
-          namedParameters: fields, transaction: transaction, tableName: table);
+          namedParameters: fields,
+          transaction: transaction,
+          tableName: table,
+          tableFieldID: tableScheme.idFieldName);
 
       var fieldsValues = tableScheme.getFieldsValues(fields);
 
@@ -1398,7 +1443,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       var context = EncodingContext(entityName,
-          namedParameters: fields, transaction: transaction);
+          namedParameters: fields,
+          transaction: transaction,
+          tableFieldID: tableScheme.idFieldName);
 
       var idFieldName = tableScheme.idFieldName!;
       var idPlaceholder =
@@ -1899,6 +1946,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  FutureOr<SQL> generateSelectIDsSQL(Transaction transaction, String entityName,
+      String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      int? limit}) {
+    return _generateSQLFrom(transaction, entityName, table, matcher,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        sqlBuilder: (String from, EncodingContext context) {
+      var tableAlias = context.resolveEntityAlias(table);
+      var tableFieldID = context.tableFieldID ?? 'id';
+      var q = dialect.elementQuote;
+      var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
+      var sql =
+          'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$limitStr';
+      return sql;
+    });
+  }
+
   FutureOr<SQL> _generateSQLFrom(Transaction transaction, String entityName,
       String table, EntityMatcher matcher,
       {Object? parameters,
@@ -1910,11 +1978,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       throw StateError('Invalid SQL condition: $matcher');
     }
 
-    var retEncodedSQL = _conditionSQLGenerator.encode(matcher, entityName,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        tableName: table);
+    var retEncodedSQL = getTableScheme(table).resolveMapped((tableScheme) {
+      var idFieldName = tableScheme?.idFieldName;
+
+      return _conditionSQLGenerator.encode(matcher, entityName,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          tableName: table,
+          tableFieldID: idFieldName);
+    });
 
     return retEncodedSQL.resolveMapped((encodedSQL) {
       var conditionSQL = encodedSQL.outputString;
@@ -2378,6 +2451,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql)
           .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+    });
+  }
+
+  @override
+  FutureOr<List<I>> doSelectIDsBy<I extends Object>(TransactionOperation op,
+      String entityName, String table, EntityMatcher matcher,
+      {Object? parameters,
+      List? positionalParameters,
+      Map<String, Object?>? namedParameters,
+      int? limit}) {
+    return generateSelectIDsSQL(op.transaction, entityName, table, matcher,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+            limit: limit)
+        .resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql)
+          .resolveMapped((r) => _finishSQLOperation(sql, op, r, (results) {
+                var ids = results.map((e) => e['id']);
+                return parseIDs<I>(ids);
+              }));
     });
   }
 

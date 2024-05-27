@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:map_history/map_history.dart';
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
@@ -427,6 +428,25 @@ class DBObjectMemoryAdapter
     }
 
     return map.length;
+  }
+
+  @override
+  FutureOr<List<I>> doExistIDs<I extends Object>(
+      TransactionOperation op, String entityName, String table, List<I> ids) {
+    return executeTransactionOperation(
+        op,
+        (conn) => _doExistIDsImpl(op, table, ids)
+            .resolveMapped((res) => _finishOperation(op, res, null)));
+  }
+
+  List<I> _doExistIDsImpl<I extends Object>(
+      TransactionOperation op, String table, List<I> ids) {
+    var map = _getTableMap(table, false);
+    if (map == null) return [];
+
+    var oIDs = map.keys.whereIn(ids).whereType<I>().toList();
+
+    return oIDs;
   }
 
   @override
