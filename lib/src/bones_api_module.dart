@@ -821,7 +821,7 @@ class APIRouteBuilder<M extends APIModule> {
           var data = hex.decode(hexData);
           return data;
         } catch (_) {
-          // not a HEX data:
+          // Not a HEX data:
         }
       } else if (value.startsWith("base64:")) {
         var base64Data = value.substring(7);
@@ -829,7 +829,7 @@ class APIRouteBuilder<M extends APIModule> {
           var data = base64.decode(base64Data);
           return data;
         } catch (_) {
-          // not a HEX data:
+          // Not a Base64 data:
         }
       }
 

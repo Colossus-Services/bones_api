@@ -1004,7 +1004,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           var data = hex.decode(hexData);
           return data;
         } catch (_) {
-          // not a HEX data:
+          // Not a HEX data:
         }
       } else if (value.startsWith("base64:")) {
         var base64Data = value.substring(7);
@@ -1012,7 +1012,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           var data = dart_convert.base64.decode(base64Data);
           return data;
         } catch (_) {
-          // not a HEX data:
+          // Not a Base64 data:
         }
       } else if (value.startsWith("url(") && value.endsWith(")")) {
         var allowReadFile = resolutionRulesResolved.allowReadFile;
