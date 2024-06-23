@@ -1275,7 +1275,7 @@ extension _ObjectExtension on Object? {
     if (self is _CachedResponse) {
       return self.fileStat;
     } else if (self is List<_CachedResponse>) {
-      return self.map((e) => e.fileStat).whereNotNull().firstOrNull;
+      return self.map((e) => e.fileStat).nonNulls.firstOrNull;
     }
     if (self is _FileStat) {
       return self;
