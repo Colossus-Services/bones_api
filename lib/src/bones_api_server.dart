@@ -378,7 +378,7 @@ class APIServerConfig {
             return dir != null ? MapEntry(domain, dir) : null;
           }
         })
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
     return domainsRoots;
   }
@@ -594,7 +594,7 @@ class APIServerConfig {
     var entries = values
         .map((e) => parseDomainEntry(e,
             checkDirectoryExistence: checkDirectoryExistence))
-        .whereNotNull()
+        .nonNulls
         .toList();
     if (entries.isEmpty) return {};
 
@@ -615,7 +615,7 @@ class APIServerConfig {
           }
           return MapEntry(e.key, dir);
         })
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
   }
 
@@ -1186,7 +1186,7 @@ class APIServer extends _APIServerBase {
 
       mimeType ??= requestedUri.queryParameters.entries
           .map((e) => _resolveMimeTypeByExtension(e.value))
-          .whereNotNull()
+          .nonNulls
           .firstOrNull;
     }
 
