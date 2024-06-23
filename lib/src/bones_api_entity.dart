@@ -998,6 +998,22 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       } else if (value.startsWith("data:")) {
         var dataURL = DataURLBase64.parse(value);
         return dataURL?.payloadArrayBuffer;
+      } else if (value.startsWith("hex:")) {
+        var hexData = value.substring(4);
+        try {
+          var data = hex.decode(hexData);
+          return data;
+        } catch (_) {
+          // not a HEX data:
+        }
+      } else if (value.startsWith("base64:")) {
+        var base64Data = value.substring(7);
+        try {
+          var data = dart_convert.base64.decode(base64Data);
+          return data;
+        } catch (_) {
+          // not a HEX data:
+        }
       } else if (value.startsWith("url(") && value.endsWith(")")) {
         var allowReadFile = resolutionRulesResolved.allowReadFile;
         if (!allowReadFile) return null;

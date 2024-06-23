@@ -823,6 +823,14 @@ class APIRouteBuilder<M extends APIModule> {
         } catch (_) {
           // not a HEX data:
         }
+      } else if (value.startsWith("base64:")) {
+        var base64Data = value.substring(7);
+        try {
+          var data = base64.decode(base64Data);
+          return data;
+        } catch (_) {
+          // not a HEX data:
+        }
       }
 
       var dataUrl = DataURLBase64.parse(value);
