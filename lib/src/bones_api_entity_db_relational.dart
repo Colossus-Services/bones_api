@@ -104,7 +104,7 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
   List<I> parseIDs<I extends Object>(Iterable<dynamic> ids) {
     var idParser = TypeParser.parserFor<I>(type: I);
     if (idParser != null) {
-      return ids.map(idParser).whereNotNull().toList();
+      return ids.map(idParser).nonNulls.toList();
     } else {
       return ids.whereType<I>().toList();
     }
@@ -282,7 +282,7 @@ class DBRelationalEntityRepository<O extends Object>
             if (fieldType.isPrimitiveType) return null;
             return MapEntry(fieldName, fieldType);
           })
-          .whereNotNull()
+          .nonNulls
           .toMapFromEntries();
 
   @override
@@ -561,7 +561,7 @@ class DBRelationalEntityRepository<O extends Object>
       }
 
       var list = values is Iterable ? values.asList : [values];
-      var listNotNull = list.whereNotNull().toList();
+      var listNotNull = list.nonNulls.toList();
 
       return setRelationship(o, field, listNotNull as dynamic,
           fieldType: fieldType, transaction: transaction);
@@ -727,7 +727,7 @@ class DBRelationalEntityRepository<O extends Object>
         }
 
         return null;
-      }).whereNotNull();
+      }).nonNulls;
 
       var relationships = Map.fromEntries(relationshipEntries);
 

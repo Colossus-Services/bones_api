@@ -1,3 +1,8 @@
+## 1.7.7
+
+- `EntityHandler`:
+  - `_resolveValueAsUInt8List`: handle `hex:` and `base64:` prefixed data.
+
 ## 1.7.6
 
 - `EntityHandler`:

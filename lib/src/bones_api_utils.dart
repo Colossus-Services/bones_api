@@ -383,7 +383,7 @@ abstract class RecursiveToString {
     _processedObjectsStack.addLast(processedObjects);
 
     try {
-      var l = o.map((e) => toStr(processedObjects!, e)).whereNotNull().toList();
+      var l = o.map((e) => toStr(processedObjects!, e)).nonNulls.toList();
       return l;
     } finally {
       var rm = _processedObjectsStack.removeLast();
@@ -453,7 +453,7 @@ class IdenticalSet<O> {
     return false;
   }
 
-  Iterable<O> toIterable() => _groups.whereNotNull().expand((l) => l);
+  Iterable<O> toIterable() => _groups.nonNulls.expand((l) => l);
 
   List<O> toList() => toIterable().toList();
 

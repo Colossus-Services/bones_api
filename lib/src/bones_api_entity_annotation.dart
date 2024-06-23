@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:meta/meta_meta.dart';
 import 'package:statistics/statistics.dart';
 
@@ -184,11 +183,11 @@ extension IterableEntityAnnotationExtension on Iterable<EntityAnnotation> {
 }
 
 extension IterableEntityFieldExtension on Iterable<EntityField> {
-  List<num> get maximum => map((e) => e.maximum).whereNotNull().toList();
+  List<num> get maximum => map((e) => e.maximum).nonNulls.toList();
 
-  List<num> get minimum => map((e) => e.minimum).whereNotNull().toList();
+  List<num> get minimum => map((e) => e.minimum).nonNulls.toList();
 
-  List<String> get regexp => map((e) => e.regexp).whereNotNull().toList();
+  List<String> get regexp => map((e) => e.regexp).nonNulls.toList();
 
   List<EntityField> get unique => where((e) => e.isUnique).toList();
 

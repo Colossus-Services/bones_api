@@ -1080,7 +1080,7 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
                     conf.map((key, value) => MapEntry<String, dynamic>(
                         key.toString(), value as dynamic)));
               })
-              .whereNotNull()
+              .nonNulls
               .toList()
             ..sort((a, b) => a.value.length.compareTo(b.value.length));
 }
@@ -1230,7 +1230,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   @override
   FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
       {Transaction? transaction}) {
-    var idsNotNull = ids is List<I> ? ids : ids.whereNotNull().toList();
+    var idsNotNull = ids is List<I> ? ids : ids.nonNulls.toList();
     if (idsNotNull.isEmpty) return <I>[];
 
     var cachedEntityByIDs =
@@ -1448,7 +1448,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       ConditionIdIN matcher,
       Object? parameters,
       EntityResolutionRules? resolutionRules) {
-    var ids = matcher.idsValues.whereNotNull().toList();
+    var ids = matcher.idsValues.nonNulls.toList();
     if (ids.isEmpty) return <O>[];
 
     final resolutionRulesResolved =
@@ -1565,7 +1565,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     Iterable<Map<String, dynamic>> entries;
     if (results is! Iterable<Map<String, dynamic>>) {
-      entries = results.whereNotNull();
+      entries = results.nonNulls;
     } else {
       entries = results;
     }
@@ -1671,7 +1671,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           var tableColumn = fieldsColumns[field]!;
 
           var ids = resultsList.map((e) => e[tableColumn]).toList();
-          var idsUniques = ids.whereNotNull().toSet().toList();
+          var idsUniques = ids.nonNulls.toSet().toList();
 
           var entities = repo
               .selectByIDs(idsUniques,
@@ -1744,7 +1744,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             var repo = _resolveEntityRepository(e.value);
             return repo != null ? MapEntry(e.key, repo) : null;
           })
-          .whereNotNull()
+          .nonNulls
           .toMapFromEntries();
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
@@ -1763,7 +1763,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           }
           return e;
         })
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
   }
 
@@ -1845,15 +1845,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
         // ignore: discarded_futures
         return targetsAsync.resolveMapped((targets) {
-          var allTargetsById = Map.fromEntries(targets
-              .whereNotNull()
+          var allTargetsById = Map.fromEntries(targets.nonNulls
               .map((e) => MapEntry(targetEntityRepository.getEntityID(e)!, e)));
 
           var relationshipsEntities = relationships.map((id, targetIds) {
-            var targetEntities = targetIds
-                .map((id) => allTargetsById[id])
-                .whereNotNull()
-                .toList();
+            var targetEntities =
+                targetIds.map((id) => allTargetsById[id]).nonNulls.toList();
 
             var targetEntitiesCast =
                 targetEntityHandler.castList(targetEntities, targetType)!;
@@ -1938,7 +1935,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       if (relationship == null) return null;
 
       return MapEntry(e.key, relationship);
-    }).whereNotNull();
+    }).nonNulls;
 
     var relationshipFields =
         Map<String, TableRelationshipReference>.fromEntries(entries);
@@ -2257,7 +2254,7 @@ class DBAdapterException implements DBException, WithRuntimeTypeNameSafe {
     if (o == null) {
       return null;
     } else if (o is Iterable) {
-      return '$indent${o.map(resolveToString).whereNotNull().join('\n$indent')}';
+      return '$indent${o.map(resolveToString).nonNulls.join('\n$indent')}';
     } else if (o is TransactionOperation) {
       return o.toString();
     } else if (o is Function()) {

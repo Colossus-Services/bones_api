@@ -1,5 +1,4 @@
 import 'package:async_extension/async_extension.dart';
-import 'package:collection/collection.dart';
 import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart' as logging;
 
@@ -10,8 +9,8 @@ import 'bones_api_entity_db_memory.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_root_starter.dart';
-import 'bones_api_utils_collections.dart';
 import 'bones_api_utils.dart';
+import 'bones_api_utils_collections.dart';
 
 final _log = logging.Logger('APITestConfig');
 
@@ -360,8 +359,7 @@ class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
         .toList()
         .resolveAll();
 
-    var relationshipTables = tablesSchemes
-        .whereNotNull()
+    var relationshipTables = tablesSchemes.nonNulls
         .expand((e) => e.tableRelationshipReference.values.expand((e) => e));
 
     var allTables = [

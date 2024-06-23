@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition_parser.dart';
@@ -936,7 +935,7 @@ class ConditionIdIN<O> extends Condition<O> {
     var idsValues = this.idsValues;
 
     var params =
-        idsValues.map((e) => e is ConditionParameter ? e : null).whereNotNull();
+        idsValues.map((e) => e is ConditionParameter ? e : null).nonNulls;
     _setParameters(params);
 
     _markResolved();

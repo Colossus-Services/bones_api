@@ -58,7 +58,7 @@ class PositionalFields {
 
   /// Converts [row] to a collection of [MapEntry].
   Iterable<MapEntry<String, Object?>> toEntries(Iterable<Object?> row) =>
-      fieldsOrder.map((f) => getMapEntry<Object>(f, row)).whereNotNull();
+      fieldsOrder.map((f) => getMapEntry<Object>(f, row)).nonNulls;
 
   /// Converts [row] to a [Map].
   Map<String, Object?> toMap(Iterable<Object?> row) =>

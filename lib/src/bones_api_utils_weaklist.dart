@@ -1,7 +1,5 @@
 import 'dart:collection';
 
-import 'package:collection/collection.dart';
-
 /// A [List] that stores elements using [WeakReference].
 class WeakList<E extends Object> extends ListBase<E?> {
   /// If `true` [autoPurge] will automatically call [purge] before a list operation.
@@ -181,9 +179,6 @@ class WeakList<E extends Object> extends ListBase<E?> {
   List<E> toList({bool growable = true}) {
     autoPurge();
 
-    return _entries
-        .map((e) => e.target)
-        .whereNotNull()
-        .toList(growable: growable);
+    return _entries.map((e) => e.target).nonNulls.toList(growable: growable);
   }
 }

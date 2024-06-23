@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:collection/collection.dart' hide IterableIntegerExtension;
 import 'package:crclib/catalog.dart';
 import 'package:crclib/crclib.dart';
 import 'package:gcloud/storage.dart' as gcs;
@@ -460,7 +459,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
       var objInfo = await _getObjectInfo(objFile);
       return objInfo != null && objInfo.length > 0 ? id : null;
-    }).resolveMapped((ids) => ids.whereNotNull().toList());
+    }).resolveMapped((ids) => ids.nonNulls.toList());
   }
 
   @override

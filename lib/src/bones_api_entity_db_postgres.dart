@@ -1,5 +1,4 @@
 import 'package:async_extension/async_extension.dart';
-import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -506,7 +505,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         columns.map((m) => m['constraint_definition'].toString()).toList();
 
     var constraints =
-        constraintsDefinitions.map(_parseConstraint).whereNotNull().toSet();
+        constraintsDefinitions.map(_parseConstraint).nonNulls.toSet();
 
     return constraints;
   }
@@ -551,7 +550,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         values = RegExp(r"'(.*?)'")
             .allMatches(arrayDef)
             .map((m) => m.group(1))
-            .whereNotNull()
+            .nonNulls
             .toSet();
       } else {
         var singleValue =
@@ -690,7 +689,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
             otherRef.sourceField,
           );
         })
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     return relationships;
@@ -822,7 +821,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       var reference = TableFieldReference(sourceTable, sourceField,
           sourceFieldType, targetTable, targetField, targetFieldType);
       return MapEntry<String, TableFieldReference>(sourceField, reference);
-    }).whereNotNull());
+    }).nonNulls);
 
     return map;
   }

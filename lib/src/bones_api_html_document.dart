@@ -427,7 +427,7 @@ class HTMLInput {
     } else if (value is Iterable) {
       return value
           .expand((e) => _resolveListIDs(e, type) ?? [])
-          .whereNotNull()
+          .nonNulls
           .toList();
     } else {
       if (type != null) {

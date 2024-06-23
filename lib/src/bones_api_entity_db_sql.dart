@@ -580,7 +580,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           var hidden = annotations.any((a) => a is EntityField && a.isHidden);
           return hidden ? f : null;
         })
-        .whereNotNull()
+        .nonNulls
         .toList(growable: false);
 
     if (hiddenFields.isNotEmpty) {
@@ -605,7 +605,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           if (repoField == null) return null;
           return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
         })
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
 
     for (var e in schemesTypes.entries) {
@@ -627,7 +627,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var referenceFields = repoFieldsNotInScheme
         .map((f) => _checkDBTableSchemeReferenceField(
             entityHandler, scheme, repoTable, f))
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
 
     var missingReferenceColumns = referenceFields.entries
@@ -669,7 +669,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
             return MapEntry(e.key, entityType);
           })
-          .whereNotNull()
+          .nonNulls
           .toMapFromEntries();
 
       if (fieldEntityTypes.isNotEmpty) {
@@ -686,7 +686,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               var refTable = e.value.targetTable;
               return MapEntry(field, refTable);
             })
-            .whereNotNull()
+            .nonNulls
             .toMapFromEntries();
 
         missingFieldReferenceConstraints = fieldEntityTypes.keys
@@ -1347,7 +1347,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var fieldsNotNull = fieldsValues.entries
           .map((e) => e.value != null ? e.key : null)
-          .whereNotNull()
+          .nonNulls
           .toList(growable: false);
 
       var fieldsValuesInSQL = <String, Object?>{};
