@@ -68,14 +68,10 @@ class SQLEntry {
       List<String>? referenceTables,
       this.columns})
       : comment = comment != null && comment.isNotEmpty ? comment : null,
-        tables = tables ??
-            columns?.map((e) => e.table).whereNotNull().toSet().toList(),
+        tables =
+            tables ?? columns?.map((e) => e.table).nonNulls.toSet().toList(),
         referenceTables = referenceTables ??
-            columns
-                ?.map((e) => e.referenceTable)
-                .whereNotNull()
-                .toSet()
-                .toList();
+            columns?.map((e) => e.referenceTable).nonNulls.toSet().toList();
 
   @override
   String toString() => comment == null ? sql : '$sql  -- $comment';
@@ -478,7 +474,7 @@ class AlterTableSQL extends TableSQL {
 
   @override
   List<String> get referenceTables => _referenceTables ??= <String>{
-        ...entries.expand((e) => e.referenceTables ?? <String>[]).whereNotNull()
+        ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls
       }.toList();
 
   @override
@@ -631,7 +627,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         var dependentTables = sql.dependentTables;
         var dependentSQLs = dependentTables
             ?.map((t) => createTables.getCreateTable(t))
-            .whereNotNull()
+            .nonNulls
             .toList();
 
         var unprocessedDependencies =
@@ -1105,7 +1101,7 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         sqlsByMainTable[table]?.whereType<CreateTableSQL>().firstOrNull;
 
     List<SQLBuilder> getCreateTables(List<String>? tables) =>
-        tables?.map(getCreateTable).whereNotNull().toList() ?? [];
+        tables?.map(getCreateTable).nonNulls.toList() ?? [];
 
     graph.populate(
       this,
