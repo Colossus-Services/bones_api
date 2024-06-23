@@ -496,7 +496,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
             otherRef.sourceField,
           );
         })
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     return relationships;
@@ -587,7 +587,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
                 sourceField, reference);
           });
         })
-        .whereNotNull()
+        .nonNulls
         .resolveAll();
 
     return mapEntriesRet.resolveMapped((mapEntries) {

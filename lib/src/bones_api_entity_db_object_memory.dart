@@ -1,7 +1,6 @@
 import 'dart:collection';
 
 import 'package:async_extension/async_extension.dart';
-import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:map_history/map_history.dart';
 import 'package:reflection_factory/reflection_factory.dart';
@@ -497,7 +496,7 @@ class DBObjectMemoryAdapter
 
           return entry;
         })
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     return entries;

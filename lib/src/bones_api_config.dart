@@ -193,7 +193,7 @@ class APIConfig {
       var val2 = _parseValue<E>(val);
       if (val2 != null) return val2;
 
-      var keyPath = [k0, k1, k2, k3, k4].whereNotNull().join('/');
+      var keyPath = [k0, k1, k2, k3, k4].nonNulls.join('/');
       throw StateError("Can't return key `$keyPath` as `$E`: $val");
     }
 

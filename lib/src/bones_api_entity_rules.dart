@@ -808,12 +808,12 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
     var eagerTypesNotNull = eagerTypes?.entries.map((e) {
       var eager = e.value;
       return eager != null ? MapEntry(e.key, eager) : null;
-    }).whereNotNull();
+    }).nonNulls;
 
     var lazyTypesNotNull = lazyTypes?.entries.map((e) {
       var lazy = e.value;
       return lazy != null ? MapEntry(e.key, lazy) : null;
-    }).whereNotNull();
+    }).nonNulls;
 
     var fetchEager = eagerTypesNotNull?.map((e) {
       var t = e.key;
@@ -843,7 +843,7 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
       ...?fetchEager,
       ...?fetchNotLazy,
     ]
-        .whereNotNull()
+        .nonNulls
         .expand((e) => e is Iterable ? e : [e])
         .whereType<Type>()
         .toList();
@@ -852,7 +852,7 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
       ...?fetchLazy,
       ...?fetchNotEager,
     ]
-        .whereNotNull()
+        .nonNulls
         .expand((e) => e is Iterable ? e : [e])
         .whereType<Type>()
         .toList();

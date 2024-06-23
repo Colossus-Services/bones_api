@@ -831,7 +831,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
           return match ? MapEntry(e.key, obj) : null;
         })
-        .whereNotNull()
+        .nonNulls
         .toList(growable: false);
 
     _checkNotReferencedEntities(entries, table, sql);
@@ -1004,7 +1004,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var targetIds = relWithID
         .map((relId) => relMap[relId]?[targetRelationshipField])
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     if (targetIds.isEmpty) {
@@ -1025,7 +1025,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
                 ? null
                 : _resolveEntityMap(e, entityHandler2, tableScheme2);
           })
-          .whereNotNull()
+          .nonNulls
           .toList();
     }
 

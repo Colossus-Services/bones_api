@@ -1333,7 +1333,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
           return MapEntry(field, typeInfo);
         })
-        .whereNotNull()
+        .nonNulls
         .toMapFromEntries();
 
     return UnmodifiableMapView(_fieldsEntityTypes = entityFields);
@@ -1347,7 +1347,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var entries = fieldsNames.map((f) {
       var annotations = getFieldEntityAnnotations(o, f);
       return annotations == null ? null : MapEntry(f, annotations);
-    }).whereNotNull();
+    }).nonNulls;
 
     var map = Map<String, List<EntityAnnotation>>.fromEntries(entries);
 
@@ -2617,7 +2617,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       });
 
       _fieldsTypes = UnmodifiableMapView<String, TypeInfo>(
-          Map<String, TypeInfo>.fromEntries(types.whereNotNull()));
+          Map<String, TypeInfo>.fromEntries(types.nonNulls));
     }
     return _fieldsTypes!;
   }
@@ -3074,12 +3074,12 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         var fieldValues = entityHandler.getField(o, e.key);
         if (fieldValues == null ||
             fieldValues is! Iterable ||
-            fieldValues.whereNotNull().isEmpty) continue;
+            fieldValues.nonNulls.isEmpty) continue;
 
         EntityRepository<Object>? tEntityRepository;
         EntityHandler<Object>? tEntityHandler;
 
-        for (var e in fieldValues.whereNotNull()) {
+        for (var e in fieldValues.nonNulls) {
           tEntityRepository ??= _resolveRepositoryProvider(
               entityHandler, entityRepository, repositoryProvider,
               obj: e, type: tType);
@@ -3451,7 +3451,7 @@ extension IterableEntityRepositoryProviderExtension
 
     var entityRepositories = notClosed
         .map((e) => e.getEntityRepository<T>(obj: obj, type: type, name: name))
-        .whereNotNull()
+        .nonNulls
         .toList(growable: false);
 
     return _resolveEntityRepository<T>(entityRepositories, type,
@@ -3515,7 +3515,7 @@ extension IterableEntityRepositoryProviderExtension
 
     var entityRepositories = notClosed
         .map((e) => e.getEntityRepositoryByType<T>(type))
-        .whereNotNull()
+        .nonNulls
         .toList();
 
     return _resolveEntityRepository<T>(entityRepositories, type,
@@ -4207,7 +4207,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     var entities = _entitiesTracker.trackInstancesNullable(os);
 
     if (stored) {
-      notifyStoredEntities(entities.whereNotNull());
+      notifyStoredEntities(entities.nonNulls);
     }
 
     return entities;
@@ -4217,7 +4217,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     _entitiesTracker.untrackInstances(os);
 
     if (deleted) {
-      notifyDeletedEntities(os.whereNotNull());
+      notifyDeletedEntities(os.nonNulls);
     }
   }
 
@@ -6078,7 +6078,7 @@ abstract class IterableEntityRepository<O extends Object>
       var oId = getID(o, entityHandler: entityHandler);
       var matches = ids.contains(oId);
       return matches ? oId as I : null;
-    }).whereNotNull();
+    }).nonNulls;
 
     return osIDs;
   }
@@ -6119,7 +6119,7 @@ abstract class IterableEntityRepository<O extends Object>
 
     var ids = entityHandler.getIDs<I>(os);
 
-    return ids.whereNotNull().toList();
+    return ids.nonNulls.toList();
   }
 
   @override
@@ -6249,7 +6249,7 @@ abstract class IterableEntityRepository<O extends Object>
     var oId = getID(o, entityHandler: entityHandler);
     var valuesIds = values.map((e) => valuesEntityHandler.getID(e));
 
-    var valuesIdsNotNull = IterableNullableExtension(valuesIds).whereNotNull();
+    var valuesIdsNotNull = valuesIds.nonNulls;
 
     return putRelationship(oId, valuesType, valuesIdsNotNull)
         .resolveMapped((ok) {

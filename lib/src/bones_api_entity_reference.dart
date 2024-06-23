@@ -2377,7 +2377,7 @@ extension NullEntityReferenceListExtension<T> on EntityReferenceList<T>? {
 }
 
 extension IterableEntityReferenceExtension<T> on Iterable<EntityReference<T>> {
-  List<Object> get allIDs => map((e) => e.id).whereNotNull().toList();
+  List<Object> get allIDs => map((e) => e.id).nonNulls.toList();
 
   List<I> allIDsAs<I>() => map((e) => e.idAs<I>()).whereType<I>().toList();
 
@@ -2388,7 +2388,7 @@ extension IterableEntityReferenceExtension<T> on Iterable<EntityReference<T>> {
 
 extension IterableEntityReferenceListExtension<T>
     on Iterable<EntityReferenceList<T>> {
-  List<Object> get allIDs => expand((e) => e.ids ?? []).whereNotNull().toList();
+  List<Object> get allIDs => expand((e) => e.ids ?? []).nonNulls.toList();
 
   List<I> allIDsAs<I>() => expand((e) => e.idsAs<I>()).whereType<I>().toList();
 
