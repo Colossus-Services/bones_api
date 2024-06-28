@@ -1,3 +1,8 @@
+## 1.7.8
+
+- `DBSQLMemoryAdapter`:
+  - `_selectEntries`: add support for `limit`.
+
 ## 1.7.7
 
 - `EntityHandler`:

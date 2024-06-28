@@ -83,6 +83,8 @@ class SQL implements SQLWrapper {
 
   final Set<String>? returnColumns;
 
+  final int? limit;
+
   final Map<String, String>? returnColumnsAliases;
 
   final String? mainTable;
@@ -128,6 +130,7 @@ class SQL implements SQLWrapper {
       this.idFieldName,
       this.returnColumns,
       this.returnColumnsAliases,
+      this.limit,
       required this.mainTable,
       this.relationship,
       this.tablesAliases,
@@ -1937,7 +1940,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
-        sqlBuilder: (String from, EncodingContext context) {
+        limit: limit, sqlBuilder: (String from, EncodingContext context) {
       var tableAlias = context.resolveEntityAlias(table);
       var q = dialect.elementQuote;
       var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
@@ -1956,7 +1959,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         parameters: parameters,
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
-        sqlBuilder: (String from, EncodingContext context) {
+        limit: limit, sqlBuilder: (String from, EncodingContext context) {
       var tableAlias = context.resolveEntityAlias(table);
       var tableFieldID = context.tableFieldID ?? 'id';
       var q = dialect.elementQuote;
@@ -1972,6 +1975,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       {Object? parameters,
       List? positionalParameters,
       Map<String, Object?>? namedParameters,
+      int? limit,
       required String Function(String from, EncodingContext context)
           sqlBuilder}) {
     if (matcher is! Condition) {
@@ -2019,6 +2023,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           entityName: encodedSQL.entityName,
           mainTable: table,
           tablesAliases: encodedSQL.tableAliases,
+          limit: limit,
         );
       } else {
         var join = StringBuffer();
@@ -2170,6 +2175,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           entityName: encodedSQL.entityName,
           mainTable: table,
           tablesAliases: encodedSQL.tableAliases,
+          limit: limit,
         );
       }
     });

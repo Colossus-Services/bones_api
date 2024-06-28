@@ -6,8 +6,8 @@ import 'package:map_history/map_history.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
-import 'bones_api_condition_encoder.dart';
 import 'bones_api_condition.dart';
+import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db_sql.dart';
@@ -738,30 +738,35 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     final condition = sql.condition;
 
-    List<Map<String, dynamic>> sel;
+    Iterable<Map<String, dynamic>> itr;
 
     if (condition == null) {
-      sel = map.values.toList();
+      itr = map.values;
     } else if (tableScheme == null ||
         (tableScheme.fieldsReferencedTablesLength == 0 &&
             tableScheme.tableRelationshipReferenceLength == 0) ||
         condition.isIDCondition) {
-      sel = map.values.where((e) {
+      itr = map.values.where((e) {
         return condition.matchesEntityMap(e,
             positionalParameters: sql.positionalParameters,
             namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
             entityHandler: entityHandler);
-      }).toList();
+      });
     } else {
-      sel = map.values.where((obj) {
+      itr = map.values.where((obj) {
         obj = _resolveEntityMap(obj, entityHandler, tableScheme);
 
         return condition.matchesEntityMap(obj,
             positionalParameters: sql.positionalParameters,
             namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
             entityHandler: entityHandler);
-      }).toList();
+      });
     }
+
+    final limit = sql.limit;
+
+    var sel =
+        limit != null && limit >= 0 ? itr.take(limit).toList() : itr.toList();
 
     return sel;
   }
