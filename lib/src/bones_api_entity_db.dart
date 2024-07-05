@@ -1677,7 +1677,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var fieldsEntityRepositories =
         _resolveFieldsEntityRepositories(resolutionRulesResolved);
 
-    if (!fieldsEntityRepositories.isNotEmpty) {
+    if (fieldsEntityRepositories.isEmpty) {
       return _resolveEntitiesSimple(
           transaction, resolutionRulesResolved, results);
     }
