@@ -1562,15 +1562,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     final fieldsListEntity = _fieldsListEntity;
     if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
 
-    final fieldsEntityRef = _fieldsEntityRef;
-    var fieldsEntityNoRef = fieldsEntity.length - fieldsEntityRef.length;
-    if (fieldsEntityNoRef > 0) return true;
+    if (_fieldsEntityNoRefLength > 0) return true;
 
-    final fieldsListEntityRef = _fieldsListEntityRef;
-
-    var fieldsListEntityNoRef =
-        fieldsListEntity.length - fieldsListEntityRef.length;
-    if (fieldsListEntityNoRef > 0) return true;
+    if (_fieldsListEntityNoRefLength > 0) return true;
 
     return null;
   }
@@ -1752,11 +1746,21 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   Map<String, TypeInfo> get _fieldsEntityRef =>
       entityHandler.fieldsWithEntityReference();
 
+  int? _fieldsEntityNoRefLengthCache;
+
+  int get _fieldsEntityNoRefLength => _fieldsEntityNoRefLengthCache ??=
+      _fieldsEntity.length - _fieldsEntityRef.length;
+
   Map<String, TypeInfo> get _fieldsListEntity =>
       entityHandler.fieldsWithTypeListEntityOrReference();
 
   Map<String, TypeInfo> get _fieldsListEntityRef =>
       entityHandler.fieldsWithEntityReferenceList();
+
+  int? _fieldsListEntityNoRefLengthCache;
+
+  int get _fieldsListEntityNoRefLength => _fieldsListEntityNoRefLengthCache ??=
+      _fieldsListEntity.length - _fieldsListEntityRef.length;
 
   Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
 
@@ -1771,11 +1775,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
       EntityResolutionRulesResolved resolutionRulesResolved) {
-    if (resolutionRulesResolved.isInnocuous) {
-      var hasRefBasic = _hasReferencedEntitiesBasic();
-      if (hasRefBasic != null && !hasRefBasic) {
-        return {};
-      }
+    if (resolutionRulesResolved.isInnocuous && _fieldsEntityNoRefLength == 0) {
+      return {};
     }
 
     final fieldsEntity = this._fieldsEntity;
