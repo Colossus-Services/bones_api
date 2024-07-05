@@ -5153,7 +5153,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       var duration = this.duration ?? Duration(milliseconds: -1);
 
       _logTransaction.info(
-          '[transaction:$id] Committed> time: ${duration.inMilliseconds} ms ;  ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: $result');
+          '[transaction:$id] Committed> time: ${duration.inMilliseconds} ms ;  ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: ${_toStringTruncated(result)}');
 
       if (duration.inMilliseconds > 500) {
         _logTransaction.warning(
@@ -5533,7 +5533,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         '  error: ${error is DBException ? error.messageAndOperation : ''}\n',
       if (extraErrors != null)
         '  extraErrors:\n    -- ${extraErrors!.map((e) => e is DBException ? e.messageAndOperation : e).join('\n    -- ')}\n',
-      '  cachedEntities: $cachedEntitiesLength\n',
+      '  cachedEntities: $totalCachedEntities\n',
       '  external: $_external\n',
       if (duration != null) '  duration: ${duration.inMilliseconds} ms\n',
       if (withOperations) ...[
@@ -5550,7 +5550,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
           '    ${_executedOperations.join(',\n    ')}',
         if (!compact) '\n  ]\n',
       ],
-      if (_commitCalled) '  result: $_result\n',
+      if (_commitCalled) '  result: ${_toStringTruncated(_result)}\n',
       '}'
     ].join();
   }
@@ -6568,4 +6568,11 @@ class SetEntityRepository<O extends Object>
 
     return idReferences?.toList() ?? <Object>[];
   }
+}
+
+String _toStringTruncated(Object? o) {
+  if (o is List && o.length > 10) {
+    return '${o.sublist(0, 10)}...${o.length}';
+  }
+  return '$o';
 }
