@@ -59,8 +59,13 @@ APITestConfigDB _getAPITestConfig(String dbType) {
     return APITestConfigDockerPostgreSQL(apiConfigPostgres,
         dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
   } else if (dbType == 'mysql') {
-    return APITestConfigDockerMySQL(apiConfigMysql,
-        dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
+    return APITestConfigDockerMySQL(
+      apiConfigMysql,
+      dockerHost: dockerHostLocal,
+      containerNamePrefix: containerPrefix,
+      // TODO: update package `mysql1` with support for MySQL 8.4.0
+      version: '8.0.37',
+    );
   } else {
     return APITestConfigDBSQLMemory(apiConfigMemory);
   }
