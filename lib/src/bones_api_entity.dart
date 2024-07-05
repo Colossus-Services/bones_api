@@ -82,17 +82,45 @@ class EntityHandlerProvider {
       _globalProvider._getEntityHandlerImpl<O>(obj: obj, type: type);
 
   EntityHandler<O>? _getEntityHandlerImpl<O>({O? obj, Type? type}) {
-    var entityHandler = _entityHandlers[O];
+    EntityHandler<O>? entityHandler;
+
+    if (type != null) {
+      entityHandler =
+          _getEntityHandlerCached<O>(type) ?? _getEntityHandlerCached<O>(O);
+    } else {
+      entityHandler = _getEntityHandlerCached<O>(O);
+    }
 
     if (entityHandler == null && obj != null) {
-      entityHandler = _entityHandlers[obj.runtimeType];
+      entityHandler = _getEntityHandlerCached<O>(obj.runtimeType);
     }
 
-    if (entityHandler == null && type != null) {
-      entityHandler = _entityHandlers[type];
+    return entityHandler;
+  }
+
+  (Type, EntityHandler)? _lastEntityHandler1;
+  (Type, EntityHandler)? _lastEntityHandler2;
+  (Type, EntityHandler)? _lastEntityHandler3;
+
+  EntityHandler<O>? _getEntityHandlerCached<O>(Type type) {
+    if (_lastEntityHandler1?.$1 == type) {
+      return _lastEntityHandler1?.$2 as EntityHandler<O>;
+    } else if (_lastEntityHandler2?.$1 == type) {
+      return _lastEntityHandler2?.$2 as EntityHandler<O>;
+    } else if (_lastEntityHandler3?.$1 == type) {
+      return _lastEntityHandler3?.$2 as EntityHandler<O>;
     }
 
-    return entityHandler as EntityHandler<O>?;
+    var entityHandler = _entityHandlers[type];
+
+    if (entityHandler != null) {
+      _lastEntityHandler3 = _lastEntityHandler2;
+      _lastEntityHandler2 = _lastEntityHandler1;
+      _lastEntityHandler1 = (type, entityHandler);
+      return entityHandler as EntityHandler<O>;
+    }
+
+    return null;
   }
 
   EntityHandler<O>? getEntityHandlerByType<O>(Type type) =>
