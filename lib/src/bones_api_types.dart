@@ -18,11 +18,11 @@ class Time implements Comparable<Time> {
     JsonDecoder.registerTypeDecoder(Time, (o, d, t) => Time.from(o));
   }
 
-  int hour;
-  int minute = 0;
-  int second = 0;
-  int millisecond = 0;
-  int microsecond = 0;
+  final int hour;
+  final int minute;
+  final int second;
+  final int millisecond;
+  final int microsecond;
 
   Time(this.hour,
       [this.minute = 0,
