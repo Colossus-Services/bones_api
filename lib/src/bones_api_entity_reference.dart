@@ -16,6 +16,67 @@ typedef EntityFetcher<T> = FutureOr<T?> Function(Object? id, Type type);
 typedef EntitiesFetcher<T> = FutureOr<List<T?>?> Function(
     List<Object?> ids, Type type);
 
+abstract class EntityInstantiator<T> {
+  T instantiate();
+}
+
+class EntityInstantiatorHandler<T> extends EntityInstantiator<T> {
+  final EntityHandler<T> entityHandler;
+  Object _map;
+
+  EntityCache? entityCache;
+  EntityHandlerProvider? entityHandlerProvider;
+
+  EntityInstantiatorHandler(this.entityHandler, Object id, this._map,
+      {Type? type, this.entityCache, this.entityHandlerProvider}) {
+    final entityCache = this.entityCache;
+
+    if (entityCache != null) {
+      type ??= entityHandler.type;
+
+      entityCache.cacheEntityInstantiator<T>(id, instantiate,
+          type: type, overwrite: false);
+    }
+  }
+
+  T? _entity;
+
+  @override
+  T instantiate() {
+    var instance = this._entity;
+    if (instance != null) return instance;
+
+    var entityMap = this.entityMap;
+
+    var entity = entityHandler.createFromMapSync(entityMap,
+        entityCache: entityCache, entityHandlerProvider: entityHandlerProvider);
+
+    this._entity = entity;
+
+    return entity;
+  }
+
+  Map<String, dynamic> get entityMap {
+    var map = this._map;
+    if (map is Map<String, dynamic>) return map;
+
+    this._map = map = resolveEntityMap(map);
+    return map;
+  }
+
+  static Map<String, dynamic> resolveEntityMap(Object entity) {
+    var entityMap = entity is Map
+        ? entity
+        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+
+    var entityMapCast = entityMap is Map<String, dynamic>
+        ? entityMap
+        : entityMap.map((key, value) => MapEntry('$key', value));
+
+    return entityMapCast;
+  }
+}
+
 /// Base class for [EntityReference] and [EntityReferenceList].
 abstract class EntityReferenceBase<T> {
   Type? _type;
@@ -161,7 +222,7 @@ abstract class EntityReferenceBase<T> {
     return type;
   }
 
-  bool _isInvalidEntityType(Type type) =>
+  static bool _isInvalidEntityType(Type type) =>
       type == Object ||
       type == dynamic ||
       type == int ||
@@ -172,7 +233,7 @@ abstract class EntityReferenceBase<T> {
       type == Map ||
       type == Set;
 
-  bool _isInvalidEntity(Object entity) =>
+  static bool _isInvalidEntity(Object entity) =>
       entity is EntityReference ||
       entity is List ||
       entity is Map ||
@@ -184,40 +245,43 @@ abstract class EntityReferenceBase<T> {
   EntityHandler<T>? _resolveEntityHandler() =>
       _entityHandler ??= _resolveEntityHandlerImpl();
 
-  EntityHandler<T>? _resolveEntityHandlerImpl() {
-    EntityHandler<T>? entityHandler;
+  EntityHandler<T>? _resolveEntityHandlerImpl() =>
+      _resolveEntityHandlerGlobal<T>(
+          _type, _typeName, _entityHandlerProvider, _entityProvider);
 
-    var entityHandlerProvider = _entityHandlerProvider;
+  static EntityHandler<T>? _resolveEntityHandlerGlobal<T>(
+      Type? type,
+      String? typeName,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityProvider? entityProvider) {
+    type ??= T;
 
     if (entityHandlerProvider != null) {
-      entityHandler = entityHandlerProvider.getEntityHandler(
-          type: _type, typeName: _typeName);
+      var entityHandler = entityHandlerProvider.getEntityHandler<T>(
+          type: type, typeName: typeName);
 
       if (entityHandler != null) {
         return entityHandler;
       }
     }
-
-    var entityProvider = _entityProvider;
 
     if (entityProvider is EntityHandlerProvider) {
       var handlerProvider = entityProvider as EntityHandlerProvider;
-      entityHandler =
-          handlerProvider.getEntityHandler(type: _type, typeName: _typeName);
+      var entityHandler =
+          handlerProvider.getEntityHandler<T>(type: type, typeName: typeName);
 
       if (entityHandler != null) {
         return entityHandler;
       }
     }
 
-    entityHandler = EntityHandlerProvider.globalProvider
-        .getEntityHandler(type: _type, typeName: _typeName);
+    var entityHandler = EntityHandlerProvider.globalProvider
+        .getEntityHandler<T>(type: type, typeName: typeName);
 
     if (entityHandler != null) {
       return entityHandler;
     }
 
-    var typeName = _typeName;
     if ((typeName == null || typeName.isEmpty) && !_isInvalidEntityType(type)) {
       typeName = '$type';
     }
@@ -342,6 +406,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             null,
             null,
             null,
+            null,
             entityHandler,
             entityProvider,
             entityHandlerProvider,
@@ -364,6 +429,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             type,
             typeName,
             _normalizeID<T>(entityHandler, id),
+            null,
             null,
             null,
             entityHandler,
@@ -395,6 +461,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             null,
             entity,
             null,
+            null,
             entityHandler,
             entityProvider,
             entityHandlerProvider,
@@ -418,6 +485,32 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             null,
             null,
             entityMap,
+            null,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entityFetcher,
+            entityCache,
+            checkGenericType);
+
+  /// Creates an [EntityReference] with an [entity] instance created from [entityInstantiator].
+  EntityReference.fromEntityInstantiator(
+      Object id, EntityInstantiator<T>? entityInstantiator,
+      {Type? type,
+      String? typeName,
+      EntityHandler<T>? entityHandler,
+      EntityProvider? entityProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityFetcher<T>? entityFetcher,
+      EntityCache? entityCache,
+      bool checkGenericType = true})
+      : this._(
+            type,
+            typeName,
+            id,
+            null,
+            null,
+            entityInstantiator,
             entityHandler,
             entityProvider,
             entityHandlerProvider,
@@ -449,13 +542,30 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entity = json['entity'];
 
       if (entity != null) {
-        var entityMap = entity is Map
-            ? entity
-            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+        if (id != null) {
+          entityHandler ??= EntityReferenceBase._resolveEntityHandlerGlobal(
+              type, typeName, entityHandlerProvider, entityProvider);
 
-        var entityMapCast = entityMap is Map<String, dynamic>
-            ? entityMap
-            : entityMap.map((key, value) => MapEntry('$key', value));
+          if (entityHandler != null) {
+            var instantiator = EntityInstantiatorHandler(
+                entityHandler, id, entity,
+                entityCache: entityCache,
+                entityHandlerProvider: entityHandlerProvider);
+
+            return EntityReference<T>.fromEntityInstantiator(id, instantiator,
+                    type: type,
+                    typeName: typeName,
+                    entityHandler: entityHandler,
+                    entityProvider: entityProvider,
+                    entityHandlerProvider: entityHandlerProvider,
+                    entityFetcher: entityFetcher,
+                    entityCache: entityCache,
+                    checkGenericType: false)
+                ._autoCast();
+          }
+        }
+
+        var entityMapCast = _resolveEntityMap(entity);
 
         return EntityReference<T>.fromEntityMap(entityMapCast,
                 type: type,
@@ -491,6 +601,29 @@ class EntityReference<T> extends EntityReferenceBase<T> {
             ._autoCast();
       }
     } else {
+      entityHandler ??= EntityReferenceBase._resolveEntityHandlerGlobal(
+          type, typeName, entityHandlerProvider, entityProvider);
+
+      if (entityHandler != null) {
+        var id = entityHandler.getIDFromMap(json);
+        if (id != null) {
+          var instantiator = EntityInstantiatorHandler(entityHandler, id, json,
+              entityCache: entityCache,
+              entityHandlerProvider: entityHandlerProvider);
+
+          return EntityReference<T>.fromEntityInstantiator(id, instantiator,
+                  type: type,
+                  typeName: typeName,
+                  entityHandler: entityHandler,
+                  entityProvider: entityProvider,
+                  entityHandlerProvider: entityHandlerProvider,
+                  entityFetcher: entityFetcher,
+                  entityCache: entityCache,
+                  checkGenericType: false)
+              ._autoCast();
+        }
+      }
+
       return EntityReference<T>.fromEntityMap(json,
               type: type,
               typeName: typeName,
@@ -502,6 +635,17 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               checkGenericType: false)
           ._autoCast();
     }
+  }
+
+  static Map<String, dynamic> _resolveEntityMap(Object entity) {
+    var entityMap = entity is Map
+        ? entity
+        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+
+    var entityMapCast = entityMap is Map<String, dynamic>
+        ? entityMap
+        : entityMap.map((key, value) => MapEntry('$key', value));
+    return entityMapCast;
   }
 
   /// Creates an [EntityReference] from [o] trying to resolve it in the best way.
@@ -569,6 +713,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       Object? id,
       T? entity,
       Map<String, dynamic>? entityMap,
+      EntityInstantiator<T>? entityInstantiator,
       EntityHandler<T>? entityHandler,
       EntityProvider? entityProvider,
       EntityHandlerProvider? entityHandlerProvider,
@@ -577,6 +722,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       bool checkGenericType)
       : _id = id,
         _entity = entity,
+        _entityInstantiator = entityInstantiator,
         _entityFetcher = entityFetcher,
         super._(type, typeName, entityHandler, entityProvider,
             entityHandlerProvider, entityCache) {
@@ -589,7 +735,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
         entityHandler
             // ignore: discarded_futures
-            .createFromMap(entityMap, entityCache: entityCache)
+            .createFromMap(entityMap,
+                entityCache: entityCache,
+                entityHandlerProvider: entityHandlerProvider)
             // ignore: discarded_futures
             .resolveMapped((o) {
           set(o);
@@ -607,7 +755,12 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       throw ArgumentError("Invalid ID type: ${id.runtimeTypeNameUnsafe} <$id>");
     }
 
-    _resolveEntity();
+    // Allow lazy instantiation:
+    if (_entityInstantiator == null) {
+      _resolveEntity();
+    } else if (id == null) {
+      throw ArgumentError("`entityInstantiator` defined but `id` is null!");
+    }
 
     if (checkGenericType) {
       _checkGenericType();
@@ -622,10 +775,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   EntityReference<T> _autoCastImpl() {
     var genericType = T;
-    if (!_isInvalidEntityType(genericType)) return this;
+    if (!EntityReferenceBase._isInvalidEntityType(genericType)) return this;
 
     var o = entityHandler?.typeInfo.callCasted<EntityReference>(<E>() {
-      if (_isInvalidEntityType(E)) return this;
+      if (EntityReferenceBase._isInvalidEntityType(E)) return this;
       return cast<E>();
     });
 
@@ -645,6 +798,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
           o._id,
           o._entity as E?,
           null,
+          o._entityInstantiator as EntityInstantiator<E>?,
           o._entityHandler as EntityHandler<E>?,
           o._entityProvider,
           o._entityHandlerProvider,
@@ -667,6 +821,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         _id,
         withEntity ? _entity : null,
         null,
+        withEntity ? _entityInstantiator : null,
         _entityHandler,
         _entityProvider,
         _entityHandlerProvider,
@@ -727,13 +882,39 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     return id;
   }
 
+  EntityInstantiator<T>? _entityInstantiator;
+
+  T? _instantiateEntity() {
+    var entity = _entity;
+    if (entity != null) return entity;
+
+    final entityInstantiator = _entityInstantiator;
+    if (entityInstantiator == null) return null;
+
+    entity = entityInstantiator.instantiate();
+    if (entity == null) return null;
+
+    _entity ??= entity;
+    _entityInstantiator = null;
+
+    var id = _getEntityID(entity);
+    if (_id == null) {
+      _id = id;
+    } else if (_id != id) {
+      throw StateError(
+          "Instantiated entity with different id: `$id` != `$_id`");
+    }
+
+    return entity;
+  }
+
   T? _entity;
 
   /// The already loaded entity.
   T? get entity => _resolveEntity();
 
   T? _resolveEntity() {
-    var entity = _entity;
+    var entity = _instantiateEntity();
 
     if (entity == null) {
       var id = this.id;
@@ -772,6 +953,11 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     } else if (isIdSet) {
       return id;
     } else {
+      if (_entityInstantiator != null) {
+        _instantiateEntity();
+        return id;
+      }
+
       return null;
     }
   }
@@ -783,7 +969,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   /// Returns [entity] as a JSON [Map].
   Map<String, dynamic>? entityToJson([JsonEncoder? jsonEncoder]) {
-    var entity = this.entity;
+    var entity = _instantiateEntity();
+
     if (entity == null) return null;
 
     if (jsonEncoder != null) {
@@ -803,6 +990,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   Object? entityOrIdToJson() {
     if (isNull) return null;
 
+    _instantiateEntity();
+
     if (isEntitySet) {
       return entityToJson();
     } else if (isIdSet) {
@@ -821,6 +1010,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   @override
   Map<String, dynamic>? toJson([JsonEncoder? jsonEncoder]) {
     if (isNull) return null;
+
+    _instantiateEntity();
 
     if (isEntitySet) {
       var id = this.id;
@@ -850,11 +1041,13 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       _id = null;
       _entity = null;
       _entityTime = null;
+      _entityInstantiator = null;
     } else {
       var id = _getEntityID(o);
       _id = id;
       _entity = o;
       _entityTime = DateTime.now();
+      _entityInstantiator = null;
     }
 
     return _entity;
@@ -867,6 +1060,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       _id = null;
       _entity = null;
       _entityTime = null;
+      _entityInstantiator = null;
     } else if (id != _id) {
       var prevID = _getEntityID(_entity);
 
@@ -875,6 +1069,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       if (id != prevID) {
         _entity = null;
         _entityTime = null;
+        _entityInstantiator = null;
       }
     }
 
@@ -899,14 +1094,18 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     return _id != null;
   }
 
+  /// Returns `true` if the [entity] has an [EntityInstantiator] not called yet.
+  bool get hasEntityInstantiator => _entityInstantiator != null;
+
   /// Returns `true` if this reference is `null` (no [id] or [entity] set).
   @override
-  bool get isNull => _entity == null && _id == null;
+  bool get isNull =>
+      _entity == null && _id == null && _entityInstantiator == null;
 
   /// Returns the current [entity] or fetches it.
   @override
   FutureOr<T?> get() {
-    var o = entity;
+    var o = _instantiateEntity();
     if (o != null) return o;
 
     return _fetchAndSet();
@@ -937,6 +1136,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     var prev = entity;
     _entity = null;
     _entityTime = null;
+    _entityInstantiator = null;
     return prev;
   }
 
@@ -1486,10 +1686,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
   EntityReferenceList<T> _autoCastImpl() {
     var genericType = T;
-    if (!_isInvalidEntityType(genericType)) return this;
+    if (!EntityReferenceBase._isInvalidEntityType(genericType)) return this;
 
     var o = entityHandler?.typeInfo.callCasted<EntityReferenceList>(<E>() {
-      if (_isInvalidEntityType(E)) return this;
+      if (EntityReferenceBase._isInvalidEntityType(E)) return this;
       return cast<E>();
     });
 
@@ -1584,8 +1784,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   }
 
   void _checkValidEntities(List<Object?> entities) {
-    var invalidIdx =
-        entities.indexWhere((e) => e != null && _isInvalidEntity(e));
+    var invalidIdx = entities.indexWhere(
+        (e) => e != null && EntityReferenceBase._isInvalidEntity(e));
 
     if (invalidIdx >= 0) {
       var entity = entities[invalidIdx];
@@ -1892,7 +2092,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     return _ids;
   }
 
-  /// Updated [ids] from [entities] isntances IDs.
+  /// Updated [ids] from [entities] instances IDs.
   bool updateIDsFromEntities() {
     var entities = _entities;
     if (entities == null) return false;
@@ -2285,8 +2485,19 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
           entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }
 
-    return EntityReference<T>._(type, null, id, entity, null, entityHandler,
-        entityProvider, _entityHandlerProvider, fetcher, _entityCache, false);
+    return EntityReference<T>._(
+        type,
+        null,
+        id,
+        entity,
+        null,
+        null,
+        entityHandler,
+        entityProvider,
+        _entityHandlerProvider,
+        fetcher,
+        _entityCache,
+        false);
   }
 
   @override
