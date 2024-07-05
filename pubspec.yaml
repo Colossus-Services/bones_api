@@ -12,7 +12,7 @@ executables:
 dependencies:
   async_extension: ^1.2.12
   async_events: ^1.2.0
-  reflection_factory: ^2.4.1
+  reflection_factory: ^2.4.2
   statistics: ^1.1.0
   swiss_knife: ^3.2.0
   data_serializer: ^1.1.0

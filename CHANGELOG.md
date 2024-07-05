@@ -22,7 +22,9 @@
 
 - `Time`: set all fields `final`.
 
-- reflection_factory: ^2.4.1
+- `APIResponse`: added metric `API-response-json`.
+
+- reflection_factory: ^2.4.2
 
 ## 1.7.8
 

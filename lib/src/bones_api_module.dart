@@ -1421,7 +1421,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
 
   FutureOr<dynamic> decodeJson(String content) {
     try {
-      return Json.decode(content);
+      return json.decode(content);
     } on FormatException {
       return content;
     }

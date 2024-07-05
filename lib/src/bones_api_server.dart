@@ -1437,8 +1437,14 @@ class APIServer extends _APIServerBase {
       return payload.toString();
     }
 
+    final jsonEncodeInit = DateTime.now();
+
     try {
       var s = _jsonEncodePayload(apiResponse, payload);
+      var jsonEncodeTime = DateTime.now().difference(jsonEncodeInit);
+
+      apiResponse.setMetric('API-response-json', duration: jsonEncodeTime);
+
       apiResponse.payloadMimeType ??= 'application/json';
       return s;
     } catch (e) {
