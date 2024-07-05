@@ -521,8 +521,15 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   void setID<V>(O o, V id) => setField<V>(o, idFieldName(o), id);
 
+  V? getIDFromMap<V>(Map<String, dynamic>? o) => o?[idFieldName()] as V?;
+
   Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
       Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
+
+  Map<dynamic, Map<String, dynamic>> toEntitiesMapByIdMap(
+          Iterable<Map<String, dynamic>> entities) =>
+      Map<dynamic, Map<String, dynamic>>.fromEntries(
+          entities.map((o) => MapEntry(getIDFromMap(o), o)));
 
   Type? _idType;
 
@@ -4192,6 +4199,9 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
   @override
   Object? getEntityID(O o) => entityHandler.getID(o);
+
+  Object? getEntityMapID(Map<String, dynamic>? o) =>
+      entityHandler.getIDFromMap(o);
 
   Map<String, Object?> getEntityFields(O o) => entityHandler.getFields(o);
 
