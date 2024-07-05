@@ -2555,7 +2555,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   FutureOr<O?> copy(O obj) {
-    var reflection = this.reflection;
+    final reflection = this.reflection;
+
+    final noReferenceField = fieldsWithTypeEntityOrReference(obj).isEmpty;
+    if (noReferenceField) {
+      var fields = reflection.getJsonFieldsVisibleValues(obj);
+      var copy = reflection.createFromMapSync(fields);
+      return copy;
+    }
+
     var json = reflection.toJson(obj);
     return reflection.fromJson(json);
   }
