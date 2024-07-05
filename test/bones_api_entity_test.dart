@@ -135,6 +135,7 @@ void main() {
         expect(ref.isNull, isTrue);
         expect(ref.isIdSet, isFalse);
         expect(ref.isEntitySet, isFalse);
+        expect(ref.hasEntity, isFalse);
 
         expect(ref.toJson(), isNull);
         expect(ref.entityToJson(), isNull);
@@ -153,6 +154,7 @@ void main() {
         expect(ref.isNull, isTrue);
         expect(ref.isIdSet, isFalse);
         expect(ref.isEntitySet, isFalse);
+        expect(ref.hasEntity, isFalse);
 
         expect(ref.toJson(), isNull);
         expect(ref.entityToJson(), isNull);
@@ -171,6 +173,7 @@ void main() {
         expect(ref.isIdSet, isTrue);
         expect(ref.isNull, isFalse);
         expect(ref.isEntitySet, isFalse);
+        expect(ref.hasEntity, isFalse);
 
         expect(
             ref.toJson(), equals({'EntityReference': 'UserInfo', 'id': 101}));
@@ -267,6 +270,7 @@ void main() {
 
         expect(ref.isEntitySet, isFalse);
         expect(ref.hasEntityInstantiator, isTrue);
+        expect(ref.hasEntity, isTrue);
         expect(ref.isIdSet, isTrue);
         expect(ref.isNull, isFalse);
 
@@ -279,6 +283,8 @@ void main() {
             }));
 
         expect(ref.isEntitySet, isTrue);
+        expect(ref.hasEntityInstantiator, isFalse);
+        expect(ref.hasEntity, isTrue);
 
         expect(ref.entityToJson(), equals({'id': 104, 'info': 'The info'}));
       }
@@ -292,12 +298,14 @@ void main() {
 
         expect(ref.isEntitySet, isFalse);
         expect(ref.hasEntityInstantiator, isTrue);
+        expect(ref.hasEntity, isTrue);
         expect(ref.isIdSet, isTrue);
         expect(ref.isNull, isFalse);
 
         expect(ref.entity, isA<UserInfo>());
         expect(ref.isEntitySet, isTrue);
         expect(ref.hasEntityInstantiator, isFalse);
+        expect(ref.hasEntity, isTrue);
 
         expect(
             ref.toJson(),

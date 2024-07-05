@@ -13,7 +13,7 @@
   - Added: `isAnyEagerEntityType`, `isAnyEagerEntityTypeInfo`, `isAnyLazyEntityType`, `isAnyLazyEntityTypeInfo`.
 
 - `EntityReference`
-  - Added `fromEntityInstantiator`.
+  - Added `fromEntityInstantiator` and `hasEntity`.
 - New `EntityInstantiator` and `EntityInstantiatorHandler`.
 
 - `EntityHandler`:

@@ -1088,6 +1088,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// Returns `true` if the [entity] instance is loaded.
   bool get isEntitySet => _entity != null;
 
+  /// Returns `true` if [isEntitySet] or [hasEntityInstantiator].
+  bool get hasEntity => _entity != null || _entityInstantiator != null;
+
   /// Returns `true` if [id] is set.
   bool get isIdSet {
     _resolveID();
