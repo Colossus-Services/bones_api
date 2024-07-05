@@ -1771,6 +1771,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
       EntityResolutionRulesResolved resolutionRulesResolved) {
+    if (resolutionRulesResolved.isInnocuous) {
+      return {};
+    }
+
     final fieldsEntity = this._fieldsEntity;
 
     return _fieldsEntityRepositoriesAll()

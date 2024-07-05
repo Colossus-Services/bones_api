@@ -3062,8 +3062,10 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         if (fieldValue is EntityReference) {
           if (fieldValue.isNull) continue;
 
-          if (fieldValue.isEntitySet) {
+          if (fieldValue.hasEntity) {
             var fieldType = fieldValue.type;
+            var fieldEntity = fieldValue.entity;
+
             var del = _deleteSubEntityImpl(
                 entityHandler,
                 entityRepository,
@@ -3071,7 +3073,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
                 o,
                 e.key,
                 fieldType,
-                fieldValue,
+                fieldEntity,
                 transaction,
                 deleted,
                 preDeleteCalls,
@@ -3090,21 +3092,34 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
           if (fieldValue.isEntitiesSet) {
             var fieldType = fieldValue.type;
-            var del = _deleteSubEntityImpl(
-                entityHandler,
-                entityRepository,
-                repositoryProvider,
-                o,
-                e.key,
-                fieldType,
-                fieldValue,
-                transaction,
-                deleted,
-                preDeleteCalls,
-                posDeleteCalls);
+            var entities = fieldValue.entities?.nonNulls.toList();
 
-            changed |= del;
-            continue;
+            if (entities == null || entities.isEmpty) continue;
+
+            EntityRepository<Object>? tEntityRepository;
+            EntityHandler<Object>? tEntityHandler;
+
+            for (var e in entities) {
+              tEntityRepository ??= _resolveRepositoryProvider(
+                  entityHandler, entityRepository, repositoryProvider,
+                  obj: e, type: fieldType);
+
+              tEntityHandler ??= _resolveEntityHandler(
+                  entityHandler, tEntityRepository, repositoryProvider,
+                  obj: e, type: fieldType);
+
+              preDeleteCalls.add(() => _deleteCascadeGenericImpl<Object>(
+                  e,
+                  transaction,
+                  tEntityHandler,
+                  tEntityRepository,
+                  repositoryProvider,
+                  deleted));
+            }
+
+            fieldValue.set(null);
+
+            changed = true;
           }
         }
       } else if (t.isIterable) {

@@ -1098,6 +1098,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   }
 
   /// Returns `true` if the [entity] has an [EntityInstantiator] not called yet.
+  /// If an [EntityInstantiator] is defined [isIdSet] also should be defined.
   bool get hasEntityInstantiator => _entityInstantiator != null;
 
   /// Returns `true` if this reference is `null` (no [id] or [entity] set).
@@ -1124,9 +1125,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         return o;
       });
 
-  /// Returns `true` if the [entity] is loaded;
+  /// Returns `true` if the [entity] is loaded.
+  /// See [hasEntity].
   @override
-  bool get isLoaded => isEntitySet;
+  bool get isLoaded => hasEntity;
 
   /// Returns the current internal value ([entity] OR [id]).
   @override
@@ -2077,6 +2079,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Sets the [entities] [ids] and returns the current [ids].
   /// If the IDs is changing the previous loaded [entities] instance are disposed.
   Object? setIDs(List<Object?>? ids) {
+    if (ids != null && ids.every((e) => e == null)) {
+      ids = null;
+    }
+
     if (ids == null) {
       _ids = null;
       _entities = null;

@@ -623,7 +623,7 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       } else {
         if (value.isNull) {
           resolvedValue = null;
-        } else if (value.isEntitySet && value.entity is V) {
+        } else if (value.hasEntity && value.entity is V) {
           resolvedValue = value.entity;
         } else if (value.isIdSet && value.id is V) {
           resolvedValue = value.id;

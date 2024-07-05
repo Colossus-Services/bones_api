@@ -343,7 +343,7 @@ class DBRelationalEntityRepository<O extends Object>
             if (value is EntityReference) {
               if (value.isNull) {
                 return null;
-              } else if (value.isEntitySet) {
+              } else if (value.hasEntity) {
                 entity = value.entity;
               } else {
                 return value.id;
