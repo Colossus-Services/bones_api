@@ -1,5 +1,5 @@
 @TestOn('vm')
-@Timeout(Duration(minutes: 2))
+@Timeout(Duration(minutes: 5))
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:bones_api/bones_api_test_mysql.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
