@@ -1772,7 +1772,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
       EntityResolutionRulesResolved resolutionRulesResolved) {
     if (resolutionRulesResolved.isInnocuous) {
-      return {};
+      var hasRefBasic = _hasReferencedEntitiesBasic();
+      if (hasRefBasic != null && !hasRefBasic) {
+        return {};
+      }
     }
 
     final fieldsEntity = this._fieldsEntity;
