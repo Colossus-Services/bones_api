@@ -2000,12 +2000,17 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   Future<void> _startNormal() async {
-    _httpServer = await shelf_io.serve(
-      _process,
-      address,
-      port,
-      shared: hasMultipleWorkers,
-    );
+    try {
+      _httpServer = await shelf_io.serve(
+        _process,
+        address,
+        port,
+        shared: hasMultipleWorkers,
+      );
+    } catch (e, s) {
+      _log.severe("Can't start `APIServer` at: $address:$port", e, s);
+      rethrow;
+    }
 
     _configureServer(_httpServer);
   }

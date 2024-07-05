@@ -3158,6 +3158,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         var fieldValuesEmpty = fieldValues.toList()..clear();
         entityHandler.setField<dynamic>(o, e.key, fieldValuesEmpty,
             entityCache: transaction);
+
         changed = true;
       } else if (t.isCollection || EntityHandler.isReflectedEnumType(t.type)) {
         continue;
@@ -4400,11 +4401,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         .resolveMapped(trackEntitiesNullable);
   }
 
-  List<O?> _idsToEntitiesList(List<dynamic> ids, Map<dynamic, O>? entitiesByID,
+  List<O?> _idsToEntitiesList(List<Object?> ids, Map<dynamic, O>? entitiesByID,
           [Map<dynamic, Object>? cachedEntities]) =>
       ids.map((id) => entitiesByID?[id] ?? cachedEntities?[id] as O?).toList();
 
-  List<O?> _idsToUniqueEntityList(List<dynamic> ids, O? o) {
+  List<O?> _idsToUniqueEntityList(List<Object?> ids, O? o) {
     if (o == null) return List<O?>.filled(ids.length, null);
     var oID = getEntityID(o);
     if (ids.length == 1) return <O?>[o];
