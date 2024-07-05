@@ -1509,48 +1509,70 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   @override
   bool hasReferencedEntities([EntityResolutionRulesResolved? resolutionRules]) {
-    final fieldsEntity = _fieldsEntity;
-    final fieldsEntityRef = _fieldsEntityRef;
-
-    final fieldsListEntity = _fieldsListEntity;
-    final fieldsListEntityRef = _fieldsListEntityRef;
-
-    if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
-
-    var fieldsEntityNoRef = fieldsEntity.length - fieldsEntityRef.length;
-    if (fieldsEntityNoRef > 0) return true;
-
-    var fieldsListEntityNoRef =
-        fieldsListEntity.length - fieldsListEntityRef.length;
-    if (fieldsListEntityNoRef > 0) return true;
+    var hasRefBasic = _hasReferencedEntitiesBasic();
+    if (hasRefBasic != null) return hasRefBasic;
 
     if (resolutionRules == null || resolutionRules.isInnocuous) return false;
 
-    if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isNotEmpty) return false;
+    final fieldsEntityRef = _fieldsEntityRef;
+    final fieldsListEntityRef = _fieldsListEntityRef;
+
+    if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isEmpty) return false;
 
     var allEager = resolutionRules.allEager ?? false;
-    var eagerEntityTypes = resolutionRules.eagerEntityTypes;
-    var lazyEntityTypes = resolutionRules.lazyEntityTypes;
-
     if (allEager) {
+      var lazyEntityTypes = resolutionRules.lazyEntityTypes;
       if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty) {
-        var anyEager = CombinedIterableView(
-          [fieldsEntityRef.values, fieldsListEntityRef.values],
-        ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+        var anyEager =
+            resolutionRules.isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
+                resolutionRules
+                    .isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
         return anyEager;
       } else {
         return true;
       }
     }
 
+    var eagerEntityTypes = resolutionRules.eagerEntityTypes;
     if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty) {
-      var anyEager = CombinedIterableView(
-        [fieldsEntityRef.values, fieldsListEntityRef.values],
-      ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+      var anyEager = resolutionRules
+              .isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
+          resolutionRules.isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
       return anyEager;
     }
 
     return false;
+  }
+
+  (bool?,)? _hasReferencedEntitiesBasicCache;
+
+  bool? _hasReferencedEntitiesBasic() {
+    var cache = _hasReferencedEntitiesBasicCache;
+    if (cache != null) {
+      return cache.$1;
+    }
+
+    var r = _hasReferencedEntitiesBasicImpl();
+    _hasReferencedEntitiesBasicCache = (r,);
+    return r;
+  }
+
+  bool? _hasReferencedEntitiesBasicImpl() {
+    final fieldsEntity = _fieldsEntity;
+    final fieldsListEntity = _fieldsListEntity;
+    if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
+
+    final fieldsEntityRef = _fieldsEntityRef;
+    var fieldsEntityNoRef = fieldsEntity.length - fieldsEntityRef.length;
+    if (fieldsEntityNoRef > 0) return true;
+
+    final fieldsListEntityRef = _fieldsListEntityRef;
+
+    var fieldsListEntityNoRef =
+        fieldsListEntity.length - fieldsListEntityRef.length;
+    if (fieldsListEntityNoRef > 0) return true;
+
+    return null;
   }
 
   FutureOr<List<O>> resolveEntities(
