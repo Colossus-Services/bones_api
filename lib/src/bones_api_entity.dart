@@ -82,17 +82,45 @@ class EntityHandlerProvider {
       _globalProvider._getEntityHandlerImpl<O>(obj: obj, type: type);
 
   EntityHandler<O>? _getEntityHandlerImpl<O>({O? obj, Type? type}) {
-    var entityHandler = _entityHandlers[O];
+    EntityHandler<O>? entityHandler;
+
+    if (type != null) {
+      entityHandler =
+          _getEntityHandlerCached<O>(type) ?? _getEntityHandlerCached<O>(O);
+    } else {
+      entityHandler = _getEntityHandlerCached<O>(O);
+    }
 
     if (entityHandler == null && obj != null) {
-      entityHandler = _entityHandlers[obj.runtimeType];
+      entityHandler = _getEntityHandlerCached<O>(obj.runtimeType);
     }
 
-    if (entityHandler == null && type != null) {
-      entityHandler = _entityHandlers[type];
+    return entityHandler;
+  }
+
+  (Type, EntityHandler)? _lastEntityHandler1;
+  (Type, EntityHandler)? _lastEntityHandler2;
+  (Type, EntityHandler)? _lastEntityHandler3;
+
+  EntityHandler<O>? _getEntityHandlerCached<O>(Type type) {
+    if (_lastEntityHandler1?.$1 == type) {
+      return _lastEntityHandler1?.$2 as EntityHandler<O>;
+    } else if (_lastEntityHandler2?.$1 == type) {
+      return _lastEntityHandler2?.$2 as EntityHandler<O>;
+    } else if (_lastEntityHandler3?.$1 == type) {
+      return _lastEntityHandler3?.$2 as EntityHandler<O>;
     }
 
-    return entityHandler as EntityHandler<O>?;
+    var entityHandler = _entityHandlers[type];
+
+    if (entityHandler != null) {
+      _lastEntityHandler3 = _lastEntityHandler2;
+      _lastEntityHandler2 = _lastEntityHandler1;
+      _lastEntityHandler1 = (type, entityHandler);
+      return entityHandler as EntityHandler<O>;
+    }
+
+    return null;
   }
 
   EntityHandler<O>? getEntityHandlerByType<O>(Type type) =>
@@ -493,8 +521,15 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   void setID<V>(O o, V id) => setField<V>(o, idFieldName(o), id);
 
+  V? getIDFromMap<V>(Map<String, dynamic>? o) => o?[idFieldName()] as V?;
+
   Map<dynamic, O> toEntitiesByIdMap(Iterable<O> entities) =>
       Map<dynamic, O>.fromEntries(entities.map((o) => MapEntry(getID(o), o)));
+
+  Map<dynamic, Map<String, dynamic>> toEntitiesMapByIdMap(
+          Iterable<Map<String, dynamic>> entities) =>
+      Map<dynamic, Map<String, dynamic>>.fromEntries(
+          entities.map((o) => MapEntry(getIDFromMap(o), o)));
 
   Type? _idType;
 
@@ -2527,7 +2562,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   FutureOr<O?> copy(O obj) {
-    var reflection = this.reflection;
+    final reflection = this.reflection;
+
+    final noReferenceField = fieldsWithTypeEntityOrReference(obj).isEmpty;
+    if (noReferenceField) {
+      var fields = reflection.getJsonFieldsVisibleValues(obj);
+      var copy = reflection.createFromMapSync(fields);
+      return copy;
+    }
+
     var json = reflection.toJson(obj);
     return reflection.fromJson(json);
   }
@@ -3019,8 +3062,10 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         if (fieldValue is EntityReference) {
           if (fieldValue.isNull) continue;
 
-          if (fieldValue.isEntitySet) {
+          if (fieldValue.hasEntity) {
             var fieldType = fieldValue.type;
+            var fieldEntity = fieldValue.entity;
+
             var del = _deleteSubEntityImpl(
                 entityHandler,
                 entityRepository,
@@ -3028,7 +3073,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
                 o,
                 e.key,
                 fieldType,
-                fieldValue,
+                fieldEntity,
                 transaction,
                 deleted,
                 preDeleteCalls,
@@ -3047,21 +3092,34 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
           if (fieldValue.isEntitiesSet) {
             var fieldType = fieldValue.type;
-            var del = _deleteSubEntityImpl(
-                entityHandler,
-                entityRepository,
-                repositoryProvider,
-                o,
-                e.key,
-                fieldType,
-                fieldValue,
-                transaction,
-                deleted,
-                preDeleteCalls,
-                posDeleteCalls);
+            var entities = fieldValue.entities?.nonNulls.toList();
 
-            changed |= del;
-            continue;
+            if (entities == null || entities.isEmpty) continue;
+
+            EntityRepository<Object>? tEntityRepository;
+            EntityHandler<Object>? tEntityHandler;
+
+            for (var e in entities) {
+              tEntityRepository ??= _resolveRepositoryProvider(
+                  entityHandler, entityRepository, repositoryProvider,
+                  obj: e, type: fieldType);
+
+              tEntityHandler ??= _resolveEntityHandler(
+                  entityHandler, tEntityRepository, repositoryProvider,
+                  obj: e, type: fieldType);
+
+              preDeleteCalls.add(() => _deleteCascadeGenericImpl<Object>(
+                  e,
+                  transaction,
+                  tEntityHandler,
+                  tEntityRepository,
+                  repositoryProvider,
+                  deleted));
+            }
+
+            fieldValue.set(null);
+
+            changed = true;
           }
         }
       } else if (t.isIterable) {
@@ -3100,6 +3158,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         var fieldValuesEmpty = fieldValues.toList()..clear();
         entityHandler.setField<dynamic>(o, e.key, fieldValuesEmpty,
             entityCache: transaction);
+
         changed = true;
       } else if (t.isCollection || EntityHandler.isReflectedEnumType(t.type)) {
         continue;
@@ -4157,6 +4216,9 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   @override
   Object? getEntityID(O o) => entityHandler.getID(o);
 
+  Object? getEntityMapID(Map<String, dynamic>? o) =>
+      entityHandler.getIDFromMap(o);
+
   Map<String, Object?> getEntityFields(O o) => entityHandler.getFields(o);
 
   FutureOr<O> fromMap(Map<String, dynamic> fields,
@@ -4339,11 +4401,11 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         .resolveMapped(trackEntitiesNullable);
   }
 
-  List<O?> _idsToEntitiesList(List<dynamic> ids, Map<dynamic, O>? entitiesByID,
+  List<O?> _idsToEntitiesList(List<Object?> ids, Map<dynamic, O>? entitiesByID,
           [Map<dynamic, Object>? cachedEntities]) =>
       ids.map((id) => entitiesByID?[id] ?? cachedEntities?[id] as O?).toList();
 
-  List<O?> _idsToUniqueEntityList(List<dynamic> ids, O? o) {
+  List<O?> _idsToUniqueEntityList(List<Object?> ids, O? o) {
     if (o == null) return List<O?>.filled(ids.length, null);
     var oID = getEntityID(o);
     if (ids.length == 1) return <O?>[o];
@@ -5117,7 +5179,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       var duration = this.duration ?? Duration(milliseconds: -1);
 
       _logTransaction.info(
-          '[transaction:$id] Committed> time: ${duration.inMilliseconds} ms ;  ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: $result');
+          '[transaction:$id] Committed> time: ${duration.inMilliseconds} ms ;  ops: ${_operations.length} ; root: ${_operations.firstOrNull} > result: ${_toStringTruncated(result)}');
 
       if (duration.inMilliseconds > 500) {
         _logTransaction.warning(
@@ -5497,7 +5559,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         '  error: ${error is DBException ? error.messageAndOperation : ''}\n',
       if (extraErrors != null)
         '  extraErrors:\n    -- ${extraErrors!.map((e) => e is DBException ? e.messageAndOperation : e).join('\n    -- ')}\n',
-      '  cachedEntities: $cachedEntitiesLength\n',
+      '  cachedEntities: $totalCachedEntities\n',
       '  external: $_external\n',
       if (duration != null) '  duration: ${duration.inMilliseconds} ms\n',
       if (withOperations) ...[
@@ -5514,7 +5576,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
           '    ${_executedOperations.join(',\n    ')}',
         if (!compact) '\n  ]\n',
       ],
-      if (_commitCalled) '  result: $_result\n',
+      if (_commitCalled) '  result: ${_toStringTruncated(_result)}\n',
       '}'
     ].join();
   }
@@ -6532,4 +6594,11 @@ class SetEntityRepository<O extends Object>
 
     return idReferences?.toList() ?? <Object>[];
   }
+}
+
+String _toStringTruncated(Object? o) {
+  if (o is List && o.length > 10) {
+    return '${o.sublist(0, 10)}...${o.length}';
+  }
+  return '$o';
 }

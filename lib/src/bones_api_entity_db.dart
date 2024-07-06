@@ -1509,48 +1509,64 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   @override
   bool hasReferencedEntities([EntityResolutionRulesResolved? resolutionRules]) {
-    final fieldsEntity = _fieldsEntity;
-    final fieldsEntityRef = _fieldsEntityRef;
-
-    final fieldsListEntity = _fieldsListEntity;
-    final fieldsListEntityRef = _fieldsListEntityRef;
-
-    if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
-
-    var fieldsEntityNoRef = fieldsEntity.length - fieldsEntityRef.length;
-    if (fieldsEntityNoRef > 0) return true;
-
-    var fieldsListEntityNoRef =
-        fieldsListEntity.length - fieldsListEntityRef.length;
-    if (fieldsListEntityNoRef > 0) return true;
+    var hasRefBasic = _hasReferencedEntitiesBasic();
+    if (hasRefBasic != null) return hasRefBasic;
 
     if (resolutionRules == null || resolutionRules.isInnocuous) return false;
 
-    if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isNotEmpty) return false;
+    final fieldsEntityRef = _fieldsEntityRef;
+    final fieldsListEntityRef = _fieldsListEntityRef;
+
+    if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isEmpty) return false;
 
     var allEager = resolutionRules.allEager ?? false;
-    var eagerEntityTypes = resolutionRules.eagerEntityTypes;
-    var lazyEntityTypes = resolutionRules.lazyEntityTypes;
-
     if (allEager) {
+      var lazyEntityTypes = resolutionRules.lazyEntityTypes;
       if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty) {
-        var anyEager = CombinedIterableView(
-          [fieldsEntityRef.values, fieldsListEntityRef.values],
-        ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+        var anyEager =
+            resolutionRules.isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
+                resolutionRules
+                    .isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
         return anyEager;
       } else {
         return true;
       }
     }
 
+    var eagerEntityTypes = resolutionRules.eagerEntityTypes;
     if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty) {
-      var anyEager = CombinedIterableView(
-        [fieldsEntityRef.values, fieldsListEntityRef.values],
-      ).any((t) => resolutionRules.isEagerEntityTypeInfo(t));
+      var anyEager = resolutionRules
+              .isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
+          resolutionRules.isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
       return anyEager;
     }
 
     return false;
+  }
+
+  (bool?,)? _hasReferencedEntitiesBasicCache;
+
+  bool? _hasReferencedEntitiesBasic() {
+    var cache = _hasReferencedEntitiesBasicCache;
+    if (cache != null) {
+      return cache.$1;
+    }
+
+    var r = _hasReferencedEntitiesBasicImpl();
+    _hasReferencedEntitiesBasicCache = (r,);
+    return r;
+  }
+
+  bool? _hasReferencedEntitiesBasicImpl() {
+    final fieldsEntity = _fieldsEntity;
+    final fieldsListEntity = _fieldsListEntity;
+    if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
+
+    if (_fieldsEntityNoRefLength > 0) return true;
+
+    if (_fieldsListEntityNoRefLength > 0) return true;
+
+    return null;
   }
 
   FutureOr<List<O>> resolveEntities(
@@ -1661,65 +1677,65 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var fieldsEntityRepositories =
         _resolveFieldsEntityRepositories(resolutionRulesResolved);
 
-    if (fieldsEntityRepositories.isNotEmpty) {
-      var fieldsEntitiesAsync =
-          _fieldsColumnsAll().resolveMapped((fieldsColumns) {
-        return fieldsEntityRepositories.entries.forEachAsync((e) {
-          var field = e.key;
-          var repo = e.value;
-
-          var tableColumn = fieldsColumns[field]!;
-
-          var ids = resultsList.map((e) => e[tableColumn]).toList();
-          var idsUniques = ids.nonNulls.toSet().toList();
-
-          var entities = repo
-              .selectByIDs(idsUniques,
-                  transaction: transaction,
-                  resolutionRules: resolutionRulesResolved)
-              .resolveMapped((entities) => idsUniques
-                  .mapIndexed((i, id) => MapEntry(id, entities[i]))
-                  .toList());
-
-          return MapEntry(tableColumn, entities);
-        }).resolveMapped((l) => l.resolveAllValues());
-      });
-
-      return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
-        for (var e in fieldsEntities) {
-          var field = e.key;
-          var fieldEntities = Map.fromEntries(e.value);
-
-          var length = resultsList.length;
-
-          for (var i = 0; i < length; ++i) {
-            var result = resultsList[i];
-            var entityId = result[field];
-            var entity = fieldEntities[entityId];
-            result[field] = entity;
-          }
-        }
-
-        return _resolveEntitiesSimple(
-            transaction, resolutionRulesResolved, resultsList);
-      });
+    if (fieldsEntityRepositories.isEmpty) {
+      return _resolveEntitiesSimple(
+          transaction, resolutionRulesResolved, results);
     }
 
-    return _resolveEntitiesSimple(
-        transaction, resolutionRulesResolved, results);
+    var fieldsEntitiesAsync =
+        _fieldsEntityColumnsAll().resolveMapped((fieldsColumns) {
+      return fieldsEntityRepositories.entries.forEachAsync((e) {
+        var field = e.key;
+        var repo = e.value;
+
+        var tableColumn = fieldsColumns[field]!;
+
+        var ids = resultsList.map((e) => e[tableColumn]).toList();
+        var idsUniques = ids.nonNulls.toSet().toList();
+
+        var entities = repo
+            .selectByIDs(idsUniques,
+                transaction: transaction,
+                resolutionRules: resolutionRulesResolved)
+            .resolveMapped((entities) => idsUniques
+                .mapIndexed((i, id) => MapEntry(id, entities[i]))
+                .toList());
+
+        return MapEntry(tableColumn, entities);
+      }).resolveMapped((l) => l.resolveAllValues());
+    });
+
+    return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
+      for (var e in fieldsEntities) {
+        var field = e.key;
+        var fieldEntities = Map.fromEntries(e.value);
+
+        var length = resultsList.length;
+
+        for (var i = 0; i < length; ++i) {
+          var result = resultsList[i];
+          var entityId = result[field];
+          var entity = fieldEntities[entityId];
+          result[field] = entity;
+        }
+      }
+
+      return _resolveEntitiesSimple(
+          transaction, resolutionRulesResolved, resultsList);
+    });
   }
 
-  Map<String, String>? _fieldsColumns;
+  Map<String, String>? _fieldsEntityColumnsAllCache;
 
-  FutureOr<Map<String, String>> _fieldsColumnsAll() {
-    var fieldsColumns = _fieldsColumns;
+  FutureOr<Map<String, String>> _fieldsEntityColumnsAll() {
+    var fieldsColumns = _fieldsEntityColumnsAllCache;
     if (fieldsColumns != null) return fieldsColumns;
 
     return _fieldsEntityRepositoriesAll()
         .map((f, _) => MapEntry(f, _resolveEntityFieldToTableColumn(f)))
         .resolveAllValues()
         .resolveMapped((fieldsColumns) {
-      _fieldsColumns = fieldsColumns;
+      _fieldsEntityColumnsAllCache = fieldsColumns;
       return fieldsColumns;
     });
   }
@@ -1730,11 +1746,21 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   Map<String, TypeInfo> get _fieldsEntityRef =>
       entityHandler.fieldsWithEntityReference();
 
+  int? _fieldsEntityNoRefLengthCache;
+
+  int get _fieldsEntityNoRefLength => _fieldsEntityNoRefLengthCache ??=
+      _fieldsEntity.length - _fieldsEntityRef.length;
+
   Map<String, TypeInfo> get _fieldsListEntity =>
       entityHandler.fieldsWithTypeListEntityOrReference();
 
   Map<String, TypeInfo> get _fieldsListEntityRef =>
       entityHandler.fieldsWithEntityReferenceList();
+
+  int? _fieldsListEntityNoRefLengthCache;
+
+  int get _fieldsListEntityNoRefLength => _fieldsListEntityNoRefLengthCache ??=
+      _fieldsListEntity.length - _fieldsListEntityRef.length;
 
   Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
 
@@ -1749,6 +1775,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
       EntityResolutionRulesResolved resolutionRulesResolved) {
+    if (resolutionRulesResolved.isInnocuous && _fieldsEntityNoRefLength == 0) {
+      return {};
+    }
+
     final fieldsEntity = this._fieldsEntity;
 
     return _fieldsEntityRepositoriesAll()

@@ -998,6 +998,17 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
     return entityType != null ? isLazyEntityType(entityType, def) : false;
   }
 
+  bool isAnyEagerEntityType(Iterable<Type> types) =>
+      types.any(isEagerEntityType);
+
+  bool isAnyEagerEntityTypeInfo(Iterable<TypeInfo> types) =>
+      types.any(isEagerEntityTypeInfo);
+
+  bool isAnyLazyEntityType(Iterable<Type> types) => types.any(isLazyEntityType);
+
+  bool isAnyLazyEntityTypeInfo(Iterable<TypeInfo> types) =>
+      types.any(isLazyEntityTypeInfo);
+
   /// Copies this instance, allowing fields overwrite.
   /// - [conflictingEntityTypes] informs the [Type]s to remove from [lazyEntityTypes] and [eagerEntityTypes].
   EntityResolutionRules copyWith({
@@ -1290,6 +1301,22 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
       resolved.isLazyEntityTypeInfo(entityTypeInfo, def);
 
   @override
+  bool isAnyEagerEntityType(Iterable<Type> types) =>
+      resolved.isAnyEagerEntityType(types);
+
+  @override
+  bool isAnyEagerEntityTypeInfo(Iterable<TypeInfo> types) =>
+      resolved.isAnyEagerEntityTypeInfo(types);
+
+  @override
+  bool isAnyLazyEntityType(Iterable<Type> types) =>
+      resolved.isAnyLazyEntityType(types);
+
+  @override
+  bool isAnyLazyEntityTypeInfo(Iterable<TypeInfo> types) =>
+      resolved.isAnyLazyEntityTypeInfo(types);
+
+  @override
   EntityResolutionRules copyWith(
           {bool? allowEntityFetch,
           bool? allowReadFile,
@@ -1378,6 +1405,18 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
   @override
   bool isLazyEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) =>
       false;
+
+  @override
+  bool isAnyEagerEntityType(Iterable<Type> types) => false;
+
+  @override
+  bool isAnyEagerEntityTypeInfo(Iterable<TypeInfo> types) => false;
+
+  @override
+  bool isAnyLazyEntityType(Iterable<Type> types) => false;
+
+  @override
+  bool isAnyLazyEntityTypeInfo(Iterable<TypeInfo> types) => false;
 
   @override
   EntityResolutionRules copyWith(

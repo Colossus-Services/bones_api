@@ -1437,8 +1437,14 @@ class APIServer extends _APIServerBase {
       return payload.toString();
     }
 
+    final jsonEncodeInit = DateTime.now();
+
     try {
       var s = _jsonEncodePayload(apiResponse, payload);
+      var jsonEncodeTime = DateTime.now().difference(jsonEncodeInit);
+
+      apiResponse.setMetric('API-response-json', duration: jsonEncodeTime);
+
       apiResponse.payloadMimeType ??= 'application/json';
       return s;
     } catch (e) {
@@ -2000,12 +2006,17 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   Future<void> _startNormal() async {
-    _httpServer = await shelf_io.serve(
-      _process,
-      address,
-      port,
-      shared: hasMultipleWorkers,
-    );
+    try {
+      _httpServer = await shelf_io.serve(
+        _process,
+        address,
+        port,
+        shared: hasMultipleWorkers,
+      );
+    } catch (e, s) {
+      _log.severe("Can't start `APIServer` at: $address:$port", e, s);
+      rethrow;
+    }
 
     _configureServer(_httpServer);
   }

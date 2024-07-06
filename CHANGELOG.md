@@ -1,3 +1,31 @@
+## 1.7.9
+
+- `EntityHandlerProvider`:
+  - Optimize `_getEntityHandlerImpl`.
+
+- `ClassReflectionEntityHandler`:
+  - Optimize `copy`.
+
+- `DBEntityRepository`:
+  - Optimize `hasReferencedEntities`.
+
+- `EntityResolutionRules`:
+  - Added: `isAnyEagerEntityType`, `isAnyEagerEntityTypeInfo`, `isAnyLazyEntityType`, `isAnyLazyEntityTypeInfo`.
+
+- `EntityReference`
+  - Added `fromEntityInstantiator` and `hasEntity`.
+- New `EntityInstantiator` and `EntityInstantiatorHandler`.
+
+- `EntityHandler`:
+  - Added `getIDFromMap` and `toEntitiesMapByIdMap`.
+- `EntityRepository`: added `getEntityMapID`.
+
+- `Time`: set all fields `final`.
+
+- `APIResponse`: added metric `API-response-json`.
+
+- reflection_factory: ^2.4.2
+
 ## 1.7.8
 
 - `DBSQLMemoryAdapter`:

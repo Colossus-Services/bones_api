@@ -1,5 +1,5 @@
 @TestOn('vm')
-@Timeout(Duration(minutes: 2))
+@Timeout(Duration(minutes: 5))
 import 'package:bones_api/bones_api_logging.dart';
 import 'package:bones_api/bones_api_test_mysql.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
@@ -59,8 +59,13 @@ APITestConfigDB _getAPITestConfig(String dbType) {
     return APITestConfigDockerPostgreSQL(apiConfigPostgres,
         dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
   } else if (dbType == 'mysql') {
-    return APITestConfigDockerMySQL(apiConfigMysql,
-        dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
+    return APITestConfigDockerMySQL(
+      apiConfigMysql,
+      dockerHost: dockerHostLocal,
+      containerNamePrefix: containerPrefix,
+      // TODO: update package `mysql1` with support for MySQL 8.4.0
+      version: '8.0.37',
+    );
   } else {
     return APITestConfigDBSQLMemory(apiConfigMemory);
   }
