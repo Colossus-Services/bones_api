@@ -75,7 +75,9 @@ abstract class APISecurity {
   }
 
   APIToken createToken(String username) => APIToken(username,
-      token: generateToken(username), duration: tokenDuration);
+      token: generateToken(username),
+      duration: tokenDuration,
+      withRefreshToken: true);
 
   FutureOr<APICredential> prepareCredential(APICredential credential) =>
       credential;
@@ -154,18 +156,17 @@ abstract class APISecurity {
       APICredential credential, bool resumed) {
     var token = credential.token;
 
-    APIToken? prevAPIToken;
-    Object? prevData;
-    List<APIPermission>? prevPermissions;
-
     if (token == null) {
-      return _resolveAuthenticationImpl(
-          credential, resumed, prevAPIToken, prevData, prevPermissions);
+      return _resolveAuthenticationImpl(credential, resumed, null, null, null);
     }
 
     var prevToken = _tokenStore.get(token);
 
     return prevToken.resolveMapped((prevToken) {
+      APIToken? prevAPIToken;
+      Object? prevData;
+      List<APIPermission>? prevPermissions;
+
       if (prevToken != null) {
         prevAPIToken = prevToken.apiToken;
         prevData = prevToken.data;
@@ -214,9 +215,10 @@ abstract class APISecurity {
       return _createAuthenticationImpl(credential, permissions, data, resumed);
     }
 
-    return validateToken(APIToken(credential.username,
-            token: credential.token, duration: tokenDuration))
-        .resolveMapped((token) {
+    var credentialToken = APIToken(credential.username,
+        token: credential.token, duration: tokenDuration);
+
+    return validateToken(credentialToken).resolveMapped((token) {
       if (token != null) {
         return APIAuthentication(token,
             permissions: permissions,
@@ -304,10 +306,12 @@ abstract class APISecurity {
   }
 
   FutureOr<bool> isValidToken(String username, String token) {
+    if (!token.startsWith('TK')) return false;
+
     return _tokenStore
         .getByUsername(username, checkExpiredTokens: true)
         .resolveMapped((userTokens) {
-      return userTokens.where((t) => t.token == token).isNotEmpty;
+      return userTokens.any((t) => t.token == token);
     });
   }
 
