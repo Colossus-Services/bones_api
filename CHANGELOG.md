@@ -1,3 +1,7 @@
+## 1.7.10
+
+- `APIToken`: added field `refreshToken`.
+
 ## 1.7.9
 
 - `EntityHandlerProvider`:
