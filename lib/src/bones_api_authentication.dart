@@ -435,11 +435,20 @@ class APIToken implements Comparable<APIToken> {
 
   final Duration duration;
 
+  final String? refreshToken;
+
   APIToken(this.username,
-      {String? token, DateTime? issueTime, Duration? duration})
+      {String? token,
+      DateTime? issueTime,
+      Duration? duration,
+      String? refreshToken,
+      bool withRefreshToken = false})
       : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
         issueTime = issueTime ?? DateTime.now(),
-        duration = duration ?? Duration(hours: 3);
+        duration = duration ?? Duration(hours: 3),
+        refreshToken = refreshToken == null && withRefreshToken
+            ? generateToken(640, variableLength: 64, prefix: 'RTK')
+            : refreshToken;
 
   DateTime get accessTime => _accessTime;
 
@@ -477,6 +486,7 @@ class APIToken implements Comparable<APIToken> {
         'issueTime': issueTime,
         'duration': duration.inSeconds,
         'expireTime': expireTime,
+        if (refreshToken != null) 'refreshToken': refreshToken,
       };
 
   factory APIToken.fromJson(Map json) => APIToken(
@@ -484,6 +494,7 @@ class APIToken implements Comparable<APIToken> {
         token: json['token'],
         issueTime: TypeParser.parseDateTime(json['issueTime']),
         duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
+        refreshToken: json['refreshToken'],
       );
 }
 
