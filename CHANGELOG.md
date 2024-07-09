@@ -1,6 +1,9 @@
 ## 1.7.10
 
-- `APIToken`: added field `refreshToken`.
+- `APIToken`, `APICredential`: added field `refreshToken`.
+
+- `APISecurity`:
+  - Added `onNewAPIToken`, `validateUnknownToken`, `validateRefreshToken`.
 
 ## 1.7.9
 
