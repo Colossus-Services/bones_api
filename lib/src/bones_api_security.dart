@@ -203,10 +203,17 @@ abstract class APISecurity {
 
         return _tokenStore
             .storeAPIToken(authentication.token, data, permissions)
-            .resolveWithValue(authentication);
+            .resolveMapped((apiTokenInfo) {
+          if (apiTokenInfo != null && changedAPIToken) {
+            onNewAPIToken(apiTokenInfo.apiToken, false);
+          }
+          return authentication;
+        });
       });
     });
   }
+
+  void onNewAPIToken(APIToken token, bool refreshed) {}
 
   FutureOr<APIAuthentication> createAuthentication(
       APICredential credential, List<APIPermission> permissions,
@@ -215,8 +222,8 @@ abstract class APISecurity {
       return _createAuthenticationImpl(credential, permissions, data, resumed);
     }
 
-    var credentialToken = APIToken(credential.username,
-        token: credential.token, duration: tokenDuration);
+    var credentialToken =
+        APIToken.fromCredential(credential, duration: tokenDuration);
 
     return validateToken(credentialToken).resolveMapped((token) {
       if (token != null) {
@@ -285,6 +292,8 @@ abstract class APISecurity {
   }
 
   FutureOr<APIToken?> validateToken(APIToken token) {
+    if (!token.token.startsWith('TK')) return null;
+
     return getUsernameValidTokens(token.username).resolveMapped((userTokens) {
       if (userTokens.isEmpty) return null;
 
@@ -297,7 +306,7 @@ abstract class APISecurity {
   }
 
   FutureOr<APIToken?> getAPIToken(String? token) {
-    if (token == null || token.isEmpty) return null;
+    if (token == null || token.isEmpty || !token.startsWith('TK')) return null;
     return _tokenStore.get(token).resolveMapped((token) => token?.apiToken);
   }
 
