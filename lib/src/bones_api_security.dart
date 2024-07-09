@@ -298,16 +298,66 @@ abstract class APISecurity {
       if (userTokens.isEmpty) return null;
 
       var idx = userTokens.indexOf(token);
-      if (idx < 0) return null;
+      if (idx < 0) {
+        return validateUnknownToken(token.username, token.token);
+      }
 
       token = userTokens[idx];
       return token;
     });
   }
 
+  /// This should be overridden to allow validation of tokens not stored in memory.
+  /// If an [APIToken] with the same [token] is returned, the [token] will be
+  /// treated as valid and authentication will be allowed.
+  /// Default return: `null`
+  FutureOr<APIToken?> validateUnknownToken(String username, String token) {
+    //print('!!! Unknown Token: $token');
+    return null;
+  }
+
   FutureOr<APIToken?> getAPIToken(String? token) {
     if (token == null || token.isEmpty || !token.startsWith('TK')) return null;
     return _tokenStore.get(token).resolveMapped((token) => token?.apiToken);
+  }
+
+  FutureOr<APIToken?> refreshAPIToken(String? username, String? refreshToken) {
+    if (username == null ||
+        refreshToken == null ||
+        username.isEmpty ||
+        refreshToken.isEmpty) {
+      return null;
+    }
+
+    return validateRefreshToken(username, refreshToken).resolveMapped((ok) {
+      if (!ok) return null;
+
+      return getUsernameValidTokens(username).resolveMapped((userTokens) {
+        var token = createToken(username);
+        userTokens.add(token);
+
+        autoValidateAllTokens();
+
+        return _tokenStore
+            .storeAPIToken(token, null, []).resolveMapped((apiTokenInfo) {
+          var apiToken = apiTokenInfo?.apiToken;
+          if (apiToken != null) {
+            onNewAPIToken(apiToken, true);
+          }
+          return apiToken;
+        });
+      });
+    });
+  }
+
+  /// This should be overridden to allow refresh tokens.
+  /// If `true` is returned, it will allow the generation of a
+  /// new valid token and enable authentication.
+  /// Default return: `true`
+  FutureOr<bool> validateRefreshToken(String username, String refreshToken) {
+    if (username.isEmpty || !refreshToken.startsWith('RTK')) return false;
+
+    return false;
   }
 
   FutureOr<List<APIToken>> getUsernameValidTokens(String username) {
@@ -320,7 +370,13 @@ abstract class APISecurity {
     return _tokenStore
         .getByUsername(username, checkExpiredTokens: true)
         .resolveMapped((userTokens) {
-      return userTokens.any((t) => t.token == token);
+      if (userTokens.any((t) => t.token == token)) {
+        return true;
+      }
+
+      return validateUnknownToken(username, token).resolveMapped((apiToken) {
+        return apiToken?.token == token;
+      });
     });
   }
 
@@ -648,11 +704,23 @@ abstract class APISecurity {
       APIRequest request, List<APICredential> credentials) {
     var username = getRequestParameterUsername(request).trim();
     var token = getRequestParameterToken(request).trim();
+    var refreshToken =
+        token.isEmpty ? getRequestParameterRefreshToken(request).trim() : '';
 
     if (username.isNotEmpty) {
       if (token.isNotEmpty) {
         var credential = APICredential(username, token: token);
         credentials.add(credential);
+      } else if (refreshToken.isNotEmpty) {
+        return refreshAPIToken(username, refreshToken)
+            .resolveMapped((apiToken) {
+          if (apiToken != null && !apiToken.isExpired()) {
+            var credential = APICredential(apiToken.username,
+                token: apiToken.token, refreshToken: apiToken.refreshToken);
+            credentials.add(credential);
+          }
+          return credentials;
+        });
       } else {
         var password = getRequestParameterPassword(request).trim();
         var credential = APICredential(username, passwordHash: password);
@@ -687,6 +755,16 @@ abstract class APISecurity {
         'x-token', 'token', 'x-access-token', 'access-token');
 
     return (token ?? '').toString();
+  }
+
+  String getRequestParameterRefreshToken(APIRequest request) {
+    var refreshToken = request.getParameterIgnoreCaseFirstOf(
+        'refreshToken', 'refresh_token', 'refreshtoken');
+
+    refreshToken ??=
+        request.getHeaderFirstOf('x-refresh-token', 'refresh-token');
+
+    return (refreshToken ?? '').toString();
   }
 
   String getRequestParameterUsername(APIRequest request) {
@@ -732,6 +810,8 @@ class APITokenStore {
       SharedMapField(
     sharedTokensID,
     sharedStore: sharedStore,
+    onInitialize: _sharedTokensOnInitialize,
+    onAbsent: _sharedTokensOnAbsent,
     onPut: _sharedTokensOnPut,
     onRemove: _sharedTokensOnRemove,
   );
@@ -739,6 +819,17 @@ class APITokenStore {
   late final SharedMapField<String, List<APIToken>>
       _sharedTokensByUsernameField =
       SharedMapField('$sharedTokensID:byUsername', sharedStore: sharedStore);
+
+  FutureOr<void> _sharedTokensOnInitialize(SharedMap sharedTokens) async {
+    if (sharedTokens.isAuxiliaryInstance) return;
+
+    _log.info("Initialized `sharedTokens`: $sharedTokens");
+  }
+
+  APITokenInfo? _sharedTokensOnAbsent(String token) {
+    //_log.info("`sharedTokens` -> onAbsent: $token");
+    return null;
+  }
 
   FutureOr<void> _sharedTokensOnPut(String token, APITokenInfo? tokenInfo) {
     _resolveSharedTokensByUsername().resolveMapped((sharedTokensByUsername) {
