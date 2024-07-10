@@ -504,6 +504,7 @@ abstract class APISecurity {
           .resolveMapped((ok) {
         if (ok) {
           request.credential = null;
+          onLogout(credential);
         }
 
         return null;
@@ -533,6 +534,8 @@ abstract class APISecurity {
       return auth;
     });
   }
+
+  void onLogout(APICredential credential) {}
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
       APIRequest request) {
@@ -820,8 +823,8 @@ class APITokenStore {
       _sharedTokensByUsernameField =
       SharedMapField('$sharedTokensID:byUsername', sharedStore: sharedStore);
 
-  FutureOr<void> _sharedTokensOnInitialize(SharedMap sharedTokens) async {
-    if (sharedTokens.isAuxiliaryInstance) return;
+  FutureOr<void> _sharedTokensOnInitialize(SharedMap sharedTokens) {
+    if (sharedTokens.isAuxiliaryInstance) return null;
 
     _log.info("Initialized `sharedTokens`: $sharedTokens");
   }
@@ -832,12 +835,13 @@ class APITokenStore {
   }
 
   FutureOr<void> _sharedTokensOnPut(String token, APITokenInfo? tokenInfo) {
-    _resolveSharedTokensByUsername().resolveMapped((sharedTokensByUsername) {
-      if (tokenInfo == null) return;
+    return _resolveSharedTokensByUsername()
+        .resolveMapped((sharedTokensByUsername) {
+      if (tokenInfo == null) return null;
       final apiToken = tokenInfo.apiToken;
       final username = apiToken.username;
 
-      sharedTokensByUsername
+      return sharedTokensByUsername
           .putIfAbsent(username, []).resolveMapped((userTokens) {
         if (!userTokens!.contains(apiToken)) {
           userTokens.add(apiToken);
@@ -847,16 +851,18 @@ class APITokenStore {
   }
 
   FutureOr<void> _sharedTokensOnRemove(String token, APITokenInfo? tokenInfo) {
-    _resolveSharedTokensByUsername().resolveMapped((sharedTokensByUsername) {
-      if (tokenInfo == null) return;
+    return _resolveSharedTokensByUsername()
+        .resolveMapped((sharedTokensByUsername) {
+      if (tokenInfo == null) return null;
+
       final apiToken = tokenInfo.apiToken;
       final username = apiToken.username;
 
-      sharedTokensByUsername.get(username).resolveMapped((userTokens) {
+      return sharedTokensByUsername.get(username).resolveMapped((userTokens) {
         if (userTokens != null) {
-          userTokens.remove(apiToken);
-          if (userTokens.isEmpty) {
-            sharedTokensByUsername.remove(username);
+          var rm = userTokens.remove(apiToken);
+          if (rm && userTokens.isEmpty) {
+            return sharedTokensByUsername.remove(username);
           }
         }
       });
@@ -970,7 +976,30 @@ class APITokenStore {
 
   FutureOr<APITokenInfo?> removeToken(String token) {
     return _resolveSharedTokens().resolveMapped((sharedTokens) {
-      return sharedTokens.remove(token);
+      return sharedTokens.remove(token).resolveMapped((tokenInfo) {
+        if (tokenInfo == null) return null;
+
+        if (sharedTokens.isMainInstance) {
+          return tokenInfo;
+        }
+
+        final apiToken = tokenInfo.apiToken;
+
+        return _resolveSharedTokensByUsername()
+            .resolveMapped((sharedTokensByUsername) {
+          return sharedTokensByUsername
+              .get(apiToken.username)
+              .resolveMapped((userTokens) {
+            if (userTokens != null) {
+              var rm = userTokens.remove(apiToken);
+              if (rm && userTokens.isEmpty) {
+                sharedTokensByUsername.remove(apiToken.username);
+              }
+            }
+            return tokenInfo;
+          });
+        });
+      });
     });
   }
 

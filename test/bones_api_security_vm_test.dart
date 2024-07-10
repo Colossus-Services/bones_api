@@ -103,6 +103,49 @@ void main() {
             throw StateError("Null `request3.authentication`");
           }
 
+          var request4 = APIRequest(APIRequestMethod.GET, 'foo');
+          request4.parameters['username'] = 'foo';
+          request4.parameters['password'] = 'foo';
+
+          var authentication4 =
+              await apiSecurity.authenticateByRequest(request4);
+          if (authentication4 == null) {
+            throw StateError("Null `authentication4`");
+          }
+
+          var requestAuthentication4 = request4.authentication;
+          if (requestAuthentication4 == null) {
+            throw StateError("Null `request4.authentication`");
+          }
+
+          if (requestAuthentication4.username != 'foo') {
+            throw StateError("`request4.authentication!.username` != 'foo'");
+          }
+
+          var request5 = APIRequest(APIRequestMethod.GET, 'foo');
+          request5.parameters['username'] = 'foo';
+          request5.parameters['password'] = 'foo';
+          request5.parameters['logout'] = 'true';
+          request5.parameters['token'] = requestAuthentication1.tokenKey;
+
+          var authentication5 = await apiSecurity
+              .authenticateByRequest(request5, allowLogout: true);
+          if (authentication5 != null) {
+            throw StateError("Not `null` `authentication5`");
+          }
+
+          await Future.delayed(Duration(milliseconds: 1000));
+
+          var request6 = APIRequest(APIRequestMethod.GET, 'foo',
+              credential:
+                  APICredential('foo', token: requestAuthentication1.tokenKey));
+
+          var authentication6 =
+              await apiSecurity.authenticateByRequest(request6);
+          if (authentication6 != null) {
+            throw StateError("Not `null` `authentication6`");
+          }
+
           return true;
         });
 

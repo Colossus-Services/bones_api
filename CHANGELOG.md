@@ -5,6 +5,8 @@
 - `APISecurity`:
   - Added `onNewAPIToken`, `validateUnknownToken`, `validateRefreshToken`.
 
+- shared_map: ^1.1.9
+
 ## 1.7.9
 
 - `EntityHandlerProvider`:
