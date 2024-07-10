@@ -3498,15 +3498,165 @@ extension IterableEntityRepositoryProviderExtension
       self = self.toList(growable: false);
     }
 
-    var length = self.length;
+    return self._getEntityRepositoryImpl<T>(
+        obj: obj,
+        type: type,
+        name: name,
+        entityRepositoryProvider: entityRepositoryProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        removeClosedProviders: removeClosedProviders);
+  }
+
+  EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
+      TypeInfo typeInfo,
+      {EntityRepositoryProvider? entityRepositoryProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
+    var entityType = typeInfo.entityType;
+    if (entityType == null) return null;
+
+    return getEntityRepositoryByType<T>(entityType,
+        entityRepositoryProvider: entityRepositoryProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        removeClosedProviders: removeClosedProviders);
+  }
+
+  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+      {EntityRepositoryProvider? entityRepositoryProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
+    var self = this;
+    if (self is! List<EntityRepositoryProvider> &&
+        self is! Set<EntityRepositoryProvider>) {
+      self = self.toList(growable: false);
+    }
+
+    return self._getEntityRepositoryByTypeImpl<T>(type,
+        entityRepositoryProvider: entityRepositoryProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        removeClosedProviders: removeClosedProviders);
+  }
+
+  Map<Type, EntityRepository> allRepositories(
+      {Map<Type, EntityRepository>? allRepositories,
+      Set<EntityRepositoryProvider>? traversedProviders}) {
+    var self = this;
+    if (self is! List<EntityRepositoryProvider> &&
+        self is! Set<EntityRepositoryProvider>) {
+      self = self.toList(growable: false);
+    }
+
+    return self._allRepositoriesImpl(
+        allRepositories: allRepositories,
+        traversedProviders: traversedProviders);
+  }
+}
+
+extension ListEntityRepositoryProviderExtension
+    on List<EntityRepositoryProvider> {
+  EntityRepository<T>? getEntityRepository<T extends Object>(
+          {T? obj,
+          Type? type,
+          String? name,
+          EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryImpl<T>(
+          obj: obj,
+          type: type,
+          name: name,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
+          TypeInfo typeInfo,
+          {EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryByTypeInfoImpl<T>(typeInfo,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+          {EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryByTypeImpl<T>(type,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  Map<Type, EntityRepository> allRepositories(
+          {Map<Type, EntityRepository>? allRepositories,
+          Set<EntityRepositoryProvider>? traversedProviders}) =>
+      _allRepositoriesImpl(
+          allRepositories: allRepositories,
+          traversedProviders: traversedProviders);
+}
+
+extension SetEntityRepositoryProviderExtension
+    on Set<EntityRepositoryProvider> {
+  EntityRepository<T>? getEntityRepository<T extends Object>(
+          {T? obj,
+          Type? type,
+          String? name,
+          EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryImpl<T>(
+          obj: obj,
+          type: type,
+          name: name,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
+          TypeInfo typeInfo,
+          {EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryByTypeInfoImpl<T>(typeInfo,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+          {EntityRepositoryProvider? entityRepositoryProvider,
+          EntityHandlerProvider? entityHandlerProvider,
+          bool removeClosedProviders = false}) =>
+      _getEntityRepositoryByTypeImpl<T>(type,
+          entityRepositoryProvider: entityRepositoryProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          removeClosedProviders: removeClosedProviders);
+
+  Map<Type, EntityRepository> allRepositories(
+          {Map<Type, EntityRepository>? allRepositories,
+          Set<EntityRepositoryProvider>? traversedProviders}) =>
+      _allRepositoriesImpl(
+          allRepositories: allRepositories,
+          traversedProviders: traversedProviders);
+}
+
+extension _IterableEntityRepositoryProviderExtension
+    on Iterable<EntityRepositoryProvider> {
+  EntityRepository<T>? _getEntityRepositoryImpl<T extends Object>(
+      {T? obj,
+      Type? type,
+      String? name,
+      EntityRepositoryProvider? entityRepositoryProvider,
+      EntityHandlerProvider? entityHandlerProvider,
+      bool removeClosedProviders = false}) {
+    final length = this.length;
     if (length == 0) {
       return null;
     } else if (length == 1) {
-      return self.first
-          .getEntityRepository<T>(obj: obj, type: type, name: name);
+      return first.getEntityRepository<T>(obj: obj, type: type, name: name);
     }
 
-    var notClosed = _whereNotClosed(self, length, removeClosedProviders);
+    var notClosed = _whereNotClosed(this, length, removeClosedProviders);
 
     var entityRepositories = notClosed
         .map((e) => e.getEntityRepository<T>(obj: obj, type: type, name: name))
@@ -3539,7 +3689,7 @@ extension IterableEntityRepositoryProviderExtension
     return notClosed;
   }
 
-  EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
+  EntityRepository<T>? _getEntityRepositoryByTypeInfoImpl<T extends Object>(
       TypeInfo typeInfo,
       {EntityRepositoryProvider? entityRepositoryProvider,
       EntityHandlerProvider? entityHandlerProvider,
@@ -3553,24 +3703,19 @@ extension IterableEntityRepositoryProviderExtension
         removeClosedProviders: removeClosedProviders);
   }
 
-  EntityRepository<T>? getEntityRepositoryByType<T extends Object>(Type type,
+  EntityRepository<T>? _getEntityRepositoryByTypeImpl<T extends Object>(
+      Type type,
       {EntityRepositoryProvider? entityRepositoryProvider,
       EntityHandlerProvider? entityHandlerProvider,
       bool removeClosedProviders = false}) {
-    var self = this;
-    if (self is! List<EntityRepositoryProvider> &&
-        self is! Set<EntityRepositoryProvider>) {
-      self = self.toList(growable: false);
-    }
-
-    var length = self.length;
+    final length = this.length;
     if (length == 0) {
       return null;
     } else if (length == 1) {
-      return self.first.getEntityRepositoryByType<T>(type);
+      return first.getEntityRepositoryByType<T>(type);
     }
 
-    var notClosed = _whereNotClosed(self, length, removeClosedProviders);
+    var notClosed = _whereNotClosed(this, length, removeClosedProviders);
 
     var entityRepositories = notClosed
         .map((e) => e.getEntityRepositoryByType<T>(type))
@@ -3627,20 +3772,14 @@ extension IterableEntityRepositoryProviderExtension
     }
   }
 
-  Map<Type, EntityRepository> allRepositories(
+  Map<Type, EntityRepository> _allRepositoriesImpl(
       {Map<Type, EntityRepository>? allRepositories,
       Set<EntityRepositoryProvider>? traversedProviders}) {
-    var self = this;
-    if (self is! List<EntityRepositoryProvider> &&
-        self is! Set<EntityRepositoryProvider>) {
-      self = self.toList(growable: false);
-    }
-
-    var length = self.length;
+    var length = this.length;
     if (length == 0) {
       return <Type, EntityRepository>{};
     } else if (length == 1) {
-      return self.first.allRepositories(
+      return first.allRepositories(
           allRepositories: allRepositories,
           traversedProviders: traversedProviders);
     }
@@ -3648,7 +3787,7 @@ extension IterableEntityRepositoryProviderExtension
     allRepositories ??= <Type, EntityRepository>{};
     traversedProviders ??= <EntityRepositoryProvider>{};
 
-    for (var e in self) {
+    for (var e in this) {
       e.allRepositories(
           allRepositories: allRepositories,
           traversedProviders: traversedProviders);

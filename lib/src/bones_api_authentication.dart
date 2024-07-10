@@ -24,16 +24,20 @@ class APICredential {
   /// The token of this credential.
   final String? token;
 
+  /// The refresh-token of this credential.
+  final String? refreshToken;
+
   APICredential(this.username,
       {this.token,
+      this.refreshToken,
       String? passwordHash,
       APIPasswordHashAlgorithm? hashAlgorithm})
       : password = passwordHash != null
             ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
             : null;
 
-  APICredential._(
-      this.username, this.usernameEntity, this.password, this.token);
+  APICredential._(this.username, this.usernameEntity, this.password, this.token,
+      this.refreshToken);
 
   static APICredential? fromMap(Map<String, dynamic>? map,
       {bool requiresUsernameAndPassword = false}) {
@@ -70,13 +74,18 @@ class APICredential {
   APICredential copy(
           {bool withUsernameEntity = true,
           bool withPassword = true,
-          bool withToken = true}) =>
-      APICredential._(username, withUsernameEntity ? usernameEntity : null,
-          withPassword ? password : null, withToken ? token : null);
+          bool withToken = true,
+          bool withRefreshToken = true}) =>
+      APICredential._(
+          username,
+          withUsernameEntity ? usernameEntity : null,
+          withPassword ? password : null,
+          withToken ? token : null,
+          withRefreshToken ? refreshToken : null);
 
   /// Returns a copy of this [APICredential] with [username].
   APICredential withUsername(String username) =>
-      APICredential._(username, usernameEntity, password, token);
+      APICredential._(username, usernameEntity, password, token, refreshToken);
 
   /// Returns `true` if this [APICredential] has a [password].
   bool get hasPassword => password != null;
@@ -87,7 +96,8 @@ class APICredential {
   /// Checks if the parameter [passwordOrHash] matches this [APICredential] [password].
   bool checkPassword(String? passwordOrHash) {
     if (passwordOrHash == null) return false;
-    return password != null && password!.checkPassword(passwordOrHash);
+    final password = this.password;
+    return password != null && password.checkPassword(passwordOrHash);
   }
 
   /// Checks if the passed [credential] matches `this` credential's [username] and [password].
@@ -435,11 +445,20 @@ class APIToken implements Comparable<APIToken> {
 
   final Duration duration;
 
+  final String? refreshToken;
+
   APIToken(this.username,
-      {String? token, DateTime? issueTime, Duration? duration})
+      {String? token,
+      DateTime? issueTime,
+      Duration? duration,
+      String? refreshToken,
+      bool withRefreshToken = false})
       : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
         issueTime = issueTime ?? DateTime.now(),
-        duration = duration ?? Duration(hours: 3);
+        duration = duration ?? Duration(hours: 3),
+        refreshToken = refreshToken == null && withRefreshToken
+            ? generateToken(640, variableLength: 64, prefix: 'RTK')
+            : refreshToken;
 
   DateTime get accessTime => _accessTime;
 
@@ -477,6 +496,7 @@ class APIToken implements Comparable<APIToken> {
         'issueTime': issueTime,
         'duration': duration.inSeconds,
         'expireTime': expireTime,
+        if (refreshToken != null) 'refreshToken': refreshToken,
       };
 
   factory APIToken.fromJson(Map json) => APIToken(
@@ -484,6 +504,17 @@ class APIToken implements Comparable<APIToken> {
         token: json['token'],
         issueTime: TypeParser.parseDateTime(json['issueTime']),
         duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
+        refreshToken: json['refreshToken'],
+      );
+
+  factory APIToken.fromCredential(APICredential credential,
+          {Duration? duration}) =>
+      APIToken(
+        credential.username,
+        token: credential.token ??
+            (throw ArgumentError("`credential` without `token`")),
+        duration: duration,
+        refreshToken: credential.refreshToken,
       );
 }
 

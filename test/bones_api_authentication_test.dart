@@ -87,6 +87,27 @@ void main() {
           allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)));
 
       expect(apiToken.token, startsWith('TK'));
+      expect(apiToken.refreshToken, isNull);
+
+      await Future.delayed(Duration(milliseconds: 100));
+
+      expect(apiToken.issueTime.compareTo(DateTime.now()), equals(-1));
+
+      expect(apiToken.isExpired(), isFalse);
+    });
+
+    test('basic (withRefreshToken: true)', () async {
+      var apiToken = APIToken('joe', withRefreshToken: true);
+
+      print(apiToken);
+
+      expect(apiToken.username, equals('joe'));
+
+      expect(apiToken.token.length,
+          allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)));
+
+      expect(apiToken.token, startsWith('TK'));
+      expect(apiToken.refreshToken, startsWith('RTK'));
 
       await Future.delayed(Duration(milliseconds: 100));
 
