@@ -6,6 +6,7 @@
   - Added `onNewAPIToken`, `validateUnknownToken`, `validateRefreshToken`.
 
 - shared_map: ^1.1.9
+- reflection_factory: ^2.4.3
 
 ## 1.7.9
 
