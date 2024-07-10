@@ -41,7 +41,7 @@ void main() {
       var token = apiSecurity.createToken('foo');
 
       expect(token.username, equals('foo'));
-      expect(token.token.length, equals(64));
+      expect(token.token.length, equals(66));
     });
 
     test('createToken2', () {
@@ -79,13 +79,17 @@ void main() {
           apiSecurity.authenticate(APICredential('foo', passwordHash: 'bar')),
           isNull);
 
-      expect(apiSecurity.authenticate(APICredential('foo', token: fooSha256)),
+      expect(
+          apiSecurity.authenticate(APICredential('foo', token: 'TK$fooSha256')),
           isNotNull);
 
-      expect(apiSecurity.authenticate(APICredential('bar', token: barSha256)),
+      expect(
+          apiSecurity.authenticate(APICredential('bar', token: 'TK$barSha256')),
           isNotNull);
 
-      expect(apiSecurity.authenticate(APICredential('baz`', token: fooSha256)),
+      expect(
+          apiSecurity
+              .authenticate(APICredential('baz`', token: 'TK$fooSha256')),
           isNull);
 
       expect(
@@ -176,7 +180,18 @@ void main() {
       {
         var request =
             APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
-        request.credential = APICredential('', token: fooSha256);
+        request.credential = APICredential('', token: 'invalidToken');
+
+        var credentials = await apiSecurity.resolveRequestCredentials(request);
+        expect(credentials, isNotEmpty);
+        expect(credentials.length, equals(1));
+        expect(credentials[0].username, isEmpty);
+      }
+
+      {
+        var request =
+            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        request.credential = APICredential('', token: 'TK$fooSha256');
 
         var credentials = await apiSecurity.resolveRequestCredentials(request);
         expect(credentials, isNotEmpty);
@@ -209,20 +224,31 @@ void main() {
         expect(response.status, equals(APIResponseStatus.OK));
 
         var json = response.payload as Map;
-        // ignore: avoid_dynamic_calls
-        json['token']['issueTime'] = '...';
-        // ignore: avoid_dynamic_calls
-        json['token']['expireTime'] = '...';
+
+        var jsonToken = json['token'] as Map;
+
+        jsonToken['issueTime'] = jsonToken['issueTime']
+            ?.toString()
+            .replaceFirst(RegExp('.+'), '...');
+
+        jsonToken['expireTime'] = jsonToken['expireTime']
+            ?.toString()
+            .replaceFirst(RegExp('.+'), '...');
+
+        jsonToken['refreshToken'] = jsonToken['refreshToken']
+            ?.toString()
+            .replaceFirst(RegExp('^RTK.+'), 'RTK...');
 
         expect(
             json,
             equals({
               'token': {
                 'username': 'foo',
-                'token': fooSha256,
+                'token': 'TK$fooSha256',
                 'issueTime': '...',
                 'duration': 10800,
-                'expireTime': '...'
+                'expireTime': '...',
+                'refreshToken': 'RTK...'
               },
               'permissions': [
                 {'type': 'basic', 'enabled': true}
@@ -269,7 +295,7 @@ void main() {
 
       {
         var request = APIRequest(APIRequestMethod.GET, 'foo');
-        request.credential = APICredential('foo', token: fooSha256);
+        request.credential = APICredential('foo', token: 'TK$fooSha256');
 
         expect(apiSecurity.resumeAuthenticationByRequest(request), isNotNull);
         expect(request.authentication, isNotNull);
@@ -419,9 +445,9 @@ class _MyAPISecurity extends APISecurity {
   @override
   String generateToken(String username) {
     if (username == 'foo') {
-      return fooSha256;
+      return 'TK$fooSha256';
     } else if (username == 'bar') {
-      return barSha256;
+      return 'TK$barSha256';
     }
 
     return super.generateToken(username);

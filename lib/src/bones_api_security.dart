@@ -312,7 +312,7 @@ abstract class APISecurity {
   /// treated as valid and authentication will be allowed.
   /// Default return: `null`
   FutureOr<APIToken?> validateUnknownToken(String username, String token) {
-    //print('!!! Unknown Token: $token');
+    // _log.info('Unknown Token: $token');
     return null;
   }
 
@@ -827,7 +827,7 @@ class APITokenStore {
   }
 
   APITokenInfo? _sharedTokensOnAbsent(String token) {
-    //_log.info("`sharedTokens` -> onAbsent: $token");
+    // _log.info("`sharedTokens` -> onAbsent: $token");
     return null;
   }
 
