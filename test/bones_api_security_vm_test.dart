@@ -118,9 +118,9 @@ class _MyAPISecurity extends APISecurity {
   @override
   String generateToken(String username) {
     if (username == 'foo') {
-      return fooSha256;
+      return 'TK$fooSha256';
     } else if (username == 'bar') {
-      return barSha256;
+      return 'TK$barSha256';
     }
 
     return super.generateToken(username);
