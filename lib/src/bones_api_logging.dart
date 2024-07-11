@@ -184,6 +184,7 @@ abstract class LoggerHandler {
   String get isolateDebugName;
 
   LoggerHandler? _parent;
+
   LoggerHandler? get parent {
     var p = _parent;
     if (p != null) return p;
@@ -484,7 +485,8 @@ abstract class LoggerHandler {
     return null;
   }
 
-  static final Expando<List<(logging.Level, String)>> _buffers = Expando();
+  static final Expando<List<(logging.Level, List<String>)>> _buffers =
+      Expando();
 
   static final Expando<Future<void>> _bufferedCalls = Expando();
 
@@ -492,22 +494,25 @@ abstract class LoggerHandler {
       logging.Level level, String message) {
     final buffer = _buffers[identifier] ??= [];
 
-    buffer.add((level, message));
+    if (buffer.isEmpty) {
+      buffer.add((level, [message]));
+    } else {
+      var levelBuffer = buffer.last;
+      if (levelBuffer.$1 == level) {
+        levelBuffer.$2.add(message);
+      } else {
+        buffer.add((level, [message]));
+      }
+    }
 
     Future<void>? call;
 
     call = _bufferedCalls[identifier] ??=
         Future.delayed(Duration(milliseconds: 100), () async {
-      var blocks = buffer.splitBeforeIndexed((i, e) {
-        if (i == 0) return false;
-        var prev = buffer[i - 1];
-        return prev.$1 != e.$1;
-      });
-
-      for (var block in blocks) {
-        if (block.isNotEmpty) {
-          var level = block.first.$1;
-          var messages = block.map((b) => b.$2).toList();
+      for (var levelBlock in buffer) {
+        var messages = levelBlock.$2;
+        if (messages.isNotEmpty) {
+          var level = levelBlock.$1;
           messagesBlockLogger(level, messages);
         }
       }

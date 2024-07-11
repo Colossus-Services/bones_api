@@ -1,3 +1,7 @@
+## 1.7.11
+
+- `LoggerHandler`: optimize `logBuffered`.
+
 ## 1.7.10
 
 - `APIToken`, `APICredential`: added field `refreshToken`.
