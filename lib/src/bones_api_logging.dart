@@ -511,10 +511,8 @@ abstract class LoggerHandler {
         Future.delayed(Duration(milliseconds: 100), () async {
       for (var levelBlock in buffer) {
         var messages = levelBlock.$2;
-        if (messages.isNotEmpty) {
-          var level = levelBlock.$1;
-          messagesBlockLogger(level, messages);
-        }
+        var level = levelBlock.$1;
+        messagesBlockLogger(level, messages);
       }
 
       buffer.clear();
