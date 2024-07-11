@@ -517,6 +517,8 @@ abstract class LoggerHandler {
         }
       }
 
+      buffer.clear();
+
       var prevCall = _bufferedCalls[identifier];
       if (identical(prevCall, call)) {
         _bufferedCalls[identifier] = null;
