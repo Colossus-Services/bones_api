@@ -510,8 +510,8 @@ abstract class LoggerHandler {
     call = _bufferedCalls[identifier] ??=
         Future.delayed(Duration(milliseconds: 100), () async {
       for (var levelBlock in buffer) {
-        var messages = levelBlock.$2;
         var level = levelBlock.$1;
+        var messages = levelBlock.$2;
         messagesBlockLogger(level, messages);
       }
 
