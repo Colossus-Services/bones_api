@@ -1,3 +1,8 @@
+## 1.7.12
+
+- `APISecurity`:
+  - `resolveRequestCredentials`: call `validateUnknownToken` to allow external tokens.
+
 ## 1.7.11
 
 - `LoggerHandler`: optimize `logBuffered`.

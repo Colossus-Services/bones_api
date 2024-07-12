@@ -661,7 +661,7 @@ abstract class APISecurity {
   FutureOr<List<APICredential>> resolveRequestCredentials(APIRequest request) {
     var credential = request.credential;
     if (credential == null) {
-      return _resolveRequestCredentialsImpl2(request, []);
+      return _resolveRequestCredentialsImpl(request, []);
     }
 
     if (credential.username.isEmpty && credential.hasToken) {
@@ -671,19 +671,19 @@ abstract class APISecurity {
       if (sessionID != null && sessionID.isNotEmpty) {
         return _sessionSet.get(sessionID).resolveMapped((session) {
           var validToken = session?.getValidToken(tokenKey);
-          return _resolveRequestCredentialsImpl1(
+          return _resolveRequestCredentialsTokens(
               request, credential, tokenKey, validToken);
         });
       }
 
-      return _resolveRequestCredentialsImpl1(
+      return _resolveRequestCredentialsTokens(
           request, credential, tokenKey, null);
     }
 
-    return _resolveRequestCredentialsImpl2(request, [credential]);
+    return _resolveRequestCredentialsImpl(request, [credential]);
   }
 
-  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl1(
+  FutureOr<List<APICredential>> _resolveRequestCredentialsTokens(
       APIRequest request,
       APICredential credential,
       String tokenKey,
@@ -691,19 +691,28 @@ abstract class APISecurity {
     if (validToken != null) {
       var username = validToken.username;
       credential = credential.withUsername(username);
-      return _resolveRequestCredentialsImpl2(request, [credential]);
+      return _resolveRequestCredentialsImpl(request, [credential]);
     } else {
       return getAPIToken(tokenKey).resolveMapped((validToken) {
         if (validToken != null) {
           var username = validToken.username;
           credential = credential.withUsername(username);
+          return _resolveRequestCredentialsImpl(request, [credential]);
+        } else {
+          return validateUnknownToken(credential.username, tokenKey)
+              .resolveMapped((validToken) {
+            if (validToken != null) {
+              var username = validToken.username;
+              credential = credential.withUsername(username);
+            }
+            return _resolveRequestCredentialsImpl(request, [credential]);
+          });
         }
-        return _resolveRequestCredentialsImpl2(request, [credential]);
       });
     }
   }
 
-  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl2(
+  FutureOr<List<APICredential>> _resolveRequestCredentialsImpl(
       APIRequest request, List<APICredential> credentials) {
     var username = getRequestParameterUsername(request).trim();
     var token = getRequestParameterToken(request).trim();
