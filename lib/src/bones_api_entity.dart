@@ -572,10 +572,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, TypeInfo>? _fieldsWithEntityReference;
 
   Map<String, TypeInfo> fieldsWithEntityReference([O? o]) =>
-      _fieldsWithEntityReference ??= fieldsWithTypeEntityOrReference(o)
-          .entries
-          .where((e) => e.value.isEntityReferenceType)
-          .toMapFromEntries();
+      _fieldsWithEntityReference ??= Map.unmodifiable(
+        fieldsWithTypeEntityOrReference(o)
+            .entries
+            .where((e) => e.value.isEntityReferenceType)
+            .toMapFromEntries(),
+      );
 
   Map<String, TypeInfo>? _fieldsWithTypeListEntity;
 
@@ -586,24 +588,61 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, TypeInfo>? _fieldsWithTypeListEntityReference;
 
   Map<String, TypeInfo> fieldsWithTypeListEntityOrReference([O? o]) =>
-      _fieldsWithTypeListEntityReference ??= fieldsWithType(
-          (_, fieldType) => fieldType.isValidListEntityOrReferenceType, o);
+      _fieldsWithTypeListEntityReference ??= fieldsWithTypeAndAnnotations(
+          (fieldName, fieldType, fieldAnnotations) {
+        if (!fieldType.isValidListEntityOrReferenceType) {
+          return false;
+        }
+
+        if (fieldAnnotations != null && fieldAnnotations.isNotEmpty) {
+          var hidden = fieldAnnotations.hasHidden;
+          return !hidden;
+        }
+
+        return true;
+      }, o);
 
   Map<String, TypeInfo>? _fieldsWithEntityReferenceList;
 
   Map<String, TypeInfo> fieldsWithEntityReferenceList([O? o]) =>
-      _fieldsWithEntityReferenceList ??= fieldsWithTypeListEntityOrReference(o)
-          .entries
-          .where((e) => e.value.isEntityReferenceListType)
-          .toMapFromEntries();
+      _fieldsWithEntityReferenceList ??= Map.unmodifiable(
+        fieldsWithTypeListEntityOrReference(o)
+            .entries
+            .where((e) => e.value.isEntityReferenceListType)
+            .toMapFromEntries(),
+      );
+
+  Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotations;
+
+  Map<String, List<EntityAnnotation>> fieldsEntityAnnotations() =>
+      _fieldsEntityAnnotations ??= Map.unmodifiable(
+          (getAllFieldsEntityAnnotations() ?? {})
+              .map<String, List<EntityAnnotation>>((k, v) =>
+                  MapEntry(k, List<EntityAnnotation>.unmodifiable(v))));
 
   Map<String, TypeInfo> fieldsWithType(
-      bool Function(String fieldName, TypeInfo fieldType) typeFilter,
+          bool Function(String fieldName, TypeInfo fieldType) typeFilter,
+          [O? o]) =>
+      Map.unmodifiable(
+        fieldsTypes(o)
+            .entries
+            .where((e) => typeFilter(e.key, e.value))
+            .toMapFromEntries(),
+      );
+
+  Map<String, TypeInfo> fieldsWithTypeAndAnnotations(
+      bool Function(String fieldName, TypeInfo fieldType,
+              List<EntityAnnotation>? fieldAnnotations)
+          typeFilter,
       [O? o]) {
-    return Map<String, TypeInfo>.unmodifiable(
-        Map<String, TypeInfo>.fromEntries(fieldsTypes(o).entries.where((e) {
-      return typeFilter(e.key, e.value);
-    })));
+    final fieldsAnnotations = fieldsEntityAnnotations();
+
+    return Map.unmodifiable(
+      fieldsTypes(o)
+          .entries
+          .where((e) => typeFilter(e.key, e.value, fieldsAnnotations[e.key]))
+          .toMapFromEntries(),
+    );
   }
 
   void inspectObject(O? o);
@@ -2288,8 +2327,6 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     return fieldsTypes;
   }
 
-  Map<String, List<EntityAnnotation>?>? _fieldsEntityAnnotations;
-
   @override
   void inspectObject(O? o) {
     if (o == null) {
@@ -2310,12 +2347,12 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
               _fieldsNames!.map((f) => MapEntry(f, o!.getFieldType(f)!))));
 
       _fieldsEntityAnnotations ??=
-          Map<String, List<EntityAnnotation>?>.unmodifiable(
-              Map<String, List<EntityAnnotation>?>.fromEntries(
+          Map<String, List<EntityAnnotation>>.unmodifiable(
+              Map<String, List<EntityAnnotation>>.fromEntries(
                   _fieldsNames!.map((f) {
         var list = o!.getFieldEntityAnnotations(f);
-        return MapEntry(f, list == null ? null : UnmodifiableListView(list));
-      })));
+        return list == null ? null : MapEntry(f, UnmodifiableListView(list));
+      }).nonNulls));
     }
   }
 

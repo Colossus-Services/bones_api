@@ -4,7 +4,7 @@ version: 1.7.13
 homepage: https://github.com/Colossus-Services/bones_api
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.4.0 <4.0.0'
 
 executables:
   bones_api:

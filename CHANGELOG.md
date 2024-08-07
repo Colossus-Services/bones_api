@@ -1,8 +1,17 @@
 ## 1.7.13
 
+- `EntityHandler`:
+  - Added `fieldsEntityAnnotations`.
+  - Added `fieldsWithTypeAndAnnotations`.
+  - `fieldsWithEntityReference`, `fieldsWithEntityReferenceList`: ensure unmodifiable.
+  - `fieldsWithTypeListEntityOrReference`: do not return hidden fields (`@EntityField.hidden()`).
+
+- sdk: '>=3.4.0 <4.0.0'
+
 - data_serializer: ^1.2.0
 - reflection_factory: ^2.4.4
 - statistics: ^1.1.1
+- collection: ^1.19.0
 - shelf: ^1.4.2
 - http: ^1.2.2
 - test: ^1.25.8
