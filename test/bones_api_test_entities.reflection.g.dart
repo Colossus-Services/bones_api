@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.4.3
+// BUILDER: reflection_factory/2.4.4
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -9,6 +9,8 @@
 // ignore_for_file: no_leading_underscores_for_local_identifiers
 // ignore_for_file: camel_case_types
 // ignore_for_file: camel_case_extensions
+// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use_from_same_package
 // ignore_for_file: unnecessary_const
 // ignore_for_file: unnecessary_cast
 // ignore_for_file: unnecessary_type_check
@@ -20,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.4.3');
+  static final Version _version = Version.parse('2.4.4');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -82,7 +84,7 @@ class Account$reflection extends ClassReflection<Account>
     return _objectReflections[object] ??= Account$reflection._(object);
   }
 
-  Account$reflection._([Account? object]) : super(Account, 'Account', object);
+  Account$reflection._([Account? object]) : super(Account, r'Account', object);
 
   static bool _registered = false;
   @override
@@ -577,7 +579,7 @@ class Address$reflection extends ClassReflection<Address>
     return _objectReflections[object] ??= Address$reflection._(object);
   }
 
-  Address$reflection._([Address? object]) : super(Address, 'Address', object);
+  Address$reflection._([Address? object]) : super(Address, r'Address', object);
 
   static bool _registered = false;
   @override
@@ -1179,7 +1181,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     return _objectReflections[object] ??= Photo$reflection._(object);
   }
 
-  Photo$reflection._([Photo? object]) : super(Photo, 'Photo', object);
+  Photo$reflection._([Photo? object]) : super(Photo, r'Photo', object);
 
   static bool _registered = false;
   @override
@@ -1732,7 +1734,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     return _objectReflections[object] ??= Role$reflection._(object);
   }
 
-  Role$reflection._([Role? object]) : super(Role, 'Role', object);
+  Role$reflection._([Role? object]) : super(Role, r'Role', object);
 
   static bool _registered = false;
   @override
@@ -2246,7 +2248,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   }
 
   RoleType$reflection._([RoleType? object])
-      : super(RoleType, 'RoleType', object);
+      : super(RoleType, r'RoleType', object);
 
   static bool _registered = false;
   @override
@@ -2320,7 +2322,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     return _objectReflections[object] ??= Store$reflection._(object);
   }
 
-  Store$reflection._([Store? object]) : super(Store, 'Store', object);
+  Store$reflection._([Store? object]) : super(Store, r'Store', object);
 
   static bool _registered = false;
   @override
@@ -2841,7 +2843,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     return _objectReflections[object] ??= User$reflection._(object);
   }
 
-  User$reflection._([User? object]) : super(User, 'User', object);
+  User$reflection._([User? object]) : super(User, r'User', object);
 
   static bool _registered = false;
   @override
@@ -3492,7 +3494,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   UserInfo$reflection._([UserInfo? object])
-      : super(UserInfo, 'UserInfo', object);
+      : super(UserInfo, r'UserInfo', object);
 
   static bool _registered = false;
   @override

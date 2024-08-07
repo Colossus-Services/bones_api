@@ -1,3 +1,13 @@
+## 1.7.13
+
+- data_serializer: ^1.2.0
+- reflection_factory: ^2.4.4
+- statistics: ^1.1.1
+- shelf: ^1.4.2
+- http: ^1.2.2
+- test: ^1.25.8
+- coverage: ^1.9.0
+
 ## 1.7.12
 
 - `APISecurity`:
