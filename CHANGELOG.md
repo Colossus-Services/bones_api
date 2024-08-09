@@ -1,3 +1,11 @@
+## 1.7.14
+
+- `APIModuleProxyHttpCaller`:
+  - `isJsonResponse`: Improve logic for determining JSON response types.
+  - `isByteArrayResponse`: Improve logic for determining raw bytes response types.
+
+- swiss_knife: ^3.2.1
+
 ## 1.7.13
 
 - `EntityHandler`:

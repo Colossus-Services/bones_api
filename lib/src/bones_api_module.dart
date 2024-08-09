@@ -1408,16 +1408,89 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     }
   }
 
-  bool isJsonResponse(HttpResponse response, MimeType? mimeType) =>
-      responsesAsJson || response.isBodyTypeJSON;
+  bool isJsonResponse(HttpResponse response, MimeType? mimeType) {
+    if (mimeType == null) {
+      return responsesAsJson;
+    }
+
+    if (mimeType.isJSON || mimeType.isJavascript) return true;
+
+    if (responsesAsJson) {
+      switch (mimeType.type) {
+        case 'font':
+        case 'image':
+        case 'audio':
+        case 'video':
+          return false;
+
+        case 'application':
+          switch (mimeType.subType) {
+            case 'gzip':
+            case 'zip':
+            case 'x-tar':
+            case 'x-bzip':
+            case 'x-bzip2':
+            case 'x-7z-compressed':
+            case 'x-rar-compressed':
+            case 'dart':
+            case 'yaml':
+            case 'xml':
+            case 'xhtml+xml':
+            case 'pdf':
+            case 'msword':
+            case 'octet-stream':
+              return false;
+            default:
+              return true;
+          }
+
+        case 'text':
+          switch (mimeType.subType) {
+            case 'html':
+            case 'css':
+            case 'csv':
+            case 'xml':
+            case 'md':
+              return false;
+            default:
+              return true;
+          }
+
+        default:
+          return true;
+      }
+    }
+
+    return false;
+  }
 
   bool isTextResponse(HttpResponse response, MimeType? mimeType) =>
       mimeType != null &&
       (mimeType.isText || mimeType.isXHTML || mimeType.isXML);
 
-  bool isByteArrayResponse(HttpResponse response, MimeType? mimeType) =>
-      mimeType != null &&
-      (mimeType.isImage || mimeType.isAudio || mimeType.isVideo);
+  bool isByteArrayResponse(HttpResponse response, MimeType? mimeType) {
+    if (mimeType == null) return false;
+
+    if (mimeType.isImage || mimeType.isAudio || mimeType.isVideo) return true;
+
+    if (mimeType.type == 'application') {
+      switch (mimeType.subType) {
+        case 'gzip':
+        case 'zip':
+        case 'x-tar':
+        case 'x-bzip':
+        case 'x-bzip2':
+        case 'x-7z-compressed':
+        case 'x-rar-compressed':
+        case 'pdf':
+        case 'msword':
+        case 'octet-stream':
+          return true;
+      }
+    }
+
+    return false;
+  }
 
   FutureOr<dynamic> decodeJson(String content) {
     try {
