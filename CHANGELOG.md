@@ -1,3 +1,10 @@
+## 1.7.15
+
+- `ConditionSQLEncoder`:
+  - `encodeConditionValuesWithOperator`: Fix encoding for `null` values to use `IS NULL` and `IS NOT NULL`.
+
+- statistics: ^1.1.2
+
 ## 1.7.14
 
 - `APIModuleProxyHttpCaller`:

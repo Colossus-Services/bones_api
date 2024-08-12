@@ -191,13 +191,30 @@ class ConditionSQLEncoder extends ConditionEncoder {
     context.write(' ');
     context.write(tableKey);
     context.write(' ');
-    context.write(operator);
-    context.write(' ');
 
     var valueSQLRet = valueToSQL(context, values,
         fieldKey: fieldKey, fieldType: keyType, valueAsList: valueAsList);
 
     return valueSQLRet.resolveMapped((valueSQL) {
+      if (valueSQL == 'null') {
+        switch (operator) {
+          case '=':
+          case 'IN':
+            {
+              context.write('IS NULL ');
+              return context;
+            }
+          case '!=':
+          case 'NOT IN':
+            {
+              context.write('IS NOT NULL ');
+              return context;
+            }
+        }
+      }
+
+      context.write(operator);
+      context.write(' ');
       context.write(valueSQL);
       context.write(' ');
       return context;
