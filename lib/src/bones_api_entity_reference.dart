@@ -225,16 +225,19 @@ abstract class EntityReferenceBase<T> {
     return type;
   }
 
-  static bool _isInvalidEntityType(Type type) =>
-      type == Object ||
-      type == dynamic ||
-      type == int ||
-      type == String ||
-      type == BigInt ||
-      type == List ||
-      type == Iterable ||
-      type == Map ||
-      type == Set;
+  static const _invalidTypes = <Type>{
+    Object,
+    dynamic,
+    int,
+    String,
+    BigInt,
+    List,
+    Iterable,
+    Map,
+    Set,
+  };
+
+  static bool _isInvalidEntityType(Type type) => _invalidTypes.contains(type);
 
   static bool _isInvalidEntity(Object entity) =>
       entity is EntityReference ||
