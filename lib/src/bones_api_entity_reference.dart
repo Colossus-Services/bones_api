@@ -83,7 +83,10 @@ abstract class EntityReferenceBase<T> {
 
   String? _typeName;
 
-  EntityHandler<T>? _entityHandler;
+  static final _entityHandlerUnresolved = Object();
+  static final _entityHandlerNull = Object();
+
+  Object _entityHandlerObject = _entityHandlerUnresolved;
 
   final EntityHandlerProvider? _entityHandlerProvider;
 
@@ -100,7 +103,7 @@ abstract class EntityReferenceBase<T> {
       EntityCache? entityCache)
       : _type = type,
         _typeName = typeName,
-        _entityHandler = entityHandler,
+        _entityHandlerObject = entityHandler ?? _entityHandlerUnresolved,
         _entityHandlerProvider = entityHandlerProvider,
         _entityProvider = entityProvider,
         _entityCache = entityCache {
@@ -140,7 +143,7 @@ abstract class EntityReferenceBase<T> {
       return classReflection.className;
     }
 
-    var typeName = '$type';
+    var typeName = resolveTypeName(type);
     return typeName;
   }
 
@@ -159,7 +162,7 @@ abstract class EntityReferenceBase<T> {
   }
 
   void _checkGenericType() {
-    var typeStr = type.toString();
+    var typeStr = resolveTypeName(type);
 
     if (type == EntityReference ||
         type == EntityReferenceList ||
@@ -222,16 +225,19 @@ abstract class EntityReferenceBase<T> {
     return type;
   }
 
-  static bool _isInvalidEntityType(Type type) =>
-      type == Object ||
-      type == dynamic ||
-      type == int ||
-      type == String ||
-      type == BigInt ||
-      type == List ||
-      type == Iterable ||
-      type == Map ||
-      type == Set;
+  static const _invalidTypes = <Type>{
+    Object,
+    dynamic,
+    int,
+    String,
+    BigInt,
+    List,
+    Iterable,
+    Map,
+    Set,
+  };
+
+  static bool _isInvalidEntityType(Type type) => _invalidTypes.contains(type);
 
   static bool _isInvalidEntity(Object entity) =>
       entity is EntityReference ||
@@ -242,12 +248,32 @@ abstract class EntityReferenceBase<T> {
   /// The [EntityHandler] for this entity [type].
   EntityHandler<T>? get entityHandler => _resolveEntityHandler();
 
-  EntityHandler<T>? _resolveEntityHandler() =>
-      _entityHandler ??= _resolveEntityHandlerImpl();
+  EntityHandler<T>? get _entityHandler {
+    var o = _entityHandlerObject;
+    return o is EntityHandler<T> ? o : null;
+  }
+
+  EntityHandler<T>? _resolveEntityHandler() {
+    var o = _entityHandlerObject;
+    if (o is EntityHandler<T>) {
+      return o;
+    } else if (identical(o, _entityHandlerUnresolved)) {
+      var eh = _resolveEntityHandlerImpl();
+      _entityHandlerObject = eh ?? _entityHandlerNull;
+      return eh;
+    } else {
+      return null;
+    }
+  }
 
   EntityHandler<T>? _resolveEntityHandlerImpl() =>
       _resolveEntityHandlerGlobal<T>(
           _type, _typeName, _entityHandlerProvider, _entityProvider);
+
+  static final Map<Type, String> _typesNames = {};
+
+  static String resolveTypeName(Type type) =>
+      _typesNames[type] ??= type.toString();
 
   static EntityHandler<T>? _resolveEntityHandlerGlobal<T>(
       Type? type,
@@ -283,7 +309,7 @@ abstract class EntityReferenceBase<T> {
     }
 
     if ((typeName == null || typeName.isEmpty) && !_isInvalidEntityType(type)) {
-      typeName = '$type';
+      typeName = resolveTypeName(type);
     }
 
     if (typeName != null && typeName.isNotEmpty) {
@@ -309,8 +335,9 @@ abstract class EntityReferenceBase<T> {
     if (entityProvider != null) return entityProvider;
 
     var entityHandler = _resolveEntityHandler();
-    var entityRepository = entityHandler?.getEntityRepositoryByType(type);
+    if (entityHandler == null) return null;
 
+    var entityRepository = entityHandler.getEntityRepositoryByType(type);
     _entityProvider = entityProvider = entityRepository?.provider;
 
     return entityProvider;
@@ -918,9 +945,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     if (entity == null) {
       var id = this.id;
-      var entityProvider = this.entityProvider;
+      if (id == null) return null;
 
-      if (id != null && entityProvider != null) {
+      var entityProvider = this.entityProvider;
+      if (entityProvider != null) {
         var entityByID =
             // ignore: discarded_futures
             entityProvider.getEntityByID<T>(id, type: type, sync: true);

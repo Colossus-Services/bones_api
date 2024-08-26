@@ -1,3 +1,14 @@
+## 1.7.16
+
+- `EntityReferenceBase`:
+  - Optimize `_resolveEntityHandler`: avoid multiple `null` resolutions. 
+  - Optimize `_resolveEntity`: avoid uncessary call to `entityProvider` when `entity` and `id` are `null`.
+  - Added `resolveTypeName`: avoid `type.toString()`.
+  - Optimize `_isInvalidEntityType`: avoid multiple `==` calls.
+
+- data_serializer: ^1.2.1
+- crypto: ^3.0.5
+
 ## 1.7.15
 
 - `ConditionSQLEncoder`:
