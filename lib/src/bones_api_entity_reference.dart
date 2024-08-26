@@ -335,8 +335,9 @@ abstract class EntityReferenceBase<T> {
     if (entityProvider != null) return entityProvider;
 
     var entityHandler = _resolveEntityHandler();
-    var entityRepository = entityHandler?.getEntityRepositoryByType(type);
+    if (entityHandler == null) return null;
 
+    var entityRepository = entityHandler.getEntityRepositoryByType(type);
     _entityProvider = entityProvider = entityRepository?.provider;
 
     return entityProvider;
