@@ -83,7 +83,10 @@ abstract class EntityReferenceBase<T> {
 
   String? _typeName;
 
-  EntityHandler<T>? _entityHandler;
+  static final _entityHandlerUnresolved = Object();
+  static final _entityHandlerNull = Object();
+
+  Object _entityHandlerObject = _entityHandlerUnresolved;
 
   final EntityHandlerProvider? _entityHandlerProvider;
 
@@ -100,7 +103,7 @@ abstract class EntityReferenceBase<T> {
       EntityCache? entityCache)
       : _type = type,
         _typeName = typeName,
-        _entityHandler = entityHandler,
+        _entityHandlerObject = entityHandler ?? _entityHandlerUnresolved,
         _entityHandlerProvider = entityHandlerProvider,
         _entityProvider = entityProvider,
         _entityCache = entityCache {
@@ -242,8 +245,23 @@ abstract class EntityReferenceBase<T> {
   /// The [EntityHandler] for this entity [type].
   EntityHandler<T>? get entityHandler => _resolveEntityHandler();
 
-  EntityHandler<T>? _resolveEntityHandler() =>
-      _entityHandler ??= _resolveEntityHandlerImpl();
+  EntityHandler<T>? get _entityHandler {
+    var o = _entityHandlerObject;
+    return o is EntityHandler<T> ? o : null;
+  }
+
+  EntityHandler<T>? _resolveEntityHandler() {
+    var o = _entityHandlerObject;
+    if (o is EntityHandler<T>) {
+      return o;
+    } else if (identical(o, _entityHandlerUnresolved)) {
+      var eh = _resolveEntityHandlerImpl();
+      _entityHandlerObject = eh ?? _entityHandlerNull;
+      return eh;
+    } else {
+      return null;
+    }
+  }
 
   EntityHandler<T>? _resolveEntityHandlerImpl() =>
       _resolveEntityHandlerGlobal<T>(
