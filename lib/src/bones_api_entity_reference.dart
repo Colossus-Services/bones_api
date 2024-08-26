@@ -944,9 +944,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     if (entity == null) {
       var id = this.id;
-      var entityProvider = this.entityProvider;
+      if (id == null) return null;
 
-      if (id != null && entityProvider != null) {
+      var entityProvider = this.entityProvider;
+      if (entityProvider != null) {
         var entityByID =
             // ignore: discarded_futures
             entityProvider.getEntityByID<T>(id, type: type, sync: true);
