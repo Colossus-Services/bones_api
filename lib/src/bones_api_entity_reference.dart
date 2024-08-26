@@ -143,7 +143,7 @@ abstract class EntityReferenceBase<T> {
       return classReflection.className;
     }
 
-    var typeName = '$type';
+    var typeName = resolveTypeName(type);
     return typeName;
   }
 
@@ -162,7 +162,7 @@ abstract class EntityReferenceBase<T> {
   }
 
   void _checkGenericType() {
-    var typeStr = type.toString();
+    var typeStr = resolveTypeName(type);
 
     if (type == EntityReference ||
         type == EntityReferenceList ||
@@ -267,6 +267,11 @@ abstract class EntityReferenceBase<T> {
       _resolveEntityHandlerGlobal<T>(
           _type, _typeName, _entityHandlerProvider, _entityProvider);
 
+  static final Map<Type, String> _typesNames = {};
+
+  static String resolveTypeName(Type type) =>
+      _typesNames[type] ??= type.toString();
+
   static EntityHandler<T>? _resolveEntityHandlerGlobal<T>(
       Type? type,
       String? typeName,
@@ -301,7 +306,7 @@ abstract class EntityReferenceBase<T> {
     }
 
     if ((typeName == null || typeName.isEmpty) && !_isInvalidEntityType(type)) {
-      typeName = '$type';
+      typeName = resolveTypeName(type);
     }
 
     if (typeName != null && typeName.isNotEmpty) {
