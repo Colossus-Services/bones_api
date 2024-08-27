@@ -290,7 +290,7 @@ void main() {
             throwsA(isA<StateError>().having(
                 (e) => e.message,
                 "Can't get entity message",
-                contains("Can't `get` entity `Role` with ID `11`"))));
+                contains("Can't `get` entity `Role` with ID `null`"))));
 
         var entityCache = JsonEntityCacheSimple();
 
