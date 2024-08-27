@@ -1,3 +1,8 @@
+## 1.7.17
+
+- `EntityReference`:
+  - Fix `set` for `null` value.
+
 ## 1.7.16
 
 - `EntityReferenceBase`:

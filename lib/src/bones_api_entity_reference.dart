@@ -1063,22 +1063,22 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   /// Sets the [entity] to [o] and returns the current [entity].
   T? set(T? o) {
-    if (identical(o, _entity)) return o;
-
     if (o == null) {
       _id = null;
       _entity = null;
       _entityTime = null;
       _entityInstantiator = null;
+      return null;
     } else {
+      if (identical(o, _entity)) return o;
+
       var id = _getEntityID(o);
       _id = id;
       _entity = o;
       _entityTime = DateTime.now();
       _entityInstantiator = null;
+      return o;
     }
-
-    return _entity;
   }
 
   /// Sets the [entity] [id] and returns the current [id].
