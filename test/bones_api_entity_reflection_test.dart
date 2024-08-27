@@ -42,6 +42,30 @@ void main() {
       expect(ref4.entity, equals(UserInfo('info 2', id: 12)));
     });
 
+    test('from', () {
+      var ref = EntityReference.fromEntity(
+          Address('NY', 'New York', 'Street 1', 123, id: 101));
+
+      expect(ref.id, equals(101));
+      expect(ref.entity, isNotNull);
+
+      var ref1 = ref.copy(withEntity: false);
+      expect(ref1.isNull, isFalse);
+      expect(ref1.id, equals(101));
+      expect(ref1.entity, isNull);
+
+      ref1.set(null);
+
+      expect(ref1.isNull, isTrue);
+      expect(ref1.id, isNull);
+      expect(ref1.entity, isNull);
+
+      ref1.set(Address('NY', 'New York', 'Street 1', 124, id: 102));
+      expect(ref1.isNull, isFalse);
+      expect(ref1.id, equals(102));
+      expect(ref1.entity, isNotNull);
+    });
+
     test('fromJson', () {
       {
         var address = Address('NY', 'New York', 'Street 1', 123);
