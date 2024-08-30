@@ -1,3 +1,10 @@
+## 1.7.18
+
+- `EntityReferenceBase`:
+  - Added `disposeInternalHandlers` and `resolve`.
+
+- coverage: ^1.9.1
+
 ## 1.7.17
 
 - `EntityReference`:
