@@ -88,11 +88,11 @@ abstract class EntityReferenceBase<T> {
 
   Object _entityHandlerObject = _entityHandlerUnresolved;
 
-  final EntityHandlerProvider? _entityHandlerProvider;
+  EntityHandlerProvider? _entityHandlerProvider;
 
   EntityProvider? _entityProvider;
 
-  final EntityCache? _entityCache;
+  EntityCache? _entityCache;
 
   EntityReferenceBase._(
       Type? type,
@@ -341,6 +341,23 @@ abstract class EntityReferenceBase<T> {
     _entityProvider = entityProvider = entityRepository?.provider;
 
     return entityProvider;
+  }
+
+  /// Disposes internal objects that are not necessary after resolve this instance.
+  /// Useful when passing this instance to another `Isolate`.
+  void disposeInternalHandlers() {
+    _entityHandlerObject = _entityHandlerUnresolved;
+    _entityHandlerProvider = null;
+    _entityProvider = null;
+    _entityCache = null;
+  }
+
+  /// Ensures that this instance is resolved.
+  /// See [disposeInternalHandlers].
+  void resolve() {
+    _resolveEntityHandler();
+    _resolveType();
+    _resolveEntityProvider();
   }
 
   Object? _getEntityID(T? o) {
@@ -1027,6 +1044,19 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     } else {
       return null;
     }
+  }
+
+  @override
+  void disposeInternalHandlers() {
+    _resolveEntity();
+    super.disposeInternalHandlers();
+    _entityFetcher = null;
+  }
+
+  @override
+  void resolve() {
+    super.resolve();
+    _resolveEntity();
   }
 
   /// Encodes this [EntityReference] instance to JSON.
@@ -1993,6 +2023,19 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// The [DateTime] of when the [entities] was [set].
   DateTime? get entitiesTime => _entitiesTime;
 
+  @override
+  void disposeInternalHandlers() {
+    _resolveEntities();
+    super.disposeInternalHandlers();
+    _entitiesFetcher = null;
+  }
+
+  @override
+  void resolve() {
+    super.resolve();
+    _resolveEntities();
+  }
+
   /// Returns [entities] as a JSON [List] of entities [Map].
   List<Map<String, dynamic>?>? entitiesToJson([JsonEncoder? jsonEncoder]) {
     var entities = this.entities;
@@ -2622,6 +2665,21 @@ extension NullEntityReferenceListExtension<T> on EntityReferenceList<T>? {
   FutureOr<List<T?>?> get() => this?.get();
 
   FutureOr<List<T?>?> getNotNull() => this?.getNotNull();
+}
+
+extension IterableEntityReferenceBaseExtension<T>
+    on Iterable<EntityReferenceBase<T>> {
+  void disposeInternalHandlers() {
+    for (var e in this) {
+      e.disposeInternalHandlers();
+    }
+  }
+
+  void resolve() {
+    for (var e in this) {
+      e.resolve();
+    }
+  }
 }
 
 extension IterableEntityReferenceExtension<T> on Iterable<EntityReference<T>> {
