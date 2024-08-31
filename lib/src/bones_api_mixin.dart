@@ -310,12 +310,16 @@ mixin Pool<O extends Object> {
 
     if (valid is Future<bool>) {
       return valid.then((valid) {
-        if (!valid) return null;
+        if (!valid) {
+          disposePoolElement(o);
+          return null;
+        }
         return preparePoolElement(o);
       });
     }
 
     if (!valid) {
+      disposePoolElement(o);
       return null;
     }
     return preparePoolElement(o);

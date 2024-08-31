@@ -1,3 +1,8 @@
+## 1.7.19
+
+- `Pool`:
+  - `_catchFromPopulatedPool`: call `disposePoolElement` on invalid elements.
+
 ## 1.7.18
 
 - `EntityReferenceBase`:
