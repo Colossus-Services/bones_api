@@ -58,7 +58,12 @@ mixin Pool<O extends Object> {
   Iterable<O> get poolElements => UnmodifiableListView<O>(_pool);
 
   bool removeFromPool(O o) {
-    return _pool.remove(o);
+    var rm = _pool.remove(o);
+    if (rm) {
+      // ignore: discarded_futures
+      closePoolElement(o);
+    }
+    return rm;
   }
 
   int removeElementsFromPool(int amount) {
@@ -305,6 +310,30 @@ mixin Pool<O extends Object> {
       }
       _waitingPoolElement = null;
     }
+
+    var valid = isPoolElementValid(o);
+
+    if (valid is Future<bool>) {
+      return valid.then((valid) {
+        if (!valid) {
+          disposePoolElement(o);
+          return _catchFromPopulatedPool2();
+        }
+        return preparePoolElement(o);
+      });
+    }
+
+    if (!valid) {
+      disposePoolElement(o);
+      return _catchFromPopulatedPool2();
+    }
+    return preparePoolElement(o);
+  }
+
+  FutureOr<O?> _catchFromPopulatedPool2() {
+    if (_pool.isEmpty) return null;
+
+    var o = _pool.removeLast();
 
     var valid = isPoolElementValid(o);
 
