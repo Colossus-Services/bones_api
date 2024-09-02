@@ -1,3 +1,8 @@
+## 1.7.20
+
+- `Pool`:
+  - `removeFromPool`: call `closePoolElement`.
+
 ## 1.7.19
 
 - `Pool`:
