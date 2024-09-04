@@ -1,3 +1,8 @@
+## 1.7.21
+
+- `Time.fromBytes`:
+  - Handle 7 bytes encoding from PostgreSQL.
+
 ## 1.7.20
 
 - `Pool`:
