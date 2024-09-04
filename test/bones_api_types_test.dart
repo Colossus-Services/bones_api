@@ -177,6 +177,35 @@ void main() {
 
       expect(Time.fromBytes(Time(23, 59, 59, 999).toBytes32()),
           equals(Time(23, 59, 59, 999)));
+
+      expect(Time.fromBytes([0, 0, 0, 15, 115, 100, 98]),
+          equals(Time(18, 26, 00, 467, 968)));
+    });
+
+    test('Time (all combinations 32-bits)', () async {
+      for (var h = 0; h <= 23; ++h) {
+        for (var m = 0; m <= 59; ++m) {
+          for (var s = 0; s <= 59; ++s) {
+            for (var ms = 0; ms <= 999; ++ms) {
+              expect(Time.fromBytes(Time(h, m, s, ms).toBytes32()),
+                  equals(Time(h, m, s, ms)));
+            }
+          }
+        }
+      }
+    });
+
+    test('Time (all combinations 64-bits)', () async {
+      for (var h = 0; h <= 23; ++h) {
+        for (var m = 0; m <= 59; ++m) {
+          for (var s = 0; s <= 59; ++s) {
+            for (var ms = 0; ms <= 999; ++ms) {
+              expect(Time.fromBytes(Time(h, m, s, ms).toBytes64()),
+                  equals(Time(h, m, s, ms)));
+            }
+          }
+        }
+      }
     });
   });
 }
