@@ -141,13 +141,22 @@ class Time implements Comparable<Time> {
 
   /// Parses [bytes] to [Time]. See [toBytes32] and [toBytes64].
   factory Time.fromBytes(List<int> bytes, {bool allowParseString = true}) {
-    if (bytes.length == 4) {
+    var length = bytes.length;
+
+    if (length == 4) {
       var milliseconds = bytes.asUint8List.getInt32(0);
       if (milliseconds >= 0) {
         var time = Time.fromMilliseconds(milliseconds);
         return time;
       }
-    } else if (bytes.length >= 8 && !_bytesInStringFormat(bytes)) {
+    }
+    // Postgres encoding:
+    else if (length == 7 && !_bytesInStringFormat(bytes)) {
+      bytes = [...bytes, 0];
+      length = bytes.length;
+    }
+
+    if (length >= 8 && !_bytesInStringFormat(bytes)) {
       var microseconds = bytes.asUint8List.getInt64();
       if (microseconds >= 0) {
         var time = Time.fromMicroseconds(microseconds);
