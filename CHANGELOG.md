@@ -2,6 +2,9 @@
 
 - `APIModuleProxyHttpCaller`:
   - Optimize `parseResponse`.
+  - `doRequest`:
+    - Added parameter `returnType`.
+   - Only use `responseType = 'arraybuffer'` if the `returnType` is `Uint8List`; otherwise, use `responseType = 'text'`.
 
 - statistics: ^1.1.3
 - swiss_knife: ^3.2.2
