@@ -1,3 +1,14 @@
+## 1.7.22
+
+- `APIModuleProxyHttpCaller`:
+  - Optimize `parseResponse`.
+
+- statistics: ^1.1.3
+- swiss_knife: ^3.2.2
+- mercury_client: ^2.2.3
+- shelf_static: ^1.1.3
+- gcloud: ^0.8.13
+
 ## 1.7.21
 
 - `Time.fromBytes`:
