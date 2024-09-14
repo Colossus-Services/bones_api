@@ -1342,7 +1342,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     );
   }
 
-  FutureOr<dynamic> parseResponse(
+  dynamic parseResponse(
     HttpResponse response, {
     HttpMethod? requestMethod,
     String? requestPath,
@@ -1350,36 +1350,36 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     Map<String, Object?>? parameters,
   }) {
     if (response.isError) {
-      return parseResponseBody(response).resolveMapped((error) {
-        var responseError = APIModuleProxyCallerResponseError(
-          'Response ERROR> $error',
-          request: {
-            'requestMethod': requestMethod?.name,
-            'requestPath': requestPath,
-            'responseStatus': response.status,
-          },
-          response: response,
-          responseStatus: parseAPIResponseStatus(response.status),
-          responseError: error,
-          module: modulePath,
-          methodName: methodName,
-          parameters: parameters,
-        );
+      var error = parseResponseBody(response);
 
-        final errorHandler = this.errorHandler ??
-            defaultErrorHandler ??
-            APIModuleProxyCallerListener.defaultErrorHandler;
+      var responseError = APIModuleProxyCallerResponseError(
+        'Response ERROR> $error',
+        request: {
+          'requestMethod': requestMethod?.name,
+          'requestPath': requestPath,
+          'responseStatus': response.status,
+        },
+        response: response,
+        responseStatus: parseAPIResponseStatus(response.status),
+        responseError: error,
+        module: modulePath,
+        methodName: methodName,
+        parameters: parameters,
+      );
 
-        if (errorHandler != null) {
-          try {
-            errorHandler(responseError);
-          } catch (e, s) {
-            _log.severe("Error calling `errorHandler`!", e, s);
-          }
+      final errorHandler = this.errorHandler ??
+          defaultErrorHandler ??
+          APIModuleProxyCallerListener.defaultErrorHandler;
+
+      if (errorHandler != null) {
+        try {
+          errorHandler(responseError);
+        } catch (e, s) {
+          _log.severe("Error calling `errorHandler`!", e, s);
         }
+      }
 
-        throw responseError;
-      });
+      throw responseError;
     }
 
     if (response.isNotOK) return null;
@@ -1387,7 +1387,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     return parseResponseBody(response);
   }
 
-  FutureOr<dynamic> parseResponseBody(HttpResponse response) {
+  Object? parseResponseBody(HttpResponse response) {
     var body = response.body;
     if (body == null) return null;
 
@@ -1492,7 +1492,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     return false;
   }
 
-  FutureOr<dynamic> decodeJson(String content) {
+  dynamic decodeJson(String content) {
     try {
       return json.decode(content);
     } on FormatException {
