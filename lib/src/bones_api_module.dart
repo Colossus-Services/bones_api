@@ -1291,8 +1291,8 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
 
   APIModuleHttpProxyRequestHandler? requestHandler;
 
-  Future<dynamic> doRequest(
-      String methodName, Map<String, Object?> parameters) async {
+  Future<dynamic> doRequest(String methodName, Map<String, Object?> parameters,
+      TypeReflection? returnType) async {
     var requestHandler = this.requestHandler;
 
     if (requestHandler != null) {
@@ -1318,6 +1318,13 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
       return MapEntry(key, val);
     });
 
+    var returnsBytes = returnType != null &&
+        (returnType.type == Uint8List ||
+            (returnType.type == Future &&
+                returnType.arguments0?.type == Uint8List));
+
+    var responseType = returnsBytes ? 'arraybuffer' : 'text';
+
     final modulePath = this.modulePath;
 
     var path = modulePath.isNotEmpty ? '$modulePath/$methodName' : methodName;
@@ -1326,11 +1333,19 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     HttpResponse response;
     if (needsJsonRequest) {
       method = HttpMethod.POST;
-      response = await httpClient.post(path,
-          body: parameters, contentType: MimeType.json);
+      response = await httpClient.post(
+        path,
+        body: parameters,
+        contentType: MimeType.json,
+        responseType: responseType,
+      );
     } else {
       method = HttpMethod.GET;
-      response = await httpClient.get(path, parameters: parameters);
+      response = await httpClient.get(
+        path,
+        parameters: parameters,
+        responseType: responseType,
+      );
     }
 
     return parseResponse(
@@ -1503,7 +1518,7 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   @override
   Future onCall(dynamic instance, String methodName,
       Map<String, Object?> parameters, TypeReflection? returnType) async {
-    var json = await doRequest(methodName, parameters);
+    var json = await doRequest(methodName, parameters, returnType);
     return resolveResponse(returnType, json);
   }
 }
