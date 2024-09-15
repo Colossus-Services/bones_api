@@ -1318,10 +1318,14 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
       return MapEntry(key, val);
     });
 
-    var returnsBytes = returnType != null &&
-        (returnType.type == Uint8List ||
-            (returnType.type == Future &&
-                returnType.arguments0?.type == Uint8List));
+    bool returnsBytes = false;
+
+    if (returnType != null) {
+      var type = returnType.type;
+      returnsBytes = type == Uint8List ||
+          ((type == Future || type == FutureOr) &&
+              returnType.arguments0?.type == Uint8List);
+    }
 
     var responseType = returnsBytes ? 'arraybuffer' : 'text';
 
