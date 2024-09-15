@@ -6,9 +6,12 @@
     - Added parameter `returnType`.
    - Only use `responseType = 'arraybuffer'` if the `returnType` is `Uint8List`; otherwise, use `responseType = 'text'`.
 
+- `HTMLInput`:
+  - Added empty option for enums.
+
 - statistics: ^1.1.3
 - swiss_knife: ^3.2.2
-- mercury_client: ^2.2.3
+- mercury_client: ^2.2.4
 - shelf_static: ^1.1.3
 - gcloud: ^0.8.13
 

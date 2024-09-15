@@ -389,6 +389,8 @@ class HTMLInput {
         var html = StringBuffer();
         html.write('<select id="field_$name" name="$name">\n');
 
+        html.write('<option value=""></option>\n');
+
         valStr = value != null
             ? (enumReflection.name(value) ?? value.toString().split('.').last)
             : '';
