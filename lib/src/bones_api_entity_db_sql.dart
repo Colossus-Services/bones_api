@@ -140,7 +140,37 @@ class SQL implements SQLWrapper {
         _parametersValuesByPosition = parametersValuesByPosition,
         placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
 
-  bool get isDummy => this == dummy;
+  SQL copy() => SQL(
+        sql,
+        positionalParameters?.toList(),
+        namedParameters?.map((k, v) => MapEntry(k, v)),
+        parametersByPlaceholder.map((k, v) => MapEntry(k, v)),
+        sqlCondition: sqlCondition,
+        sqlPositional: _sqlPositional,
+        parametersKeysByPosition: _parametersKeysByPosition?.toList(),
+        parametersValuesByPosition: _parametersValuesByPosition?.toList(),
+        condition: condition,
+        entityName: entityName,
+        idFieldName: idFieldName,
+        returnColumns: returnColumns?.toSet(),
+        returnColumnsAliases:
+            returnColumnsAliases?.map((k, v) => MapEntry(k, v)),
+        limit: limit,
+        mainTable: mainTable,
+        relationship: relationship,
+        tablesAliases: tablesAliases?.map((k, v) => MapEntry(k, v)),
+        placeholderRegexp: placeholderRegexp,
+      );
+
+  /// Ensures that this is not the [dummy] instance.
+  /// Returns a [copy] if necessary.
+  SQL ensureNotSharedDummy() => identical(this, dummy) ? copy() : this;
+
+  /// Returns `true` if this is the [dummy] instance.
+  /// See [ensureNotSharedDummy].
+  bool get isSharedDummy => identical(this, dummy);
+
+  bool get isDummy => identical(this, dummy) || sql == 'dummy';
 
   bool get isFullyDummy => isDummy && !hasPreOrPosSQL;
 
@@ -1567,7 +1597,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var constrainSQL = _generateConstrainRelationshipSQL(
           tableScheme, table, field, id, otherTableName, otherIds);
 
-      sqls.last.posSQL = [constrainSQL];
+      var lastIdx = sqls.lastIndex;
+
+      var sqlsLast = sqls[lastIdx].ensureNotSharedDummy();
+      sqls[lastIdx] = sqlsLast;
+
+      sqlsLast.posSQL = [constrainSQL];
 
       return sqls;
     });
@@ -1696,7 +1731,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             sql, op.transaction, connection);
 
         if (sql.hasPosSQL) {
-          sql.posSQL!.map((e) {
+          return sql.posSQL!.map((e) {
             _logTransactionOperationSQL('insertRelationship[POS]', op, e);
             return doDeleteSQL(
                 entityName, e.mainTable!, e, op.transaction, connection);
@@ -2269,6 +2304,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         var posSql2 =
             SQL('DROP TABLE $q$tmpTable$q', [], {}, {}, mainTable: tmpTable);
+
+        deleteSQL = deleteSQL.ensureNotSharedDummy();
 
         deleteSQL.preSQL = [preSql];
         deleteSQL.posSQL = [posSql1, posSql2];
