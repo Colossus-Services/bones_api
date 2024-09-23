@@ -1,3 +1,11 @@
+## 1.7.23
+
+- `SQL`:
+  - Added `copy`, `isSharedDummy`, and `ensureNotSharedDummy`.
+  - Fix `generateInsertRelationshipSQLs`: use `ensureNotSharedDummy`.
+
+- meta: ^1.16.0
+
 ## 1.7.22
 
 - `APIModuleProxyHttpCaller`:
