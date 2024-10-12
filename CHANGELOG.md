@@ -1,3 +1,10 @@
+## 1.7.24
+
+- `APISecurity`:
+  - `refreshAPIToken`: after `refreshToken` and create a new token, populate permissions calling `getCredentialPermissions`.
+
+- gcloud: ^0.8.15
+
 ## 1.7.23
 
 - `SQL`:
