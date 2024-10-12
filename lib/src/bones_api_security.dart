@@ -338,13 +338,20 @@ abstract class APISecurity {
 
         autoValidateAllTokens();
 
-        return _tokenStore
-            .storeAPIToken(token, null, []).resolveMapped((apiTokenInfo) {
-          var apiToken = apiTokenInfo?.apiToken;
-          if (apiToken != null) {
-            onNewAPIToken(apiToken, true);
-          }
-          return apiToken;
+        var newTokenCredential = APICredential(username,
+            token: token.token, refreshToken: token.refreshToken);
+
+        return getCredentialPermissions(newTokenCredential, null)
+            .resolveMapped((permission) {
+          return _tokenStore
+              .storeAPIToken(token, null, permission)
+              .resolveMapped((apiTokenInfo) {
+            var apiToken = apiTokenInfo?.apiToken;
+            if (apiToken != null) {
+              onNewAPIToken(apiToken, true);
+            }
+            return apiToken;
+          });
         });
       });
     });

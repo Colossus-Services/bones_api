@@ -106,7 +106,8 @@ void main() {
       expect(
           res.toInfos(),
           equals(
-              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }'));
+              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }'),
+          reason: 'Payload: <<${res.payload}>>');
 
       expect(res.payloadMimeType.toString(), equals('text/plain'));
     });
