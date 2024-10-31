@@ -1,3 +1,15 @@
+## 1.7.25
+
+- `APISecurity`:
+  - `onNewAPIToken`: added parameter `request`.
+
+- yaml_writer: ^2.0.1
+- args: ^2.6.0
+- logging: ^1.3.0
+- crypto: ^3.0.6
+- path: ^1.9.1
+- coverage: ^1.10.0
+
 ## 1.7.24
 
 - `APISecurity`:

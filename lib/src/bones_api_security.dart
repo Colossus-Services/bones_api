@@ -141,7 +141,7 @@ abstract class APISecurity {
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
-      return _resolveAuthentication(credential, resume)
+      return _resolveAuthentication(credential, resume, request)
           .resolveMapped((authentication) {
         if (request != null) {
           return resolveRequestAuthentication(request, authentication);
@@ -153,11 +153,12 @@ abstract class APISecurity {
   }
 
   FutureOr<APIAuthentication?> _resolveAuthentication(
-      APICredential credential, bool resumed) {
+      APICredential credential, bool resumed, APIRequest? request) {
     var token = credential.token;
 
     if (token == null) {
-      return _resolveAuthenticationImpl(credential, resumed, null, null, null);
+      return _resolveAuthenticationImpl(
+          credential, resumed, null, null, null, request);
     }
 
     var prevToken = _tokenStore.get(token);
@@ -173,8 +174,8 @@ abstract class APISecurity {
         prevPermissions = prevToken.permissions;
       }
 
-      return _resolveAuthenticationImpl(
-          credential, resumed, prevAPIToken, prevData, prevPermissions);
+      return _resolveAuthenticationImpl(credential, resumed, prevAPIToken,
+          prevData, prevPermissions, request);
     });
   }
 
@@ -183,7 +184,8 @@ abstract class APISecurity {
       bool resumed,
       APIToken? prevAPIToken,
       Object? prevData,
-      List<APIPermission>? prevPermissions) {
+      List<APIPermission>? prevPermissions,
+      APIRequest? request) {
     var permissions = getCredentialPermissions(credential, prevPermissions);
     var data = getAuthenticationData(credential, prevData);
 
@@ -205,7 +207,7 @@ abstract class APISecurity {
             .storeAPIToken(authentication.token, data, permissions)
             .resolveMapped((apiTokenInfo) {
           if (apiTokenInfo != null && changedAPIToken) {
-            onNewAPIToken(apiTokenInfo.apiToken, false);
+            onNewAPIToken(apiTokenInfo.apiToken, false, request: request);
           }
           return authentication;
         });
@@ -213,7 +215,7 @@ abstract class APISecurity {
     });
   }
 
-  void onNewAPIToken(APIToken token, bool refreshed) {}
+  void onNewAPIToken(APIToken token, bool refreshed, {APIRequest? request}) {}
 
   FutureOr<APIAuthentication> createAuthentication(
       APICredential credential, List<APIPermission> permissions,
@@ -321,7 +323,8 @@ abstract class APISecurity {
     return _tokenStore.get(token).resolveMapped((token) => token?.apiToken);
   }
 
-  FutureOr<APIToken?> refreshAPIToken(String? username, String? refreshToken) {
+  FutureOr<APIToken?> refreshAPIToken(String? username, String? refreshToken,
+      {APIRequest? request}) {
     if (username == null ||
         refreshToken == null ||
         username.isEmpty ||
@@ -348,7 +351,7 @@ abstract class APISecurity {
               .resolveMapped((apiTokenInfo) {
             var apiToken = apiTokenInfo?.apiToken;
             if (apiToken != null) {
-              onNewAPIToken(apiToken, true);
+              onNewAPIToken(apiToken, true, request: request);
             }
             return apiToken;
           });
@@ -731,7 +734,7 @@ abstract class APISecurity {
         var credential = APICredential(username, token: token);
         credentials.add(credential);
       } else if (refreshToken.isNotEmpty) {
-        return refreshAPIToken(username, refreshToken)
+        return refreshAPIToken(username, refreshToken, request: request)
             .resolveMapped((apiToken) {
           if (apiToken != null && !apiToken.isExpired()) {
             var credential = APICredential(apiToken.username,
