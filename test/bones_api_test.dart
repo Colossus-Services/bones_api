@@ -427,6 +427,14 @@ void main() {
           equals('Payload length: 0'));
     });
 
+    test('proxy: mapKeys', () async {
+      var infoProxy = MyInfoModuleProxy(
+          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+
+      expect(await infoProxy.mapKeys({'a': 1, 'b': '2', 'c': true}),
+          equals(['a', 'b', 'c']));
+    });
+
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
@@ -752,6 +760,10 @@ class MyInfoModule extends APIModule {
   FutureOr<APIResponse<String>> withPayload(Uint8List? payload) {
     var reply = 'Payload length: ${payload?.length ?? -1}';
     return APIResponse.ok(reply);
+  }
+
+  FutureOr<APIResponse<List<String>>> mapKeys(Map<String, dynamic> map) {
+    return APIResponse.ok(map.keys.toList());
   }
 }
 
