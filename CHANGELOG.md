@@ -1,3 +1,8 @@
+## 1.7.26
+
+- reflection_factory: ^2.4.5
+- gcloud: ^0.8.16
+
 ## 1.7.25
 
 - `APISecurity`:

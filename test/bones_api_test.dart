@@ -427,6 +427,22 @@ void main() {
           equals('Payload length: 0'));
     });
 
+    test('proxy: mapKeys', () async {
+      var infoProxy = MyInfoModuleProxy(
+          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+
+      expect(await infoProxy.mapKeys({'a': 1, 'b': '2', 'c': true}),
+          equals(['a', 'b', 'c']));
+    });
+
+    test('proxy: listMultiplier', () async {
+      var infoProxy = MyInfoModuleProxy(
+          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+
+      expect(
+          await infoProxy.listMultiplier([1, 2, 3], 10), equals([10, 20, 30]));
+    });
+
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
@@ -445,6 +461,8 @@ void main() {
           ']},'
           '{"name":"info","routes":['
           '{"name":"echo","parameters":{"msg":"String"},"uri":"http://localhost:0/info/echo?msg=String"},'
+          '{"name":"listMultiplier","parameters":{"list":"List<int>","m":"int"},"uri":"http://localhost:5544/info/listMultiplier?list=List%3Cint%3E&m=int"},'
+          '{"name":"mapKeys","parameters":{"map":"Map<String,dynamic>"},"uri":"http://localhost:5544/info/mapKeys?map=Map%3CString%2Cdynamic%3E"},'
           '{"name":"toUpperCase","parameters":{"msg":"String"},"uri":"http://localhost:0/info/toUpperCase?msg=String"},'
           '{"name":"withPayload","parameters":{"payload":"Uint8List"},"uri":"http://localhost:5544/info/withPayload?payload=Uint8List"}'
           ']}'
@@ -752,6 +770,14 @@ class MyInfoModule extends APIModule {
   FutureOr<APIResponse<String>> withPayload(Uint8List? payload) {
     var reply = 'Payload length: ${payload?.length ?? -1}';
     return APIResponse.ok(reply);
+  }
+
+  FutureOr<APIResponse<List<String>>> mapKeys(Map<String, dynamic> map) {
+    return APIResponse.ok(map.keys.toList());
+  }
+
+  FutureOr<APIResponse<List<int>>> listMultiplier(List<int> list, int m) {
+    return APIResponse.ok(list.map((n) => n * m).toList(), mimeType: 'json');
   }
 }
 

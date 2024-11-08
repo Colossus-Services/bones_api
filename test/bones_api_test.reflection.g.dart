@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.4.4
+// BUILDER: reflection_factory/2.4.5
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.4.4');
+  static final Version _version = Version.parse('2.4.5');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -446,6 +446,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'getRoutesHandlersNames',
     'initialize',
     'initializeDependencies',
+    'listMultiplier',
+    'mapKeys',
     'resolveRoute',
     'toUpperCase',
     'withPayload'
@@ -564,6 +566,41 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             obj,
             const <__PR>[
               __PR(__TR<Uint8List>(Uint8List), 'payload', true, true)
+            ],
+            null,
+            null,
+            null);
+      case 'mapkeys':
+        return MethodReflection<MyInfoModule,
+                FutureOr<APIResponse<List<String>>>>(
+            this,
+            MyInfoModule,
+            'mapKeys',
+            __TR<FutureOr<APIResponse<List<String>>>>(FutureOr, <__TR>[
+              __TR<APIResponse<List<String>>>(
+                  APIResponse, <__TR>[__TR.tListString])
+            ]),
+            false,
+            (o) => o!.mapKeys,
+            obj,
+            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+            null,
+            null,
+            null);
+      case 'listmultiplier':
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<List<int>>>>(
+            this,
+            MyInfoModule,
+            'listMultiplier',
+            __TR<FutureOr<APIResponse<List<int>>>>(FutureOr, <__TR>[
+              __TR<APIResponse<List<int>>>(APIResponse, <__TR>[__TR.tListInt])
+            ]),
+            false,
+            (o) => o!.listMultiplier,
+            obj,
+            const <__PR>[
+              __PR(__TR.tListInt, 'list', false, true),
+              __PR(__TR.tInt, 'm', false, true)
             ],
             null,
             null,
@@ -919,6 +956,29 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         },
         __TR.tFutureString);
     return __retFut$<String>(ret);
+  }
+
+  Future<List<String>> mapKeys(Map<String, dynamic> map) {
+    var ret = onCall(
+        this,
+        'mapKeys',
+        <String, dynamic>{
+          'map': map,
+        },
+        __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
+    return __retFut$<List<String>>(ret);
+  }
+
+  Future<List<int>> listMultiplier(List<int> list, int m) {
+    var ret = onCall(
+        this,
+        'listMultiplier',
+        <String, dynamic>{
+          'list': list,
+          'm': m,
+        },
+        __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
+    return __retFut$<List<int>>(ret);
   }
 }
 
