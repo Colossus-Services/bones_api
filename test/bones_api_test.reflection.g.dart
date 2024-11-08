@@ -446,6 +446,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'getRoutesHandlersNames',
     'initialize',
     'initializeDependencies',
+    'listMultiplier',
     'mapKeys',
     'resolveRoute',
     'toUpperCase',
@@ -583,6 +584,24 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             (o) => o!.mapKeys,
             obj,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+            null,
+            null,
+            null);
+      case 'listmultiplier':
+        return MethodReflection<MyInfoModule, FutureOr<APIResponse<List<int>>>>(
+            this,
+            MyInfoModule,
+            'listMultiplier',
+            __TR<FutureOr<APIResponse<List<int>>>>(FutureOr, <__TR>[
+              __TR<APIResponse<List<int>>>(APIResponse, <__TR>[__TR.tListInt])
+            ]),
+            false,
+            (o) => o!.listMultiplier,
+            obj,
+            const <__PR>[
+              __PR(__TR.tListInt, 'list', false, true),
+              __PR(__TR.tInt, 'm', false, true)
+            ],
             null,
             null,
             null);
@@ -948,6 +967,18 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         },
         __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
     return __retFut$<List<String>>(ret);
+  }
+
+  Future<List<int>> listMultiplier(List<int> list, int m) {
+    var ret = onCall(
+        this,
+        'listMultiplier',
+        <String, dynamic>{
+          'list': list,
+          'm': m,
+        },
+        __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
+    return __retFut$<List<int>>(ret);
   }
 }
 
