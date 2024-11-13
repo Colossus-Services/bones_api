@@ -1,3 +1,8 @@
+## 1.7.28
+
+- `EntityAccessRules._simplified`:
+  - Fix: Added parameter `masker`.
+
 ## 1.7.27
 
 - `EntityAccessRuleType`:

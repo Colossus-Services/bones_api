@@ -119,9 +119,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
             rules == null);
 
   const EntityAccessRules._simplified(this.ruleType, this.entityType,
-      this.entityFields, this.rules, this.condition)
-      : masker = null,
-        _simplified = true,
+      this.entityFields, this.rules, this.condition, this.masker)
+      : _simplified = true,
         super(false);
 
   const EntityAccessRules.group(List<EntityAccessRules> rules)
@@ -496,8 +495,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
     return s._isInnocuousImpl()
         ? EntityAccessRules.innocuous
-        : EntityAccessRules._simplified(
-            s.ruleType, s.entityType, s.entityFields, s.rules, s.condition);
+        : EntityAccessRules._simplified(s.ruleType, s.entityType,
+            s.entityFields, s.rules, s.condition, s.masker);
   }
 
   EntityAccessRules _simplifiedImpl() {
