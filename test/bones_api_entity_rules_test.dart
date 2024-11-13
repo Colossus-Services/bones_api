@@ -448,6 +448,81 @@ void main() {
     test('maskFields(condition,subgroup) + toJsonEncodable (cached)',
         () => testMaskFieldsSubgroupJson(true));
 
+    test('defaultMask', () {
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 'abc'),
+          equals(''));
+
+      expect(
+          EntityAccessRules.defaultMask(null, Object(), 'x', 123), equals(0));
+
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
+          equals(0.0));
+
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
+          equals(0.0));
+
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', true),
+          equals(false));
+
+      // Map
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <String, String>{'a': 'A'}),
+          allOf(isA<Map<String, String>>(), equals({})));
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <String, int>{'a': 123}),
+          allOf(isA<Map<String, int>>(), equals({})));
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <String, double>{'a': 12.3}),
+          allOf(isA<Map<String, double>>(), equals({})));
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <String, num>{'a': 12.3, 'b': 2}),
+          allOf(isA<Map<String, num>>(), equals({})));
+
+      expect(
+          EntityAccessRules.defaultMask(null, Object(), 'x',
+              <String, Object>{'a': 12.3, 'b': 2, 'c': 'x'}),
+          allOf(isA<Map<String, Object>>(), equals({})));
+
+      expect(
+          EntityAccessRules.defaultMask(null, Object(), 'x',
+              <String, dynamic>{'a': 12.3, 'b': 2, 'c': 'x', 'd': null}),
+          allOf(isA<Map<String, dynamic>>(), equals({})));
+
+      // List
+
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', <String>['a']),
+          allOf(isA<List<String>>(), equals([])));
+
+      expect(EntityAccessRules.defaultMask(null, Object(), 'x', <int>[123]),
+          allOf(isA<List<int>>(), equals([])));
+
+      expect(
+          EntityAccessRules.defaultMask(null, Object(), 'x', <double>[12.34]),
+          allOf(isA<List<double>>(), equals([])));
+
+      expect(
+          EntityAccessRules.defaultMask(null, Object(), 'x', <num>[12.34, 456]),
+          allOf(isA<List<num>>(), equals([])));
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <Object>[12.34, 456, 'x']),
+          allOf(isA<List<Object>>(), equals([])));
+
+      expect(
+          EntityAccessRules.defaultMask(
+              null, Object(), 'x', <dynamic>[12.34, 456, 'x', null]),
+          allOf(isA<List<dynamic>>(), equals([])));
+    });
+
     test('group: blockFields', () {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['email', 'password']),
