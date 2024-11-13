@@ -383,8 +383,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     type ??= object.runtimeType;
 
     if (ruleType == EntityAccessRuleType.mask) {
-      var m = isMaskedEntityTypeField(type, field);
-
+      var m =
+          isMaskedEntityTypeField(type, field, context: context, direct: true);
       if (m != null && m) {
         return _applyMask(context, object, field, value);
       }
@@ -393,11 +393,27 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     final rules = this.rules;
     if (rules == null || rules.isEmpty) return value;
 
+    var hasSubGroupRule = false;
     for (var rule in rules) {
       if (rule.ruleType == EntityAccessRuleType.mask) {
-        var m = rule.isMaskedEntityTypeField(type, field);
+        var m = rule.isMaskedEntityTypeField(type, field,
+            context: context, direct: true);
         if (m != null && m) {
           return rule._applyMask(context, object, field, value);
+        }
+      } else if (rule.ruleType == null) {
+        hasSubGroupRule = true;
+      }
+    }
+
+    if (hasSubGroupRule) {
+      for (var rule in rules) {
+        if (rule.ruleType == null) {
+          var m = rule.isMaskedEntityTypeField(type, field, context: context);
+          if (m != null && m) {
+            return rule.applyMask(object, field, value,
+                context: context, type: type);
+          }
         }
       }
     }
