@@ -439,8 +439,30 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     if (value is String) return '' as V;
     if (value is int) return 0 as V;
     if (value is double) return 0.0 as V;
+    if (value is bool) return false as V;
 
     if (value is DateTime) return DateTime.fromMillisecondsSinceEpoch(0) as V;
+
+    if (value is Time) return Time(0) as V;
+
+    if (value is Map) {
+      if (value is Map<String, String>) return <String, String>{} as V;
+      if (value is Map<String, int>) return <String, int>{} as V;
+      if (value is Map<String, double>) return <String, double>{} as V;
+      if (value is Map<String, num>) return <String, num>{} as V;
+      if (value is Map<String, Object>) return <String, Object>{} as V;
+      if (value is Map<String, dynamic>) return <String, dynamic>{} as V;
+      return {} as V;
+    }
+
+    if (value is List) {
+      if (value is List<String>) return <String>[] as V;
+      if (value is List<int>) return <int>[] as V;
+      if (value is List<double>) return <double>[] as V;
+      if (value is List<num>) return <num>[] as V;
+      if (value is List<Object>) return <Object>[] as V;
+      return [] as V;
+    }
 
     return value;
   }
@@ -758,7 +780,8 @@ class EntityAccessRulesCached implements EntityAccessRules {
   @override
   V applyMask<O extends Object, V>(O object, String field, V value,
           {EntityAccessRulesContext? context, Type? type}) =>
-      accessRules.applyMask<O, V>(object, field, value, context: context);
+      accessRules.applyMask<O, V>(object, field, value,
+          context: context, type: type);
 
   @override
   V _applyMask<O extends Object, V>(
