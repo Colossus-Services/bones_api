@@ -194,6 +194,14 @@ void main() {
     testMaskFields(bool cached) {
       var r1 = EntityAccessRules.maskFields(User, ['email', 'password']);
 
+      var r1s = r1.simplified();
+      expect(identical(r1.ruleType, r1s.ruleType), isTrue);
+      expect(identical(r1.entityType, r1s.entityType), isTrue);
+      expect(identical(r1.condition, r1s.condition), isTrue);
+      expect(identical(r1.masker, r1s.masker), isTrue);
+      expect(r1s.entityFields, equals((r1.entityFields)));
+      expect(r1s.rules, equals((r1.rules)));
+
       if (cached) {
         r1 = r1.cached;
       }
@@ -249,6 +257,14 @@ void main() {
           }
         }),
       ]);
+
+      var r1s = r1.simplified();
+      expect(identical(r1.ruleType, r1s.ruleType), isTrue);
+      expect(identical(r1.entityType, r1s.entityType), isTrue);
+      expect(identical(r1.condition, r1s.condition), isTrue);
+      expect(identical(r1.masker, r1s.masker), isTrue);
+      expect(r1s.entityFields, equals((r1.entityFields)));
+      expect(r1s.rules, equals((r1.rules)));
 
       if (cached) {
         r1 = r1.cached;
