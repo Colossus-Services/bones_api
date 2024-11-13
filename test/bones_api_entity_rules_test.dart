@@ -374,6 +374,80 @@ void main() {
     test('maskFields(condition) + toJsonEncodable (cached)',
         () => testMaskFieldsJson(true));
 
+    void testMaskFieldsSubgroupJson(bool cached) {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['password']),
+        EntityAccessRules.group([
+          EntityAccessRules.maskFields(User, ['email'], condition: (context) {
+            var apiRequest = context?.contextAs<APIRequest>();
+            var o = context?.object;
+
+            if (o is User) {
+              var username = apiRequest?.credential?.username;
+              var sameAccount = username == o.email;
+              return !sameAccount;
+            } else {
+              return true;
+            }
+          }, masker: (context, object, field, value) {
+            switch (field) {
+              case 'email':
+                return '@';
+              default:
+                return value;
+            }
+          })
+        ]),
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+
+      var user1 = User('joe@mail.com', '123456',
+          Address('NY', 'New York', 'Street A', 101), [],
+          id: 101);
+
+      var user2 = User('smith@mail.com', '654321',
+          Address('NY', 'New York', 'Street A', 102), [],
+          id: 102);
+
+      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
+          credential: APICredential('joe@mail.com'));
+
+      User$reflection.boot();
+
+      var j0 = Json.toJson(user1) as Map;
+
+      expect(j0['id'], equals(101));
+      expect(j0['email'], equals(user1.email));
+      expect(j0['password'], equals(user1.password));
+
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j1['id'], equals(101));
+      expect(j1['email'], equals(user1.email));
+      expect(j1['password'], isNull);
+
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j2['id'], equals(102));
+      expect(j2['email'], equals('@'));
+      expect(j2['password'], isNull);
+    }
+
+    test('maskFields(condition,subgroup) + toJsonEncodable',
+        () => testMaskFieldsSubgroupJson(false));
+
+    test('maskFields(condition,subgroup) + toJsonEncodable (cached)',
+        () => testMaskFieldsSubgroupJson(true));
+
     test('group: blockFields', () {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['email', 'password']),
