@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.7.26';
+  static const String VERSION = '1.7.27';
 
   static bool _boot = false;
 
@@ -921,7 +921,7 @@ class APIRouteHandler<T> {
     return allRules;
   }
 
-  static final Map<EntityAccessRules, EntityAccessRulesCached>
+  static final Map<EntityAccessRules, EntityAccessRules>
       _entityAccessRulesCached = {};
 
   EntityAccessRules? _entityAccessRules;
@@ -953,7 +953,7 @@ class APIRouteHandler<T> {
     if (allRules.isInnocuous) return EntityAccessRules.innocuous;
 
     return _entityAccessRulesCached.putIfAbsent(
-        allRules, () => EntityAccessRulesCached(allRules));
+        allRules, () => allRules.cached);
   }
 
   /// Calls this route.

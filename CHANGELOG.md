@@ -1,3 +1,16 @@
+## 1.7.27
+
+- `EntityAccessRuleType`:
+  - Added `mask`.
+
+- `EntityAccessRules`:
+  - Added field `masker`.
+  - Added getter `cached`.
+  - Added `hasRuleType`.
+
+- gcloud: ^0.8.17
+- coverage: ^1.11.0
+
 ## 1.7.26
 
 - reflection_factory: ^2.4.5

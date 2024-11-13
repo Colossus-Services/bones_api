@@ -61,10 +61,22 @@ void main() {
 
       expect(EntityAccessRules.block(User).isInnocuous, isFalse);
       expect(EntityAccessRules.allow(User).isInnocuous, isFalse);
+      expect(EntityAccessRules.mask(User).isInnocuous, isFalse);
+
+      expect(
+          EntityAccessRules.group([EntityAccessRules.block(User)]).isInnocuous,
+          isFalse);
+
+      expect(
+          EntityAccessRules.group([EntityAccessRules.mask(Account)])
+              .isInnocuous,
+          isFalse);
+
       expect(
           EntityAccessRules.group([
             EntityAccessRules.block(User),
-            EntityAccessRules.block(Account)
+            EntityAccessRules.block(Account),
+            EntityAccessRules.mask(Account)
           ]).isInnocuous,
           isFalse);
 
@@ -94,6 +106,24 @@ void main() {
 
       expect(r1.isInnocuous, isFalse);
       expect(r1.ruleType, equals(EntityAccessRuleType.allow));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, anyOf(isNull, isEmpty));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+    });
+
+    test('mask', () {
+      var r1 = EntityAccessRules.mask(User);
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.mask));
       expect(r1.entityType, equals(User));
       expect(r1.entityFields, anyOf(isNull, isEmpty));
 
@@ -161,6 +191,189 @@ void main() {
       expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
     });
 
+    testMaskFields(bool cached) {
+      var r1 = EntityAccessRules.maskFields(User, ['email', 'password']);
+
+      if (cached) {
+        r1 = r1.cached;
+      }
+
+      expect(r1.isInnocuous, isFalse);
+      expect(r1.ruleType, equals(EntityAccessRuleType.mask));
+      expect(r1.entityType, equals(User));
+      expect(r1.entityFields, equals(['email', 'password']));
+
+      expect(r1.hasRuleForEntityType(User), isTrue);
+      expect(r1.hasRuleForEntityType(Account), isFalse);
+      expect(r1.hasRuleForEntityType(Address), isFalse);
+
+      expect(r1.hasRuleForEntityTypeField(User), isTrue);
+      expect(r1.hasRuleForEntityTypeField(Account), isFalse);
+      expect(r1.hasRuleForEntityTypeField(Address), isFalse);
+
+      expect(r1.isAllowedEntityType(User), isTrue);
+      expect(r1.isAllowedEntityType(Account), isNull);
+
+      expect(r1.isAllowedEntityTypeField(User, 'email'), isNull);
+      expect(r1.isAllowedEntityTypeField(User, 'password'), isNull);
+      expect(r1.isAllowedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isAllowedEntityTypeField(Account, 'user'), isNull);
+      expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+
+      expect(r1.isMaskedEntityTypeField(User, 'email'), isTrue);
+      expect(r1.isMaskedEntityTypeField(User, 'password'), isTrue);
+      expect(r1.isMaskedEntityTypeField(User, 'address'), isNull);
+
+      expect(r1.isMaskedEntityTypeField(Account, 'user'), isNull);
+      expect(r1.isMaskedEntityTypeField(Account, 'userInfo'), isNull);
+    }
+
+    test('maskFields', () => testMaskFields(false));
+
+    test('maskFields (cached)', () => testMaskFields(true));
+
+    void testBlockFields(bool cached) {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['password']),
+        EntityAccessRules.blockFields(User, ['email'], condition: (context) {
+          var apiRequest = context?.contextAs<APIRequest>();
+          var o = context?.object;
+
+          if (o is User) {
+            var username = apiRequest?.credential?.username;
+            var sameAccount = username == o.email;
+            return !sameAccount;
+          } else {
+            return true;
+          }
+        }),
+      ]);
+
+      if (cached) {
+        r1 = r1.cached;
+      }
+
+      expect(r1.isInnocuous, isFalse);
+
+      var user1 = User('joe@mail.com', '123456',
+          Address('NY', 'New York', 'Street A', 101), [],
+          id: 101);
+
+      var user2 = User('smith@mail.com', '654321',
+          Address('NY', 'New York', 'Street A', 102), [],
+          id: 102);
+
+      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
+          credential: APICredential('joe@mail.com'));
+
+      User$reflection.boot();
+
+      var j0 = Json.toJson(user1) as Map;
+
+      expect(j0['id'], equals(101));
+      expect(j0['email'], equals(user1.email));
+      expect(j0['password'], equals(user1.password));
+
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j1['id'], equals(101));
+      expect(j1['email'], equals(user1.email));
+      expect(j1['password'], isNull);
+
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j2['id'], equals(102));
+      expect(j2['email'], isNull);
+      expect(j2['password'], isNull);
+    }
+
+    test('blockFields(condition) + toJsonEncodable',
+        () => testBlockFields(false));
+
+    test('blockFields(condition) + toJsonEncodable (cached)',
+        () => testBlockFields(true));
+
+    void testMaskFieldsJson(bool cached) {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['password']),
+        EntityAccessRules.maskFields(User, ['email'], condition: (context) {
+          var apiRequest = context?.contextAs<APIRequest>();
+          var o = context?.object;
+
+          if (o is User) {
+            var username = apiRequest?.credential?.username;
+            var sameAccount = username == o.email;
+            return !sameAccount;
+          } else {
+            return true;
+          }
+        }, masker: (context, object, field, value) {
+          switch (field) {
+            case 'email':
+              return '@';
+            default:
+              return value;
+          }
+        }),
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+
+      var user1 = User('joe@mail.com', '123456',
+          Address('NY', 'New York', 'Street A', 101), [],
+          id: 101);
+
+      var user2 = User('smith@mail.com', '654321',
+          Address('NY', 'New York', 'Street A', 102), [],
+          id: 102);
+
+      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
+          credential: APICredential('joe@mail.com'));
+
+      User$reflection.boot();
+
+      var j0 = Json.toJson(user1) as Map;
+
+      expect(j0['id'], equals(101));
+      expect(j0['email'], equals(user1.email));
+      expect(j0['password'], equals(user1.password));
+
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j1['id'], equals(101));
+      expect(j1['email'], equals(user1.email));
+      expect(j1['password'], isNull);
+
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+            apiRequest, Json.defaultToEncodableJsonProvider(), o),
+      ) as Map;
+
+      expect(j2['id'], equals(102));
+      expect(j2['email'], equals('@'));
+      expect(j2['password'], isNull);
+    }
+
+    test('maskFields(condition) + toJsonEncodable',
+        () => testMaskFieldsJson(false));
+
+    test('maskFields(condition) + toJsonEncodable (cached)',
+        () => testMaskFieldsJson(true));
+
     test('group: blockFields', () {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['email', 'password']),
@@ -189,6 +402,8 @@ void main() {
 
       expect(r1.isAllowedEntityTypeField(Account, 'user'), isFalse);
       expect(r1.isAllowedEntityTypeField(Account, 'userInfo'), isNull);
+
+      expect(r1.isMaskedEntityTypeField(Account, 'user'), isNull);
     });
 
     test('group: allowFields', () {

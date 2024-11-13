@@ -53,11 +53,18 @@ class MergeEntityRulesError<R extends EntityRules<R>> extends Error {
 }
 
 /// An [EntityAccessRules] type.
-enum EntityAccessRuleType { allow, block }
+enum EntityAccessRuleType { allow, block, mask }
 
 /// An [EntityAccessRules.condition].
 typedef EntityAccessRulesCondition = bool Function(
     EntityAccessRulesContext? context);
+
+/// An [EntityAccessRules.masker].
+typedef EntityAccessRulesMasker = Object? Function(
+    EntityAccessRulesContext? context,
+    Object object,
+    String field,
+    Object? value);
 
 /// An [EntityAccessRules] context passed to rules with a condition ([EntityAccessRulesCondition]).
 class EntityAccessRulesContext {
@@ -94,6 +101,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
   final EntityAccessRulesCondition? condition;
 
+  final EntityAccessRulesMasker? masker;
+
   final bool _simplified;
 
   const EntityAccessRules(
@@ -101,7 +110,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
       this.entityType,
       this.entityFields,
       this.rules,
-      this.condition})
+      this.condition,
+      this.masker})
       : _simplified = false,
         super(ruleType == null &&
             entityType == null &&
@@ -110,7 +120,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
   const EntityAccessRules._simplified(this.ruleType, this.entityType,
       this.entityFields, this.rules, this.condition)
-      : _simplified = true,
+      : masker = null,
+        _simplified = true,
         super(false);
 
   const EntityAccessRules.group(List<EntityAccessRules> rules)
@@ -121,6 +132,7 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
         entityType = null,
         entityFields = null,
         condition = null,
+        masker = null,
         _simplified = false,
         super(false);
 
@@ -131,6 +143,7 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
         entityType = entityType,
         ruleType = EntityAccessRuleType.block,
         rules = null,
+        masker = null,
         _simplified = false,
         super(false);
 
@@ -147,6 +160,7 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
         entityType = entityType,
         ruleType = EntityAccessRuleType.allow,
         rules = null,
+        masker = null,
         _simplified = false,
         super(false);
 
@@ -155,6 +169,21 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
       {EntityAccessRulesCondition? condition})
       : this.allow(entityType,
             entityFields: entityFields, condition: condition);
+
+  const EntityAccessRules.mask(Type entityType,
+      {this.entityFields, this.condition, this.masker})
+      :
+        // ignore: prefer_initializing_formals
+        entityType = entityType,
+        ruleType = EntityAccessRuleType.mask,
+        rules = null,
+        _simplified = false,
+        super(false);
+
+  const EntityAccessRules.maskFields(Type entityType, List<String> entityFields,
+      {EntityAccessRulesCondition? condition, EntityAccessRulesMasker? masker})
+      : this.mask(entityType,
+            entityFields: entityFields, condition: condition, masker: masker);
 
   /// Returns `true` if this instance is equivalent to [innocuous] instance (no resolution rules to apply).
   @override
@@ -181,6 +210,8 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     return true;
   }
 
+  EntityAccessRules get cached => EntityAccessRulesCached(this);
+
   @override
   bool get isValid => true;
 
@@ -200,21 +231,35 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     if (isInnocuous) return null;
 
     if (entityType == type) {
-      if (ruleType == EntityAccessRuleType.allow) {
-        // If allows a field also allows a type (not checking `entityFields`):
-        return true;
-      } else if (ruleType == EntityAccessRuleType.block) {
-        final entityFields = this.entityFields;
-        var fieldRule = entityFields != null && entityFields.isNotEmpty;
+      switch (ruleType) {
+        case EntityAccessRuleType.allow:
+          {
+            // If allows a field also allows a type (not checking `entityFields`):
+            return true;
+          }
+        case EntityAccessRuleType.block:
+          {
+            final entityFields = this.entityFields;
+            var fieldRule = entityFields != null && entityFields.isNotEmpty;
 
-        // If blocks a field it's not fully blocking a type:
-        if (fieldRule) {
-          return true;
-        }
-        // If there's NO field rule, the type is being blocked:
-        else {
-          return false;
-        }
+            // If blocks a field it's not fully blocking a type:
+            if (fieldRule) {
+              return true;
+            }
+            // If there's NO field rule, the type is being blocked:
+            else {
+              return false;
+            }
+          }
+        case EntityAccessRuleType.mask:
+          {
+            // If masks a field also allows a type.
+            return true;
+          }
+        default:
+          {
+            break;
+          }
       }
     }
 
@@ -227,6 +272,17 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     }
 
     return null;
+  }
+
+  bool hasRuleType(List<EntityAccessRuleType> ruleTypes) {
+    if (ruleTypes.isEmpty) return false;
+
+    if (ruleType != null && ruleTypes.contains(ruleType)) {
+      return true;
+    }
+
+    final rules = this.rules;
+    return rules != null && rules.any((r) => r.hasRuleType(ruleTypes));
   }
 
   bool hasRuleForEntityTypeField(Type type) {
@@ -250,18 +306,34 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     if (entityType == type) {
       final condition = this.condition;
 
-      if (ruleType == EntityAccessRuleType.allow) {
-        if (entityFields.anyIgnoreCase(field)) {
-          return (condition == null || condition(context));
-        } else {
-          return null;
-        }
-      } else if (ruleType == EntityAccessRuleType.block) {
-        if (entityFields.anyIgnoreCase(field)) {
-          return !(condition == null || condition(context));
-        } else {
-          return null;
-        }
+      switch (ruleType) {
+        case EntityAccessRuleType.allow:
+          {
+            if (entityFields.anyIgnoreCase(field)) {
+              var allowed = condition == null || condition(context);
+              return allowed;
+            } else {
+              return null;
+            }
+          }
+        case EntityAccessRuleType.block:
+          {
+            if (entityFields.anyIgnoreCase(field)) {
+              var allowed = condition == null || condition(context);
+              var blocked = !allowed;
+              return blocked;
+            } else {
+              return null;
+            }
+          }
+        case EntityAccessRuleType.mask:
+          {
+            return null;
+          }
+        default:
+          {
+            break;
+          }
       }
     }
 
@@ -274,6 +346,87 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     }
 
     return null;
+  }
+
+  bool? isMaskedEntityTypeField(Type type, String field,
+      {EntityAccessRulesContext? context, bool direct = false}) {
+    if (isInnocuous) return null;
+
+    final entityFields = this.entityFields;
+
+    if (entityType == type) {
+      if (ruleType == EntityAccessRuleType.mask) {
+        if (entityFields.anyIgnoreCase(field)) {
+          final condition = this.condition;
+          return (condition == null || condition(context));
+        } else {
+          return null;
+        }
+      }
+    }
+
+    if (direct) return false;
+
+    final rules = this.rules;
+    if (rules == null || rules.isEmpty) return null;
+
+    for (var r in rules.reversed) {
+      var masked = r.isMaskedEntityTypeField(type, field, context: context);
+      if (masked != null) return masked;
+    }
+
+    return null;
+  }
+
+  V applyMask<O extends Object, V>(O object, String field, V value,
+      {EntityAccessRulesContext? context, Type? type}) {
+    type ??= object.runtimeType;
+
+    if (ruleType == EntityAccessRuleType.mask) {
+      var m = isMaskedEntityTypeField(type, field);
+
+      if (m != null && m) {
+        return _applyMask(context, object, field, value);
+      }
+    }
+
+    final rules = this.rules;
+    if (rules == null || rules.isEmpty) return value;
+
+    for (var rule in rules) {
+      if (rule.ruleType == EntityAccessRuleType.mask) {
+        var m = rule.isMaskedEntityTypeField(type, field);
+        if (m != null && m) {
+          return rule._applyMask(context, object, field, value);
+        }
+      }
+    }
+
+    return value;
+  }
+
+  V _applyMask<O extends Object, V>(
+      EntityAccessRulesContext? context, O object, String field, V value) {
+    var masker = this.masker;
+
+    if (masker != null) {
+      return masker(context, object, field, value) as V;
+    } else {
+      return defaultMask<O, V>(context, object, field, value);
+    }
+  }
+
+  static V defaultMask<O extends Object, V>(
+      EntityAccessRulesContext? context, O object, String field, V value) {
+    if (value == null) return null as V;
+
+    if (value is String) return '' as V;
+    if (value is int) return 0 as V;
+    if (value is double) return 0.0 as V;
+
+    if (value is DateTime) return DateTime.fromMillisecondsSinceEpoch(0) as V;
+
+    return value;
   }
 
   EntityAccessRules copyWith({
@@ -480,10 +633,26 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
       var c = EntityAccessRulesContext(this, o, context: apiRequest);
 
-      map.removeWhere((key, _) {
-        var allowed = isAllowedEntityTypeField(t, key, context: c);
-        return allowed != null && !allowed;
-      });
+      if (hasRuleType(
+          const [EntityAccessRuleType.allow, EntityAccessRuleType.block])) {
+        map.removeWhere((key, _) {
+          var allowed = isAllowedEntityTypeField(t, key, context: c);
+          return allowed != null && !allowed;
+        });
+      }
+
+      if (hasRuleType(const [EntityAccessRuleType.mask])) {
+        for (var key in map.keys.toList(growable: false)) {
+          var masked = isMaskedEntityTypeField(t, key, context: c);
+          if (masked != null && masked) {
+            var value = map[key];
+            var valueMasked = applyMask(o, key, value, context: c);
+            if (!identical(valueMasked, value)) {
+              map[key] = valueMasked;
+            }
+          }
+        }
+      }
 
       return map;
     };
@@ -504,6 +673,9 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   @override
   bool _isInnocuousImpl() => accessRules._isInnocuousImpl();
+
+  @override
+  EntityAccessRules get cached => this;
 
   @override
   bool get isValid => accessRules.isValid;
@@ -527,6 +699,9 @@ class EntityAccessRulesCached implements EntityAccessRules {
   EntityAccessRulesCondition? get condition => accessRules.condition;
 
   @override
+  EntityAccessRulesMasker? get masker => accessRules.masker;
+
+  @override
   bool get _simplified => accessRules._simplified;
 
   final Map<Type, bool> _hasRuleForEntityType = <Type, bool>{};
@@ -534,6 +709,15 @@ class EntityAccessRulesCached implements EntityAccessRules {
   @override
   bool hasRuleForEntityType(Type type) => _hasRuleForEntityType.putIfAbsent(
       type, () => accessRules.hasRuleForEntityType(type));
+
+  final Map<_CacheKey, bool> _hasRuleType = <_CacheKey, bool>{};
+
+  @override
+  bool hasRuleType(List<EntityAccessRuleType> ruleTypes) {
+    final cacheKey = _CacheKey(ruleTypes);
+    return _hasRuleType.putIfAbsent(
+        cacheKey, () => accessRules.hasRuleType(ruleTypes));
+  }
 
   final Map<Type, bool> _hasRuleForEntityTypeField = <Type, bool>{};
 
@@ -548,6 +732,22 @@ class EntityAccessRulesCached implements EntityAccessRules {
   bool? isAllowedEntityTypeField(Type type, String field,
           {EntityAccessRulesContext? context}) =>
       accessRules.isAllowedEntityTypeField(type, field, context: context);
+
+  @override
+  bool? isMaskedEntityTypeField(Type type, String field,
+          {EntityAccessRulesContext? context, bool direct = false}) =>
+      accessRules.isMaskedEntityTypeField(type, field,
+          context: context, direct: direct);
+
+  @override
+  V applyMask<O extends Object, V>(O object, String field, V value,
+          {EntityAccessRulesContext? context, Type? type}) =>
+      accessRules.applyMask<O, V>(object, field, value, context: context);
+
+  @override
+  V _applyMask<O extends Object, V>(
+          EntityAccessRulesContext? context, O object, String field, V value) =>
+      accessRules._applyMask<O, V>(context, object, field, value);
 
   @override
   EntityAccessRules copyWith({
@@ -598,6 +798,25 @@ class EntityAccessRulesCached implements EntityAccessRules {
       accessRules.toJsonEncodable(apiRequest, encodableJsonProvider, o);
 }
 
+class _CacheKey<T> {
+  final List<T> entries;
+
+  _CacheKey(this.entries);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _CacheKey<T> && ListEquality<T>().equals(entries, other.entries);
+
+  late final int _hashCode = ListEquality<T>().hash(entries);
+
+  @override
+  int get hashCode => _hashCode;
+
+  @override
+  String toString() => '$entries';
+}
+
 class _EntityAccessRulesInnocuous implements EntityAccessRules {
   const _EntityAccessRulesInnocuous();
 
@@ -633,6 +852,9 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
   bool _isInnocuousImpl() => true;
 
   @override
+  EntityAccessRules get cached => this;
+
+  @override
   bool get isValid => true;
 
   @override
@@ -654,6 +876,12 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
   EntityAccessRulesCondition? get condition => null;
 
   @override
+  EntityAccessRulesMasker? get masker => null;
+
+  @override
+  bool hasRuleType(List<EntityAccessRuleType> ruleTypes) => false;
+
+  @override
   bool hasRuleForEntityType(Type type) => false;
 
   @override
@@ -666,6 +894,21 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
   bool? isAllowedEntityTypeField(Type type, String field,
           {EntityAccessRulesContext? context}) =>
       null;
+
+  @override
+  bool? isMaskedEntityTypeField(Type type, String field,
+          {EntityAccessRulesContext? context, bool direct = false}) =>
+      null;
+
+  @override
+  V applyMask<O extends Object, V>(O object, String field, V value,
+          {EntityAccessRulesContext? context, Type? type}) =>
+      value;
+
+  @override
+  V _applyMask<O extends Object, V>(
+          EntityAccessRulesContext? context, O object, String field, V value) =>
+      value;
 
   @override
   EntityAccessRules simplified() => this;
