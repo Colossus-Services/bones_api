@@ -658,7 +658,7 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
       }
 
       if (hasRuleType(const [EntityAccessRuleType.mask])) {
-        for (var key in map.keys.toList(growable: false)) {
+        for (var key in map.keys) {
           var masked = isMaskedEntityTypeField(t, key, context: c);
           if (masked != null && masked) {
             var value = map[key];
