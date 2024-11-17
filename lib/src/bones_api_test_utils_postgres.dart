@@ -12,12 +12,25 @@ class APITestConfigDockerPostgreSQL
   @override
   String get runtimeTypeNameSafe => 'APITestConfigDockerPostgreSQL';
 
+  /// Runtime Postgres configuration: `-c port=$postgresPort`
+  int? postgresPort;
+
+  /// Runtime Postgres configuration: `-c max_connections=$maxConnections`
+  int? maxConnections;
+
+  /// Runtime Postgres configuration: `-c log_statement=$logStatement`
+  String? logStatement;
+
   final String version;
 
   APITestConfigDockerPostgreSQL(Map<String, dynamic> apiConfig,
       {DockerHost? dockerHost,
       String? containerNamePrefix,
-      this.version = 'latest'})
+      this.postgresPort,
+      this.maxConnections,
+      this.logStatement,
+      this.version = 'latest',
+      super.cleanContainer})
       : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
     DBPostgreSQLAdapter.boot();
@@ -30,12 +43,14 @@ class APITestConfigDockerPostgreSQL
   @override
   PostgreSQLContainerConfig createDBContainerConfig(int dbPort) =>
       PostgreSQLContainerConfig(
-        version: version,
-        pgUser: dbUser,
-        pgPassword: dbPass,
-        pgDatabase: dbName,
-        hostPort: dbPort,
-      );
+          version: version,
+          pgUser: dbUser,
+          pgPassword: dbPass,
+          pgDatabase: dbName,
+          hostPort: dbPort,
+          postgresPort: postgresPort,
+          maxConnections: maxConnections,
+          logStatement: logStatement);
 
   @override
   Future<int> resolveFreePort(int port) => freeport.resolveFreePort(port);
