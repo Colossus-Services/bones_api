@@ -4,6 +4,9 @@
   - Added fields `postgresPort`, `maxConnections` and `logStatement`.
   - constructor: `super.cleanContainer`.
 
+- `APITestConfigDockerMySQL`:
+  - constructor: `super.cleanContainer`.
+
 ## 1.7.29
 
 - reflection_factory: ^2.4.6
