@@ -15,7 +15,10 @@ class PostgresTestConfig extends APITestConfigDockerPostgreSQL {
   @override
   String get runtimeTypeNameSafe => 'PostgresTestConfig';
 
-  PostgresTestConfig({required bool generateTables, required bool checkTables})
+  PostgresTestConfig(
+      {required bool generateTables,
+      required bool checkTables,
+      super.cleanContainer})
       : super({
           'db': {
             'postgres': {

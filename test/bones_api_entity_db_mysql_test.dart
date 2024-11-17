@@ -15,7 +15,10 @@ class MySQLTestConfig extends APITestConfigDockerMySQL {
   @override
   String get runtimeTypeNameSafe => 'MySQLTestConfig';
 
-  MySQLTestConfig({required bool generateTables, required bool checkTables})
+  MySQLTestConfig(
+      {required bool generateTables,
+      required bool checkTables,
+      super.cleanContainer})
       : super(
           {
             'db': {

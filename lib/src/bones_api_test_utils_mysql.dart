@@ -20,7 +20,8 @@ class APITestConfigDockerMySQL
       {DockerHost? dockerHost,
       String? containerNamePrefix,
       this.forceNativePasswordAuthentication = true,
-      this.version = 'latest'})
+      this.version = 'latest',
+      super.cleanContainer})
       : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig,
             containerNamePrefix: containerNamePrefix) {
     DBMySQLAdapter.boot();
