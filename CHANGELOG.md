@@ -10,6 +10,8 @@
 - `APITestConfigDockerMySQL`:
   - constructor: `super.cleanContainer`.
 
+- docker_commander: ^2.1.7
+
 ## 1.7.29
 
 - reflection_factory: ^2.4.6
