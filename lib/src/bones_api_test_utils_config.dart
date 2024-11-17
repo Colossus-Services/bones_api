@@ -415,9 +415,12 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
   /// The container name prefix.
   final String containerNamePrefix;
 
+  /// If `true` will clean the container after stop. (`docker run --rm`)
+  final bool cleanContainer;
+
   APITestConfigDockerDB(
       DockerHost dockerHost, this.dbType, Map<String, dynamic> apiConfig,
-      {String? containerNamePrefix})
+      {String? containerNamePrefix, this.cleanContainer = true})
       : containerNamePrefix =
             containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
         super(dockerHost, apiConfig);
@@ -426,12 +429,13 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
   Future<C> createContainer(DockerCommander dockerCommander) async {
     var dbPort = await this.dbPort;
 
-    _log.info('Initializing $dbType container at port: $dbPort');
+    _log.info(
+        'Initializing $dbType container at port: $dbPort (cleanContainer: $cleanContainer)');
 
     var containerConfig = createDBContainerConfig(dbPort);
 
     var container = await containerConfig.run(dockerCommander,
-        name: '${containerNamePrefix}_$dbPort', cleanContainer: true);
+        name: '${containerNamePrefix}_$dbPort', cleanContainer: cleanContainer);
 
     _log.info('Container initialized: $container');
 
@@ -448,5 +452,5 @@ abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
     with APITestConfigDBSQLMixin
     implements APITestConfigDBSQL, WithRuntimeTypeNameSafe {
   APITestConfigDockerDBSQL(super.dockerHost, super.dbType, super.apiConfig,
-      {super.containerNamePrefix});
+      {super.containerNamePrefix, super.cleanContainer});
 }

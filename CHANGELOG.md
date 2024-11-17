@@ -1,5 +1,8 @@
 ## 1.7.30
 
+- `APITestConfigDockerDB`:
+  - Added field `cleanContainer`.
+
 - `APITestConfigDockerPostgreSQL`:
   - Added fields `postgresPort`, `maxConnections` and `logStatement`.
   - constructor: `super.cleanContainer`.
