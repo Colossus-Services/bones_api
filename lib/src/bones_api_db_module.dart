@@ -7,6 +7,7 @@ import 'package:logging/logging.dart' as logging;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_reference.dart';
@@ -14,7 +15,6 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_html_document.dart';
 import 'bones_api_module.dart';
-import 'bones_api_authentication.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIDBModule');
@@ -484,8 +484,12 @@ class APIDBModule extends APIModule {
 
     var content = [];
 
-    var parameters = apiRequest.parameters;
+    _addScriptFixDateTime(content);
+
+    var parameters = Map<String, dynamic>.from(apiRequest.parameters);
     if (parameters.isNotEmpty) {
+      _fixParametersDateTime(parameters);
+
       var entity2 = await entityHandler.createFromMap(parameters,
           entityProvider: entityRepository.provider,
           resolutionRules: EntityResolutionRules(allowEntityFetch: true));
@@ -527,6 +531,8 @@ class APIDBModule extends APIModule {
     }
 
     content.add('<form method="post">');
+    content.add(
+        '<input id="LOCAL_TIMEZONE" type="hidden" name="__LOCAL_TIMEZONE__">');
 
     _writeInputTable(entityRepository, content, entity);
 
@@ -535,11 +541,98 @@ class APIDBModule extends APIModule {
 
     content.add('</form>');
 
+    content.add(
+        "<script type='application/javascript'> setLocalTimeZone() ; fixAllInputsDateTimeToLocal() ;</script>");
+
     htmlDoc.content = content;
 
     var html = htmlDoc.build();
 
     return APIResponse.ok(html, mimeType: 'html');
+  }
+
+  void _fixParametersDateTime(Map<String, dynamic> parameters) {
+    var localTimeZoneStr = parameters.remove('__LOCAL_TIMEZONE__');
+
+    if (localTimeZoneStr != null) {
+      var localTimeZoneMin = TypeParser.parseInt(localTimeZoneStr);
+
+      if (localTimeZoneMin != null && localTimeZoneMin != 0) {
+        for (var e in parameters.entries) {
+          var key = e.key;
+          var value = e.value;
+
+          if (value is String &&
+              RegExp(r'^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?Z?$')
+                  .hasMatch(value)) {
+            var d = TypeParser.parseDateTime(value);
+            if (d != null) {
+              var d2 = DateTime.utc(
+                  d.year, d.month, d.day, d.hour, d.minute, d.second);
+              var d3 = d2.add(Duration(minutes: localTimeZoneMin));
+              parameters[key] = d3;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void _addScriptFixDateTime(List<dynamic> content) {
+    content.add(r'''
+<script type="application/javascript">
+  function toLocalISOString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const s = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds;
+    return s;
+  }
+
+  function fixInputDateTimeToLocal(input) {
+    let dStr = input.value;
+    if (dStr.length < 16) {
+      return ;
+    }
+    
+    const d = new Date(dStr);
+    console.log(d);
+    
+    const dLocal = new Date(Date.UTC(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds()
+    ));
+    
+    console.log(dLocal);
+    
+    const dLocalStr = toLocalISOString(dLocal);
+    input.value = dLocalStr;
+    console.log("-- Fixed DataTime: "+ dStr + " -> "+ dLocalStr); 
+  }
+  
+  function fixAllInputsDateTimeToLocal() {
+    const inputs = document.querySelectorAll('input[type="datetime-local"]');
+
+    inputs.forEach(input => {
+      fixInputDateTimeToLocal(input);
+    });
+  }
+  
+  function setLocalTimeZone() {
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const inputLocalTimeZone = document.querySelector('#LOCAL_TIMEZONE');
+    inputLocalTimeZone.value = offsetMinutes;
+    console.log("-- LOCAL_TIMEZONE: "+ offsetMinutes +" min");
+  }
+</script>
+''');
   }
 
   void _writeEntityJson(EntityHandler entityHandler, Type entityType,
