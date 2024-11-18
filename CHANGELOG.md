@@ -1,3 +1,14 @@
+## 1.7.31
+
+- `HTMLInput._resolveInput`: ensure that `DataTime` values are UTC.
+
+- `APIDBModule`:
+  - Added `_addScriptFixDateTime` and `_fixParametersDateTime` (used by `insert`).
+  - `_writeInputTable`: id with link to the `select` route.
+  - `select`:
+    - Show entry index.
+    - JSON url with query parameters.
+
 ## 1.7.30
 
 - `APITestConfigDockerDB`:
