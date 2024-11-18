@@ -329,6 +329,9 @@ class HTMLInput {
       var d = TypeParser.parseDateTime(value);
       String? dStr;
       if (d != null) {
+        if (!d.isUtc) {
+          d = d.toUtc();
+        }
         dStr = d.toIso8601String();
         var idx = dStr.lastIndexOf(':');
         assert(idx > 4);
