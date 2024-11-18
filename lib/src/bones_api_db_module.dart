@@ -347,6 +347,7 @@ class APIDBModule extends APIModule {
     content.add('<table class="center">');
 
     content.add('<thead><tr>');
+    content.add('<td style="text-align: left">#</td>');
     for (var e in fieldsEntries) {
       content.add('<td style="text-align: center">${e.key}</td>');
     }
@@ -354,8 +355,10 @@ class APIDBModule extends APIModule {
         '<td style="text-align: center; min-width: 100px;">[operations]</td>');
     content.add('</tr></thead>');
 
+    var i = 0;
     for (var o in list) {
       content.add('<tr>');
+      content.add('<td>$i</td>');
 
       for (var e in fieldsEntries) {
         var fieldName = e.key;
@@ -402,15 +405,16 @@ class APIDBModule extends APIModule {
       }
 
       content.add('</tr>');
+      ++i;
     }
 
     content.add(
-        '<tr><td colspan="${fieldsEntries.length + 1}" style="text-align: right"><a href="${basePath}insert/$repoName">&nbsp;+&nbsp;</a></td></tr>');
+        '<tr><td colspan="${fieldsEntries.length + 2}" style="text-align: right"><a href="${basePath}insert/$repoName">&nbsp;+&nbsp;</a></td></tr>');
 
     content.add('</table>');
 
     content.add(
-        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json">JSON</a></i></div>');
+        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json${query.isNotEmpty ? '?$query' : ''}">JSON</a></i></div>');
 
     htmlDoc.content = content;
 
@@ -656,9 +660,14 @@ class APIDBModule extends APIModule {
     content.add(
         '<tr><td colspan="3"><h2>${entityRepository.type}:</h2></td></tr>');
 
+    var repoName = entityRepository.name;
+    var idFieldName = entityHandler.idFieldName(entity);
+
     for (var e in fieldsEntries) {
       var name = e.key;
       var type = e.value;
+
+      var isID = name == idFieldName;
 
       Object? value;
       if (entity != null) {
@@ -666,7 +675,13 @@ class APIDBModule extends APIModule {
       }
 
       content.add('<tr><td style="text-align: right; vertical-align: top;">');
-      content.add('$name: &nbsp;\n');
+
+      if (isID && value != null) {
+        var href = '${basePath}select/$repoName?id==$value';
+        content.add('<a href="$href">$name</a>: &nbsp;\n');
+      } else {
+        content.add('$name: &nbsp;\n');
+      }
 
       content.add('</td><td>');
 
