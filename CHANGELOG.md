@@ -1,3 +1,7 @@
+## 1.7.32
+
+- reflection_factory: ^2.4.7
+
 ## 1.7.31
 
 - `HTMLInput._resolveInput`: ensure that `DataTime` values are UTC.
