@@ -2066,42 +2066,46 @@ final class APIServerWorker extends _APIServerBase {
 
     final certificatesHandler = CertificatesHandlerIO(letsEncryptDirectory);
 
-    final LetsEncrypt letsEncrypt = LetsEncrypt(certificatesHandler,
-        production: letsEncryptProduction, log: _letsEncryptLogger);
+    final LetsEncrypt letsEncrypt = LetsEncrypt(
+      port: port,
+      securePort: securePort,
+      bindingAddress: address,
+      certificatesHandler,
+      production: letsEncryptProduction,
+      log: _letsEncryptLogger,
+    );
 
     var pipeline = const Pipeline().addMiddleware(_redirectToHttpsMiddleware);
 
     var handler = pipeline.addHandler(_process);
 
-    final domains = this.domains;
+    final configDomains = this.domains;
+    var configDomainsEmails = configDomains.map((d) => 'contact@$d').toList();
 
-    var domain = domains.first;
-    var domainEmail = 'contact@$domain';
+    var domains =
+        Domain.fromDomainsNamesAndEmails(configDomains, configDomainsEmails);
 
-    _log.info("Let's Encrypt domain: $domain");
+    _log.info("Let's Encrypt domains: $configDomains");
 
     if (!allowRequestLetsEncryptCertificate) {
       _log.warning("NOT allowed to request Let's Encrypt certificates!");
     }
 
-    var servers = await letsEncrypt.startSecureServer(
+    var servers = await letsEncrypt.startServer(
       handler,
-      {domain: domainEmail},
-      port: port,
-      securePort: securePort,
-      bindingAddress: address,
+      domains,
       requestCertificate: allowRequestLetsEncryptCertificate,
       shared: hasMultipleWorkers,
     );
 
-    var server = servers[0]; // HTTP Server.
-    var secureServer = servers[1]; // HTTPS Server.
+    var httpServer = servers.http;
+    var httpSecureServer = servers.https;
 
-    _httpServer = server;
-    _httpSecureServer = secureServer;
+    _httpServer = httpServer;
+    _httpSecureServer = httpSecureServer;
 
-    _configureServer(server);
-    _configureServer(secureServer);
+    _configureServer(httpServer);
+    _configureServer(httpSecureServer);
   }
 
   Handler _redirectToHttpsMiddleware(Handler innerHandler) {
