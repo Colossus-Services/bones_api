@@ -1,3 +1,10 @@
+## 1.8.0-beta.2
+
+- `letsEncrypt.startServer`:
+  - Pass `checkCertificate: letsEncryptProduction,`
+
+- shelf_letsencrypt: ^2.0.0-beta.4
+
 ## 1.8.0-beta.1
 
 - `APIServerWorker`:

@@ -2095,6 +2095,7 @@ final class APIServerWorker extends _APIServerBase {
       handler,
       domains,
       requestCertificate: allowRequestLetsEncryptCertificate,
+      checkCertificate: letsEncryptProduction,
       shared: hasMultipleWorkers,
     );
 
