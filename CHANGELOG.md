@@ -1,3 +1,7 @@
+## 1.8.0-beta.3
+
+- shelf_letsencrypt: ^2.0.0-beta.5
+
 ## 1.8.0-beta.2
 
 - `letsEncrypt.startServer`:
