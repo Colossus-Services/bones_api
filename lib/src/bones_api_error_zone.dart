@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:async_extension/async_extension.dart' as async_extension;
 
@@ -153,18 +154,39 @@ class ZoneField<T extends Object> {
   /// See [set].
   T? remove({Zone? contextZone}) => set(null, contextZone: contextZone);
 
-  final List<Zone> _zones = <Zone>[];
+  final Queue<Zone> _zones = Queue<Zone>();
 
   /// Creates a new [contextZone] to store values.
   Zone createContextZone() {
     var zone = parentZone.fork(specification: ZoneSpecification());
-    _zones.add(zone);
+    _zones.addLast(zone);
+    return zone;
+  }
+
+  /// Same as [createContextZone] handling Uncaught Errors.
+  /// See [ZoneSpecification.handleUncaughtError].
+  Zone createSafeContextZone(
+      void Function(Object error, StackTrace stackTrace) handleUncaughtError) {
+    var zoneSpecification = ZoneSpecification(
+        handleUncaughtError: (self, parent, zone, error, stack) =>
+            handleUncaughtError(error, stack));
+    var zone = parentZone.fork(specification: zoneSpecification);
+    _zones.addLast(zone);
     return zone;
   }
 
   /// Disposes the [contextZone] and any related value.
   void disposeContextZone(Zone contextZone) {
-    _zones.remove(contextZone);
+    if (_zones.isNotEmpty) {
+      if (identical(_zones.last, contextZone)) {
+        var rmObj = _zones.removeLast();
+        assert(identical(rmObj, contextZone));
+      } else {
+        var rm = _zones.remove(contextZone);
+        assert(rm);
+      }
+    }
+
     _values[contextZone] = null;
   }
 
