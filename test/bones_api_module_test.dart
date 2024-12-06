@@ -1,5 +1,7 @@
 @TestOn('vm')
+import 'package:async_extension/async_extension.dart';
 import 'package:bones_api/bones_api_server.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -38,6 +40,7 @@ void main() {
       const aboutRoutes = ['about'];
 
       const userRoutes = [
+        'asyncError',
         'echoListUser',
         'echoListUser2',
         'echoUser',
@@ -280,6 +283,33 @@ void main() {
               'entityFields': ['email']
             }
           }));
+
+      var logAPIRoot = logging.Logger('APIRoot');
+
+      var severeLog = Completer<logging.LogRecord>();
+
+      logAPIRoot.onRecord.listen((logRecord) {
+        if (logRecord.level == logging.Level.SEVERE) {
+          severeLog.completeSafe(logRecord);
+        }
+      });
+
+      var messageDate = 'Date: ${DateTime.now()}';
+
+      expect(
+          (await apiRoot.call(APIRequest.post(
+            '/user/asyncError',
+            payload: messageDate,
+          )))
+              .payloadAs<String>(),
+          equals('Message: $messageDate'));
+
+      expect(
+          (await severeLog.future).message,
+          allOf(
+            contains('Asynchronous error while calling:'),
+            contains('APIRequest#15{ method: POST, path: /user/asyncError'),
+          ));
 
       apiRoot.close();
     });

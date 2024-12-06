@@ -1224,6 +1224,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'acceptsRequest',
     'addRoute',
     'apiInfo',
+    'asyncError',
     'call',
     'checkInitialized',
     'configure',
@@ -1522,6 +1523,19 @@ class UserModule$reflection extends ClassReflection<UserModule>
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
+            null,
+            null,
+            null);
+      case 'asyncerror':
+        return MethodReflection<UserModule, APIResponse<String>>(
+            this,
+            UserModule,
+            'asyncError',
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+            false,
+            (o) => o!.asyncError,
+            obj,
+            const <__PR>[__PR(__TR.tString, 'message', false, true)],
             null,
             null,
             null);

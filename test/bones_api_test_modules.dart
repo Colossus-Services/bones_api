@@ -70,8 +70,8 @@ class UserModule extends APIModule {
       User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
 
   Future<APIResponse<Map>> getContextEntityResolutionRules() async {
-    var cotextProvider = EntityRulesResolver.cotextProviders.first;
-    var resolutionRules = cotextProvider.getContextEntityResolutionRules();
+    var contextProvider = EntityRulesResolver.cotextProviders.first;
+    var resolutionRules = contextProvider.getContextEntityResolutionRules();
     return APIResponse.ok(
         {'context.resolutionRules': resolutionRules?.toJson()});
   }
@@ -88,5 +88,15 @@ class UserModule extends APIModule {
     var routeHandler = request.routeHandler;
     var accessRules = routeHandler?.entityAccessRules;
     return APIResponse.ok({'accessRules': accessRules?.toJson()});
+  }
+
+  Future<APIResponse<String>> asyncError(String message) async {
+    Future.delayed(Duration(milliseconds: 1), () {
+      throw StateError("Async Error!");
+    });
+
+    await Future.delayed(Duration(seconds: 1));
+
+    return APIResponse.ok('Message: $message');
   }
 }
