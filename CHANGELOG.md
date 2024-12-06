@@ -1,3 +1,15 @@
+##  1.8.0-beta.6
+
+- `ZoneField`:
+  - `_zones`: optimize using `Queue`.
+  - Added `createSafeContextZone` (handles Uncaught Errors).
+
+- `APIRoot`
+  - `_callZoned`: use `currentAPIRequest.createSafeContextZone` and avoid Uncaught Errors that can quit a server.
+
+- test: ^1.25.12
+- coverage: ^1.11.1
+
 ## 1.8.0-beta.5
 
 - shelf_letsencrypt: ^2.0.0-beta.7
