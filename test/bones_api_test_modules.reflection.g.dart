@@ -1527,11 +1527,13 @@ class UserModule$reflection extends ClassReflection<UserModule>
             null,
             null);
       case 'asyncerror':
-        return MethodReflection<UserModule, APIResponse<String>>(
+        return MethodReflection<UserModule, Future<APIResponse<String>>>(
             this,
             UserModule,
             'asyncError',
-            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+            __TR<Future<APIResponse<String>>>(Future, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
+            ]),
             false,
             (o) => o!.asyncError,
             obj,
