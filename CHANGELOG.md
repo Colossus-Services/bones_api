@@ -1,4 +1,4 @@
-##  1.8.0-beta.6
+## 1.8.0
 
 - `ZoneField`:
   - `_zones`: optimize using `Queue`.
@@ -7,43 +7,22 @@
 - `APIRoot`
   - `_callZoned`: use `currentAPIRequest.createSafeContextZone` and avoid Uncaught Errors that can quit a server.
 
-- test: ^1.25.12
-- coverage: ^1.11.1
-
-## 1.8.0-beta.5
-
-- shelf_letsencrypt: ^2.0.0-beta.7
-
-## 1.8.0-beta.4
-
-- shelf_letsencrypt: ^2.0.0-beta.6
-
-## 1.8.0-beta.3
-
-- shelf_letsencrypt: ^2.0.0-beta.5
-
-## 1.8.0-beta.2
-
-- `letsEncrypt.startServer`:
-  - Pass `checkCertificate: letsEncryptProduction,`
-
-- shelf_letsencrypt: ^2.0.0-beta.4
-
-## 1.8.0-beta.1
-
 - `APIServerWorker`:
   - `_startLetsEncrypt`: allow multiple domains.
+  - `letsEncrypt.startServer`:
+    - Pass `checkCertificate: letsEncryptProduction,`
 
 - sdk: '>=3.5.0 <4.0.0'
 
-- shelf_letsencrypt: ^2.0.0-beta.2
-- dependency_validator: ^4.1.1
+- shelf_letsencrypt: ^2.0.0
 - map_history: ^1.0.4
 - gcloud: ^0.8.18
 
+- lints: ^4.0.0
+- dependency_validator: ^4.1.2
+- test: ^1.25.12
+- coverage: ^1.11.1
 - build_runner: ^2.4.13
-- test: ^1.25.9
-- dependency_validator: ^4.1.1
 
 ## 1.7.32
 
