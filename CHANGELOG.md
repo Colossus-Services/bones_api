@@ -1,3 +1,8 @@
+## 1.8.1
+
+- map_history: ^1.0.6
+- shelf_letsencrypt: ^2.0.1
+
 ## 1.8.0
 
 - `ZoneField`:
