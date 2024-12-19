@@ -390,6 +390,81 @@ class Time implements Comparable<Time> {
   operator >(Time other) => totalMicrosecond > other.totalMicrosecond;
 
   operator >=(Time other) => totalMicrosecond >= other.totalMicrosecond;
+
+  /// Adds a [Duration], [Time], or [int] (ms) to the current instance,
+  /// returning a new [Time] instance.
+  ///
+  /// The behavior of the operator depends on the type of [other]:
+  /// - If [other] is `null`, the current instance is returned.
+  /// - If [other] is an `int`, it is interpreted as milliseconds and is added to the current instance.
+  /// - If [other] is a [Time] or [Duration] instance, its added to the current instance.
+  ///
+  /// Throws:
+  /// - A [StateError] if [other] is not `null`, `Time`, `int`, or `Duration`.
+  operator +(Object? other) {
+    if (other == null) return this;
+
+    if (other is Time) {
+      other = other.asDuration;
+    } else if (other is int) {
+      other = Duration(milliseconds: other);
+    }
+
+    if (other is Duration) {
+      if (other.inMicroseconds == 0) return this;
+      var t = asDuration + other;
+      return t.toTime();
+    }
+
+    throw StateError("Can't handle type: $other");
+  }
+
+  /// Subtracts a [Duration], [Time], or [int] (ms) from the current instance,
+  /// returning a new [Time] instance.
+  ///
+  /// The behavior of the operator depends on the type of [other]:
+  /// - If [other] is `null`, the current instance is returned.
+  /// - If [other] is an `int`, it is interpreted as milliseconds and is subtracted from the current instance.
+  /// - If [other] is a [Time] or [Duration] instance, it is subtracted from the current instance.
+  ///
+  /// Throws:
+  /// - A [StateError] if [other] is not `null`, `Time`, `int`, or `Duration`.
+  operator -(Object? other) {
+    if (other == null) return this;
+
+    if (other is Time) {
+      other = other.asDuration;
+    } else if (other is int) {
+      other = Duration(milliseconds: other);
+    }
+
+    if (other is Duration) {
+      if (other.inMicroseconds == 0) return this;
+      var t = asDuration - other;
+      return t.toTime();
+    }
+
+    throw StateError("Can't handle type: $other");
+  }
+}
+
+extension DurationToTimeExtension on Duration {
+  /// Converts the current [Duration] instance to a [Time] object.
+  Time toTime() {
+    var hour = inHours % 24;
+    var minute = inMinutes % 60;
+    var second = inSeconds % 60;
+    var millisecond = inMilliseconds % 1000;
+    var microsecond = inMicroseconds % 1000;
+
+    if (hour < 0) hour = 24 - hour;
+    if (minute < 0) minute = 60 - minute;
+    if (second < 0) second = 60 - second;
+    if (millisecond < 0) millisecond = 1000 - millisecond;
+    if (microsecond < 0) microsecond = 1000 - microsecond;
+
+    return Time(hour, minute, second, millisecond, microsecond);
+  }
 }
 
 extension DateTimeToTimeExtension on DateTime {
