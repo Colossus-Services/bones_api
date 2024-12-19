@@ -1,5 +1,9 @@
 ## 1.8.2
 
+✨♻️ Add `Time` operators for addition `+` and subtraction `-`.
+
+- New `DurationToTimeExtension`: `Duration`.`toTime()`
+
 - async_extension: ^1.2.13
 - reflection_factory: ^2.4.8
 
