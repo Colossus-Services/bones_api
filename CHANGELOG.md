@@ -1,3 +1,11 @@
+## 1.8.2
+
+- async_extension: ^1.2.13
+- reflection_factory: ^2.4.8
+
+- build_runner: ^2.4.14
+- test: ^1.25.13
+
 ## 1.8.1
 
 - map_history: ^1.0.6
