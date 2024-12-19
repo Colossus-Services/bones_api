@@ -451,17 +451,18 @@ class Time implements Comparable<Time> {
 extension DurationToTimeExtension on Duration {
   /// Converts the current [Duration] instance to a [Time] object.
   Time toTime() {
-    var hour = inHours % 24;
-    var minute = inMinutes % 60;
-    var second = inSeconds % 60;
-    var millisecond = inMilliseconds % 1000;
-    var microsecond = inMicroseconds % 1000;
+    var d = this;
+    if (d.isNegative) {
+      const oneDayMic = 24 * 60 * 60 * 1000 * 1000;
+      var positiveMic = oneDayMic - ((-d.inMicroseconds) % oneDayMic);
+      d = Duration(microseconds: positiveMic);
+    }
 
-    if (hour < 0) hour = 24 - hour;
-    if (minute < 0) minute = 60 - minute;
-    if (second < 0) second = 60 - second;
-    if (millisecond < 0) millisecond = 1000 - millisecond;
-    if (microsecond < 0) microsecond = 1000 - microsecond;
+    var hour = d.inHours % 24;
+    var minute = d.inMinutes % 60;
+    var second = d.inSeconds % 60;
+    var millisecond = d.inMilliseconds % 1000;
+    var microsecond = d.inMicroseconds % 1000;
 
     return Time(hour, minute, second, millisecond, microsecond);
   }
