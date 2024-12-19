@@ -78,8 +78,10 @@ void main() {
         expect(v, equals(1234));
       }
     });
+  });
 
-    test('Time', () async {
+  group('Time', () {
+    test('basic', () async {
       _testTime(Time(1, 2, 3), '01:02:03');
 
       _testTime(Time(20, 11, 31), '20:11:31');
@@ -152,6 +154,28 @@ void main() {
                   microseconds: 456)
               .inMicroseconds));
 
+      expect(Time(8, 10) + Time(0, 10), equals(Time(8, 20)));
+      expect(Time(8, 50) + Time(0, 20), equals(Time(9, 10)));
+      expect(Time(23, 50) + Time(0, 20), equals(Time(0, 10)));
+
+      expect(Time(8, 10) - Time(0, 10), equals(Time(8, 0)));
+      expect(Time(8, 10) - Time(0, 20), equals(Time(7, 50)));
+      expect(Time(0, 10) - Time(0, 20), equals(Time(23, 50)));
+
+      expect(Time(8, 10) + Duration(hours: 0, minutes: 10, seconds: 40),
+          equals(Time(8, 20, 40)));
+      expect(Time(8, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
+          equals(Time(10, 10, 40)));
+      expect(Time(23, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
+          equals(Time(1, 10, 40)));
+
+      expect(Time(8, 10) - Duration(hours: 0, minutes: 10, seconds: 40),
+          equals(Time(7, 59, 20)));
+      expect(Time(8, 50) - Duration(hours: 1, minutes: 20, seconds: 40),
+          equals(Time(7, 29, 20)));
+      expect(Time(0, 10) - Duration(hours: 1, minutes: 20, seconds: 40),
+          equals(Time(22, 49, 20)));
+
       _testTimeLessThan(Time(20, 11, 31), Time(21, 11, 31), false);
       _testTimeLessThan(Time(21, 10, 31), Time(21, 11, 31), false);
       _testTimeLessThan(Time(21, 11, 30), Time(21, 11, 31), false);
@@ -182,7 +206,7 @@ void main() {
           equals(Time(18, 26, 00, 467, 968)));
     });
 
-    test('Time (all combinations 32-bits)', () async {
+    test('(all combinations 32-bits)', () async {
       for (var h = 0; h <= 23; ++h) {
         for (var m = 0; m <= 59; ++m) {
           for (var s = 0; s <= 59; ++s) {
@@ -195,7 +219,7 @@ void main() {
       }
     });
 
-    test('Time (all combinations 64-bits)', () async {
+    test('(all combinations 64-bits)', () async {
       for (var h = 0; h <= 23; ++h) {
         for (var m = 0; m <= 59; ++m) {
           for (var s = 0; s <= 59; ++s) {
