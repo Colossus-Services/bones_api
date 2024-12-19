@@ -2497,9 +2497,6 @@ final class APIServerWorker extends _APIServerBase {
 
           return Response.internalServerError(body: retError, headers: headers);
         }
-      default:
-        return Response.notFound('NOT FOUND[${request.method}]: ${request.url}',
-            headers: headers);
     }
   }
 

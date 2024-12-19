@@ -1144,8 +1144,6 @@ extension APIRequestMethodExtension on APIRequestMethod {
         return 'OPTIONS';
       case APIRequestMethod.HEAD:
         return 'HEAD';
-      default:
-        throw ArgumentError('Unknown method: $this');
     }
   }
 }
@@ -1240,8 +1238,6 @@ extension APIRequesterSourceExtension on APIRequesterSource {
         return 'remote';
       case APIRequesterSource.unknown:
         return 'unknown';
-      default:
-        throw ArgumentError('Unknown: $this');
     }
   }
 }

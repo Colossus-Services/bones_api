@@ -2480,7 +2480,9 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       }
     } else if (otherEntities is T) {
       if (isEntitiesSet &&
-          _listIdenticalEquality.equals(entities, [otherEntities])) return true;
+          _listIdenticalEquality.equals(entities, [otherEntities])) {
+        return true;
+      }
 
       var entityHandler = this.entityHandler;
 
@@ -2492,7 +2494,9 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       return null;
     } else if (otherEntities is List<T?>) {
       if (isEntitiesSet &&
-          _listIdenticalEquality.equals(entities, otherEntities)) return true;
+          _listIdenticalEquality.equals(entities, otherEntities)) {
+        return true;
+      }
 
       var entityHandler = this.entityHandler;
 

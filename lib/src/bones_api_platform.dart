@@ -40,8 +40,6 @@ extension APIPlatformTypeExtension on APIPlatformType {
         return 'macos';
       case APIPlatformType.windows:
         return 'windows';
-      default:
-        throw StateError('Unknown: $this');
     }
   }
 }

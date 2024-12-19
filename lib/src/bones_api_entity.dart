@@ -255,7 +255,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         type == Decimal ||
         type == DynamicInt ||
         type == DynamicNumber ||
-        type == Uint8List) return true;
+        type == Uint8List) {
+      return true;
+    }
 
     return false;
   }
@@ -1563,7 +1565,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var fieldsNames = this.fieldsNames(o);
     for (var f in fieldsNames) {
       if (!_isValidFieldValueImpl<dynamic>(
-          o, f, null, false, validatedEntities)) return false;
+          o, f, null, false, validatedEntities)) {
+        return false;
+      }
     }
     return true;
   }
@@ -3169,7 +3173,9 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         var fieldValues = entityHandler.getField(o, e.key);
         if (fieldValues == null ||
             fieldValues is! Iterable ||
-            fieldValues.nonNulls.isEmpty) continue;
+            fieldValues.nonNulls.isEmpty) {
+          continue;
+        }
 
         EntityRepository<Object>? tEntityRepository;
         EntityHandler<Object>? tEntityHandler;
@@ -4259,7 +4265,9 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
         o is DynamicNumber ||
         o is DateTime ||
         o is Time ||
-        o is Enum) return o;
+        o is Enum) {
+      return o;
+    }
 
     if (o is EntityReferenceBase) {
       return o.copy();

@@ -736,7 +736,9 @@ extension RecordExtension on Record {
       Object?,
       Object?,
       Object?
-    )) return 8;
+    )) {
+      return 8;
+    }
 
     if (o is (
       Object?,
@@ -748,7 +750,9 @@ extension RecordExtension on Record {
       Object?,
       Object?,
       Object?
-    )) return 9;
+    )) {
+      return 9;
+    }
 
     if (o is (
       Object?,
@@ -761,7 +765,9 @@ extension RecordExtension on Record {
       Object?,
       Object?,
       Object?
-    )) return 10;
+    )) {
+      return 10;
+    }
 
     return -1;
   }
