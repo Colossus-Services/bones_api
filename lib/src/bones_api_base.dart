@@ -543,14 +543,17 @@ abstract class APIRoot with Initializable, Closable {
   /// Returns the current [APIRequest] of the current [call].
   final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
 
-  static const _callZonedErrorHeader = '__callZoned__';
-
-  late final _callZoneSpecification = ZoneSpecification(
-      handleUncaughtError: (self, parent, zone, error, stackTrace) {
+  static void _uncaughtAsynchronousError(Zone self, ZoneDelegate parent,
+      Zone zone, Object error, StackTrace stackTrace) {
     var request = zone['APIRequest'];
     _log.severe("Uncaught asynchronous error while calling: $request", error,
         stackTrace);
-  });
+  }
+
+  static final _callZoneSpecification =
+      ZoneSpecification(handleUncaughtError: _uncaughtAsynchronousError);
+
+  static const _callZonedErrorHeader = '__callZoned__';
 
   FutureOr<APIResponse<T>> _callZoned<T>(
       APIRequest request, bool externalCall) {
