@@ -307,7 +307,7 @@ void main() {
       expect(
           (await severeLog.future).message,
           allOf(
-            contains('Asynchronous error while calling:'),
+            contains('Uncaught asynchronous error while calling:'),
             contains('APIRequest#15{ method: POST, path: /user/asyncError'),
           ));
 
