@@ -1,3 +1,21 @@
+## 1.8.3
+
+- `ZoneField`:
+  - `createContextZone`: added parameter `zoneValues`.
+  - `createSafeContextZone`:
+    - Added named parameters `zoneSpecification` and `zoneValues`
+    - Changed `handleUncaughtError` to named parameter.
+
+- `APIRoot`:
+  - `_callZoned`:
+    - Fix closure memory leak.
+      - Optimize and avoid a new closure on parameter `handleUncaughtError` for every `Zone` created
+        through `currentAPIRequest.createSafeContextZone`. Now using a single `ZoneSpecification` instance.
+      - Ensure that `currentAPIRequest.disposeContextZone(callZone)` is always called.
+
+- async_extension: ^1.2.14
+- test: ^1.25.14
+
 ## 1.8.2
 
 ✨♻️ Add `Time` operators for addition `+` and subtraction `-`.
