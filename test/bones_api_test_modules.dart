@@ -90,6 +90,14 @@ class UserModule extends APIModule {
     return APIResponse.ok({'accessRules': accessRules?.toJson()});
   }
 
+  Future<APIResponse<String>> returnAPIResponseError(String message) async {
+    return APIResponse.error(error: 'Return error: $message');
+  }
+
+  Future<APIResponse<String>> throwAPIResponseError(String message) async {
+    throw APIResponse.error(error: 'Throw error: $message');
+  }
+
   Future<APIResponse<String>> asyncError(String message) async {
     Future.delayed(Duration(milliseconds: 1), () {
       throw StateError("Async Error!");

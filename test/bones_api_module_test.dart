@@ -51,7 +51,9 @@ void main() {
         'getRequestEntityAccessRules',
         'getRequestEntityResolutionRules',
         'getUser',
-        'getUserAsync'
+        'getUserAsync',
+        'returnAPIResponseError',
+        'throwAPIResponseError',
       ];
 
       expect(aboutModule.allRoutesNames, equals({...aboutRoutes}));
@@ -298,6 +300,22 @@ void main() {
 
       expect(
           (await apiRoot.call(APIRequest.post(
+            '/user/returnAPIResponseError',
+            payload: messageDate,
+          ))),
+          isA<APIResponse>().having(
+              (r) => r.error, 'error', equals('Return error: $messageDate')));
+
+      expect(
+          (await apiRoot.call(APIRequest.post(
+            '/user/throwAPIResponseError',
+            payload: messageDate,
+          ))),
+          isA<APIResponse>().having(
+              (r) => r.error, 'error', equals('Throw error: $messageDate')));
+
+      expect(
+          (await apiRoot.call(APIRequest.post(
             '/user/asyncError',
             payload: messageDate,
           )))
@@ -308,7 +326,7 @@ void main() {
           (await severeLog.future).message,
           allOf(
             contains('Uncaught asynchronous error while calling:'),
-            contains('APIRequest#15{ method: POST, path: /user/asyncError'),
+            contains('APIRequest#17{ method: POST, path: /user/asyncError'),
           ));
 
       apiRoot.close();

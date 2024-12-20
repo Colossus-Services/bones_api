@@ -1,3 +1,8 @@
+## 1.8.4
+
+- `APIRoot`:
+  - `_callZoned`: allow an `APIResponse` to be thrown as response.
+
 ## 1.8.3
 
 - `ZoneField`:

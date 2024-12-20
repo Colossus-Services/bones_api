@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.8.3';
+  static const String VERSION = '1.8.4';
 
   static bool _boot = false;
 
@@ -553,8 +553,6 @@ abstract class APIRoot with Initializable, Closable {
   static final _callZoneSpecification =
       ZoneSpecification(handleUncaughtError: _uncaughtAsynchronousError);
 
-  static const _callZonedErrorHeader = '__callZoned__';
-
   FutureOr<APIResponse<T>> _callZoned<T>(
       APIRequest request, bool externalCall) {
     var callZone = currentAPIRequest.createSafeContextZone(
@@ -575,27 +573,23 @@ abstract class APIRoot with Initializable, Closable {
         if (response is Future<APIResponse<T>>) {
           return response.then(
             (response) => _callZonedReturn(callZone, request, response),
-            onError: (e, s) {
-              var response = APIResponse<T>.error(
-                error: e,
-                stackTrace: s,
-                headers: {_callZonedErrorHeader: true},
-              );
-              return _callZonedReturn(callZone, request, response);
-            },
+            onError: (e, s) => _callZonedReturn(
+                callZone, request, _resolveErrorAPIResponse(e, s)),
           );
         } else {
           return _callZonedReturn(callZone, request, response);
         }
       } catch (e, s) {
-        var response = APIResponse<T>.error(
-          error: e,
-          stackTrace: s,
-          headers: {_callZonedErrorHeader: true},
-        );
-        return _callZonedReturn(callZone, request, response);
+        return _callZonedReturn(
+            callZone, request, _resolveErrorAPIResponse(e, s));
       }
     });
+  }
+
+  APIResponse<T> _resolveErrorAPIResponse<T>(Object e, StackTrace s) {
+    return e is APIResponse
+        ? e.cast<T>()
+        : APIResponse<T>.error(error: e, stackTrace: s);
   }
 
   FutureOr<APIResponse<T>> _callZonedReturn<T>(
@@ -603,15 +597,6 @@ abstract class APIRoot with Initializable, Closable {
     currentAPIRequest.disposeContextZone(callZone);
 
     response._apiRequest = request;
-
-    if (response.isError && response.headers[_callZonedErrorHeader] == true) {
-      var stackTrace = response.stackTrace;
-      if (stackTrace != null) {
-        Error.throwWithStackTrace(response.error, stackTrace);
-      } else {
-        throw response.error;
-      }
-    }
 
     return response;
   }

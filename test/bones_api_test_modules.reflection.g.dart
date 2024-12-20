@@ -1251,7 +1251,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'initializeDependencies',
     'notARoute',
     'notARouteAsync',
-    'resolveRoute'
+    'resolveRoute',
+    'returnAPIResponseError',
+    'throwAPIResponseError'
   ];
 
   @override
@@ -1523,6 +1525,36 @@ class UserModule$reflection extends ClassReflection<UserModule>
             const <__PR>[
               __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
             ],
+            null,
+            null,
+            null);
+      case 'returnapiresponseerror':
+        return MethodReflection<UserModule, Future<APIResponse<String>>>(
+            this,
+            UserModule,
+            'returnAPIResponseError',
+            __TR<Future<APIResponse<String>>>(Future, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
+            ]),
+            false,
+            (o) => o!.returnAPIResponseError,
+            obj,
+            const <__PR>[__PR(__TR.tString, 'message', false, true)],
+            null,
+            null,
+            null);
+      case 'throwapiresponseerror':
+        return MethodReflection<UserModule, Future<APIResponse<String>>>(
+            this,
+            UserModule,
+            'throwAPIResponseError',
+            __TR<Future<APIResponse<String>>>(Future, <__TR>[
+              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
+            ]),
+            false,
+            (o) => o!.throwAPIResponseError,
+            obj,
+            const <__PR>[__PR(__TR.tString, 'message', false, true)],
             null,
             null,
             null);
