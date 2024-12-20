@@ -157,8 +157,10 @@ class ZoneField<T extends Object> {
   final Queue<Zone> _zones = Queue<Zone>();
 
   /// Creates a new [contextZone] to store values.
-  Zone createContextZone() {
-    var zone = parentZone.fork(specification: ZoneSpecification());
+  Zone createContextZone({Map<Object?, Object?>? zoneValues}) {
+    var zone = parentZone.fork(
+        specification: ZoneSpecification(), zoneValues: zoneValues);
+
     _zones.addLast(zone);
     return zone;
   }
@@ -166,11 +168,24 @@ class ZoneField<T extends Object> {
   /// Same as [createContextZone] handling Uncaught Errors.
   /// See [ZoneSpecification.handleUncaughtError].
   Zone createSafeContextZone(
-      void Function(Object error, StackTrace stackTrace) handleUncaughtError) {
-    var zoneSpecification = ZoneSpecification(
-        handleUncaughtError: (self, parent, zone, error, stack) =>
-            handleUncaughtError(error, stack));
-    var zone = parentZone.fork(specification: zoneSpecification);
+      {ZoneSpecification? zoneSpecification,
+      Map<Object?, Object?>? zoneValues,
+      void Function(Object error, StackTrace stackTrace)?
+          handleUncaughtError}) {
+    if (zoneSpecification == null) {
+      if (handleUncaughtError == null) {
+        throw ArgumentError(
+            "One of the parameters, `zoneSpecification` or `handleUncaughtError`, must be provided!");
+      }
+
+      zoneSpecification = ZoneSpecification(
+          handleUncaughtError: (self, parent, zone, error, stack) =>
+              handleUncaughtError(error, stack));
+    }
+
+    var zone = parentZone.fork(
+        specification: zoneSpecification, zoneValues: zoneValues);
+
     _zones.addLast(zone);
     return zone;
   }
