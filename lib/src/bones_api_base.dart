@@ -545,12 +545,19 @@ abstract class APIRoot with Initializable, Closable {
 
   static const _callZonedErrorHeader = '__callZoned__';
 
+  late final _callZoneSpecification = ZoneSpecification(
+      handleUncaughtError: (self, parent, zone, error, stackTrace) {
+    var request = zone['APIRequest'];
+    _log.severe("Uncaught asynchronous error while calling: $request", error,
+        stackTrace);
+  });
+
   FutureOr<APIResponse<T>> _callZoned<T>(
       APIRequest request, bool externalCall) {
-    var callZone = currentAPIRequest.createSafeContextZone((error, stackTrace) {
-      _log.severe(
-          "Asynchronous error while calling: $request", error, stackTrace);
-    });
+    var callZone = currentAPIRequest.createSafeContextZone(
+      zoneSpecification: _callZoneSpecification,
+      zoneValues: {'APIRequest': request},
+    );
 
     return callZone.run<FutureOr<APIResponse<T>>>(() {
       currentAPIRequest.set(request, contextZone: callZone);
@@ -563,34 +570,47 @@ abstract class APIRoot with Initializable, Closable {
         // to be rethrown by the previous `Zone`.
 
         if (response is Future<APIResponse<T>>) {
-          return response.then((r) => r, onError: (e, s) {
-            return APIResponse.error(
+          return response.then(
+            (response) => _callZonedReturn(callZone, request, response),
+            onError: (e, s) {
+              var response = APIResponse<T>.error(
                 error: e,
                 stackTrace: s,
-                headers: {_callZonedErrorHeader: true});
-          });
+                headers: {_callZonedErrorHeader: true},
+              );
+              return _callZonedReturn(callZone, request, response);
+            },
+          );
         } else {
-          return response;
+          return _callZonedReturn(callZone, request, response);
         }
       } catch (e, s) {
-        return APIResponse.error(
-            error: e, stackTrace: s, headers: {_callZonedErrorHeader: true});
+        var response = APIResponse<T>.error(
+          error: e,
+          stackTrace: s,
+          headers: {_callZonedErrorHeader: true},
+        );
+        return _callZonedReturn(callZone, request, response);
       }
-    }).resolveMapped((response) {
-      currentAPIRequest.remove(contextZone: callZone);
-      response._apiRequest = request;
-
-      if (response.isError && response.headers[_callZonedErrorHeader] == true) {
-        var stackTrace = response.stackTrace;
-        if (stackTrace != null) {
-          Error.throwWithStackTrace(response.error, stackTrace);
-        } else {
-          throw response.error;
-        }
-      }
-
-      return response;
     });
+  }
+
+  FutureOr<APIResponse<T>> _callZonedReturn<T>(
+      Zone callZone, APIRequest request, APIResponse<T> response) {
+    currentAPIRequest.disposeContextZone(callZone);
+
+    response._apiRequest = request;
+
+    if (response.isError && response.headers[_callZonedErrorHeader] == true) {
+      var stackTrace = response.stackTrace;
+      if (stackTrace != null) {
+        Error.throwWithStackTrace(response.error, stackTrace);
+      } else {
+        throw response.error;
+      }
+    }
+
+    return response;
   }
 
   FutureOr<APIResponse<T>> _preCall<T>(APIRequest request, bool externalCall) {
