@@ -35,6 +35,65 @@ void main() {
       expect(api.getModule('base')!.defaultRouteName, equals('404'));
     });
 
+    test('basic', () async {
+      {
+        var resp = APIResponse<List>.unauthorized(error: "Not allowed")
+            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+
+        expect(resp, isA<APIResponse<List>>());
+        expect(resp.error, equals("Not allowed"));
+        expect(resp.requiresAuthentication, isTrue);
+        expect(resp.authenticationType, equals('Basic'));
+        expect(resp.authenticationRealm, equals('Foo'));
+
+        var resp2 = resp.cast<Map>();
+
+        expect(resp2, isA<APIResponse<Map>>());
+        expect(resp2.error, equals("Not allowed"));
+        expect(resp2.requiresAuthentication, isTrue);
+        expect(resp2.authenticationType, equals('Basic'));
+        expect(resp2.authenticationRealm, equals('Foo'));
+
+        var resp3 = resp.cast<Map>(error: "Wow!");
+
+        expect(resp3, isA<APIResponse<Map>>());
+        expect(resp3.error, equals("Wow!"));
+        expect(resp3.requiresAuthentication, isTrue);
+        expect(resp3.authenticationType, equals('Basic'));
+        expect(resp3.authenticationRealm, equals('Foo'));
+      }
+
+      {
+        var resp = APIResponse<List>.unauthorized(payloadDynamic: "Not allowed")
+            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+
+        expect(resp, isA<APIResponse<List>>());
+        expect(resp.payload, isNull);
+        expect(resp.error, isNull);
+        expect(resp.requiresAuthentication, isTrue);
+        expect(resp.authenticationType, equals('Basic'));
+        expect(resp.authenticationRealm, equals('Foo'));
+
+        var resp2 = resp.cast<Map>();
+
+        expect(resp2, isA<APIResponse<Map>>());
+        expect(resp2.payload, isNull);
+        expect(resp2.error, isNull);
+        expect(resp2.requiresAuthentication, isTrue);
+        expect(resp2.authenticationType, equals('Basic'));
+        expect(resp2.authenticationRealm, equals('Foo'));
+
+        var resp3 = resp.cast<Map>(error: "Wow!");
+
+        expect(resp3, isA<APIResponse<Map>>());
+        expect(resp3.payload, isNull);
+        expect(resp3.error, equals("Wow!"));
+        expect(resp3.requiresAuthentication, isTrue);
+        expect(resp3.authenticationType, equals('Basic'));
+        expect(resp3.authenticationRealm, equals('Foo'));
+      }
+    });
+
     test('foo[GET]', () async {
       var apiRequest = APIRequest.get('/base/foo');
 

@@ -1,3 +1,9 @@
+## 1.8.6
+
+- ✨♻️ Improve cast method in APIResponse
+  - Add error parameter to cast method for more flexibility
+  - Include additional requires authentication in the copied APIResponse object.
+
 ## 1.8.5
 
 - refactor(api):

@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.8.5';
+  static const String VERSION = '1.8.6';
 
   static bool _boot = false;
 
@@ -2606,7 +2606,7 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   }
 
   /// Copy this response casting the [payload] to [E].
-  APIResponse<E> cast<E>({E? payload}) {
+  APIResponse<E> cast<E>({E? payload, Object? error}) {
     return APIResponse<E>(status,
         payload: payload ?? (this.payload as E?),
         payloadMimeType: payloadMimeType,
@@ -2616,9 +2616,12 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
         headers: headers,
         keepAliveTimeout: keepAliveTimeout,
         keepAliveMaxRequests: keepAliveMaxRequests,
-        error: error,
+        error: error ?? this.error,
         stackTrace: stackTrace,
         metrics: _metrics)
+      .._requiresAuthentication = _requiresAuthentication
+      .._authenticationType = _authenticationType
+      .._authenticationRealm = _authenticationRealm
       .._copyStartedMetrics(this);
   }
 
@@ -2653,6 +2656,9 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
         error: error,
         stackTrace: stackTrace,
         metrics: metrics ?? _metrics)
+      .._requiresAuthentication = _requiresAuthentication
+      .._authenticationType = _authenticationType
+      .._authenticationRealm = _authenticationRealm
       .._copyStartedMetrics(this);
   }
 
@@ -2956,11 +2962,12 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   /// Depending of the serve implementation (usually HTTP),
   /// it will send to the client the request for authentication
   /// (in HTTP is the headers `WWW-Authenticate`).
-  void requireAuthentication(
+  APIResponse<T> requireAuthentication(
       {bool require = true, String type = 'Basic', String realm = 'API'}) {
     _requiresAuthentication = require;
     _authenticationType = type;
     _authenticationRealm = realm;
+    return this;
   }
 
   /// Returns `true` if [status] is a [APIResponseStatus.OK] or a [APIResponseStatus.NOT_FOUND].
