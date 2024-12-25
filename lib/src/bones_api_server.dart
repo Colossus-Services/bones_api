@@ -1373,12 +1373,13 @@ class APIServer extends _APIServerBase {
   /// Resolves a [payload] to an HTTP body (accepts [payload] as a [Future]).
   /// See [resolveBodySync].
   static FutureOr<Object?> resolveBody(
-      dynamic payload, APIResponse apiResponse) {
+      Object? payload, APIResponse apiResponse) {
     if (payload == null) return null;
 
     if (payload is Future) {
       return payload.then((value) {
-        return resolveBody(value, apiResponse);
+        if (value == null) return null;
+        return _resolveBodyImpl(value, apiResponse);
       }, onError: (e, s) {
         return apiResponse.asError(error: 'ERROR: $e\n$s');
       });
@@ -1389,7 +1390,7 @@ class APIServer extends _APIServerBase {
 
   /// Resolves a [payload] to an HTTP body (Does NOT accept [payload] as a [Future]).
   /// See [resolveBody].
-  static Object? resolveBodySync(dynamic payload, APIResponse apiResponse) {
+  static Object? resolveBodySync(Object? payload, APIResponse apiResponse) {
     if (payload == null) return null;
 
     if (payload is Future) {
@@ -2460,9 +2461,11 @@ final class APIServerWorker extends _APIServerBase {
               headers.getAsString('WWW-Authenticate', ignoreCase: true);
 
           if (wwwAuthenticate != null && wwwAuthenticate.isNotEmpty) {
-            return Response(401, body: payload, headers: headers);
+            return Response(401,
+                body: payload ?? apiResponse.error, headers: headers);
           } else {
-            return Response.forbidden(payload, headers: headers);
+            return Response.forbidden(payload ?? apiResponse.error,
+                headers: headers);
           }
         }
       case APIResponseStatus.REDIRECT:
@@ -2481,7 +2484,8 @@ final class APIServerWorker extends _APIServerBase {
           return Response(307, body: body, headers: headers);
         }
       case APIResponseStatus.BAD_REQUEST:
-        return Response(400, body: payload, headers: headers);
+        return Response(400,
+            body: payload ?? apiResponse.error, headers: headers);
       case APIResponseStatus.ERROR:
         {
           var error = apiResponse.error ?? '';

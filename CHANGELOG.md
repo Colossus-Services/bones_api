@@ -1,3 +1,13 @@
+## 1.8.5
+
+- refactor(api):
+  - 🔨 improve payload handling in resolveBody and resolveBodySync
+  - 🔨 `UNAUTHORIZED`, `BAD_REQUEST`: Allow `error` as `payload` in response generation.
+
+- swiss_knife: ^3.2.3
+- yaml: ^3.1.3
+- stream_channel: ^2.1.3
+
 ## 1.8.4
 
 - `APIRoot`:
