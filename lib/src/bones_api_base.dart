@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.8.4';
+  static const String VERSION = '1.8.5';
 
   static bool _boot = false;
 
@@ -2798,12 +2798,14 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? mimeType,
+      Object? error,
       Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.UNAUTHORIZED,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
+        error: error,
         metrics: metrics);
   }
 
@@ -2876,12 +2878,14 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
       T? payload,
       Object? payloadDynamic,
       Object? mimeType,
+      Object? error,
       Map<String, APIMetric>? metrics}) {
     return APIResponse(APIResponseStatus.BAD_REQUEST,
         headers: headers ?? <String, dynamic>{},
         payload: payload,
         payloadDynamic: payloadDynamic,
         payloadMimeType: mimeType,
+        error: error,
         metrics: metrics);
   }
 
