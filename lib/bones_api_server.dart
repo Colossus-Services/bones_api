@@ -1,5 +1,5 @@
 /// Bones_API Server Library.
-library bones_api_server;
+library;
 
 export 'bones_api.dart';
 export 'src/bones_api_error_zone.dart';

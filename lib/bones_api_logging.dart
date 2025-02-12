@@ -1,4 +1,4 @@
 /// Bones_API Logging Library.
-library bones_api_logging;
+library;
 
 export 'src/bones_api_logging.dart';

@@ -302,7 +302,7 @@
 /// {@canonicalFor bones_api_utils_timedmap.TimedMap}
 
 /// Bones_API Library.
-library bones_api;
+library;
 
 export 'dart:async';
 
