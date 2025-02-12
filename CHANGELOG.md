@@ -1,3 +1,15 @@
+## 1.8.7
+
+- reflection_factory: ^2.4.10
+- petitparser: ^6.1.0
+- hotreloader: ^4.3.0
+- stream_channel: ^2.1.4
+- http: ^1.3.0
+
+- lints: ^5.1.1
+- build_runner: ^2.4.15
+- test: ^1.25.15
+
 ## 1.8.6
 
 - ✨♻️ Improve cast method in APIResponse

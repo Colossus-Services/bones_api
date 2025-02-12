@@ -33,7 +33,7 @@ class APIConfig {
     development = TypeParser.parseBool(dev, false)!;
 
     var test = _properties['test'];
-    test = TypeParser.parseBool(test, false)!;
+    this.test = TypeParser.parseBool(test, false)!;
   }
 
   /// The source of this configuration.
