@@ -136,9 +136,9 @@ y=zzz
       expect(
           apiConfig.toYAMLEncoded(),
           equals('foo: 123\n'
-              'bar: \'abc\'\n'
+              'bar: "abc"\n'
               'password: 123456\n'
-              'baz: \'%bar%\'\n'));
+              'baz: "%bar%"\n'));
 
       expect(
           apiConfig.toPropertiesEncoded(),
