@@ -974,7 +974,7 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
       response = await _getURL(
         request.requestURL,
         method: APIRequestMethod.POST,
-        payload: request.sendData,
+        payload: request.sendData as List<int>?,
         payloadType: request.headerContentType,
       );
     } else {

@@ -443,6 +443,32 @@ void main() {
             equals(Role(RoleType.admin, enabled: true)));
       }
     });
+
+    test('dumpRuntimeTypes', () {
+      expect(Json.dumpRuntimeTypes(null), equals('<null>'));
+      expect(Json.dumpRuntimeTypes(123), equals('<int>:123'));
+      expect(Json.dumpRuntimeTypes(12.3), equals('<double>:12.3'));
+      expect(Json.dumpRuntimeTypes(true), equals('<bool>:true'));
+      expect(Json.dumpRuntimeTypes("foo"), equals('<String>:"foo"'));
+
+      expect(
+          Json.dumpRuntimeTypes(<int>[1, 2]),
+          contains(
+            '<int>>:[\n'
+            '  <int>:1,\n'
+            '  <int>:2\n'
+            ']',
+          ));
+
+      expect(
+          Json.dumpRuntimeTypes(<String, int>{'a': 1, 'b': 2}),
+          contains(
+            '<String, int>>:{\n'
+            '  <String>:"a"=<int>:1,\n'
+            '  <String>:"b"=<int>:2\n'
+            '}',
+          ));
+    });
   });
 }
 

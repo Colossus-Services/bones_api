@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.4.10
+// BUILDER: reflection_factory/2.5.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.4.10');
+  static final Version _version = Version.parse('2.5.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -164,8 +164,7 @@ class Account$reflection extends ClassReflection<Account>
             this,
             Account,
             'entityReference',
-            () => (User user, {required EntityReference<UserInfo> userInfo}) =>
-                Account.entityReference(user, userInfo: userInfo),
+            () => Account.entityReference,
             const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
             null,
             const <String, __PR>{
@@ -182,8 +181,7 @@ class Account$reflection extends ClassReflection<Account>
             this,
             Account,
             '',
-            () => (User user, {Object? userInfo}) =>
-                Account(user, userInfo: userInfo),
+            () => Account.new,
             const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
             null,
             const <String, __PR>{
@@ -192,7 +190,7 @@ class Account$reflection extends ClassReflection<Account>
             null);
       case 'empty':
         return ConstructorReflection<Account>(this, Account, 'empty',
-            () => () => Account.empty(), null, null, null, null);
+            () => Account.empty, null, null, null, null);
       default:
         return null;
     }
@@ -659,18 +657,7 @@ class Address$reflection extends ClassReflection<Address>
             this,
             Address,
             '',
-            () => (String state, String city, String street, int number,
-                    {int? id,
-                    List<Store>? stores,
-                    Object? closedStores,
-                    Object? latitude,
-                    Object? longitude}) =>
-                Address(state, city, street, number,
-                    id: id,
-                    stores: stores,
-                    closedStores: closedStores,
-                    latitude: latitude,
-                    longitude: longitude),
+            () => Address.new,
             const <__PR>[
               __PR(__TR.tString, 'state', false, true),
               __PR(__TR.tString, 'city', false, true),
@@ -692,13 +679,13 @@ class Address$reflection extends ClassReflection<Address>
             null);
       case 'empty':
         return ConstructorReflection<Address>(this, Address, 'empty',
-            () => () => Address.empty(), null, null, null, null);
+            () => Address.empty, null, null, null, null);
       case 'frommap':
         return ConstructorReflection<Address>(
             this,
             Address,
             'fromMap',
-            () => (Map<String, dynamic> map) => Address.fromMap(map),
+            () => Address.fromMap,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
             null,
             null,
@@ -1262,7 +1249,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Photo,
             'fromID',
-            () => (String id) => Photo.fromID(id),
+            () => Photo.fromID,
             const <__PR>[__PR(__TR.tString, 'id', false, true)],
             null,
             null,
@@ -1272,8 +1259,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Photo,
             'fromData',
-            () =>
-                (Uint8List data, {String? id}) => Photo.fromData(data, id: id),
+            () => Photo.fromData,
             const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'data', false, true)],
             null,
             const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
@@ -1283,14 +1269,14 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Photo,
             'from',
-            () => (Object o, {String? id}) => Photo.from(o, id: id),
+            () => Photo.from,
             const <__PR>[__PR(__TR.tObject, 'o', false, true)],
             null,
             const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
             null);
       case 'empty':
-        return ConstructorReflection<Photo>(this, Photo, 'empty',
-            () => () => Photo.empty(), null, null, null, null);
+        return ConstructorReflection<Photo>(
+            this, Photo, 'empty', () => Photo.empty, null, null, null, null);
       default:
         return null;
     }
@@ -1814,9 +1800,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             this,
             Role,
             '',
-            () => (RoleType type,
-                    {int? id, bool enabled = true, Decimal? value}) =>
-                Role(type, id: id, enabled: enabled, value: value),
+            () => Role.new,
             const <__PR>[__PR(__TR<RoleType>(RoleType), 'type', false, true)],
             null,
             const <String, __PR>{
@@ -1826,14 +1810,14 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             },
             null);
       case 'empty':
-        return ConstructorReflection<Role>(this, Role, 'empty',
-            () => () => Role.empty(), null, null, null, null);
+        return ConstructorReflection<Role>(
+            this, Role, 'empty', () => Role.empty, null, null, null, null);
       case 'frommap':
         return ConstructorReflection<Role>(
             this,
             Role,
             'fromMap',
-            () => (Map<String, dynamic> map) => Role.fromMap(map),
+            () => Role.fromMap,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
             null,
             null,
@@ -2398,8 +2382,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             this,
             Store,
             '',
-            () => (String name, int? number, {int? id, User? owner}) =>
-                Store(name, number, id: id, owner: owner),
+            () => Store.new,
             const <__PR>[
               __PR(__TR.tString, 'name', false, true),
               __PR(__TR.tInt, 'number', true, true)
@@ -2411,8 +2394,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             },
             null);
       case 'empty':
-        return ConstructorReflection<Store>(this, Store, 'empty',
-            () => () => Store.empty(), null, null, null, null);
+        return ConstructorReflection<Store>(
+            this, Store, 'empty', () => Store.empty, null, null, null, null);
       default:
         return null;
     }
@@ -2919,21 +2902,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             this,
             User,
             '',
-            () => (String email, String password, Address address,
-                    List<Role> roles,
-                    {int? id,
-                    int? level,
-                    Time? wakeUpTime,
-                    Object? userInfo,
-                    Object? photo,
-                    DateTime? creationTime}) =>
-                User(email, password, address, roles,
-                    id: id,
-                    level: level,
-                    wakeUpTime: wakeUpTime,
-                    userInfo: userInfo,
-                    photo: photo,
-                    creationTime: creationTime),
+            () => User.new,
             const <__PR>[
               __PR(__TR.tString, 'email', false, true),
               __PR(__TR.tString, 'password', false, true),
@@ -2953,8 +2922,8 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             },
             null);
       case 'empty':
-        return ConstructorReflection<User>(this, User, 'empty',
-            () => () => User.empty(), null, null, null, null);
+        return ConstructorReflection<User>(
+            this, User, 'empty', () => User.empty, null, null, null, null);
       default:
         return null;
     }
@@ -3570,14 +3539,14 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             this,
             UserInfo,
             '',
-            () => (String info, {int? id}) => UserInfo(info, id: id),
+            () => UserInfo.new,
             const <__PR>[__PR(__TR.tString, 'info', false, true)],
             null,
             const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
             null);
       case 'empty':
         return ConstructorReflection<UserInfo>(this, UserInfo, 'empty',
-            () => () => UserInfo.empty(), null, null, null, null);
+            () => UserInfo.empty, null, null, null, null);
       default:
         return null;
     }
