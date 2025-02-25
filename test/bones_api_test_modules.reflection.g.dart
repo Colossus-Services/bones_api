@@ -65,7 +65,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.5.0');
+  Version get languageVersion => Version.parse('3.6.0');
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
@@ -850,7 +850,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.5.0');
+  Version get languageVersion => Version.parse('3.6.0');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
