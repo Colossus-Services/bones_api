@@ -1,10 +1,11 @@
 import 'dart:async';
-// ignore: deprecated_member_use
-import 'dart:html';
+import 'dart:js_interop';
+
 import 'dart:typed_data';
 
 import 'package:mercury_client/mercury_client.dart';
 import 'package:swiss_knife/swiss_knife.dart';
+import 'package:web/web.dart' as web;
 
 import 'bones_api_extension.dart';
 import 'bones_api_platform.dart';
@@ -65,13 +66,13 @@ class APIPlatformBrowser extends APIPlatform {
   void stdout(Object? o) => stdoutLn(o);
 
   @override
-  void stdoutLn(Object? o) => window.console.log(o);
+  void stdoutLn(Object? o) => web.console.log(o?.jsify());
 
   @override
   void stderr(Object? o) => stderrLn(o);
 
   @override
-  void stderrLn(Object? o) => window.console.error(o);
+  void stderrLn(Object? o) => web.console.error(o?.jsify());
 
   static final RegExp _regExpUriStart = RegExp(r'^\w+:/');
 
@@ -131,7 +132,7 @@ class APIPlatformBrowser extends APIPlatform {
 
   @override
   Iterable<String> get propertiesKeys {
-    var location = window.location.href.trim();
+    var location = web.window.location.href.trim();
     var uri = location.isNotEmpty ? Uri.tryParse(location) : null;
 
     return {..._properties.keys, ...?uri?.queryParameters.keys};
@@ -152,7 +153,7 @@ class APIPlatformBrowser extends APIPlatform {
     var prev = _properties[key];
     if (prev != null) return prev;
 
-    var location = window.location.href.trim();
+    var location = web.window.location.href.trim();
     if (location.isEmpty) return defaultValue;
 
     var uri = Uri.tryParse(location);

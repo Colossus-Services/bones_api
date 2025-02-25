@@ -1138,7 +1138,10 @@ abstract class APIModuleProxyCallerListener<T>
     var mainType =
         typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
 
-    //var debugJsonPretty = Json.encode(json, pretty: true);
+    // var debugJsonPretty = Json.encode(json, pretty: true);
+    // print(debugJsonPretty);
+
+    // print(Json.dumpRuntimeTypes(json));
 
     var jsonDecoder = Json.decoder(
         entityHandlerProvider: EntityHandlerProvider.globalProvider);

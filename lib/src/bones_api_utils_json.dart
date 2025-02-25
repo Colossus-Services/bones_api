@@ -593,6 +593,16 @@ class Json {
         return null;
       } else if (type.type == value.runtimeType) {
         return value;
+      } else if (type.isStringType) {
+        return TypeParser.parseString(value);
+      } else if (type.isIntType) {
+        return TypeParser.parseInt(value);
+      } else if (type.isDoubleType) {
+        return TypeParser.parseDouble(value);
+      } else if (type.isNumType) {
+        return TypeParser.parseNum(value);
+      } else if (type.isBoolType) {
+        return TypeParser.parseBool(value);
       } else if (type.isEntityReferenceType && value is EntityReference) {
         if (type.arguments0?.type == value.type) {
           return value;
@@ -667,6 +677,24 @@ class Json {
     return classification.hasNull
         ? entityHandler.castIterableNullable(list, entityType)
         : entityHandler.castIterable(list, entityType);
+  }
+
+  /// A debugging tool that generates a `String` representation of [o],
+  /// showing the [runtimeType] of each value in the tree.
+  static String dumpRuntimeTypes(Object? o, [String indent = '']) {
+    if (o == null) return '$indent<null>';
+    if (o is String) return '$indent<String>:"$o"';
+    if (o is bool) return '$indent<bool>:$o';
+    if (o is int) return '$indent<int>:$o';
+    if (o is double) return '$indent<double>:$o';
+    if (o is num) return '$indent<num>:$o';
+    if (o is Iterable) {
+      return '$indent<${o.runtimeType}>:[\n$indent${o.map((e) => dumpRuntimeTypes(e, '  $indent')).join(',\n$indent')}\n$indent]';
+    }
+    if (o is Map) {
+      return '$indent<${o.runtimeType}>:{\n$indent${o.entries.map((e) => "${dumpRuntimeTypes(e.key, '  $indent')}=${dumpRuntimeTypes(e.value, '')}").join(',\n$indent')}\n$indent}';
+    }
+    return '@<${o.runtimeType}>:$o';
   }
 }
 

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.4.10
+// BUILDER: reflection_factory/2.5.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.4.10');
+  static final Version _version = Version.parse('2.5.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -65,7 +65,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.5.0');
+  Version get languageVersion => Version.parse('3.6.0');
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
@@ -129,7 +129,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
             this,
             AboutModule,
             '',
-            () => (APIRoot apiRoot) => AboutModule(apiRoot),
+            () => AboutModule.new,
             const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
             null,
             null,
@@ -850,7 +850,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.5.0');
+  Version get languageVersion => Version.parse('3.6.0');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -914,7 +914,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
             this,
             UserModule,
             '',
-            () => (APIRoot apiRoot) => UserModule(apiRoot),
+            () => UserModule.new,
             const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
             null,
             null,
