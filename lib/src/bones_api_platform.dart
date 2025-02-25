@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:args_simple/args_simple.dart';
 
 import 'bones_api_platform_generic.dart'
-    if (dart.library.html) 'bones_api_platform_browser.dart'
-    if (dart.library.io) 'bones_api_platform_io.dart';
+    if (dart.library.io) 'bones_api_platform_io.dart'
+    if (dart.library.js_interop) 'bones_api_platform_browser.dart';
 
 enum APIPlatformType {
   generic,

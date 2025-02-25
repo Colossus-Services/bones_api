@@ -1,5 +1,8 @@
 ## 1.9.0
 
+- `APIPlatformBrowser`:
+  - Change use of `dart:html` (deprecated) to package `web`.
+
 - `Json`:
   - `defaultFieldValueResolver`: optimize primitives parsing (String, bool, int, double, num) .
   - Added `dumpRuntimeTypes`.
@@ -13,6 +16,7 @@
 - mercury_client: ^2.3.0
 - resource_portable: ^3.1.2
 - collection: ^1.19.0
+- web: ^1.1.0
 
 ## 1.8.7
 
