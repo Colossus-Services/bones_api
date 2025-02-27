@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.0
+// BUILDER: reflection_factory/2.5.1
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,11 +22,46 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.0');
+  static final Version _version = Version.parse('2.5.1');
 
   Version get reflectionFactoryVersion => _version;
 
   List<Reflection> siblingsReflection() => _siblingsReflection();
+}
+
+Symbol? _getSymbol(String? key) {
+  if (key == null) return null;
+
+  switch (key) {
+    case r"closedStores":
+      return const Symbol(r"closedStores");
+    case r"creationTime":
+      return const Symbol(r"creationTime");
+    case r"enabled":
+      return const Symbol(r"enabled");
+    case r"id":
+      return const Symbol(r"id");
+    case r"latitude":
+      return const Symbol(r"latitude");
+    case r"level":
+      return const Symbol(r"level");
+    case r"longitude":
+      return const Symbol(r"longitude");
+    case r"owner":
+      return const Symbol(r"owner");
+    case r"photo":
+      return const Symbol(r"photo");
+    case r"stores":
+      return const Symbol(r"stores");
+    case r"userInfo":
+      return const Symbol(r"userInfo");
+    case r"value":
+      return const Symbol(r"value");
+    case r"wakeUpTime":
+      return const Symbol(r"wakeUpTime");
+    default:
+      return null;
+  }
 }
 
 // ignore: non_constant_identifier_names
@@ -106,6 +141,9 @@ class Account$reflection extends ClassReflection<Account>
   static Account$reflection? _withoutObjectInstance;
   @override
   Account$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static Account$reflection get staticInstance =>
       _withoutObjectInstance ??= Account$reflection._();
@@ -599,6 +637,9 @@ class Address$reflection extends ClassReflection<Address>
   static Address$reflection? _withoutObjectInstance;
   @override
   Address$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static Address$reflection get staticInstance =>
       _withoutObjectInstance ??= Address$reflection._();
@@ -1191,6 +1232,9 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   @override
   Photo$reflection withoutObjectInstance() => staticInstance;
 
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
   static Photo$reflection get staticInstance =>
       _withoutObjectInstance ??= Photo$reflection._();
 
@@ -1743,6 +1787,9 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   @override
   Role$reflection withoutObjectInstance() => staticInstance;
 
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
   static Role$reflection get staticInstance =>
       _withoutObjectInstance ??= Role$reflection._();
 
@@ -2254,6 +2301,9 @@ class RoleType$reflection extends EnumReflection<RoleType>
   @override
   RoleType$reflection withoutObjectInstance() => staticInstance;
 
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
   static RoleType$reflection get staticInstance =>
       _withoutObjectInstance ??= RoleType$reflection._();
 
@@ -2328,6 +2378,9 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   static Store$reflection? _withoutObjectInstance;
   @override
   Store$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static Store$reflection get staticInstance =>
       _withoutObjectInstance ??= Store$reflection._();
@@ -2848,6 +2901,9 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   static User$reflection? _withoutObjectInstance;
   @override
   User$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static User$reflection get staticInstance =>
       _withoutObjectInstance ??= User$reflection._();
@@ -3485,6 +3541,9 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   static UserInfo$reflection? _withoutObjectInstance;
   @override
   UserInfo$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static UserInfo$reflection get staticInstance =>
       _withoutObjectInstance ??= UserInfo$reflection._();

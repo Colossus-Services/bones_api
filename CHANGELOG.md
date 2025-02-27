@@ -1,3 +1,9 @@
+## 1.9.1
+
+- async_events: ^1.3.0
+- reflection_factory: ^2.5.1
+- web: ^1.1.1
+
 ## 1.9.0
 
 - `APIPlatformBrowser`:

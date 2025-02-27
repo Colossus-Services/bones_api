@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.0
+// BUILDER: reflection_factory/2.5.1
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,11 +22,30 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.0');
+  static final Version _version = Version.parse('2.5.1');
 
   Version get reflectionFactoryVersion => _version;
 
   List<Reflection> siblingsReflection() => _siblingsReflection();
+}
+
+Symbol? _getSymbol(String? key) {
+  if (key == null) return null;
+
+  switch (key) {
+    case r"config":
+      return const Symbol(r"config");
+    case r"method":
+      return const Symbol(r"method");
+    case r"parameters":
+      return const Symbol(r"parameters");
+    case r"parent":
+      return const Symbol(r"parent");
+    case r"rules":
+      return const Symbol(r"rules");
+    default:
+      return null;
+  }
 }
 
 // ignore: non_constant_identifier_names
@@ -74,6 +93,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   static AboutModule$reflection? _withoutObjectInstance;
   @override
   AboutModule$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static AboutModule$reflection get staticInstance =>
       _withoutObjectInstance ??= AboutModule$reflection._();
@@ -859,6 +881,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
   static UserModule$reflection? _withoutObjectInstance;
   @override
   UserModule$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static UserModule$reflection get staticInstance =>
       _withoutObjectInstance ??= UserModule$reflection._();

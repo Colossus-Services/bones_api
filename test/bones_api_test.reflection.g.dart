@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.0
+// BUILDER: reflection_factory/2.5.1
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,11 +22,30 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.0');
+  static final Version _version = Version.parse('2.5.1');
 
   Version get reflectionFactoryVersion => _version;
 
   List<Reflection> siblingsReflection() => _siblingsReflection();
+}
+
+Symbol? _getSymbol(String? key) {
+  if (key == null) return null;
+
+  switch (key) {
+    case r"config":
+      return const Symbol(r"config");
+    case r"method":
+      return const Symbol(r"method");
+    case r"parameters":
+      return const Symbol(r"parameters");
+    case r"parent":
+      return const Symbol(r"parent");
+    case r"rules":
+      return const Symbol(r"rules");
+    default:
+      return null;
+  }
 }
 
 Future<T> __retFut$<T>(Object? o) => ClassProxy.returnFuture<T>(o);
@@ -70,6 +89,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   static MyInfoModule$reflection? _withoutObjectInstance;
   @override
   MyInfoModule$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
 
   static MyInfoModule$reflection get staticInstance =>
       _withoutObjectInstance ??= MyInfoModule$reflection._();
