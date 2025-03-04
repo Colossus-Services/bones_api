@@ -4,7 +4,7 @@
   - `resolveFiledName`: improve field matching. 
 
 - `EntityHandler`
-  - `getFieldType`: added parameter `resolveFiledName: true`.
+  - `getFieldType`: added parameter `resolveFiledName: false`.
   - Optimize field and types resolution.
 
 - `GenericEntityHandler`, `ClassReflectionEntityHandler`:
