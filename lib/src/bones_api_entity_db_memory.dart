@@ -561,7 +561,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         return MapEntry(key, value);
       }
 
-      var fieldType = entityHandler.getFieldType(null, key);
+      var fieldType =
+          entityHandler.getFieldType(null, key, resolveFiledName: false);
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType && value is EntityReference) {
@@ -1157,8 +1158,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       if (targetEntityHandler != null) {
         targetName = getEntityRepositoryByType(targetEntityHandler.type)?.name;
         targetIdField = targetEntityHandler.idFieldName();
-        targetIdType =
-            targetEntityHandler.getFieldType(null, targetIdField)?.type;
+        targetIdType = targetEntityHandler
+            .getFieldType(null, targetIdField, resolveFiledName: false)
+            ?.type;
       }
 
       targetName ??= targetEntityType.type.toString().toLowerCase();
@@ -1228,8 +1230,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
         var sourceEntityHandler = repo.entityHandler;
         var sourceFieldId = sourceEntityHandler.idFieldName();
-        var sourceFieldIdType =
-            sourceEntityHandler.getFieldType(null, sourceFieldId)?.type ?? int;
+        var sourceFieldIdType = sourceEntityHandler
+                .getFieldType(null, sourceFieldId, resolveFiledName: false)
+                ?.type ??
+            int;
 
         var relTable = '${sourceTable}__${sourceField}__rel';
         var relSourceField = '${sourceTable}__$sourceFieldId';

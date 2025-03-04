@@ -542,9 +542,13 @@ mixin FieldsFromMap {
     bool includeAbsentFields = false,
     List<String>? returnMapUsedKeys,
   }) {
-    var f = fieldsNames.firstWhereOrNull((f) => f == fieldName);
+    var fieldResolved = fieldsNames.firstWhereOrNull((f) => f == fieldName);
+    if (fieldResolved != null) return fieldResolved;
 
-    f ??= fieldsNames.firstWhereOrNull((f) {
+    String? fieldNameLC;
+    String? fieldNameSimple;
+
+    fieldResolved = fieldsNames.firstWhereOrNull((f) {
       String? fLC, fSimple;
       if (fieldsNamesIndexes != null) {
         var idx = fieldsNamesIndexes[f]!;
@@ -552,16 +556,18 @@ mixin FieldsFromMap {
         fSimple = fieldsNamesSimple?[idx];
       }
 
+      fieldNameLC ??= fieldToLCKey(fieldName);
       fLC ??= fieldToLCKey(f);
-      if (fieldName == fLC) return true;
+      if (fieldNameLC == fLC) return true;
 
+      fieldNameSimple ??= fieldToSimpleKey(fieldName);
       fSimple ??= fieldToSimpleKey(f);
-      if (fieldName == fSimple) return true;
+      if (fieldNameSimple == fSimple) return true;
 
       return false;
     });
 
-    return f;
+    return fieldResolved;
   }
 
   /// Returns a [Map] with the fields values populated from the provided [map].

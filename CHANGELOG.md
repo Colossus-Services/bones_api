@@ -1,3 +1,15 @@
+## 1.9.2
+
+- `FieldsFromMap`:
+  - `resolveFiledName`: improve field matching. 
+
+- `EntityHandler`
+  - `getFieldType`: added parameter `resolveFiledName: true`.
+  - Optimize field and types resolution.
+
+- `GenericEntityHandler`, `ClassReflectionEntityHandler`:
+  - Optimize field and types resolution.
+
 ## 1.9.1
 
 - async_events: ^1.3.0

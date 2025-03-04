@@ -644,7 +644,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     for (var e in schemesTypes.entries) {
       var field = e.key;
       var schemeType = e.value;
-      var fieldType = entityHandler.getFieldType(null, field);
+      var fieldType =
+          entityHandler.getFieldType(null, field, resolveFiledName: true);
 
       if (!checkDBTableField(repoType, field, schemeType, fieldType)) {
         return _DBTableCheck.error(
@@ -757,8 +758,23 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       missingEnumConstraints =
           entityEnumFields.whereNotIn(enumConstraintsFields).toSet();
 
+      var entityFieldsNamesIndexes = entityHandler.fieldsNamesIndexes();
+      var entityFieldsNames = entityHandler.fieldsNames();
+      var entityFieldsNamesLC = entityHandler.fieldsNamesLC();
+      var entityFieldsNamesSimple = entityHandler.fieldsNamesSimple();
+
       for (var e in enumConstraints) {
-        var fieldType = entityHandler.getFieldType(null, e.field);
+        var fieldName = entityHandler.resolveFiledName(
+              entityFieldsNames,
+              e.field,
+              fieldsNamesIndexes: entityFieldsNamesIndexes,
+              fieldsNamesLC: entityFieldsNamesLC,
+              fieldsNamesSimple: entityFieldsNamesSimple,
+            ) ??
+            e.field;
+
+        var fieldType = entityHandler.getFieldType(null, fieldName,
+            resolveFiledName: false);
         if (fieldType == null) continue;
 
         var enumReflection =
@@ -828,7 +844,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     String table,
     String fieldName,
   ) {
-    var fieldType = entityHandler.getFieldType(null, fieldName);
+    var fieldType =
+        entityHandler.getFieldType(null, fieldName, resolveFiledName: false);
     if (fieldType == null) return null;
     var entityType = fieldType.entityTypeInfo ?? fieldType.listEntityType;
     if (entityType == null) return null;
@@ -2732,7 +2749,10 @@ class _DBTableColumn {
 
   factory _DBTableColumn.fromEntityHandler(
       EntityHandler<Object> entityHandler, String fieldName) {
-    var type = entityHandler.getFieldType(null, fieldName) ?? TypeInfo.tString;
+    var type =
+        entityHandler.getFieldType(null, fieldName, resolveFiledName: true) ??
+            TypeInfo.tString;
+
     var annotations = entityHandler
         .getFieldEntityAnnotations(null, fieldName)
         ?.whereType<EntityField>()
