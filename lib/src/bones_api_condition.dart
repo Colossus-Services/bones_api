@@ -1240,7 +1240,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   TypeInfo? _resolveValueType(String? keyName, TypeInfo? objType,
       EntityHandler? objEntityHandler, Object? value) {
     if (keyName != null) {
-      var type = objEntityHandler?.getFieldType(null, keyName);
+      var type =
+          objEntityHandler?.getFieldType(null, keyName, resolveFiledName: true);
       if (type != null) return type;
     }
 
@@ -1257,8 +1258,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       return objType ?? TypeInfo.from(value);
     }
 
-    var t = objEntityHandler?.getEntityHandler(obj: value)?.type;
-    return t != null ? TypeInfo.fromType(t) : null;
+    var t = objEntityHandler?.getEntityHandler(obj: value)?.typeInfo;
+    return t;
   }
 }
 

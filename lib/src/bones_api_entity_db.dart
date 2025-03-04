@@ -429,7 +429,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         entityName: entityName, tableName: tableName, entityType: entityType);
 
     if (entityRepository != null) {
-      var type = entityRepository.entityHandler.getFieldType(null, field);
+      var type = entityRepository.entityHandler
+          .getFieldType(null, field, resolveFiledName: true);
       return type;
     }
 

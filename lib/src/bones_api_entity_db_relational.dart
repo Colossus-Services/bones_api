@@ -278,7 +278,8 @@ class DBRelationalEntityRepository<O extends Object>
       _nonPrimitiveFields ??= entityHandler
           .fieldsNames(o)
           .map((fieldName) {
-            var fieldType = entityHandler.getFieldType(o, fieldName)!;
+            var fieldType = entityHandler.getFieldType(o, fieldName,
+                resolveFiledName: false)!;
             if (fieldType.isPrimitiveType) return null;
             return MapEntry(fieldName, fieldType);
           })
@@ -574,7 +575,7 @@ class DBRelationalEntityRepository<O extends Object>
   FutureOr<bool> setRelationship<E extends Object>(
       O o, String field, List<E> values,
       {TypeInfo? fieldType, Transaction? transaction}) {
-    fieldType ??= entityHandler.getFieldType(o, field)!;
+    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
 
     var op = TransactionOperationStoreRelationship(
         name, operationExecutor, o, values,
@@ -610,7 +611,7 @@ class DBRelationalEntityRepository<O extends Object>
   @override
   FutureOr<Iterable<dynamic>> selectRelationship<E>(O? o, String field,
       {Object? oId, TypeInfo? fieldType, Transaction? transaction}) {
-    fieldType ??= entityHandler.getFieldType(o, field)!;
+    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
 
     oId ??= entityHandler.getID(o!);
 
@@ -747,7 +748,8 @@ class DBRelationalEntityRepository<O extends Object>
         .map((o) => getID(o, entityHandler: entityHandler)! as Object)
         .toList();
 
-    fieldType ??= entityHandler.getFieldType(os?.first, field)!;
+    fieldType ??=
+        entityHandler.getFieldType(os?.first, field, resolveFiledName: true)!;
 
     if (oIds.isEmpty) {
       return <dynamic, Iterable<dynamic>>{};

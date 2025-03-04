@@ -535,7 +535,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   Type? _idType;
 
-  Type idType([O? o]) => _idType ??= getFieldType(o, idFieldName(o))!.type;
+  Type idType([O? o]) => _idType ??=
+      getFieldType(o, idFieldName(o), resolveFiledName: false)!.type;
 
   String idFieldName([O? o]);
 
@@ -741,11 +742,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   }
 
   FutureOr<dynamic> resolveEntityFieldValue(O o, String key, dynamic value,
-      {EntityProvider? entityProvider,
+      {bool resolveFiledName = false,
+      EntityProvider? entityProvider,
       EntityCache? entityCache,
       EntityResolutionRules? resolutionRules}) {
     entityCache ??= JsonEntityCacheSimple();
-    var fieldType = getFieldType(o, key);
+    var fieldType = getFieldType(o, key, resolveFiledName: resolveFiledName);
     return resolveValueByType(fieldType, value,
         entityProvider: entityProvider,
         entityCache: entityCache,
@@ -1362,39 +1364,49 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return _fieldsNamesSimple!;
   }
 
-  TypeInfo? getFieldType(O? o, String key);
+  TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false});
+
+  Map<String, TypeInfo>? _fieldsTypes;
 
   Map<String, TypeInfo> getFieldsTypes([O? o]) {
-    return Map<String, TypeInfo>.fromEntries(fieldsNames(o)
-        .map((key) => MapEntry<String, TypeInfo>(key, getFieldType(o, key)!)));
+    return _fieldsTypes ??= Map.unmodifiable(
+      Map<String, TypeInfo>.fromEntries(
+        fieldsNames(o).map(
+          (key) => MapEntry<String, TypeInfo>(
+            key,
+            getFieldType(o, key, resolveFiledName: false)!,
+          ),
+        ),
+      ),
+    );
   }
 
   Map<String, TypeInfo>? _fieldsEnumTypes;
 
   Map<String, TypeInfo> getFieldsEnumTypes([O? o]) {
     var enumFields = _fieldsEnumTypes;
-    if (enumFields != null) return UnmodifiableMapView(enumFields);
+    if (enumFields != null) return enumFields;
 
     final reflectionFactory = ReflectionFactory();
 
-    enumFields = getFieldsTypes(o)
+    var mapEnumFields = getFieldsTypes(o)
         .entries
         .where((e) =>
             reflectionFactory.getRegisterEnumReflection(e.value.type) != null)
         .toMapFromEntries();
 
-    return UnmodifiableMapView(_fieldsEnumTypes = enumFields);
+    return _fieldsEnumTypes = Map.unmodifiable(mapEnumFields);
   }
 
   Map<String, TypeInfo>? _fieldsEntityTypes;
 
   Map<String, TypeInfo> getFieldsEntityTypes([O? o]) {
     var entityFields = _fieldsEntityTypes;
-    if (entityFields != null) return UnmodifiableMapView(entityFields);
+    if (entityFields != null) return entityFields;
 
     var enumFields = getFieldsEnumTypes(o);
 
-    entityFields = getFieldsTypes()
+    var mapEntityFields = getFieldsTypes()
         .entries
         .map((e) {
           var field = e.key;
@@ -1412,7 +1424,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .nonNulls
         .toMapFromEntries();
 
-    return UnmodifiableMapView(_fieldsEntityTypes = entityFields);
+    return _fieldsEntityTypes = Map.unmodifiable(mapEntityFields);
   }
 
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
@@ -1495,7 +1507,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
 
     if (resolvedValue != null) {
-      var fieldType = getFieldType(o, key);
+      var fieldType = getFieldType(o, key, resolveFiledName: true);
 
       if (fieldType != null) {
         EntityHandler<Object>? fieldEntityHandler;
@@ -2146,6 +2158,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var setFutures = fieldsValues.entries.map((e) {
       return setFieldValueDynamic(o, e.key, e.value,
+              resolveFiledName: false,
               entityProvider: entityProvider,
               entityCache: entityCache,
               resolutionRules: resolutionRules)
@@ -2156,10 +2169,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   }
 
   FutureOr<dynamic> setFieldValueDynamic(O o, String key, dynamic value,
-      {EntityProvider? entityProvider,
+      {bool resolveFiledName = false,
+      EntityProvider? entityProvider,
       EntityCache? entityCache,
       EntityResolutionRules? resolutionRules}) {
     var retValue2 = resolveEntityFieldValue(o, key, value,
+        resolveFiledName: resolveFiledName,
         entityProvider: entityProvider,
         entityCache: entityCache,
         resolutionRules: resolutionRules);
@@ -2312,8 +2327,6 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     return fieldsNames;
   }
 
-  Map<String, TypeInfo>? _fieldsTypes;
-
   @override
   Map<String, TypeInfo> fieldsTypes([O? o]) {
     var fieldsTypes = _fieldsTypes;
@@ -2344,19 +2357,28 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     if (o != null && _idFieldsName == null) {
       _idFieldsName = o.idFieldName;
 
-      _fieldsNames ??= List<String>.unmodifiable(o.fieldsNames);
+      final fieldsNames =
+          _fieldsNames ??= List<String>.unmodifiable(o.fieldsNames);
 
       _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
-          Map<String, TypeInfo>.fromEntries(
-              _fieldsNames!.map((f) => MapEntry(f, o!.getFieldType(f)!))));
+        Map<String, TypeInfo>.fromEntries(
+          fieldsNames.map((f) => MapEntry(f, o!.getFieldType(f)!)),
+        ),
+      );
 
       _fieldsEntityAnnotations ??=
           Map<String, List<EntityAnnotation>>.unmodifiable(
-              Map<String, List<EntityAnnotation>>.fromEntries(
-                  _fieldsNames!.map((f) {
-        var list = o!.getFieldEntityAnnotations(f);
-        return list == null ? null : MapEntry(f, UnmodifiableListView(list));
-      }).nonNulls));
+        Map<String, List<EntityAnnotation>>.fromEntries(
+          fieldsNames.map(
+            (f) {
+              var list = o!.getFieldEntityAnnotations(f);
+              return list == null
+                  ? null
+                  : MapEntry(f, List<EntityAnnotation>.unmodifiable(list));
+            },
+          ).nonNulls,
+        ),
+      );
     }
   }
 
@@ -2409,13 +2431,33 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
-  TypeInfo? getFieldType(O? o, String key) {
+  TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false}) {
     inspectObject(o);
-    if (o != null) {
-      return o.getFieldType(key);
-    } else {
-      return _fieldsTypes?[key];
+
+    TypeInfo? fieldType;
+
+    final fieldsTypes = _fieldsTypes;
+    if (fieldsTypes != null) {
+      fieldType = fieldsTypes[key];
+
+      if (fieldType == null && resolveFiledName) {
+        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
+        if (resolvedFieldName != null) {
+          fieldType = fieldsTypes[resolvedFieldName];
+        }
+      }
+    } else if (o != null) {
+      fieldType = o.getFieldType(key);
+
+      if (fieldType == null && resolveFiledName) {
+        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
+        if (resolvedFieldName != null) {
+          fieldType = o.getFieldType(key);
+        }
+      }
     }
+
+    return fieldType;
   }
 
   @override
@@ -2535,9 +2577,35 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
       reflection.getJsonFieldsVisibleValues(o);
 
   @override
-  TypeInfo? getFieldType(O? o, String key) {
-    var field = reflection.field(key, o);
-    return field != null ? TypeInfo.from(field) : null;
+  TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false}) {
+    TypeInfo? fieldType;
+
+    final fieldsTypes = _fieldsTypes;
+    if (fieldsTypes != null) {
+      fieldType = fieldsTypes[key];
+
+      if (fieldType == null && resolveFiledName) {
+        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
+        if (resolvedFieldName != null) {
+          fieldType = fieldsTypes[resolvedFieldName];
+        }
+      }
+    } else {
+      var field = reflection.field(key, o);
+
+      if (field == null && resolveFiledName) {
+        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
+        if (resolvedFieldName != null) {
+          field = reflection.field(resolvedFieldName, o);
+        }
+      }
+
+      if (field != null) {
+        fieldType = TypeInfo.from(field);
+      }
+    }
+
+    return fieldType;
   }
 
   List<Object>? getFieldAnnotations(O? o, String key) {
@@ -2686,45 +2754,37 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   List<String> fieldsNames([O? o]) =>
       _fieldsNames ??= List.unmodifiable(fieldsTypes(o).keys);
 
-  Map<String, TypeInfo>? _fieldsTypes;
-
   @override
   Map<String, TypeInfo> fieldsTypes([O? o]) {
-    if (_fieldsTypes == null) {
-      var reflection = reflectionWithObject(o);
-
-      var types = reflection.fieldsNames.map((f) {
-        var field = reflection.field(f, o);
-        if (field == null || !field.hasSetter) return null;
-        var type = TypeInfo.from(field);
-        return MapEntry(f, type);
-      });
-
-      _fieldsTypes = UnmodifiableMapView<String, TypeInfo>(
-          Map<String, TypeInfo>.fromEntries(types.nonNulls));
-    }
-    return _fieldsTypes!;
+    return _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
+      Map<String, TypeInfo>.fromEntries(
+        reflectionWithObject(o).fieldsNames.map(
+          (f) {
+            var field = reflection.field(f, o);
+            if (field == null || !field.hasSetter) return null;
+            var type = TypeInfo.from(field);
+            return MapEntry(f, type);
+          },
+        ).nonNulls,
+      ),
+    );
   }
 
   Map<String, Map<String, TypeInfo>>? _constructors;
 
   @override
   Map<String, Map<String, TypeInfo>>? constructors([O? o]) {
-    if (_constructors == null) {
-      var reflection = reflectionWithObject(o);
-
-      var map = reflection.allConstructors().map((c) {
-        var name = c.name;
-        var args = c.allParameters
-            .map((p) => MapEntry(p.jsonName, p.type.typeInfo))
-            .toMapFromEntries();
-        return MapEntry(name, UnmodifiableMapView(args));
-      }).toMapFromEntries();
-
-      _constructors = UnmodifiableMapView(map);
-    }
-
-    return _constructors!;
+    return _constructors ??= Map.unmodifiable(
+      reflectionWithObject(o).allConstructors().map(
+        (c) {
+          var name = c.name;
+          var args = c.allParameters
+              .map((p) => MapEntry(p.jsonName, p.type.typeInfo))
+              .toMapFromEntries();
+          return MapEntry(name, Map.unmodifiable(args));
+        },
+      ).toMapFromEntries(),
+    );
   }
 
   @override
@@ -6479,7 +6539,7 @@ abstract class IterableEntityRepository<O extends Object>
       {TypeInfo? fieldType, Transaction? transaction}) {
     checkNotClosed();
 
-    fieldType ??= entityHandler.getFieldType(o, field)!;
+    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
 
     if (!fieldType.isListEntityOrReference) {
       throw StateError("Field `$field` not a `List` entity type: $fieldType");
@@ -6512,7 +6572,7 @@ abstract class IterableEntityRepository<O extends Object>
       {Object? oId, TypeInfo? fieldType, Transaction? transaction}) {
     checkNotClosed();
 
-    fieldType ??= entityHandler.getFieldType(o, field)!;
+    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
 
     if (!fieldType.isListEntityOrReference) {
       throw StateError("Field `$field` not a `List` entity type: $fieldType");
@@ -6607,7 +6667,8 @@ abstract class IterableEntityRepository<O extends Object>
       var value = entityHandler.getField(o, fieldName);
       if (value == null) return null;
 
-      var fieldType = entityHandler.getFieldType(o, fieldName)!;
+      var fieldType =
+          entityHandler.getFieldType(o, fieldName, resolveFiledName: false)!;
 
       if (!EntityHandler.isValidEntityType(fieldType.type)) {
         return null;

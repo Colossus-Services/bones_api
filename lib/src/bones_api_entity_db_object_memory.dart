@@ -647,7 +647,8 @@ class DBObjectMemoryAdapter
         return MapEntry(key, value);
       }
 
-      var fieldType = entityHandler.getFieldType(null, key);
+      var fieldType =
+          entityHandler.getFieldType(null, key, resolveFiledName: false);
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType) {

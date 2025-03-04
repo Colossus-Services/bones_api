@@ -1510,7 +1510,8 @@ abstract mixin class SQLGenerator {
         entityFieldAnnotations: entityFieldAnnotations);
 
     if (enumType == null) {
-      throw StateError("Can't find `EnumReflection` for type: $fieldType");
+      throw StateError(
+          "Can't find column `$table`.`$columnName` `EnumReflection` for type: $fieldType");
     }
 
     var type = enumType.key;
