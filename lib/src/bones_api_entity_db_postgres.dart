@@ -1,6 +1,6 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:postgres/postgres.dart';
+import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
@@ -34,7 +34,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     DBSQLAdapter.boot();
 
-    Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
+    Transaction.registerErrorFilter((e, s) => e is PgException);
 
     DBSQLAdapter.registerAdapter([
       'sql.postgres',
@@ -232,8 +232,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       Object? previousError) {
     if (error is DBPostgreSQLAdapterException) {
       return error;
-    } else if (error is PostgreSQLException) {
-      if (error.severity == PostgreSQLSeverity.error) {
+    } else if (error is ServerException) {
+      if (error.severity == Severity.error) {
         if (error.code == '23505') {
           return EntityFieldInvalid("unique", error.detail,
               fieldName: error.columnName,
@@ -272,7 +272,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     var count = ++_connectionCount;
 
     for (var i = 0; i < 3; ++i) {
-      var timeout = i == 0 ? 3 : (i == 1 ? 10 : 30);
+      final timeoutSec = i == 0 ? 3 : (i == 1 ? 10 : 30);
+      final timeout = Duration(seconds: timeoutSec);
 
       var connection = await _createConnectionImpl(password, timeout);
 
@@ -298,7 +299,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
             return _createConnectionImpl(password, timeout).then((conn) {
               if (conn == null) {
-                var error = PostgreSQLException(
+                var error = PgException(
                     "Error connecting to: $databaseName@$host:$port");
 
                 _log.severe(
@@ -313,8 +314,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       }
     }
 
-    var error =
-        PostgreSQLException("Error connecting to: $databaseName@$host:$port");
+    var error = PgException("Error connecting to: $databaseName@$host:$port");
 
     _log.severe("Can't connect to PostgreSQL: $databaseName@$host:$port");
 
@@ -322,25 +322,33 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   Future<PostgreSQLConnectionWrapper?> _createConnectionImpl(
-      String password, int timeout) async {
-    var connection = PostgreSQLConnection(host, port, databaseName,
-        username: username, password: password, timeoutInSeconds: timeout);
-    var ok = await tryCallMapped(() => connection.open(),
-        onSuccessValue: true, onErrorValue: false);
+      String password, Duration timeout) async {
+    final endpoint = Endpoint(
+        host: host,
+        port: port,
+        database: databaseName,
+        username: username,
+        password: password);
 
-    if (ok == null || !ok) return null;
+    final connectionSettings = ConnectionSettings(connectTimeout: timeout);
 
-    var connWrapper = PostgreSQLConnectionWrapper(connection);
+    var connection = await tryCall(
+      () => Connection.open(endpoint, settings: connectionSettings),
+    );
+
+    if (connection == null) return null;
+
+    var connWrapper = PostgreSQLConnectionWrapper(connection, endpoint);
 
     _connectionFinalizer.attach(connWrapper, connection);
 
     return connWrapper;
   }
 
-  late final Finalizer<PostgreSQLConnection> _connectionFinalizer =
+  late final Finalizer<Connection> _connectionFinalizer =
       Finalizer(_finalizeConnection);
 
-  void _finalizeConnection(PostgreSQLConnection connection) {
+  void _finalizeConnection(Connection connection) {
     try {
       // ignore: discarded_futures
       connection.close();
@@ -1129,33 +1137,52 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 }
 
 /// A [DBPostgreSQLAdapter] connection wrapper.
-class PostgreSQLConnectionWrapper
-    extends DBConnectionWrapper<PostgreSQLExecutionContext> {
-  PostgreSQLConnectionWrapper(super.nativeConnection);
+class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
+  final Endpoint _endpoint;
+
+  PostgreSQLConnectionWrapper(super.nativeConnection, this._endpoint);
 
   @override
   String get connectionURL {
-    var c = nativeConnection as PostgreSQLConnection;
-    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
+    return 'postgresql://${_endpoint.username}@${_endpoint.host}:${_endpoint.port}/${_endpoint.database}';
   }
 
   Future<List<Map<String, Map<String, dynamic>>>> mappedResultsQuery(String sql,
-      {Map<String, dynamic>? substitutionValues}) {
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.mappedResultsQuery(sql,
-        substitutionValues: substitutionValues);
+
+    var rs = await nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+    );
+
+    var tablesColumnsMap = rs.map((e) => e.toTablesColumnMap()).toList();
+
+    var mappedResult = tablesColumnsMap
+        .map((e) => e.map((k, v) => MapEntry('$k', v)))
+        .toList();
+
+    return mappedResult;
   }
 
-  Future<PostgreSQLResult> query(String sql,
-      {Map<String, dynamic>? substitutionValues}) {
+  Future<Result> query(String sql,
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.query(sql, substitutionValues: substitutionValues);
+    return nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+    );
   }
 
-  Future<int> execute(String sql, {Map<String, dynamic>? substitutionValues}) {
+  Future<int> execute(String sql,
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.execute(sql,
-        substitutionValues: substitutionValues);
+    var rs = await nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+      ignoreRows: true,
+    );
+    return rs.affectedRows;
   }
 
   Future openTransaction(
@@ -1163,23 +1190,26 @@ class PostgreSQLConnectionWrapper
         queryBlock, {
     int? commitTimeoutInSeconds,
   }) {
-    var conn = nativeConnection as PostgreSQLConnection;
+    var conn = nativeConnection as Connection;
     updateLastAccessTime();
-    return conn.transaction((transactionContext) => queryBlock(
-        PostgreSQLConnectionTransactionWrapper(this, transactionContext)));
+
+    return conn.runTx(
+      (tx) => queryBlock(
+        PostgreSQLConnectionTransactionWrapper(this, tx, _endpoint),
+      ),
+    );
   }
 
   @override
   bool isClosedImpl() {
     final nativeConnection = this.nativeConnection;
-    return nativeConnection is PostgreSQLConnection &&
-        nativeConnection.isClosed;
+    return nativeConnection is Connection && !nativeConnection.isOpen;
   }
 
   @override
   void closeImpl() {
     final nativeConnection = this.nativeConnection;
-    if (nativeConnection is PostgreSQLConnection) {
+    if (nativeConnection is Connection) {
       try {
         // ignore: discarded_futures
         nativeConnection.close();
@@ -1196,7 +1226,8 @@ class PostgreSQLConnectionTransactionWrapper
     extends PostgreSQLConnectionWrapper {
   final PostgreSQLConnectionWrapper parent;
 
-  PostgreSQLConnectionTransactionWrapper(this.parent, super.nativeConnection);
+  PostgreSQLConnectionTransactionWrapper(
+      this.parent, super.nativeConnection, super.endpoint);
 
   @override
   Future openTransaction(
@@ -1206,8 +1237,10 @@ class PostgreSQLConnectionTransactionWrapper
           {int? commitTimeoutInSeconds}) =>
       queryBlock(this);
 
-  void cancelTransaction({String? reason}) =>
-      nativeConnection.cancelTransaction(reason: reason);
+  void cancelTransaction({String? reason}) {
+    var tx = nativeConnection as TxSession;
+    unawaited(tx.rollback());
+  }
 
   @override
   String get runtimeTypeNameSafe => 'PostgreSQLConnectionTransactionWrapper';
@@ -1226,4 +1259,22 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
       super.parentStackTrace,
       super.operation,
       super.previousError});
+}
+
+extension on ResultRow {
+  Map<int, Map<String, dynamic>> toTablesColumnMap() {
+    final tablesMap = <int, Map<String, dynamic>>{};
+
+    for (final (i, col) in schema.columns.indexed) {
+      var map = tablesMap[col.tableOid ?? 0] ??= {};
+
+      if (col.columnName case final String name) {
+        map[name] = this[i];
+      } else {
+        map['[$i]'] = this[i];
+      }
+    }
+
+    return tablesMap;
+  }
 }
