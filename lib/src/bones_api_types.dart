@@ -183,6 +183,10 @@ class Time implements Comparable<Time> {
       throw FormatException('Invalid `Time` format: $s');
     }
 
+    if (s.startsWith('Time(') && s.endsWith(')')) {
+      s = s.substring(5, s.length - 1);
+    }
+
     var idx1 = s.indexOf(':');
     var idx2 = s.indexOf('.');
 

@@ -1,6 +1,10 @@
 ## 1.9.3
 
-- Upgrade to `postgres` API v3.
+- `DBPostgreSQLAdapter`:
+  - Upgrade to `postgres` API v3.
+  - Allow SSL connections.
+
+- `Time.parse`: accept format `Time(hh:mm:ss.sss)`
 
 - postgres: ^3.5.4
 - project_template: ^1.1.1
