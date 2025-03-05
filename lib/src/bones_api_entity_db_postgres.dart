@@ -330,7 +330,10 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         username: username,
         password: password);
 
-    final connectionSettings = ConnectionSettings(connectTimeout: timeout);
+    final connectionSettings = ConnectionSettings(
+      connectTimeout: timeout,
+      sslMode: SslMode.require,
+    );
 
     var connection = await tryCall(
       () => Connection.open(endpoint, settings: connectionSettings),
