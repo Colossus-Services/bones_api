@@ -1,4 +1,4 @@
-## 1.9.3
+## 1.9.3-beta.1
 
 - `DBPostgreSQLAdapter`:
   - Upgrade to `postgres` API v3.
