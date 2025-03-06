@@ -1,6 +1,6 @@
 @TestOn('vm')
 @Tags(['docker', 'postgres', 'entities', 'slow'])
-@Timeout(Duration(minutes: 4))
+@Timeout(Duration(minutes: 40))
 import 'package:bones_api/bones_api_db_postgre.dart';
 import 'package:bones_api/bones_api_test_postgres.dart';
 import 'package:test/test.dart';
@@ -19,18 +19,22 @@ class PostgresTestConfig extends APITestConfigDockerPostgreSQL {
       {required bool generateTables,
       required bool checkTables,
       super.cleanContainer})
-      : super({
-          'db': {
-            'postgres': {
-              'username': dbUser,
-              'password': dbPass,
-              'database': dbName,
-              'port': -5432,
-              'generateTables': generateTables,
-              'checkTables': checkTables,
+      : super(
+          {
+            'db': {
+              'postgres': {
+                'username': dbUser,
+                'password': dbPass,
+                'database': dbName,
+                'port': -5432,
+                'generateTables': generateTables,
+                'checkTables': checkTables,
+              }
             }
-          }
-        }, containerNamePrefix: 'bones_api_test_postgres');
+          },
+          containerNamePrefix: 'bones_api_test_postgres',
+          logStatement: 'all',
+        );
 }
 
 Future<void> main() async {

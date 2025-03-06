@@ -842,7 +842,7 @@ class APIDBModule extends APIModule {
 
       var zipEncoder = ZipEncoder();
 
-      var encode = zipEncoder.encode(archive)!;
+      var encode = zipEncoder.encode(archive);
       var zipData = encode is Uint8List ? encode : Uint8List.fromList(encode);
 
       var zipFileName = '$zipName.zip';
