@@ -23,6 +23,8 @@ import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
 
+export 'bones_api_entity_db.dart' show DBAdapterCapabilityConnectivity;
+
 final _log = logging.Logger('SQLAdapter')..registerAsDbLogger();
 
 /// [SQL] wrapper interface.
@@ -287,7 +289,8 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
       required super.transactionAbort,
       required super.constraintSupport,
       required this.tableSQL,
-      required super.multiIsolateSupport});
+      required super.multiIsolateSupport,
+      required super.connectivity});
 
   @override
   String get info => '${super.info}, tableSQL: $tableSQL';

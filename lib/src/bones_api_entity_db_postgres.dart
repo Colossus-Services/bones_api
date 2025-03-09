@@ -110,7 +110,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               transactionAbort: true,
               tableSQL: true,
               constraintSupport: true,
-              multiIsolateSupport: true),
+              multiIsolateSupport: true,
+              connectivity: DBAdapterCapabilityConnectivity.secureAndUnsecure),
         ) {
     boot();
 

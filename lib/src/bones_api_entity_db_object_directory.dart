@@ -92,7 +92,8 @@ class DBObjectDirectoryAdapter
               transactions: true,
               transactionAbort: true,
               constraintSupport: false,
-              multiIsolateSupport: true),
+              multiIsolateSupport: true,
+              connectivity: DBAdapterCapabilityConnectivity.none),
         ) {
     boot();
 
