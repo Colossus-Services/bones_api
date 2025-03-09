@@ -1,3 +1,15 @@
+## 1.9.3-beta.2
+
+- New `DBAdapterCapabilityConnectivity`.
+
+- `DBAdapterCapability`:
+  - Added field `connectivity`.
+
+- `DBPostgreSQLAdapter`:
+  - Added field `onlySecureConnections`.
+
+- dependency_validator: ^4.1.3
+
 ## 1.9.3-beta.1
 
 - `DBPostgreSQLAdapter`:
