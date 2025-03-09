@@ -3,6 +3,7 @@ import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -71,6 +72,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
+  final bool onlySecureConnections;
+
   DBPostgreSQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
@@ -78,6 +81,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
+      this.onlySecureConnections = false,
       super.generateTables,
       super.checkTables,
       super.populateTables,
@@ -175,6 +179,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
+    var onlySecureConnections =
+        parseBool(config?['onlySecureConnections'], false)!;
+
     return DBPostgreSQLAdapter(
       database,
       username,
@@ -191,6 +198,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
       logSQL: logSql,
+      onlySecureConnections: onlySecureConnections,
     );
   }
 
@@ -330,9 +338,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         username: username,
         password: password);
 
-    var connection = await (_lastConnectSSLSupported
-        ? _connectSSLImpl(endpoint, timeout)
-        : _connectNoSSLImpl(endpoint, timeout));
+    Connection? connection;
+    if (onlySecureConnections) {
+      connection = await _connectSSLImpl(endpoint, timeout);
+    } else {
+      connection = await (_lastConnectSSLSupported
+          ? _connectSSLImpl(endpoint, timeout)
+          : _connectNoSSLImpl(endpoint, timeout));
+    }
 
     if (connection == null) return null;
 
@@ -358,7 +371,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       _lastConnectSSLSupported = true;
       return connection;
     } on PgException catch (e) {
-      if (e.severity == Severity.error &&
+      if (!onlySecureConnections &&
+          e.severity == Severity.error &&
           e.message.contains('not support SSL')) {
         try {
           var connection = await Connection.open(
