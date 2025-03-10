@@ -424,6 +424,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       bool checkTables = true,
       Object? populateTables,
       super.parentRepositoryProvider,
+      super.connectivity,
       super.populateSource,
       super.populateSourceVariables,
       super.workingPath,
