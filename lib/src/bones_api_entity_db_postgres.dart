@@ -1,4 +1,5 @@
 import 'package:async_extension/async_extension.dart';
+import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
@@ -71,8 +72,6 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
-  final bool onlySecureConnections;
-
   DBPostgreSQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
@@ -80,13 +79,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
-      this.onlySecureConnections = false,
       super.generateTables,
       super.checkTables,
       super.populateTables,
       super.populateSource,
       super.populateSourceVariables,
       super.parentRepositoryProvider,
+      super.connectivity,
       super.workingPath,
       super.logSQL})
       : host = host ?? 'localhost',
@@ -178,8 +177,16 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
-    var onlySecureConnections =
-        TypeParser.parseBool(config?['onlySecureConnections'], false)!;
+    var connectivityStr = (config?['connectivity'] ?? '')
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    var connectivity = DBAdapterConnectivity.values.firstWhereOrNull(
+          (e) => e.name.toLowerCase() == connectivityStr,
+        ) ??
+        DBAdapterConnectivity.any;
 
     return DBPostgreSQLAdapter(
       database,
@@ -195,9 +202,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       populateSource: populateSource,
       populateSourceVariables: populateSourceVariables,
       parentRepositoryProvider: parentRepositoryProvider,
+      connectivity: connectivity,
       workingPath: workingPath,
       logSQL: logSql,
-      onlySecureConnections: onlySecureConnections,
     );
   }
 
@@ -338,8 +345,10 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         password: password);
 
     Connection? connection;
-    if (onlySecureConnections) {
+    if (connectivity == DBAdapterConnectivity.secure) {
       connection = await _connectSSLImpl(endpoint, timeout);
+    } else if (connectivity == DBAdapterConnectivity.insecure) {
+      connection = await _connectNoSSLImpl(endpoint, timeout);
     } else {
       connection = await (_lastConnectSSLSupported
           ? _connectSSLImpl(endpoint, timeout)
@@ -370,7 +379,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       _lastConnectSSLSupported = true;
       return connection;
     } on PgException catch (e) {
-      if (!onlySecureConnections &&
+      if (connectivity.allowInsecure &&
           e.severity == Severity.error &&
           e.message.contains('not support SSL')) {
         try {
@@ -403,8 +412,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       _lastConnectSSLSupported = false;
       return connection;
     } on PgException catch (e) {
-      if (e.severity == Severity.error &&
-          e.message.contains('not support SSL')) {
+      if (connectivity.allowSecure && e.severity == Severity.error) {
         try {
           var connection = await Connection.open(
             endpoint,

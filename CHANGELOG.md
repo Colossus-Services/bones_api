@@ -1,3 +1,14 @@
+## 1.9.3-beta.3
+
+- New `DBAdapterConnectivity`.
+
+- `DBAdapter`:
+  - Added field `connectivity`.
+
+- `DBPostgreSQLAdapter`:
+  - Remove filed `onlySecureConnections`.
+  - Added support to `connectivity` field.
+
 ## 1.9.3-beta.2
 
 - New `DBAdapterCapabilityConnectivity`.
