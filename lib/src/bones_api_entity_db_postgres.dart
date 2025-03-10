@@ -3,7 +3,6 @@ import 'package:logging/logging.dart' as logging;
 import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
-import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -180,7 +179,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
     var onlySecureConnections =
-        parseBool(config?['onlySecureConnections'], false)!;
+        TypeParser.parseBool(config?['onlySecureConnections'], false)!;
 
     return DBPostgreSQLAdapter(
       database,
