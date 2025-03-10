@@ -378,10 +378,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       );
       _lastConnectSSLSupported = true;
       return connection;
-    } on PgException catch (e) {
-      if (connectivity.allowInsecure &&
-          e.severity == Severity.error &&
-          e.message.contains('not support SSL')) {
+    } catch (e) {
+      if (connectivity.allowInsecure) {
         try {
           var connection = await Connection.open(
             endpoint,
@@ -411,8 +409,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       );
       _lastConnectSSLSupported = false;
       return connection;
-    } on PgException catch (e) {
-      if (connectivity.allowSecure && e.severity == Severity.error) {
+    } catch (e) {
+      if (connectivity.allowSecure) {
         try {
           var connection = await Connection.open(
             endpoint,

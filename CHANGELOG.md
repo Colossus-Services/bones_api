@@ -1,3 +1,8 @@
+## 1.9.3-beta.4
+
+- `DBPostgreSQLAdapter`:
+  - `_connectSSLImpl`, `_connectNoSSLImpl`: simplify error handling.
+
 ## 1.9.3-beta.3
 
 - New `DBAdapterConnectivity`.
