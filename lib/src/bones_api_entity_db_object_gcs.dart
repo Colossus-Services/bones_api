@@ -106,7 +106,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
               transactions: true,
               transactionAbort: true,
               constraintSupport: false,
-              multiIsolateSupport: true),
+              multiIsolateSupport: true,
+              connectivity: DBAdapterCapabilityConnectivity.secure),
         ) {
     boot();
 

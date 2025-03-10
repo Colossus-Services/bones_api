@@ -1,6 +1,6 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
-import 'package:postgres/postgres.dart';
+import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
@@ -15,7 +15,6 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_utils_call.dart';
 import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
@@ -34,7 +33,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     DBSQLAdapter.boot();
 
-    Transaction.registerErrorFilter((e, s) => e is PostgreSQLException);
+    Transaction.registerErrorFilter((e, s) => e is PgException);
 
     DBSQLAdapter.registerAdapter([
       'sql.postgres',
@@ -72,6 +71,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
+  final bool onlySecureConnections;
+
   DBPostgreSQLAdapter(this.databaseName, this.username,
       {String? host = 'localhost',
       Object? password,
@@ -79,6 +80,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       int? port = 5432,
       int minConnections = 1,
       int maxConnections = 3,
+      this.onlySecureConnections = false,
       super.generateTables,
       super.checkTables,
       super.populateTables,
@@ -111,7 +113,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               transactionAbort: true,
               tableSQL: true,
               constraintSupport: true,
-              multiIsolateSupport: true),
+              multiIsolateSupport: true,
+              connectivity: DBAdapterCapabilityConnectivity.secureAndUnsecure),
         ) {
     boot();
 
@@ -175,6 +178,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
+    var onlySecureConnections =
+        TypeParser.parseBool(config?['onlySecureConnections'], false)!;
+
     return DBPostgreSQLAdapter(
       database,
       username,
@@ -191,6 +197,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       parentRepositoryProvider: parentRepositoryProvider,
       workingPath: workingPath,
       logSQL: logSql,
+      onlySecureConnections: onlySecureConnections,
     );
   }
 
@@ -232,8 +239,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       Object? previousError) {
     if (error is DBPostgreSQLAdapterException) {
       return error;
-    } else if (error is PostgreSQLException) {
-      if (error.severity == PostgreSQLSeverity.error) {
+    } else if (error is ServerException) {
+      if (error.severity == Severity.error) {
         if (error.code == '23505') {
           return EntityFieldInvalid("unique", error.detail,
               fieldName: error.columnName,
@@ -272,7 +279,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     var count = ++_connectionCount;
 
     for (var i = 0; i < 3; ++i) {
-      var timeout = i == 0 ? 3 : (i == 1 ? 10 : 30);
+      final timeoutSec = i == 0 ? 3 : (i == 1 ? 10 : 30);
+      final timeout = Duration(seconds: timeoutSec);
 
       var connection = await _createConnectionImpl(password, timeout);
 
@@ -298,7 +306,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
             return _createConnectionImpl(password, timeout).then((conn) {
               if (conn == null) {
-                var error = PostgreSQLException(
+                var error = PgException(
                     "Error connecting to: $databaseName@$host:$port");
 
                 _log.severe(
@@ -313,8 +321,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       }
     }
 
-    var error =
-        PostgreSQLException("Error connecting to: $databaseName@$host:$port");
+    var error = PgException("Error connecting to: $databaseName@$host:$port");
 
     _log.severe("Can't connect to PostgreSQL: $databaseName@$host:$port");
 
@@ -322,25 +329,103 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   Future<PostgreSQLConnectionWrapper?> _createConnectionImpl(
-      String password, int timeout) async {
-    var connection = PostgreSQLConnection(host, port, databaseName,
-        username: username, password: password, timeoutInSeconds: timeout);
-    var ok = await tryCallMapped(() => connection.open(),
-        onSuccessValue: true, onErrorValue: false);
+      String password, Duration timeout) async {
+    final endpoint = Endpoint(
+        host: host,
+        port: port,
+        database: databaseName,
+        username: username,
+        password: password);
 
-    if (ok == null || !ok) return null;
+    Connection? connection;
+    if (onlySecureConnections) {
+      connection = await _connectSSLImpl(endpoint, timeout);
+    } else {
+      connection = await (_lastConnectSSLSupported
+          ? _connectSSLImpl(endpoint, timeout)
+          : _connectNoSSLImpl(endpoint, timeout));
+    }
 
-    var connWrapper = PostgreSQLConnectionWrapper(connection);
+    if (connection == null) return null;
+
+    var connWrapper = PostgreSQLConnectionWrapper(connection, endpoint);
 
     _connectionFinalizer.attach(connWrapper, connection);
 
     return connWrapper;
   }
 
-  late final Finalizer<PostgreSQLConnection> _connectionFinalizer =
+  var _lastConnectSSLSupported = true;
+
+  Future<Connection?> _connectSSLImpl(
+      Endpoint endpoint, Duration timeout) async {
+    try {
+      var connection = await Connection.open(
+        endpoint,
+        settings: ConnectionSettings(
+          connectTimeout: timeout,
+          sslMode: SslMode.require,
+        ),
+      );
+      _lastConnectSSLSupported = true;
+      return connection;
+    } on PgException catch (e) {
+      if (!onlySecureConnections &&
+          e.severity == Severity.error &&
+          e.message.contains('not support SSL')) {
+        try {
+          var connection = await Connection.open(
+            endpoint,
+            settings: ConnectionSettings(
+              connectTimeout: timeout,
+              sslMode: SslMode.disable,
+            ),
+          );
+          _lastConnectSSLSupported = false;
+          return connection;
+        } catch (_) {}
+      }
+
+      return null;
+    }
+  }
+
+  Future<Connection?> _connectNoSSLImpl(
+      Endpoint endpoint, Duration timeout) async {
+    try {
+      var connection = await Connection.open(
+        endpoint,
+        settings: ConnectionSettings(
+          connectTimeout: timeout,
+          sslMode: SslMode.disable,
+        ),
+      );
+      _lastConnectSSLSupported = false;
+      return connection;
+    } on PgException catch (e) {
+      if (e.severity == Severity.error &&
+          e.message.contains('not support SSL')) {
+        try {
+          var connection = await Connection.open(
+            endpoint,
+            settings: ConnectionSettings(
+              connectTimeout: timeout,
+              sslMode: SslMode.require,
+            ),
+          );
+          _lastConnectSSLSupported = true;
+          return connection;
+        } catch (_) {}
+      }
+
+      return null;
+    }
+  }
+
+  late final Finalizer<Connection> _connectionFinalizer =
       Finalizer(_finalizeConnection);
 
-  void _finalizeConnection(PostgreSQLConnection connection) {
+  void _finalizeConnection(Connection connection) {
     try {
       // ignore: discarded_futures
       connection.close();
@@ -401,9 +486,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       var sql =
           "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
 
-      var results = await connection.mappedResultsQuery(sql);
-
-      var scheme = results.map((e) => e['']!).toList(growable: false);
+      var scheme = await connection.mappedResultsQuery(sql);
 
       await releaseIntoPool(connection);
 
@@ -434,9 +517,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       var sql =
           "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
 
-      var results = await connection.mappedResultsQuery(sql);
-
-      var scheme = results.map((e) => e['']!).toList(growable: false);
+      var scheme = await connection.mappedResultsQuery(sql);
 
       if (scheme.isEmpty) {
         await releaseIntoPool(connection);
@@ -495,11 +576,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       tbl.relname = '$table';
     ''';
 
-    var results = await connection.mappedResultsQuery(sql);
-
-    var columns = results.map((r) {
-      return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList(growable: false);
+    var columns = await connection.mappedResultsQuery(sql);
 
     var constraintsDefinitions =
         columns.map((m) => m['constraint_definition'].toString()).toList();
@@ -584,11 +661,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       constraint_type = 'PRIMARY KEY' and tc.table_name = '$table';
     ''';
 
-    var results = await connection.mappedResultsQuery(sql);
-
-    var columns = results.map((r) {
-      return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList(growable: false);
+    var columns = await connection.mappedResultsQuery(sql);
 
     var primaryFields = Map.fromEntries(columns
         .map((m) => MapEntry(m['column_name'].toString(), m['data_type'])));
@@ -734,13 +807,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var results = await connection.mappedResultsQuery(sql);
 
-    var names = results
-        .map((e) {
-          var v = e.values.first;
-          return v.values.first;
-        })
-        .map((e) => '$e')
-        .toList();
+    var names = results.map((e) => e.values.first).map((e) => '$e').toList();
 
     return names;
   }
@@ -795,11 +862,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       o.contype = 'f' AND m.relname = '$table' AND o.conrelid IN (SELECT oid FROM pg_class c WHERE c.relkind = 'r') 
     ''';
 
-    var results = await connection.mappedResultsQuery(sql);
-
-    var referenceFields = results.map((r) {
-      return Map.fromEntries(r.values.expand((e) => e.entries));
-    }).toList(growable: false);
+    var referenceFields = await connection.mappedResultsQuery(sql);
 
     var map =
         Map<String, TableFieldReference>.fromEntries(referenceFields.map((e) {
@@ -871,9 +934,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
             substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) {
       var count = results
-          .map((e) {
-            var tableResults = e[table] ?? e[''];
-            var count = tableResults?['count'] ?? 0;
+          .map((row) {
+            var count = row['count'] ?? 0;
             return count is int ? count : int.tryParse(count.toString().trim());
           })
           .whereType<int>()
@@ -895,11 +957,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         .mappedResultsQuery(sql.sql,
             substitutionValues: sql.parametersByPlaceholder)
         .resolveMapped((results) {
-      var ids = results
-          .map((e) => e[table])
-          .whereType<Map<String, dynamic>>()
-          .map((e) => e['id']);
-
+      var ids = results.map((row) => _resolveReturningID(row, sql));
       return parseIDs<I>(ids);
     });
   }
@@ -913,17 +971,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       PostgreSQLConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
-    return connection
-        .mappedResultsQuery(sql.sql,
-            substitutionValues: sql.parametersByPlaceholder)
-        .resolveMapped((results) {
-      var entries = results
-          .map((e) => e[table])
-          .whereType<Map<String, dynamic>>()
-          .toList();
-
-      return entries;
-    });
+    return connection.mappedResultsQuery(sql.sql,
+        substitutionValues: sql.parametersByPlaceholder);
   }
 
   @override
@@ -935,17 +984,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       PostgreSQLConnectionWrapper connection) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
-    return connection
-        .mappedResultsQuery(sql.sql,
-            substitutionValues: sql.parametersByPlaceholder)
-        .resolveMapped((results) {
-      var entries = results
-          .map((e) => e[table])
-          .whereType<Map<String, dynamic>>()
-          .toList();
-
-      return entries;
-    });
+    return connection.mappedResultsQuery(sql.sql,
+        substitutionValues: sql.parametersByPlaceholder);
   }
 
   @override
@@ -1039,14 +1079,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   dynamic _resolveResultID(
-      List<Map<String, Map<String, dynamic>>> results, String table, SQL sql) {
+      List<Map<String, dynamic>> results, String table, SQL sql) {
     if (results.isEmpty) {
       return null;
     }
 
-    var returning = results.first[table];
+    var returning = results.first;
 
-    if (returning == null || returning.isEmpty) {
+    return _resolveReturningID(returning, sql);
+  }
+
+  dynamic _resolveReturningID(Map<String, dynamic> returning, SQL sql) {
+    if (returning.isEmpty) {
       return null;
     } else if (returning.length == 1) {
       var id = returning.values.first;
@@ -1129,33 +1173,48 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 }
 
 /// A [DBPostgreSQLAdapter] connection wrapper.
-class PostgreSQLConnectionWrapper
-    extends DBConnectionWrapper<PostgreSQLExecutionContext> {
-  PostgreSQLConnectionWrapper(super.nativeConnection);
+class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
+  final Endpoint _endpoint;
+
+  PostgreSQLConnectionWrapper(super.nativeConnection, this._endpoint);
 
   @override
   String get connectionURL {
-    var c = nativeConnection as PostgreSQLConnection;
-    return 'postgresql://${c.username}@${c.host}:${c.port}/${c.databaseName}';
+    return 'postgresql://${_endpoint.username}@${_endpoint.host}:${_endpoint.port}/${_endpoint.database}';
   }
 
-  Future<List<Map<String, Map<String, dynamic>>>> mappedResultsQuery(String sql,
-      {Map<String, dynamic>? substitutionValues}) {
+  Future<List<Map<String, dynamic>>> mappedResultsQuery(String sql,
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.mappedResultsQuery(sql,
-        substitutionValues: substitutionValues);
+
+    var rs = await nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+    );
+
+    var mappedResult = rs.map((e) => e.toResultsMap()).toList();
+
+    return mappedResult;
   }
 
-  Future<PostgreSQLResult> query(String sql,
-      {Map<String, dynamic>? substitutionValues}) {
+  Future<Result> query(String sql,
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.query(sql, substitutionValues: substitutionValues);
+    return nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+    );
   }
 
-  Future<int> execute(String sql, {Map<String, dynamic>? substitutionValues}) {
+  Future<int> execute(String sql,
+      {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.execute(sql,
-        substitutionValues: substitutionValues);
+    var rs = await nativeConnection.execute(
+      Sql.named(sql),
+      parameters: substitutionValues,
+      ignoreRows: true,
+    );
+    return rs.affectedRows;
   }
 
   Future openTransaction(
@@ -1163,23 +1222,26 @@ class PostgreSQLConnectionWrapper
         queryBlock, {
     int? commitTimeoutInSeconds,
   }) {
-    var conn = nativeConnection as PostgreSQLConnection;
+    var conn = nativeConnection as Connection;
     updateLastAccessTime();
-    return conn.transaction((transactionContext) => queryBlock(
-        PostgreSQLConnectionTransactionWrapper(this, transactionContext)));
+
+    return conn.runTx(
+      (tx) => queryBlock(
+        PostgreSQLConnectionTransactionWrapper(this, tx, _endpoint),
+      ),
+    );
   }
 
   @override
   bool isClosedImpl() {
     final nativeConnection = this.nativeConnection;
-    return nativeConnection is PostgreSQLConnection &&
-        nativeConnection.isClosed;
+    return nativeConnection is Connection && !nativeConnection.isOpen;
   }
 
   @override
   void closeImpl() {
     final nativeConnection = this.nativeConnection;
-    if (nativeConnection is PostgreSQLConnection) {
+    if (nativeConnection is Connection) {
       try {
         // ignore: discarded_futures
         nativeConnection.close();
@@ -1196,7 +1258,8 @@ class PostgreSQLConnectionTransactionWrapper
     extends PostgreSQLConnectionWrapper {
   final PostgreSQLConnectionWrapper parent;
 
-  PostgreSQLConnectionTransactionWrapper(this.parent, super.nativeConnection);
+  PostgreSQLConnectionTransactionWrapper(
+      this.parent, super.nativeConnection, super.endpoint);
 
   @override
   Future openTransaction(
@@ -1206,8 +1269,10 @@ class PostgreSQLConnectionTransactionWrapper
           {int? commitTimeoutInSeconds}) =>
       queryBlock(this);
 
-  void cancelTransaction({String? reason}) =>
-      nativeConnection.cancelTransaction(reason: reason);
+  void cancelTransaction({String? reason}) {
+    var tx = nativeConnection as TxSession;
+    unawaited(tx.rollback());
+  }
 
   @override
   String get runtimeTypeNameSafe => 'PostgreSQLConnectionTransactionWrapper';
@@ -1226,4 +1291,20 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
       super.parentStackTrace,
       super.operation,
       super.previousError});
+}
+
+extension on ResultRow {
+  Map<String, dynamic> toResultsMap() {
+    final map = <String, dynamic>{};
+
+    for (final (i, col) in schema.columns.indexed) {
+      if (col.columnName case final String name) {
+        map[name] = this[i];
+      } else {
+        map['[$i]'] = this[i];
+      }
+    }
+
+    return map;
+  }
 }

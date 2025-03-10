@@ -91,7 +91,8 @@ class DBObjectMemoryAdapter
               transactions: true,
               transactionAbort: true,
               constraintSupport: false,
-              multiIsolateSupport: false),
+              multiIsolateSupport: false,
+              connectivity: DBAdapterCapabilityConnectivity.none),
         ) {
     boot();
 

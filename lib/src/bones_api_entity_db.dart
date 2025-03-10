@@ -29,6 +29,14 @@ class DBDialect {
   }
 }
 
+/// The [DBAdapterCapability.connectivity].
+enum DBAdapterCapabilityConnectivity {
+  none,
+  unsecure,
+  secure,
+  secureAndUnsecure;
+}
+
 /// [DBAdapter] capabilities.
 class DBAdapterCapability implements WithRuntimeTypeNameSafe {
   /// The dialect of the DB.
@@ -50,16 +58,20 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
   /// - If an adapter tries to initialize inside an auxiliary [Isolate] ([DBAdapter.auxiliaryMode]), it will fail.
   final bool multiIsolateSupport;
 
+  /// The supported connection types.
+  final DBAdapterCapabilityConnectivity connectivity;
+
   const DBAdapterCapability({
     required this.dialect,
     required this.transactions,
     required this.transactionAbort,
     required this.constraintSupport,
     required this.multiIsolateSupport,
+    required this.connectivity,
   });
 
   String get info =>
-      'transactions: $transactions, transactionAbort: $transactionAbort, constraintSupport: $constraintSupport, multiIsolateSupport: $multiIsolateSupport';
+      'transactions: $transactions, transactionAbort: $transactionAbort, constraintSupport: $constraintSupport, multiIsolateSupport: $multiIsolateSupport, connectivity: ${connectivity.name}';
 
   @override
   String get runtimeTypeNameSafe => 'DBAdapterCapability';

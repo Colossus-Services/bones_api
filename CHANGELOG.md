@@ -1,3 +1,27 @@
+## 1.9.3-beta.2
+
+- New `DBAdapterCapabilityConnectivity`.
+
+- `DBAdapterCapability`:
+  - Added field `connectivity`.
+
+- `DBPostgreSQLAdapter`:
+  - Added field `onlySecureConnections`.
+
+- dependency_validator: ^4.1.3
+
+## 1.9.3-beta.1
+
+- `DBPostgreSQLAdapter`:
+  - Upgrade to `postgres` API v3.
+  - Allow SSL connections.
+
+- `Time.parse`: accept format `Time(hh:mm:ss.sss)`
+
+- postgres: ^3.5.4
+- project_template: ^1.1.1
+- archive: ^4.0.4
+
 ## 1.9.2
 
 - `FieldsFromMap`:

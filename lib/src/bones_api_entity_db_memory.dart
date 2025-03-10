@@ -109,7 +109,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
               transactionAbort: true,
               tableSQL: false,
               constraintSupport: false,
-              multiIsolateSupport: false),
+              multiIsolateSupport: false,
+              connectivity: DBAdapterCapabilityConnectivity.none),
         ) {
     boot();
 
