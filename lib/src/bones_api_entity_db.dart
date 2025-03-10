@@ -89,6 +89,20 @@ typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>>
 
 typedef PreFinishDBOperation<T, R> = FutureOr<R> Function(T result);
 
+/// The [DBAdapter.connectivity] type.
+enum DBAdapterConnectivity {
+  any,
+  secure,
+  insecure,
+  secureAndInsecure;
+
+  bool get allowSecure =>
+      this == any || this == secure || this == secureAndInsecure;
+
+  bool get allowInsecure =>
+      this == any || this == insecure || this == secureAndInsecure;
+}
+
 /// Base class for DB adapters.
 ///
 /// A [DBAdapter] implementation is responsible to connect to the database and
@@ -178,6 +192,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   /// The DB dialect name of this adapter.
   String get dialectName => capability.dialect.name;
 
+  /// The type of connectivity.
+  final DBAdapterConnectivity connectivity;
+
   final EntityRepositoryProvider? parentRepositoryProvider;
 
   static int _instanceIDCount = 0;
@@ -188,6 +205,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   DBAdapter(
       this.name, this.minConnections, this.maxConnections, this.capability,
       {this.parentRepositoryProvider,
+      this.connectivity = DBAdapterConnectivity.any,
       Object? populateSource,
       Object? populateSourceVariables,
       String? workingPath})
