@@ -345,19 +345,21 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         password: password);
 
     Connection? connection;
+    bool? secure;
     if (connectivity == DBAdapterConnectivity.secure) {
-      connection = await _connectSSLImpl(endpoint, timeout);
+      (connection, secure) = await _connectSSLImpl(endpoint, timeout);
     } else if (connectivity == DBAdapterConnectivity.insecure) {
-      connection = await _connectNoSSLImpl(endpoint, timeout);
+      (connection, secure) = await _connectNoSSLImpl(endpoint, timeout);
     } else {
-      connection = await (_lastConnectSSLSupported
+      (connection, secure) = await (_lastConnectSSLSupported
           ? _connectSSLImpl(endpoint, timeout)
           : _connectNoSSLImpl(endpoint, timeout));
     }
 
     if (connection == null) return null;
 
-    var connWrapper = PostgreSQLConnectionWrapper(connection, endpoint);
+    var connWrapper = PostgreSQLConnectionWrapper(connection, endpoint.username,
+        endpoint.host, endpoint.port, endpoint.database, secure ?? false);
 
     _connectionFinalizer.attach(connWrapper, connection);
 
@@ -366,7 +368,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
   var _lastConnectSSLSupported = true;
 
-  Future<Connection?> _connectSSLImpl(
+  Future<(Connection?, bool?)> _connectSSLImpl(
       Endpoint endpoint, Duration timeout) async {
     try {
       var connection = await Connection.open(
@@ -377,7 +379,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ),
       );
       _lastConnectSSLSupported = true;
-      return connection;
+      return (connection, true);
     } catch (e) {
       if (connectivity.allowInsecure) {
         try {
@@ -389,15 +391,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
             ),
           );
           _lastConnectSSLSupported = false;
-          return connection;
+          return (connection, false);
         } catch (_) {}
       }
 
-      return null;
+      return (null, null);
     }
   }
 
-  Future<Connection?> _connectNoSSLImpl(
+  Future<(Connection?, bool?)> _connectNoSSLImpl(
       Endpoint endpoint, Duration timeout) async {
     try {
       var connection = await Connection.open(
@@ -408,7 +410,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ),
       );
       _lastConnectSSLSupported = false;
-      return connection;
+      return (connection, false);
     } catch (e) {
       if (connectivity.allowSecure) {
         try {
@@ -420,11 +422,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
             ),
           );
           _lastConnectSSLSupported = true;
-          return connection;
+          return (connection, true);
         } catch (_) {}
       }
 
-      return null;
+      return (null, null);
     }
   }
 
@@ -1180,13 +1182,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
 /// A [DBPostgreSQLAdapter] connection wrapper.
 class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
-  final Endpoint _endpoint;
+  final String? username;
+  final String host;
+  final int port;
+  final String database;
+  final bool secure;
 
-  PostgreSQLConnectionWrapper(super.nativeConnection, this._endpoint);
+  PostgreSQLConnectionWrapper(super.nativeConnection, this.username, this.host,
+      this.port, this.database, this.secure);
 
   @override
   String get connectionURL {
-    return 'postgresql://${_endpoint.username}@${_endpoint.host}:${_endpoint.port}/${_endpoint.database}';
+    return "postgresql://$username@$host:$port/$database${secure ? '?sslmode=require' : ''}";
   }
 
   Future<List<Map<String, dynamic>>> mappedResultsQuery(String sql,
@@ -1233,7 +1240,8 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
 
     return conn.runTx(
       (tx) => queryBlock(
-        PostgreSQLConnectionTransactionWrapper(this, tx, _endpoint),
+        PostgreSQLConnectionTransactionWrapper(
+            this, tx, username, host, port, database, secure),
       ),
     );
   }
@@ -1264,8 +1272,8 @@ class PostgreSQLConnectionTransactionWrapper
     extends PostgreSQLConnectionWrapper {
   final PostgreSQLConnectionWrapper parent;
 
-  PostgreSQLConnectionTransactionWrapper(
-      this.parent, super.nativeConnection, super.endpoint);
+  PostgreSQLConnectionTransactionWrapper(this.parent, super.nativeConnection,
+      super.username, super.host, super.port, super.database, super.secure);
 
   @override
   Future openTransaction(

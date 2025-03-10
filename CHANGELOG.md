@@ -1,3 +1,12 @@
+## 1.9.3-beta.5
+
+- `DBPostgreSQLAdapter`:
+
+- `PostgreSQLConnectionWrapper`:
+  - Remove field `_endpoint`.
+  - Added fields `username`, `host`, `port`, `database`, `secure`.
+  - `connectionURL`: appended query string with `sslmode`.
+
 ## 1.9.3-beta.4
 
 - `DBPostgreSQLAdapter`:
