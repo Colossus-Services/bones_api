@@ -1,8 +1,10 @@
 ## 1.9.3-beta.6
 
 - args: ^2.7.0
-- postgres: ^3.5.5
-- archive: ^4.0.5
+- postgres: ^3.5.6
+- archive: ^4.0.7
+
+- coverage: ^1.12.0
 
 ## 1.9.3-beta.5
 

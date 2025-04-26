@@ -546,8 +546,11 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     var type = this.type;
 
     Type? entityType;
+
     if (type.isEntityReferenceBaseType) {
       entityType = arguments0?.type;
+    } else if (isList) {
+      entityType = type;
     } else {
       entityType = type;
     }
