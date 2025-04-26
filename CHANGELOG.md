@@ -1,7 +1,7 @@
 ## 1.9.3-beta.6
 
-- `TypeInfoEntityExtension`:
-  - `entityType`: also handle `List<Entity>`, returning the `List` generic type.
+- `TypeInfoEntityExtension`, `TypeReflectionEntityExtension`:
+  - `entityType`: also handle `List<E>`, returning the `List` generic type (`E`).
 
 - args: ^2.7.0
 - postgres: ^3.5.6
