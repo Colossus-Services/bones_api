@@ -693,6 +693,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
               entityProvider: entityProvider,
               entityHandlerProvider: entityHandlerProvider,
               entityCache: entityCache));
+        } else if (t.isListEntity) {
+          var entityType = t.arguments0 ?? TypeInfo.tObject;
+          v2 = v2.resolveMapped((val) => entityType.toCastedList(val));
         }
       }
 
@@ -1414,7 +1417,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
           if (enumFields.containsKey(field)) return null;
 
-          if (typeInfo.isEntityReferenceListType) return null;
+          if (typeInfo.isListEntityOrReference) return null;
 
           var entityType = typeInfo.entityType;
           if (entityType == null) return null;
