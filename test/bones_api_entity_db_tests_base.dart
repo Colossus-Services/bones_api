@@ -242,6 +242,11 @@ Future<bool> runAdapterTests(
       expect(sqlAdapter.isInitialized, isTrue,
           reason: "`DBSQLAdapter` not initialized: $sqlAdapter");
 
+      if (checkTables) {
+        var checkOK = await sqlAdapter.checkDBTables();
+        expect(checkOK, isTrue, reason: "sqlAdapter.checkDBTables()");
+      }
+
       await Future.delayed(Duration(seconds: 1));
     });
 
