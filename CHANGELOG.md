@@ -14,6 +14,11 @@
 - `EntityHandler`:
   - `resolveFieldsValues`: ensure that `List<E>` fields are casted to the list, using `entityType.toCastedList(val)`.
 
+- New `InitializationError`.
+ 
+- `Initializable`: better handling of errors of dependencies while initializing.
+
+- async_extension: ^1.2.15
 - args: ^2.7.0
 - postgres: ^3.5.6
 - archive: ^4.0.7
