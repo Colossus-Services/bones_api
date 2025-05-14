@@ -478,7 +478,8 @@ extension TypeReflectionEntityExtension<T> on TypeReflection<T> {
   bool get isEntityReferenceListType => type == EntityReferenceList;
 
   /// Returns a valid entity [Type].
-  /// If this [TypeInfo] is an [EntityReference] it will return the [EntityReference.type].
+  /// - If this [TypeInfo] is an [EntityReferenceBase] it will return the [EntityReferenceBase.type].
+  /// - If this [TypeInfo] is an [List] it will return the [arguments0].
   /// See [EntityHandler.isValidEntityType].
   Type? get entityType {
     var type = this.type;
@@ -487,6 +488,8 @@ extension TypeReflectionEntityExtension<T> on TypeReflection<T> {
     if (type.isEntityReferenceBaseType) {
       var arguments = this.arguments;
       entityType = arguments.isNotEmpty ? arguments0!.type : null;
+    } else if (isListType) {
+      entityType = arguments0?.type;
     } else {
       entityType = type;
     }
@@ -540,13 +543,17 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       type == EntityReference || type == EntityReferenceList;
 
   /// Returns a valid entity [Type].
-  /// If this [TypeInfo] is an [EntityReference] it will return the [EntityReference.type].
+  /// - If this [TypeInfo] is an [EntityReferenceBase] it will return the [EntityReferenceBase.type].
+  /// - If this [TypeInfo] is an [List] it will return the [arguments0].
   /// See [EntityHandler.isValidEntityType].
   Type? get entityType {
     var type = this.type;
 
     Type? entityType;
+
     if (type.isEntityReferenceBaseType) {
+      entityType = arguments0?.type;
+    } else if (isList) {
       entityType = arguments0?.type;
     } else {
       entityType = type;
@@ -762,6 +769,20 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entityFetcher: entityFetcher,
           entityCache: entityCache);
     }
+  }
+
+  List<E>? toCastedList<E>(Object? val) {
+    return callCasted<List?>(<A>() {
+      if (val is List<A>) {
+        return val;
+      } else if (val is Iterable<A>) {
+        return val.toList();
+      } else if (val is A) {
+        return <A>[val];
+      } else {
+        return null;
+      }
+    }) as List<E>?;
   }
 
   EntityReferenceList<T> toEntityReferenceList(Object? o,

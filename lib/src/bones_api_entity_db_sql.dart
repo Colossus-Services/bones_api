@@ -579,8 +579,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         alterTablesSQLs.removeAt(0);
       }
 
-      _log.info(
-          'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
+      if (alterTablesSQLs.isNotEmpty) {
+        _log.info(
+            'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
+      }
 
       var allErrors = repositoriesChecksErrors.join('\n');
 
@@ -664,7 +666,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var referenceFields = repoFieldsNotInScheme
         .map((f) => _checkDBTableSchemeReferenceField(
-            entityHandler, scheme, repoTable, f))
+            entityHandler, scheme, repoTable, f,
+            allowCollectionFields: false))
+        .nonNulls
+        .toMapFromEntries();
+
+    var collectionReferenceFields = repoFieldsNotInScheme
+        .map((f) => _checkDBTableSchemeReferenceField(
+            entityHandler, scheme, repoTable, f,
+            allowCollectionFields: true))
         .nonNulls
         .toMapFromEntries();
 
@@ -673,9 +683,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .map((e) => e.key)
         .toList();
 
+    var missingCollectionReferenceColumns = collectionReferenceFields.entries
+        .where((e) => e.value == null)
+        .map((e) => e.key)
+        .toList();
+
     var missingColumns = repoFieldsNames
-        .whereNot(
-            (f) => fieldsInScheme.contains(f) || referenceFields.containsKey(f))
+        .whereNot((f) =>
+            fieldsInScheme.contains(f) ||
+            referenceFields.containsKey(f) ||
+            collectionReferenceFields.containsKey(f))
         .toList();
 
     var missingFieldReferenceConstraints = <String>{};
@@ -797,6 +814,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
+        missingCollectionReferenceColumns.isNotEmpty ||
         missingFieldReferenceConstraints.isNotEmpty ||
         missingUniqueConstraints.isNotEmpty ||
         missingEnumConstraints.isNotEmpty ||
@@ -805,6 +823,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
           "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
           "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
+          "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
           "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
           "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
           "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
@@ -817,6 +836,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingReferenceColumns
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingCollectionReferenceColumns
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingFieldReferenceConstraints
@@ -842,17 +864,20 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   MapEntry<String, TableRelationshipReference?>?
-      _checkDBTableSchemeReferenceField(
-    EntityHandler<Object> entityHandler,
-    TableScheme scheme,
-    String table,
-    String fieldName,
-  ) {
+      _checkDBTableSchemeReferenceField(EntityHandler<Object> entityHandler,
+          TableScheme scheme, String table, String fieldName,
+          {required bool allowCollectionFields}) {
     var fieldType =
         entityHandler.getFieldType(null, fieldName, resolveFiledName: false);
     if (fieldType == null) return null;
+
+    if (!allowCollectionFields && fieldType.isListEntityOrReference) {
+      return null;
+    }
+
     var entityType = fieldType.entityTypeInfo ?? fieldType.listEntityType;
     if (entityType == null) return null;
+
     var targetTable = getTableForType(entityType);
     if (targetTable == null) return null;
 
@@ -2597,6 +2622,8 @@ class _DBTableCheck {
 
   List<_DBTableColumn>? missingReferenceColumns;
 
+  List<_DBTableColumn>? missingCollectionReferenceColumns;
+
   List<_DBTableColumn>? missingReferenceConstraints;
 
   List<_DBTableColumn>? missingUniqueConstraints;
@@ -2609,6 +2636,7 @@ class _DBTableCheck {
       this.scheme,
       this.missingColumns,
       this.missingReferenceColumns,
+      this.missingCollectionReferenceColumns,
       this.missingReferenceConstraints,
       this.missingUniqueConstraints,
       this.missingEnumConstraints,
@@ -2624,6 +2652,7 @@ class _DBTableCheck {
       error == null &&
       (missingColumns?.isEmpty ?? true) &&
       (missingReferenceColumns?.isEmpty ?? true) &&
+      (missingCollectionReferenceColumns?.isEmpty ?? true) &&
       (missingReferenceConstraints?.isEmpty ?? true) &&
       (missingUniqueConstraints?.isEmpty ?? true) &&
       (missingEnumConstraints?.isEmpty ?? true) &&
@@ -2715,8 +2744,12 @@ class _DBTableCheck {
   String toString() {
     var missingColumns = this.missingColumns ?? [];
     var missingReferenceColumns = this.missingReferenceColumns ?? [];
+    var missingCollectionReferenceColumns =
+        this.missingCollectionReferenceColumns ?? [];
 
-    if (missingColumns.isNotEmpty || missingReferenceColumns.isNotEmpty) {
+    if (missingColumns.isNotEmpty ||
+        missingReferenceColumns.isNotEmpty ||
+        missingCollectionReferenceColumns.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
 
@@ -2728,6 +2761,11 @@ class _DBTableCheck {
           .map((e) => '${e.type.toString(withT: false)} ${e.name}')
           .join(' , ');
 
+      var missingCollectionReferenceColumnsStr =
+          missingCollectionReferenceColumns
+              .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+              .join(' , ');
+
       var errorMsg = [
         "Can't find all `$repoType` fields in table `$schemeTableName` scheme:",
         "  -- repository: $repository\n  -- scheme: $scheme",
@@ -2735,6 +2773,8 @@ class _DBTableCheck {
           "  -- missingColumns: [$missingColumnsStr]",
         if (missingReferenceColumns.isNotEmpty)
           "  -- missingReferenceColumns: [$missingReferenceColumnsStr]",
+        if (missingCollectionReferenceColumns.isNotEmpty)
+          "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
       ].join('\n');
 
       return '$errorMsg\n';

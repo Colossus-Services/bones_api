@@ -119,8 +119,14 @@ class InitializationResult {
   /// The dependencies of this [Initializable] instance.
   final List<Initializable> dependencies;
 
+  /// The thrown error, if any.
+  final Object? error;
+
+  /// The thrown error [StackTrace], if any.
+  final StackTrace? stackTrace;
+
   InitializationResult(this.initializable, this.ok,
-      {Iterable<Initializable>? dependencies})
+      {Iterable<Initializable>? dependencies, this.error, this.stackTrace})
       : dependencies = dependencies?.toList() ?? <Initializable>[];
 
   factory InitializationResult.ok(Initializable initializable,
@@ -129,8 +135,10 @@ class InitializationResult {
         dependencies: dependencies);
   }
 
-  factory InitializationResult.error(Initializable initializable) =>
-      InitializationResult(initializable, false);
+  factory InitializationResult.error(Initializable initializable,
+          [Object? error, StackTrace? stackTrace]) =>
+      InitializationResult(initializable, false,
+          error: error, stackTrace: stackTrace);
 
   @override
   String toString() {
@@ -138,8 +146,39 @@ class InitializationResult {
         ? '->${dependencies.length <= 3 ? dependencies.toInitializationStatus() : dependencies.length}'
         : '';
 
-    return '[${ok ? 'OK' : 'ERROR'}]@${initializable.initializationStatus}$depsStr';
+    if (ok) {
+      return '[OK]@${initializable.initializationStatus}$depsStr';
+    } else {
+      var s = '[ERROR]@${initializable.initializationStatus}$depsStr';
+      return error == null
+          ? s
+          : (stackTrace == null ? '$s\n$error' : '$s\n$error\n$stackTrace');
+    }
   }
+}
+
+extension IterableInitializationResultExtension
+    on Iterable<InitializationResult> {
+  List<InitializationResult> whereOk() => where((e) => e.ok).toList();
+
+  List<InitializationResult> whereNotOk() => where((e) => !e.ok).toList();
+
+  String allToString() => map((e) {
+        var s = e.toString().replaceAll('\n', '\n     ').trim();
+        return '  -- $s';
+      }).join('\n');
+
+  String errorsToString() => whereNotOk().allToString();
+}
+
+/// An [Initializable] initialization error. Extends [StateError].
+class InitializationError extends StateError {
+  final Initializable initializable;
+
+  InitializationError(this.initializable, super.message) : super();
+
+  @override
+  String toString() => "Initialization error> $message";
 }
 
 class _InitializationChain {
@@ -270,7 +309,8 @@ class _InitializationChain {
   void _checkDependency(Initializable dependency) {
     var dependencies = _dependencies;
     if (dependencies == null || !dependencies.containsIdentical(dependency)) {
-      throw StateError("Dependency not in chain: $dependency");
+      throw InitializationError(initializable,
+          "Dependency not in chain: $dependency\nInitializable: $initializable");
     }
   }
 
@@ -346,7 +386,8 @@ class _InitializationChain {
 
     var prev = initializedDependenciesCompleters[dependency];
     if (prev != null && !identical(prev, completer)) {
-      throw StateError("Dependency completer already set!");
+      throw InitializationError(initializable,
+          "Dependency completer already set!\nInitializable: $initializable");
     }
 
     initializedDependenciesCompleters[dependency] = completer;
@@ -576,26 +617,39 @@ mixin Initializable {
       status._markAsynchronous(true);
 
       return _initializeDependenciesAsync = initDeps.then((initDeps) async {
-        return _doDependenciesInitialization(initDeps)
-            .resolveMapped((depsInit) {
-          _checkAllDependenciesOk(depsInit.results);
-          return _callInitialize();
-        });
-      });
+        return _doDependenciesInitialization.tryCallThen(
+          initDeps,
+          (depsInit) {
+            _checkAllDependenciesOk(depsInit.results);
+            return _callInitialize();
+          },
+          onError: (e, s) => _onInitializationError(e, s),
+        );
+      }, onError: (e, s) => _onInitializationError(e, s));
     } else {
       var hasAsyncDep = initDeps.any((dep) => dep.isAsyncInitialization);
       status._markAsynchronous(hasAsyncDep);
 
-      return _doDependenciesInitialization(initDeps).resolveMapped((depsInit) {
-        _checkAllDependenciesOk(depsInit.results);
-        return _callInitialize();
-      });
+      return _doDependenciesInitialization.tryCallThen(
+        initDeps,
+        (depsInit) {
+          _checkAllDependenciesOk(depsInit.results);
+          return _callInitialize();
+        },
+        onError: (e, s) => _onInitializationError(e, s),
+      );
     }
   }
 
+  InitializationResult _onInitializationError(e, s) =>
+      InitializationResult.error(this, e, s);
+
   void _checkAllDependenciesOk(List<InitializationResult> depsInit) {
-    if (depsInit.any((res) => !res.ok)) {
-      throw StateError("Error initializing dependencies: $this");
+    var depsWithError = depsInit.where((res) => !res.ok).toList();
+    if (depsWithError.isNotEmpty) {
+      var errors = depsWithError.allToString();
+      throw InitializationError(
+          this, "Error initializing dependencies: $this\n$errors");
     }
   }
 
@@ -714,13 +768,20 @@ mixin Initializable {
   }
 
   FutureOr<InitializationResult> _callInitialize() {
-    var ret = initialize();
+    try {
+      var ret = initialize();
 
-    if (ret is Future<InitializationResult>) {
-      _status._markAsynchronous(true);
-      return _initializeAsync = ret.then(_finalizeInitialization);
-    } else {
-      return _finalizeInitialization(ret);
+      if (ret is Future<InitializationResult>) {
+        _status._markAsynchronous(true);
+        return _initializeAsync = ret.then(
+          _finalizeInitialization,
+          onError: (e, s) => _onInitializationError(e, s),
+        );
+      } else {
+        return _finalizeInitialization(ret);
+      }
+    } catch (e, s) {
+      return InitializationResult.error(this, e, s);
     }
   }
 
@@ -729,7 +790,7 @@ mixin Initializable {
     if (!result.ok) {
       _log.info(
           '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR');
-      throw StateError("Error initializing (async): $this");
+      throw InitializationError(this, "Error initializing (async): $this");
     }
 
     _status._setFinalizing();
@@ -751,26 +812,31 @@ mixin Initializable {
       return result;
     }
 
-    return _doDependenciesInitialization(dependencies)
-        .resolveMapped((depsResults) {
-      if (depsResults.hasSkipped) {
-        var skipped = depsResults.skipped
-            ?.notInitialized(ignoreFinalizing: true)
-            .toList();
+    return _doDependenciesInitialization.tryCallThen(
+      dependencies,
+      (depsResults) {
+        if (depsResults.hasSkipped) {
+          var skipped = depsResults.skipped
+              ?.notInitialized(ignoreFinalizing: true)
+              .toList();
 
-        if (skipped?.isNotEmpty ?? false) {
-          return _doDependenciesInitialization(dependencies,
-                  forceCircular: true)
-              .resolveMapped((depsResults2) {
-            var allDepsResults =
-                depsResults.merge(depsResults2, dependencies: dependencies);
-            return _finalizeInitializationWithDeps(allDepsResults, result);
-          });
+          if (skipped?.isNotEmpty ?? false) {
+            return (() => _doDependenciesInitialization(dependencies,
+                forceCircular: true)).tryCallThen(
+              (depsResults2) {
+                var allDepsResults =
+                    depsResults.merge(depsResults2, dependencies: dependencies);
+                return _finalizeInitializationWithDeps(allDepsResults, result);
+              },
+              onError: (e, s) => _onInitializationError(e, s),
+            );
+          }
         }
-      }
 
-      return _finalizeInitializationWithDeps(depsResults, result);
-    });
+        return _finalizeInitializationWithDeps(depsResults, result);
+      },
+      onError: (e, s) => _onInitializationError(e, s),
+    );
   }
 
   FutureOr<InitializationResult> _finalizeInitializationWithDeps(
@@ -874,7 +940,7 @@ mixin Initializable {
 
   /// Checks if this instance is initialized.
   ///
-  /// Throws a [StateError] if is not initialized and
+  /// Throws a [InitializationError] if is not initialized and
   /// can't initialize it synchronously.
   void checkInitialized() {
     if (!isInitialized) {
@@ -883,8 +949,8 @@ mixin Initializable {
       // ignore: discarded_futures
       var ret = _doInitializationImpl();
       if (ret is Future<InitializationResult>) {
-        throw StateError(
-            "Not initialized yet! Async initialization for: $this");
+        throw InitializationError(
+            this, "Not initialized yet! Async initialization for: $this");
       }
     }
   }
@@ -901,13 +967,13 @@ mixin Initializable {
     if (ret is Future<InitializationResult>) {
       return ret.then((result) {
         if (!result.ok) {
-          throw StateError("Error initializing (async): $this");
+          throw InitializationError(this, "Error initializing (async): $this");
         }
         return callback();
       });
     } else {
       if (!ret.ok) {
-        throw StateError("Error initializing: $this");
+        throw InitializationError(this, "Error initializing: $this");
       }
 
       return callback();

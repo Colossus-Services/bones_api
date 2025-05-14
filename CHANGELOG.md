@@ -1,8 +1,29 @@
 ## 1.9.3-beta.6
 
+- `TypeInfoEntityExtension`, `TypeReflectionEntityExtension`:
+  - `entityType`: also handle `List<E>`, returning the `List` generic type (`E`).
+
+- `TypeInfoEntityExtension`:
+  - Added `toCastedList`.
+
+- `DBSQLAdapter`:
+  - `_checkDBTableScheme`:
+    - Separate references and collection references in `referenceFields` and `collectionReferenceFields`. 
+  - `_DBTableCheck`: added field `missingCollectionReferenceColumns`.
+
+- `EntityHandler`:
+  - `resolveFieldsValues`: ensure that `List<E>` fields are casted to the list, using `entityType.toCastedList(val)`.
+
+- New `InitializationError`.
+ 
+- `Initializable`: better handling of errors of dependencies while initializing.
+
+- async_extension: ^1.2.15
 - args: ^2.7.0
-- postgres: ^3.5.5
-- archive: ^4.0.5
+- postgres: ^3.5.6
+- archive: ^4.0.7
+
+- coverage: ^1.12.0
 
 ## 1.9.3-beta.5
 
