@@ -3,6 +3,15 @@
 - `GenericEntityHandler`, `ClassReflectionEntityHandler`:
   - `getFieldType`: if the field doesn't have a setter do not use cached fileds types.
 
+- meta: ^1.17.0
+- gcloud: ^0.8.19
+- http: ^1.4.0
+- googleapis_auth: ^2.0.0
+
+- test: ^1.26.2
+- coverage: ^1.14.1
+- vm_service: ^15.0.2
+
 ## 1.9.3-beta.6
 
 - `TypeInfoEntityExtension`, `TypeReflectionEntityExtension`:
