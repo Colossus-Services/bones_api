@@ -9,7 +9,7 @@ linter:
     avoid_dynamic_calls: true
     avoid_type_to_string: true
     no_runtimeType_toString: true
-    discarded_futures: true
+    discarded_futures: false
     no_adjacent_strings_in_list: true
     library_annotations: false
 
