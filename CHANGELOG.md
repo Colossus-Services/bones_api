@@ -1,3 +1,8 @@
+## 1.9.3-beta.7
+
+- `GenericEntityHandler`, `ClassReflectionEntityHandler`:
+  - `getFieldType`: if the field doesn't have a setter do not use cached fileds types.
+
 ## 1.9.3-beta.6
 
 - `TypeInfoEntityExtension`, `TypeReflectionEntityExtension`:

@@ -2449,7 +2449,9 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
           fieldType = fieldsTypes[resolvedFieldName];
         }
       }
-    } else if (o != null) {
+    }
+
+    if (fieldType == null && o != null) {
       fieldType = o.getFieldType(key);
 
       if (fieldType == null && resolveFiledName) {
@@ -2593,7 +2595,9 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
           fieldType = fieldsTypes[resolvedFieldName];
         }
       }
-    } else {
+    }
+
+    if (fieldType == null) {
       var field = reflection.field(key, o);
 
       if (field == null && resolveFiledName) {
