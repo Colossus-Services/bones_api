@@ -1314,6 +1314,9 @@ class APIServer extends _APIServerBase {
   static Uint8List _loadPayloadBytes(
       Request request, List<List<int>> payloadBlocks,
       {int? maxPayloadLength, bool? decompressPayload}) {
+    maxPayloadLength ??= -1;
+    decompressPayload ??= false;
+
     Uint8List bytes;
 
     if (payloadBlocks.length == 1) {
@@ -1326,18 +1329,14 @@ class APIServer extends _APIServerBase {
 
       assert(bytes.length == bs0.length);
 
-      if (maxPayloadLength != null &&
-          maxPayloadLength >= 0 &&
-          bytes.length > maxPayloadLength) {
+      if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
         throw StateError(
             "Payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
       }
     } else {
       var allBytesSz = payloadBlocks.map((e) => e.length).sum;
 
-      if (maxPayloadLength != null &&
-          maxPayloadLength >= 0 &&
-          allBytesSz > maxPayloadLength) {
+      if (maxPayloadLength >= 0 && allBytesSz > maxPayloadLength) {
         throw StateError(
             "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).");
       }
@@ -1356,12 +1355,11 @@ class APIServer extends _APIServerBase {
       assert(bytesOffset == allBytesSz);
     }
 
-    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    if (decompressPayload && bytes.isNotEmpty) {
+      var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
 
-    if (contentEncoding != null &&
-        (decompressPayload ?? false) &&
-        bytes.isNotEmpty) {
       switch (contentEncoding) {
+        case null:
         case '':
         case 'identity':
           {
@@ -1369,8 +1367,7 @@ class APIServer extends _APIServerBase {
           }
         case 'gzip':
           {
-            bytes =
-                _decodePayloadGzip(bytes, maxPayloadLength: maxPayloadLength);
+            bytes = _decodePayloadGzip(bytes, maxPayloadLength);
           }
         case 'deflate':
           {
@@ -1385,9 +1382,8 @@ class APIServer extends _APIServerBase {
     return bytes;
   }
 
-  static Uint8List _decodePayloadGzip(Uint8List bytes,
-      {int? maxPayloadLength}) {
-    if (maxPayloadLength != null && maxPayloadLength >= 0) {
+  static Uint8List _decodePayloadGzip(Uint8List bytes, int maxPayloadLength) {
+    if (maxPayloadLength >= 0) {
       final byteData = ByteData.sublistView(bytes);
       var gzipUncompressedSize =
           byteData.getUint32(bytes.length - 4, Endian.little);
@@ -1399,6 +1395,14 @@ class APIServer extends _APIServerBase {
     }
 
     var decoded = gzip.decode(bytes);
+
+    if (maxPayloadLength >= 0) {
+      if (decoded.length > maxPayloadLength) {
+        throw StateError(
+            "Decompressed GZip payload size (${decoded.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+      }
+    }
+
     return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
   }
 
