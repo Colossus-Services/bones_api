@@ -124,6 +124,23 @@ class APIServerConfig {
   /// The maximum `Content-Length` (in bytes) allowed for a cached [Response]. Default: 10M
   final int staticFilesCacheMaxContentLength;
 
+  /// The maximum allowed request payload size in bytes.
+  ///
+  /// If set, any request with a payload larger than this value will be
+  /// rejected with a 500 Bad Request response.
+  ///
+  /// Default: null (no size limit).
+  final int? maxPayloadLength;
+
+  /// Whether to decompress the request payload if it is compressed using
+  /// a supported `Content-Encoding` (e.g., gzip or deflate).
+  ///
+  /// If `true`, the payload will be automatically decompressed before processing.
+  /// If `false`, compressed payloads will be left as-is.
+  ///
+  /// Default: false.
+  final bool decompressPayload;
+
   /// If `true` log messages to [stdout] (console).
   late final bool logToConsole;
 
@@ -164,6 +181,8 @@ class APIServerConfig {
     bool? cacheStaticFilesResponses,
     int? staticFilesCacheMaxMemorySize,
     int? staticFilesCacheMaxContentLength,
+    this.maxPayloadLength,
+    this.decompressPayload = false,
     this.apiConfig,
     bool? logToConsole,
     bool? logQueue,
@@ -260,6 +279,9 @@ class APIServerConfig {
     var staticFilesCacheMaxContentLength =
         a.optionAsInt('static-files-cache-max-content-length');
 
+    var maxPayloadLength = a.optionAsInt('max-payload-length');
+    var decompressPayload = a.flag('decompress-payload');
+
     var logToConsole = a.flagOr('log-toConsole', null);
 
     var logQueue = a.flagOr('log-queue', null);
@@ -308,6 +330,8 @@ class APIServerConfig {
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
+      maxPayloadLength: maxPayloadLength,
+      decompressPayload: decompressPayload,
       serverResponseDelay: serverResponseDelay,
       apiConfig: apiConfig,
       logToConsole: logToConsole,
@@ -697,6 +721,8 @@ class APIServerConfig {
         'cacheStaticFilesResponses': cacheStaticFilesResponses,
         'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
         'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
+        'maxPayloadLength': maxPayloadLength,
+        'decompressPayload': decompressPayload,
         'logToConsole': logToConsole,
         'logQueue': logQueue,
         if (args.isNotEmpty) 'args': args.toList(),
@@ -720,6 +746,8 @@ class APIServerConfig {
       apiCacheControl: json['apiCacheControl'],
       staticFilesCacheControl: json['staticFilesCacheControl'],
       cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
+      maxPayloadLength: json['maxPayloadLength'],
+      decompressPayload: json['decompressPayload'],
       logToConsole: json['logToConsole'],
       logQueue: json['logQueue'],
       args: json['args'],
@@ -767,6 +795,8 @@ abstract class _APIServerBase extends APIServerConfig {
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
+    super.maxPayloadLength,
+    super.decompressPayload,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -796,6 +826,8 @@ abstract class _APIServerBase extends APIServerConfig {
               apiServerConfig.staticFilesCacheMaxMemorySize,
           staticFilesCacheMaxContentLength:
               apiServerConfig.staticFilesCacheMaxContentLength,
+          maxPayloadLength: apiServerConfig.maxPayloadLength,
+          decompressPayload: apiServerConfig.decompressPayload,
           serverResponseDelay: apiServerConfig.serverResponseDelay,
           logToConsole: apiServerConfig.logToConsole,
           logQueue: apiServerConfig.logQueue,
@@ -912,6 +944,8 @@ class APIServer extends _APIServerBase {
     super.apiCacheControl,
     super.staticFilesCacheControl,
     super.cacheStaticFilesResponses,
+    super.maxPayloadLength,
+    super.decompressPayload,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -1003,6 +1037,8 @@ class APIServer extends _APIServerBase {
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
+      maxPayloadLength: maxPayloadLength,
+      decompressPayload: decompressPayload,
       letsEncryptDirectory: letsEncryptDirectory,
       securePort: securePort,
       useSessionID: useSessionID,
@@ -1032,7 +1068,10 @@ class APIServer extends _APIServerBase {
 
   /// Converts a [request] to an [APIRequest].
   static FutureOr<APIRequest> toAPIRequest(Request request,
-      {required bool cookieless, required bool useSessionID}) {
+      {required bool cookieless,
+      required bool useSessionID,
+      int? maxPayloadLength,
+      bool? decompressPayload}) {
     var requestTime = DateTime.now();
 
     var method = parseAPIRequestMethod(request.method) ?? APIRequestMethod.GET;
@@ -1094,7 +1133,10 @@ class APIServer extends _APIServerBase {
 
     var parsingDuration = DateTime.now().difference(requestTime);
 
-    return _resolvePayload(request).resolveMapped((payloadResolved) {
+    return _resolvePayload(request,
+            maxPayloadLength: maxPayloadLength,
+            decompressPayload: decompressPayload)
+        .resolveMapped((payloadResolved) {
       var mimeType = payloadResolved?.$1;
       var payload = payloadResolved?.$2;
 
@@ -1158,8 +1200,17 @@ class APIServer extends _APIServerBase {
   static final MimeType _mimeTypeTextPlain =
       MimeType.parse(MimeType.textPlain)!;
 
-  static Future<(MimeType, Object)?> _resolvePayload(Request request) {
+  static FutureOr<(MimeType, Object)?> _resolvePayload(Request request,
+      {int? maxPayloadLength, bool? decompressPayload}) {
     var contentLength = request.contentLength;
+
+    if (maxPayloadLength != null &&
+        maxPayloadLength >= 0 &&
+        contentLength != null &&
+        contentLength > maxPayloadLength) {
+      throw StateError(
+          "Can't read payload. `Content-Length` ($contentLength) exceeds `maxPayloadLength` ($maxPayloadLength).");
+    }
 
     var contentMimeType = _resolveContentMimeType(request);
     if (contentLength == null && contentMimeType == null) {
@@ -1169,9 +1220,21 @@ class APIServer extends _APIServerBase {
     var mimeType = contentMimeType ?? _mimeTypeTextPlain;
 
     if (mimeType.isStringType) {
-      return _resolvePayloadFromString(mimeType, request);
+      if (contentLength == 0) {
+        return (mimeType, '');
+      }
+
+      return _resolvePayloadFromString(mimeType, request,
+          maxPayloadLength: maxPayloadLength,
+          decompressPayload: decompressPayload);
     } else {
-      return _resolvePayloadBytes(mimeType, request);
+      if (contentLength == 0) {
+        return (mimeType, Uint8List(0));
+      }
+
+      return _resolvePayloadBytes(mimeType, request,
+          maxPayloadLength: maxPayloadLength,
+          decompressPayload: decompressPayload);
     }
   }
 
@@ -1204,8 +1267,12 @@ class APIServer extends _APIServerBase {
   }
 
   static Future<(MimeType, Object)?> _resolvePayloadFromString(
-          MimeType mimeType, Request request) =>
-      _loadPayloadString(mimeType, request).then((s) {
+          MimeType mimeType, Request request,
+          {int? maxPayloadLength, bool? decompressPayload}) =>
+      _loadPayloadString(mimeType, request,
+              maxPayloadLength: maxPayloadLength,
+              decompressPayload: decompressPayload)
+          .then((s) {
         if (s == null) return null;
 
         Object payload = s;
@@ -1218,10 +1285,12 @@ class APIServer extends _APIServerBase {
         return (mimeType, payload);
       });
 
-  static Future<String?> _loadPayloadString(
-          MimeType mimeType, Request request) =>
+  static Future<String?> _loadPayloadString(MimeType mimeType, Request request,
+          {int? maxPayloadLength, bool? decompressPayload}) =>
       request.read().toList().then((bs) {
-        var allBytes = _loadPayloadBytes(bs);
+        var allBytes = _loadPayloadBytes(request, bs,
+            maxPayloadLength: maxPayloadLength,
+            decompressPayload: decompressPayload);
 
         var encoding = mimeType.charsetEncoding ?? utf8;
 
@@ -1233,13 +1302,18 @@ class APIServer extends _APIServerBase {
       });
 
   static Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
-          MimeType mimeType, Request request) =>
+          MimeType mimeType, Request request,
+          {int? maxPayloadLength, bool? decompressPayload}) =>
       request.read().toList().then((bs) {
-        var allBytes = _loadPayloadBytes(bs);
+        var allBytes = _loadPayloadBytes(request, bs,
+            maxPayloadLength: maxPayloadLength,
+            decompressPayload: decompressPayload);
         return (mimeType, allBytes);
       });
 
-  static Uint8List _loadPayloadBytes(List<List<int>> payloadBlocks) {
+  static Uint8List _loadPayloadBytes(
+      Request request, List<List<int>> payloadBlocks,
+      {int? maxPayloadLength, bool? decompressPayload}) {
     Uint8List bytes;
 
     if (payloadBlocks.length == 1) {
@@ -1251,8 +1325,22 @@ class APIServer extends _APIServerBase {
       }
 
       assert(bytes.length == bs0.length);
+
+      if (maxPayloadLength != null &&
+          maxPayloadLength >= 0 &&
+          bytes.length > maxPayloadLength) {
+        throw StateError(
+            "Payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+      }
     } else {
       var allBytesSz = payloadBlocks.map((e) => e.length).sum;
+
+      if (maxPayloadLength != null &&
+          maxPayloadLength >= 0 &&
+          allBytesSz > maxPayloadLength) {
+        throw StateError(
+            "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).");
+      }
 
       bytes = Uint8List(allBytesSz);
       var bytesOffset = 0;
@@ -1268,7 +1356,55 @@ class APIServer extends _APIServerBase {
       assert(bytesOffset == allBytesSz);
     }
 
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+
+    if (contentEncoding != null &&
+        (decompressPayload ?? false) &&
+        bytes.isNotEmpty) {
+      switch (contentEncoding) {
+        case '':
+        case 'identity':
+          {
+            break;
+          }
+        case 'gzip':
+          {
+            bytes =
+                _decodePayloadGzip(bytes, maxPayloadLength: maxPayloadLength);
+          }
+        case 'deflate':
+          {
+            bytes = _decodePayloadZlib(bytes);
+          }
+        default:
+          throw UnsupportedError(
+              "Unknown `Content-Encoding`: $contentEncoding");
+      }
+    }
+
     return bytes;
+  }
+
+  static Uint8List _decodePayloadGzip(Uint8List bytes,
+      {int? maxPayloadLength}) {
+    if (maxPayloadLength != null && maxPayloadLength >= 0) {
+      final byteData = ByteData.sublistView(bytes);
+      var gzipUncompressedSize =
+          byteData.getUint32(bytes.length - 4, Endian.little);
+
+      if (gzipUncompressedSize < 0 || gzipUncompressedSize > maxPayloadLength) {
+        throw StateError(
+            "Can't decompress payload of size ${bytes.length}: GZip payload uncompressed size ($gzipUncompressedSize) exceeds `maxPayloadLength` ($maxPayloadLength).");
+      }
+    }
+
+    var decoded = gzip.decode(bytes);
+    return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
+  }
+
+  static Uint8List _decodePayloadZlib(Uint8List bytes) {
+    var decoded = zlib.decode(bytes);
+    return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');
@@ -1700,6 +1836,8 @@ final class APIServerWorker extends _APIServerBase {
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
+    super.maxPayloadLength,
+    super.decompressPayload,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -2144,10 +2282,15 @@ final class APIServerWorker extends _APIServerBase {
     APIRequest? apiRequest;
     try {
       return APIServer.toAPIRequest(request,
-              cookieless: cookieless, useSessionID: useSessionID)
-          .resolveMapped((apiReq) {
+              cookieless: cookieless,
+              useSessionID: useSessionID,
+              maxPayloadLength: maxPayloadLength,
+              decompressPayload: decompressPayload)
+          .then((apiReq) {
         apiRequest = apiReq;
         return _processAPIRequest(request, apiReq);
+      }, onError: (e, s) {
+        return _errorProcessing(request, apiRequest, e, s);
       });
     } catch (e, s) {
       return _errorProcessing(request, apiRequest, e, s);

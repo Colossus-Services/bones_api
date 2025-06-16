@@ -3,6 +3,7 @@ import 'dart:convert' as convert;
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive_io.dart';
 import 'package:bones_api/bones_api_console.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:mercury_client/mercury_client.dart' as mercury_client;
@@ -277,7 +278,8 @@ void main() {
   group('APIServer', () {
     final api = MyAPI();
 
-    final apiServer = APIServer(api, 'localhost', 5544);
+    final apiServer = APIServer(api, 'localhost', 5544,
+        decompressPayload: true, maxPayloadLength: 100);
 
     setUp(() async {
       await apiServer.start();
@@ -445,6 +447,84 @@ void main() {
               '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: áÁ>>)'));
     });
 
+    test('payload(Hello World!) /base', () async {
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          payload: convert.utf8.encode('Hello World!'),
+          payloadType: 'text/plain');
+      expect(res.toString(), equals('(200, PAYLOAD: 12 <<Hello World!>>)'));
+    });
+
+    test('payload(empty) /base', () async {
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          payload: Uint8List(0),
+          payloadType: 'application/octet-stream');
+      expect(res.toString(), equals('(200, PAYLOAD: empty)'));
+    });
+
+    test('payload+gzip(Hello World With GZip!) /base', () async {
+      var payload = convert.utf8.encode('Hello World With GZip!');
+      var payloadGZip = GZipEncoder().encode(payload);
+
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          headers: {'Content-Encoding': 'gzip'},
+          payload: payloadGZip,
+          payloadType: 'text/plain');
+      expect(res.toString(),
+          equals('(200, PAYLOAD: 22 <<Hello World With GZip!>>)'));
+    });
+
+    test('payload(large content) /base', () async {
+      const largePayload =
+          'This is a large content, over maxPayloadLength: 100> ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          payload: convert.utf8.encode(largePayload),
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          allOf(startsWith('(500, ERROR processing request:'),
+              contains('Payload size (115) exceeds `maxPayloadLength` (100)')));
+    });
+
+    test('payload+gzip /base', () async {
+      const content =
+          'This is a normal content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+      var payload = convert.utf8.encode(content);
+      var payloadGZip = GZipEncoder().encode(payload);
+
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          headers: {'Content-Encoding': 'gzip'},
+          payload: payloadGZip,
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          equals(
+              '(200, PAYLOAD: 90 <<This is a normal content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)'));
+    });
+
+    test('payload+gzip(large content) /base', () async {
+      const largePayload =
+          'This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+      var payload = convert.utf8.encode(largePayload);
+      var payloadGZip = GZipEncoder().encode(payload);
+
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          headers: {'Content-Encoding': 'gzip'},
+          payload: payloadGZip,
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          allOf(
+              startsWith('(500, ERROR processing request:'),
+              contains(
+                  "Can't decompress payload of size 48: GZip payload uncompressed size (117) exceeds `maxPayloadLength` (100).")));
+    });
+
     test('get /info', () async {
       var res = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
@@ -514,6 +594,7 @@ void main() {
           '{"name":"foo","method":"GET","uri":"http://localhost:0/base/foo"},'
           '{"name":"foo","method":"POST","uri":"http://localhost:0/base/foo"},'
           '{"name":"upload","method":"POST","uri":"http://localhost:5544/base/upload"},'
+          '{"name":"payload","method":"POST","uri":"http://localhost:5544/base/payload"},'
           '{"name":"patch","method":"PATCH","uri":"http://localhost:0/base/patch"},'
           '{"name":"put","method":"PUT","uri":"http://localhost:0/base/put"},'
           '{"name":"delete","method":"DELETE","uri":"http://localhost:0/base/delete"}'
@@ -797,6 +878,16 @@ class MyBaseModule extends APIModule {
             'mimeType: ${request.payloadMimeType} ; '
             'length: ${request.payloadAsBytes?.length}'
             '${(request.payloadMimeType?.isStringType ?? false) ? '<<${request.payload}>>' : ''}'));
+
+    routes.post('payload', (request) {
+      var payloadBytes = request.payloadAsBytes;
+      if (payloadBytes == null || payloadBytes.isEmpty) {
+        return APIResponse.ok('PAYLOAD: empty');
+      }
+
+      var payloadStr = convert.utf8.decode(payloadBytes);
+      return APIResponse.ok('PAYLOAD: ${payloadStr.length} <<$payloadStr>>');
+    });
   }
 }
 
@@ -843,12 +934,14 @@ class MyInfoModule extends APIModule {
 Future<(int, String)> _getURL(String url,
     {APIRequestMethod? method,
     Map<String, dynamic>? parameters,
+    Map<String, String>? headers,
     List<int>? payload,
     String? payloadType,
     String? expectedContentType}) async {
   var (status, content, _) = await _getUrlAndHeaders(url,
       method: method,
       parameters: parameters,
+      headers: headers,
       payload: payload,
       payloadType: payloadType,
       expectedContentType: expectedContentType);
