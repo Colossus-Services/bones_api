@@ -525,6 +525,42 @@ void main() {
                   "Can't decompress payload of size 48: GZip payload uncompressed size (117) exceeds `maxPayloadLength` (100).")));
     });
 
+    test('payload+zlib /base', () async {
+      const largePayload =
+          'This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+      var payload = convert.utf8.encode(largePayload);
+      var payloadZlib = ZLibEncoder().encode(payload);
+
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          headers: {'Content-Encoding': 'deflate'},
+          payload: payloadZlib,
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          equals(
+              '(200, PAYLOAD: 89 <<This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)'));
+    });
+
+    test('payload+zlib(large content) /base', () async {
+      const largePayload =
+          'This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+      var payload = convert.utf8.encode(largePayload);
+      var payloadZlib = ZLibEncoder().encode(payload);
+
+      var res = await _getURL('${apiServer.url}base/payload',
+          method: APIRequestMethod.POST,
+          headers: {'Content-Encoding': 'deflate'},
+          payload: payloadZlib,
+          payloadType: 'text/plain');
+      expect(
+          res.toString(),
+          allOf(
+              startsWith('(500, ERROR processing request:'),
+              contains(
+                  "Decompressed `deflate` payload size (117) exceeds `maxPayloadLength` (100)")));
+    });
+
     test('get /info', () async {
       var res = await _getURL('${apiServer.url}info/echo',
           method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});

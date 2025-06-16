@@ -1380,7 +1380,7 @@ class APIServer extends _APIServerBase {
 
       if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
         throw StateError(
-            "Decompressed GZip payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+            "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
       }
     }
 
