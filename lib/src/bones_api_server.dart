@@ -1377,6 +1377,11 @@ class APIServer extends _APIServerBase {
           throw UnsupportedError(
               "Unknown `Content-Encoding`: $contentEncoding");
       }
+
+      if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
+        throw StateError(
+            "Decompressed GZip payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+      }
     }
 
     return bytes;
@@ -1395,14 +1400,6 @@ class APIServer extends _APIServerBase {
     }
 
     var decoded = gzip.decode(bytes);
-
-    if (maxPayloadLength >= 0) {
-      if (decoded.length > maxPayloadLength) {
-        throw StateError(
-            "Decompressed GZip payload size (${decoded.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
-      }
-    }
-
     return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
   }
 
