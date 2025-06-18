@@ -1,3 +1,13 @@
+## 1.9.3-beta.8
+
+- `APIServerConfig`, `APIServerWorker`, `APIServer`:
+  - Add `maxPayloadLength` and `decompressPayload` options for request handling.
+
+- `APIServer`:
+  - `_loadPayloadBytes`:
+    - Added support for compressed payload in gzip and deflate.
+    - Added `_decodePayloadGzip` to handled GZip decompression and check the decompressed size in header before decompression. 
+
 ## 1.9.3-beta.7
 
 - `GenericEntityHandler`, `ClassReflectionEntityHandler`:
