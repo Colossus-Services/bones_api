@@ -266,6 +266,10 @@ class _InitializationChain {
     var parent0 = firstParent;
     if (parent0 == null) return false;
 
+    if (identical(parent, parent0)) {
+      return false;
+    }
+
     var parentParents = parent._chain._parents;
     if (parentParents == null || parentParents.isEmpty) return false;
 
@@ -501,6 +505,14 @@ class _InitializationChain {
       }
     }
   }
+
+  @override
+  String toString() => '_InitializationChain{'
+      '_parents: ${_parents?.length ?? ''}, '
+      '_dependencies: ${_dependencies?.length ?? ''}, '
+      '_initializedDependencies: ${_initializedDependencies?.length ?? ''}, '
+      '_initializedDependenciesCompleters: ${_initializedDependenciesCompleters?.length ?? ''}'
+      '}@$initializable';
 }
 
 mixin Initializable {
@@ -575,9 +587,50 @@ mixin Initializable {
           return initCircular;
         }
 
+        final circularInitTime = DateTime.now();
+
+        var parentsLength1 = chain.parents.length;
+
         return initCircular.timeout(Duration(milliseconds: 1000),
-            onTimeout: () {
-          _log.warning("Circular initialization timeout (1s): $this");
+            onTimeout: () async {
+          var parentsLength2 = chain.parents.length;
+
+          // Extra timeout if a new parent is added:
+          if (parentsLength2 > parentsLength1) {
+            _log.warning(
+                "Circular initialization with extra parents... ($this)");
+
+            const circularTimeoutError = "!!CIRCULAR TIMEOUT!!";
+
+            var r = await initCircular.timeout(Duration(milliseconds: 1000),
+                onTimeout: () =>
+                    InitializationResult.error(this, circularTimeoutError));
+            if (r.ok) {
+              return r;
+            } else if (r.error != circularTimeoutError) {
+              return r;
+            } else {
+              var parentsLength3 = chain.parents.length;
+
+              if (parentsLength3 > parentsLength2) {
+                var r2 = await initCircular.timeout(
+                    Duration(milliseconds: 1000),
+                    onTimeout: () =>
+                        InitializationResult.error(this, circularTimeoutError));
+
+                if (r2.ok) {
+                  return r;
+                } else if (r2.error != circularTimeoutError) {
+                  return r;
+                }
+              }
+            }
+          }
+
+          final circularTime = DateTime.now().difference(circularInitTime);
+
+          _log.warning(
+              "Circular initialization timeout (${circularTime.inMilliseconds} ms): $this");
           return _resultOk();
         });
       }
