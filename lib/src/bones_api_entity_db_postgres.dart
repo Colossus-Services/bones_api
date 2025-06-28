@@ -919,9 +919,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         }
       }
 
+      if (isID) {
+        return 'BIGINT';
+      }
+
       return 'INT'; // default to 32-bit int
-    } else if (!isID && (type.isBigInt || type.type == DynamicInt)) {
-      return 'NUMERIC';
+    } else if (type.isBigInt) {
+      if (isID) {
+        return 'BIGINT';
+      }
+
+      return 'NUMERIC'; // arbitrary-precision integers
+    } else if (type.type == DynamicInt) {
+      return 'NUMERIC'; // arbitrary-precision integers
     }
 
     var sqlType = super.typeToSQLType(type, column,

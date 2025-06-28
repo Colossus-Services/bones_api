@@ -621,9 +621,19 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         }
       }
 
+      if (isID) {
+        return 'BIGINT';
+      }
+
       return 'INT'; // default: 32-bits integer
-    } else if (!isID && (type.isBigInt || type.type == DynamicInt)) {
-      return 'DECIMAL(65, 0)';
+    } else if (type.isBigInt) {
+      if (isID) {
+        return 'BIGINT';
+      }
+
+      return 'DECIMAL(65, 0)'; // integers with maximum of 62 digits.
+    } else if (type.type == DynamicInt) {
+      return 'DECIMAL(65, 0)'; // integers with maximum of 62 digits.
     }
 
     var sqlType = super.typeToSQLType(type, column,
