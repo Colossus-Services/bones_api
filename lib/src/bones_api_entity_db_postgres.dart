@@ -899,7 +899,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
   @override
   String? typeToSQLType(TypeInfo type, String column,
-      {List<EntityField>? entityFieldAnnotations}) {
+      {List<EntityField>? entityFieldAnnotations, bool isID = false}) {
     if (type.isInt) {
       final min = entityFieldAnnotations?.minimum.firstOrNull;
       final max = entityFieldAnnotations?.maximum.firstOrNull;
@@ -920,12 +920,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       }
 
       return 'INT'; // default to 32-bit int
-    } else if (type.isBigInt || type.type == DynamicInt) {
+    } else if (!isID && (type.isBigInt || type.type == DynamicInt)) {
       return 'NUMERIC';
     }
 
     var sqlType = super.typeToSQLType(type, column,
-        entityFieldAnnotations: entityFieldAnnotations);
+        entityFieldAnnotations: entityFieldAnnotations, isID: isID);
 
     if (sqlType == 'TIME') {
       return 'TIME WITHOUT TIME ZONE';

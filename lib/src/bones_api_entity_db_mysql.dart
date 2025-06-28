@@ -599,7 +599,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
   @override
   String? typeToSQLType(TypeInfo type, String column,
-      {List<EntityField>? entityFieldAnnotations}) {
+      {List<EntityField>? entityFieldAnnotations, bool isID = false}) {
     if (type.isInt) {
       final min = entityFieldAnnotations?.minimum.firstOrNull;
       final max = entityFieldAnnotations?.maximum.firstOrNull;
@@ -622,12 +622,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       }
 
       return 'INT'; // default: 32-bits integer
-    } else if (type.isBigInt || type.type == DynamicInt) {
+    } else if (!isID && (type.isBigInt || type.type == DynamicInt)) {
       return 'DECIMAL(65, 0)';
     }
 
     var sqlType = super.typeToSQLType(type, column,
-        entityFieldAnnotations: entityFieldAnnotations);
+        entityFieldAnnotations: entityFieldAnnotations, isID: isID);
 
     if (sqlType == 'VARCHAR') {
       var sz = getVarcharPreferredSize(column);

@@ -1201,7 +1201,7 @@ abstract mixin class SQLGenerator {
   String getTableForEntityRepository(EntityRepository entityRepository);
 
   String? typeToSQLType(TypeInfo type, String column,
-      {List<EntityField>? entityFieldAnnotations}) {
+      {List<EntityField>? entityFieldAnnotations, bool isID = false}) {
     if (type.isString) {
       var maximum = entityFieldAnnotations?.maximum.firstOrNull;
       return maximum != null && maximum > 0 ? 'VARCHAR($maximum)' : 'VARCHAR';
@@ -1362,7 +1362,7 @@ abstract mixin class SQLGenerator {
     }
 
     var sqlType = typeToSQLType(idType, idName,
-        entityFieldAnnotations: entityFieldAnnotations);
+        entityFieldAnnotations: entityFieldAnnotations, isID: true);
     return sqlType;
   }
 
