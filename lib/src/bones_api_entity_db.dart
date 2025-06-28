@@ -70,8 +70,11 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
     required this.connectivity,
   });
 
-  String get info =>
-      'transactions: $transactions, transactionAbort: $transactionAbort, constraintSupport: $constraintSupport, multiIsolateSupport: $multiIsolateSupport, connectivity: ${connectivity.name}';
+  String get info => 'transactions: $transactions, '
+      'transactionAbort: $transactionAbort, '
+      'constraintSupport: $constraintSupport, '
+      'multiIsolateSupport: $multiIsolateSupport, '
+      'connectivity: ${connectivity.name}';
 
   @override
   String get runtimeTypeNameSafe => 'DBAdapterCapability';
@@ -2246,11 +2249,39 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
     return adapter.resolveMapped((adapter) {
       var repositories = buildRepositories(adapter);
 
+      var duplicatedError = _checkDuplicatedRepositories(repositories);
+      if (duplicatedError != null) return duplicatedError;
+
       return extraDependencies().resolveMapped((extraDependencies) {
         return InitializationResult.ok(this,
             dependencies: [adapter, ...repositories, ...extraDependencies]);
       });
     });
+  }
+
+  InitializationResult? _checkDuplicatedRepositories(
+      List<EntityRepository<Object>> repositories) {
+    var repositoriesByType = repositories.groupBy((r) => (r.type, r.name));
+
+    var duplicatedRepositoriesGroups =
+        repositoriesByType.entries.where((e) => e.value.length > 1).toList();
+
+    if (duplicatedRepositoriesGroups.isEmpty) return null;
+
+    _log.warning("Duplicated repositores on: $this");
+
+    for (var e in duplicatedRepositoriesGroups) {
+      var repoType = e.key.$1;
+      var repoName = e.key.$2;
+      var repos = e.value;
+      _log.warning(
+          "Found duplicated repositores for `$repoType` (`$repoName`):\n  -- ${repos.join('\n  -- ')}");
+    }
+
+    var duplicatedRepos = duplicatedRepositoriesGroups.expand((e) => e.value);
+
+    return InitializationResult.error(this,
+        "Duplicated repositories:\n  -- ${duplicatedRepos.join('\n  -- ')}");
   }
 
   /// List of adapters that need to be initialized to [buildRepositories].
