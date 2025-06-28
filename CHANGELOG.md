@@ -1,3 +1,11 @@
+## 1.9.3-beta.11
+
+- `DBEntityRepositoryProvider`:
+  - Added `_checkDuplicatedRepositories`: check for duplicated repositores, by `Type` and `name`.
+
+- `Initializable`:
+  - `_doInitializationImpl`: add extra timeout when new parents are added.
+
 ## 1.9.3-beta.10
 
 - `DBMySQLAdapter`, `DBPostgreSQLAdapter`:
