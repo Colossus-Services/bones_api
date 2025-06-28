@@ -900,6 +900,30 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   String? typeToSQLType(TypeInfo type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
+    if (type.isInt) {
+      final min = entityFieldAnnotations?.minimum.firstOrNull;
+      final max = entityFieldAnnotations?.maximum.firstOrNull;
+
+      if (min != null || max != null) {
+        const intLimits = [
+          ('SMALLINT', -32768, 32767),
+          ('INT', -2147483648, 2147483647),
+          ('BIGINT', -9223372036854775808, 9223372036854775807),
+        ];
+
+        for (final (typeName, minLimit, maxLimit) in intLimits) {
+          final minOk = min == null || min >= minLimit;
+          final maxOk = max == null || max <= maxLimit;
+
+          if (minOk && maxOk) return typeName;
+        }
+      }
+
+      return 'INT'; // default to 32-bit int
+    } else if (type.isBigInt || type.type == DynamicInt) {
+      return 'NUMERIC';
+    }
+
     var sqlType = super.typeToSQLType(type, column,
         entityFieldAnnotations: entityFieldAnnotations);
 
