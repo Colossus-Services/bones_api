@@ -3,7 +3,7 @@ import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mysql1/mysql1.dart';
 import 'package:reflection_factory/reflection_factory.dart';
-import 'package:statistics/statistics.dart' show Decimal;
+import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
 
 import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
@@ -600,6 +600,32 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   @override
   String? typeToSQLType(TypeInfo type, String column,
       {List<EntityField>? entityFieldAnnotations}) {
+    if (type.isInt) {
+      final min = entityFieldAnnotations?.minimum.firstOrNull;
+      final max = entityFieldAnnotations?.maximum.firstOrNull;
+
+      if (min != null || max != null) {
+        const intLimits = [
+          ('TINYINT', -128, 127),
+          ('SMALLINT', -32768, 32767),
+          ('MEDIUMINT', -8388608, 8388607),
+          ('INT', -2147483648, 2147483647),
+          ('BIGINT', -9223372036854775808, 9223372036854775807),
+        ];
+
+        for (final (typeName, minLimit, maxLimit) in intLimits) {
+          final minOk = min == null || min >= minLimit;
+          final maxOk = max == null || max <= maxLimit;
+
+          if (minOk && maxOk) return typeName;
+        }
+      }
+
+      return 'INT'; // default: 32-bits integer
+    } else if (type.isBigInt || type.type == DynamicInt) {
+      return 'DECIMAL(65, 0)';
+    }
+
     var sqlType = super.typeToSQLType(type, column,
         entityFieldAnnotations: entityFieldAnnotations);
 
