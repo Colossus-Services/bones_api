@@ -1,3 +1,13 @@
+## 1.9.3-beta.9
+
+- `DBMySQLAdapter`:
+  - Fix for `int`: use `entityFieldAnnotations` min/max to define SQL type (`TINYINT`,`SMALLINT`,`MEDIUMINT`,`INT`,`BIGINT`).
+  - Fix for `BigInt` and `DynamicInt`: `DECIMAL(65, 0)`
+
+- `DBPostgreSQLAdapter`:
+  - Fix `int`: use `entityFieldAnnotations` min/max to define SQL type (`SMALLINT`,`INT`,`BIGINT`).
+  - Fix for `BigInt` and `DynamicInt`: `NUMERIC`
+
 ## 1.9.3-beta.8
 
 - `APIServerConfig`, `APIServerWorker`, `APIServer`:
