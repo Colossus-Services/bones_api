@@ -2958,6 +2958,7 @@ class DBSQLAdapterException extends DBAdapterException {
       super.operation,
       super.previousError});
 }
+
 /// A mixin that provides SQL statement caching functionality.
 ///
 /// `StatementCache` manages a cache of prepared SQL statements,
@@ -3022,8 +3023,6 @@ abstract mixin class StatementCache<S> {
     return Future.delayed(
         delay, () => checkPreparedSQLsCached(timeout: timeout));
   }
-
-
 
   /// Minimum interval between automatic cache checks (1 min).
   static final _checkPreparedSQLsCachedPeriod = const Duration(minutes: 1);
