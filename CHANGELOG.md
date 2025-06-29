@@ -1,3 +1,15 @@
+## 1.9.4-beta.1
+
+- `DBSQLAdapterCapability`: added `statementsCache`.
+
+- `ConditionSQLEncoder`:
+  - Added property `forCachedStatements`: forces generation of SQL statements suitable for caching.
+
+- New mixin `StatementCache`
+  - New `CachedStatement`.
+
+- `PostgreSQLConnectionWrapper` now has support for statements cache (with `StatementCache`).
+
 ## 1.9.3-beta.11
 
 - `DBEntityRepositoryProvider`:
