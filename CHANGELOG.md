@@ -36,7 +36,7 @@
 ## 1.9.3-beta.7
 
 - `GenericEntityHandler`, `ClassReflectionEntityHandler`:
-  - `getFieldType`: if the field doesn't have a setter do not use cached fileds types.
+  - `getFieldType`: if the field doesn't have a setter do not use cached fields types.
 
 - meta: ^1.17.0
 - gcloud: ^0.8.19
