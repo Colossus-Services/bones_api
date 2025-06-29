@@ -1093,13 +1093,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
         return doInsertSQL(
                 entityName, table, insertSQL, transaction, connection)
-            .resolveMapped((res) => _fixeTableSequence(transaction, entityName,
+            .resolveMapped((res) => _fixTableSequence(transaction, entityName,
                 table, idFieldName, idFieldType, connection, res));
       });
     });
   }
 
-  FutureOr<dynamic> _fixeTableSequence(
+  FutureOr<dynamic> _fixTableSequence(
       Transaction transaction,
       String entityName,
       String table,
