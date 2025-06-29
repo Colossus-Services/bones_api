@@ -2958,14 +2958,26 @@ class DBSQLAdapterException extends DBAdapterException {
       super.operation,
       super.previousError});
 }
-
+/// A mixin that provides SQL statement caching functionality.
+///
+/// `StatementCache` manages a cache of prepared SQL statements,
+/// automatically expiring and disposing of them after a configurable timeout.
 abstract mixin class StatementCache<S> {
+  /// Internal cache mapping SQL strings to prepared statements.
   final Map<String, FutureOr<CachedStatement<S>>> _preparedSQLCache = {};
 
+  /// Clears all cached prepared statements.
   void disposePreparedSQLCache() {
     _preparedSQLCache.clear();
   }
 
+  /// Prepares or retrieves a cached SQL statement.
+  ///
+  /// If the statement is already cached, it's reused. Otherwise,
+  /// [prepareSQLCachedImpl] is called to prepare a new statement,
+  /// which is cached and returned.
+  ///
+  /// If an error occurs during preparation, the entry is removed from the cache.
   FutureOr<S> prepareSQLCached(String sql) {
     var cached = _preparedSQLCache[sql];
     if (cached != null) {
@@ -2990,22 +3002,40 @@ abstract mixin class StatementCache<S> {
     }
   }
 
+  /// Prepares and returns a [CachedStatement] for the given SQL.
+  ///
+  /// Must be implemented by the concrete class.
   FutureOr<CachedStatement<S>> prepareSQLCachedImpl(String sql);
 
+  /// Default timeout (10 min) used to determine statement expiration.
   static const Duration defaultStatementCacheTimeout = Duration(minutes: 10);
 
+  /// Configurable timeout for cached statements. Default: 10 min
   Duration statementCacheTimeout = defaultStatementCacheTimeout;
 
+  /// Schedules an asynchronous check for expired cached statements.
+  ///
+  /// [delay] specifies the delay before the check is performed. Default: 10 sec
+  /// [timeout] overrides the default expiration duration.
   Future<int> checkPreparedSQLsCachedAsync(
       {Duration delay = const Duration(seconds: 10), Duration? timeout}) {
     return Future.delayed(
         delay, () => checkPreparedSQLsCached(timeout: timeout));
   }
 
-  DateTime _checkPreparedSQLsCachedTime = DateTime.now();
 
+
+  /// Minimum interval between automatic cache checks (1 min).
   static final _checkPreparedSQLsCachedPeriod = const Duration(minutes: 1);
 
+  /// Tracks the last time cache was checked.
+  DateTime _checkPreparedSQLsCachedTime = DateTime.now();
+
+  /// Checks for and removes expired cached statements.
+  ///
+  /// Returns the number of removed statements.
+  ///
+  /// Set [force] to `true` to force a check regardless of elapsed time.
   int checkPreparedSQLsCached({bool force = false, Duration? timeout}) {
     final now = DateTime.now();
 
@@ -3041,31 +3071,47 @@ abstract mixin class StatementCache<S> {
     return expired.length;
   }
 
+  /// Disposes of the given statement.
+  ///
+  /// Must be implemented to properly clean up resources.
   void disposeCachedStatement(S statement);
 }
 
+/// A wrapper for a cached prepared SQL statement of generic type `S`.
+///
+/// Tracks usage statistics and expiration status.
 class CachedStatement<S> {
+  /// The actual prepared statement instance.
   final S statement;
 
   int _usageCount = 1;
   DateTime _lastUsageTime;
 
+  /// Creates a [CachedStatement] for the given [statement].
   CachedStatement(this.statement) : _lastUsageTime = DateTime.now();
 
+  /// Timestamp of the last time the statement was used.
   DateTime get lastUsageTime => _lastUsageTime;
 
+  /// Number of times the statement was used.
   int get usageCount => _usageCount;
 
+  /// Marks the statement as used, updating the usage count and timestamp.
   void markUsage() {
     ++_usageCount;
     _lastUsageTime = DateTime.now();
   }
 
+  /// Returns the statement, marking it as used.
+  /// See [markUsage].
   S useStatement() {
     markUsage();
     return statement;
   }
 
+  /// Returns `true` if the statement is considered expired.
+  ///
+  /// Uses [timeout] to determine expiration based on last usage time.
   bool isExpired(
       {DateTime? now, Duration timeout = const Duration(minutes: 10)}) {
     now ??= DateTime.now();
