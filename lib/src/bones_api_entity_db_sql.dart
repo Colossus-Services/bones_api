@@ -283,12 +283,17 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
   /// See [DBSQLAdapter.populateTables].
   final bool tableSQL;
 
+  /// `true` if the adapter supports caching of SQL statements.
+  /// See [ConditionSQLEncoder.forCachedStatements]
+  final bool statementsCache;
+
   const DBSQLAdapterCapability(
       {required super.dialect,
       required super.transactions,
       required super.transactionAbort,
       required super.constraintSupport,
       required this.tableSQL,
+      required this.statementsCache,
       required super.multiIsolateSupport,
       required super.connectivity});
 
@@ -434,8 +439,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         _populateTables = populateTables {
     boot();
 
-    _conditionSQLGenerator =
-        ConditionSQLEncoder(this, sqlElementQuote: dialect.elementQuote);
+    _conditionSQLGenerator = ConditionSQLEncoder(
+      this,
+      sqlElementQuote: dialect.elementQuote,
+      forCachedStatements: capability.statementsCache,
+    );
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends DBSQLAdapter<C>>(
