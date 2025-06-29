@@ -2991,8 +2991,9 @@ abstract mixin class StatementCache<S> {
       var future = _preparedSQLCache[sql] = prepareSQLCachedImpl(sql);
 
       if (future is Future<CachedStatement<S>>) {
-        future.catchError((e, s) {
+        future.then((_) => null, onError: (_) {
           _preparedSQLCache.remove(sql);
+          return null;
         });
       }
 
