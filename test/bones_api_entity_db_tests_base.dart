@@ -866,9 +866,19 @@ Future<bool> runAdapterTests(
 
         expect(await userAPIRepository.existsID(1), isTrue);
         expect(await userAPIRepository.existsID(id), isTrue);
-        expect(await userAPIRepository.existsID(123123123123), isFalse);
-        expect(await userAPIRepository.existIDs([1, id, 123123123123]),
-            equals([1, id]));
+
+        // Named parameters in SQL:
+        if (sqlAdapter.capability.statementsCache) {
+          expect(await userAPIRepository.existsID(1231231231), isFalse);
+          expect(await userAPIRepository.existIDs([1, id, 1231231231]),
+              equals([1, id]));
+        }
+        // In-line values in SQL:
+        else {
+          expect(await userAPIRepository.existsID(123123123123), isFalse);
+          expect(await userAPIRepository.existIDs([1, id, 123123123123]),
+              equals([1, id]));
+        }
 
         expect(
             await userAPIRepository.selectIDsByQuery(' email == ? ',

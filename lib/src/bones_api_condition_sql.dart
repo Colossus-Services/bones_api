@@ -9,10 +9,15 @@ final _log = logging.Logger('ConditionSQLEncoder');
 
 /// A [Condition] encoder for SQL.
 class ConditionSQLEncoder extends ConditionEncoder {
+  /// The character used to quote identifiers in the SQL dialect.
   final String sqlElementQuote;
 
+  /// If `true`, forces generation of SQL statements suitable for caching by
+  /// avoiding inline values and using substitution values whenever possible.
+  final bool forCachedStatements;
+
   ConditionSQLEncoder(SchemeProvider super.schemeProvider,
-      {required this.sqlElementQuote});
+      {required this.sqlElementQuote, this.forCachedStatements = false});
 
   @override
   String get groupOpener => '(';
@@ -38,6 +43,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var schemeProvider = this.schemeProvider;
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idValue);
+
+      if (forCachedStatements) {
+        var c2 = KeyConditionEQ(
+          [ConditionKeyField('id')],
+          ConditionParameter.key(idKey),
+        );
+        return encodeKeyConditionEQ(c2, context);
+      }
+
       var q = sqlElementQuote;
       var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
@@ -58,6 +72,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
 
         var idKey = context.addEncodingParameter(idFieldName, c.idValue);
+
+        if (forCachedStatements) {
+          var c2 = KeyConditionEQ(
+            [ConditionKeyField(idFieldName)],
+            ConditionParameter.key(idKey),
+          );
+          return encodeKeyConditionEQ(c2, context);
+        }
+
         var q = sqlElementQuote;
         var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
@@ -76,6 +99,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var schemeProvider = this.schemeProvider;
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idsValues);
+
+      if (forCachedStatements) {
+        var c2 = KeyConditionIN(
+          [ConditionKeyField('id')],
+          ConditionParameter.key(idKey),
+        );
+        return encodeKeyConditionIN(c2, context);
+      }
+
       var q = sqlElementQuote;
       var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
@@ -96,6 +128,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
 
         var idKey = context.addEncodingParameter(idFieldName, c.idsValues);
+
+        if (forCachedStatements) {
+          var c2 = KeyConditionIN(
+            [ConditionKeyField(idFieldName)],
+            ConditionParameter.key(idKey),
+          );
+          return encodeKeyConditionIN(c2, context);
+        }
+
         var q = sqlElementQuote;
         var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
