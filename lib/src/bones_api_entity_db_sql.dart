@@ -2950,3 +2950,144 @@ class DBSQLAdapterException extends DBAdapterException {
       super.operation,
       super.previousError});
 }
+
+abstract mixin class StatementCache<S> {
+  final Map<String, FutureOr<CachedStatement<S>>> _preparedSQLCache = {};
+
+  void disposePreparedSQLCache() {
+    _preparedSQLCache.clear();
+  }
+
+  FutureOr<S> prepareSQLCached(String sql) {
+    var cached = _preparedSQLCache[sql];
+    if (cached != null) {
+      return cached.useStatement();
+    }
+
+    checkPreparedSQLsCachedAsync();
+
+    try {
+      var future = _preparedSQLCache[sql] = prepareSQLCachedImpl(sql);
+
+      if (future is Future<CachedStatement<S>>) {
+        future.catchError((e, s) {
+          _preparedSQLCache.remove(sql);
+        });
+      }
+
+      return future.statement;
+    } catch (_) {
+      _preparedSQLCache.remove(sql);
+      rethrow;
+    }
+  }
+
+  FutureOr<CachedStatement<S>> prepareSQLCachedImpl(String sql);
+
+  static const Duration defaultStatementCacheTimeout = Duration(minutes: 10);
+
+  Duration statementCacheTimeout = defaultStatementCacheTimeout;
+
+  Future<int> checkPreparedSQLsCachedAsync(
+      {Duration delay = const Duration(seconds: 10), Duration? timeout}) {
+    return Future.delayed(
+        delay, () => checkPreparedSQLsCached(timeout: timeout));
+  }
+
+  DateTime _checkPreparedSQLsCachedTime = DateTime.now();
+
+  static final _checkPreparedSQLsCachedPeriod = const Duration(minutes: 1);
+
+  int checkPreparedSQLsCached({bool force = false, Duration? timeout}) {
+    final now = DateTime.now();
+
+    if (!force) {
+      var checkElapsedTime = now.difference(_checkPreparedSQLsCachedTime);
+      if (checkElapsedTime < _checkPreparedSQLsCachedPeriod) {
+        return 0;
+      }
+    }
+
+    _checkPreparedSQLsCachedTime = now;
+
+    timeout ??= statementCacheTimeout;
+
+    var expired = <String>[];
+
+    for (var e in _preparedSQLCache.entries) {
+      var cached = e.value;
+      if (cached is CachedStatement<S>) {
+        if (cached.isExpired(now: now, timeout: timeout)) {
+          expired.add(e.key);
+        }
+      }
+    }
+
+    for (var e in expired) {
+      var cached = _preparedSQLCache.remove(e);
+      if (cached is CachedStatement<S>) {
+        disposeCachedStatement(cached.statement);
+      }
+    }
+
+    return expired.length;
+  }
+
+  void disposeCachedStatement(S statement);
+}
+
+class CachedStatement<S> {
+  final S statement;
+
+  int _usageCount = 1;
+  DateTime _lastUsageTime;
+
+  CachedStatement(this.statement) : _lastUsageTime = DateTime.now();
+
+  DateTime get lastUsageTime => _lastUsageTime;
+
+  int get usageCount => _usageCount;
+
+  void markUsage() {
+    ++_usageCount;
+    _lastUsageTime = DateTime.now();
+  }
+
+  S useStatement() {
+    markUsage();
+    return statement;
+  }
+
+  bool isExpired(
+      {DateTime? now, Duration timeout = const Duration(minutes: 10)}) {
+    now ??= DateTime.now();
+    var elapsedTime = now.difference(_lastUsageTime);
+    return elapsedTime > timeout;
+  }
+}
+
+extension FutureCachedStatementExtension<S> on Future<CachedStatement<S>> {
+  Future<S> get statement => then((r) => r.statement);
+
+  Future<S> useStatement() => then((r) => r.useStatement());
+}
+
+extension FutureOrCachedStatementExtension<S> on FutureOr<CachedStatement<S>> {
+  FutureOr<S> get statement {
+    var self = this;
+    if (self is Future<CachedStatement<S>>) {
+      return self.statement;
+    } else {
+      return self.statement;
+    }
+  }
+
+  FutureOr<S> useStatement() {
+    var self = this;
+    if (self is Future<CachedStatement<S>>) {
+      return self.useStatement();
+    } else {
+      return self.useStatement();
+    }
+  }
+}
