@@ -1,3 +1,25 @@
+## 1.9.3
+
+- `DBPostgreSQLAdapter`:
+  - Upgrade to `postgres` API v3.
+  - Allow SSL connections.
+
+- `DBEntityRepositoryProvider`: check for duplicated repositories.
+
+- `APIServerConfig`, `APIServerWorker`, `APIServer`:
+  - Add `maxPayloadLength` and `decompressPayload` options for request handling.
+
+- `APIServer`:
+  - `_loadPayloadBytes`:
+    - Added support for compressed payload in gzip and deflate.
+    - Added `_decodePayloadGzip` to handled GZip decompression and check the decompressed size in header before decompression.
+
+- `Time.parse`: accept format `Time(hh:mm:ss.sss)`
+
+- Fix SQL column generation type if min/max is defined for the field.
+
+- postgres: ^3.5.6
+
 ## 1.9.3-beta.11
 
 - `DBEntityRepositoryProvider`:
