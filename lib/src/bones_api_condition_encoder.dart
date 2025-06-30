@@ -1273,7 +1273,7 @@ abstract class ConditionEncoder {
           value == list.first;
         } else {
           throw ArgumentError(
-              "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value");
+              "Can't resolve a `List` with multiple values to a primitive type: $valueTypeInfo >> $value");
         }
       }
 
