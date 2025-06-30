@@ -283,12 +283,17 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
   /// See [DBSQLAdapter.populateTables].
   final bool tableSQL;
 
+  /// `true` if the adapter supports caching of SQL statements.
+  /// See [ConditionSQLEncoder.forCachedStatements]
+  final bool statementsCache;
+
   const DBSQLAdapterCapability(
       {required super.dialect,
       required super.transactions,
       required super.transactionAbort,
       required super.constraintSupport,
       required this.tableSQL,
+      required this.statementsCache,
       required super.multiIsolateSupport,
       required super.connectivity});
 
@@ -434,8 +439,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         _populateTables = populateTables {
     boot();
 
-    _conditionSQLGenerator =
-        ConditionSQLEncoder(this, sqlElementQuote: dialect.elementQuote);
+    _conditionSQLGenerator = ConditionSQLEncoder(
+      this,
+      sqlElementQuote: dialect.elementQuote,
+      forCachedStatements: capability.statementsCache,
+    );
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends DBSQLAdapter<C>>(
@@ -2949,4 +2957,191 @@ class DBSQLAdapterException extends DBAdapterException {
       super.parentStackTrace,
       super.operation,
       super.previousError});
+}
+
+/// A mixin that provides SQL statement caching functionality.
+///
+/// `StatementCache` manages a cache of prepared SQL statements,
+/// automatically expiring and disposing of them after a configurable timeout.
+abstract mixin class StatementCache<S> {
+  /// Internal cache mapping SQL strings to prepared statements.
+  final Map<String, FutureOr<CachedStatement<S>>> _preparedSQLCache = {};
+
+  /// Clears all cached prepared statements.
+  void disposePreparedSQLCache() {
+    _preparedSQLCache.clear();
+  }
+
+  /// Prepares or retrieves a cached SQL statement.
+  ///
+  /// If the statement is already cached, it's reused. Otherwise,
+  /// [prepareSQLCachedImpl] is called to prepare a new statement,
+  /// which is cached and returned.
+  ///
+  /// If an error occurs during preparation, the entry is removed from the cache.
+  FutureOr<S> prepareSQLCached(String sql) {
+    var cached = _preparedSQLCache[sql];
+    if (cached != null) {
+      return cached.useStatement();
+    }
+
+    checkPreparedSQLsCachedAsync();
+
+    try {
+      var future = _preparedSQLCache[sql] = prepareSQLCachedImpl(sql);
+
+      if (future is Future<CachedStatement<S>>) {
+        future.then((_) => null, onError: (_) {
+          _preparedSQLCache.remove(sql);
+          return null;
+        });
+      }
+
+      return future.statement;
+    } catch (_) {
+      _preparedSQLCache.remove(sql);
+      rethrow;
+    }
+  }
+
+  /// Prepares and returns a [CachedStatement] for the given SQL.
+  ///
+  /// Must be implemented by the concrete class.
+  FutureOr<CachedStatement<S>> prepareSQLCachedImpl(String sql);
+
+  /// Default timeout (10 min) used to determine statement expiration.
+  static const Duration defaultStatementCacheTimeout = Duration(minutes: 10);
+
+  /// Configurable timeout for cached statements. Default: 10 min
+  Duration statementCacheTimeout = defaultStatementCacheTimeout;
+
+  /// Schedules an asynchronous check for expired cached statements.
+  ///
+  /// [delay] specifies the delay before the check is performed. Default: 10 sec
+  /// [timeout] overrides the default expiration duration.
+  Future<int> checkPreparedSQLsCachedAsync(
+      {Duration delay = const Duration(seconds: 10), Duration? timeout}) {
+    return Future.delayed(
+        delay, () => checkPreparedSQLsCached(timeout: timeout));
+  }
+
+  /// Minimum interval between automatic cache checks (1 min).
+  static final _checkPreparedSQLsCachedPeriod = const Duration(minutes: 1);
+
+  /// Tracks the last time cache was checked.
+  DateTime _checkPreparedSQLsCachedTime = DateTime.now();
+
+  /// Checks for and removes expired cached statements.
+  ///
+  /// Returns the number of removed statements.
+  ///
+  /// Set [force] to `true` to force a check regardless of elapsed time.
+  int checkPreparedSQLsCached({bool force = false, Duration? timeout}) {
+    final now = DateTime.now();
+
+    if (!force) {
+      var checkElapsedTime = now.difference(_checkPreparedSQLsCachedTime);
+      if (checkElapsedTime < _checkPreparedSQLsCachedPeriod) {
+        return 0;
+      }
+    }
+
+    _checkPreparedSQLsCachedTime = now;
+
+    timeout ??= statementCacheTimeout;
+
+    var expired = <String>[];
+
+    for (var e in _preparedSQLCache.entries) {
+      var cached = e.value;
+      if (cached is CachedStatement<S>) {
+        if (cached.isExpired(now: now, timeout: timeout)) {
+          expired.add(e.key);
+        }
+      }
+    }
+
+    for (var e in expired) {
+      var cached = _preparedSQLCache.remove(e);
+      if (cached is CachedStatement<S>) {
+        disposeCachedStatement(cached.statement);
+      }
+    }
+
+    return expired.length;
+  }
+
+  /// Disposes of the given statement.
+  ///
+  /// Must be implemented to properly clean up resources.
+  void disposeCachedStatement(S statement);
+}
+
+/// A wrapper for a cached prepared SQL statement of generic type `S`.
+///
+/// Tracks usage statistics and expiration status.
+class CachedStatement<S> {
+  /// The actual prepared statement instance.
+  final S statement;
+
+  int _usageCount = 1;
+  DateTime _lastUsageTime;
+
+  /// Creates a [CachedStatement] for the given [statement].
+  CachedStatement(this.statement) : _lastUsageTime = DateTime.now();
+
+  /// Timestamp of the last time the statement was used.
+  DateTime get lastUsageTime => _lastUsageTime;
+
+  /// Number of times the statement was used.
+  int get usageCount => _usageCount;
+
+  /// Marks the statement as used, updating the usage count and timestamp.
+  void markUsage() {
+    ++_usageCount;
+    _lastUsageTime = DateTime.now();
+  }
+
+  /// Returns the statement, marking it as used.
+  /// See [markUsage].
+  S useStatement() {
+    markUsage();
+    return statement;
+  }
+
+  /// Returns `true` if the statement is considered expired.
+  ///
+  /// Uses [timeout] to determine expiration based on last usage time.
+  bool isExpired(
+      {DateTime? now, Duration timeout = const Duration(minutes: 10)}) {
+    now ??= DateTime.now();
+    var elapsedTime = now.difference(_lastUsageTime);
+    return elapsedTime > timeout;
+  }
+}
+
+extension FutureCachedStatementExtension<S> on Future<CachedStatement<S>> {
+  Future<S> get statement => then((r) => r.statement);
+
+  Future<S> useStatement() => then((r) => r.useStatement());
+}
+
+extension FutureOrCachedStatementExtension<S> on FutureOr<CachedStatement<S>> {
+  FutureOr<S> get statement {
+    var self = this;
+    if (self is Future<CachedStatement<S>>) {
+      return self.statement;
+    } else {
+      return self.statement;
+    }
+  }
+
+  FutureOr<S> useStatement() {
+    var self = this;
+    if (self is Future<CachedStatement<S>>) {
+      return self.useStatement();
+    } else {
+      return self.useStatement();
+    }
+  }
 }

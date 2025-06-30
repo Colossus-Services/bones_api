@@ -1158,6 +1158,10 @@ abstract class ConditionEncoder {
     if (valueAsList) {
       return _resolveParameterValueImpl(value, context, valueType, true)
           .resolveMapped((values) {
+        if (values is EncodingValue<String, Object?>) {
+          return values.asEncodingValueList();
+        }
+
         var list = values is List
             ? values
             : (values is Iterable ? values.toList(growable: false) : [values]);
@@ -1179,6 +1183,10 @@ abstract class ConditionEncoder {
       if (!context.parametersPlaceholders.containsKey(valueKey)) {
         return _resolveParameterValueImpl(value, context, valueType, false)
             .resolveMapped((val) {
+          if (val is EncodingValue<String, Object?>) {
+            return val;
+          }
+
           context.parametersPlaceholders[valueKey] ??= val;
           return EncodingPlaceholder(
               valueKey, valueType, placeholder, encodeEncodingPlaceholder);
@@ -1197,6 +1205,10 @@ abstract class ConditionEncoder {
         positionalParameters: context.positionalParameters,
         namedParameters: context.namedParameters,
         encodingParameters: context.encodingParameters);
+
+    if (paramValue is EncodingValue) {
+      return paramValue;
+    }
 
     if (valueType != null) {
       return resolveValueToType(paramValue, valueType,
@@ -1273,7 +1285,7 @@ abstract class ConditionEncoder {
           value == list.first;
         } else {
           throw ArgumentError(
-              "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value");
+              "Can't resolve a `List` with multiple values to a primitive type: $valueTypeInfo >> $value");
         }
       }
 
@@ -1354,6 +1366,18 @@ abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
 
   @override
   String toString() => encode.toString();
+
+  EncodingValueList<E> asEncodingValueList() {
+    var values = this;
+    if (values is EncodingValueList<E>) {
+      return values as EncodingValueList<E>;
+    } else {
+      return EncodingValueList(values.key, values.type, [values], (p) {
+        var v = values.encode;
+        return '( $v )' as E;
+      });
+    }
+  }
 }
 
 abstract class EncodingValueResolved<E, T extends EncodingValueResolved<E, T>>

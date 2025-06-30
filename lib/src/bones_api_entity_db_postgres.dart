@@ -111,6 +111,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               transactions: true,
               transactionAbort: true,
               tableSQL: true,
+              statementsCache: true,
               constraintSupport: true,
               multiIsolateSupport: true,
               connectivity: DBAdapterCapabilityConnectivity.secureAndUnsecure),
@@ -1093,13 +1094,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
         return doInsertSQL(
                 entityName, table, insertSQL, transaction, connection)
-            .resolveMapped((res) => _fixeTableSequence(transaction, entityName,
+            .resolveMapped((res) => _fixTableSequence(transaction, entityName,
                 table, idFieldName, idFieldType, connection, res));
       });
     });
   }
 
-  FutureOr<dynamic> _fixeTableSequence(
+  FutureOr<dynamic> _fixTableSequence(
       Transaction transaction,
       String entityName,
       String table,
@@ -1215,7 +1216,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 }
 
 /// A [DBPostgreSQLAdapter] connection wrapper.
-class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
+class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session>
+    with StatementCache<Statement> {
   final String? username;
   final String host;
   final int port;
@@ -1230,14 +1232,17 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     return "postgresql://$username@$host:$port/$database${secure ? '?sslmode=require' : ''}";
   }
 
+  Future<Result> _executeWithCachedStatement(
+      String sql, Map<String, dynamic>? substitutionValues) async {
+    var statement = await prepareSQLCached(sql);
+    return statement.run(substitutionValues);
+  }
+
   Future<List<Map<String, dynamic>>> mappedResultsQuery(String sql,
       {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
 
-    var rs = await nativeConnection.execute(
-      Sql.named(sql),
-      parameters: substitutionValues,
-    );
+    var rs = await _executeWithCachedStatement(sql, substitutionValues);
 
     var mappedResult = rs.map((e) => e.toResultsMap()).toList();
 
@@ -1247,20 +1252,21 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
   Future<Result> query(String sql,
       {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
-    return nativeConnection.execute(
-      Sql.named(sql),
-      parameters: substitutionValues,
-    );
+
+    return _executeWithCachedStatement(sql, substitutionValues);
   }
 
   Future<int> execute(String sql,
       {Map<String, dynamic>? substitutionValues}) async {
     updateLastAccessTime();
+
+    // Can't use `prepareSQLCached` for `ignoreRows: true`.
     var rs = await nativeConnection.execute(
       Sql.named(sql),
       parameters: substitutionValues,
       ignoreRows: true,
     );
+
     return rs.affectedRows;
   }
 
@@ -1278,6 +1284,18 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
             this, tx, username, host, port, database, secure),
       ),
     );
+  }
+
+  @override
+  Future<CachedStatement<Statement>> prepareSQLCachedImpl(String sql) async {
+    var sqlNamed = Sql.named(sql);
+    var statement = await nativeConnection.prepare(sqlNamed);
+    return CachedStatement(statement);
+  }
+
+  @override
+  void disposeCachedStatement(Statement statement) {
+    statement.dispose();
   }
 
   @override
