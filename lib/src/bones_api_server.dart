@@ -262,6 +262,7 @@ class APIServerConfig {
             defaultLongLivedStaticFilesCacheControl),
         longLivedStaticFilesCached = resolveLongLivedStaticFiles(
             longLivedStaticFilesCached,
+            def: defaultLongLivedStaticFilesCached,
             apiConfig: apiConfig),
         cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
             cacheStaticFilesResponses,
@@ -566,8 +567,8 @@ class APIServerConfig {
   }
 
   static List<Pattern> resolveLongLivedStaticFiles(Object? patterns,
-      {APIConfig? apiConfig}) {
-    if (patterns == null) return [];
+      {List<Pattern>? def, APIConfig? apiConfig}) {
+    if (patterns == null) return def ?? [];
 
     List list;
 
@@ -594,6 +595,10 @@ class APIServerConfig {
         })
         .nonNulls
         .toList();
+
+    if (list.isEmpty) {
+      return def ?? [];
+    }
 
     return files;
   }
@@ -2060,14 +2065,19 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   /// Returns `true` if [filePath] matches any pattern in [longLivedStaticFilesCached].
-  bool isLongLivedStaticFileCached(String filePath) =>
-      longLivedStaticFilesCached.any((p) {
-        if (p is RegExp) {
-          return p.hasMatch(filePath);
-        } else {
-          return filePath == p.toString();
-        }
-      });
+  bool isLongLivedStaticFileCached(String filePath) {
+    if (!filePath.startsWith('/')) {
+      filePath = '/$filePath';
+    }
+
+    return longLivedStaticFilesCached.any((p) {
+      if (p is RegExp) {
+        return p.hasMatch(filePath);
+      } else {
+        return filePath == p.toString();
+      }
+    });
+  }
 
   Map<String, Object>? _buildResponseContext(
       Directory rootDirectory, Request request, Response response) {
