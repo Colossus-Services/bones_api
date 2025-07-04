@@ -1,4 +1,4 @@
-## 1.9.4
+## 1.9.4-beta.1
 
 - `CacheControl`:
   - Removed `mustRevalidate` from the default `directives` (conflicts with `staleWhileRevalidate`).
