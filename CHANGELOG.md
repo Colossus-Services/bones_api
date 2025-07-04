@@ -1,3 +1,11 @@
+## 1.9.4
+
+- `CacheControl`:
+  - Removed `mustRevalidate` from the default `directives` (conflicts with `staleWhileRevalidate`).
+
+- `APIServerConfig`:
+  - `defaultStaticFilesCacheControl`: removed `must-revalidate` (conflicts with `stale-while-revalidate`).
+
 ## 1.9.3
 
 - `DBPostgreSQLAdapter`:

@@ -113,7 +113,7 @@ class APIServerConfig {
 
   /// The default value for [staticFilesCacheControl].
   static const String defaultStaticFilesCacheControl =
-      'private, no-transform, must-revalidate, max-age=60, stale-while-revalidate=600, stale-if-error=300';
+      'private, no-transform, max-age=60, stale-while-revalidate=600, stale-if-error=1200';
 
   /// If `true` will cache static files. Default: true
   final bool cacheStaticFilesResponses;
