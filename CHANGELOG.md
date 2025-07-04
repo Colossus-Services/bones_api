@@ -8,6 +8,11 @@
   - Added `longLivedStaticFilesCacheControl` and `longLivedStaticFilesCached`
     - Default values are for PWA bootstrap files: `/`, `/index.html`, `styles.css`, `/pwa_sw.js`
 
+- `APIServerResponseCache`:
+  - Improve headers of cached responses:
+    - Added `Cache-Control` and `Server`.
+    - Added `Last-Modified` on 304 responses.
+
 ## 1.9.3
 
 - `DBPostgreSQLAdapter`:

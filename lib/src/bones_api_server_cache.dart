@@ -382,12 +382,17 @@ class APIServerResponseCache {
 
     if (requestIfModifiableSince == null) return null;
 
+    var cacheControl = response.headers[HttpHeaders.cacheControlHeader];
+    var server = response.headers[HttpHeaders.serverHeader];
+
     var file = response.context['file'];
 
     var cachedResponse = _CachedResponse304(
       path: request.url.path,
       file: file,
       requestIfModifiableSince: requestIfModifiableSince,
+      cacheControl: cacheControl,
+      server: server,
     );
 
     var key = cachedResponse.key;
@@ -416,12 +421,15 @@ class APIServerResponseCache {
 
     var file = response.context['file_not_found'] ?? response.context['file'];
 
+    var server = response.headers[HttpHeaders.serverHeader];
+
     var cachedResponse = _CachedResponse404(
       path: path,
       file: file,
       content: content,
       contentEncoding: contentEncoding,
       encoding: encoding,
+      server: server,
     );
 
     var key = cachedResponse.key;
@@ -1014,11 +1022,16 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       return null;
     }
 
+    var cacheControl = headers[HttpHeaders.cacheControlHeader]?.firstOrNull;
+    var server = headers[HttpHeaders.serverHeader]?.firstOrNull;
+
     var cachedResponse304 = _CachedResponse304(
       path: path,
       file: file,
       fileStat: fileStat,
       requestIfModifiableSince: lastModified,
+      cacheControl: cacheControl,
+      server: server,
     );
 
     assert(cachedResponse304.statusCode == 304);
@@ -1030,12 +1043,16 @@ class _CachedResponse200 extends _CachedResponseWithBody {
 
 class _CachedResponse304 extends _CachedResponse {
   final String requestIfModifiableSince;
+  final String? cacheControl;
+  final String? server;
 
   _CachedResponse304({
     required super.path,
     required super.file,
     super.fileStat,
     required this.requestIfModifiableSince,
+    this.cacheControl,
+    this.server,
   }) : super(statusCode: 304);
 
   @override
@@ -1060,7 +1077,15 @@ class _CachedResponse304 extends _CachedResponse {
   Response toResponse(Request request, {DateTime? requestInitTime}) {
     markUsage();
 
-    var headers = <String, List<String>>{};
+    final cacheControl = this.cacheControl;
+    final server = this.server;
+
+    var headers = <String, List<String>>{
+      'Last-Modified': [requestIfModifiableSince],
+      if (cacheControl != null) 'Cache-Control': [cacheControl],
+      if (server != null) 'Server': [server],
+    };
+
     configureMetricsHeaders(headers, requestInitTime: requestInitTime);
 
     return Response(statusCode, headers: headers);
@@ -1076,12 +1101,15 @@ class _CachedResponse304 extends _CachedResponse {
 }
 
 class _CachedResponse404 extends _CachedResponseWithBody {
+  final String? server;
+
   _CachedResponse404({
     required super.path,
     required super.file,
     super.content,
     super.contentEncoding,
     super.encoding,
+    this.server,
   }) : super(statusCode: 404, fileStat: null);
 
   @override
@@ -1093,7 +1121,12 @@ class _CachedResponse404 extends _CachedResponseWithBody {
   Response toResponse(Request request, {DateTime? requestInitTime}) {
     markUsage();
 
-    var headers = <String, List<String>>{};
+    final server = this.server;
+
+    var headers = <String, List<String>>{
+      if (server != null) 'Server': [server],
+    };
+
     configureMetricsHeaders(headers, requestInitTime: requestInitTime);
 
     return Response(statusCode, headers: headers, body: Body(content));
