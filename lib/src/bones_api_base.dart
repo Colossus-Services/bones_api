@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.9.3';
+  static const String VERSION = '1.9.4';
 
   static bool _boot = false;
 
@@ -2410,7 +2410,6 @@ class CacheControl {
     this.directives = const <CacheControlDirective>[
       CacheControlDirective.private,
       CacheControlDirective.noTransform,
-      CacheControlDirective.mustRevalidate,
       CacheControlDirective.staleWhileRevalidate,
       CacheControlDirective.staleIfError,
     ],
