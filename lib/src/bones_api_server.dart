@@ -107,13 +107,54 @@ class APIServerConfig {
   /// The `cache-control` header for static files.
   final String staticFilesCacheControl;
 
+  /// The `cache-control` for long-lived static files.
+  /// See [longLivedStaticFilesCached].
+  final String longLivedStaticFilesCacheControl;
+
+  /// Patterns of files using [longLivedStaticFilesCacheControl].
+  /// See [staticFilesCacheControl].
+  final List<Pattern> longLivedStaticFilesCached;
+
   /// The default value for [apiCacheControl].
   static const String defaultApiCacheControl =
       'private, no-transform, must-revalidate, max-age=0, no-store, no-cache';
 
-  /// The default value for [staticFilesCacheControl].
+  /// The default value for [staticFilesCacheControl]:
+  /// - `private`: Cached only by the browser, not shared caches (e.g., CDN).
+  /// - `no-transform`: Prevents proxies from modifying the response.
+  /// - `max-age=60`: Fresh for 60 seconds.
+  /// - `stale-while-revalidate=600`: Serve stale content for up to 10 minutes while revalidating.
+  /// - `stale-if-error=1200`: Serve stale content for up to 20 minutes if there's a fetch error.
   static const String defaultStaticFilesCacheControl =
       'private, no-transform, max-age=60, stale-while-revalidate=600, stale-if-error=1200';
+
+  /// The default value for [longLivedStaticFilesCacheControl]:
+  /// - `private`: Cached only by the browser.
+  /// - `max-age=86400`: Fresh for 1 day (24 hours).
+  /// - `stale-while-revalidate=2592000`: Serve stale content for up to 30 days while revalidating.
+  /// - `stale-if-error=2592000`: Serve stale content for up to 30 days if there's a fetch error.
+  static const String defaultLongLivedStaticFilesCacheControl =
+      'private, max-age=86400, stale-while-revalidate=2592000, stale-if-error=2592000';
+
+  /// Default list of patterns for files that should use [defaultLongLivedStaticFilesCacheControl].
+  ///
+  /// Optimized for PWA setups where the API server delivers both API responses and static assets
+  /// required for application startup.
+  ///
+  /// These files are either:
+  /// - Infrequently updated and suitable for long-lived caching.
+  /// - Critical for the offline bootstrap of PWA apps, before the Service Worker takes control and can serve cached content.
+  ///
+  /// Examples:
+  /// - `'/'`: PWA entry point.
+  /// - `'/index.html'`: Main HTML shell.
+  /// - `'/pwa_sw.js'`: Service Worker script.
+  static const List<Pattern> defaultLongLivedStaticFilesCached = [
+    '/',
+    '/index.html',
+    '/styles.css',
+    '/pwa_sw.js',
+  ];
 
   /// If `true` will cache static files. Default: true
   final bool cacheStaticFilesResponses;
@@ -178,6 +219,8 @@ class APIServerConfig {
     bool? useSessionID,
     String? apiCacheControl,
     String? staticFilesCacheControl,
+    String? longLivedStaticFilesCacheControl,
+    Object? longLivedStaticFilesCached,
     bool? cacheStaticFilesResponses,
     int? staticFilesCacheMaxMemorySize,
     int? staticFilesCacheMaxContentLength,
@@ -214,6 +257,12 @@ class APIServerConfig {
             normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
         staticFilesCacheControl = normalizeHeaderValue(
             staticFilesCacheControl, defaultStaticFilesCacheControl),
+        longLivedStaticFilesCacheControl = normalizeHeaderValue(
+            longLivedStaticFilesCacheControl,
+            defaultLongLivedStaticFilesCacheControl),
+        longLivedStaticFilesCached = resolveLongLivedStaticFiles(
+            longLivedStaticFilesCached,
+            apiConfig: apiConfig),
         cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
             cacheStaticFilesResponses,
             apiConfig: apiConfig),
@@ -272,6 +321,11 @@ class APIServerConfig {
     var staticFilesCacheControl =
         a.optionAsString('static-files-cache-control');
 
+    var longLivedStaticFilesCacheControl =
+        a.optionAsString('long-lived-static-files-cache-control');
+    var longLivedStaticFilesCached =
+        a.optionAsList('long-lived-static-files-cached');
+
     var cacheStaticFilesResponses =
         a.optionAsBool('cache-static-files-responses');
     var staticFilesCacheMaxMemorySize =
@@ -327,6 +381,8 @@ class APIServerConfig {
       useSessionID: useSessionID,
       apiCacheControl: apiCacheControl,
       staticFilesCacheControl: staticFilesCacheControl,
+      longLivedStaticFilesCacheControl: longLivedStaticFilesCacheControl,
+      longLivedStaticFilesCached: longLivedStaticFilesCached,
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
@@ -507,6 +563,39 @@ class APIServerConfig {
 
   static bool resolveUseSessionID(bool cookieless, bool? useSessionID) {
     return cookieless ? false : (useSessionID ?? true);
+  }
+
+  static List<Pattern> resolveLongLivedStaticFiles(Object? patterns,
+      {APIConfig? apiConfig}) {
+    if (patterns == null) return [];
+
+    List list;
+
+    if (patterns is Iterable) {
+      list = patterns.toList();
+    } else {
+      list = [patterns];
+    }
+
+    List<Pattern> files = list
+        .map((e) {
+          if (e is RegExp) return e;
+
+          var s = e.toString().trim();
+          if (s.isEmpty) return null;
+
+          if (s.startsWith('re:')) {
+            return RegExp(s.substring(3));
+          } else if (s.startsWith('regexp:')) {
+            return RegExp(s.substring(7));
+          } else {
+            return s;
+          }
+        })
+        .nonNulls
+        .toList();
+
+    return files;
   }
 
   static bool resolveCacheStaticFilesResponses(bool? cache,
@@ -718,6 +807,14 @@ class APIServerConfig {
         'totalWorkers': totalWorkers,
         'apiCacheControl': apiCacheControl,
         'staticFilesCacheControl': staticFilesCacheControl,
+        'longLivedStaticFilesCacheControl': longLivedStaticFilesCacheControl,
+        'longLivedStaticFilesCached': longLivedStaticFilesCached.map((e) {
+          if (e is RegExp) {
+            return 'regexp:${e.pattern}';
+          } else {
+            return e.toString();
+          }
+        }).toList(),
         'cacheStaticFilesResponses': cacheStaticFilesResponses,
         'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
         'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
@@ -745,6 +842,9 @@ class APIServerConfig {
       totalWorkers: json['totalWorkers'],
       apiCacheControl: json['apiCacheControl'],
       staticFilesCacheControl: json['staticFilesCacheControl'],
+      longLivedStaticFilesCacheControl:
+          json['longLivedStaticFilesCacheControl'],
+      longLivedStaticFilesCached: json['longLivedStaticFilesCached'],
       cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
       maxPayloadLength: json['maxPayloadLength'],
       decompressPayload: json['decompressPayload'],
@@ -792,6 +892,8 @@ abstract class _APIServerBase extends APIServerConfig {
     super.useSessionID,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.longLivedStaticFilesCacheControl,
+    super.longLivedStaticFilesCached,
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
@@ -821,6 +923,10 @@ abstract class _APIServerBase extends APIServerConfig {
           useSessionID: apiServerConfig.useSessionID,
           apiCacheControl: apiServerConfig.apiCacheControl,
           staticFilesCacheControl: apiServerConfig.staticFilesCacheControl,
+          longLivedStaticFilesCacheControl:
+              apiServerConfig.longLivedStaticFilesCacheControl,
+          longLivedStaticFilesCached:
+              apiServerConfig.longLivedStaticFilesCached,
           cacheStaticFilesResponses: apiServerConfig.cacheStaticFilesResponses,
           staticFilesCacheMaxMemorySize:
               apiServerConfig.staticFilesCacheMaxMemorySize,
@@ -943,6 +1049,8 @@ class APIServer extends _APIServerBase {
     super.totalWorkers,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.longLivedStaticFilesCacheControl,
+    super.longLivedStaticFilesCached,
     super.cacheStaticFilesResponses,
     super.maxPayloadLength,
     super.decompressPayload,
@@ -1034,6 +1142,8 @@ class APIServer extends _APIServerBase {
       domains: domainsRoots,
       apiCacheControl: apiCacheControl,
       staticFilesCacheControl: staticFilesCacheControl,
+      longLivedStaticFilesCacheControl: longLivedStaticFilesCacheControl,
+      longLivedStaticFilesCached: longLivedStaticFilesCached,
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
@@ -1834,6 +1944,8 @@ final class APIServerWorker extends _APIServerBase {
     super.useSessionID,
     super.apiCacheControl,
     super.staticFilesCacheControl,
+    super.longLivedStaticFilesCacheControl,
+    super.longLivedStaticFilesCached,
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
@@ -1929,16 +2041,33 @@ final class APIServerWorker extends _APIServerBase {
       );
     }
 
-    var headers = <String, String>{};
-    headers[HttpHeaders.cacheControlHeader] = staticFilesCacheControl;
+    var cacheControl = staticFilesCacheControl;
 
-    headers[HttpHeaders.serverHeader] ??= serverName;
+    if (longLivedStaticFilesCached.isNotEmpty &&
+        isLongLivedStaticFileCached(request.url.path)) {
+      cacheControl = longLivedStaticFilesCacheControl;
+    }
+
+    var headers = <String, String>{
+      if (cacheControl.isNotEmpty) HttpHeaders.cacheControlHeader: cacheControl,
+      HttpHeaders.serverHeader: serverName,
+    };
 
     return response.change(
       headers: headers,
       context: _buildResponseContext(rootDirectory, request, response),
     );
   }
+
+  /// Returns `true` if [filePath] matches any pattern in [longLivedStaticFilesCached].
+  bool isLongLivedStaticFileCached(String filePath) =>
+      longLivedStaticFilesCached.any((p) {
+        if (p is RegExp) {
+          return p.hasMatch(filePath);
+        } else {
+          return filePath == p.toString();
+        }
+      });
 
   Map<String, Object>? _buildResponseContext(
       Directory rootDirectory, Request request, Response response) {

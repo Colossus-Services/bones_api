@@ -5,6 +5,8 @@
 
 - `APIServerConfig`:
   - `defaultStaticFilesCacheControl`: removed `must-revalidate` (conflicts with `stale-while-revalidate`).
+  - Added `longLivedStaticFilesCacheControl` and `longLivedStaticFilesCached`
+    - Default values are for PWA bootstrap files: `/`, `/index.html`, `styles.css`, `/pwa_sw.js`
 
 ## 1.9.3
 
