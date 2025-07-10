@@ -1,3 +1,14 @@
+## 1.9.4-beta.2
+
+- `APIServerConfig`:
+  - `defaultLongLivedStaticFilesCacheControl`: changed `max-age` from 86400 (1 day) to 3600 (1 hour).
+  - Constructor:
+    - Improved parameters that can be passed through `apiConfig`:
+      - `cookieless`, `useSessionID`.
+      - `maxPayloadLength`, `decompressPayload`.
+      - `apiCacheControl`, `staticFilesCacheControl`.
+      - `longLivedStaticFilesCacheControl`, `longLivedStaticFilesCached`.
+
 ## 1.9.4-beta.1
 
 - `CacheControl`:
