@@ -130,11 +130,11 @@ class APIServerConfig {
 
   /// The default value for [longLivedStaticFilesCacheControl]:
   /// - `private`: Cached only by the browser.
-  /// - `max-age=86400`: Fresh for 1 day (24 hours).
+  /// - `max-age=86400`: Fresh for 1 hour.
   /// - `stale-while-revalidate=2592000`: Serve stale content for up to 30 days while revalidating.
   /// - `stale-if-error=2592000`: Serve stale content for up to 30 days if there's a fetch error.
   static const String defaultLongLivedStaticFilesCacheControl =
-      'private, max-age=86400, stale-while-revalidate=2592000, stale-if-error=2592000';
+      'private, max-age=3600, stale-while-revalidate=2592000, stale-if-error=2592000';
 
   /// Default list of patterns for files that should use [defaultLongLivedStaticFilesCacheControl].
   ///
