@@ -215,7 +215,7 @@ class APIServerConfig {
     bool? allowRequestLetsEncryptCertificate,
     this.hotReload = false,
     int? totalWorkers = 1,
-    this.cookieless = false,
+    bool? cookieless,
     bool? useSessionID,
     String? apiCacheControl,
     String? staticFilesCacheControl,
@@ -224,8 +224,8 @@ class APIServerConfig {
     bool? cacheStaticFilesResponses,
     int? staticFilesCacheMaxMemorySize,
     int? staticFilesCacheMaxContentLength,
-    this.maxPayloadLength,
-    this.decompressPayload = false,
+    int? maxPayloadLength,
+    bool? decompressPayload,
     this.apiConfig,
     bool? logToConsole,
     bool? logQueue,
@@ -253,13 +253,22 @@ class APIServerConfig {
                 apiConfig: apiConfig),
         letsEncryptDirectory = resolveLetsEncryptDirectory(letsEncryptDirectory,
             apiConfig: apiConfig, letsEncrypt: letsEncrypt),
-        apiCacheControl =
-            normalizeHeaderValue(apiCacheControl, defaultApiCacheControl),
+        apiCacheControl = normalizeHeaderValue(apiCacheControl,
+            defaultApiCacheControl, apiConfig, 'cache', 'api', 'cache_control'),
         staticFilesCacheControl = normalizeHeaderValue(
-            staticFilesCacheControl, defaultStaticFilesCacheControl),
+            staticFilesCacheControl,
+            defaultStaticFilesCacheControl,
+            apiConfig,
+            'cache',
+            'static_files',
+            'cache_control'),
         longLivedStaticFilesCacheControl = normalizeHeaderValue(
             longLivedStaticFilesCacheControl,
-            defaultLongLivedStaticFilesCacheControl),
+            defaultLongLivedStaticFilesCacheControl,
+            apiConfig,
+            'cache',
+            'long_lived_static_files',
+            'cache_control'),
         longLivedStaticFilesCached = resolveLongLivedStaticFiles(
             longLivedStaticFilesCached,
             def: defaultLongLivedStaticFilesCached,
@@ -274,8 +283,14 @@ class APIServerConfig {
             resolveStaticFilesCacheMaxContentLength(
                 staticFilesCacheMaxContentLength,
                 apiConfig: apiConfig),
-        useSessionID = resolveUseSessionID(cookieless, useSessionID),
+        cookieless = resolveCookieless(cookieless, apiConfig: apiConfig),
+        useSessionID =
+            resolveUseSessionID(cookieless, useSessionID, apiConfig: apiConfig),
         totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
+        maxPayloadLength =
+            resolveMaxPayloadLength(maxPayloadLength, apiConfig: apiConfig),
+        decompressPayload =
+            resolveDecompressPayload(decompressPayload, apiConfig: apiConfig),
         logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
         logQueue = resolveLogQueue(logQueue, apiConfig: apiConfig),
         args = resolveArgs(args);
@@ -306,17 +321,20 @@ class APIServerConfig {
     var address = a.optionAsString('address');
 
     var letsEncrypt = a.flag('letsencrypt');
-    var letsEncryptProduction = letsEncrypt && a.flag('letsencrypt-production');
-    var allowRequestLetsEncryptCertificate =
-        letsEncrypt && a.flag('allow-request-letsencrypt-certificate');
+    var letsEncryptProduction =
+        letsEncrypt ? a.flagOr('letsencrypt-production', null) : false;
+    var allowRequestLetsEncryptCertificate = letsEncrypt
+        ? a.flagOr('allow-request-letsencrypt-certificate', null)
+        : false;
     var letsEncryptDirectory =
         letsEncrypt ? a.optionAsDirectory('letsencrypt-directory') : null;
 
     var hotReload = a.flag('hot-reload');
     var totalWorkers = a.optionAsInt('total-workers');
 
-    var cookieless = a.flag('cookieless');
-    var useSessionID = a.flagOr('use-session-id', !cookieless)!;
+    var cookieless = a.flagOr('cookieless', null);
+    var useSessionID =
+        a.flagOr('use-session-id', cookieless != null ? !cookieless : null);
 
     var apiCacheControl = a.optionAsString('api-cache-control');
     var staticFilesCacheControl =
@@ -335,7 +353,7 @@ class APIServerConfig {
         a.optionAsInt('static-files-cache-max-content-length');
 
     var maxPayloadLength = a.optionAsInt('max-payload-length');
-    var decompressPayload = a.flag('decompress-payload');
+    var decompressPayload = a.flagOr('decompress-payload', null);
 
     var logToConsole = a.flagOr('log-toConsole', null);
 
@@ -436,10 +454,19 @@ class APIServerConfig {
         : (securePort ?? -1);
   }
 
-  static String normalizeHeaderValue(String? header, String def) {
+  static String normalizeHeaderValue(String? header, String def,
+      [APIConfig? apiConfig, String? k0, String? k1, String? k2, String? k3]) {
     if (header == null) return def;
     header = header.trim();
-    return header.isNotEmpty ? header : def;
+    if (header.isNotEmpty) {
+      return header;
+    } else {
+      if (apiConfig != null && k0 != null) {
+        var val = apiConfig.getPath(k0, k1, k2);
+        if (val != null) return val;
+      }
+      return def;
+    }
   }
 
   static Map<String, Directory> resolveDomainsRoots(List domains,
@@ -562,20 +589,50 @@ class APIServerConfig {
     return (totalWorkers ?? 1).clamp(1, 100);
   }
 
-  static bool resolveUseSessionID(bool cookieless, bool? useSessionID) {
-    return cookieless ? false : (useSessionID ?? true);
+  static bool resolveCookieless(bool? cookieless, {APIConfig? apiConfig}) {
+    cookieless ??= apiConfig?.getPath('server', 'cookieless');
+    return cookieless ?? false;
+  }
+
+  static bool resolveUseSessionID(bool? cookieless, bool? useSessionID,
+      {APIConfig? apiConfig}) {
+    cookieless = resolveCookieless(cookieless, apiConfig: apiConfig);
+    if (cookieless) return false;
+
+    useSessionID ??= apiConfig?.getPath('server', 'use_session_id');
+    return useSessionID ?? true;
+  }
+
+  static int? resolveMaxPayloadLength(int? maxPayloadLength,
+      {APIConfig? apiConfig}) {
+    maxPayloadLength ??= apiConfig?.getPath('server', 'max_payload_length');
+    return maxPayloadLength;
+  }
+
+  static bool resolveDecompressPayload(bool? decompressPayload,
+      {APIConfig? apiConfig}) {
+    decompressPayload ??= apiConfig?.getPath('server', 'decompress_payload');
+    return decompressPayload ?? false;
   }
 
   static List<Pattern> resolveLongLivedStaticFiles(Object? patterns,
       {List<Pattern>? def, APIConfig? apiConfig}) {
-    if (patterns == null) return def ?? [];
-
     List list;
 
     if (patterns is Iterable) {
       list = patterns.toList();
-    } else {
+    } else if (patterns != null) {
       list = [patterns];
+    } else {
+      if (apiConfig != null) {
+        list = apiConfig
+                .getAsMap('cache')
+                ?.getAsMap('long_lived_static_files')
+                ?.getAsList('cached') ??
+            [];
+      } else {
+        list = [];
+      }
     }
 
     List<Pattern> files = list
