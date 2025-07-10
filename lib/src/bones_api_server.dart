@@ -456,9 +456,8 @@ class APIServerConfig {
 
   static String normalizeHeaderValue(String? header, String def,
       [APIConfig? apiConfig, String? k0, String? k1, String? k2, String? k3]) {
-    if (header == null) return def;
-    header = header.trim();
-    if (header.isNotEmpty) {
+    header = header?.trim();
+    if (header != null && header.isNotEmpty) {
       return header;
     } else {
       if (apiConfig != null && k0 != null) {

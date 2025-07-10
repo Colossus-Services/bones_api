@@ -1,3 +1,8 @@
+## 1.9.4-beta.3
+
+- `APIServerConfig`:
+  - Fix `normalizeHeaderValue` resolution when using `apiConfig`.
+
 ## 1.9.4-beta.2
 
 - `APIServerConfig`:
