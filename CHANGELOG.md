@@ -1,3 +1,18 @@
+## 1.9.4
+
+- Main updates (see `v1.9.4-beta.*` for more):
+  - `APIServerConfig`:
+    - `defaultStaticFilesCacheControl`: removed `must-revalidate` (conflicts with `stale-while-revalidate`).
+    - Added `longLivedStaticFilesCacheControl` and `longLivedStaticFilesCached`
+      - Default values are for PWA bootstrap files: `/`, `/index.html`, `styles.css`, `/pwa_sw.js`
+    - Constructor:
+      - Improved parameters that can be passed through `apiConfig`:
+
+  - `CacheControl`:
+    - Removed `mustRevalidate` from the default `directives` (conflicts with `staleWhileRevalidate`).
+
+- coverage: ^1.15.0
+
 ## 1.9.4-beta.3
 
 - `APIServerConfig`:
