@@ -1,3 +1,10 @@
+## 1.9.5
+
+- reflection_factory: ^2.5.2
+- swiss_knife: ^3.3.3
+
+- test: ^1.26.3
+
 ## 1.9.4
 
 - Main updates (see `v1.9.4-beta.*` for more):
