@@ -1,5 +1,10 @@
 ## 1.9.5
 
+- `APIServer`:
+  - `_resolveBodyImpl`:
+    - Catch `OutOfMemoryError` and log.
+    - Log errors while encoding payload to JSON.
+
 - reflection_factory: ^2.5.2
 - swiss_knife: ^3.3.3
 

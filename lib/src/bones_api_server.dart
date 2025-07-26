@@ -1756,11 +1756,17 @@ class APIServer extends _APIServerBase {
 
       apiResponse.payloadMimeType ??= 'application/json';
       return s;
-    } catch (e) {
-      var s = payload.toString();
+    } on OutOfMemoryError catch (e, s) {
+      var msg = "`OutOfMemoryError` while encoding payload to JSON!";
+      _log.severe(msg, e, s);
+      return apiResponse.asError(error: '** $msg\n$e\n$s');
+    } catch (e, s) {
+      _log.warning("ERROR while encoding payload to JSON!", e, s);
+      apiResponse.headers['X-Payload-Encoding-Error'] = '$e';
+      var p = payload.toString();
       apiResponse.payloadMimeType ??=
-          resolveBestTextMimeType(s, apiResponse.payloadFileExtension);
-      return s;
+          resolveBestTextMimeType(p, apiResponse.payloadFileExtension);
+      return p;
     }
   }
 
