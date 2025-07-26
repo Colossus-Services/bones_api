@@ -1759,14 +1759,11 @@ class APIServer extends _APIServerBase {
     } on OutOfMemoryError catch (e, s) {
       var msg = "`OutOfMemoryError` while encoding payload to JSON!";
       _log.severe(msg, e, s);
-      return apiResponse.asError(error: '** $msg\n$e\n$s');
+      return apiResponse.asError(error: '** $msg\n$e', stackTrace: s);
     } catch (e, s) {
-      _log.warning("ERROR while encoding payload to JSON!", e, s);
-      apiResponse.headers['X-Payload-Encoding-Error'] = '$e';
-      var p = payload.toString();
-      apiResponse.payloadMimeType ??=
-          resolveBestTextMimeType(p, apiResponse.payloadFileExtension);
-      return p;
+      var msg = "ERROR while encoding payload to JSON!";
+      _log.severe(msg, e, s);
+      return apiResponse.asError(error: '** $msg\n$e', stackTrace: s);
     }
   }
 

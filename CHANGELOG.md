@@ -2,8 +2,9 @@
 
 - `APIServer`:
   - `_resolveBodyImpl`:
-    - Catch `OutOfMemoryError` and log.
     - Log errors while encoding payload to JSON.
+    - Catch `OutOfMemoryError` and log.
+    - Return `apiResponse.asError` on errors.
 
 - reflection_factory: ^2.5.2
 - swiss_knife: ^3.3.3
