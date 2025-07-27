@@ -32,6 +32,7 @@ import 'bones_api_utils.dart';
 import 'bones_api_utils_httpclient.dart';
 import 'bones_api_utils_isolate.dart';
 import 'bones_api_utils_json.dart';
+import 'bones_api_utils_sink.dart';
 
 final _log = logging.Logger('APIServer');
 
@@ -1749,13 +1750,14 @@ class APIServer extends _APIServerBase {
     final jsonEncodeInit = DateTime.now();
 
     try {
-      var s = _jsonEncodePayload(apiResponse, payload);
+      // Note: `jsonBytes` may be compressed with GZip.
+      var jsonBytes = _jsonEncodePayload(apiResponse, payload);
       var jsonEncodeTime = DateTime.now().difference(jsonEncodeInit);
 
-      apiResponse.setMetric('API-response-json', duration: jsonEncodeTime);
+      apiResponse.setMetric('API-Response-JSON', duration: jsonEncodeTime);
 
       apiResponse.payloadMimeType ??= 'application/json';
-      return s;
+      return jsonBytes;
     } on OutOfMemoryError catch (e, s) {
       var msg = "`OutOfMemoryError` while encoding payload to JSON!";
       _log.severe(msg, e, s);
@@ -1767,24 +1769,62 @@ class APIServer extends _APIServerBase {
     }
   }
 
-  static String _jsonEncodePayload(APIResponse<dynamic> apiResponse, payload) {
+  /// Encodes the given [payload] to JSON and writes it to an [AutoGZipSink].
+  ///
+  /// Returns either raw JSON bytes or GZip-compressed JSON bytes.
+  static Uint8List _jsonEncodePayload(
+      APIResponse<dynamic> apiResponse, payload) {
     final apiRequest = apiResponse.apiRequest;
+
+    final encodeInit = DateTime.now();
+    final bytesSink = AutoGZipSink();
 
     if (apiRequest != null) {
       final routeHandler = apiRequest.routeHandler;
-
       if (routeHandler != null) {
         var accessRules = routeHandler.entityAccessRules;
-
         if (!accessRules.isInnocuous) {
-          return Json.encode(payload,
+          Json.encodeToSink(payload, bytesSink,
               toEncodableProvider: (o) => accessRules.toJsonEncodable(
                   apiRequest, Json.defaultToEncodableJsonProvider(), o));
+
+          return _resolveJsonEncodePayloadBytes(
+              apiResponse, bytesSink, encodeInit);
         }
       }
     }
 
-    return Json.encode(payload, toEncodable: ReflectionFactory.toJsonEncodable);
+    Json.encodeToSink(payload, bytesSink,
+        toEncodable: ReflectionFactory.toJsonEncodable);
+
+    return _resolveJsonEncodePayloadBytes(apiResponse, bytesSink, encodeInit);
+  }
+
+  /// Finalizes the JSON encoding and returns the resulting bytes.
+  ///
+  /// Closes the [bytesSink] and collects the output.
+  /// If GZip was applied, adds headers to [apiResponse].
+  /// See [_defineGZipEncodedHeaders].
+  static Uint8List _resolveJsonEncodePayloadBytes(
+      APIResponse<dynamic> apiResponse,
+      AutoGZipSink bytesSink,
+      DateTime encodeInit) {
+    bytesSink.close();
+
+    final bytes = bytesSink.toBytes();
+
+    if (bytesSink.isGzip) {
+      var inputLength = bytesSink.inputLength;
+      var compressionCapacity = bytesSink.capacity;
+
+      _defineGZipEncodedHeaders(apiResponse.headers,
+          bodyLength: inputLength,
+          compressedBodyLength: bytes.length,
+          compressionCapacity: compressionCapacity,
+          gzipInit: encodeInit);
+    }
+
+    return bytes;
   }
 
   static final RegExp _htmlTag = RegExp(r'<\w+.*?>');
@@ -1941,8 +1981,16 @@ class APIServer extends _APIServerBase {
     return def;
   }
 
-  static String resolveServerTiming(Map<String, APIMetric> metrics) {
+  static String resolveServerTiming(Map<String, APIMetric> metrics,
+      [String? serverTiming]) {
     var s = StringBuffer();
+
+    if (serverTiming != null) {
+      serverTiming = serverTiming.trim();
+      if (serverTiming.isNotEmpty) {
+        s.write(serverTiming);
+      }
+    }
 
     for (var e in metrics.entries) {
       var metric = e.value;
@@ -2618,6 +2666,49 @@ final class APIServerWorker extends _APIServerBase {
       return apiResponse.fileResponse;
     }
 
+    var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
+
+    final serverResponseDelay = this.serverResponseDelay;
+    if (serverResponseDelay != null && !serverResponseDelay.isNegative) {
+      final retPayloadOrig = retPayload;
+
+      _log.info(
+          "[DEV] Response #${apiRequest.id} delayed in ${serverResponseDelay.toStringUnit()}: ${apiRequest.requestedUri}");
+
+      retPayload = Future.delayed(serverResponseDelay, () async {
+        var payload = await retPayloadOrig;
+        return payload;
+      });
+    }
+
+    return retPayload.resolveMapped((payload) {
+      if (payload is APIResponse) {
+        var apiResponse2 = payload;
+
+        return APIServer.resolveBody(apiResponse2.payload, apiResponse2)
+            .resolveMapped((payload2) {
+          var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
+
+          var response = _sendAPIResponse(
+              request, apiRequest, apiResponse2, headers, payload2);
+
+          apiResponse.disposeAsync();
+
+          return _processResponse(apiRequest, apiResponse2, request, response);
+        });
+      } else {
+        var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
+
+        var response = _sendAPIResponse(
+            request, apiRequest, apiResponse, headers, payload);
+
+        return _processResponse(apiRequest, apiResponse, request, response);
+      }
+    });
+  }
+
+  Map<String, Object> _resolveAPIResponseHeaders(
+      APIResponse<dynamic> apiResponse, APIRequest apiRequest) {
     var headers = <String, Object>{};
 
     if (!apiResponse.hasCORS) {
@@ -2669,41 +2760,7 @@ final class APIServerWorker extends _APIServerBase {
 
     // headers['X-APIToken'] = apiRequest.credential?.token ?? '?';
 
-    var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
-
-    final serverResponseDelay = this.serverResponseDelay;
-    if (serverResponseDelay != null && !serverResponseDelay.isNegative) {
-      final retPayloadOrig = retPayload;
-
-      _log.info(
-          "[DEV] Response #${apiRequest.id} delayed in ${serverResponseDelay.toStringUnit()}: ${apiRequest.requestedUri}");
-
-      retPayload = Future.delayed(serverResponseDelay, () async {
-        var payload = await retPayloadOrig;
-        return payload;
-      });
-    }
-
-    return retPayload.resolveMapped((payload) {
-      if (payload is APIResponse) {
-        var apiResponse2 = payload;
-
-        return APIServer.resolveBody(apiResponse2.payload, apiResponse2)
-            .resolveMapped((payload2) {
-          var response = _sendAPIResponse(
-              request, apiRequest, apiResponse2, headers, payload2);
-
-          apiResponse.disposeAsync();
-
-          return _processResponse(apiRequest, apiResponse2, request, response);
-        });
-      } else {
-        var response = _sendAPIResponse(
-            request, apiRequest, apiResponse, headers, payload);
-
-        return _processResponse(apiRequest, apiResponse, request, response);
-      }
-    });
+    return headers;
   }
 
   FutureOr<Response> _processResponse(APIRequest apiRequest,
@@ -2780,7 +2837,10 @@ final class APIServerWorker extends _APIServerBase {
         ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
         : apiResponse.metrics;
 
-    headers['server-timing'] = APIServer.resolveServerTiming(allMetrics);
+    headers['server-timing'] = APIServer.resolveServerTiming(
+      allMetrics,
+      headers['server-timing']?.toString(),
+    );
 
     if (cookieless) {
       headers.remove(HttpHeaders.setCookieHeader);
@@ -2918,5 +2978,66 @@ extension _APIRequestExtension on APIRequest {
     }
 
     return Request(method.name, requestedUri);
+  }
+}
+
+/// Adds GZip-related headers to the given [headers] map.
+///
+/// Sets the `Content-Encoding` and `Content-Length` headers to indicate
+/// GZip compression and its size. Optionally adds:
+///
+/// - `X-Compression-Ratio`: with detailed compression info
+/// - `Server-Timing`: duration of the compression step (if [gzipInit] is provided)
+///
+/// Parameters:
+/// - [bodyLength]: original uncompressed body size in bytes
+/// - [compressedBodyLength]: resulting GZip-compressed size
+/// - [compressionCapacity]: internal capacity allocated for compression
+/// - [addCompressionRatioHeader]: whether to include `X-Compression-Ratio`
+/// - [addServerTiming]: whether to append timing info to `Server-Timing`
+/// - [gzipInit]: start time of GZip encoding, required for timing
+/// - [serverTimingEntryName]: label used in the `Server-Timing` header
+void _defineGZipEncodedHeaders(Map<String, dynamic> headers,
+    {required int bodyLength,
+    required int compressedBodyLength,
+    required int compressionCapacity,
+    bool addCompressionRatioHeader = true,
+    bool addServerTiming = true,
+    DateTime? gzipInit,
+    String serverTimingEntryName = 'obj->json->gzip'}) {
+  headers[HttpHeaders.contentEncodingHeader] = 'gzip';
+  headers[HttpHeaders.contentLengthHeader] = compressedBodyLength.toString();
+
+  if (addCompressionRatioHeader) {
+    var compressionRatio = compressedBodyLength / bodyLength;
+
+    var compressionRatioStr = '$compressionRatio';
+    if (compressionRatioStr.length > 6) {
+      compressionRatioStr = compressionRatio.toStringAsFixed(4);
+    }
+
+    headers['X-Compression-Ratio'] =
+        '$compressionRatioStr ($compressedBodyLength/$bodyLength/$compressionCapacity)';
+  }
+
+  if (addServerTiming && gzipInit != null) {
+    const headerServerTiming = 'server-timing';
+
+    var gzipTime = DateTime.now().difference(gzipInit);
+    var dur = gzipTime.inMicroseconds / 1000;
+
+    var serverTiming2 = StringBuffer();
+
+    var serverTiming = headers[headerServerTiming]?.toString();
+    if (serverTiming != null && serverTiming.isNotEmpty) {
+      serverTiming2.write(serverTiming);
+      serverTiming2.write(',');
+    }
+
+    serverTiming2.write(serverTimingEntryName);
+    serverTiming2.write(';dur=');
+    serverTiming2.write(dur);
+
+    headers[headerServerTiming] = serverTiming2.toString();
   }
 }
