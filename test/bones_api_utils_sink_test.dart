@@ -1,3 +1,4 @@
+@TestOn('vm')
 import 'dart:io';
 
 import 'package:bones_api/src/bones_api_utils_sink.dart';
