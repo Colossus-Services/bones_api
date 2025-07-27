@@ -1,3 +1,23 @@
+## 1.9.5
+
+- `APIServer`:
+  - `_resolveBodyImpl`:
+    - Log errors while encoding payload to JSON.
+    - Catch `OutOfMemoryError` and log.
+    - Return `apiResponse.asError` on errors.
+  - `_jsonEncodePayload`:
+    - Now uses `AutoGZipSink` and `Json.encodeToSink` to stream JSON encoding with automatic GZip compression based on output size.
+
+- Added `AutoGZipSink`, `GZipSink` and `BytesSink` and `BytesBuffer`.
+
+- `Json`:
+  - Added `encodeToSink`.
+
+- reflection_factory: ^2.5.2
+- swiss_knife: ^3.3.3
+
+- test: ^1.26.3
+
 ## 1.9.4
 
 - Main updates (see `v1.9.4-beta.*` for more):
