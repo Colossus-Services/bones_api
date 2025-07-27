@@ -10,6 +10,9 @@
 
 - Added `AutoGZipSink`, `GZipSink` and `BytesSink` and `BytesBuffer`.
 
+- `Json`:
+  - Added `encodeToSink`.
+
 - reflection_factory: ^2.5.2
 - swiss_knife: ^3.3.3
 
