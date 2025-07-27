@@ -3004,7 +3004,7 @@ void _defineGZipEncodedHeaders(Map<String, dynamic> headers,
     bool addCompressionRatioHeader = true,
     bool addServerTiming = true,
     DateTime? gzipInit,
-    String serverTimingEntryName = 'obj->json->gzip'}) {
+    String serverTimingEntryName = 'obj-json-gzip'}) {
   headers[HttpHeaders.contentEncodingHeader] = 'gzip';
   headers[HttpHeaders.contentLengthHeader] = compressedBodyLength.toString();
 
