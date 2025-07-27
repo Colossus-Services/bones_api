@@ -6,6 +6,8 @@
     - Catch `OutOfMemoryError` and log.
     - Return `apiResponse.asError` on errors.
 
+- Added `AutoGZipSink`, `GZipSink` and `BytesSink` and `BytesBuffer`.
+
 - reflection_factory: ^2.5.2
 - swiss_knife: ^3.3.3
 
