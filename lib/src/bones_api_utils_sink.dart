@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+/// Automatically switches to GZip compression when input exceeds [minGZipLength].
 class AutoGZipSink extends ByteConversionSinkBuffered {
+  /// Inner sink that may switch between plain and gzip modes.
   ByteConversionSinkBuffered _sink;
 
+  /// Minimum input size to trigger GZip compression.
   final int minGZipLength;
 
   AutoGZipSink({this.minGZipLength = 512, int capacity = 1024})
@@ -15,16 +18,16 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
 
   bool _gzip = false;
 
+  /// Returns `true` if GZip compression is active.
   bool get isGzip => _gzip;
 
+  /// Switches to GZip compression. Keeps previously added data.
   void switchToGzip() {
     if (_gzip) return;
     var prevBytes = _sink.toBytes(copy: true);
     _sink.reset();
-
     _sink = GZipSink(bytesSink: _sink);
     _gzip = true;
-
     _sink.add(prevBytes);
   }
 
@@ -33,19 +36,14 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
     if (!_gzip && _sink.length + chunk.length >= minGZipLength) {
       switchToGzip();
     }
-
     _sink.add(chunk);
   }
 
   @override
-  void close() {
-    _sink.close();
-  }
+  void close() => _sink.close();
 
   @override
-  Uint8List toBytes({bool copy = false}) {
-    return _sink.toBytes();
-  }
+  Uint8List toBytes({bool copy = false}) => _sink.toBytes(copy: copy);
 
   @override
   int get capacity => _sink.capacity;
@@ -53,16 +51,14 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
   @override
   int get length => _sink.length;
 
+  /// Resets internal state and disables GZip if active.
   @override
   void reset() {
     if (!_gzip) {
       _sink.reset();
     } else {
       var gzipSink = _sink as GZipSink;
-
-      // Close to avoid memory leak:
-      gzipSink.close();
-
+      gzipSink.close(); // Avoid memory leak
       _sink = gzipSink._bytesSink;
       _sink.reset();
       _gzip = false;
@@ -70,16 +66,17 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
   }
 }
 
+/// Wraps a sink to apply GZip compression using [ZLibEncoder].
 class GZipSink extends ByteConversionSinkBuffered {
   final ByteConversionSinkBuffered _bytesSink;
   late ByteConversionSink _gzipSink;
   final int level;
 
-  GZipSink(
-      {this.level = 4,
-      ByteConversionSinkBuffered? bytesSink,
-      int capacity = 1024 * 4})
-      : _bytesSink = bytesSink ?? BytesSink(capacity: capacity) {
+  GZipSink({
+    this.level = 4,
+    ByteConversionSinkBuffered? bytesSink,
+    int capacity = 1024 * 4,
+  }) : _bytesSink = bytesSink ?? BytesSink(capacity: capacity) {
     _gzipSink = _createGZipEncoder(level);
   }
 
@@ -116,6 +113,7 @@ class GZipSink extends ByteConversionSinkBuffered {
   @override
   Uint8List toBytes({bool copy = false}) => _bytesSink.toBytes();
 
+  /// Resets the compressor and underlying buffer.
   @override
   void reset() {
     _gzipSink.close();
@@ -125,6 +123,7 @@ class GZipSink extends ByteConversionSinkBuffered {
   }
 }
 
+/// Buffer that accumulates bytes and supports reset and conversion to [Uint8List].
 class BytesSink extends BytesBuffer implements ByteConversionSinkBuffered {
   BytesSink({super.capacity});
 
@@ -144,11 +143,10 @@ class BytesSink extends BytesBuffer implements ByteConversionSinkBuffered {
   }
 }
 
+/// Base class for sinks with tracking and reset support.
 abstract class ByteConversionSinkBuffered extends ByteConversionSink {
   int get length;
-
   int get capacity;
-
   int get inputLength;
 
   Uint8List toBytes({bool copy = false});
@@ -156,6 +154,7 @@ abstract class ByteConversionSinkBuffered extends ByteConversionSink {
   void reset();
 }
 
+/// A growing byte buffer with auto-resize and slice access.
 class BytesBuffer {
   Uint8List _buffer;
   int _length = 0;
@@ -166,11 +165,7 @@ class BytesBuffer {
 
   int get capacity => _buffer.length;
 
-  /// Returns the added bytes as a [Uint8List]. See [add]
-  ///
-  /// If [copy] is `false` and the buffer is fully used (`_length == _buffer.length`),
-  /// returns the internal buffer directly to avoid copying.
-  /// Otherwise, returns a view of the buffer up to the actual written length.
+  /// Returns buffer contents. May return internal buffer if fully used and [copy] is false.
   Uint8List toBytes({bool copy = false}) {
     if (!copy && _length == _buffer.length) {
       return _buffer;
@@ -178,15 +173,13 @@ class BytesBuffer {
     return Uint8List.sublistView(_buffer, 0, _length);
   }
 
-  /// Add butes to the buffer.
+  /// Adds [bytes] to buffer, resizing if needed.
   void add(List<int> bytes) {
     final chunkLength = bytes.length;
     final requiredLength = _length + chunkLength;
-
     if (requiredLength > _buffer.length) {
       _increaseCapacity(requiredLength);
     }
-
     _buffer.setRange(_length, _length + chunkLength, bytes);
     _length += chunkLength;
   }
@@ -199,13 +192,14 @@ class BytesBuffer {
     _buffer = newBuffer;
   }
 
+  /// Calculates next buffer size based on usage pattern.
   int computeNewLength(int prevLength, int requiredLength) {
     assert(prevLength < requiredLength);
 
     if (requiredLength < 1024 * 1024 * 8) {
       var newLength = prevLength * 2;
       while (newLength < requiredLength) {
-        newLength = newLength * 2;
+        newLength *= 2;
       }
       return newLength;
     } else if (requiredLength < 1024 * 1024 * 32) {
@@ -223,6 +217,7 @@ class BytesBuffer {
     }
   }
 
+  /// Clears the buffer content without releasing memory.
   void reset() {
     _length = 0;
   }
