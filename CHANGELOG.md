@@ -2,7 +2,7 @@
 
 - `APIServer`:
   - `_defineGZipEncodedHeaders`:
-  - Fix `serverTimingEntryName` default value from `obj->json->gzip` to `obj-json-gzip`.
+    - Fix `serverTimingEntryName` default value from `obj->json->gzip` to `obj-json-gzip`.
 
 ## 1.9.5
 
