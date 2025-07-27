@@ -154,6 +154,32 @@ class Json {
         pretty: pretty, autoResetEntityCache: autoResetEntityCache);
   }
 
+  /// Sames as [encode] but outputs to [sink].
+  static void encodeToSink(Object? o, Sink<List<int>> sink,
+      {bool pretty = false,
+      JsonFieldMatcher? maskField,
+      String maskText = '***',
+      JsonFieldMatcher? removeField,
+      bool removeNullFields = false,
+      ToEncodableJsonProvider? toEncodableProvider,
+      ToEncodable? toEncodable,
+      EntityHandlerProvider? entityHandlerProvider,
+      EntityCache? entityCache,
+      bool? autoResetEntityCache}) {
+    var jsonEncoder = _buildJsonEncoder(
+        maskField,
+        maskText,
+        removeField,
+        removeNullFields,
+        toEncodableProvider,
+        toEncodable,
+        entityHandlerProvider,
+        entityCache);
+
+    return jsonEncoder.encodeToSink(o, sink,
+        pretty: pretty, autoResetEntityCache: autoResetEntityCache);
+  }
+
   static final JsonEncoder defaultEncoder = JsonEncoder(
       toEncodableProvider: (o) => _jsonEncodableProvider(o, null),
       entityCache: JsonEntityCacheSimple(),

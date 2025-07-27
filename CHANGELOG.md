@@ -5,6 +5,8 @@
     - Log errors while encoding payload to JSON.
     - Catch `OutOfMemoryError` and log.
     - Return `apiResponse.asError` on errors.
+  - `_jsonEncodePayload`:
+    - Now uses `AutoGZipSink` and `Json.encodeToSink` to stream JSON encoding with automatic GZip compression based on output size.
 
 - Added `AutoGZipSink`, `GZipSink` and `BytesSink` and `BytesBuffer`.
 
