@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bones_api/src/bones_api_utils_sink.dart';
 import 'package:test/test.dart';
 
@@ -66,7 +68,7 @@ void main() {
 
   group('GZipSink', () {
     test('basic', () {
-      const gzipHeader = [31, 139, 8, 0, 0, 0, 0, 0, 0, 19];
+      var gzipHeader = _getGZipHeader();
 
       var bs = GZipSink(capacity: 8);
 
@@ -164,7 +166,7 @@ void main() {
 
   group('AutoGZipSink', () {
     test('basic', () {
-      const gzipHeader = [31, 139, 8, 0, 0, 0, 0, 0, 0, 19];
+      var gzipHeader = _getGZipHeader();
 
       var bs = AutoGZipSink(minGZipLength: 10, capacity: 8);
 
@@ -257,4 +259,10 @@ void main() {
       expect(bs.toBytes(), equals([1, 2, 3]));
     });
   });
+}
+
+List<int> _getGZipHeader() {
+  //[31, 139, 8, 0, 0, 0, 0, 0, 0, 19]
+  var compressed = gzip.encode([1, 2, 3]);
+  return compressed.sublist(0, 10);
 }
