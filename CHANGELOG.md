@@ -1,3 +1,13 @@
+## 1.9.7
+
+- `EntityAccessRules`: added `totalRules`.
+
+- `APIModule`:
+  - Added `addRouteHandler`.
+
+- `APIRouteBuilder`:
+    - Added `addRouteHandler`.
+
 ## 1.9.6
 
 - `APIServer`:
