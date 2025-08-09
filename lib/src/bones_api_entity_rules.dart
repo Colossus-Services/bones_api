@@ -1,6 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:reflection_factory/reflection_factory.dart';
-import 'package:statistics/statistics.dart';
+import 'package:statistics/statistics.dart' hide IterableIntExtension;
 
 import 'bones_api_base.dart';
 import 'bones_api_entity_reference.dart';
@@ -183,6 +183,20 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
       {EntityAccessRulesCondition? condition, EntityAccessRulesMasker? masker})
       : this.mask(entityType,
             entityFields: entityFields, condition: condition, masker: masker);
+
+  /// Returns the total number of applicable rules, including nested rules when present.
+  int totalRules() {
+    if (isInnocuous) return 0;
+
+    var selfCount = ruleType != null ? 1 : 0;
+
+    final rules = this.rules;
+    if (rules == null || rules.isEmpty) return selfCount;
+
+    var subCount = rules.map((e) => e.totalRules()).sum;
+
+    return selfCount + subCount;
+  }
 
   /// Returns `true` if this instance is equivalent to [innocuous] instance (no resolution rules to apply).
   @override
@@ -702,6 +716,11 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   EntityAccessRulesCached(this.accessRules);
 
+  int? _totalRules;
+
+  @override
+  int totalRules() => _totalRules ??= accessRules.totalRules();
+
   @override
   bool? get _innocuous => accessRules._innocuous;
 
@@ -857,6 +876,9 @@ class _CacheKey<T> {
 
 class _EntityAccessRulesInnocuous implements EntityAccessRules {
   const _EntityAccessRulesInnocuous();
+
+  @override
+  int totalRules() => 0;
 
   @override
   bool? get _innocuous => true;
