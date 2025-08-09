@@ -151,6 +151,29 @@ abstract class APIModule with Initializable {
       {Map<String, TypeInfo>? parameters,
       Iterable<APIRouteRule>? rules,
       APIRouteConfig? config}) {
+    _checkMethodNotOPTIONS(method);
+
+    var routeHandler = APIRouteHandlerFunction(
+        this, method, name, function, parameters, rules, config);
+
+    var routesHandlers = _getRoutesHandlers(method);
+    routesHandlers[name] = routeHandler;
+    return this;
+  }
+
+  /// Adds a [routeHandler], of [name], to this module.
+  ///
+  /// [routeHandler] The route handler, to process calls.
+  APIModule addRouteHandler(APIRouteHandler routeHandler) {
+    final method = routeHandler.requestMethod;
+    _checkMethodNotOPTIONS(method);
+
+    var routesHandlers = _getRoutesHandlers(method);
+    routesHandlers[routeHandler.routeName] = routeHandler;
+    return this;
+  }
+
+  void _checkMethodNotOPTIONS(APIRequestMethod? method) {
     if (method == APIRequestMethod.OPTIONS) {
       throw ArgumentError("Can't add a route with method `OPTIONS`."
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
@@ -397,6 +420,10 @@ class APIRouteBuilder<M extends APIModule> {
           APIRouteConfig? config}) =>
       module.addRoute(method, name, function,
           parameters: parameters, rules: rules, config: config);
+
+  /// Adds a [routeHandler] of [name] with [handler] for the request [method].
+  APIModule addRouteHandler(APIRouteHandler routeHandler) =>
+      module.addRouteHandler(routeHandler);
 
   /// Adds routes from [provider] for ANY request method.
   void anyFrom(Object? provider) => from(null, provider);
