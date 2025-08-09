@@ -42,7 +42,7 @@ typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.9.6';
+  static const String VERSION = '1.9.7';
 
   static bool _boot = false;
 
@@ -881,12 +881,10 @@ typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
     APIRequest request);
 
 /// A route handler, with its [function] and [rules].
-class APIRouteHandler<T> {
+abstract class APIRouteHandler<T> {
   final APIModule module;
   final APIRequestMethod? requestMethod;
   final String routeName;
-
-  APIRouteFunction<T> function;
 
   Map<String, TypeInfo>? parameters;
 
@@ -894,14 +892,8 @@ class APIRouteHandler<T> {
 
   APIRouteConfig config;
 
-  APIRouteHandler(
-      this.module,
-      this.requestMethod,
-      this.routeName,
-      this.function,
-      this.parameters,
-      Iterable<APIRouteRule>? rules,
-      APIRouteConfig? config)
+  APIRouteHandler(this.module, this.requestMethod, this.routeName,
+      this.parameters, Iterable<APIRouteRule>? rules, APIRouteConfig? config)
       : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]),
         config = config ?? APIRouteConfig.defaultConfig;
 
@@ -985,11 +977,13 @@ class APIRouteHandler<T> {
 
     final initTime = DateTime.now();
 
-    return function(request)
-        .resolveMapped((response) => _callResponse(response, initTime));
+    return callImpl(request)
+        .resolveMapped((response) => callResponse(response, initTime));
   }
 
-  APIResponse<T> _callResponse(APIResponse<T> response, DateTime initTime) {
+  FutureOr<APIResponse<T>> callImpl(APIRequest request);
+
+  APIResponse<T> callResponse(APIResponse<T> response, DateTime initTime) {
     if (config.log && _log.isLoggable(logging.Level.INFO)) {
       final time = DateTime.now().difference(initTime);
 
@@ -1028,6 +1022,18 @@ class APIRouteHandler<T> {
         '${rules.isNotEmpty ? ', rules: $rules' : ''}'
         '}';
   }
+}
+
+/// `APIRouteHandler` implementation that calls [function].
+class APIRouteHandlerFunction<T> extends APIRouteHandler<T> {
+  final APIRouteFunction<T> function;
+
+  APIRouteHandlerFunction(super.module, super.requestMethod, super.routeName,
+      this.function, super.parameters, super.rules, super.config)
+      : super();
+
+  @override
+  FutureOr<APIResponse<T>> callImpl(APIRequest request) => function(request);
 }
 
 /// A route information.

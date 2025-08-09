@@ -8,6 +8,10 @@
 - `APIRouteBuilder`:
     - Added `addRouteHandler`.
 
+- Now `APIRouteHandler` is abstract:
+  - Removed field `function`.
+  - Public implementation `APIRouteHandlerFunction`.
+
 ## 1.9.6
 
 - `APIServer`:
