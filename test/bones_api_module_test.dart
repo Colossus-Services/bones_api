@@ -45,7 +45,6 @@ void main() {
         'echoListUser2',
         'echoUser',
         'geDynamicAsync',
-        'geDynamicAsync2',
         'getContextEntityResolutionRules',
         'getDynamic',
         'getRequestEntityAccessRules',
