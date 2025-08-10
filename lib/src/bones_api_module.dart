@@ -30,6 +30,7 @@ abstract class APIModule with Initializable {
   static const Set<String> interfaceMethodsNames = <String>{
     'acceptsRequest',
     'addRoute',
+    'addRouteHandler',
     'apiInfo',
     'call',
     'configure',
@@ -178,11 +179,6 @@ abstract class APIModule with Initializable {
       throw ArgumentError("Can't add a route with method `OPTIONS`."
           "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
     }
-
-    var routesHandlers = _getRoutesHandlers(method);
-    routesHandlers[name] = APIRouteHandler(
-        this, method, name, function, parameters, rules, config);
-    return this;
   }
 
   /// Returns the routes builder of this module.
@@ -531,124 +527,94 @@ class APIRouteBuilder<M extends APIModule> {
 
     var config = apiMethod.annotations.whereType<APIRouteConfig>().firstOrNull;
 
-    if (returnsAPIResponse && receivesAPIRequest) {
-      var paramName = apiMethod.normalParametersNames.first;
-      var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
+    if (returnsAPIResponse) {
+      var returnTypeInfo = apiMethod.returnType!.typeInfo;
+      if (returnTypeInfo.isFuture || returnTypeInfo.isFutureOr) {
+        assert(returnTypeInfo.hasArguments);
+        returnTypeInfo = returnTypeInfo.arguments0!;
+      }
 
-      add(
-        requestMethod,
-        apiMethod.name,
-        // ignore: discarded_futures
-        (req) => _apiMethodStandard(apiMethod, req),
-        parameters: parameters,
-        rules: rules,
-        config: config,
-      );
+      assert(returnTypeInfo.isOf(APIResponse),
+          "Not an `APIResponse`: $returnTypeInfo -> $apiMethod");
+
+      APIRouteHandler routeHandler;
+
+      if (receivesAPIRequest) {
+        var paramName = apiMethod.normalParametersNames.first;
+        var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
+
+        routeHandler = returnTypeInfo.hasArguments
+            ? returnTypeInfo.callCastedArgumentA(
+                <T>() => _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>(
+                  module,
+                  requestMethod,
+                  apiMethod.name,
+                  apiMethod,
+                  parameters,
+                  rules,
+                  config,
+                ),
+              )
+            : _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
+                module,
+                requestMethod,
+                apiMethod.name,
+                apiMethod,
+                parameters,
+                rules,
+                config,
+              );
+      } else {
+        var parameters = Map<String, TypeInfo>.fromEntries(apiMethod
+            .allParameters
+            .map((p) => MapEntry(p.name, TypeInfo.from(p))));
+
+        routeHandler = returnTypeInfo.hasArguments
+            ? returnTypeInfo.callCastedArgumentA(
+                <T>() => _APIRouteHandlerAPIMethodReflection<T>(
+                  module,
+                  requestMethod,
+                  apiMethod.name,
+                  apiMethod,
+                  parameters,
+                  rules,
+                  config,
+                ),
+              )
+            : _APIRouteHandlerAPIMethodReflection(
+                module,
+                requestMethod,
+                apiMethod.name,
+                apiMethod,
+                parameters,
+                rules,
+                config,
+              );
+      }
+
+      addRouteHandler(routeHandler);
 
       return true;
     } else if (receivesAPIRequest) {
       var paramName = apiMethod.normalParametersNames.first;
       var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
-      add(
+      var routeHandler = _APIRouteHandlerAPIMethodAPIRequest(
+        module,
         requestMethod,
         apiMethod.name,
-        // ignore: discarded_futures
-        (req) => _apiMethodStandard(apiMethod, req),
-        parameters: parameters,
-        rules: rules,
-        config: config,
+        apiMethod,
+        parameters,
+        rules,
+        config,
       );
 
-      return true;
-    } else if (returnsAPIResponse) {
-      var parameters = Map<String, TypeInfo>.fromEntries(apiMethod.allParameters
-          .map((p) => MapEntry(p.name, TypeInfo.from(p))));
-
-      add(
-        requestMethod,
-        apiMethod.name,
-        // ignore: discarded_futures
-        (req) => _apiMethodInvocation(apiMethod, req),
-        parameters: parameters,
-        rules: rules,
-        config: config,
-      );
+      addRouteHandler(routeHandler);
 
       return true;
     }
 
     return false;
-  }
-
-  FutureOr<APIResponse> _apiMethodStandard(
-      MethodReflection apiMethod, APIRequest request) {
-    var ret = apiMethod.invoke([request]);
-    if (ret is Future) {
-      return ret.then((r) => APIResponse.from(r));
-    } else {
-      return APIResponse.from(ret);
-    }
-  }
-
-  FutureOr<APIResponse> _apiMethodInvocation(
-      MethodReflection apiMethod, APIRequest request) {
-    var methodInvocation = _resolveMethodInvocation(apiMethod, request);
-    var ret = methodInvocation.invoke(apiMethod.method);
-
-    if (ret == null) {
-      return APIResponse.error(
-          error: "Call returned `null` (not an `APIResponse`): $apiMethod");
-    } else if (ret is Future && ret is! Future<APIResponse>) {
-      return ret.then((ret) {
-        if (ret == null) {
-          return APIResponse.error(
-              error: "Call returned `null` (not an `APIResponse`): $apiMethod");
-        } else {
-          try {
-            return ret as APIResponse;
-          } catch (e, s) {
-            return APIResponse.error(
-                error:
-                    "Call didn't returned an `APIResponse`. Returned type: ${ret.runtimeType} > $apiMethod\n$e",
-                stackTrace: s);
-          }
-        }
-      });
-    } else {
-      try {
-        return ret as FutureOr<APIResponse>;
-      } catch (e, s) {
-        return APIResponse.error(
-            error:
-                "Call didn't returned a `FutureOr<APIResponse>`. Returned type: ${ret.runtimeType} > $apiMethod\n$e",
-            stackTrace: s);
-      }
-    }
-  }
-
-  MethodInvocation _resolveMethodInvocation(
-      MethodReflection method, APIRequest request) {
-    var payloadIsParametersMap = _isPayloadParametersMap(method, request);
-
-    var methodInvocation = method.methodInvocation((p, i) =>
-        _resolveRequestParameter(request, p, i, payloadIsParametersMap));
-
-    return methodInvocation;
-  }
-
-  bool _isPayloadParametersMap(MethodReflection method, APIRequest request) {
-    var payload = request.payload;
-    if (payload is! Map) return false;
-
-    var allParametersNames = method.allParametersNames;
-
-    if (payload.isEmpty && allParametersNames.isNotEmpty) return false;
-
-    var hasNonParameterKey =
-        payload.keys.any((k) => !allParametersNames.containsIgnoreCase(k));
-
-    return !hasNonParameterKey;
   }
 
   static final TypeInfo _typeInfoDecimal = TypeInfo.fromType(Decimal);
@@ -657,64 +623,6 @@ class APIRouteBuilder<M extends APIModule> {
       TypeInfo.fromType(DynamicNumber);
 
   static final TypeInfo _typeInfoTime = TypeInfo.fromType(Time);
-
-  Object? _resolveRequestParameter(
-      APIRequest request,
-      ParameterReflection parameter,
-      int? parameterIndex,
-      bool payloadIsParametersMap,
-      {EntityResolutionRules? resolutionRules}) {
-    var parameterTypeInfo = parameter.type.typeInfo;
-
-    if (parameterTypeInfo.isOf(APIRequest)) {
-      return request;
-    } else if (parameterTypeInfo.isOf(APICredential)) {
-      return request.credential;
-    } else if (parameterTypeInfo.isOf(APIAuthentication)) {
-      return request.authentication;
-    }
-
-    Object? value = request.getParameterIgnoreCase(parameter.name);
-
-    if (value == null) {
-      if (request.hasPayload) {
-        if (payloadIsParametersMap) {
-          var map = request.payload as Map<String, Object?>;
-          value = map.getIgnoreCase(parameter.name);
-        } else {
-          if (parameterTypeInfo.isUInt8List) {
-            return request.payloadAsBytes;
-          }
-
-          var payload = request.payload;
-          var payloadTypeInfo = TypeInfo.from(payload);
-
-          if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
-            return payload;
-          } else if (payload is Map &&
-              EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
-            return _resolveValueAsEntity(parameterTypeInfo, payload,
-                resolutionRules: resolutionRules);
-          } else if (payload is List &&
-              parameterTypeInfo.isListEntity &&
-              EntityHandler.isValidEntityType(
-                  parameterTypeInfo.listEntityType!.type)) {
-            return _resolveValueAsEntity(parameterTypeInfo, payload,
-                resolutionRules: resolutionRules);
-          }
-        }
-      }
-
-      if (value == null && parameterIndex != null) {
-        var pathPart = request.pathPartAt(2 + parameterIndex);
-        value = pathPart;
-      }
-    }
-
-    if (value == null) return null;
-
-    return resolveValueByType(parameterTypeInfo, value);
-  }
 
   static Object? resolveValueByType(TypeInfo typeInfo, Object? value,
       {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
@@ -1555,4 +1463,201 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
     var json = await doRequest(methodName, parameters, returnType);
     return resolveResponse(returnType, json);
   }
+}
+
+class _APIRouteHandlerAPIMethodAPIRequest extends APIRouteHandler {
+  final MethodReflection apiMethod;
+
+  _APIRouteHandlerAPIMethodAPIRequest(
+      super.module,
+      super.requestMethod,
+      super.routeName,
+      this.apiMethod,
+      super.parameters,
+      super.rules,
+      super.config)
+      : super();
+
+  @override
+  FutureOr<APIResponse> callImpl(APIRequest request) {
+    Object? ret = apiMethod.invoke([request]);
+
+    if (ret is Future) {
+      return ret.then((r) => APIResponse.from(r));
+    } else {
+      return APIResponse.from(ret);
+    }
+  }
+
+  @override
+  String toString() => '_APIRouteHandlerAPIMethodAPIRequest@$apiMethod';
+}
+
+abstract class _APIRouteHandlerAPIMethodAPIResponse<T>
+    extends APIRouteHandler<T?> {
+  final MethodReflection apiMethod;
+
+  _APIRouteHandlerAPIMethodAPIResponse(
+      super.module,
+      super.requestMethod,
+      super.routeName,
+      this.apiMethod,
+      super.parameters,
+      super.rules,
+      super.config)
+      : super();
+
+  FutureOr<APIResponse<T?>> castAPIResponse(Object? ret) {
+    if (ret is Future) {
+      return ret.then((r) {
+        try {
+          return r as APIResponse<T?>;
+        } catch (e, s) {
+          return _castErrorAPIResponse(r, e, s);
+        }
+      });
+    } else {
+      try {
+        return ret as APIResponse<T?>;
+      } catch (e, s) {
+        return _castErrorAPIResponse(ret, e, s);
+      }
+    }
+  }
+
+  APIResponse<T?> _castErrorAPIResponse(Object? r, Object e, StackTrace s) =>
+      APIResponse.error(
+          error:
+              "Call didn't returned an `APIResponse<$T?>`. Returned type: ${r.runtimeType} > $apiMethod\n$e",
+          stackTrace: s);
+}
+
+class _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>
+    extends _APIRouteHandlerAPIMethodAPIResponse<T> {
+  _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
+      super.module,
+      super.requestMethod,
+      super.routeName,
+      super.apiMethod,
+      super.parameters,
+      super.rules,
+      super.config)
+      : super();
+
+  @override
+  FutureOr<APIResponse<T?>> callImpl(APIRequest request) {
+    var ret = apiMethod.invoke([request]);
+    return castAPIResponse(ret);
+  }
+
+  @override
+  String toString() =>
+      '_APIRouteHandlerAPIMethodAPIRequestAPIResponse<$T>@$apiMethod';
+}
+
+class _APIRouteHandlerAPIMethodReflection<T>
+    extends _APIRouteHandlerAPIMethodAPIResponse<T> {
+  _APIRouteHandlerAPIMethodReflection(
+      super.module,
+      super.requestMethod,
+      super.routeName,
+      super.apiMethod,
+      super.parameters,
+      super.rules,
+      super.config)
+      : super();
+
+  @override
+  FutureOr<APIResponse<T?>> callImpl(APIRequest request) {
+    var methodInvocation = _resolveMethodInvocation(apiMethod, request);
+    var ret = methodInvocation.invoke(apiMethod.method);
+    return castAPIResponse(ret);
+  }
+
+  MethodInvocation _resolveMethodInvocation(
+      MethodReflection method, APIRequest request) {
+    final payloadIsParametersMap = _isPayloadParametersMap(method, request);
+
+    var methodInvocation = method.methodInvocation((p, i) =>
+        _resolveRequestParameter(request, p, i, payloadIsParametersMap));
+
+    return methodInvocation;
+  }
+
+  bool _isPayloadParametersMap(MethodReflection method, APIRequest request) {
+    var payload = request.payload;
+    if (payload is! Map) return false;
+
+    var allParametersNames = method.allParametersNames;
+
+    if (payload.isEmpty && allParametersNames.isNotEmpty) return false;
+
+    var hasNonParameterKey =
+        payload.keys.any((k) => !allParametersNames.containsIgnoreCase(k));
+
+    return !hasNonParameterKey;
+  }
+
+  static Object? _resolveRequestParameter(
+      APIRequest request,
+      ParameterReflection parameter,
+      int? parameterIndex,
+      bool payloadIsParametersMap,
+      {EntityResolutionRules? resolutionRules}) {
+    var parameterTypeInfo = parameter.type.typeInfo;
+
+    if (parameterTypeInfo.isOf(APIRequest)) {
+      return request;
+    } else if (parameterTypeInfo.isOf(APICredential)) {
+      return request.credential;
+    } else if (parameterTypeInfo.isOf(APIAuthentication)) {
+      return request.authentication;
+    }
+
+    Object? value = request.getParameterIgnoreCase(parameter.name);
+
+    if (value == null) {
+      if (request.hasPayload) {
+        if (payloadIsParametersMap) {
+          var map = request.payload as Map<String, Object?>;
+          value = map.getIgnoreCase(parameter.name);
+        } else {
+          if (parameterTypeInfo.isUInt8List) {
+            return request.payloadAsBytes;
+          }
+
+          var payload = request.payload;
+          var payloadTypeInfo = TypeInfo.from(payload);
+
+          if (parameterTypeInfo.equalsTypeAndArguments(payloadTypeInfo)) {
+            return payload;
+          } else if (payload is Map &&
+              EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
+            return APIRouteBuilder._resolveValueAsEntity(
+                parameterTypeInfo, payload,
+                resolutionRules: resolutionRules);
+          } else if (payload is List &&
+              parameterTypeInfo.isListEntity &&
+              EntityHandler.isValidEntityType(
+                  parameterTypeInfo.listEntityType!.type)) {
+            return APIRouteBuilder._resolveValueAsEntity(
+                parameterTypeInfo, payload,
+                resolutionRules: resolutionRules);
+          }
+        }
+      }
+
+      if (value == null && parameterIndex != null) {
+        var pathPart = request.pathPartAt(2 + parameterIndex);
+        value = pathPart;
+      }
+    }
+
+    if (value == null) return null;
+
+    return APIRouteBuilder.resolveValueByType(parameterTypeInfo, value);
+  }
+
+  @override
+  String toString() => '_APIRouteHandlerAPIMethodReflection<$T>@$apiMethod';
 }

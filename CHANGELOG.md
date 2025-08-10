@@ -7,10 +7,19 @@
 
 - `APIRouteBuilder`:
     - Added `addRouteHandler`.
+    - `apiMethod`: optimize the built `routeHandler`.
 
 - Now `APIRouteHandler` is abstract:
   - Removed field `function`.
   - Public implementation `APIRouteHandlerFunction`.
+
+- `MethodReflectionExtension`:
+  - `returnsAPIResponse`: do not accept `dynamic`.
+
+- `APIServer`:
+  - Improve error logging when start fails.
+
+- reflection_factory: ^2.5.3
 
 ## 1.9.6
 
