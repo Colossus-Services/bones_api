@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.2
+// BUILDER: reflection_factory/2.5.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.2');
+  static final Version _version = Version.parse('2.5.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -330,7 +330,7 @@ class Account$reflection extends ClassReflection<Account>
         return FieldReflection<Account, User>(
           this,
           Account,
-          __TR<User>(User),
+          const __TR<User>(User),
           'user',
           false,
           (o) => () => o!.user,
@@ -342,7 +342,7 @@ class Account$reflection extends ClassReflection<Account>
         return FieldReflection<Account, EntityReference<UserInfo>>(
           this,
           Account,
-          __TR<EntityReference<UserInfo>>(
+          const __TR<EntityReference<UserInfo>>(
               EntityReference, <__TR>[__TR<UserInfo>(UserInfo)]),
           'userInfo',
           false,
@@ -511,7 +511,7 @@ class Account$reflection extends ClassReflection<Account>
             this,
             Account,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -569,7 +569,7 @@ class Account$reflection extends ClassReflection<Account>
             this,
             Entity,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -889,7 +889,7 @@ class Address$reflection extends ClassReflection<Address>
         return FieldReflection<Address, Decimal>(
           this,
           Address,
-          __TR<Decimal>(Decimal),
+          const __TR<Decimal>(Decimal),
           'latitude',
           false,
           (o) => () => o!.latitude,
@@ -901,7 +901,7 @@ class Address$reflection extends ClassReflection<Address>
         return FieldReflection<Address, Decimal>(
           this,
           Address,
-          __TR<Decimal>(Decimal),
+          const __TR<Decimal>(Decimal),
           'longitude',
           false,
           (o) => () => o!.longitude,
@@ -913,7 +913,7 @@ class Address$reflection extends ClassReflection<Address>
         return FieldReflection<Address, List<Store>>(
           this,
           Address,
-          __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
+          const __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
           'stores',
           false,
           (o) => () => o!.stores,
@@ -925,7 +925,7 @@ class Address$reflection extends ClassReflection<Address>
         return FieldReflection<Address, EntityReferenceList<Store>>(
           this,
           Address,
-          __TR<EntityReferenceList<Store>>(
+          const __TR<EntityReferenceList<Store>>(
               EntityReferenceList, <__TR>[__TR<Store>(Store)]),
           'closedStores',
           false,
@@ -1106,7 +1106,7 @@ class Address$reflection extends ClassReflection<Address>
             this,
             Address,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -1119,7 +1119,7 @@ class Address$reflection extends ClassReflection<Address>
             this,
             Address,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -1421,7 +1421,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
         return FieldReflection<Photo, Uint8List?>(
           this,
           Photo,
-          __TR<Uint8List>(Uint8List),
+          const __TR<Uint8List>(Uint8List),
           'data',
           true,
           (o) => () => o!.data,
@@ -1601,7 +1601,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Photo,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -1672,7 +1672,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Entity,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -1743,7 +1743,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
             this,
             Photo,
             'fromMap',
-            __TR<Photo>(Photo),
+            const __TR<Photo>(Photo),
             false,
             () => Photo.fromMap,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
@@ -1969,7 +1969,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
         return FieldReflection<Role, RoleType>(
           this,
           Role,
-          __TR<RoleType>(RoleType),
+          const __TR<RoleType>(RoleType),
           'type',
           false,
           (o) => () => o!.type,
@@ -1993,7 +1993,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
         return FieldReflection<Role, Decimal?>(
           this,
           Role,
-          __TR<Decimal>(Decimal),
+          const __TR<Decimal>(Decimal),
           'value',
           true,
           (o) => () => o!.value,
@@ -2162,7 +2162,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             this,
             Role,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -2233,7 +2233,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
             this,
             Entity,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -2575,7 +2575,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
         return FieldReflection<Store, User?>(
           this,
           Store,
-          __TR<User>(User),
+          const __TR<User>(User),
           'owner',
           true,
           (o) => () => o!.owner,
@@ -2744,7 +2744,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             this,
             Store,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -2757,7 +2757,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             this,
             Store,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -2858,7 +2858,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
             this,
             Store,
             'fromMap',
-            __TR<FutureOr<Store>>(FutureOr, <__TR>[__TR<Store>(Store)]),
+            const __TR<FutureOr<Store>>(FutureOr, <__TR>[__TR<Store>(Store)]),
             false,
             () => Store.fromMap,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
@@ -3115,7 +3115,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, Address>(
           this,
           User,
-          __TR<Address>(Address),
+          const __TR<Address>(Address),
           'address',
           false,
           (o) => () => o!.address,
@@ -3127,7 +3127,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, List<Role>>(
           this,
           User,
-          __TR<List<Role>>(List, <__TR>[__TR<Role>(Role)]),
+          const __TR<List<Role>>(List, <__TR>[__TR<Role>(Role)]),
           'roles',
           false,
           (o) => () => o!.roles,
@@ -3151,7 +3151,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, Time?>(
           this,
           User,
-          __TR<Time>(Time),
+          const __TR<Time>(Time),
           'wakeUpTime',
           true,
           (o) => () => o!.wakeUpTime,
@@ -3163,7 +3163,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, EntityReference<UserInfo>>(
           this,
           User,
-          __TR<EntityReference<UserInfo>>(
+          const __TR<EntityReference<UserInfo>>(
               EntityReference, <__TR>[__TR<UserInfo>(UserInfo)]),
           'userInfo',
           false,
@@ -3176,7 +3176,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, Photo?>(
           this,
           User,
-          __TR<Photo>(Photo),
+          const __TR<Photo>(Photo),
           'photo',
           true,
           (o) => () => o!.photo,
@@ -3188,7 +3188,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, DateTime>(
           this,
           User,
-          __TR<DateTime>(DateTime),
+          const __TR<DateTime>(DateTime),
           'creationTime',
           false,
           (o) => () => o!.creationTime,
@@ -3369,7 +3369,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             this,
             User,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -3382,7 +3382,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             this,
             User,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -3496,7 +3496,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             this,
             User,
             'fromMap',
-            __TR<FutureOr<User>>(FutureOr, <__TR>[__TR<User>(User)]),
+            const __TR<FutureOr<User>>(FutureOr, <__TR>[__TR<User>(User)]),
             false,
             () => User.fromMap,
             const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
@@ -3887,7 +3887,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             this,
             UserInfo,
             'getFieldType',
-            __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getFieldType,
             obj,
@@ -3900,7 +3900,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             this,
             UserInfo,
             'getFieldEntityAnnotations',
-            __TR<List<EntityAnnotation>>(
+            const __TR<List<EntityAnnotation>>(
                 List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
             true,
             (o) => o!.getFieldEntityAnnotations,
@@ -4002,7 +4002,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
             this,
             UserInfo,
             'fromMap',
-            __TR<FutureOr<UserInfo>>(
+            const __TR<FutureOr<UserInfo>>(
                 FutureOr, <__TR>[__TR<UserInfo>(UserInfo)]),
             false,
             () => UserInfo.fromMap,

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.2
+// BUILDER: reflection_factory/2.5.3
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.2');
+  static final Version _version = Version.parse('2.5.3');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -248,7 +248,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, APIRoot>(
           this,
           APIModule,
-          __TR<APIRoot>(APIRoot),
+          const __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
           (o) => () => o!.apiRoot,
@@ -284,7 +284,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, APIConfig>(
           this,
           APIModule,
-          __TR<APIConfig>(APIConfig),
+          const __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
           (o) => () => o!.apiConfig,
@@ -320,7 +320,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, APIRouteBuilder<APIModule>>(
           this,
           APIModule,
-          __TR<APIRouteBuilder<APIModule>>(
+          const __TR<APIRouteBuilder<APIModule>>(
               APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
           'routes',
           false,
@@ -345,7 +345,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, APISecurity?>(
           this,
           APIModule,
-          __TR<APISecurity>(APISecurity),
+          const __TR<APISecurity>(APISecurity),
           'security',
           true,
           (o) => () => o!.security,
@@ -370,7 +370,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, InitializationStatus>(
           this,
           Initializable,
-          __TR<InitializationStatus>(InitializationStatus),
+          const __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
           (o) => () => o!.initializationStatus,
@@ -453,6 +453,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
     'addRoute',
+    'addRouteHandler',
     'apiInfo',
     'call',
     'checkInitialized',
@@ -547,7 +548,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             MyInfoModule,
             'echo',
-            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
               __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
             ]),
             false,
@@ -565,7 +566,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             MyInfoModule,
             'toUpperCase',
-            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
               __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
             ]),
             false,
@@ -580,7 +581,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             MyInfoModule,
             'withPayload',
-            __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
               __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
             ]),
             false,
@@ -598,7 +599,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             MyInfoModule,
             'mapKeys',
-            __TR<FutureOr<APIResponse<List<String>>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse<List<String>>>>(FutureOr, <__TR>[
               __TR<APIResponse<List<String>>>(
                   APIResponse, <__TR>[__TR.tListString])
             ]),
@@ -614,7 +615,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             MyInfoModule,
             'listMultiplier',
-            __TR<FutureOr<APIResponse<List<int>>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse<List<int>>>>(FutureOr, <__TR>[
               __TR<APIResponse<List<int>>>(APIResponse, <__TR>[__TR.tListInt])
             ]),
             false,
@@ -645,7 +646,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'initialize',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
+            const __TR<FutureOr<InitializationResult>>(FutureOr,
                 <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.initialize,
@@ -659,7 +660,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'getRoutesHandlersNames',
-            __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
+            const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
             false,
             (o) => o!.getRoutesHandlersNames,
             obj,
@@ -675,7 +676,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'addRoute',
-            __TR<APIModule>(APIModule),
+            const __TR<APIModule>(APIModule),
             false,
             (o) => o!.addRoute,
             obj,
@@ -710,12 +711,32 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
                   false)
             },
             null);
+      case 'addroutehandler':
+        return MethodReflection<MyInfoModule, APIModule>(
+            this,
+            APIModule,
+            'addRouteHandler',
+            const __TR<APIModule>(APIModule),
+            false,
+            (o) => o!.addRouteHandler,
+            obj,
+            const <__PR>[
+              __PR(
+                  __TR<APIRouteHandler<dynamic>>(
+                      APIRouteHandler, <__TR>[__TR.tDynamic]),
+                  'routeHandler',
+                  false,
+                  true)
+            ],
+            null,
+            null,
+            null);
       case 'getroutehandler':
         return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
             this,
             APIModule,
             'getRouteHandler',
-            __TR<APIRouteHandler<dynamic>>(
+            const __TR<APIRouteHandler<dynamic>>(
                 APIRouteHandler, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getRouteHandler,
@@ -732,7 +753,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'getRouteHandlerByRequest',
-            __TR<APIRouteHandler<dynamic>>(
+            const __TR<APIRouteHandler<dynamic>>(
                 APIRouteHandler, <__TR>[__TR.tDynamic]),
             true,
             (o) => o!.getRouteHandlerByRequest,
@@ -763,7 +784,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'call',
-            __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
+            const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
               __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
             ]),
             false,
@@ -795,7 +816,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             APIModule,
             'apiInfo',
-            __TR<APIModuleInfo>(APIModuleInfo),
+            const __TR<APIModuleInfo>(APIModuleInfo),
             false,
             (o) => o!.apiInfo,
             obj,
@@ -810,7 +831,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             Initializable,
             'ensureInitialized',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
+            const __TR<FutureOr<InitializationResult>>(FutureOr,
                 <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.ensureInitialized,
@@ -827,7 +848,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             Initializable,
             'ensureInitializedAsync',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
+            const __TR<FutureOr<InitializationResult>>(FutureOr,
                 <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.ensureInitializedAsync,
@@ -844,7 +865,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             Initializable,
             'doInitialization',
-            __TR<FutureOr<InitializationResult>>(FutureOr,
+            const __TR<FutureOr<InitializationResult>>(FutureOr,
                 <__TR>[__TR<InitializationResult>(InitializationResult)]),
             false,
             (o) => o!.doInitialization,
@@ -861,7 +882,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             this,
             Initializable,
             'initializeDependencies',
-            __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
+            const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
               __TR<List<Initializable>>(
                   List, <__TR>[__TR<Initializable>(Initializable)])
             ]),
@@ -987,7 +1008,7 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
         <String, dynamic>{
           'map': map,
         },
-        __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
+        const __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
     return __retFut$<List<String>>(ret);
   }
 
@@ -999,7 +1020,7 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
           'list': list,
           'm': m,
         },
-        __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
+        const __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
     return __retFut$<List<int>>(ret);
   }
 }
