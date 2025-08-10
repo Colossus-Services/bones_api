@@ -151,13 +151,13 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
 
     var typeInfo = returnType.typeInfo;
 
-    if (typeInfo.isOf(APIResponse) || typeInfo.isDynamic) return true;
+    if (typeInfo.isOf(APIResponse)) return true;
 
     if (typeInfo.isFuture || typeInfo.isFutureOr) {
       var arg = typeInfo.arguments0;
       if (arg == null) return false;
 
-      if (arg.isOf(APIResponse) || arg.isDynamic) return true;
+      if (arg.isOf(APIResponse)) return true;
     }
 
     return false;
