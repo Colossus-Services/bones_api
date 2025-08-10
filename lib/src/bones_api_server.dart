@@ -1868,7 +1868,18 @@ class APIServer extends _APIServerBase {
             '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
             'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
-    return 'APIServer{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$serverResponseDelayStr$secureStr, totalWorkers: $totalWorkers, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
+    return 'APIServer[${BonesAPI.VERSION}]{ '
+        'apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), '
+        'address: $address, '
+        'port: $port$serverResponseDelayStr$secureStr, '
+        'totalWorkers: $totalWorkers, '
+        'cacheStaticFilesResponses: $cacheStaticFilesResponses, '
+        'hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), '
+        'cookieless: $cookieless, '
+        'SESSIONID: $useSessionID, '
+        'started: $isStarted, '
+        'stopped: $isStopped$domainsStr '
+        '}';
   }
 
   /// Creates an [APIServer] with [apiRoot].
@@ -2385,6 +2396,10 @@ final class APIServerWorker extends _APIServerBase {
 
       if (!result.ok) {
         _log.severe('Error loading APIRoot: ${apiRoot.name}');
+
+        if (result.error != null) {
+          _log.severe(result.error, result.stackTrace);
+        }
       }
 
       return result.ok;
