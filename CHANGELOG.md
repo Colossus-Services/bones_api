@@ -1,3 +1,11 @@
+## 1.9.9
+
+- `APISecurity`:
+  - Added `notifyAPITokenInfoChange`, `disposeAuthenticationPermission`, `disposeAuthenticationDataAndPermission`.
+
+- `APITokenStore`:
+  - Added `removeTokenPermissions`, `removeTokenDataAndPermissions`.
+
 ## 1.9.8
 
 - sdk: '>=3.7.0 <4.0.0'
