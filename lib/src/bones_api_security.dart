@@ -494,10 +494,61 @@ abstract class APISecurity {
 
   FutureOr<bool> checkCredentialPassword(APICredential credential);
 
+  Future<void> notifyAPITokenInfoChange({
+    String? token,
+    String? username,
+  }) async {
+    List<APIToken>? userTokens;
+
+    if (username != null) {
+      userTokens = await getUsernameValidTokens(username);
+
+      for (var apiToken in userTokens) {
+        await onAPITokenInfoChange(apiToken.token, username: apiToken.username);
+      }
+    }
+
+    if (token != null &&
+        (userTokens == null ||
+            userTokens.none((apiToken) => apiToken.token == token))) {
+      await onAPITokenInfoChange(token);
+    }
+  }
+
+  Future<void> onAPITokenInfoChange(String token, {String? username}) async {
+    await disposeAuthenticationDataAndPermission(token);
+  }
+
   FutureOr<List<APIPermission>> getCredentialPermissions(
     APICredential credential,
     List<APIPermission>? previousPermissions,
   );
+
+  FutureOr<bool> disposeAuthenticationPermission(String? token) {
+    if (token == null) {
+      return false;
+    }
+
+    var prevToken = _tokenStore.removeTokenPermissions(token);
+
+    return prevToken.resolveMapped((prevToken) {
+      var disposeTokenPermissions = prevToken != null;
+      return disposeTokenPermissions;
+    });
+  }
+
+  FutureOr<bool> disposeAuthenticationDataAndPermission(String? token) {
+    if (token == null) {
+      return false;
+    }
+
+    var prevToken = _tokenStore.removeTokenDataAndPermissions(token);
+
+    return prevToken.resolveMapped((prevToken) {
+      var disposeTokenDataAndPermissions = prevToken != null;
+      return disposeTokenDataAndPermissions;
+    });
+  }
 
   FutureOr<Object?> getAuthenticationData(
     APICredential credential,
@@ -922,7 +973,7 @@ abstract class APISecurity {
 }
 
 typedef APITokenInfo =
-    ({APIToken apiToken, Object? data, List<APIPermission> permissions});
+    ({APIToken apiToken, Object? data, List<APIPermission>? permissions});
 
 /// The tokens store for the [APISecurity].
 class APITokenStore {
@@ -1176,6 +1227,38 @@ class APITokenStore {
             apiToken: tokenInfo.apiToken,
             data: null,
             permissions: tokenInfo.permissions,
+          ));
+        }
+
+        return tokenInfo;
+      });
+    });
+  }
+
+  FutureOr<APITokenInfo?> removeTokenPermissions(String token) {
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.get(token).resolveMapped((tokenInfo) {
+        if (tokenInfo != null) {
+          return sharedTokens.put(token, (
+            apiToken: tokenInfo.apiToken,
+            data: tokenInfo.data,
+            permissions: null,
+          ));
+        }
+
+        return tokenInfo;
+      });
+    });
+  }
+
+  FutureOr<APITokenInfo?> removeTokenDataAndPermissions(String token) {
+    return _resolveSharedTokens().resolveMapped((sharedTokens) {
+      return sharedTokens.get(token).resolveMapped((tokenInfo) {
+        if (tokenInfo != null) {
+          return sharedTokens.put(token, (
+            apiToken: tokenInfo.apiToken,
+            data: null,
+            permissions: null,
           ));
         }
 
