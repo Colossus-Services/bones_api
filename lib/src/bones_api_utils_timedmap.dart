@@ -5,8 +5,13 @@ class TimedMap<K, V> implements Map<K, V> {
   /// The key timeout. When a key is put, it expires after the timeout [Duration].
   final Duration keyTimeout;
 
-  final bool? Function(TimedMap timedMap, Object? key, Duration elapsedTime,
-      Duration keyTimeout)? keyTimeoutChecker;
+  final bool? Function(
+    TimedMap timedMap,
+    Object? key,
+    Duration elapsedTime,
+    Duration keyTimeout,
+  )?
+  keyTimeoutChecker;
 
   TimedMap(this.keyTimeout, [Map<K, V>? map, this.keyTimeoutChecker]) {
     if (map != null) {
@@ -86,16 +91,18 @@ class TimedMap<K, V> implements Map<K, V> {
   /// Returns the values of this instance checking [keyTimeout].
   /// See [checkAllEntries].
   List<V> valuesChecked({DateTime? now, Duration? keyTimeout}) =>
-      keysChecked(now: now, keyTimeout: keyTimeout)
-          .map((k) => _entries[k]!)
-          .toList();
+      keysChecked(
+        now: now,
+        keyTimeout: keyTimeout,
+      ).map((k) => _entries[k]!).toList();
 
   /// Returns the entries of this instance checking [keyTimeout].
   /// See [checkAllEntries].
   List<MapEntry<K, V>> entriesChecked({DateTime? now, Duration? keyTimeout}) =>
-      keysChecked(now: now, keyTimeout: keyTimeout)
-          .map((k) => MapEntry(k, _entries[k] as V))
-          .toList();
+      keysChecked(
+        now: now,
+        keyTimeout: keyTimeout,
+      ).map((k) => MapEntry(k, _entries[k] as V)).toList();
 
   /// Checks all the entries of this instance.
   ///
@@ -233,26 +240,34 @@ class TimedMap<K, V> implements Map<K, V> {
 
   @override
   TimedMap<K2, V2> map<K2, V2>(
-          MapEntry<K2, V2> Function(K key, V value) convert) =>
-      TimedMap<K2, V2>(keyTimeout, _entries.map(convert));
+    MapEntry<K2, V2> Function(K key, V value) convert,
+  ) => TimedMap<K2, V2>(keyTimeout, _entries.map(convert));
 
   @override
   V putIfAbsent(K key, V Function() ifAbsent) => _entries.putIfAbsent(key, () {
-        var v = ifAbsent();
-        _entriesPutTime[key] = DateTime.now();
-        return v;
-      });
+    var v = ifAbsent();
+    _entriesPutTime[key] = DateTime.now();
+    return v;
+  });
 
   /// Same as [putIfAbsent], but calls [checkEntry] first.
-  V putIfAbsentChecked(K key, V Function() ifAbsent,
-      {DateTime? now, Duration? keyTimeout}) {
+  V putIfAbsentChecked(
+    K key,
+    V Function() ifAbsent, {
+    DateTime? now,
+    Duration? keyTimeout,
+  }) {
     checkEntry(key, now: now, keyTimeout: keyTimeout);
     return putIfAbsent(key, ifAbsent);
   }
 
   /// Same as [putIfAbsentChecked], but accepts an async function for [ifAbsent].
-  FutureOr<V> putIfAbsentCheckedAsync(K key, FutureOr<V> Function() ifAbsent,
-      {DateTime? now, Duration? keyTimeout}) {
+  FutureOr<V> putIfAbsentCheckedAsync(
+    K key,
+    FutureOr<V> Function() ifAbsent, {
+    DateTime? now,
+    Duration? keyTimeout,
+  }) {
     if (checkEntry(key, now: now, keyTimeout: keyTimeout)) {
       return ifAbsent().resolveMapped((val) {
         put(key, val, now: now);
@@ -273,19 +288,28 @@ class TimedMap<K, V> implements Map<K, V> {
 
   @override
   V update(K key, V Function(V value) update, {V Function()? ifAbsent}) =>
-      _entries.update(key, (V v) {
-        v = update(v);
-        _entriesPutTime[key] = DateTime.now();
-        return v;
-      }, ifAbsent: () {
-        var v = ifAbsent!();
-        _entriesPutTime[key] = DateTime.now();
-        return v;
-      });
+      _entries.update(
+        key,
+        (V v) {
+          v = update(v);
+          _entriesPutTime[key] = DateTime.now();
+          return v;
+        },
+        ifAbsent: () {
+          var v = ifAbsent!();
+          _entriesPutTime[key] = DateTime.now();
+          return v;
+        },
+      );
 
   /// Same as [update], but calls [checkEntry] first.
-  V updateTimed(K key, V Function(V value) update,
-      {V Function()? ifAbsent, DateTime? now, Duration? keyTimeout}) {
+  V updateTimed(
+    K key,
+    V Function(V value) update, {
+    V Function()? ifAbsent,
+    DateTime? now,
+    Duration? keyTimeout,
+  }) {
     checkEntry(key, now: now, keyTimeout: keyTimeout);
     return this.update(key, update, ifAbsent: ifAbsent);
   }

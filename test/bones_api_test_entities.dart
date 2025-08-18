@@ -8,35 +8,43 @@ import 'package:statistics/statistics.dart';
 part 'bones_api_test_entities.reflection.g.dart';
 
 final storeEntityHandler = GenericEntityHandler<Store>(
-    instantiatorDefault: Store.empty,
-    instantiatorFromMap: Store.fromMap,
-    type: Store,
-    typeName: 'Store');
+  instantiatorDefault: Store.empty,
+  instantiatorFromMap: Store.fromMap,
+  type: Store,
+  typeName: 'Store',
+);
 
 final addressEntityHandler = GenericEntityHandler<Address>(
-    instantiatorDefault: Address.empty,
-    instantiatorFromMap: (m) => Address.fromMap(m));
+  instantiatorDefault: Address.empty,
+  instantiatorFromMap: (m) => Address.fromMap(m),
+);
 
-final roleEntityHandler =
-    GenericEntityHandler<Role>(instantiatorFromMap: Role.fromMap);
+final roleEntityHandler = GenericEntityHandler<Role>(
+  instantiatorFromMap: Role.fromMap,
+);
 
-final photoEntityHandler =
-    GenericEntityHandler<Photo>(instantiatorFromMap: Photo.from);
+final photoEntityHandler = GenericEntityHandler<Photo>(
+  instantiatorFromMap: Photo.from,
+);
 
 final userInfoEntityHandler = GenericEntityHandler<UserInfo>(
-    instantiatorDefault: UserInfo.empty, instantiatorFromMap: UserInfo.fromMap);
+  instantiatorDefault: UserInfo.empty,
+  instantiatorFromMap: UserInfo.fromMap,
+);
 
 final userEntityHandler = GenericEntityHandler<User>(
-    instantiatorDefault: User.empty, instantiatorFromMap: User.fromMap);
+  instantiatorDefault: User.empty,
+  instantiatorFromMap: User.fromMap,
+);
 
 class StoreAPIRepository extends APIRepository<Store> {
   StoreAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 }
 
 class AddressAPIRepository extends APIRepository<Address> {
   AddressAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 
   FutureOr<Iterable<Address>> selectByState(String state) {
     return selectByQuery(' state == ? ', parameters: {'state': state});
@@ -47,29 +55,31 @@ class AddressAPIRepository extends APIRepository<Address> {
   }
 
   FutureOr<Iterable<Address>> selectByClosedStore(Store store) {
-    return selectByQuery(' closedStores =~ ? ',
-        parameters: {'closedStores': store});
+    return selectByQuery(
+      ' closedStores =~ ? ',
+      parameters: {'closedStores': store},
+    );
   }
 }
 
 class RoleAPIRepository extends APIRepository<Role> {
   RoleAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 }
 
 class PhotoAPIRepository extends APIRepository<Photo> {
   PhotoAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 }
 
 class UserInfoAPIRepository extends APIRepository<UserInfo> {
   UserInfoAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 }
 
 class UserAPIRepository extends APIRepository<User> {
   UserAPIRepository(EntityRepositoryProvider provider)
-      : super(provider: provider);
+    : super(provider: provider);
 
   FutureOr<User?> selectByEmail(String email) {
     return selectFirstByQuery(' email == ? ', parameters: {'email': email});
@@ -87,15 +97,22 @@ class UserAPIRepository extends APIRepository<User> {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
 
-  FutureOr<Iterable<User>> selectByINAddressStates(List<String> states,
-      {EntityResolutionRules? resolutionRules}) {
-    return selectByQuery(' address.state =~ ? ',
-        namedParameters: {'state': states}, resolutionRules: resolutionRules);
+  FutureOr<Iterable<User>> selectByINAddressStates(
+    List<String> states, {
+    EntityResolutionRules? resolutionRules,
+  }) {
+    return selectByQuery(
+      ' address.state =~ ? ',
+      namedParameters: {'state': states},
+      resolutionRules: resolutionRules,
+    );
   }
 
   FutureOr<Iterable<User>> selectByINAddressStatesSingleValue(String state) {
-    return selectByQuery(' address.state =~ ? ',
-        namedParameters: {'state': state});
+    return selectByQuery(
+      ' address.state =~ ? ',
+      namedParameters: {'state': state},
+    );
   }
 
   FutureOr<Iterable<User>> selectByRoleType(String type) {
@@ -121,7 +138,7 @@ class Account extends Entity {
   Account.entityReference(this.user, {required this.userInfo});
 
   Account(this.user, {Object? userInfo})
-      : userInfo = EntityReference<UserInfo>.from(userInfo);
+    : userInfo = EntityReference<UserInfo>.from(userInfo);
 
   Account.empty() : this(User.empty());
 
@@ -138,11 +155,7 @@ class Account extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames => const <String>[
-        'id',
-        'user',
-        'userInfo',
-      ];
+  List<String> get fieldsNames => const <String>['id', 'user', 'userInfo'];
 
   @override
   V? getField<V>(String key) {
@@ -166,8 +179,9 @@ class Account extends Entity {
       case 'user':
         return TypeInfo<User>(Address);
       case 'userInfo':
-        return TypeInfo<EntityReference<UserInfo>>.fromType(
-            EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+        return TypeInfo<EntityReference<UserInfo>>.fromType(EntityReference, [
+          TypeInfo<UserInfo>.fromType(UserInfo),
+        ]);
       default:
         return null;
     }
@@ -198,10 +212,10 @@ class Account extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'user': user.toJson(),
-        'userInfo': userInfo.toJson(),
-      };
+    if (id != null) 'id': id,
+    'user': user.toJson(),
+    'userInfo': userInfo.toJson(),
+  };
 }
 
 @EnableReflection()
@@ -229,31 +243,38 @@ class User extends Entity {
 
   DateTime creationTime;
 
-  User(this.email, this.password, this.address, this.roles,
-      {this.id,
-      this.level,
-      this.wakeUpTime,
-      Object? userInfo,
-      Object? photo,
-      DateTime? creationTime})
-      : userInfo = EntityReference<UserInfo>.from(userInfo,
-            entityHandler: userInfoEntityHandler),
-        photo = photo != null ? Photo.from(photo) : null,
-        creationTime = creationTime ?? DateTime.now();
+  User(
+    this.email,
+    this.password,
+    this.address,
+    this.roles, {
+    this.id,
+    this.level,
+    this.wakeUpTime,
+    Object? userInfo,
+    Object? photo,
+    DateTime? creationTime,
+  }) : userInfo = EntityReference<UserInfo>.from(
+         userInfo,
+         entityHandler: userInfoEntityHandler,
+       ),
+       photo = photo != null ? Photo.from(photo) : null,
+       creationTime = creationTime ?? DateTime.now();
 
   User.empty() : this('', '', Address.empty(), <Role>[]);
 
   static FutureOr<User> fromMap(Map<String, dynamic> map) => User(
-      map.getAsString('email')!,
-      map.getAsString('password')!,
-      map.getAs<Address>('address')!,
-      map.getAsList<Role>('roles', def: <Role>[])!,
-      id: map['id'],
-      level: map['level'],
-      wakeUpTime: map['wakeUpTime'],
-      userInfo: map['userInfo'],
-      photo: map['photo'],
-      creationTime: map['creationTime']);
+    map.getAsString('email')!,
+    map.getAsString('password')!,
+    map.getAs<Address>('address')!,
+    map.getAsList<Role>('roles', def: <Role>[])!,
+    id: map['id'],
+    level: map['level'],
+    wakeUpTime: map['wakeUpTime'],
+    userInfo: map['userInfo'],
+    photo: map['photo'],
+    creationTime: map['creationTime'],
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -269,17 +290,17 @@ class User extends Entity {
   @JsonField.hidden()
   @override
   List<String> get fieldsNames => const <String>[
-        'id',
-        'email',
-        'password',
-        'address',
-        'roles',
-        'level',
-        'wakeUpTime',
-        'userInfo',
-        'photo',
-        'creationTime'
-      ];
+    'id',
+    'email',
+    'password',
+    'address',
+    'roles',
+    'level',
+    'wakeUpTime',
+    'userInfo',
+    'photo',
+    'creationTime',
+  ];
 
   @override
   V? getField<V>(String key) {
@@ -327,8 +348,9 @@ class User extends Entity {
       case 'wakeUpTime':
         return TypeInfo<Time>(Time);
       case 'userInfo':
-        return TypeInfo<EntityReference<UserInfo>>.fromType(
-            EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+        return TypeInfo<EntityReference<UserInfo>>.fromType(EntityReference, [
+          TypeInfo<UserInfo>.fromType(UserInfo),
+        ]);
       case 'photo':
         return TypeInfo<Photo>(Photo);
       case 'creationTime':
@@ -412,17 +434,17 @@ class User extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'email': email,
-        'password': password,
-        'address': address.toJson(),
-        'roles': roles.map((e) => e.toJson()).toList(),
-        'level': level,
-        'wakeUpTime': wakeUpTime,
-        'userInfo': userInfo.toJson(),
-        if (photo != null) 'photo': photo?.toJson(),
-        'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
-      };
+    if (id != null) 'id': id,
+    'email': email,
+    'password': password,
+    'address': address.toJson(),
+    'roles': roles.map((e) => e.toJson()).toList(),
+    'level': level,
+    'wakeUpTime': wakeUpTime,
+    'userInfo': userInfo.toJson(),
+    if (photo != null) 'photo': photo?.toJson(),
+    'creationTime': creationTime.toUtc().millisecondsSinceEpoch,
+  };
 
   @override
   String toString() {
@@ -492,9 +514,7 @@ class UserInfo extends Entity {
   List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
     switch (key) {
       case 'info':
-        return [
-          EntityField.maximum(1000),
-        ];
+        return [EntityField.maximum(1000)];
       default:
         return null;
     }
@@ -520,10 +540,7 @@ class UserInfo extends Entity {
   }
 
   @override
-  Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'info': info,
-      };
+  Map<String, dynamic> toJson() => {if (id != null) 'id': id, 'info': info};
 }
 
 @EnableReflection()
@@ -539,7 +556,7 @@ class Photo extends Entity {
   Photo.fromID(this.id);
 
   Photo.fromData(Uint8List data, {String? id})
-      : this._(id ?? computeID(data), data);
+    : this._(id ?? computeID(data), data);
 
   factory Photo.from(Object o, {String? id}) {
     if (o is Photo) return o;
@@ -547,9 +564,10 @@ class Photo extends Entity {
     if (o is Uint8List) return Photo.fromData(o, id: id);
 
     if (o is Map) {
-      var map = o is Map<String, Object?>
-          ? o
-          : o.map((key, value) => MapEntry('$key', value));
+      var map =
+          o is Map<String, Object?>
+              ? o
+              : o.map((key, value) => MapEntry('$key', value));
       return Photo.fromMap(map);
     }
 
@@ -635,9 +653,9 @@ class Photo extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        'id': id,
-        if (data != null) 'data': base64.encode(data!),
-      };
+    'id': id,
+    if (data != null) 'data': base64.encode(data!),
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -684,8 +702,12 @@ class Store extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames =>
-      const <String>['id', 'name', 'number', 'owner'];
+  List<String> get fieldsNames => const <String>[
+    'id',
+    'name',
+    'number',
+    'owner',
+  ];
 
   @override
   V? getField<V>(String key) {
@@ -723,9 +745,7 @@ class Store extends Entity {
   List<EntityAnnotation>? getFieldEntityAnnotations(String key) {
     switch (key) {
       case 'name':
-        return [
-          EntityField.maximum(100),
-        ];
+        return [EntityField.maximum(100)];
       default:
         return null;
     }
@@ -764,11 +784,11 @@ class Store extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'name': name,
-        'number': number,
-        'owner': owner?.toJson(),
-      };
+    if (id != null) 'id': id,
+    'name': name,
+    'number': number,
+    'owner': owner?.toJson(),
+  };
 }
 
 @EnableReflection()
@@ -793,29 +813,38 @@ class Address extends Entity {
   List<Store> stores;
   EntityReferenceList<Store> closedStores;
 
-  Address(this.state, this.city, this.street, this.number,
-      {this.id,
-      List<Store>? stores,
-      Object? closedStores,
-      Object? latitude,
-      Object? longitude})
-      : stores = stores ?? <Store>[],
-        closedStores = EntityReferenceList<Store>.from(
-            closedStores ?? <Store>[],
-            entityHandler: storeEntityHandler),
-        latitude = Decimal.from(latitude) ?? Decimal.zero,
-        longitude = Decimal.from(longitude) ?? Decimal.zero;
+  Address(
+    this.state,
+    this.city,
+    this.street,
+    this.number, {
+    this.id,
+    List<Store>? stores,
+    Object? closedStores,
+    Object? latitude,
+    Object? longitude,
+  }) : stores = stores ?? <Store>[],
+       closedStores = EntityReferenceList<Store>.from(
+         closedStores ?? <Store>[],
+         entityHandler: storeEntityHandler,
+       ),
+       latitude = Decimal.from(latitude) ?? Decimal.zero,
+       longitude = Decimal.from(longitude) ?? Decimal.zero;
 
   Address.empty() : this('', '', '', 0);
 
   Address.fromMap(Map<String, dynamic> map)
-      : this(map.getAsString('state')!, map.getAsString('city')!,
-            map.getAsString('street')!, map.getAsInt('number')!,
-            stores: map.getAsList<Store>('stores', def: <Store>[])!,
-            closedStores: map['closedStores'],
-            latitude: map['latitude'],
-            longitude: map['longitude'],
-            id: map.getAsInt('id'));
+    : this(
+        map.getAsString('state')!,
+        map.getAsString('city')!,
+        map.getAsString('street')!,
+        map.getAsInt('number')!,
+        stores: map.getAsList<Store>('stores', def: <Store>[])!,
+        closedStores: map['closedStores'],
+        latitude: map['latitude'],
+        longitude: map['longitude'],
+        id: map.getAsInt('id'),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -846,16 +875,16 @@ class Address extends Entity {
   @JsonField.hidden()
   @override
   List<String> get fieldsNames => const <String>[
-        'id',
-        'state',
-        'city',
-        'street',
-        'number',
-        'stores',
-        'closedStores',
-        'latitude',
-        'longitude',
-      ];
+    'id',
+    'state',
+    'city',
+    'street',
+    'number',
+    'stores',
+    'closedStores',
+    'latitude',
+    'longitude',
+  ];
 
   @override
   V? getField<V>(String key) {
@@ -900,7 +929,9 @@ class Address extends Entity {
         return TypeInfo<List<Store>>(List, [TypeInfo<Store>(Store)]);
       case 'closedStores':
         return TypeInfo<EntityReferenceList<Store>>.fromType(
-            EntityReferenceList, [TypeInfo<Store>.fromType(Store)]);
+          EntityReferenceList,
+          [TypeInfo<Store>.fromType(Store)],
+        );
       case 'latitude':
         return TypeInfo.fromType(Decimal);
       case 'longitude':
@@ -980,24 +1011,20 @@ class Address extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'state': state,
-        'city': city,
-        'street': street,
-        'number': number,
-        'stores': stores.map((e) => e.toJson()).toList(),
-        'closedStores': closedStores.toJson(),
-        'latitude': latitude.toDouble(),
-        'longitude': longitude.toDouble(),
-      };
+    if (id != null) 'id': id,
+    'state': state,
+    'city': city,
+    'street': street,
+    'number': number,
+    'stores': stores.map((e) => e.toJson()).toList(),
+    'closedStores': closedStores.toJson(),
+    'latitude': latitude.toDouble(),
+    'longitude': longitude.toDouble(),
+  };
 }
 
 @EnableReflection()
-enum RoleType {
-  admin,
-  guest,
-  unknown,
-}
+enum RoleType { admin, guest, unknown }
 
 @EnableReflection()
 class Role extends Entity {
@@ -1014,10 +1041,12 @@ class Role extends Entity {
   Role.empty() : this(RoleType.unknown);
 
   Role.fromMap(Map<String, dynamic> map)
-      : this(RoleType$from(map.get('type')) ?? RoleType.unknown,
-            enabled: map.getAsBool('enabled', defaultValue: false)!,
-            value: Decimal.from(map.get('value')),
-            id: map.getAsInt('id'));
+    : this(
+        RoleType$from(map.get('type')) ?? RoleType.unknown,
+        enabled: map.getAsBool('enabled', defaultValue: false)!,
+        value: Decimal.from(map.get('value')),
+        id: map.getAsInt('id'),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -1036,8 +1065,12 @@ class Role extends Entity {
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames =>
-      const <String>['enabled', 'id', 'type', 'value'];
+  List<String> get fieldsNames => const <String>[
+    'enabled',
+    'id',
+    'type',
+    'value',
+  ];
 
   @override
   V? getField<V>(String key) {
@@ -1101,11 +1134,11 @@ class Role extends Entity {
 
   @override
   Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        if (id != null) 'id': id,
-        'type': type.enumName,
-        'value': value?.toStringStandard(),
-      };
+    'enabled': enabled,
+    if (id != null) 'id': id,
+    'type': type.enumName,
+    'value': value?.toStringStandard(),
+  };
 
   @override
   String toString() {

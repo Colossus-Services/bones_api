@@ -85,8 +85,11 @@ class StringUtils {
   }
 
   /// Returns `true` if [s] ends with [pattern] (accepts [RegExp]).
-  static bool endsWithPattern(String s, Pattern pattern,
-      {bool isEndingPattern = false}) {
+  static bool endsWithPattern(
+    String s,
+    Pattern pattern, {
+    bool isEndingPattern = false,
+  }) {
     if (pattern is RegExp) {
       var p = isEndingPattern ? pattern : asEndingPattern(pattern);
       return p.hasMatch(s);
@@ -96,10 +99,12 @@ class StringUtils {
   }
 
   /// Returns the equals head part of [l] elements.
-  static String getHeadEquality(List<String> l,
-      {Pattern? delimiter,
-      int? minLength,
-      bool Function(String s)? validator}) {
+  static String getHeadEquality(
+    List<String> l, {
+    Pattern? delimiter,
+    int? minLength,
+    bool Function(String s)? validator,
+  }) {
     if (l.length <= 1) return '';
 
     var min = l.map((e) => e.length).min;
@@ -137,10 +142,12 @@ class StringUtils {
   }
 
   /// Returns the equals tail part of [l] elements.
-  static String getTailEquality(List<String> l,
-      {Pattern? delimiter,
-      int? minLength,
-      bool Function(String s)? validator}) {
+  static String getTailEquality(
+    List<String> l, {
+    Pattern? delimiter,
+    int? minLength,
+    bool Function(String s)? validator,
+  }) {
     if (l.length <= 1) return '';
 
     var min = l.map((e) => e.length).min;
@@ -173,14 +180,20 @@ class StringUtils {
     return longestWithDelimiter ?? longest;
   }
 
-  static List<String> trimEqualities(List<String> l,
-      {Pattern? delimiter,
-      int? minLength,
-      bool Function(String s)? validator}) {
+  static List<String> trimEqualities(
+    List<String> l, {
+    Pattern? delimiter,
+    int? minLength,
+    bool Function(String s)? validator,
+  }) {
     if (l.length <= 1) return l.toList();
 
-    var head = getHeadEquality(l,
-        delimiter: delimiter, minLength: minLength, validator: validator);
+    var head = getHeadEquality(
+      l,
+      delimiter: delimiter,
+      minLength: minLength,
+      validator: validator,
+    );
     var headSz = head.length;
 
     var min = l.map((e) => e.length).min;
@@ -189,25 +202,33 @@ class StringUtils {
       tailMinLength = minLength;
     }
 
-    var tail = getTailEquality(l,
-        delimiter: delimiter, minLength: tailMinLength, validator: validator);
+    var tail = getTailEquality(
+      l,
+      delimiter: delimiter,
+      minLength: tailMinLength,
+      validator: validator,
+    );
     var tailSz = tail.length;
 
     var l2 = l.map((e) => e.substring(headSz, e.length - tailSz)).toList();
     return l2;
   }
 
-  static Map<String, String> trimEqualitiesMap(List<String> l,
-      {String? delimiter,
-      String Function(String s)? normalizer,
-      bool Function(String s)? validator}) {
+  static Map<String, String> trimEqualitiesMap(
+    List<String> l, {
+    String? delimiter,
+    String Function(String s)? normalizer,
+    bool Function(String s)? validator,
+  }) {
     var l1 = normalizer != null ? normalizeAll(l, normalizer) : l;
     var l2 = trimEqualities(l1, delimiter: delimiter, validator: validator);
     return Map<String, String>.fromIterables(l, l2);
   }
 
   static List<String> normalizeAll(
-      List<String> l, String Function(String s)? normalizer) {
+    List<String> l,
+    String Function(String s)? normalizer,
+  ) {
     if (normalizer == null) return l;
     l = l.map(normalizer).toList();
     return l;
@@ -333,7 +354,9 @@ extension ExtensionRuntimeTypeNameUnsafe on Object? {
 /// Use this interface to avoid [StackOverflowError] on complex [toString].
 abstract class RecursiveToString {
   static Set<Object>? processedObjects(
-      Set<Object>? processedObjects, Object? o) {
+    Set<Object>? processedObjects,
+    Object? o,
+  ) {
     processedObjects ??= Set<Object>.identity();
 
     if (o != null && !processedObjects.add(o)) {
@@ -347,7 +370,10 @@ abstract class RecursiveToString {
       QueueList<Set<Object>>();
 
   static String? recursiveToString(
-      Set<Object>? processedObjects, Object? o, String? Function() str) {
+    Set<Object>? processedObjects,
+    Object? o,
+    String? Function() str,
+  ) {
     processedObjects ??= _processedObjectsStack.lastOrNull;
 
     processedObjects = RecursiveToString.processedObjects(processedObjects, o);
@@ -376,7 +402,7 @@ abstract class RecursiveToString {
     processedObjects = RecursiveToString.processedObjects(processedObjects, o);
     if (processedObjects == null) {
       return [
-        '${o.map((e) => e is RecursiveToString ? e.toStringSimple() : e.runtimeType).toList()}...'
+        '${o.map((e) => e is RecursiveToString ? e.toStringSimple() : e.runtimeType).toList()}...',
       ];
     }
 
@@ -402,7 +428,7 @@ class IdenticalSet<O> {
   final List<List<O>?> _groups;
 
   IdenticalSet({int groups = 7})
-      : _groups = List.filled(groups.clamp(2, 1000), null);
+    : _groups = List.filled(groups.clamp(2, 1000), null);
 
   List<O> _getGroup(o) {
     var h = o.hashCode;

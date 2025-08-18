@@ -78,8 +78,9 @@ class APIConfig {
   Iterable<String> get keys => _properties.keys;
 
   /// The [properties] entries.
-  Iterable<MapEntry<String, dynamic>> get entries => _properties.entries
-      .map((e) => MapEntry(e.key, _resolveValue(e.key, e.value, null)));
+  Iterable<MapEntry<String, dynamic>> get entries => _properties.entries.map(
+    (e) => MapEntry(e.key, _resolveValue(e.key, e.value, null)),
+  );
 
   /// The [properties] values.
   Iterable<dynamic> get values => entries.map((e) => e.value);
@@ -201,8 +202,11 @@ class APIConfig {
   }
 
   /// Alias to [get] returning a [Map].
-  Map<String, V>? getAsMap<V>(String key,
-      {Map<String, V>? defaultValue, bool caseSensitive = false}) {
+  Map<String, V>? getAsMap<V>(
+    String key, {
+    Map<String, V>? defaultValue,
+    bool caseSensitive = false,
+  }) {
     var m = get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
     if (m == null) return null;
     if (m is! Map) {
@@ -212,8 +216,11 @@ class APIConfig {
   }
 
   /// Alias to [get] returning a [List].
-  List<E>? getAsList<E>(String key,
-      {List<E>? defaultValue, bool caseSensitive = false}) {
+  List<E>? getAsList<E>(
+    String key, {
+    List<E>? defaultValue,
+    bool caseSensitive = false,
+  }) {
     var l = get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
     if (l == null) return null;
     if (l is! List) {
@@ -225,8 +232,11 @@ class APIConfig {
   /// Alias to [get] returning as [T].
   /// If not null, it attempts to parse the value into [T] or throws a [StateError].
   T? getAs<T>(String key, {T? defaultValue, bool caseSensitive = false}) {
-    var val =
-        get(key, defaultValue: defaultValue, caseSensitive: caseSensitive);
+    var val = get(
+      key,
+      defaultValue: defaultValue,
+      caseSensitive: caseSensitive,
+    );
     if (val == null) return null;
     if (val is! T) {
       var val2 = _parseValue<T>(val);
@@ -296,8 +306,11 @@ class APIConfig {
   static FutureOr<APIConfig?> fromAsync(dynamic o, [dynamic def]) =>
       _fromImpl(o, allowAsync: true, def: def);
 
-  static FutureOr<APIConfig?> _fromImpl(dynamic o,
-      {required bool allowAsync, Object? def}) {
+  static FutureOr<APIConfig?> _fromImpl(
+    dynamic o, {
+    required bool allowAsync,
+    Object? def,
+  }) {
     BonesAPI.boot();
 
     if (o == null) {
@@ -313,7 +326,8 @@ class APIConfig {
       if (ret is Future) {
         if (!allowAsync) {
           throw StateError(
-              "Async not allowed. APIConfigProvider returned a Future: $ret");
+            "Async not allowed. APIConfigProvider returned a Future: $ret",
+          );
         }
         return ret;
       } else {
@@ -401,12 +415,13 @@ class APIConfig {
 
       if (path != null) {
         return Uri(
-            scheme: u.scheme,
-            userInfo: u.userInfo,
-            host: u.host,
-            port: u.port,
-            path: path,
-            query: u.query);
+          scheme: u.scheme,
+          userInfo: u.userInfo,
+          host: u.host,
+          port: u.port,
+          path: path,
+          query: u.query,
+        );
       }
     }
 
@@ -433,8 +448,12 @@ class APIConfig {
   /// - If [type] is defined (`JSON`, `YAML`or `properties`), forces decoding
   /// of the specified type format.
   /// - If [autoIdentify] is `true` it tries to detect the format to decode.
-  static APIConfig? fromContent(String content,
-      {String? type, bool autoIdentify = true, String? source}) {
+  static APIConfig? fromContent(
+    String content, {
+    String? type,
+    bool autoIdentify = true,
+    String? source,
+  }) {
     type ??= '';
     type = type.toLowerCase().trim();
 
@@ -490,7 +509,8 @@ class APIConfig {
     Object? o = yaml;
     if (yaml is Map) {
       o = Map<String, dynamic>.fromEntries(
-          yaml.entries.expand(_toMapEntry).toList());
+        yaml.entries.expand(_toMapEntry).toList(),
+      );
     }
 
     return APIConfig.fromCollection(o)!;
@@ -501,11 +521,11 @@ class APIConfig {
 
   /// Constructs an [APIConfig] from [jsonEncoded].
   APIConfig.fromJsonEncoded(String jsonEncoded)
-      : this(dart_convert.json.decode(jsonEncoded));
+    : this(dart_convert.json.decode(jsonEncoded));
 
   /// Constructs an [APIConfig] from [properties].
   APIConfig.fromPropertiesEncoded(String properties)
-      : this(parsePropertiesEncoded(properties));
+    : this(parsePropertiesEncoded(properties));
 
   static Map<String, dynamic> parsePropertiesEncoded(String properties) {
     var entries = parsePropertiesEncodedEntries(properties);
@@ -518,20 +538,22 @@ class APIConfig {
   static final RegExp _regexpKeyDelimiter = RegExp(r'[:=]');
 
   static List<MapEntry<String, dynamic>> parsePropertiesEncodedEntries(
-      String properties) {
+    String properties,
+  ) {
     var lines = properties.split(_regexpLineBreak);
 
-    var l = lines.expand((l) {
-      if (_regexpKeyLine.hasMatch(l)) {
-        var idx = l.indexOf(_regexpKeyDelimiter);
-        var k = l.substring(0, idx).trim();
-        var v = l.substring(idx + 1);
-        var val = _parseJsonValue(v);
-        return <MapEntry<String, dynamic>>[MapEntry(k, val)];
-      } else {
-        return <MapEntry<String, dynamic>>[];
-      }
-    }).toList();
+    var l =
+        lines.expand((l) {
+          if (_regexpKeyLine.hasMatch(l)) {
+            var idx = l.indexOf(_regexpKeyDelimiter);
+            var k = l.substring(0, idx).trim();
+            var v = l.substring(idx + 1);
+            var val = _parseJsonValue(v);
+            return <MapEntry<String, dynamic>>[MapEntry(k, val)];
+          } else {
+            return <MapEntry<String, dynamic>>[];
+          }
+        }).toList();
 
     return l;
   }
@@ -551,8 +573,9 @@ class APIConfig {
       return [MapEntry<String, dynamic>('${o.key}', _toMapValue(o.value))];
     } else if (o is Map) {
       return o.entries
-          .map((e) =>
-              MapEntry<String, dynamic>('${e.key}', _toMapValue(e.value)))
+          .map(
+            (e) => MapEntry<String, dynamic>('${e.key}', _toMapValue(e.value)),
+          )
           .toList();
     } else if (o is Iterable) {
       return o.expand(_toMapEntry).toList();
@@ -586,9 +609,10 @@ class APIConfig {
       Json.toJson(_properties, maskField: maskField);
 
   /// Converts this configuration [properties] to an encoded JSON.
-  String toJsonEncoded(
-          {bool Function(String key)? maskField, bool pretty = true}) =>
-      Json.encode(_properties, pretty: pretty, maskField: maskField);
+  String toJsonEncoded({
+    bool Function(String key)? maskField,
+    bool pretty = true,
+  }) => Json.encode(_properties, pretty: pretty, maskField: maskField);
 
   /// Converts this configuration [properties] to an encoded YAML.
   String toYAMLEncoded() => YamlWriter().write(_properties);

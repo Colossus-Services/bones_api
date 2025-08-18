@@ -7,13 +7,18 @@ void main() {
       var errors = <StateError>[];
 
       var zone = createErrorZone(
-          onUncaughtError: (e, s) => errors.add(e as StateError));
+        onUncaughtError: (e, s) => errors.add(e as StateError),
+      );
 
       zone.run(() => print('foo'));
       expect(errors, isEmpty);
 
-      zone.run(() => Future.delayed(
-          Duration(milliseconds: 1), () => throw StateError('e1')));
+      zone.run(
+        () => Future.delayed(
+          Duration(milliseconds: 1),
+          () => throw StateError('e1'),
+        ),
+      );
 
       await Future.delayed(Duration(milliseconds: 200), () => true);
 

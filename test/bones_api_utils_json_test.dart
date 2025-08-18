@@ -29,170 +29,209 @@ void main() {
       expect(Json.toJson<Object?>(null), isNull);
       expect(Json.toJson<int>(null), isNull);
 
-      expect(Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),
-          equals('2021-01-02 03:04:05.000Z'));
+      expect(
+        Json.toJson(DateTime.utc(2021, 1, 2, 3, 4, 5)),
+        equals('2021-01-02 03:04:05.000Z'),
+      );
 
       expect(
-          Json.toJson({'a': 1, 'b': 2, 'p': 123}, removeField: (k) => k == 'p'),
-          equals({'a': 1, 'b': 2}));
+        Json.toJson({'a': 1, 'b': 2, 'p': 123}, removeField: (k) => k == 'p'),
+        equals({'a': 1, 'b': 2}),
+      );
 
       expect(
-          Json.toJson({'a': 1, 'b': 2, 'p': 123}, maskField: (k) => k == 'p'),
-          equals({'a': 1, 'b': 2, 'p': '***'}));
-
-      expect(Json.toJson({'a': 1, 'b': 2, 'foo': Foo(51, 'x')}),
-          equals({'a': 1, 'b': 2, 'foo': '#51[x]'}));
+        Json.toJson({'a': 1, 'b': 2, 'p': 123}, maskField: (k) => k == 'p'),
+        equals({'a': 1, 'b': 2, 'p': '***'}),
+      );
 
       expect(
-          Json.toJson({'a': 1, 'b': 2, 'foo': Foo(51, 'x')}, toEncodable: (o) {
+        Json.toJson({'a': 1, 'b': 2, 'foo': Foo(51, 'x')}),
+        equals({'a': 1, 'b': 2, 'foo': '#51[x]'}),
+      );
+
+      expect(
+        Json.toJson(
+          {'a': 1, 'b': 2, 'foo': Foo(51, 'x')},
+          toEncodable: (o) {
             return o is Foo ? '${o.id}:${o.name}' : o;
-          }),
-          equals({'a': 1, 'b': 2, 'foo': '51:x'}));
+          },
+        ),
+        equals({'a': 1, 'b': 2, 'foo': '51:x'}),
+      );
 
-      expect(Json.toJson(Role(RoleType.unknown)),
-          equals({'type': 'unknown', 'enabled': true, 'value': null}));
+      expect(
+        Json.toJson(Role(RoleType.unknown)),
+        equals({'type': 'unknown', 'enabled': true, 'value': null}),
+      );
 
       roleEntityHandler.toString();
 
       expect(
-          Json.toJson(Role(RoleType.admin), removeField: (k) => k == 'enabled'),
-          equals({'type': 'admin', 'value': null}));
+        Json.toJson(Role(RoleType.admin), removeField: (k) => k == 'enabled'),
+        equals({'type': 'admin', 'value': null}),
+      );
 
       expect(
-          Json.toJson(
-              Role(RoleType.guest,
-                  enabled: false, value: Decimal.parse('456.789')),
-              removeNullFields: true),
-          equals({'type': 'guest', 'enabled': false, 'value': '456.789'}));
+        Json.toJson(
+          Role(RoleType.guest, enabled: false, value: Decimal.parse('456.789')),
+          removeNullFields: true,
+        ),
+        equals({'type': 'guest', 'enabled': false, 'value': '456.789'}),
+      );
 
       expect(
-          Json.toJson(EntityReference.fromEntity(Role(RoleType.admin))),
-          equals({
-            'EntityReference': 'Role',
-            'entity': {'enabled': true, 'type': 'admin', 'value': null}
-          }));
+        Json.toJson(EntityReference.fromEntity(Role(RoleType.admin))),
+        equals({
+          'EntityReference': 'Role',
+          'entity': {'enabled': true, 'type': 'admin', 'value': null},
+        }),
+      );
 
       expect(
-          Json.toJson(EntityReference.fromEntity(Role(RoleType.admin)),
-              removeNullFields: true),
-          equals({
-            'EntityReference': 'Role',
-            'entity': {'enabled': true, 'type': 'admin'}
-          }));
+        Json.toJson(
+          EntityReference.fromEntity(Role(RoleType.admin)),
+          removeNullFields: true,
+        ),
+        equals({
+          'EntityReference': 'Role',
+          'entity': {'enabled': true, 'type': 'admin'},
+        }),
+      );
 
       expect(
-          Json.toJson(EntityReferenceList.fromEntities(
-              [Role(RoleType.admin), Role(RoleType.guest)])),
-          equals({
+        Json.toJson(
+          EntityReferenceList.fromEntities([
+            Role(RoleType.admin),
+            Role(RoleType.guest),
+          ]),
+        ),
+        equals({
+          'EntityReferenceList': 'Role',
+          'entities': [
+            {'enabled': true, 'type': 'admin', 'value': null},
+            {'enabled': true, 'type': 'guest', 'value': null},
+          ],
+        }),
+      );
+
+      expect(
+        Json.toJson(
+          EntityReferenceList.fromEntities([
+            Role(RoleType.admin),
+            Role(RoleType.guest),
+          ]),
+          removeNullFields: true,
+        ),
+        equals({
+          'EntityReferenceList': 'Role',
+          'entities': [
+            {'enabled': true, 'type': 'admin'},
+            {'enabled': true, 'type': 'guest'},
+          ],
+        }),
+      );
+
+      expect(
+        Json.toJson({
+          'name': 'a',
+          'value': EntityReferenceList.fromEntities([
+            Role(RoleType.admin),
+            Role(RoleType.guest),
+          ]),
+        }),
+        equals({
+          'name': 'a',
+          'value': {
             'EntityReferenceList': 'Role',
             'entities': [
               {'enabled': true, 'type': 'admin', 'value': null},
-              {'enabled': true, 'type': 'guest', 'value': null}
-            ]
-          }));
+              {'enabled': true, 'type': 'guest', 'value': null},
+            ],
+          },
+        }),
+      );
 
       expect(
-          Json.toJson(
-              EntityReferenceList.fromEntities(
-                  [Role(RoleType.admin), Role(RoleType.guest)]),
-              removeNullFields: true),
-          equals({
+        Json.toJson({
+          'name': 'a',
+          'value': EntityReferenceList.fromEntities([
+            Role(RoleType.admin),
+            Role(RoleType.guest),
+          ]),
+        }, removeNullFields: true),
+        equals({
+          'name': 'a',
+          'value': {
             'EntityReferenceList': 'Role',
             'entities': [
               {'enabled': true, 'type': 'admin'},
-              {'enabled': true, 'type': 'guest'}
-            ]
-          }));
+              {'enabled': true, 'type': 'guest'},
+            ],
+          },
+        }),
+      );
 
       expect(
-          Json.toJson({
-            'name': 'a',
-            'value': EntityReferenceList.fromEntities(
-                [Role(RoleType.admin), Role(RoleType.guest)])
-          }),
-          equals({
-            'name': 'a',
-            'value': {
+        Json.toJson({
+          'name': 'a',
+          'values': [
+            EntityReferenceList.fromEntities([
+              Role(RoleType.admin),
+              Role(RoleType.guest),
+            ]),
+            EntityReferenceList.fromEntities([Role(RoleType.unknown)]),
+          ],
+        }),
+        equals({
+          'name': 'a',
+          'values': [
+            {
               'EntityReferenceList': 'Role',
               'entities': [
                 {'enabled': true, 'type': 'admin', 'value': null},
-                {'enabled': true, 'type': 'guest', 'value': null}
-              ]
-            }
-          }));
+                {'enabled': true, 'type': 'guest', 'value': null},
+              ],
+            },
+            {
+              'EntityReferenceList': 'Role',
+              'entities': [
+                {'enabled': true, 'type': 'unknown', 'value': null},
+              ],
+            },
+          ],
+        }),
+      );
 
       expect(
-          Json.toJson({
-            'name': 'a',
-            'value': EntityReferenceList.fromEntities(
-                [Role(RoleType.admin), Role(RoleType.guest)])
-          }, removeNullFields: true),
-          equals({
-            'name': 'a',
-            'value': {
+        Json.toJson({
+          'name': 'a',
+          'values': [
+            EntityReferenceList.fromEntities([
+              Role(RoleType.admin),
+              Role(RoleType.guest),
+            ]),
+            EntityReferenceList.fromEntities([Role(RoleType.unknown)]),
+          ],
+        }, removeNullFields: true),
+        equals({
+          'name': 'a',
+          'values': [
+            {
               'EntityReferenceList': 'Role',
               'entities': [
                 {'enabled': true, 'type': 'admin'},
-                {'enabled': true, 'type': 'guest'}
-              ]
-            }
-          }));
-
-      expect(
-          Json.toJson({
-            'name': 'a',
-            'values': [
-              EntityReferenceList.fromEntities(
-                  [Role(RoleType.admin), Role(RoleType.guest)]),
-              EntityReferenceList.fromEntities([Role(RoleType.unknown)])
-            ]
-          }),
-          equals({
-            'name': 'a',
-            'values': [
-              {
-                'EntityReferenceList': 'Role',
-                'entities': [
-                  {'enabled': true, 'type': 'admin', 'value': null},
-                  {'enabled': true, 'type': 'guest', 'value': null}
-                ]
-              },
-              {
-                'EntityReferenceList': 'Role',
-                'entities': [
-                  {'enabled': true, 'type': 'unknown', 'value': null}
-                ]
-              }
-            ]
-          }));
-
-      expect(
-          Json.toJson({
-            'name': 'a',
-            'values': [
-              EntityReferenceList.fromEntities(
-                  [Role(RoleType.admin), Role(RoleType.guest)]),
-              EntityReferenceList.fromEntities([Role(RoleType.unknown)])
-            ]
-          }, removeNullFields: true),
-          equals({
-            'name': 'a',
-            'values': [
-              {
-                'EntityReferenceList': 'Role',
-                'entities': [
-                  {'enabled': true, 'type': 'admin'},
-                  {'enabled': true, 'type': 'guest'}
-                ]
-              },
-              {
-                'EntityReferenceList': 'Role',
-                'entities': [
-                  {'enabled': true, 'type': 'unknown'}
-                ]
-              }
-            ]
-          }));
+                {'enabled': true, 'type': 'guest'},
+              ],
+            },
+            {
+              'EntityReferenceList': 'Role',
+              'entities': [
+                {'enabled': true, 'type': 'unknown'},
+              ],
+            },
+          ],
+        }),
+      );
     });
 
     test('fromJson', () async {
@@ -204,23 +243,29 @@ void main() {
       expect(Json.fromJson<Object?>(null), isNull);
       expect(Json.fromJson([1, 2, 3]), equals([1, 2, 3]));
       expect(Json.fromJson({'a': 1, "b": 2}), equals({'a': 1, "b": 2}));
-      expect(Json.fromJson({'a': 1, "b": 2, "c": null}),
-          equals({'a': 1, "b": 2, "c": null}));
+      expect(
+        Json.fromJson({'a': 1, "b": 2, "c": null}),
+        equals({'a': 1, "b": 2, "c": null}),
+      );
 
       Role$reflection.boot();
 
       {
         var json = Json.toJson(Role(RoleType.guest, enabled: false));
 
-        expect(Json.fromJson<Role>(json),
-            equals(Role(RoleType.guest, enabled: false)));
+        expect(
+          Json.fromJson<Role>(json),
+          equals(Role(RoleType.guest, enabled: false)),
+        );
       }
 
       {
         var json = Json.toJson(Role(RoleType.admin));
 
-        expect(Json.fromJson<Role>(json),
-            equals(Role(RoleType.admin, enabled: true)));
+        expect(
+          Json.fromJson<Role>(json),
+          equals(Role(RoleType.admin, enabled: true)),
+        );
       }
     });
 
@@ -232,12 +277,26 @@ void main() {
       {
         var creationTime = DateTime.utc(2022, 1, 2);
         var address = Address('CA', 'LA', 'one', 101, id: 1101);
-        var role1 = Role(RoleType.guest,
-            enabled: true, value: 10.20.toDecimal(), id: 10);
-        var role2 = Role(RoleType.admin,
-            enabled: true, value: 101.10.toDecimal(), id: 101);
-        var user = User('joe@mail.com', '123', address, [role1, role2],
-            id: 1001, creationTime: creationTime);
+        var role1 = Role(
+          RoleType.guest,
+          enabled: true,
+          value: 10.20.toDecimal(),
+          id: 10,
+        );
+        var role2 = Role(
+          RoleType.admin,
+          enabled: true,
+          value: 101.10.toDecimal(),
+          id: 101,
+        );
+        var user = User(
+          'joe@mail.com',
+          '123',
+          address,
+          [role1, role2],
+          id: 1001,
+          creationTime: creationTime,
+        );
 
         var json = Json.toJson(user) as Map;
 
@@ -270,40 +329,66 @@ void main() {
 
         var entityReference1 = Json.fromJson<EntityReference>({
           'EntityReference': 'Role',
-          'entity': {'enabled': true, 'type': 'admin', 'id': 11}
+          'entity': {'enabled': true, 'type': 'admin', 'id': 11},
         });
         expect(
-            entityReference1,
-            allOf(isA<EntityReference<Role>>()
-                .having((e) => e.entity, 'equals entity', equals(role))));
+          entityReference1,
+          allOf(
+            isA<EntityReference<Role>>().having(
+              (e) => e.entity,
+              'equals entity',
+              equals(role),
+            ),
+          ),
+        );
 
-        var entityReference2 = Json.fromJson<EntityReference>(
-            {'EntityReference': 'Role', 'id': 11});
+        var entityReference2 = Json.fromJson<EntityReference>({
+          'EntityReference': 'Role',
+          'id': 11,
+        });
         expect(
-            entityReference2,
-            allOf(isA<EntityReference<Role>>()
-                .having((e) => e.entity, 'null entity', isNull)));
+          entityReference2,
+          allOf(
+            isA<EntityReference<Role>>().having(
+              (e) => e.entity,
+              'null entity',
+              isNull,
+            ),
+          ),
+        );
 
         expect(entityReference2!.get(), isNull);
         expect(
-            () => entityReference2.getNotNull(),
-            throwsA(isA<StateError>().having(
-                (e) => e.message,
-                "Can't get entity message",
-                contains("Can't `get` entity `Role` with ID `null`"))));
+          () => entityReference2.getNotNull(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              "Can't get entity message",
+              contains("Can't `get` entity `Role` with ID `null`"),
+            ),
+          ),
+        );
 
         var entityCache = JsonEntityCacheSimple();
 
         entityCache.cacheEntity(role);
 
         var entityReference3 = Json.fromJson<EntityReference>(
-            {'EntityReference': 'Role', 'id': 11},
-            entityCache: entityCache, autoResetEntityCache: false);
+          {'EntityReference': 'Role', 'id': 11},
+          entityCache: entityCache,
+          autoResetEntityCache: false,
+        );
 
         expect(
-            entityReference3,
-            allOf(isA<EntityReference<Role>>()
-                .having((e) => e.entity, 'equals entity', equals(role))));
+          entityReference3,
+          allOf(
+            isA<EntityReference<Role>>().having(
+              (e) => e.entity,
+              'equals entity',
+              equals(role),
+            ),
+          ),
+        );
 
         expect(entityReference3!.get(), isNotNull);
       }
@@ -316,71 +401,112 @@ void main() {
           'EntityReferenceList': 'Role',
           'entities': [
             {'enabled': true, 'type': 'admin', 'id': 11},
-            {'enabled': true, 'type': 'guest', 'id': 12}
-          ]
+            {'enabled': true, 'type': 'guest', 'id': 12},
+          ],
         });
         expect(
-            entityReferenceList1,
-            allOf(isA<EntityReferenceList<Role>>().having(
-                (e) => e.entities, 'equals entity', equals([role1, role2]))));
+          entityReferenceList1,
+          allOf(
+            isA<EntityReferenceList<Role>>().having(
+              (e) => e.entities,
+              'equals entity',
+              equals([role1, role2]),
+            ),
+          ),
+        );
 
         var entityReferenceList2 = Json.fromJson<EntityReferenceList>({
           'EntityReferenceList': 'Role',
-          'ids': [11, 12]
+          'ids': [11, 12],
         });
         expect(
-            entityReferenceList2,
-            allOf(isA<EntityReferenceList<Role>>()
-                .having((e) => e.entities, 'null entity', isNull)));
+          entityReferenceList2,
+          allOf(
+            isA<EntityReferenceList<Role>>().having(
+              (e) => e.entities,
+              'null entity',
+              isNull,
+            ),
+          ),
+        );
 
         expect(entityReferenceList2!.get(), isNull);
         expect(
-            () => entityReferenceList2.getNotNull(),
-            throwsA(isA<StateError>().having(
-                (e) => e.message,
-                "Can't get entities message",
-                contains(
-                    "Can't `get` entities `Role` with IDs [<11>, <12>]"))));
+          () => entityReferenceList2.getNotNull(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              "Can't get entities message",
+              contains("Can't `get` entities `Role` with IDs [<11>, <12>]"),
+            ),
+          ),
+        );
 
         var entityCache = JsonEntityCacheSimple();
 
         entityCache.cacheEntity(role1);
         entityCache.cacheEntity(role2);
 
-        var entityReferenceList3 = Json.fromJson<EntityReferenceList>({
-          'EntityReferenceList': 'Role',
-          'ids': [11, 12]
-        }, entityCache: entityCache, autoResetEntityCache: false);
+        var entityReferenceList3 = Json.fromJson<EntityReferenceList>(
+          {
+            'EntityReferenceList': 'Role',
+            'ids': [11, 12],
+          },
+          entityCache: entityCache,
+          autoResetEntityCache: false,
+        );
 
         expect(
-            entityReferenceList3,
-            allOf(isA<EntityReferenceList<Role>>().having(
-                (e) => e.entities, 'equals entities', equals([role1, role2]))));
+          entityReferenceList3,
+          allOf(
+            isA<EntityReferenceList<Role>>().having(
+              (e) => e.entities,
+              'equals entities',
+              equals([role1, role2]),
+            ),
+          ),
+        );
 
         expect(await entityReferenceList3!.get(), equals([role1, role2]));
 
-        var entityReferenceList4 = Json.fromJsonList<EntityReferenceList>([
-          {
-            'EntityReferenceList': 'Role',
-            'ids': [11, 12]
-          },
-          {
-            'EntityReferenceList': 'Role',
-            'ids': [11]
-          }
-        ], entityCache: entityCache, autoResetEntityCache: false);
+        var entityReferenceList4 = Json.fromJsonList<EntityReferenceList>(
+          [
+            {
+              'EntityReferenceList': 'Role',
+              'ids': [11, 12],
+            },
+            {
+              'EntityReferenceList': 'Role',
+              'ids': [11],
+            },
+          ],
+          entityCache: entityCache,
+          autoResetEntityCache: false,
+        );
 
         expect(entityReferenceList4.length, equals(2));
 
         expect(
-            entityReferenceList4[0],
-            allOf(isA<EntityReferenceList<Role>>().having(
-                (e) => e.entities, 'equals entities', equals([role1, role2]))));
+          entityReferenceList4[0],
+          allOf(
+            isA<EntityReferenceList<Role>>().having(
+              (e) => e.entities,
+              'equals entities',
+              equals([role1, role2]),
+            ),
+          ),
+        );
 
         expect(
-            entityReferenceList4[1],
-            allOf(isA<EntityReferenceList<Role>>().having(
-                (e) => e.entities, 'equals entities', equals([role1]))));
+          entityReferenceList4[1],
+          allOf(
+            isA<EntityReferenceList<Role>>().having(
+              (e) => e.entities,
+              'equals entities',
+              equals([role1]),
+            ),
+          ),
+        );
 
         expect(await entityReferenceList4[0]?.get(), equals([role1, role2]));
         expect(await entityReferenceList4[1]?.get(), equals([role1]));
@@ -391,28 +517,40 @@ void main() {
       expect(Json.encode({'a': 1, 'b': 2}), equals('{"a":1,"b":2}'));
 
       expect(
-          Json.encode({'a': 1, 'b': 2}, pretty: true),
-          equals('{\n'
-              '  "a": 1,\n'
-              '  "b": 2\n'
-              '}'));
+        Json.encode({'a': 1, 'b': 2}, pretty: true),
+        equals(
+          '{\n'
+          '  "a": 1,\n'
+          '  "b": 2\n'
+          '}',
+        ),
+      );
 
       expect(
-          Json.encode({'a': 1, 'pass': 123456},
-              maskField: (f) => f.contains('pass')),
-          equals('{"a":1,"pass":"***"}'));
+        Json.encode({
+          'a': 1,
+          'pass': 123456,
+        }, maskField: (f) => f.contains('pass')),
+        equals('{"a":1,"pass":"***"}'),
+      );
 
       expect(
-          Json.encode({'a': 1, 'pass': 123456},
-              maskField: (f) => f.contains('pass'), maskText: 'x'),
-          equals('{"a":1,"pass":"x"}'));
+        Json.encode(
+          {'a': 1, 'pass': 123456},
+          maskField: (f) => f.contains('pass'),
+          maskText: 'x',
+        ),
+        equals('{"a":1,"pass":"x"}'),
+      );
     });
 
     test('decode', () async {
       expect(Json.decode('{"a":1,"b":2}'), equals({'a': 1, 'b': 2}));
 
       expect(
-          Json.decode('{"ab": {"a":1,"b":2}}', jsomMapDecoder: (map, j) {
+        Json.decode(
+          '{"ab": {"a":1,"b":2}}',
+          jsomMapDecoder: (map, j) {
             return map.map((k, v) {
               switch (k) {
                 case 'ab':
@@ -421,26 +559,33 @@ void main() {
                   return MapEntry(k, v);
               }
             });
-          }),
-          equals({'ab': AB(1, 2)}));
+          },
+        ),
+        equals({'ab': AB(1, 2)}),
+      );
     });
 
     test('decodeFromBytes', () async {
       Role$reflection.boot();
 
       {
-        var jsonBytes =
-            Json.encodeToBytes(Role(RoleType.guest, enabled: false));
+        var jsonBytes = Json.encodeToBytes(
+          Role(RoleType.guest, enabled: false),
+        );
 
-        expect(Json.decodeFromBytes<Role>(jsonBytes),
-            equals(Role(RoleType.guest, enabled: false)));
+        expect(
+          Json.decodeFromBytes<Role>(jsonBytes),
+          equals(Role(RoleType.guest, enabled: false)),
+        );
       }
 
       {
         var jsonBytes = Json.encodeToBytes(Role(RoleType.admin));
 
-        expect(Json.decodeFromBytes<Role>(jsonBytes),
-            equals(Role(RoleType.admin, enabled: true)));
+        expect(
+          Json.decodeFromBytes<Role>(jsonBytes),
+          equals(Role(RoleType.admin, enabled: true)),
+        );
       }
     });
 
@@ -452,22 +597,24 @@ void main() {
       expect(Json.dumpRuntimeTypes("foo"), equals('<String>:"foo"'));
 
       expect(
-          Json.dumpRuntimeTypes(<int>[1, 2]),
-          contains(
-            '<int>>:[\n'
-            '  <int>:1,\n'
-            '  <int>:2\n'
-            ']',
-          ));
+        Json.dumpRuntimeTypes(<int>[1, 2]),
+        contains(
+          '<int>>:[\n'
+          '  <int>:1,\n'
+          '  <int>:2\n'
+          ']',
+        ),
+      );
 
       expect(
-          Json.dumpRuntimeTypes(<String, int>{'a': 1, 'b': 2}),
-          contains(
-            '<String, int>>:{\n'
-            '  <String>:"a"=<int>:1,\n'
-            '  <String>:"b"=<int>:2\n'
-            '}',
-          ));
+        Json.dumpRuntimeTypes(<String, int>{'a': 1, 'b': 2}),
+        contains(
+          '<String, int>>:{\n'
+          '  <String>:"a"=<int>:1,\n'
+          '  <String>:"b"=<int>:2\n'
+          '}',
+        ),
+      );
     });
   });
 }

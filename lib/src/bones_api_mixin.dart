@@ -88,21 +88,23 @@ mixin Pool<O extends Object> {
 
   FutureOr<List<O>> invalidPoolElements({bool checkUsage = true}) =>
       filterPoolElements(
-          (e) => isPoolElementInvalid(e, checkUsage: checkUsage));
+        (e) => isPoolElementInvalid(e, checkUsage: checkUsage),
+      );
 
   FutureOr<List<O>> filterPoolElements(FutureOr<bool> Function(O o) filter) {
     var hasFuture = false;
 
-    var elements = _pool.map<FutureOr<O?>>((o) {
-      var valid = filter(o);
+    var elements =
+        _pool.map<FutureOr<O?>>((o) {
+          var valid = filter(o);
 
-      if (valid is Future<bool>) {
-        hasFuture = true;
-        return valid.then((valid) => valid ? o : null);
-      }
+          if (valid is Future<bool>) {
+            hasFuture = true;
+            return valid.then((valid) => valid ? o : null);
+          }
 
-      return valid ? o : null;
-    }).toList();
+          return valid ? o : null;
+        }).toList();
 
     if (hasFuture) {
       return elements.resolveAllNotNull();
@@ -205,13 +207,15 @@ mixin Pool<O extends Object> {
 
   Duration get poolYieldTimeout => _defaultPoolYieldTimeout;
 
-  static final Duration _defaultPoolFullYieldTimeout =
-      Duration(milliseconds: 120);
+  static final Duration _defaultPoolFullYieldTimeout = Duration(
+    milliseconds: 120,
+  );
 
   Duration get poolFullYieldTimeout => _defaultPoolFullYieldTimeout;
 
-  static final Duration _defaultPoolFullWaitTimeout =
-      Duration(milliseconds: 240);
+  static final Duration _defaultPoolFullWaitTimeout = Duration(
+    milliseconds: 240,
+  );
 
   Duration get poolFullWaitTimeout => _defaultPoolFullWaitTimeout;
 
@@ -228,16 +232,21 @@ mixin Pool<O extends Object> {
       var yield = Completer<bool>();
       _yields.addLast(yield);
 
-      created = yield.future.timeout(poolYieldTimeout, onTimeout: () {
-        _yields.remove(yield);
-        return false;
-      }).then((ok) {
-        if (_pool.isNotEmpty) {
-          return _catchFromPopulatedPool();
-        } else {
-          return createPoolElement();
-        }
-      });
+      created = yield.future
+          .timeout(
+            poolYieldTimeout,
+            onTimeout: () {
+              _yields.remove(yield);
+              return false;
+            },
+          )
+          .then((ok) {
+            if (_pool.isNotEmpty) {
+              return _catchFromPopulatedPool();
+            } else {
+              return createPoolElement();
+            }
+          });
     } else {
       created = createPoolElement();
     }
@@ -257,7 +266,9 @@ mixin Pool<O extends Object> {
   }
 
   FutureOr<O> _catchFromEmptyPoolForced(
-      DateTime catchInitTime, Duration? timeout) {
+    DateTime catchInitTime,
+    Duration? timeout,
+  ) {
     var alive = poolAliveElementsSize;
 
     Future<bool> waiting;
@@ -266,30 +277,38 @@ mixin Pool<O extends Object> {
       var yield = Completer<bool>();
       _yields.addLast(yield);
 
-      waiting = yield.future.timeout(poolFullYieldTimeout, onTimeout: () {
-        _yields.remove(yield);
-        return false;
-      });
+      waiting = yield.future.timeout(
+        poolFullYieldTimeout,
+        onTimeout: () {
+          _yields.remove(yield);
+          return false;
+        },
+      );
     } else {
       var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
       waiting = waitingPoolElement.future;
     }
 
-    var ret = waiting.then((_) {
-      if (_pool.isNotEmpty) {
-        return _catchFromPopulatedPool();
-      } else {
-        return _waitElementInPool(catchInitTime);
-      }
-    }).then((o) {
-      if (o != null) return o;
-      return createPoolElementForced();
-    });
+    var ret = waiting
+        .then((_) {
+          if (_pool.isNotEmpty) {
+            return _catchFromPopulatedPool();
+          } else {
+            return _waitElementInPool(catchInitTime);
+          }
+        })
+        .then((o) {
+          if (o != null) return o;
+          return createPoolElementForced();
+        });
 
     if (timeout != null) {
-      return ret.timeout(timeout, onTimeout: () {
-        throw PoolTimeoutError("Catch from Pool timeout[$timeout]: $this");
-      });
+      return ret.timeout(
+        timeout,
+        onTimeout: () {
+          throw PoolTimeoutError("Catch from Pool timeout[$timeout]: $this");
+        },
+      );
     } else {
       return ret;
     }
@@ -360,8 +379,10 @@ mixin Pool<O extends Object> {
     while (true) {
       var waitingPoolElement = _waitingPoolElement ??= Completer<bool>();
 
-      await waitingPoolElement.future
-          .timeout(poolFullWaitTimeout, onTimeout: () => false);
+      await waitingPoolElement.future.timeout(
+        poolFullWaitTimeout,
+        onTimeout: () => false,
+      );
 
       if (_pool.isNotEmpty) {
         var o = await _catchFromPopulatedPool();
@@ -372,9 +393,10 @@ mixin Pool<O extends Object> {
         final elapsedTime = DateTime.now().difference(catchInitTime);
 
         _logPool.warning(
-            "Pool full ($poolAliveElementsSize / $poolSizeDesiredLimit) "
-            "after trying to catch for ${elapsedTime.inMilliseconds} ms. "
-            "Forcing createPoolElement<$O>() ...");
+          "Pool full ($poolAliveElementsSize / $poolSizeDesiredLimit) "
+          "after trying to catch for ${elapsedTime.inMilliseconds} ms. "
+          "Forcing createPoolElement<$O>() ...",
+        );
 
         return createPoolElementForced();
       }
@@ -401,7 +423,10 @@ mixin Pool<O extends Object> {
   FutureOr<bool> checkPool() => removeInvalidElementsFromPool();
 
   FutureOr<bool> checkPoolSize(
-      int minSize, int maxSize, int checkInvalidsIntervalMs) {
+    int minSize,
+    int maxSize,
+    int checkInvalidsIntervalMs,
+  ) {
     var poolSize = this.poolSize;
 
     if (poolSize <= minSize) {
@@ -416,7 +441,8 @@ mixin Pool<O extends Object> {
       return removeInvalidElementsFromPool().resolveMapped((_) {
         var excess = this.poolSize - maxSize;
         _logPool.info(
-            "Removing excess> poolSize: $poolSize ; maxSize: $maxSize ; excess: $excess");
+          "Removing excess> poolSize: $poolSize ; maxSize: $maxSize ; excess: $excess",
+        );
         removeElementsFromPool(excess);
         return true;
       });
@@ -484,29 +510,34 @@ mixin Pool<O extends Object> {
     return closePoolElement(o);
   }
 
-  FutureOr<R> executeWithPool<R>(FutureOr<R> Function(O o) f,
-      {Duration? timeout,
-      bool Function(O o)? validator,
-      Function(Object error, StackTrace stackTrace)? onError}) {
+  FutureOr<R> executeWithPool<R>(
+    FutureOr<R> Function(O o) f, {
+    Duration? timeout,
+    bool Function(O o)? validator,
+    Function(Object error, StackTrace stackTrace)? onError,
+  }) {
     return catchFromPool(timeout: timeout).then((o) {
       try {
         var ret = f(o);
 
-        return ret.then((val) {
-          if (validator == null || validator(o)) {
-            releaseIntoPool(o);
-          } else {
+        return ret.then(
+          (val) {
+            if (validator == null || validator(o)) {
+              releaseIntoPool(o);
+            } else {
+              disposePoolElement(o);
+            }
+            return val;
+          },
+          onError: (e, s) {
             disposePoolElement(o);
-          }
-          return val;
-        }, onError: (e, s) {
-          disposePoolElement(o);
-          if (onError != null) {
-            return onError(e, s);
-          } else {
-            throw e;
-          }
-        });
+            if (onError != null) {
+              return onError(e, s);
+            } else {
+              throw e;
+            }
+          },
+        );
       } catch (e, s) {
         disposePoolElement(o);
         if (onError != null) {
@@ -522,7 +553,8 @@ mixin Pool<O extends Object> {
 mixin FieldsFromMap {
   Map<String, int> buildFieldsNamesIndexes(List<String> fieldsNames) {
     return Map<String, int>.fromEntries(
-        List.generate(fieldsNames.length, (i) => MapEntry(fieldsNames[i], i)));
+      List.generate(fieldsNames.length, (i) => MapEntry(fieldsNames[i], i)),
+    );
   }
 
   List<String> buildFieldsNamesLC(List<String> fieldsNames) =>
@@ -598,7 +630,14 @@ mixin FieldsFromMap {
       }
 
       var entry = _getFieldValueFromMapImpl(
-          f, fLC, fSimple, map, mapLC, mapSimple, returnMapField);
+        f,
+        fLC,
+        fSimple,
+        map,
+        mapLC,
+        mapSimple,
+        returnMapField,
+      );
 
       if (entry == null) {
         if (includeAbsentFields) {
@@ -619,28 +658,45 @@ mixin FieldsFromMap {
 
   /// Returns a [field] value from [map].
   /// - [field] is case insensitive.
-  Object? getFieldValueFromMap(String field, Map<String, Object?> map,
-      {String? fieldLC,
-      String? fieldSimple,
-      Map<String, String>? mapLC,
-      Map<String, String>? mapSimple}) {
+  Object? getFieldValueFromMap(
+    String field,
+    Map<String, Object?> map, {
+    String? fieldLC,
+    String? fieldSimple,
+    Map<String, String>? mapLC,
+    Map<String, String>? mapSimple,
+  }) {
     var entry = _getFieldValueFromMapImpl(
-        field, fieldLC, fieldSimple, map, mapLC, mapSimple, null);
+      field,
+      fieldLC,
+      fieldSimple,
+      map,
+      mapLC,
+      mapSimple,
+      null,
+    );
     return entry?.value;
   }
 
   MapEntry<String, Object?>? _getFieldValueFromMapImpl(
-      String field,
-      String? fieldLC,
-      String? fieldSimple,
-      Map<String, Object?> map,
-      Map<String, String>? mapLC,
-      Map<String, String>? mapSimple,
-      List<String>? returnMapField) {
+    String field,
+    String? fieldLC,
+    String? fieldSimple,
+    Map<String, Object?> map,
+    Map<String, String>? mapLC,
+    Map<String, String>? mapSimple,
+    List<String>? returnMapField,
+  ) {
     if (map.isEmpty) return null;
 
     var key = _getFieldKeyInMapImpl(
-        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
+      field,
+      fieldLC,
+      fieldSimple,
+      map,
+      mapLC,
+      mapSimple,
+    );
     if (key == null) return null;
 
     returnMapField?[0] = key;
@@ -652,42 +708,61 @@ mixin FieldsFromMap {
   /// Returns a [Map] of [field] keys from [map].
   /// - [field] is case insensitive.
   Map<String, String?> getFieldsKeysInMap(
-      List<String> fields, Map<String, Object?> map,
-      {String? fieldLC,
-      String? fieldSimple,
-      Map<String, String>? mapLC,
-      Map<String, String>? mapSimple}) {
-    var fieldsMap = fields
-        .map((f) => MapEntry(
-            f,
-            getFieldKeyInMap(f, map,
-                fieldLC: fieldLC,
-                fieldSimple: fieldSimple,
-                mapLC: mapLC,
-                mapSimple: mapSimple)))
-        .toMapFromEntries();
+    List<String> fields,
+    Map<String, Object?> map, {
+    String? fieldLC,
+    String? fieldSimple,
+    Map<String, String>? mapLC,
+    Map<String, String>? mapSimple,
+  }) {
+    var fieldsMap =
+        fields
+            .map(
+              (f) => MapEntry(
+                f,
+                getFieldKeyInMap(
+                  f,
+                  map,
+                  fieldLC: fieldLC,
+                  fieldSimple: fieldSimple,
+                  mapLC: mapLC,
+                  mapSimple: mapSimple,
+                ),
+              ),
+            )
+            .toMapFromEntries();
 
     return fieldsMap;
   }
 
   /// Returns a [field] key from [map].
   /// - [field] is case insensitive.
-  String? getFieldKeyInMap(String field, Map<String, Object?> map,
-      {String? fieldLC,
-      String? fieldSimple,
-      Map<String, String>? mapLC,
-      Map<String, String>? mapSimple}) {
+  String? getFieldKeyInMap(
+    String field,
+    Map<String, Object?> map, {
+    String? fieldLC,
+    String? fieldSimple,
+    Map<String, String>? mapLC,
+    Map<String, String>? mapSimple,
+  }) {
     return _getFieldKeyInMapImpl(
-        field, fieldLC, fieldSimple, map, mapLC, mapSimple);
+      field,
+      fieldLC,
+      fieldSimple,
+      map,
+      mapLC,
+      mapSimple,
+    );
   }
 
   String? _getFieldKeyInMapImpl(
-      String field,
-      String? fieldLC,
-      String? fieldSimple,
-      Map<String, Object?> map,
-      Map<String, String>? mapLC,
-      Map<String, String>? mapSimple) {
+    String field,
+    String? fieldLC,
+    String? fieldSimple,
+    Map<String, Object?> map,
+    Map<String, String>? mapLC,
+    Map<String, String>? mapSimple,
+  ) {
     if (map.isEmpty) return null;
 
     if (map.containsKey(field)) return field;

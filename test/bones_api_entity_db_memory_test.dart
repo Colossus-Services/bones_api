@@ -7,15 +7,15 @@ import 'bones_api_entity_db_tests_base.dart';
 
 class MemoryTestConfig extends APITestConfigDBSQLMemory {
   MemoryTestConfig({required bool generateTables, required bool checkTables})
-      : super({
-          'db': {
-            'sql.memory': {
-              'port': 0,
-              'generateTables': generateTables,
-              'checkTable': checkTables,
-            }
-          }
-        });
+    : super({
+        'db': {
+          'sql.memory': {
+            'port': 0,
+            'generateTables': generateTables,
+            'checkTable': checkTables,
+          },
+        },
+      });
 }
 
 Future<void> main() async {
@@ -31,8 +31,12 @@ Future<void> main() async {
   await _runTest(false, true, true, true);
 }
 
-Future<bool> _runTest(bool useReflection, bool generateTables, bool checkTables,
-    bool populateSource) {
+Future<bool> _runTest(
+  bool useReflection,
+  bool generateTables,
+  bool checkTables,
+  bool populateSource,
+) {
   return runAdapterTests(
     'DBSQLMemory',
     MemoryTestConfig(generateTables: generateTables, checkTables: checkTables),

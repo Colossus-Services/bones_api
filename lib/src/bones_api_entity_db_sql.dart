@@ -59,8 +59,12 @@ class MultipleSQL implements SQLWrapper {
 /// This is used by a [DBSQLAdapter] to execute queries.
 class SQL implements SQLWrapper {
   static final SQL dummy = SQL(
-      'dummy', <dynamic>[], <String, dynamic>{}, <String, dynamic>{},
-      mainTable: '_');
+    'dummy',
+    <dynamic>[],
+    <String, dynamic>{},
+    <String, dynamic>{},
+    mainTable: '_',
+  );
 
   @override
   int get sqlsLength => 1;
@@ -121,48 +125,50 @@ class SQL implements SQLWrapper {
 
   bool get hasPreOrPosSQL => hasPreSQL || hasPosSQL;
 
-  SQL(this.sql, this.positionalParameters, this.namedParameters,
-      this.parametersByPlaceholder,
-      {this.sqlCondition,
-      String? sqlPositional,
-      List<String>? parametersKeysByPosition,
-      List<Object?>? parametersValuesByPosition,
-      this.condition,
-      this.entityName,
-      this.idFieldName,
-      this.returnColumns,
-      this.returnColumnsAliases,
-      this.limit,
-      required this.mainTable,
-      this.relationship,
-      this.tablesAliases,
-      RegExp? placeholderRegexp})
-      : _sqlPositional = sqlPositional,
-        _parametersKeysByPosition = parametersKeysByPosition,
-        _parametersValuesByPosition = parametersValuesByPosition,
-        placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
+  SQL(
+    this.sql,
+    this.positionalParameters,
+    this.namedParameters,
+    this.parametersByPlaceholder, {
+    this.sqlCondition,
+    String? sqlPositional,
+    List<String>? parametersKeysByPosition,
+    List<Object?>? parametersValuesByPosition,
+    this.condition,
+    this.entityName,
+    this.idFieldName,
+    this.returnColumns,
+    this.returnColumnsAliases,
+    this.limit,
+    required this.mainTable,
+    this.relationship,
+    this.tablesAliases,
+    RegExp? placeholderRegexp,
+  }) : _sqlPositional = sqlPositional,
+       _parametersKeysByPosition = parametersKeysByPosition,
+       _parametersValuesByPosition = parametersValuesByPosition,
+       placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
 
   SQL copy() => SQL(
-        sql,
-        positionalParameters?.toList(),
-        namedParameters?.map((k, v) => MapEntry(k, v)),
-        parametersByPlaceholder.map((k, v) => MapEntry(k, v)),
-        sqlCondition: sqlCondition,
-        sqlPositional: _sqlPositional,
-        parametersKeysByPosition: _parametersKeysByPosition?.toList(),
-        parametersValuesByPosition: _parametersValuesByPosition?.toList(),
-        condition: condition,
-        entityName: entityName,
-        idFieldName: idFieldName,
-        returnColumns: returnColumns?.toSet(),
-        returnColumnsAliases:
-            returnColumnsAliases?.map((k, v) => MapEntry(k, v)),
-        limit: limit,
-        mainTable: mainTable,
-        relationship: relationship,
-        tablesAliases: tablesAliases?.map((k, v) => MapEntry(k, v)),
-        placeholderRegexp: placeholderRegexp,
-      );
+    sql,
+    positionalParameters?.toList(),
+    namedParameters?.map((k, v) => MapEntry(k, v)),
+    parametersByPlaceholder.map((k, v) => MapEntry(k, v)),
+    sqlCondition: sqlCondition,
+    sqlPositional: _sqlPositional,
+    parametersKeysByPosition: _parametersKeysByPosition?.toList(),
+    parametersValuesByPosition: _parametersValuesByPosition?.toList(),
+    condition: condition,
+    entityName: entityName,
+    idFieldName: idFieldName,
+    returnColumns: returnColumns?.toSet(),
+    returnColumnsAliases: returnColumnsAliases?.map((k, v) => MapEntry(k, v)),
+    limit: limit,
+    mainTable: mainTable,
+    relationship: relationship,
+    tablesAliases: tablesAliases?.map((k, v) => MapEntry(k, v)),
+    placeholderRegexp: placeholderRegexp,
+  );
 
   /// Ensures that this is not the [dummy] instance.
   /// Returns a [copy] if necessary.
@@ -283,14 +289,15 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
   /// See [DBSQLAdapter.populateTables].
   final bool tableSQL;
 
-  const DBSQLAdapterCapability(
-      {required super.dialect,
-      required super.transactions,
-      required super.transactionAbort,
-      required super.constraintSupport,
-      required this.tableSQL,
-      required super.multiIsolateSupport,
-      required super.connectivity});
+  const DBSQLAdapterCapability({
+    required super.dialect,
+    required super.transactions,
+    required super.transactionAbort,
+    required super.constraintSupport,
+    required this.tableSQL,
+    required super.multiIsolateSupport,
+    required super.connectivity,
+  });
 
   @override
   String get info => '${super.info}, tableSQL: $tableSQL';
@@ -299,8 +306,8 @@ class DBSQLAdapterCapability extends DBAdapterCapability {
   String get runtimeTypeNameSafe => 'DBSQLAdapterCapability';
 }
 
-typedef DBSQLAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>
-    = DBAdapterInstantiator<C, A>;
+typedef DBSQLAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>> =
+    DBAdapterInstantiator<C, A>;
 
 /// Base class for SQL DB adapters.
 ///
@@ -331,22 +338,26 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       adapterRegister.registeredAdaptersTypes;
 
   static void registerAdapter<C extends Object, A extends DBSQLAdapter<C>>(
-      List<String> names,
-      Type type,
-      DBSQLAdapterInstantiator<C, A> adapterInstantiator) {
+    List<String> names,
+    Type type,
+    DBSQLAdapterInstantiator<C, A> adapterInstantiator,
+  ) {
     boot();
     adapterRegister.registerAdapter(names, type, adapterInstantiator);
   }
 
   static DBSQLAdapterInstantiator<C, A>?
-      getAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>(
-              {String? name, Type? type}) =>
-          adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
+  getAdapterInstantiator<C extends Object, A extends DBSQLAdapter<C>>({
+    String? name,
+    Type? type,
+  }) => adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBSQLAdapterInstantiator<C, A>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfig<C extends Object,
-              A extends DBSQLAdapter<C>>(Map<String, dynamic> config) =>
-          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
+  getAdapterInstantiatorsFromConfig<
+    C extends Object,
+    A extends DBSQLAdapter<C>
+  >(Map<String, dynamic> config) =>
+      adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
   static bool? parseConfigLogSQL(Map<String, dynamic>? config) {
     var logSql = config?.getIgnoreCase('log.sql');
@@ -370,7 +381,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   static List<bool> parseConfigDBGenerateTablesAndCheckTables(
-      Map<String, dynamic>? config) {
+    Map<String, dynamic>? config,
+  ) {
     bool? checkTables;
     bool? generateTables;
 
@@ -380,14 +392,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       'generate_tables',
     ];
 
-    const checkTablesKeys = [
-      'checkTables',
-      'check-tables',
-      'check_tables',
-    ];
+    const checkTablesKeys = ['checkTables', 'check-tables', 'check_tables'];
 
-    generateTables =
-        config?.getMultiKeyAsBool(generateTablesKeys, ignoreCase: true);
+    generateTables = config?.getMultiKeyAsBool(
+      generateTablesKeys,
+      ignoreCase: true,
+    );
 
     checkTables = config?.getMultiKeyAsBool(checkTablesKeys, ignoreCase: true);
 
@@ -395,11 +405,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var populate = config?['populate'];
 
       if (populate is Map) {
-        generateTables ??=
-            populate.getMultiKeyAsBool(generateTablesKeys, ignoreCase: true);
+        generateTables ??= populate.getMultiKeyAsBool(
+          generateTablesKeys,
+          ignoreCase: true,
+        );
 
-        checkTables ??=
-            populate.getMultiKeyAsBool(checkTablesKeys, ignoreCase: true);
+        checkTables ??= populate.getMultiKeyAsBool(
+          checkTablesKeys,
+          ignoreCase: true,
+        );
       }
     }
 
@@ -418,46 +432,56 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
-  DBSQLAdapter(super.name, super.minConnections, super.maxConnections,
-      DBSQLAdapterCapability super.capability,
-      {bool generateTables = false,
-      bool checkTables = true,
-      Object? populateTables,
-      super.parentRepositoryProvider,
-      super.connectivity,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.workingPath,
-      this.logSQL = false})
-      : _generateTables = generateTables,
-        _checkTables = checkTables,
-        _populateTables = populateTables {
+  DBSQLAdapter(
+    super.name,
+    super.minConnections,
+    super.maxConnections,
+    DBSQLAdapterCapability super.capability, {
+    bool generateTables = false,
+    bool checkTables = true,
+    Object? populateTables,
+    super.parentRepositoryProvider,
+    super.connectivity,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.workingPath,
+    this.logSQL = false,
+  }) : _generateTables = generateTables,
+       _checkTables = checkTables,
+       _populateTables = populateTables {
     boot();
 
-    _conditionSQLGenerator =
-        ConditionSQLEncoder(this, sqlElementQuote: dialect.elementQuote);
+    _conditionSQLGenerator = ConditionSQLEncoder(
+      this,
+      sqlElementQuote: dialect.elementQuote,
+    );
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends DBSQLAdapter<C>>(
-      Map<String, dynamic> config,
-      {int minConnections = 1,
-      int maxConnections = 3,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+    Map<String, dynamic> config, {
+    int minConnections = 1,
+    int maxConnections = 3,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var instantiators = getAdapterInstantiatorsFromConfig<C, A>(config);
 
     if (instantiators.isEmpty) {
       throw StateError(
-          "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}");
+        "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}",
+      );
     }
 
-    return DBAdapter.instantiateAdaptor<C, A>(instantiators, config,
-        minConnections: minConnections,
-        maxConnections: maxConnections,
-        parentRepositoryProvider: parentRepositoryProvider,
-        workingPath: workingPath);
+    return DBAdapter.instantiateAdaptor<C, A>(
+      instantiators,
+      config,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
+      parentRepositoryProvider: parentRepositoryProvider,
+      workingPath: workingPath,
+    );
   }
 
   bool _generateTables;
@@ -506,50 +530,70 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   FutureOr<bool> _checkDBTablesImpl(
-      Map<EntityRepository<Object>, TableScheme?> repositorySchemes) {
-    var repositoriesChecks = repositorySchemes.entries
-        .map((e) => _checkDBTableScheme(e.key, e.value))
-        .toList();
+    Map<EntityRepository<Object>, TableScheme?> repositorySchemes,
+  ) {
+    var repositoriesChecks =
+        repositorySchemes.entries
+            .map((e) => _checkDBTableScheme(e.key, e.value))
+            .toList();
 
     var repositoriesChecksErrors =
         repositoriesChecks.where((e) => e.isError).toList();
 
     if (repositoriesChecksErrors.isNotEmpty) {
-      var missingColumnsSQLs = repositoriesChecksErrors
-          .where((e) => e.missingColumns?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingColumnsSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingColumnsSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingColumns?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingColumnsSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
-      var missingReferenceColumnsSQLs = repositoriesChecksErrors
-          .where((e) => e.missingReferenceColumns?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingReferenceColumnsSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingReferenceColumnsSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingReferenceColumns?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingReferenceColumnsSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
-      var missingReferenceConstraintsSQLs = repositoriesChecksErrors
-          .where((e) => e.missingReferenceConstraints?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingReferenceConstraintsSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingReferenceConstraintsSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingReferenceConstraints?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingReferenceConstraintsSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
-      var missingUniqueConstraintsSQLs = repositoriesChecksErrors
-          .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingUniqueConstraintsSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
-      var missingEnumConstraintsSQLs = repositoriesChecksErrors
-          .where((e) => e.missingEnumConstraints?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingEnumConstraintsSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingEnumConstraintsSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingEnumConstraints?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingEnumConstraintsSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
-      var missingEnumValuesSQLs = repositoriesChecksErrors
-          .where((e) => e.missingEnumValues?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingEnumValuesSQLs(this))
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
-          .toList();
+      var missingEnumValuesSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingEnumValues?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingEnumValuesSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
 
       var alterTablesSQLs = [
         ...missingColumnsSQLs,
@@ -565,15 +609,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ...missingEnumValuesSQLs,
       ];
 
-      alterTablesSQLs = alterTablesSQLs.expandIndexed((i, s) {
-        if (i > 0 && s.isEmpty) {
-          var prev = alterTablesSQLs[i - 1];
-          if (prev.isEmpty) {
-            return <String>[];
-          }
-        }
-        return [s];
-      }).toList();
+      alterTablesSQLs =
+          alterTablesSQLs.expandIndexed((i, s) {
+            if (i > 0 && s.isEmpty) {
+              var prev = alterTablesSQLs[i - 1];
+              if (prev.isEmpty) {
+                return <String>[];
+              }
+            }
+            return [s];
+          }).toList();
 
       while (alterTablesSQLs.isNotEmpty && alterTablesSQLs.first.isEmpty) {
         alterTablesSQLs.removeAt(0);
@@ -581,7 +626,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       if (alterTablesSQLs.isNotEmpty) {
         _log.info(
-            'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n');
+          'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n',
+        );
       }
 
       var allErrors = repositoriesChecksErrors.join('\n');
@@ -596,15 +642,19 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   _DBTableCheck _checkDBTableScheme(
-      EntityRepository<Object> repository, TableScheme? scheme) {
+    EntityRepository<Object> repository,
+    TableScheme? scheme,
+  ) {
     var repoType = repository.type;
 
     if (scheme == null) {
       _log.severe(
-          'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
+        'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this',
+      );
 
       return _DBTableCheck.error(
-          'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this');
+        'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this',
+      );
     }
 
     var schemeTableName = scheme.name;
@@ -624,7 +674,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (hiddenFields.isNotEmpty) {
       _log.info(
-          "Entity `$repoType` (table: `$schemeTableName`) hidden fields: $hiddenFields");
+        "Entity `$repoType` (table: `$schemeTableName`) hidden fields: $hiddenFields",
+      );
     }
 
     var repoFieldsNames = entityFields.whereNotIn(hiddenFields).toList();
@@ -634,28 +685,35 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var repoTable = getTableForEntityRepository(repository);
 
-    var schemeToRepoMap =
-        scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
+    var schemeToRepoMap = scheme.getFieldsKeysInMap(
+      scheme.fieldsNames,
+      repoFieldsMap,
+    );
 
-    var schemesTypes = schemeToRepoMap.entries
-        .map((e) {
-          var schemeField = e.key;
-          var repoField = e.value;
-          if (repoField == null) return null;
-          return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
-        })
-        .nonNulls
-        .toMapFromEntries();
+    var schemesTypes =
+        schemeToRepoMap.entries
+            .map((e) {
+              var schemeField = e.key;
+              var repoField = e.value;
+              if (repoField == null) return null;
+              return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
+            })
+            .nonNulls
+            .toMapFromEntries();
 
     for (var e in schemesTypes.entries) {
       var field = e.key;
       var schemeType = e.value;
-      var fieldType =
-          entityHandler.getFieldType(null, field, resolveFiledName: true);
+      var fieldType = entityHandler.getFieldType(
+        null,
+        field,
+        resolveFiledName: true,
+      );
 
       if (!checkDBTableField(repoType, field, schemeType, fieldType)) {
         return _DBTableCheck.error(
-            "Invalid scheme type> entityType: $repoType; field: $field ; schemeType: $schemeType ; fieldType: $fieldType");
+          "Invalid scheme type> entityType: $repoType; field: $field ; schemeType: $schemeType ; fieldType: $fieldType",
+        );
       }
     }
 
@@ -664,36 +722,55 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var repoFieldsNotInScheme =
         repoFieldsNames.whereNot((f) => fieldsInScheme.contains(f)).toList();
 
-    var referenceFields = repoFieldsNotInScheme
-        .map((f) => _checkDBTableSchemeReferenceField(
-            entityHandler, scheme, repoTable, f,
-            allowCollectionFields: false))
-        .nonNulls
-        .toMapFromEntries();
+    var referenceFields =
+        repoFieldsNotInScheme
+            .map(
+              (f) => _checkDBTableSchemeReferenceField(
+                entityHandler,
+                scheme,
+                repoTable,
+                f,
+                allowCollectionFields: false,
+              ),
+            )
+            .nonNulls
+            .toMapFromEntries();
 
-    var collectionReferenceFields = repoFieldsNotInScheme
-        .map((f) => _checkDBTableSchemeReferenceField(
-            entityHandler, scheme, repoTable, f,
-            allowCollectionFields: true))
-        .nonNulls
-        .toMapFromEntries();
+    var collectionReferenceFields =
+        repoFieldsNotInScheme
+            .map(
+              (f) => _checkDBTableSchemeReferenceField(
+                entityHandler,
+                scheme,
+                repoTable,
+                f,
+                allowCollectionFields: true,
+              ),
+            )
+            .nonNulls
+            .toMapFromEntries();
 
-    var missingReferenceColumns = referenceFields.entries
-        .where((e) => e.value == null)
-        .map((e) => e.key)
-        .toList();
+    var missingReferenceColumns =
+        referenceFields.entries
+            .where((e) => e.value == null)
+            .map((e) => e.key)
+            .toList();
 
-    var missingCollectionReferenceColumns = collectionReferenceFields.entries
-        .where((e) => e.value == null)
-        .map((e) => e.key)
-        .toList();
+    var missingCollectionReferenceColumns =
+        collectionReferenceFields.entries
+            .where((e) => e.value == null)
+            .map((e) => e.key)
+            .toList();
 
-    var missingColumns = repoFieldsNames
-        .whereNot((f) =>
-            fieldsInScheme.contains(f) ||
-            referenceFields.containsKey(f) ||
-            collectionReferenceFields.containsKey(f))
-        .toList();
+    var missingColumns =
+        repoFieldsNames
+            .whereNot(
+              (f) =>
+                  fieldsInScheme.contains(f) ||
+                  referenceFields.containsKey(f) ||
+                  collectionReferenceFields.containsKey(f),
+            )
+            .toList();
 
     var missingFieldReferenceConstraints = <String>{};
 
@@ -707,46 +784,49 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       // REF CONSTRAINTS //
 
-      var fieldEntityTypes = entityHandler
-          .getFieldsEntityTypes()
-          .entries
-          .map((e) {
-            var entityType = e.value.entityType;
-            if (entityType == null) return null;
+      var fieldEntityTypes =
+          entityHandler
+              .getFieldsEntityTypes()
+              .entries
+              .map((e) {
+                var entityType = e.value.entityType;
+                if (entityType == null) return null;
 
-            var refRepository =
-                repository.provider.getEntityRepositoryByType(entityType);
+                var refRepository = repository.provider
+                    .getEntityRepositoryByType(entityType);
 
-            if (refRepository == null ||
-                !refRepository.isSameEntityManager(repository)) {
-              return null;
-            }
+                if (refRepository == null ||
+                    !refRepository.isSameEntityManager(repository)) {
+                  return null;
+                }
 
-            return MapEntry(e.key, entityType);
-          })
-          .nonNulls
-          .toMapFromEntries();
+                return MapEntry(e.key, entityType);
+              })
+              .nonNulls
+              .toMapFromEntries();
 
       if (fieldEntityTypes.isNotEmpty) {
         var fieldsReferencedTables = scheme.fieldsReferencedTables;
 
-        var fieldsReferences = fieldsReferencedTables.entries
-            .map((e) {
-              var colum = e.key;
-              var field = schemeToRepoMap[colum] ?? colum;
+        var fieldsReferences =
+            fieldsReferencedTables.entries
+                .map((e) {
+                  var colum = e.key;
+                  var field = schemeToRepoMap[colum] ?? colum;
 
-              var entityType = fieldEntityTypes[field];
-              if (entityType == null) return null;
+                  var entityType = fieldEntityTypes[field];
+                  if (entityType == null) return null;
 
-              var refTable = e.value.targetTable;
-              return MapEntry(field, refTable);
-            })
-            .nonNulls
-            .toMapFromEntries();
+                  var refTable = e.value.targetTable;
+                  return MapEntry(field, refTable);
+                })
+                .nonNulls
+                .toMapFromEntries();
 
-        missingFieldReferenceConstraints = fieldEntityTypes.keys
-            .where((f) => !fieldsReferences.containsKey(f))
-            .toSet();
+        missingFieldReferenceConstraints =
+            fieldEntityTypes.keys
+                .where((f) => !fieldsReferences.containsKey(f))
+                .toSet();
       }
 
       // UNIQUE CONSTRAINTS //
@@ -754,14 +834,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var uniqueConstraints =
           scheme.constraints.whereType<TableUniqueConstraint>().toList();
 
-      var uniqueConstraintsFields =
-          uniqueConstraints.toFields(fieldMap: schemeToRepoMap);
+      var uniqueConstraintsFields = uniqueConstraints.toFields(
+        fieldMap: schemeToRepoMap,
+      );
 
-      var entityUniqueFields = entityHandler
-          .getAllFieldsWithEntityAnnotation<EntityField>(
-              null, (a) => a.isUnique)
-          .keys
-          .toList();
+      var entityUniqueFields =
+          entityHandler
+              .getAllFieldsWithEntityAnnotation<EntityField>(
+                null,
+                (a) => a.isUnique,
+              )
+              .keys
+              .toList();
 
       missingUniqueConstraints =
           entityUniqueFields.whereNotIn(uniqueConstraintsFields).toSet();
@@ -771,8 +855,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var enumConstraints =
           scheme.constraints.whereType<TableEnumConstraint>().toList();
 
-      var enumConstraintsFields =
-          enumConstraints.toFields(fieldMap: schemeToRepoMap);
+      var enumConstraintsFields = enumConstraints.toFields(
+        fieldMap: schemeToRepoMap,
+      );
 
       var entityEnumFields = entityHandler.getFieldsEnumTypes().keys.toList();
 
@@ -785,7 +870,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var entityFieldsNamesSimple = entityHandler.fieldsNamesSimple();
 
       for (var e in enumConstraints) {
-        var fieldName = entityHandler.resolveFiledName(
+        var fieldName =
+            entityHandler.resolveFiledName(
               entityFieldsNames,
               e.field,
               fieldsNamesIndexes: entityFieldsNamesIndexes,
@@ -794,12 +880,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             ) ??
             e.field;
 
-        var fieldType = entityHandler.getFieldType(null, fieldName,
-            resolveFiledName: false);
+        var fieldType = entityHandler.getFieldType(
+          null,
+          fieldName,
+          resolveFiledName: false,
+        );
         if (fieldType == null) continue;
 
-        var enumReflection =
-            reflectionFactory.getRegisterEnumReflection(fieldType.type);
+        var enumReflection = reflectionFactory.getRegisterEnumReflection(
+          fieldType.type,
+        );
         if (enumReflection == null) continue;
 
         var valuesNames = enumReflection.valuesNames;
@@ -820,14 +910,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         missingEnumConstraints.isNotEmpty ||
         missingEnumValues.isNotEmpty) {
       _log.severe(
-          "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
-          "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
-          "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
-          "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
-          "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
-          "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
-          "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
-          "${missingEnumValues.isNotEmpty ? '-- missingEnumValues: $missingEnumValues\n' : ''}");
+        "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
+        "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
+        "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
+        "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
+        "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
+        "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
+        "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
+        "${missingEnumValues.isNotEmpty ? '-- missingEnumValues: $missingEnumValues\n' : ''}",
+      );
 
       return _DBTableCheck.missing(
         repository,
@@ -851,9 +942,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
             .toList(),
         missingEnumValues.entries
-            .map((e) => MapEntry(
+            .map(
+              (e) => MapEntry(
                 _DBTableColumn.fromEntityHandler(entityHandler, e.key),
-                e.value))
+                e.value,
+              ),
+            )
             .toMapFromEntries(),
       );
     }
@@ -864,11 +958,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   MapEntry<String, TableRelationshipReference?>?
-      _checkDBTableSchemeReferenceField(EntityHandler<Object> entityHandler,
-          TableScheme scheme, String table, String fieldName,
-          {required bool allowCollectionFields}) {
-    var fieldType =
-        entityHandler.getFieldType(null, fieldName, resolveFiledName: false);
+  _checkDBTableSchemeReferenceField(
+    EntityHandler<Object> entityHandler,
+    TableScheme scheme,
+    String table,
+    String fieldName, {
+    required bool allowCollectionFields,
+  }) {
+    var fieldType = entityHandler.getFieldType(
+      null,
+      fieldName,
+      resolveFiledName: false,
+    );
     if (fieldType == null) return null;
 
     if (!allowCollectionFields && fieldType.isListEntityOrReference) {
@@ -885,21 +986,30 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     try {
       tableRef = scheme.getTableRelationshipReference(
-          sourceTable: table, sourceField: fieldName, targetTable: targetTable);
+        sourceTable: table,
+        sourceField: fieldName,
+        targetTable: targetTable,
+      );
     } catch (e) {
       _log.warning(
-          "Error while getting relationship table for field: `$table`.`$fieldName`",
-          e);
+        "Error while getting relationship table for field: `$table`.`$fieldName`",
+        e,
+      );
     }
 
     return MapEntry(fieldName, tableRef);
   }
 
-  bool checkDBTableField(Type entityType, String fieldName, Type? schemeType,
-      TypeInfo<dynamic>? fieldType) {
+  bool checkDBTableField(
+    Type entityType,
+    String fieldName,
+    Type? schemeType,
+    TypeInfo<dynamic>? fieldType,
+  ) {
     if (schemeType == null || fieldType == null) {
       throw StateError(
-          "Invalid scheme field(`$entityType`.`$fieldName`) type> schemeType: $schemeType ; fieldType: $fieldType > $this");
+        "Invalid scheme field(`$entityType`.`$fieldName`) type> schemeType: $schemeType ; fieldType: $fieldType > $this",
+      );
     }
 
     var fieldEntityType = fieldType.entityType;
@@ -909,7 +1019,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           !schemeType.isEntityIDType &&
           !fieldType.isEntityReferenceBaseType) {
         throw StateError(
-            "Invalid scheme field(`$fieldName`) type> fieldEntityType: $fieldEntityType ; schemeType: $schemeType (invalid ID type) > $this");
+          "Invalid scheme field(`$fieldName`) type> fieldEntityType: $fieldEntityType ; schemeType: $schemeType (invalid ID type) > $this",
+        );
       }
 
       return true;
@@ -920,20 +1031,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       if (schemeType == String) {
-        var enumReflection =
-            ReflectionFactory().getRegisterEnumReflection(type);
+        var enumReflection = ReflectionFactory().getRegisterEnumReflection(
+          type,
+        );
         if (enumReflection != null && enumReflection.enumType == type) {
           return true;
         }
       }
 
       throw StateError(
-          "Invalid scheme field(`$fieldName`) type> fieldType: $type != schemeType: $schemeType > $this");
+        "Invalid scheme field(`$fieldName`) type> fieldType: $type != schemeType: $schemeType > $this",
+      );
     }
   }
 
   Future<Map<EntityRepository<Object>, TableScheme?>>
-      getRepositoriesSchemes() async {
+  getRepositoriesSchemes() async {
     var reposBlocks =
         entityRepositories.splitBeforeIndexed((i, r) => i % 2 == 0).toList();
 
@@ -944,11 +1057,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     final contextID = List.unmodifiable([this, "getRepositoriesSchemes"]);
 
     for (var block in reposBlocks) {
-      var repositorySchemes = await block
-          .map((r) => MapEntry(
-              r, getTableSchemeForEntityRepository(r, contextID: contextID)))
-          .toMapFromEntries()
-          .resolveAllValues();
+      var repositorySchemes =
+          await block
+              .map(
+                (r) => MapEntry(
+                  r,
+                  getTableSchemeForEntityRepository(r, contextID: contextID),
+                ),
+              )
+              .toMapFromEntries()
+              .resolveAllValues();
 
       allSchemes.addAll(repositorySchemes);
     }
@@ -977,11 +1095,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     return generateFullCreateTableSQLs(withDate: false)
         .resolveMapped((fullCreateTableSQLs) {
-      return populateTables(fullCreateTableSQLs);
-    }).resolveMapped((tables) {
-      _generatedTables = true;
-      return tables;
-    });
+          return populateTables(fullCreateTableSQLs);
+        })
+        .resolveMapped((tables) {
+          _generatedTables = true;
+          return tables;
+        });
   }
 
   FutureOr<List<String>> populateTables(Object? tables) {
@@ -1005,7 +1124,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           return fileData.resolveMapped((data) {
             if (data != null) {
               _log.info(
-                  'Populating $this tables [SQL length: ${data.length}]...');
+                'Populating $this tables [SQL length: ${data.length}]...',
+              );
 
               return populateTablesFromSQLs(data).resolveMapped((tables) {
                 _log.info('Populate tables finished: $tables');
@@ -1016,8 +1136,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             }
           });
         }
-      } else if (RegExp(r'(?:^|\s+)(?:CREATE|ALTER)\s+TABLE\s')
-          .hasMatch(tables)) {
+      } else if (RegExp(
+        r'(?:^|\s+)(?:CREATE|ALTER)\s+TABLE\s',
+      ).hasMatch(tables)) {
         _log.info('Populating $this tables [SQL length: ${tables.length}]...');
 
         return populateTablesFromSQLs(tables).resolveMapped((tables) {
@@ -1032,14 +1153,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   static String? extractTableNameInSQL(String tableSQL) {
     var match = RegExp(
-            r'''(?:^|\s)(?:CREATE|ALTER)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?['"`]?(\w+)['"`]?''')
-        .firstMatch(tableSQL);
+      r'''(?:^|\s)(?:CREATE|ALTER)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?['"`]?(\w+)['"`]?''',
+    ).firstMatch(tableSQL);
 
     return match?.group(1);
   }
 
-  static List<String> extractTableSQLs(String sqls) => extractSQLs(sqls,
-      RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true));
+  static List<String> extractTableSQLs(String sqls) => extractSQLs(
+    sqls,
+    RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true),
+  );
 
   static List<String> extractSQLs(String sqls, RegExp commandPrefixPattern) {
     sqls = removeSQLsComments(sqls);
@@ -1048,9 +1171,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var list = <String>[];
 
     var regexpCreateTableSQL = RegExp(
-        r'\s' + commandPrefixPattern.pattern + r'\s.*?;',
-        caseSensitive: false,
-        dotAll: true);
+      r'\s' + commandPrefixPattern.pattern + r'\s.*?;',
+      caseSensitive: false,
+      dotAll: true,
+    );
 
     sqls.replaceAllMapped(regexpCreateTableSQL, (m) {
       var sql = m[0]!;
@@ -1062,18 +1186,24 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   static String removeSQLsComments(String sqls) {
-    sqls =
-        sqls.replaceAllMapped(RegExp(r'/\*.*?\*/', dotAll: true), (m) => m[1]!);
+    sqls = sqls.replaceAllMapped(
+      RegExp(r'/\*.*?\*/', dotAll: true),
+      (m) => m[1]!,
+    );
 
     while (true) {
       var prev = sqls;
       sqls = sqls.replaceAllMapped(
-          RegExp(r'(?:^|\n)--[^\n]*?([\r\n]+)', dotAll: true), (m) => m[1]!);
+        RegExp(r'(?:^|\n)--[^\n]*?([\r\n]+)', dotAll: true),
+        (m) => m[1]!,
+      );
       if (prev == sqls) break;
     }
 
     sqls = sqls.replaceAllMapped(
-        RegExp(r'[ \t]--[ \t][^\n]*?(\n|$)', dotAll: true), (m) => m[1]!);
+      RegExp(r'[ \t]--[ \t][^\n]*?(\n|$)', dotAll: true),
+      (m) => m[1]!,
+    );
 
     return sqls;
   }
@@ -1123,7 +1253,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     _entityRepositoriesBuildOrderIn = repositories.toList();
 
     var sqls = generateEntityRepositoresCreateTableSQLs(
-        verbose: !DBAdapter.auxiliaryMode);
+      verbose: !DBAdapter.auxiliaryMode,
+    );
 
     var ordered = sqls.entries.toHierarchicalOrder().map((e) => e.key).toList();
 
@@ -1142,31 +1273,41 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// Generates the [CreateTableSQL] for each [EntityRepository].
   /// See [entityRepositories].
   Map<EntityRepository, CreateTableSQL>
-      generateEntityRepositoresCreateTableSQLs(
-              {bool ifNotExists = true,
-              bool sortColumns = true,
-              bool verbose = false}) =>
-          entityRepositories
-              .map((r) => MapEntry<EntityRepository, CreateTableSQL>(
-                  r,
-                  generateCreateTableSQL(
-                      entityRepository: r,
-                      ifNotExists: ifNotExists,
-                      sortColumns: sortColumns)))
-              .toHierarchicalOrder(verbose: verbose)
-              .toMapFromEntries();
+  generateEntityRepositoresCreateTableSQLs({
+    bool ifNotExists = true,
+    bool sortColumns = true,
+    bool verbose = false,
+  }) =>
+      entityRepositories
+          .map(
+            (r) => MapEntry<EntityRepository, CreateTableSQL>(
+              r,
+              generateCreateTableSQL(
+                entityRepository: r,
+                ifNotExists: ifNotExists,
+                sortColumns: sortColumns,
+              ),
+            ),
+          )
+          .toHierarchicalOrder(verbose: verbose)
+          .toMapFromEntries();
 
   /// Generate all the SQLs to create the tables.
   @override
-  List<SQLBuilder> generateCreateTableSQLs(
-      {bool ifNotExists = true, bool sortColumns = true}) {
+  List<SQLBuilder> generateCreateTableSQLs({
+    bool ifNotExists = true,
+    bool sortColumns = true,
+  }) {
     var sqls = generateEntityRepositoresCreateTableSQLs(
-        ifNotExists: ifNotExists, sortColumns: sortColumns);
+      ifNotExists: ifNotExists,
+      sortColumns: sortColumns,
+    );
 
-    var allSQLs = sqls.values
-        .expand((e) => e.allSQLBuilders)
-        .toList()
-        .toHierarchicalOrder();
+    var allSQLs =
+        sqls.values
+            .expand((e) => e.allSQLBuilders)
+            .toList()
+            .toHierarchicalOrder();
 
     return allSQLs;
   }
@@ -1183,8 +1324,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       return value.toStringStandard();
     } else if (value is Enum) {
       var enumType = value.runtimeType;
-      var enumReflection =
-          ReflectionFactory().getRegisterEnumReflection(enumType);
+      var enumReflection = ReflectionFactory().getRegisterEnumReflection(
+        enumType,
+      );
 
       var name = enumReflection?.getName(value);
       name ??= enumToName(value);
@@ -1196,17 +1338,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   FutureOr<String> fieldValueToSQL(
-          EncodingContext context,
-          TableScheme tableScheme,
-          String fieldName,
-          Object? value,
-          Map<String, Object?> fieldsValues) =>
-      _resolveFieldValueToSQL(context, tableScheme, fieldName, value)
-          .resolveMapped((refId) {
-        fieldsValues.putIfAbsent(fieldName, () => refId);
-        var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
-        return valueSQL;
-      });
+    EncodingContext context,
+    TableScheme tableScheme,
+    String fieldName,
+    Object? value,
+    Map<String, Object?> fieldsValues,
+  ) => _resolveFieldValueToSQL(
+    context,
+    tableScheme,
+    fieldName,
+    value,
+  ).resolveMapped((refId) {
+    fieldsValues.putIfAbsent(fieldName, () => refId);
+    var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
+    return valueSQL;
+  });
 
   FutureOr<Object?> _resolveFieldValueToSQL(
     EncodingContext context,
@@ -1240,14 +1386,17 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var refEntityHandler = refEntityRepository.entityHandler;
 
-      var refId = fieldRef != null
-          ? refEntityHandler.getField(refEntity, fieldRef.targetField)
-          : refEntityHandler.getID(refEntity);
+      var refId =
+          fieldRef != null
+              ? refEntityHandler.getField(refEntity, fieldRef.targetField)
+              : refEntityHandler.getID(refEntity);
 
       if (refId != null) return refId;
 
-      var retRefId = refEntityRepository.store(refEntity,
-          transaction: context.transaction);
+      var retRefId = refEntityRepository.store(
+        refEntity,
+        transaction: context.transaction,
+      );
       return retRefId;
     }
   }
@@ -1263,7 +1412,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var reflection = reflectionFactory.getRegisterClassReflection(valueType);
 
-      var refEntityHandler = reflection?.entityHandler ??
+      var refEntityHandler =
+          reflection?.entityHandler ??
           reflectionFactory.getRegisterEntityHandler(valueType);
 
       var refId = refEntityHandler?.getID(entity);
@@ -1274,11 +1424,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   FutureOr<bool> executeTableSQL(String createTableSQL);
 
   FutureOr<SQL> generateCountSQL(
-      Transaction transaction, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+    Transaction transaction,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var q = dialect.elementQuote;
 
     if (matcher == null) {
@@ -1292,18 +1445,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         mainTable: table,
       );
     } else {
-      return _generateSQLFrom(transaction, entityName, table, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          sqlBuilder: (String from, EncodingContext context) {
-        return 'SELECT count(*) as ${q}count$q $from';
-      });
+      return _generateSQLFrom(
+        transaction,
+        entityName,
+        table,
+        matcher,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        sqlBuilder: (String from, EncodingContext context) {
+          return 'SELECT count(*) as ${q}count$q $from';
+        },
+      );
     }
   }
 
   FutureOr<int> countSQL(
-      TransactionOperation op, String entityName, String table, SQL sql) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+  ) {
     if (sql.isDummy) return 0;
 
     return executeTransactionOperation(op, sql, (connection) {
@@ -1313,7 +1475,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   void _logTransactionOperationSQL(
-      String method, TransactionOperation op, Object sql) {
+    String method,
+    TransactionOperation op,
+    Object sql,
+  ) {
     if (logSQL && _log.handler.isLoggingDB) {
       String msg() {
         String s;
@@ -1346,39 +1511,62 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   @override
   FutureOr<int> doCount(
-      TransactionOperation op, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<int, int>? preFinish}) {
-    return generateCountSQL(op.transaction, entityName, table,
-            matcher: matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        .resolveMapped((sql) {
-      return countSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  }) {
+    return generateCountSQL(
+      op.transaction,
+      entityName,
+      table,
+      matcher: matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    ).resolveMapped((sql) {
+      return countSQL(
+        op,
+        entityName,
+        table,
+        sql,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   FutureOr<SQL> generateExistIDsSQL<I extends Object>(
-      Transaction transaction, String entityName, String table, List<I> ids) {
+    Transaction transaction,
+    String entityName,
+    String table,
+    List<I> ids,
+  ) {
     if (ids.isEmpty) return SQL.dummy;
 
-    return _generateSQLFrom(transaction, entityName, table, ConditionIdIN(ids),
-        sqlBuilder: (String from, EncodingContext context) {
-      var tableFieldID = context.tableFieldID ?? 'id';
-      var tableAlias = context.resolveEntityAlias(table);
-      var q = dialect.elementQuote;
-      var sql = 'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from';
-      return sql;
-    });
+    return _generateSQLFrom(
+      transaction,
+      entityName,
+      table,
+      ConditionIdIN(ids),
+      sqlBuilder: (String from, EncodingContext context) {
+        var tableFieldID = context.tableFieldID ?? 'id';
+        var tableAlias = context.resolveEntityAlias(table);
+        var q = dialect.elementQuote;
+        var sql = 'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from';
+        return sql;
+      },
+    );
   }
 
   FutureOr<List<I>> existIDsSQL<I extends Object>(
-      TransactionOperation op, String entityName, String table, SQL sql) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+  ) {
     if (sql.isDummy) return [];
 
     return executeTransactionOperation(op, sql, (connection) {
@@ -1397,16 +1585,29 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   @override
   FutureOr<List<I>> doExistIDs<I extends Object>(
-      TransactionOperation op, String entityName, String table, List<I> ids) {
-    return generateExistIDsSQL(op.transaction, entityName, table, ids)
-        .resolveMapped((sql) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<I> ids,
+  ) {
+    return generateExistIDsSQL(
+      op.transaction,
+      entityName,
+      table,
+      ids,
+    ).resolveMapped((sql) {
       return existIDsSQL(op, entityName, table, sql).resolveMapped(
-          (r) => _finishSQLOperation(sql, op, r, (ids) => parseIDs<I>(ids)));
+        (r) => _finishSQLOperation(sql, op, r, (ids) => parseIDs<I>(ids)),
+      );
     });
   }
 
-  FutureOr<SQL> generateInsertSQL(Transaction transaction, String entityName,
-      String table, Map<String, Object?> fields) {
+  FutureOr<SQL> generateInsertSQL(
+    Transaction transaction,
+    String entityName,
+    String table,
+    Map<String, Object?> fields,
+  ) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1416,11 +1617,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         throw StateError(errorMsg);
       }
 
-      var context = EncodingContext(entityName,
-          namedParameters: fields,
-          transaction: transaction,
-          tableName: table,
-          tableFieldID: tableScheme.idFieldName);
+      var context = EncodingContext(
+        entityName,
+        namedParameters: fields,
+        transaction: transaction,
+        tableName: table,
+        tableFieldID: tableScheme.idFieldName,
+      );
 
       var fieldsValues = tableScheme.getFieldsValues(fields);
 
@@ -1432,56 +1635,70 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var fieldsValuesInSQL = <String, Object?>{};
 
       return fieldsNotNull
-          .map((f) => fieldValueToSQL(
-              context, tableScheme, f, fieldsValues[f]!, fieldsValuesInSQL))
+          .map(
+            (f) => fieldValueToSQL(
+              context,
+              tableScheme,
+              f,
+              fieldsValues[f]!,
+              fieldsValuesInSQL,
+            ),
+          )
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
-        assert(fieldsNotNull.length == values.length);
+            assert(fieldsNotNull.length == values.length);
 
-        var idFieldName = tableScheme.idFieldName;
-        assert(idFieldName != null && idFieldName.isNotEmpty);
+            var idFieldName = tableScheme.idFieldName;
+            assert(idFieldName != null && idFieldName.isNotEmpty);
 
-        var q = dialect.elementQuote;
+            var q = dialect.elementQuote;
 
-        var sql = StringBuffer();
+            var sql = StringBuffer();
 
-        sql.write('INSERT INTO $q');
-        sql.write(table);
-        sql.write(q);
+            sql.write('INSERT INTO $q');
+            sql.write(table);
+            sql.write(q);
 
-        if (fieldsNotNull.isNotEmpty) {
-          sql.write('(');
-          sql.write(fieldsNotNull.map((f) => '$q$f$q').join(','));
-          sql.write(')');
-        }
+            if (fieldsNotNull.isNotEmpty) {
+              sql.write('(');
+              sql.write(fieldsNotNull.map((f) => '$q$f$q').join(','));
+              sql.write(')');
+            }
 
-        if (dialect.acceptsOutputSyntax) {
-          sql.write(' OUTPUT INSERTED.');
-          sql.write(q);
-          sql.write(idFieldName);
-          sql.write(q);
-        }
+            if (dialect.acceptsOutputSyntax) {
+              sql.write(' OUTPUT INSERTED.');
+              sql.write(q);
+              sql.write(idFieldName);
+              sql.write(q);
+            }
 
-        if (values.isNotEmpty) {
-          sql.write(' VALUES (');
-          sql.write(values.join(' , '));
-          sql.write(')');
-        } else {
-          if (dialect.acceptsInsertDefaultValues) {
-            sql.write(' DEFAULT VALUES ');
-          } else {
-            sql.write(' VALUES () ');
-          }
-        }
+            if (values.isNotEmpty) {
+              sql.write(' VALUES (');
+              sql.write(values.join(' , '));
+              sql.write(')');
+            } else {
+              if (dialect.acceptsInsertDefaultValues) {
+                sql.write(' DEFAULT VALUES ');
+              } else {
+                sql.write(' VALUES () ');
+              }
+            }
 
-        if (dialect.acceptsReturningSyntax) {
-          sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
-        }
+            if (dialect.acceptsReturningSyntax) {
+              sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
+            }
 
-        return SQL(sql.toString(), null, fields, fieldsValuesInSQL,
-            entityName: table, idFieldName: idFieldName, mainTable: table);
-      });
+            return SQL(
+              sql.toString(),
+              null,
+              fields,
+              fieldsValuesInSQL,
+              entityName: table,
+              idFieldName: idFieldName,
+              mainTable: table,
+            );
+          });
     });
   }
 
@@ -1500,16 +1717,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  FutureOr<dynamic> doInsertRelationshipSQL(String entityName, String table,
-      SQL sql, Transaction transaction, C connection) {
+  FutureOr<dynamic> doInsertRelationshipSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    C connection,
+  ) {
     return doInsertSQL(entityName, table, sql, transaction, connection);
   }
 
-  FutureOr<dynamic> doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, C connection);
+  FutureOr<dynamic> doInsertSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    C connection,
+  );
 
-  FutureOr<SQL> generateUpdateSQL(Transaction transaction, String entityName,
-      String table, Object id, Map<String, Object?> fields) {
+  FutureOr<SQL> generateUpdateSQL(
+    Transaction transaction,
+    String entityName,
+    String table,
+    Object id,
+    Map<String, Object?> fields,
+  ) {
     if (fields.isEmpty) return SQL.dummy;
 
     var retTableScheme = getTableScheme(table);
@@ -1521,17 +1753,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         throw StateError(errorMsg);
       }
 
-      var context = EncodingContext(entityName,
-          namedParameters: fields,
-          transaction: transaction,
-          tableFieldID: tableScheme.idFieldName);
+      var context = EncodingContext(
+        entityName,
+        namedParameters: fields,
+        transaction: transaction,
+        tableFieldID: tableScheme.idFieldName,
+      );
 
       var idFieldName = tableScheme.idFieldName!;
-      var idPlaceholder =
-          _conditionSQLGenerator.parameterPlaceholder(idFieldName);
+      var idPlaceholder = _conditionSQLGenerator.parameterPlaceholder(
+        idFieldName,
+      );
 
-      var fieldsValues =
-          tableScheme.getFieldsValues(fields, fields: fields.keys.toSet());
+      var fieldsValues = tableScheme.getFieldsValues(
+        fields,
+        fields: fields.keys.toSet(),
+      );
 
       // No value to update:
       if (fieldsValues.isEmpty) {
@@ -1543,79 +1780,111 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var fieldsValuesInSQL = <String, Object?>{idFieldName: id};
 
       return fieldsKeys
-          .map((f) => fieldValueToSQL(
-              context, tableScheme, f, fieldsValues[f], fieldsValuesInSQL))
+          .map(
+            (f) => fieldValueToSQL(
+              context,
+              tableScheme,
+              f,
+              fieldsValues[f],
+              fieldsValuesInSQL,
+            ),
+          )
           .toList(growable: false)
           .resolveAll()
           .resolveMapped((values) {
-        var q = dialect.elementQuote;
-        var sql = StringBuffer();
+            var q = dialect.elementQuote;
+            var sql = StringBuffer();
 
-        sql.write('UPDATE $q');
-        sql.write(table);
-        sql.write('$q SET ');
+            sql.write('UPDATE $q');
+            sql.write(table);
+            sql.write('$q SET ');
 
-        for (var i = 0; i < values.length; ++i) {
-          var f = fieldsKeys[i];
-          var v = values[i];
+            for (var i = 0; i < values.length; ++i) {
+              var f = fieldsKeys[i];
+              var v = values[i];
 
-          if (i > 0) sql.write(' , ');
-          sql.write(q);
-          sql.write(f);
-          sql.write(q);
-          sql.write(' = ');
-          sql.write(v);
-        }
+              if (i > 0) sql.write(' , ');
+              sql.write(q);
+              sql.write(f);
+              sql.write(q);
+              sql.write(' = ');
+              sql.write(v);
+            }
 
-        if (dialect.acceptsOutputSyntax) {
-          sql.write(' OUTPUT INSERTED.');
-          sql.write(q);
-          sql.write(idFieldName);
-          sql.write(q);
-        }
+            if (dialect.acceptsOutputSyntax) {
+              sql.write(' OUTPUT INSERTED.');
+              sql.write(q);
+              sql.write(idFieldName);
+              sql.write(q);
+            }
 
-        sql.write(' WHERE ');
+            sql.write(' WHERE ');
 
-        var conditionSQL = '$idFieldName = $idPlaceholder';
-        sql.write(conditionSQL);
+            var conditionSQL = '$idFieldName = $idPlaceholder';
+            sql.write(conditionSQL);
 
-        if (dialect.acceptsReturningSyntax) {
-          sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
-        }
+            if (dialect.acceptsReturningSyntax) {
+              sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
+            }
 
-        return SQL(sql.toString(), null, fields, fieldsValuesInSQL,
-            sqlCondition: conditionSQL,
-            entityName: table,
-            idFieldName: idFieldName,
-            mainTable: table);
-      });
+            return SQL(
+              sql.toString(),
+              null,
+              fields,
+              fieldsValuesInSQL,
+              sqlCondition: conditionSQL,
+              entityName: table,
+              idFieldName: idFieldName,
+              mainTable: table,
+            );
+          });
     });
   }
 
-  FutureOr<dynamic> updateSQL(TransactionOperation op, String entityName,
-      String table, SQL sql, Object id, Map<String, Object?> fields,
-      {bool allowAutoInsert = false}) {
+  FutureOr<dynamic> updateSQL(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+    Object id,
+    Map<String, Object?> fields, {
+    bool allowAutoInsert = false,
+  }) {
     if (sql.isDummy) return id;
 
     return executeTransactionOperation(op, sql, (connection) {
       _logTransactionOperationSQL('updateSQL', op, sql);
-      return doUpdateSQL(entityName, table, sql, id, op.transaction, connection,
-          allowAutoInsert: allowAutoInsert);
+      return doUpdateSQL(
+        entityName,
+        table,
+        sql,
+        id,
+        op.transaction,
+        connection,
+        allowAutoInsert: allowAutoInsert,
+      );
     });
   }
 
-  FutureOr<dynamic> doUpdateSQL(String entityName, String table, SQL sql,
-      Object id, Transaction transaction, C connection,
-      {bool allowAutoInsert = false});
+  FutureOr<dynamic> doUpdateSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Object id,
+    Transaction transaction,
+    C connection, {
+    bool allowAutoInsert = false,
+  });
 
   FutureOr<List<SQL>> generateInsertRelationshipSQLs(
-      Transaction transaction,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName,
-      List otherIds) {
+    Transaction transaction,
+    String entityName,
+    String table,
+    String field,
+    dynamic id,
+    String otherTableName,
+    List otherIds,
+  ) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1626,22 +1895,38 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       var relationship = tableScheme.getTableRelationshipReference(
-          sourceTable: table, sourceField: field, targetTable: otherTableName);
+        sourceTable: table,
+        sourceField: field,
+        targetTable: otherTableName,
+      );
 
       if (relationship == null) {
         throw StateError(
-            "Can't find TableRelationshipReference for tables: $table -> $otherTableName\n$tableScheme");
+          "Can't find TableRelationshipReference for tables: $table -> $otherTableName\n$tableScheme",
+        );
       }
 
-      var sqls = otherIds.isEmpty
-          ? [SQL.dummy]
-          : otherIds
-              .map((otherId) =>
-                  _generateInsertRelationshipSQL(relationship, id, otherId))
-              .toList();
+      var sqls =
+          otherIds.isEmpty
+              ? [SQL.dummy]
+              : otherIds
+                  .map(
+                    (otherId) => _generateInsertRelationshipSQL(
+                      relationship,
+                      id,
+                      otherId,
+                    ),
+                  )
+                  .toList();
 
       var constrainSQL = _generateConstrainRelationshipSQL(
-          tableScheme, table, field, id, otherTableName, otherIds);
+        tableScheme,
+        table,
+        field,
+        id,
+        otherTableName,
+        otherIds,
+      );
 
       var lastIdx = sqls.lastIndex;
 
@@ -1655,7 +1940,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   SQL _generateInsertRelationshipSQL(
-      TableRelationshipReference relationship, dynamic id, dynamic otherId) {
+    TableRelationshipReference relationship,
+    dynamic id,
+    dynamic otherId,
+  ) {
     var relationshipTable = relationship.relationshipTable;
     var sourceIdField = relationship.sourceRelationshipField;
     var targetIdField = relationship.targetRelationshipField;
@@ -1684,18 +1972,34 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       sql.write(' ON CONFLICT DO NOTHING ');
     }
 
-    return SQL(sql.toString(), null, parameters, parameters,
-        mainTable: relationshipTable, relationship: relationship);
+    return SQL(
+      sql.toString(),
+      null,
+      parameters,
+      parameters,
+      mainTable: relationshipTable,
+      relationship: relationship,
+    );
   }
 
-  SQL _generateConstrainRelationshipSQL(TableScheme tableScheme, String table,
-      String field, dynamic id, String otherTableName, List otherIds) {
+  SQL _generateConstrainRelationshipSQL(
+    TableScheme tableScheme,
+    String table,
+    String field,
+    dynamic id,
+    String otherTableName,
+    List otherIds,
+  ) {
     var relationship = tableScheme.getTableRelationshipReference(
-        sourceTable: table, sourceField: field, targetTable: otherTableName);
+      sourceTable: table,
+      sourceField: field,
+      targetTable: otherTableName,
+    );
 
     if (relationship == null) {
       throw StateError(
-          "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+        "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
+      );
     }
 
     var relationshipTable = relationship.relationshipTable;
@@ -1750,21 +2054,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       condition = KeyConditionEQ([ConditionKeyField(sourceIdField)], id);
     }
 
-    return SQL(sql.toString(), null, parameters, parameters,
-        condition: condition,
-        sqlCondition: conditionSQL,
-        mainTable: relationshipTable,
-        relationship: relationship);
+    return SQL(
+      sql.toString(),
+      null,
+      parameters,
+      parameters,
+      condition: condition,
+      sqlCondition: conditionSQL,
+      mainTable: relationshipTable,
+      relationship: relationship,
+    );
   }
 
   FutureOr<bool> insertRelationshipSQLs(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      List<SQL> sqls,
-      dynamic id,
-      String otherTable,
-      List otherIds) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<SQL> sqls,
+    dynamic id,
+    String otherTable,
+    List otherIds,
+  ) {
     if (sqls.length == 1 && sqls.first.isFullyDummy) {
       return true;
     }
@@ -1772,31 +2082,49 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return executeTransactionOperation(op, sqls.first, (connection) {
       _logTransactionOperationSQL('insertRelationshipSQLs', op, sqls);
 
-      var retInserts = sqls.map((sql) {
-        var ret = doInsertRelationshipSQL(entityName, sql.mainTable ?? table,
-            sql, op.transaction, connection);
+      var retInserts =
+          sqls.map((sql) {
+            var ret = doInsertRelationshipSQL(
+              entityName,
+              sql.mainTable ?? table,
+              sql,
+              op.transaction,
+              connection,
+            );
 
-        if (sql.hasPosSQL) {
-          return sql.posSQL!.map((e) {
-            _logTransactionOperationSQL('insertRelationship[POS]', op, e);
-            return doDeleteSQL(
-                entityName, e.mainTable!, e, op.transaction, connection);
-          }).resolveAllWithValue(ret);
-        } else {
-          return ret;
-        }
-      }).resolveAll();
+            if (sql.hasPosSQL) {
+              return sql.posSQL!
+                  .map((e) {
+                    _logTransactionOperationSQL(
+                      'insertRelationship[POS]',
+                      op,
+                      e,
+                    );
+                    return doDeleteSQL(
+                      entityName,
+                      e.mainTable!,
+                      e,
+                      op.transaction,
+                      connection,
+                    );
+                  })
+                  .resolveAllWithValue(ret);
+            } else {
+              return ret;
+            }
+          }).resolveAll();
       return retInserts.resolveWithValue(true);
     });
   }
 
   FutureOr<SQL> generateSelectRelationshipSQL(
-      Transaction transaction,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName) {
+    Transaction transaction,
+    String entityName,
+    String table,
+    String field,
+    dynamic id,
+    String otherTableName,
+  ) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1807,11 +2135,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       var relationship = tableScheme.getTableRelationshipReference(
-          sourceTable: table, sourceField: field, targetTable: otherTableName);
+        sourceTable: table,
+        sourceField: field,
+        targetTable: otherTableName,
+      );
 
       if (relationship == null) {
         throw StateError(
-            "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+          "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
+        );
       }
 
       var parameters = {'source_id': id};
@@ -1833,46 +2165,59 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       sql.write(conditionSQL);
       sql.write(' )');
 
-      var condition = KeyConditionEQ(
-          [ConditionKeyField(relationship.sourceRelationshipField)], id);
+      var condition = KeyConditionEQ([
+        ConditionKeyField(relationship.sourceRelationshipField),
+      ], id);
 
-      return SQL(sql.toString(), null, parameters, parameters,
-          condition: condition,
-          sqlCondition: conditionSQL,
-          returnColumnsAliases: {
-            relationship.sourceRelationshipField: 'source_id',
-            relationship.targetRelationshipField: 'target_id',
-          },
-          mainTable: relationship.relationshipTable,
-          relationship: relationship);
+      return SQL(
+        sql.toString(),
+        null,
+        parameters,
+        parameters,
+        condition: condition,
+        sqlCondition: conditionSQL,
+        returnColumnsAliases: {
+          relationship.sourceRelationshipField: 'source_id',
+          relationship.targetRelationshipField: 'target_id',
+        },
+        mainTable: relationship.relationshipTable,
+        relationship: relationship,
+      );
     });
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipSQL(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      SQL sql,
-      dynamic id,
-      String otherTable) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+    dynamic id,
+    String otherTable,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
       _logTransactionOperationSQL('selectRelationshipSQL', op, sql);
 
       var ret = doSelectSQL(
-          entityName, sql.mainTable ?? table, sql, op.transaction, connection);
+        entityName,
+        sql.mainTable ?? table,
+        sql,
+        op.transaction,
+        connection,
+      );
       return ret;
     });
   }
 
   FutureOr<SQL> generateSelectRelationshipsSQL(
-      Transaction transaction,
-      String entityName,
-      String table,
-      String field,
-      List<dynamic> ids,
-      String otherTableName) {
+    Transaction transaction,
+    String entityName,
+    String table,
+    String field,
+    List<dynamic> ids,
+    String otherTableName,
+  ) {
     var retTableScheme = getTableScheme(table);
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1883,17 +2228,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
 
       var relationship = tableScheme.getTableRelationshipReference(
-          sourceTable: table, sourceField: field, targetTable: otherTableName);
+        sourceTable: table,
+        sourceField: field,
+        targetTable: otherTableName,
+      );
 
       if (relationship == null) {
         throw StateError(
-            "Can't find TableRelationshipReference for tables: $table -> $otherTableName");
+          "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
+        );
       }
 
       var q = dialect.elementQuote;
 
-      var conditionSQL =
-          StringBuffer('$q${relationship.sourceRelationshipField}$q IN (');
+      var conditionSQL = StringBuffer(
+        '$q${relationship.sourceRelationshipField}$q IN (',
+      );
 
       var parameters = <String, dynamic>{};
       for (var i = 0; i < ids.length; ++i) {
@@ -1920,67 +2270,93 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       sql.write(conditionSQLStr);
       sql.write(' )');
 
-      var condition = KeyConditionIN(
-          [ConditionKeyField(relationship.sourceRelationshipField)], ids);
+      var condition = KeyConditionIN([
+        ConditionKeyField(relationship.sourceRelationshipField),
+      ], ids);
 
-      return SQL(sql.toString(), ids, {'ids': ids}, parameters,
-          condition: condition,
-          sqlCondition: conditionSQLStr,
-          returnColumnsAliases: {
-            relationship.sourceRelationshipField: 'source_id',
-            relationship.targetRelationshipField: 'target_id',
-          },
-          mainTable: relationship.relationshipTable,
-          relationship: relationship);
+      return SQL(
+        sql.toString(),
+        ids,
+        {'ids': ids},
+        parameters,
+        condition: condition,
+        sqlCondition: conditionSQLStr,
+        returnColumnsAliases: {
+          relationship.sourceRelationshipField: 'source_id',
+          relationship.targetRelationshipField: 'target_id',
+        },
+        mainTable: relationship.relationshipTable,
+        relationship: relationship,
+      );
     });
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      SQL sql,
-      List<dynamic> ids,
-      String otherTable) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
+    List<dynamic> ids,
+    String otherTable,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
       _logTransactionOperationSQL('selectRelationshipsSQL', op, sql);
 
       var ret = doSelectSQL(
-          entityName, sql.mainTable ?? table, sql, op.transaction, connection);
+        entityName,
+        sql.mainTable ?? table,
+        sql,
+        op.transaction,
+        connection,
+      );
       return ret;
     });
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
-          Object? previousError) =>
-      DBSQLAdapterException('error', '$error',
-          parentError: error,
-          parentStackTrace: stackTrace,
-          previousError: previousError,
-          operation: operation);
+  Object resolveError(
+    Object error,
+    StackTrace stackTrace,
+    Object? operation,
+    Object? previousError,
+  ) => DBSQLAdapterException(
+    'error',
+    '$error',
+    parentError: error,
+    parentStackTrace: stackTrace,
+    previousError: previousError,
+    operation: operation,
+  );
 
   @override
-  bool isTransactionWithSingleOperation(TransactionOperation op,
-      [SQLWrapper? sql]) {
+  bool isTransactionWithSingleOperation(
+    TransactionOperation op, [
+    SQLWrapper? sql,
+  ]) {
     return super.isTransactionWithSingleOperation(op) &&
         (sql == null || (sql.sqlsLength == 1 && !sql.mainSQL.hasPreOrPosSQL));
   }
 
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      SQLWrapper sql, FutureOr<R> Function(C connection) f) {
+  FutureOr<R> executeTransactionOperation<R>(
+    TransactionOperation op,
+    SQLWrapper sql,
+    FutureOr<R> Function(C connection) f,
+  ) {
     var transaction = op.transaction;
 
     if (isTransactionWithSingleOperation(op, sql)) {
-      return executeWithPool(f,
-          onError: (e, s) => transaction.notifyExecutionError(
-                e,
-                s,
-                errorResolver: resolveError,
-                operation: op,
-                debugInfo: () => sql.mainSQL.toString(),
-              ));
+      return executeWithPool(
+        f,
+        onError:
+            (e, s) => transaction.notifyExecutionError(
+              e,
+              s,
+              errorResolver: resolveError,
+              operation: op,
+              debugInfo: () => sql.mainSQL.toString(),
+            ),
+      );
     }
 
     if (transaction.isOpen) {
@@ -2011,54 +2387,77 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  FutureOr<SQL> generateSelectSQL(Transaction transaction, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit}) {
-    return _generateSQLFrom(transaction, entityName, table, matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        limit: limit, sqlBuilder: (String from, EncodingContext context) {
-      var tableAlias = context.resolveEntityAlias(table);
-      var q = dialect.elementQuote;
-      var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
-      var sql = 'SELECT $q$tableAlias$q.* $from$limitStr';
-      return sql;
-    });
+  FutureOr<SQL> generateSelectSQL(
+    Transaction transaction,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+  }) {
+    return _generateSQLFrom(
+      transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      limit: limit,
+      sqlBuilder: (String from, EncodingContext context) {
+        var tableAlias = context.resolveEntityAlias(table);
+        var q = dialect.elementQuote;
+        var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
+        var sql = 'SELECT $q$tableAlias$q.* $from$limitStr';
+        return sql;
+      },
+    );
   }
 
-  FutureOr<SQL> generateSelectIDsSQL(Transaction transaction, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit}) {
-    return _generateSQLFrom(transaction, entityName, table, matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        limit: limit, sqlBuilder: (String from, EncodingContext context) {
-      var tableAlias = context.resolveEntityAlias(table);
-      var tableFieldID = context.tableFieldID ?? 'id';
-      var q = dialect.elementQuote;
-      var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
-      var sql =
-          'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$limitStr';
-      return sql;
-    });
+  FutureOr<SQL> generateSelectIDsSQL(
+    Transaction transaction,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+  }) {
+    return _generateSQLFrom(
+      transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      limit: limit,
+      sqlBuilder: (String from, EncodingContext context) {
+        var tableAlias = context.resolveEntityAlias(table);
+        var tableFieldID = context.tableFieldID ?? 'id';
+        var q = dialect.elementQuote;
+        var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
+        var sql =
+            'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$limitStr';
+        return sql;
+      },
+    );
   }
 
-  FutureOr<SQL> _generateSQLFrom(Transaction transaction, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit,
-      required String Function(String from, EncodingContext context)
-          sqlBuilder}) {
+  FutureOr<SQL> _generateSQLFrom(
+    Transaction transaction,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+    required String Function(String from, EncodingContext context) sqlBuilder,
+  }) {
     if (matcher is! Condition) {
       throw StateError('Invalid SQL condition: $matcher');
     }
@@ -2066,19 +2465,24 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var retEncodedSQL = getTableScheme(table).resolveMapped((tableScheme) {
       var idFieldName = tableScheme?.idFieldName;
 
-      return _conditionSQLGenerator.encode(matcher, entityName,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          tableName: table,
-          tableFieldID: idFieldName);
+      return _conditionSQLGenerator.encode(
+        matcher,
+        entityName,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        tableName: table,
+        tableFieldID: idFieldName,
+      );
     });
 
     return retEncodedSQL.resolveMapped((encodedSQL) {
       var conditionSQL = encodedSQL.outputString;
 
-      var tableAlias =
-          _conditionSQLGenerator.resolveEntityAlias(encodedSQL, table);
+      var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
+        encodedSQL,
+        table,
+      );
 
       var q = dialect.elementQuote;
 
@@ -2113,8 +2517,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           var refTable = e.key;
           var refTableAlias = encodedSQL.resolveEntityAlias(refTable);
 
-          var innerRef =
-              e.value.every((ref) => encodedSQL.isInnerFieldReference(ref));
+          var innerRef = e.value.every(
+            (ref) => encodedSQL.isInnerFieldReference(ref),
+          );
 
           if (innerRef) {
             join.write('INNER JOIN ');
@@ -2126,9 +2531,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
           for (var fieldRef in e.value) {
             var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-                encodedSQL, fieldRef.sourceTable);
+              encodedSQL,
+              fieldRef.sourceTable,
+            );
             var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-                encodedSQL, fieldRef.targetTable);
+              encodedSQL,
+              fieldRef.targetTable,
+            );
 
             join.write(q);
             join.write(sourceTableAlias);
@@ -2199,7 +2608,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           join.write(') ');
 
           var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-              encodedSQL, targetTable);
+            encodedSQL,
+            targetTable,
+          );
 
           String targetTableField;
           String targetRelationshipField;
@@ -2292,33 +2703,42 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     C connection,
   );
 
-  FutureOr<SQL> generateDeleteSQL(Transaction transaction, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
-    var retDeleteSQL = _generateSQLFrom(transaction, entityName, table, matcher,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        sqlBuilder: (String from, EncodingContext context) {
-      var tableAlias = context.resolveEntityAlias(table);
+  FutureOr<SQL> generateDeleteSQL(
+    Transaction transaction,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
+    var retDeleteSQL = _generateSQLFrom(
+      transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      sqlBuilder: (String from, EncodingContext context) {
+        var tableAlias = context.resolveEntityAlias(table);
 
-      var sql = StringBuffer();
-      sql.write('DELETE ');
+        var sql = StringBuffer();
+        sql.write('DELETE ');
 
-      if (dialect.acceptsOutputSyntax) {
-        sql.write(' OUTPUT DELETED.* ');
-      }
+        if (dialect.acceptsOutputSyntax) {
+          sql.write(' OUTPUT DELETED.* ');
+        }
 
-      sql.write(from);
+        sql.write(from);
 
-      if (dialect.acceptsReturningSyntax) {
-        sql.write(' RETURNING "$tableAlias".*');
-      }
+        if (dialect.acceptsReturningSyntax) {
+          sql.write(' RETURNING "$tableAlias".*');
+        }
 
-      return sql.toString();
-    });
+        return sql.toString();
+      },
+    );
 
     if (dialect.acceptsTemporaryTableForReturning &&
         !dialect.acceptsOutputSyntax &&
@@ -2336,20 +2756,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         var sqlAsTableAlias = tableAlias != null ? ' as $q$tableAlias$q ' : '';
 
         var preSql = SQL(
-            'CREATE TEMPORARY TABLE IF NOT EXISTS $q$tmpTable$q AS ('
-            ' SELECT $sqlSelAll FROM $q$table$q$sqlAsTableAlias WHERE $conditionSQL '
-            ')',
-            positionalParameters ?? (parameters is List ? parameters : null),
-            namedParameters ??
-                (parameters is Map<String, dynamic> ? parameters : null),
-            deleteSQL.parametersByPlaceholder,
-            mainTable: tmpTable);
+          'CREATE TEMPORARY TABLE IF NOT EXISTS $q$tmpTable$q AS ('
+          ' SELECT $sqlSelAll FROM $q$table$q$sqlAsTableAlias WHERE $conditionSQL '
+          ')',
+          positionalParameters ?? (parameters is List ? parameters : null),
+          namedParameters ??
+              (parameters is Map<String, dynamic> ? parameters : null),
+          deleteSQL.parametersByPlaceholder,
+          mainTable: tmpTable,
+        );
 
-        var posSql1 =
-            SQL('SELECT * FROM $q$tmpTable$q', [], {}, {}, mainTable: tmpTable);
+        var posSql1 = SQL(
+          'SELECT * FROM $q$tmpTable$q',
+          [],
+          {},
+          {},
+          mainTable: tmpTable,
+        );
 
-        var posSql2 =
-            SQL('DROP TABLE $q$tmpTable$q', [], {}, {}, mainTable: tmpTable);
+        var posSql2 = SQL(
+          'DROP TABLE $q$tmpTable$q',
+          [],
+          {},
+          {},
+          mainTable: tmpTable,
+        );
 
         deleteSQL = deleteSQL.ensureNotSharedDummy();
 
@@ -2387,20 +2818,23 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   );
 
   @override
-  DBSQLRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
-          {String? tableName, Type? type}) =>
+  DBSQLRepositoryAdapter<O>? createRepositoryAdapter<O>(
+    String name, {
+    String? tableName,
+    Type? type,
+  }) =>
       super.createRepositoryAdapter<O>(name, tableName: tableName, type: type)
           as DBSQLRepositoryAdapter<O>?;
 
   @override
   DBSQLRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
-          String name, String? tableName, Type? type) =>
-      DBSQLRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
+    String name,
+    String? tableName,
+    Type? type,
+  ) => DBSQLRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
 
   @override
-  DBSQLRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
-    String name,
-  ) =>
+  DBSQLRepositoryAdapter<O>? getRepositoryAdapterByName<O>(String name) =>
       super.getRepositoryAdapterByName<O>(name) as DBSQLRepositoryAdapter<O>?;
 
   @override
@@ -2409,12 +2843,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   @override
   DBSQLRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(
-          String tableName) =>
+    String tableName,
+  ) =>
       super.getRepositoryAdapterByTableName<O>(tableName)
           as DBSQLRepositoryAdapter<O>?;
 
   FutureOr<R> _finishOperation<T, R>(
-      TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) {
     if (preFinish != null) {
       return preFinish(res).resolveMapped((res2) => op.finish(res2));
     } else {
@@ -2422,8 +2860,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
   }
 
-  FutureOr<R> _finishSQLOperation<T, R>(Object sql, TransactionOperation op,
-      T r, PreFinishDBOperation<T, R>? preFinish) {
+  FutureOr<R> _finishSQLOperation<T, R>(
+    Object sql,
+    TransactionOperation op,
+    T r,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) {
     var sqlTime = DateTime.now().difference(op.initTime);
 
     String f() {
@@ -2441,176 +2883,304 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   @override
-  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
-    return generateDeleteSQL(op.transaction, entityName, table, matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        .resolveMapped((sql) {
-      return deleteSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) {
+    return generateDeleteSQL(
+      op.transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    ).resolveMapped((sql) {
+      return deleteSQL(
+        op,
+        entityName,
+        table,
+        sql,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
-  FutureOr doInsert<O>(TransactionOperation op, String entityName, String table,
-      O o, Map<String, dynamic> fields,
-      {String? idFieldName,
-      PreFinishDBOperation<dynamic, dynamic>? preFinish}) {
-    return generateInsertSQL(op.transaction, entityName, table, fields)
-        .resolveMapped((sql) {
-      return insertSQL(op, entityName, table, sql, fields)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+  FutureOr doInsert<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation<dynamic, dynamic>? preFinish,
+  }) {
+    return generateInsertSQL(
+      op.transaction,
+      entityName,
+      table,
+      fields,
+    ).resolveMapped((sql) {
+      return insertSQL(
+        op,
+        entityName,
+        table,
+        sql,
+        fields,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
   FutureOr<bool> doInsertRelationship(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName,
-      List otherIds,
-      [PreFinishDBOperation<bool, bool>? preFinish]) {
-    return generateInsertRelationshipSQLs(op.transaction, entityName, table,
-            field, id, otherTableName, otherIds)
-        .resolveMapped((sqls) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    String field,
+    dynamic id,
+    String otherTableName,
+    List otherIds, [
+    PreFinishDBOperation<bool, bool>? preFinish,
+  ]) {
+    return generateInsertRelationshipSQLs(
+      op.transaction,
+      entityName,
+      table,
+      field,
+      id,
+      otherTableName,
+      otherIds,
+    ).resolveMapped((sqls) {
       return insertRelationshipSQLs(
-              op, entityName, table, sqls, id, otherTableName, otherIds)
-          .resolveMapped((r) => _finishSQLOperation(sqls, op, r, preFinish));
+        op,
+        entityName,
+        table,
+        sqls,
+        id,
+        otherTableName,
+        otherIds,
+      ).resolveMapped((r) => _finishSQLOperation(sqls, op, r, preFinish));
     });
   }
 
   @override
   FutureOr<R?> doSelectByID<R>(
-      TransactionOperation op, String entityName, String table, Object id,
-      {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) {
-    return generateSelectSQL(op.transaction, entityName, table, ConditionID(id))
-        .resolveMapped((sql) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  }) {
+    return generateSelectSQL(
+      op.transaction,
+      entityName,
+      table,
+      ConditionID(id),
+    ).resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql).resolveMapped(
-          (r) => _finishSQLOperation(sql, op, r.firstOrNull, preFinish));
+        (r) => _finishSQLOperation(sql, op, r.firstOrNull, preFinish),
+      );
     });
   }
 
   @override
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
-      String table, List<Object> ids,
-      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-          preFinish}) {
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<Object> ids, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) {
     return generateSelectSQL(
-            op.transaction, entityName, table, ConditionIdIN(ids))
-        .resolveMapped((sql) {
-      return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+      op.transaction,
+      entityName,
+      table,
+      ConditionIdIN(ids),
+    ).resolveMapped((sql) {
+      return selectSQL(
+        op,
+        entityName,
+        table,
+        sql,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
   FutureOr<List<R>> doSelectAll<R>(
-      TransactionOperation op, String entityName, String table,
-      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-          preFinish}) {
-    return generateSelectSQL(op.transaction, entityName, table, ConditionANY())
-        .resolveMapped((sql) {
-      return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) {
+    return generateSelectSQL(
+      op.transaction,
+      entityName,
+      table,
+      ConditionANY(),
+    ).resolveMapped((sql) {
+      return selectSQL(
+        op,
+        entityName,
+        table,
+        sql,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
-  FutureOr<R> doSelect<R>(TransactionOperation op, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit,
-      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish}) {
-    return generateSelectSQL(op.transaction, entityName, table, matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-            limit: limit)
-        .resolveMapped((sql) {
-      return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+  FutureOr<R> doSelect<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) {
+    return generateSelectSQL(
+      op.transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      limit: limit,
+    ).resolveMapped((sql) {
+      return selectSQL(
+        op,
+        entityName,
+        table,
+        sql,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
-  FutureOr<List<I>> doSelectIDsBy<I extends Object>(TransactionOperation op,
-      String entityName, String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      int? limit}) {
-    return generateSelectIDsSQL(op.transaction, entityName, table, matcher,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-            limit: limit)
-        .resolveMapped((sql) {
-      return selectSQL(op, entityName, table, sql)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, (results) {
-                var ids = results.map((e) => e['id']);
-                return parseIDs<I>(ids);
-              }));
+  FutureOr<List<I>> doSelectIDsBy<I extends Object>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+  }) {
+    return generateSelectIDsSQL(
+      op.transaction,
+      entityName,
+      table,
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      limit: limit,
+    ).resolveMapped((sql) {
+      return selectSQL(op, entityName, table, sql).resolveMapped(
+        (r) => _finishSQLOperation(sql, op, r, (results) {
+          var ids = results.map((e) => e['id']);
+          return parseIDs<I>(ids);
+        }),
+      );
     });
   }
 
   @override
   FutureOr<R> doSelectRelationship<R>(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      dynamic id,
-      String otherTableName,
-      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    String field,
+    dynamic id,
+    String otherTableName, [
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  ]) {
     return generateSelectRelationshipSQL(
-            op.transaction, entityName, table, field, id, otherTableName)
-        .resolveMapped((sql) {
+      op.transaction,
+      entityName,
+      table,
+      field,
+      id,
+      otherTableName,
+    ).resolveMapped((sql) {
       return selectRelationshipSQL(
-              op, entityName, table, sql, id, otherTableName)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+        op,
+        entityName,
+        table,
+        sql,
+        id,
+        otherTableName,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
   FutureOr<R> doSelectRelationships<R>(
-      TransactionOperation op,
-      String entityName,
-      String table,
-      String field,
-      List ids,
-      String otherTableName,
-      [PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish]) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    String field,
+    List ids,
+    String otherTableName, [
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  ]) {
     return generateSelectRelationshipsSQL(
-            op.transaction, entityName, table, field, ids, otherTableName)
-        .resolveMapped((sql) {
+      op.transaction,
+      entityName,
+      table,
+      field,
+      ids,
+      otherTableName,
+    ).resolveMapped((sql) {
       return selectRelationshipsSQL(
-              op, entityName, table, sql, ids, otherTableName)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+        op,
+        entityName,
+        table,
+        sql,
+        ids,
+        otherTableName,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 
   @override
-  FutureOr doUpdate<O>(TransactionOperation op, String entityName, String table,
-      O o, Object id, Map<String, dynamic> fields,
-      {String? idFieldName,
-      PreFinishDBOperation? preFinish,
-      bool allowAutoInsert = false}) {
-    return generateUpdateSQL(op.transaction, entityName, table, id, fields)
-        .resolveMapped((sql) {
-      return updateSQL(op, entityName, table, sql, id, fields,
-              allowAutoInsert: allowAutoInsert)
-          .resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
+  FutureOr doUpdate<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+    bool allowAutoInsert = false,
+  }) {
+    return generateUpdateSQL(
+      op.transaction,
+      entityName,
+      table,
+      id,
+      fields,
+    ).resolveMapped((sql) {
+      return updateSQL(
+        op,
+        entityName,
+        table,
+        sql,
+        id,
+        fields,
+        allowAutoInsert: allowAutoInsert,
+      ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
   }
 }
@@ -2632,15 +3202,16 @@ class _DBTableCheck {
   Map<_DBTableColumn, List<String>>? missingEnumValues;
 
   _DBTableCheck.missing(
-      this.repository,
-      this.scheme,
-      this.missingColumns,
-      this.missingReferenceColumns,
-      this.missingCollectionReferenceColumns,
-      this.missingReferenceConstraints,
-      this.missingUniqueConstraints,
-      this.missingEnumConstraints,
-      this.missingEnumValues);
+    this.repository,
+    this.scheme,
+    this.missingColumns,
+    this.missingReferenceColumns,
+    this.missingCollectionReferenceColumns,
+    this.missingReferenceConstraints,
+    this.missingUniqueConstraints,
+    this.missingEnumConstraints,
+    this.missingEnumValues,
+  );
 
   String? error;
 
@@ -2664,13 +3235,16 @@ class _DBTableCheck {
       _generateMissingSQLs(missingColumns, sqlGenerator);
 
   List<AlterTableSQL> generateMissingReferenceColumnsSQLs(
-          SQLGenerator sqlGenerator) =>
-      _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
+    SQLGenerator sqlGenerator,
+  ) => _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
 
   List<AlterTableSQL> generateMissingReferenceConstraintsSQLs(
-      SQLGenerator sqlGenerator) {
-    var columnsSQLs =
-        _generateMissingSQLs(missingReferenceConstraints, sqlGenerator);
+    SQLGenerator sqlGenerator,
+  ) {
+    var columnsSQLs = _generateMissingSQLs(
+      missingReferenceConstraints,
+      sqlGenerator,
+    );
 
     var constraints =
         columnsSQLs.expand((e) => e.constraints ?? <AlterTableSQL>[]).toList();
@@ -2679,63 +3253,88 @@ class _DBTableCheck {
   }
 
   List<AlterTableSQL> generateMissingUniqueConstraintsSQLs(
-          SQLGenerator sqlGenerator) =>
-      _generateMissingUniqueConstraintsSQLs(
-          missingUniqueConstraints, sqlGenerator);
+    SQLGenerator sqlGenerator,
+  ) => _generateMissingUniqueConstraintsSQLs(
+    missingUniqueConstraints,
+    sqlGenerator,
+  );
 
   List<AlterTableSQL> generateMissingEnumConstraintsSQLs(
-          SQLGenerator sqlGenerator) =>
+    SQLGenerator sqlGenerator,
+  ) =>
       _generateMissingEnumConstraintsSQLs(missingEnumConstraints, sqlGenerator);
 
   List<AlterTableSQL> generateMissingEnumValuesSQLs(
-          SQLGenerator sqlGenerator) =>
-      _generateMissingEnumConstraintsSQLs(
-          missingEnumValues?.keys, sqlGenerator);
+    SQLGenerator sqlGenerator,
+  ) => _generateMissingEnumConstraintsSQLs(
+    missingEnumValues?.keys,
+    sqlGenerator,
+  );
 
   List<AlterTableSQL> _generateMissingSQLs(
-      List<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
+    List<_DBTableColumn>? missing,
+    SQLGenerator sqlGenerator,
+  ) {
     var scheme = this.scheme;
     if (missing == null || missing.isEmpty || scheme == null) {
       return [];
     }
 
-    var sqls = missing
-        .map((f) => sqlGenerator.generateAddColumnAlterTableSQL(
-            scheme.name, f.name, f.type,
-            entityFieldAnnotations: f.annotations))
-        .toList();
+    var sqls =
+        missing
+            .map(
+              (f) => sqlGenerator.generateAddColumnAlterTableSQL(
+                scheme.name,
+                f.name,
+                f.type,
+                entityFieldAnnotations: f.annotations,
+              ),
+            )
+            .toList();
 
     return sqls;
   }
 
   List<AlterTableSQL> _generateMissingUniqueConstraintsSQLs(
-      Iterable<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
+    Iterable<_DBTableColumn>? missing,
+    SQLGenerator sqlGenerator,
+  ) {
     var scheme = this.scheme;
     if (missing == null || missing.isEmpty || scheme == null) {
       return [];
     }
 
-    var sqls = missing.map((f) {
-      return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
-          scheme.name, f.name, f.type,
-          entityFieldAnnotations: f.annotations);
-    }).toList();
+    var sqls =
+        missing.map((f) {
+          return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
+            scheme.name,
+            f.name,
+            f.type,
+            entityFieldAnnotations: f.annotations,
+          );
+        }).toList();
 
     return sqls;
   }
 
   List<AlterTableSQL> _generateMissingEnumConstraintsSQLs(
-      Iterable<_DBTableColumn>? missing, SQLGenerator sqlGenerator) {
+    Iterable<_DBTableColumn>? missing,
+    SQLGenerator sqlGenerator,
+  ) {
     var scheme = this.scheme;
     if (missing == null || missing.isEmpty || scheme == null) {
       return [];
     }
 
-    var sqls = missing.map((f) {
-      return sqlGenerator.generateAddEnumConstraintAlterTableSQL(
-          scheme.name, f.name, f.type,
-          entityFieldAnnotations: f.annotations);
-    }).toList();
+    var sqls =
+        missing.map((f) {
+          return sqlGenerator.generateAddEnumConstraintAlterTableSQL(
+            scheme.name,
+            f.name,
+            f.type,
+            entityFieldAnnotations: f.annotations,
+          );
+        }).toList();
 
     return sqls;
   }
@@ -2792,15 +3391,18 @@ class _DBTableColumn {
   _DBTableColumn(this.name, this.type, this.annotations);
 
   factory _DBTableColumn.fromEntityHandler(
-      EntityHandler<Object> entityHandler, String fieldName) {
+    EntityHandler<Object> entityHandler,
+    String fieldName,
+  ) {
     var type =
         entityHandler.getFieldType(null, fieldName, resolveFiledName: true) ??
-            TypeInfo.tString;
+        TypeInfo.tString;
 
-    var annotations = entityHandler
-        .getFieldEntityAnnotations(null, fieldName)
-        ?.whereType<EntityField>()
-        .toList();
+    var annotations =
+        entityHandler
+            .getFieldEntityAnnotations(null, fieldName)
+            ?.whereType<EntityField>()
+            .toList();
     return _DBTableColumn(fieldName, type, annotations);
   }
 
@@ -2813,124 +3415,241 @@ class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
   @override
   DBSQLAdapter get databaseAdapter => super.databaseAdapter as DBSQLAdapter;
 
-  DBSQLRepositoryAdapter(DBSQLAdapter super.databaseAdapter, super.name,
-      {super.tableName, super.type});
+  DBSQLRepositoryAdapter(
+    DBSQLAdapter super.databaseAdapter,
+    super.name, {
+    super.tableName,
+    super.type,
+  });
 
   @override
   SQLDialect get dialect => super.dialect as SQLDialect;
 
-  FutureOr<SQL> generateCountSQL(Transaction transaction,
-          {EntityMatcher? matcher,
-          Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
-      databaseAdapter.generateCountSQL(transaction, name, tableName,
-          matcher: matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+  FutureOr<SQL> generateCountSQL(
+    Transaction transaction, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => databaseAdapter.generateCountSQL(
+    transaction,
+    name,
+    tableName,
+    matcher: matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
 
   FutureOr<int> countSQL(TransactionOperation op, SQL sql) {
     return databaseAdapter.countSQL(op, name, tableName, sql);
   }
 
   FutureOr<SQL> generateSelectSQL(
-          Transaction transaction, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          int? limit}) =>
-      databaseAdapter.generateSelectSQL(transaction, name, tableName, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          limit: limit);
+    Transaction transaction,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    int? limit,
+  }) => databaseAdapter.generateSelectSQL(
+    transaction,
+    name,
+    tableName,
+    matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    limit: limit,
+  );
 
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(
-      TransactionOperation op, SQL sql) {
+    TransactionOperation op,
+    SQL sql,
+  ) {
     return databaseAdapter.selectSQL(op, name, tableName, sql);
   }
 
   FutureOr<SQL> generateInsertSQL(
-      Transaction transaction, O o, Map<String, dynamic> fields) {
+    Transaction transaction,
+    O o,
+    Map<String, dynamic> fields,
+  ) {
     return databaseAdapter.generateInsertSQL(
-        transaction, name, tableName, fields);
+      transaction,
+      name,
+      tableName,
+      fields,
+    );
   }
 
   FutureOr<dynamic> insertSQL(
-      TransactionOperation op, SQL sql, Map<String, dynamic> fields,
-      {String? idFieldName}) {
+    TransactionOperation op,
+    SQL sql,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+  }) {
     return databaseAdapter
         .insertSQL(op, name, tableName, sql, fields)
         .resolveMapped((ret) => ret ?? {});
   }
 
   FutureOr<SQL> generateUpdateSQL(
-      Transaction transaction, O o, Object id, Map<String, dynamic> fields) {
+    Transaction transaction,
+    O o,
+    Object id,
+    Map<String, dynamic> fields,
+  ) {
     return databaseAdapter.generateUpdateSQL(
-        transaction, name, tableName, id, fields);
+      transaction,
+      name,
+      tableName,
+      id,
+      fields,
+    );
   }
 
   FutureOr<dynamic> updateSQL(
-      TransactionOperation op, SQL sql, Object id, Map<String, dynamic> fields,
-      {String? idFieldName, bool allowAutoInsert = false}) {
+    TransactionOperation op,
+    SQL sql,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    bool allowAutoInsert = false,
+  }) {
     return databaseAdapter
-        .updateSQL(op, name, tableName, sql, id, fields,
-            allowAutoInsert: allowAutoInsert)
+        .updateSQL(
+          op,
+          name,
+          tableName,
+          sql,
+          id,
+          fields,
+          allowAutoInsert: allowAutoInsert,
+        )
         .resolveMapped((ret) => ret ?? {});
   }
 
-  FutureOr<List<SQL>> generateInsertRelationshipSQLs(Transaction transaction,
-      String field, dynamic id, String otherTableName, List otherIds) {
+  FutureOr<List<SQL>> generateInsertRelationshipSQLs(
+    Transaction transaction,
+    String field,
+    dynamic id,
+    String otherTableName,
+    List otherIds,
+  ) {
     return databaseAdapter.generateInsertRelationshipSQLs(
-        transaction, name, tableName, field, id, otherTableName, otherIds);
+      transaction,
+      name,
+      tableName,
+      field,
+      id,
+      otherTableName,
+      otherIds,
+    );
   }
 
-  FutureOr<bool> insertRelationshipSQLs(TransactionOperation op, List<SQL> sqls,
-      dynamic id, String otherTableName, List otherIds) {
+  FutureOr<bool> insertRelationshipSQLs(
+    TransactionOperation op,
+    List<SQL> sqls,
+    dynamic id,
+    String otherTableName,
+    List otherIds,
+  ) {
     return databaseAdapter.insertRelationshipSQLs(
-        op, name, tableName, sqls, id, otherTableName, otherIds);
+      op,
+      name,
+      tableName,
+      sqls,
+      id,
+      otherTableName,
+      otherIds,
+    );
   }
 
-  FutureOr<SQL> generateSelectRelationshipSQL(Transaction transaction,
-      String field, dynamic id, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipSQL(
+    Transaction transaction,
+    String field,
+    dynamic id,
+    String otherTableName,
+  ) {
     return databaseAdapter.generateSelectRelationshipSQL(
-        transaction, name, tableName, field, id, otherTableName);
+      transaction,
+      name,
+      tableName,
+      field,
+      id,
+      otherTableName,
+    );
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipSQL(
-      TransactionOperation op, SQL sql, dynamic id, String otherTableName) {
+    TransactionOperation op,
+    SQL sql,
+    dynamic id,
+    String otherTableName,
+  ) {
     return databaseAdapter.selectRelationshipSQL(
-        op, name, tableName, sql, id, otherTableName);
+      op,
+      name,
+      tableName,
+      sql,
+      id,
+      otherTableName,
+    );
   }
 
-  FutureOr<SQL> generateSelectRelationshipsSQL(Transaction transaction,
-      String field, List<dynamic> ids, String otherTableName) {
+  FutureOr<SQL> generateSelectRelationshipsSQL(
+    Transaction transaction,
+    String field,
+    List<dynamic> ids,
+    String otherTableName,
+  ) {
     return databaseAdapter.generateSelectRelationshipsSQL(
-        transaction, name, tableName, field, ids, otherTableName);
+      transaction,
+      name,
+      tableName,
+      field,
+      ids,
+      otherTableName,
+    );
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipsSQL(
-      TransactionOperation op,
-      SQL sql,
-      List<dynamic> ids,
-      String otherTableName) {
+    TransactionOperation op,
+    SQL sql,
+    List<dynamic> ids,
+    String otherTableName,
+  ) {
     return databaseAdapter.selectRelationshipsSQL(
-        op, name, tableName, sql, ids, otherTableName);
+      op,
+      name,
+      tableName,
+      sql,
+      ids,
+      otherTableName,
+    );
   }
 
   FutureOr<SQL> generateDeleteSQL(
-          Transaction transaction, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
-      databaseAdapter.generateDeleteSQL(transaction, name, tableName, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+    Transaction transaction,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => databaseAdapter.generateDeleteSQL(
+    transaction,
+    name,
+    tableName,
+    matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
 
   FutureOr<Iterable<Map<String, dynamic>>> deleteSQL(
-      TransactionOperation op, SQL sql) {
+    TransactionOperation op,
+    SQL sql,
+  ) {
     return databaseAdapter.deleteSQL(op, name, tableName, sql);
   }
 
@@ -2944,9 +3663,12 @@ class DBSQLAdapterException extends DBAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBSQLAdapterException';
 
-  DBSQLAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBSQLAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }

@@ -13,7 +13,8 @@ void main() async {
     print('** Test needs Dart VM Service to trigger the GC.\n');
     print('** Please run the test with the `--enable-vm-service` parameter:\n');
     print(
-        '     dart --enable-vm-service test test/bones_api_utils_weaklist_test.dart\n');
+      '     dart --enable-vm-service test test/bones_api_utils_weaklist_test.dart\n',
+    );
     return;
   }
 
@@ -88,9 +89,7 @@ void main() async {
 List<String> _cleanupPathSegments(Uri uri) {
   final pathSegments = <String>[];
   if (uri.pathSegments.isNotEmpty) {
-    pathSegments.addAll(uri.pathSegments.where(
-      (s) => s.isNotEmpty,
-    ));
+    pathSegments.addAll(uri.pathSegments.where((s) => s.isNotEmpty));
   }
   return pathSegments;
 }

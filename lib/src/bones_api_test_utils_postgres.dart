@@ -23,16 +23,21 @@ class APITestConfigDockerPostgreSQL
 
   final String version;
 
-  APITestConfigDockerPostgreSQL(Map<String, dynamic> apiConfig,
-      {DockerHost? dockerHost,
-      String? containerNamePrefix,
-      this.postgresPort,
-      this.maxConnections,
-      this.logStatement,
-      this.version = 'latest',
-      super.cleanContainer})
-      : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig,
-            containerNamePrefix: containerNamePrefix) {
+  APITestConfigDockerPostgreSQL(
+    Map<String, dynamic> apiConfig, {
+    DockerHost? dockerHost,
+    String? containerNamePrefix,
+    this.postgresPort,
+    this.maxConnections,
+    this.logStatement,
+    this.version = 'latest',
+    super.cleanContainer,
+  }) : super(
+         dockerHost ?? DockerHostLocal(),
+         'PostgreSQL',
+         apiConfig,
+         containerNamePrefix: containerNamePrefix,
+       ) {
     DBPostgreSQLAdapter.boot();
   }
 
@@ -43,14 +48,15 @@ class APITestConfigDockerPostgreSQL
   @override
   PostgreSQLContainerConfig createDBContainerConfig(int dbPort) =>
       PostgreSQLContainerConfig(
-          version: version,
-          pgUser: dbUser,
-          pgPassword: dbPass,
-          pgDatabase: dbName,
-          hostPort: dbPort,
-          postgresPort: postgresPort,
-          maxConnections: maxConnections,
-          logStatement: logStatement);
+        version: version,
+        pgUser: dbUser,
+        pgPassword: dbPass,
+        pgDatabase: dbName,
+        hostPort: dbPort,
+        postgresPort: postgresPort,
+        maxConnections: maxConnections,
+        logStatement: logStatement,
+      );
 
   @override
   Future<int> resolveFreePort(int port) => freeport.resolveFreePort(port);
@@ -66,10 +72,11 @@ class APITestConfigDockerPostgreSQL
     var body = res.split(RegExp(r'--+\+--+\+--+\+'))[1];
     var parts = body.split(RegExp(r'[\r\n]'));
 
-    var names = parts
-        .where((p) => p.contains(RegExp(r'\s+\|\s+\w+\s+\|')))
-        .map((p) => p.split(RegExp(r'\s+\|\s+'))[1].trim())
-        .toList();
+    var names =
+        parts
+            .where((p) => p.contains(RegExp(r'\s+\|\s+\w+\s+\|')))
+            .map((p) => p.split(RegExp(r'\s+\|\s+'))[1].trim())
+            .toList();
 
     return names;
   }

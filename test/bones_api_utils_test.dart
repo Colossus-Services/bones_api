@@ -21,28 +21,43 @@ void main() {
 
   group('StringUtils', () {
     test('toLowerCaseSimple, toLowerCaseUnderscore', () async {
-      expect(StringUtils.toLowerCase('someCamel-Case+Name'),
-          equals('somecamel-case+name'));
-
-      expect(StringUtils.toLowerCaseSimpleCached('someCamel-Case+Name'),
-          equals('somecamelcasename'));
-
-      expect(StringUtils.toLowerCaseUnderscore('someCamelCaseName'),
-          equals('some_camel_case_name'));
-
-      expect(StringUtils.toLowerCaseUnderscore('someCamel-caseName'),
-          equals('some_camel-case_name'));
       expect(
-          StringUtils.toLowerCaseUnderscore('someCamel-caseName', simple: true),
-          equals('some_camel_case_name'));
+        StringUtils.toLowerCase('someCamel-Case+Name'),
+        equals('somecamel-case+name'),
+      );
 
-      expect(StringUtils.toLowerCaseUnderscore('_someCamelCaseName'),
-          equals('_some_camel_case_name'));
+      expect(
+        StringUtils.toLowerCaseSimpleCached('someCamel-Case+Name'),
+        equals('somecamelcasename'),
+      );
 
-      expect(StringUtils.toLowerCaseUnderscore('someCamel_CaseName'),
-          equals('some_camel_case_name'));
-      expect(StringUtils.toLowerCaseUnderscore('_someCamel_CaseName'),
-          equals('_some_camel_case_name'));
+      expect(
+        StringUtils.toLowerCaseUnderscore('someCamelCaseName'),
+        equals('some_camel_case_name'),
+      );
+
+      expect(
+        StringUtils.toLowerCaseUnderscore('someCamel-caseName'),
+        equals('some_camel-case_name'),
+      );
+      expect(
+        StringUtils.toLowerCaseUnderscore('someCamel-caseName', simple: true),
+        equals('some_camel_case_name'),
+      );
+
+      expect(
+        StringUtils.toLowerCaseUnderscore('_someCamelCaseName'),
+        equals('_some_camel_case_name'),
+      );
+
+      expect(
+        StringUtils.toLowerCaseUnderscore('someCamel_CaseName'),
+        equals('some_camel_case_name'),
+      );
+      expect(
+        StringUtils.toLowerCaseUnderscore('_someCamel_CaseName'),
+        equals('_some_camel_case_name'),
+      );
     });
 
     test('getHeadEquality', () async {
@@ -58,98 +73,157 @@ void main() {
 
     test('getHeadEquality', () async {
       expect(
-          StringUtils.getHeadEquality(['abc_xyz', 'abc_123']), equals('abc_'));
-      expect(StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_123']),
-          equals('abc_'));
-
-      expect(StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3']),
-          equals('abc_xyz'));
+        StringUtils.getHeadEquality(['abc_xyz', 'abc_123']),
+        equals('abc_'),
+      );
       expect(
-          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
-              delimiter: '_'),
-          equals('abc_'));
+        StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_123']),
+        equals('abc_'),
+      );
 
       expect(
-          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
-              validator: (s) => !s.contains('y')),
-          equals('abc_x'));
+        StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3']),
+        equals('abc_xyz'),
+      );
       expect(
-          StringUtils.getHeadEquality(['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
-              validator: (s) => !s.contains('y'), delimiter: '_'),
-          equals('abc_'));
+        StringUtils.getHeadEquality([
+          'abc_xyz1',
+          'abc_xyz2',
+          'abc_xyz3',
+        ], delimiter: '_'),
+        equals('abc_'),
+      );
+
+      expect(
+        StringUtils.getHeadEquality([
+          'abc_xyz1',
+          'abc_xyz2',
+          'abc_xyz3',
+        ], validator: (s) => !s.contains('y')),
+        equals('abc_x'),
+      );
+      expect(
+        StringUtils.getHeadEquality(
+          ['abc_xyz1', 'abc_xyz2', 'abc_xyz3'],
+          validator: (s) => !s.contains('y'),
+          delimiter: '_',
+        ),
+        equals('abc_'),
+      );
     });
 
     test('getTailEquality', () async {
       expect(
-          StringUtils.getTailEquality(['abc_xyz', '123_xyz']), equals('_xyz'));
-      expect(StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '123_xyz']),
-          equals('_xyz'));
-
-      expect(StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz']),
-          equals('abc_xyz'));
+        StringUtils.getTailEquality(['abc_xyz', '123_xyz']),
+        equals('_xyz'),
+      );
       expect(
-          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
-              delimiter: '_'),
-          equals('_xyz'));
+        StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '123_xyz']),
+        equals('_xyz'),
+      );
 
       expect(
-          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
-              validator: (s) => !s.contains('b')),
-          equals('c_xyz'));
+        StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz']),
+        equals('abc_xyz'),
+      );
       expect(
-          StringUtils.getTailEquality(['1abc_xyz', '2abc_xyz', '3abc_xyz'],
-              validator: (s) => !s.contains('b'), delimiter: '_'),
-          equals('_xyz'));
+        StringUtils.getTailEquality([
+          '1abc_xyz',
+          '2abc_xyz',
+          '3abc_xyz',
+        ], delimiter: '_'),
+        equals('_xyz'),
+      );
+
+      expect(
+        StringUtils.getTailEquality([
+          '1abc_xyz',
+          '2abc_xyz',
+          '3abc_xyz',
+        ], validator: (s) => !s.contains('b')),
+        equals('c_xyz'),
+      );
+      expect(
+        StringUtils.getTailEquality(
+          ['1abc_xyz', '2abc_xyz', '3abc_xyz'],
+          validator: (s) => !s.contains('b'),
+          delimiter: '_',
+        ),
+        equals('_xyz'),
+      );
     });
 
     test('trimEqualitiesMap', () async {
       expect(
-          StringUtils.trimEqualitiesMap(['item_abc', 'item_klm', 'item_xyz']),
-          equals({'item_abc': 'abc', 'item_klm': 'klm', 'item_xyz': 'xyz'}));
+        StringUtils.trimEqualitiesMap(['item_abc', 'item_klm', 'item_xyz']),
+        equals({'item_abc': 'abc', 'item_klm': 'klm', 'item_xyz': 'xyz'}),
+      );
 
       expect(
-          StringUtils.trimEqualitiesMap(
-              ['item_abc_id', 'item_klm_id', 'item_xyz_id']),
-          equals({
-            'item_abc_id': 'abc',
-            'item_klm_id': 'klm',
-            'item_xyz_id': 'xyz'
-          }));
+        StringUtils.trimEqualitiesMap([
+          'item_abc_id',
+          'item_klm_id',
+          'item_xyz_id',
+        ]),
+        equals({
+          'item_abc_id': 'abc',
+          'item_klm_id': 'klm',
+          'item_xyz_id': 'xyz',
+        }),
+      );
 
       expect(
-          StringUtils.trimEqualitiesMap(
-              ['item_abc_1k_id', 'item_klm_2k_id', 'item_xyz_3k_id']),
-          equals({
-            'item_abc_1k_id': 'abc_1',
-            'item_klm_2k_id': 'klm_2',
-            'item_xyz_3k_id': 'xyz_3'
-          }));
+        StringUtils.trimEqualitiesMap([
+          'item_abc_1k_id',
+          'item_klm_2k_id',
+          'item_xyz_3k_id',
+        ]),
+        equals({
+          'item_abc_1k_id': 'abc_1',
+          'item_klm_2k_id': 'klm_2',
+          'item_xyz_3k_id': 'xyz_3',
+        }),
+      );
 
       expect(
-          StringUtils.trimEqualitiesMap(
-              ['item_abc_1k_id', 'item_klm_2k_id', 'item_xyz_3k_id'],
-              delimiter: '_'),
-          equals({
-            'item_abc_1k_id': 'abc_1k',
-            'item_klm_2k_id': 'klm_2k',
-            'item_xyz_3k_id': 'xyz_3k'
-          }));
-
-      expect(StringUtils.trimEqualitiesMap(['item_abc_id', 'item_abc_xyz_id']),
-          equals({'item_abc_id': 'i', 'item_abc_xyz_id': 'xyz_i'}));
-
-      expect(
-          StringUtils.trimEqualitiesMap(['item_abc_id', 'item_abc_xyz_id'],
-              validator: (s) => !s.contains('abc')),
-          equals({'item_abc_id': 'c', 'item_abc_xyz_id': 'c_xyz'}));
-
-      expect(StringUtils.trimEqualitiesMap(['item_xyz_id', 'item_abc_xyz_id']),
-          equals({'item_xyz_id': 'x', 'item_abc_xyz_id': 'abc_x'}));
+        StringUtils.trimEqualitiesMap([
+          'item_abc_1k_id',
+          'item_klm_2k_id',
+          'item_xyz_3k_id',
+        ], delimiter: '_'),
+        equals({
+          'item_abc_1k_id': 'abc_1k',
+          'item_klm_2k_id': 'klm_2k',
+          'item_xyz_3k_id': 'xyz_3k',
+        }),
+      );
 
       expect(
-          StringUtils.trimEqualitiesMap(['item_xyz_id', 'item_abc_xyz_id'],
-              delimiter: '_', validator: (s) => !s.contains('xyz')),
-          equals({'item_xyz_id': 'xyz', 'item_abc_xyz_id': 'abc_xyz'}));
+        StringUtils.trimEqualitiesMap(['item_abc_id', 'item_abc_xyz_id']),
+        equals({'item_abc_id': 'i', 'item_abc_xyz_id': 'xyz_i'}),
+      );
+
+      expect(
+        StringUtils.trimEqualitiesMap([
+          'item_abc_id',
+          'item_abc_xyz_id',
+        ], validator: (s) => !s.contains('abc')),
+        equals({'item_abc_id': 'c', 'item_abc_xyz_id': 'c_xyz'}),
+      );
+
+      expect(
+        StringUtils.trimEqualitiesMap(['item_xyz_id', 'item_abc_xyz_id']),
+        equals({'item_xyz_id': 'x', 'item_abc_xyz_id': 'abc_x'}),
+      );
+
+      expect(
+        StringUtils.trimEqualitiesMap(
+          ['item_xyz_id', 'item_abc_xyz_id'],
+          delimiter: '_',
+          validator: (s) => !s.contains('xyz'),
+        ),
+        equals({'item_xyz_id': 'xyz', 'item_abc_xyz_id': 'abc_xyz'}),
+      );
     });
   });
 
@@ -167,8 +241,10 @@ void main() {
       expect(TypeParser.parseInt(' -123,456.78 '), equals(-123456));
       expect(TypeParser.parseInt(' "123,456.78 " '), equals(123456));
       expect(TypeParser.parseInt(' "-123,456.78 " '), equals(-123456));
-      expect(TypeParser.parseInt(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
-          equals(1577934245000));
+      expect(
+        TypeParser.parseInt(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
+        equals(1577934245000),
+      );
       expect(TypeParser.parseInt(null, 404), equals(404));
       expect(TypeParser.parseInt('', 404), equals(404));
       expect(TypeParser.parseInt(' x ', 404), equals(404));
@@ -193,8 +269,10 @@ void main() {
       expect(TypeParser.parseDouble(' -123,456.78 '), equals(-123456.78));
       expect(TypeParser.parseDouble(' "123,456.78 " '), equals(123456.78));
       expect(TypeParser.parseDouble(' "-123,456.78 " '), equals(-123456.78));
-      expect(TypeParser.parseDouble(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
-          equals(1577934245000));
+      expect(
+        TypeParser.parseDouble(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
+        equals(1577934245000),
+      );
       expect(TypeParser.parseDouble(null, 404), equals(404));
       expect(TypeParser.parseDouble('', 404), equals(404));
       expect(TypeParser.parseDouble(' x ', 404), equals(404));
@@ -219,8 +297,10 @@ void main() {
       expect(TypeParser.parseNum(' -123,456.78 '), equals(-123456.78));
       expect(TypeParser.parseNum(' "123,456.78 " '), equals(123456.78));
       expect(TypeParser.parseNum(' "-123,456.78 " '), equals(-123456.78));
-      expect(TypeParser.parseNum(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
-          equals(1577934245000));
+      expect(
+        TypeParser.parseNum(DateTime.utc(2020, 1, 2, 3, 4, 5, 0, 0)),
+        equals(1577934245000),
+      );
       expect(TypeParser.parseNum(null, 404), equals(404));
       expect(TypeParser.parseNum('', 404), equals(404));
       expect(TypeParser.parseNum(' x ', 404), equals(404));
@@ -286,23 +366,29 @@ void main() {
       expect(TypeParser.parserFor(obj: {'a': 1})!('a:1'), isA<Map>());
       expect(TypeParser.parserFor(obj: {1, 2})!('1,2'), isA<Set>());
       expect(TypeParser.parserFor(obj: [1, 2])!('1,2'), isA<List>());
-      expect(TypeParser.parserFor(obj: [1, 2].map((e) => e))!('1,2'),
-          isA<Iterable>());
+      expect(
+        TypeParser.parserFor(obj: [1, 2].map((e) => e))!('1,2'),
+        isA<Iterable>(),
+      );
     });
 
     test('parseList', () async {
       expect(TypeParser.parseList([1, 2, 3]), equals([1, 2, 3]));
       expect(TypeParser.parseList('1,2,3'), equals(['1', '2', '3']));
-      expect(TypeParser.parseList('1,2,3', elementParser: TypeParser.parseInt),
-          equals([1, 2, 3]));
+      expect(
+        TypeParser.parseList('1,2,3', elementParser: TypeParser.parseInt),
+        equals([1, 2, 3]),
+      );
       expect(TypeParser.parseList<int>('1,2,3'), equals([1, 2, 3]));
     });
 
     test('parseSet', () async {
       expect(TypeParser.parseSet([1, 2, 3]), equals({1, 2, 3}));
       expect(TypeParser.parseSet('1,2,3'), equals({'1', '2', '3'}));
-      expect(TypeParser.parseSet('1,2,3', elementParser: TypeParser.parseInt),
-          equals({1, 2, 3}));
+      expect(
+        TypeParser.parseSet('1,2,3', elementParser: TypeParser.parseInt),
+        equals({1, 2, 3}),
+      );
       expect(TypeParser.parseSet<int>('1,2,3'), equals({1, 2, 3}));
     });
 
@@ -310,12 +396,17 @@ void main() {
       expect(TypeParser.parseMap({'a': 1, 'b': 2}), equals({'a': 1, 'b': 2}));
       expect(TypeParser.parseMap('a:1&b:2'), equals({'a': '1', 'b': '2'}));
       expect(
-          TypeParser.parseMap('a:1&b:2',
-              keyParser: TypeParser.parseString,
-              valueParser: TypeParser.parseInt),
-          equals({'a': 1, 'b': 2}));
-      expect(TypeParser.parseMap<String, int>('a:1&b:2'),
-          equals({'a': 1, 'b': 2}));
+        TypeParser.parseMap(
+          'a:1&b:2',
+          keyParser: TypeParser.parseString,
+          valueParser: TypeParser.parseInt,
+        ),
+        equals({'a': 1, 'b': 2}),
+      );
+      expect(
+        TypeParser.parseMap<String, int>('a:1&b:2'),
+        equals({'a': 1, 'b': 2}),
+      );
     });
   });
 
@@ -480,24 +571,29 @@ void main() {
       expect(positionalFields.getMapEntry('b', [1, 2, 3])!.value, equals(2));
 
       expect(
-          positionalFields.toMap([1, 2, 3]), equals({'a': 1, 'b': 2, 'c': 3}));
+        positionalFields.toMap([1, 2, 3]),
+        equals({'a': 1, 'b': 2, 'c': 3}),
+      );
 
       expect(
-          positionalFields.toListOfMap([
-            [1, 2, 3],
-            [10, 20, 30]
-          ]),
-          equals([
-            {'a': 1, 'b': 2, 'c': 3},
-            {'a': 10, 'b': 20, 'c': 30}
-          ]));
+        positionalFields.toListOfMap([
+          [1, 2, 3],
+          [10, 20, 30],
+        ]),
+        equals([
+          {'a': 1, 'b': 2, 'c': 3},
+          {'a': 10, 'b': 20, 'c': 30},
+        ]),
+      );
     });
   });
 
   group('InstanceTracker', () {
     test('basic', () async {
       var tracker = InstanceTracker<Map<String, Object>, List<Object>>(
-          'test', (m) => m.values.toList());
+        'test',
+        (m) => m.values.toList(),
+      );
 
       var m1 = {'a': 1, 'b': 2};
       var m2 = {'a': 2, 'b': 20};
@@ -538,13 +634,19 @@ void main() {
 
       expect(tryCall(() => null, defaultValue: 123), equals(123));
 
-      expect(tryCall(() => 123, onSuccessValue: 456, onErrorValue: -456),
-          equals(456));
+      expect(
+        tryCall(() => 123, onSuccessValue: 456, onErrorValue: -456),
+        equals(456),
+      );
 
       expect(
-          tryCall(() => throw StateError('test'),
-              onSuccessValue: 456, onErrorValue: -456),
-          equals(-456));
+        tryCall(
+          () => throw StateError('test'),
+          onSuccessValue: 456,
+          onErrorValue: -456,
+        ),
+        equals(-456),
+      );
     });
 
     test('tryCallSync', () {
@@ -552,13 +654,19 @@ void main() {
 
       expect(tryCallSync(() => null, defaultValue: 123), equals(123));
 
-      expect(tryCallSync(() => 123, onSuccessValue: 456, onErrorValue: -456),
-          equals(456));
+      expect(
+        tryCallSync(() => 123, onSuccessValue: 456, onErrorValue: -456),
+        equals(456),
+      );
 
       expect(
-          tryCallSync(() => throw StateError('test'),
-              onSuccessValue: 456, onErrorValue: -456),
-          equals(-456));
+        tryCallSync(
+          () => throw StateError('test'),
+          onSuccessValue: 456,
+          onErrorValue: -456,
+        ),
+        equals(-456),
+      );
     });
   });
 
@@ -604,38 +712,58 @@ void main() {
 
       expect(tryCallMapped(() => null, defaultValue: 123), equals(123));
 
-      expect(tryCallMapped(() => 123, onSuccessValue: 456, onErrorValue: -456),
-          equals(456));
+      expect(
+        tryCallMapped(() => 123, onSuccessValue: 456, onErrorValue: -456),
+        equals(456),
+      );
 
       expect(
-          tryCallMapped(() => throw StateError('test error'),
-              onSuccessValue: 456, onErrorValue: -456),
-          equals(-456));
+        tryCallMapped(
+          () => throw StateError('test error'),
+          onSuccessValue: 456,
+          onErrorValue: -456,
+        ),
+        equals(-456),
+      );
     });
 
     test('async', () async {
       expect(await tryCallMapped(() => _asyncValue(123)), equals(123));
 
-      expect(await tryCallMapped(() => _asyncValue(null), defaultValue: 123),
-          equals(123));
+      expect(
+        await tryCallMapped(() => _asyncValue(null), defaultValue: 123),
+        equals(123),
+      );
 
       expect(
-          await tryCallMapped(() => _asyncValue(123),
-              onSuccessValue: 456, onErrorValue: -456),
-          equals(456));
+        await tryCallMapped(
+          () => _asyncValue(123),
+          onSuccessValue: 456,
+          onErrorValue: -456,
+        ),
+        equals(456),
+      );
 
       expect(
-          await tryCallMapped(() => _asyncValue(123),
-              onSuccess: (v) => 456 * 2, onError: (e, s) => -456 * 2),
-          equals(456 * 2));
+        await tryCallMapped(
+          () => _asyncValue(123),
+          onSuccess: (v) => 456 * 2,
+          onError: (e, s) => -456 * 2,
+        ),
+        equals(456 * 2),
+      );
 
       expect(
-          await tryCallMapped(
-              () => Future.delayed(Duration(milliseconds: 1),
-                  () => throw StateError('test async error')),
-              onSuccess: (v) => (456 * 2).toString(),
-              onError: (e, s) => e.toString()),
-          contains('test async error'));
+        await tryCallMapped(
+          () => Future.delayed(
+            Duration(milliseconds: 1),
+            () => throw StateError('test async error'),
+          ),
+          onSuccess: (v) => (456 * 2).toString(),
+          onError: (e, s) => e.toString(),
+        ),
+        contains('test async error'),
+      );
     });
   });
 }

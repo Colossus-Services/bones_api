@@ -12,26 +12,36 @@ void main() {
       var map = {
         'country_code': 'US',
         'city': 'New York',
-        'stateOrProvince': 'NY'
+        'stateOrProvince': 'NY',
       };
 
       expect(
-          fieldsTest.getFieldValueFromMap('country_code', map), equals('US'));
+        fieldsTest.getFieldValueFromMap('country_code', map),
+        equals('US'),
+      );
       expect(fieldsTest.getFieldValueFromMap('countrycode', map), equals('US'));
       expect(fieldsTest.getFieldValueFromMap('countryCode', map), equals('US'));
       expect(
-          fieldsTest.getFieldValueFromMap('countryCode_', map), equals('US'));
+        fieldsTest.getFieldValueFromMap('countryCode_', map),
+        equals('US'),
+      );
 
       expect(fieldsTest.getFieldValueFromMap('city', map), equals('New York'));
       expect(fieldsTest.getFieldValueFromMap('City', map), equals('New York'));
       expect(fieldsTest.getFieldValueFromMap('City_', map), equals('New York'));
 
-      expect(fieldsTest.getFieldValueFromMap('stateOrProvince', map),
-          equals('NY'));
-      expect(fieldsTest.getFieldValueFromMap('state_Or_Province', map),
-          equals('NY'));
-      expect(fieldsTest.getFieldValueFromMap('stateorprovince', map),
-          equals('NY'));
+      expect(
+        fieldsTest.getFieldValueFromMap('stateOrProvince', map),
+        equals('NY'),
+      );
+      expect(
+        fieldsTest.getFieldValueFromMap('state_Or_Province', map),
+        equals('NY'),
+      );
+      expect(
+        fieldsTest.getFieldValueFromMap('stateorprovince', map),
+        equals('NY'),
+      );
     });
 
     test('getFieldValueFromMap', () async {
@@ -43,55 +53,49 @@ void main() {
       var fieldsNamesSimple = fieldsTest.buildFieldsNamesSimple(fieldsNames);
 
       expect(
-          fieldsTest.getFieldsValuesFromMap(
-              fieldsNames,
-              {
-                'country_code': 'US',
-                'city': 'New York',
-                'stateOrProvince': 'NY'
-              },
-              fieldsNamesIndexes: fieldsNamesIndexes,
-              fieldsNamesLC: fieldsNamesLC,
-              fieldsNamesSimple: fieldsNamesSimple),
-          equals({
-            'country_code': 'US',
-            'city': 'New York',
-            'state_or_province': 'NY'
-          }));
+        fieldsTest.getFieldsValuesFromMap(
+          fieldsNames,
+          {'country_code': 'US', 'city': 'New York', 'stateOrProvince': 'NY'},
+          fieldsNamesIndexes: fieldsNamesIndexes,
+          fieldsNamesLC: fieldsNamesLC,
+          fieldsNamesSimple: fieldsNamesSimple,
+        ),
+        equals({
+          'country_code': 'US',
+          'city': 'New York',
+          'state_or_province': 'NY',
+        }),
+      );
 
       expect(
-          fieldsTest.getFieldsValuesFromMap(
-              fieldsNames,
-              {
-                'countrycode': 'US',
-                'City': 'New York',
-                'stateOrProvince': 'NY'
-              },
-              fieldsNamesIndexes: fieldsNamesIndexes,
-              fieldsNamesLC: fieldsNamesLC,
-              fieldsNamesSimple: fieldsNamesSimple),
-          equals({
-            'country_code': 'US',
-            'city': 'New York',
-            'state_or_province': 'NY'
-          }));
+        fieldsTest.getFieldsValuesFromMap(
+          fieldsNames,
+          {'countrycode': 'US', 'City': 'New York', 'stateOrProvince': 'NY'},
+          fieldsNamesIndexes: fieldsNamesIndexes,
+          fieldsNamesLC: fieldsNamesLC,
+          fieldsNamesSimple: fieldsNamesSimple,
+        ),
+        equals({
+          'country_code': 'US',
+          'city': 'New York',
+          'state_or_province': 'NY',
+        }),
+      );
 
       expect(
-          fieldsTest.getFieldsValuesFromMap(
-              fieldsNames,
-              {
-                'countryCode': 'US',
-                'City': 'New York',
-                'state_Or_Province': 'NY'
-              },
-              fieldsNamesIndexes: fieldsNamesIndexes,
-              fieldsNamesLC: fieldsNamesLC,
-              fieldsNamesSimple: fieldsNamesSimple),
-          equals({
-            'country_code': 'US',
-            'city': 'New York',
-            'state_or_province': 'NY'
-          }));
+        fieldsTest.getFieldsValuesFromMap(
+          fieldsNames,
+          {'countryCode': 'US', 'City': 'New York', 'state_Or_Province': 'NY'},
+          fieldsNamesIndexes: fieldsNamesIndexes,
+          fieldsNamesLC: fieldsNamesLC,
+          fieldsNamesSimple: fieldsNamesSimple,
+        ),
+        equals({
+          'country_code': 'US',
+          'city': 'New York',
+          'state_or_province': 'NY',
+        }),
+      );
     });
   });
 

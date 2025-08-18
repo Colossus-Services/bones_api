@@ -33,8 +33,12 @@ class APIPlatformGeneric extends APIPlatform {
     _log('WARNING', message);
   }
 
-  void _log(String type, Object? message,
-      [Object? error, StackTrace? stackTrace]) {
+  void _log(
+    String type,
+    Object? message, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
     print('[WARNING] $message');
     if (error != null) {
       print(error);
@@ -83,8 +87,11 @@ class APIPlatformGeneric extends APIPlatform {
   }
 
   @override
-  String? getProperty(String? key,
-      {String? defaultValue, bool caseSensitive = false}) {
+  String? getProperty(
+    String? key, {
+    String? defaultValue,
+    bool caseSensitive = false,
+  }) {
     if (key == null) return defaultValue;
 
     var prev = _properties[key];

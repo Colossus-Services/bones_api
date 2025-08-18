@@ -11,14 +11,16 @@ void main() {
       var logErrors = [];
       var logDb = [];
 
-      var apiRoot = TestAPIRoot(apiConfig: {
-        'log': {
-          'all': (l, m) => logAll.add([l, m]),
-          'error': (l, m) => logErrors.add([l, m]),
-          'db': (l, m) => logDb.add([l, m]),
-          'console': true,
-        }
-      });
+      var apiRoot = TestAPIRoot(
+        apiConfig: {
+          'log': {
+            'all': (l, m) => logAll.add([l, m]),
+            'error': (l, m) => logErrors.add([l, m]),
+            'db': (l, m) => logDb.add([l, m]),
+            'console': true,
+          },
+        },
+      );
 
       DBSQLMemoryAdapter.boot();
 

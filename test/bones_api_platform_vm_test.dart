@@ -9,14 +9,15 @@ void main() {
       expect(apiPlatform, isNotNull);
 
       expect(
-          apiPlatform.type,
-          anyOf(
-            APIPlatformType.vm,
-            APIPlatformType.native,
-            APIPlatformType.linux,
-            APIPlatformType.windows,
-            APIPlatformType.macos,
-          ));
+        apiPlatform.type,
+        anyOf(
+          APIPlatformType.vm,
+          APIPlatformType.native,
+          APIPlatformType.linux,
+          APIPlatformType.windows,
+          APIPlatformType.macos,
+        ),
+      );
 
       var capability = apiPlatform.capability;
       expect(capability.canReadFile, isTrue);
@@ -24,13 +25,18 @@ void main() {
       expect(capability.int32 || capability.int64, isTrue);
       expect(capability.double32 || capability.double64, isTrue);
 
-      expect(apiPlatform.resolveFilePath('pubspec.yaml'),
-          contains('pubspec.yaml'));
+      expect(
+        apiPlatform.resolveFilePath('pubspec.yaml'),
+        contains('pubspec.yaml'),
+      );
 
       expect(
-          apiPlatform.getProperty('__TEST__UNKNOWN_PROPERTY_KEY__',
-              defaultValue: 'def_vm'),
-          equals('def_vm'));
+        apiPlatform.getProperty(
+          '__TEST__UNKNOWN_PROPERTY_KEY__',
+          defaultValue: 'def_vm',
+        ),
+        equals('def_vm'),
+      );
     });
   });
 }

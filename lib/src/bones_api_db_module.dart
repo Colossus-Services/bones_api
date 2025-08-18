@@ -24,9 +24,12 @@ class APIDBModule extends APIModule {
 
   final APICredential? credential;
 
-  APIDBModule(APIRoot apiRoot,
-      {String name = 'db', this.onlyOnDevelopment = true, this.credential})
-      : super(apiRoot, name);
+  APIDBModule(
+    APIRoot apiRoot, {
+    String name = 'db',
+    this.onlyOnDevelopment = true,
+    this.credential,
+  }) : super(apiRoot, name);
 
   bool get development => apiConfig.development;
 
@@ -45,8 +48,9 @@ class APIDBModule extends APIModule {
 
       var openTransactions = Transaction.openInstances;
 
-      var info =
-          StringBuffer('Open Transactions (${openTransactions.length}):\n');
+      var info = StringBuffer(
+        'Open Transactions (${openTransactions.length}):\n',
+      );
 
       for (var t in openTransactions) {
         info.write(t);
@@ -79,9 +83,10 @@ class APIDBModule extends APIModule {
 
       var table = pathParams.removeAt(0);
 
-      var eager = pathParams.any((p) => equalsIgnoreAsciiCase(p, 'eager'))
-          ? true
-          : null;
+      var eager =
+          pathParams.any((p) => equalsIgnoreAsciiCase(p, 'eager'))
+              ? true
+              : null;
 
       var json = _containsKey(pathParams, 'json');
       return select(table, request, eager: eager, json: json);
@@ -151,8 +156,9 @@ class APIDBModule extends APIModule {
     if (credential == null) {
       if (!development) {
         throw APIResponse.error(
-            error:
-                "Not a `development` environment to allow unauthenticated access.");
+          error:
+              "Not a `development` environment to allow unauthenticated access.",
+        );
       }
 
       return null;
@@ -200,27 +206,31 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var allRepositoriesEntries = allRepositories.entries
-        .sorted((a, b) => a.value.name.compareTo(b.value.name))
-        .toList();
+    var allRepositoriesEntries =
+        allRepositories.entries
+            .sorted((a, b) => a.value.name.compareTo(b.value.name))
+            .toList();
 
     if (json) {
-      var map = allRepositoriesEntries
-          .map((e) {
-            var type = e.key;
-            var repo = e.value;
-            return MapEntry('$type', repo.name);
-          })
-          .sorted((a, b) => a.key.compareTo(b.key))
-          .toMapFromEntries();
+      var map =
+          allRepositoriesEntries
+              .map((e) {
+                var type = e.key;
+                var repo = e.value;
+                return MapEntry('$type', repo.name);
+              })
+              .sorted((a, b) => a.key.compareTo(b.key))
+              .toMapFromEntries();
 
       return APIResponse.ok(map, mimeType: 'json');
     }
 
     var htmlDoc = HTMLDocument.darkTheme(
       title: 'DB - Tables',
-      top:
-          _buildTop(apiRootName: apiRoot.name, apiRootVersion: apiRoot.version),
+      top: _buildTop(
+        apiRootName: apiRoot.name,
+        apiRootVersion: apiRoot.version,
+      ),
       footer: _buildFooter(),
     );
 
@@ -228,20 +238,23 @@ class APIDBModule extends APIModule {
 
     content.add('<br><table class="center">');
     content.add(
-        '<thead><tr><td style="text-align: right">Type: &nbsp;</td><td style="text-align: center">Table:</td><td style="text-align: center">Operations:</td></tr></thead>');
+      '<thead><tr><td style="text-align: right">Type: &nbsp;</td><td style="text-align: center">Table:</td><td style="text-align: center">Operations:</td></tr></thead>',
+    );
 
     for (var e in allRepositoriesEntries) {
       var type = e.key;
       var repo = e.value;
       var repoName = repo.name;
       content.add(
-          '<tr><td style="text-align: right"><b>$type:</b> &nbsp;</td><td style="text-align: center">$repoName</td><td> &nbsp; [ <a href="${basePath}select/$repoName">select</a> &nbsp;|&nbsp; <a href="${basePath}insert/$repoName">insert</a> ] &nbsp;</td></tr>');
+        '<tr><td style="text-align: right"><b>$type:</b> &nbsp;</td><td style="text-align: center">$repoName</td><td> &nbsp; [ <a href="${basePath}select/$repoName">select</a> &nbsp;|&nbsp; <a href="${basePath}insert/$repoName">insert</a> ] &nbsp;</td></tr>',
+      );
     }
 
     content.add('</table>');
 
     content.add(
-        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}tables/json">JSON</a></i></div>');
+      '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}tables/json">JSON</a></i></div>',
+    );
 
     htmlDoc.content = content;
 
@@ -250,8 +263,12 @@ class APIDBModule extends APIModule {
     return APIResponse.ok(html, mimeType: 'html');
   }
 
-  Future<APIResponse<dynamic>> select(String table, APIRequest apiRequest,
-      {bool? eager, bool json = false}) async {
+  Future<APIResponse<dynamic>> select(
+    String table,
+    APIRequest apiRequest, {
+    bool? eager,
+    bool json = false,
+  }) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
@@ -260,8 +277,9 @@ class APIDBModule extends APIModule {
 
     final entityRepositoryProviders = await this.entityRepositoryProviders;
 
-    var entityRepository =
-        entityRepositoryProviders.getEntityRepository(name: table);
+    var entityRepository = entityRepositoryProviders.getEntityRepository(
+      name: table,
+    );
 
     if (entityRepository == null) {
       return APIResponse.error(error: "Can't find table: $table");
@@ -279,22 +297,27 @@ class APIDBModule extends APIModule {
 
     eager ??= false;
 
-    _log.info("APIDBModule[REQUEST]> select> "
-        "table: `$table` ; "
-        "eager: $eager"
-        "${query.isNotEmpty ? ' ; QUERY> $query' : ''}");
+    _log.info(
+      "APIDBModule[REQUEST]> select> "
+      "table: `$table` ; "
+      "eager: $eager"
+      "${query.isNotEmpty ? ' ; QUERY> $query' : ''}",
+    );
 
     var resolutionRules = eager ? EntityResolutionRules(allEager: eager) : null;
 
     List<Object> list;
 
     if (query.isEmpty) {
-      var selectAll =
-          await entityRepository.selectAll(resolutionRules: resolutionRules);
+      var selectAll = await entityRepository.selectAll(
+        resolutionRules: resolutionRules,
+      );
       list = selectAll.toList();
     } else {
-      var selectByQuery = await entityRepository.selectByQuery(query,
-          resolutionRules: resolutionRules);
+      var selectByQuery = await entityRepository.selectByQuery(
+        query,
+        resolutionRules: resolutionRules,
+      );
       list = selectByQuery.toList();
     }
 
@@ -327,10 +350,11 @@ class APIDBModule extends APIModule {
     var htmlDoc = HTMLDocument.darkTheme(
       title: 'DB - Tables',
       top: _buildTop(
-          apiRootName: apiRoot.name,
-          apiRootVersion: apiRoot.version,
-          table: table,
-          entityType: entityType),
+        apiRootName: apiRoot.name,
+        apiRootVersion: apiRoot.version,
+        table: table,
+        entityType: entityType,
+      ),
       footer: _buildFooter(),
     );
 
@@ -352,7 +376,8 @@ class APIDBModule extends APIModule {
       content.add('<td style="text-align: center">${e.key}</td>');
     }
     content.add(
-        '<td style="text-align: center; min-width: 100px;">[operations]</td>');
+      '<td style="text-align: center; min-width: 100px;">[operations]</td>',
+    );
     content.add('</tr></thead>');
 
     var i = 0;
@@ -368,9 +393,12 @@ class APIDBModule extends APIModule {
         var v2 = _resolveValue(v, fieldType);
 
         var entityType = fieldType.entityType ?? fieldType.listEntityType?.type;
-        var fieldEntityRepository = entityType != null
-            ? entityRepositoryProviders.getEntityRepositoryByType(entityType)
-            : null;
+        var fieldEntityRepository =
+            entityType != null
+                ? entityRepositoryProviders.getEntityRepositoryByType(
+                  entityType,
+                )
+                : null;
 
         if (fieldEntityRepository != null) {
           var repoName = fieldEntityRepository.name;
@@ -409,12 +437,14 @@ class APIDBModule extends APIModule {
     }
 
     content.add(
-        '<tr><td colspan="${fieldsEntries.length + 2}" style="text-align: right"><a href="${basePath}insert/$repoName">&nbsp;+&nbsp;</a></td></tr>');
+      '<tr><td colspan="${fieldsEntries.length + 2}" style="text-align: right"><a href="${basePath}insert/$repoName">&nbsp;+&nbsp;</a></td></tr>',
+    );
 
     content.add('</table>');
 
     content.add(
-        '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json${query.isNotEmpty ? '?$query' : ''}">JSON</a></i></div>');
+      '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json${query.isNotEmpty ? '?$query' : ''}">JSON</a></i></div>',
+    );
 
     htmlDoc.content = content;
 
@@ -448,17 +478,20 @@ class APIDBModule extends APIModule {
     Enum,
     DateTime,
     EntityReference,
-    EntityReferenceList
+    EntityReferenceList,
   ];
 
-  Future<APIResponse<String>> insert(String table, APIRequest apiRequest,
-      {Object? id}) async {
+  Future<APIResponse<String>> insert(
+    String table,
+    APIRequest apiRequest, {
+    Object? id,
+  }) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 
-    var entityRepository =
-        (await entityRepositoryProviders).getEntityRepository(name: table);
+    var entityRepository = (await entityRepositoryProviders)
+        .getEntityRepository(name: table);
 
     if (entityRepository == null) {
       return APIResponse.error(error: "Can't find table: $table");
@@ -479,10 +512,11 @@ class APIDBModule extends APIModule {
     var htmlDoc = HTMLDocument.darkTheme(
       title: 'DB - ${update ? 'update' : 'insert'} @ $entityType',
       top: _buildTop(
-          apiRootName: apiRoot.name,
-          apiRootVersion: apiRoot.version,
-          table: table,
-          entityType: entityType),
+        apiRootName: apiRoot.name,
+        apiRootVersion: apiRoot.version,
+        table: table,
+        entityType: entityType,
+      ),
       footer: _buildFooter(),
     );
 
@@ -494,9 +528,11 @@ class APIDBModule extends APIModule {
     if (parameters.isNotEmpty) {
       _fixParametersDateTime(parameters);
 
-      var entity2 = await entityHandler.createFromMap(parameters,
-          entityProvider: entityRepository.provider,
-          resolutionRules: EntityResolutionRules(allowEntityFetch: true));
+      var entity2 = await entityHandler.createFromMap(
+        parameters,
+        entityProvider: entityRepository.provider,
+        resolutionRules: EntityResolutionRules(allowEntityFetch: true),
+      );
 
       try {
         if (entity != null) {
@@ -507,9 +543,11 @@ class APIDBModule extends APIModule {
         }
       } catch (e, s) {
         content.add(
-            '<h3 style="text-align: left;">Error instantiating `$entityType`:</h3>\n');
+          '<h3 style="text-align: left;">Error instantiating `$entityType`:</h3>\n',
+        );
         content.add(
-            '<pre>Parameters: ${Json.encode(parameters, pretty: true)}</pre>\n');
+          '<pre>Parameters: ${Json.encode(parameters, pretty: true)}</pre>\n',
+        );
         content.add('<pre>ERROR:\n$e\n$s\n</pre>');
         content.add('<hr>\n');
       }
@@ -519,14 +557,16 @@ class APIDBModule extends APIModule {
           var id = await entityRepository.store(entity);
 
           content.add(
-              '<br><h2 style="text-align: left;">${update ? 'Updated' : 'Inserted'}: #$id</h2>\n');
+            '<br><h2 style="text-align: left;">${update ? 'Updated' : 'Inserted'}: #$id</h2>\n',
+          );
 
           _writeEntityJson(entityHandler, entityType, entity, content);
 
           content.add('<br><hr>');
         } catch (e, s) {
           content.add(
-              '<br><h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+            '<br><h3 style="text-align: left;">Error storing `$entityType`:</h3>\n',
+          );
           content.add('<pre>EntityRepository: $entityRepository</pre>\n');
           content.add('<pre>ERROR:\n$e\n$s\n</pre>');
           content.add('<br><hr>\n');
@@ -536,17 +576,20 @@ class APIDBModule extends APIModule {
 
     content.add('<form method="post">');
     content.add(
-        '<input id="LOCAL_TIMEZONE" type="hidden" name="__LOCAL_TIMEZONE__">');
+      '<input id="LOCAL_TIMEZONE" type="hidden" name="__LOCAL_TIMEZONE__">',
+    );
 
     _writeInputTable(entityRepository, content, entity);
 
     content.add(
-        '<br><div style="text-align: center; width: 100%;"><button type="submit">${update ? 'Update' : 'Insert'}</button></div>');
+      '<br><div style="text-align: center; width: 100%;"><button type="submit">${update ? 'Update' : 'Insert'}</button></div>',
+    );
 
     content.add('</form>');
 
     content.add(
-        "<script type='application/javascript'> setLocalTimeZone() ; fixAllInputsDateTimeToLocal() ;</script>");
+      "<script type='application/javascript'> setLocalTimeZone() ; fixAllInputsDateTimeToLocal() ;</script>",
+    );
 
     htmlDoc.content = content;
 
@@ -567,12 +610,19 @@ class APIDBModule extends APIModule {
           var value = e.value;
 
           if (value is String &&
-              RegExp(r'^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?Z?$')
-                  .hasMatch(value)) {
+              RegExp(
+                r'^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?Z?$',
+              ).hasMatch(value)) {
             var d = TypeParser.parseDateTime(value);
             if (d != null) {
               var d2 = DateTime.utc(
-                  d.year, d.month, d.day, d.hour, d.minute, d.second);
+                d.year,
+                d.month,
+                d.day,
+                d.hour,
+                d.minute,
+                d.second,
+              );
               var d3 = d2.add(Duration(minutes: localTimeZoneMin));
               parameters[key] = d3;
             }
@@ -639,8 +689,12 @@ class APIDBModule extends APIModule {
 ''');
   }
 
-  void _writeEntityJson(EntityHandler entityHandler, Type entityType,
-      Object entity, List content) {
+  void _writeEntityJson(
+    EntityHandler entityHandler,
+    Type entityType,
+    Object entity,
+    List content,
+  ) {
     var json = entityHandler.toJson(entity);
     var jsonEnc = Json.encode(json, pretty: true);
 
@@ -650,7 +704,10 @@ class APIDBModule extends APIModule {
   }
 
   void _writeInputTable(
-      EntityRepository<Object> entityRepository, List content, Object? entity) {
+    EntityRepository<Object> entityRepository,
+    List content,
+    Object? entity,
+  ) {
     var entityHandler = entityRepository.entityHandler;
 
     var fieldsEntries = _fieldsOrdered(entityHandler);
@@ -658,7 +715,8 @@ class APIDBModule extends APIModule {
     content.add('<br><table class="center">');
 
     content.add(
-        '<tr><td colspan="3"><h2>${entityRepository.type}:</h2></td></tr>');
+      '<tr><td colspan="3"><h2>${entityRepository.type}:</h2></td></tr>',
+    );
 
     var repoName = entityRepository.name;
     var idFieldName = entityHandler.idFieldName(entity);
@@ -691,13 +749,15 @@ class APIDBModule extends APIModule {
 
       String typeStr;
       if (type.isEntityReferenceType) {
-        typeStr = type.isValidGenericType
-            ? type.genericType.toString()
-            : type.toString(withT: false);
+        typeStr =
+            type.isValidGenericType
+                ? type.genericType.toString()
+                : type.toString(withT: false);
       } else if (type.isEntityReferenceListType) {
-        typeStr = type.isValidGenericType
-            ? type.genericType.toString()
-            : type.toString(withT: false);
+        typeStr =
+            type.isValidGenericType
+                ? type.genericType.toString()
+                : type.toString(withT: false);
       } else if (type.isListEntity) {
         typeStr = type.genericType.toString();
       } else {
@@ -715,13 +775,16 @@ class APIDBModule extends APIModule {
   }
 
   Future<APIResponse<String>> delete(
-      String table, APIRequest apiRequest, Object? id) async {
+    String table,
+    APIRequest apiRequest,
+    Object? id,
+  ) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
     }
 
-    var entityRepository =
-        (await entityRepositoryProviders).getEntityRepository(name: table);
+    var entityRepository = (await entityRepositoryProviders)
+        .getEntityRepository(name: table);
 
     if (entityRepository == null) {
       return APIResponse.error(error: "Can't find table: $table");
@@ -738,16 +801,18 @@ class APIDBModule extends APIModule {
     var entityExists = await entityRepository.existsID(id);
     if (!entityExists) {
       return APIResponse.notFound(
-          payloadDynamic: "Can't find `$entityType` entity with ID: $id");
+        payloadDynamic: "Can't find `$entityType` entity with ID: $id",
+      );
     }
 
     var htmlDoc = HTMLDocument.darkTheme(
       title: 'DB - delete @ $entityType',
       top: _buildTop(
-          apiRootName: apiRoot.name,
-          apiRootVersion: apiRoot.version,
-          table: table,
-          entityType: entityType),
+        apiRootName: apiRoot.name,
+        apiRootVersion: apiRoot.version,
+        table: table,
+        entityType: entityType,
+      ),
       footer: _buildFooter(),
     );
 
@@ -768,7 +833,8 @@ class APIDBModule extends APIModule {
         _writeEntityJson(entityHandler, entityType, entity, content);
       } catch (e, s) {
         content.add(
-            '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+          '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n',
+        );
         content.add('<pre>EntityRepository: $entityRepository</pre>\n');
         content.add('<pre>ERROR:\n$e\n$s\n</pre>\n');
       }
@@ -785,7 +851,8 @@ class APIDBModule extends APIModule {
         _writeEntityJson(entityHandler, entityType, entity, content);
       } catch (e, s) {
         content.add(
-            '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n');
+          '<h3 style="text-align: left;">Error storing `$entityType`:</h3>\n',
+        );
         content.add('<pre>EntityRepository: $entityRepository</pre>\n');
         content.add('<pre>ERROR:\n$e\n$s\n</pre>\n');
       }
@@ -793,7 +860,8 @@ class APIDBModule extends APIModule {
       var url = apiRequest.requestedUri;
 
       content.add(
-          '''<br><div style="text-align: left; width: 100%;"><button type="submit" onclick="window.location='${url.path}?confirm=true'">Confirm Deletion</button></div>''');
+        '''<br><div style="text-align: left; width: 100%;"><button type="submit" onclick="window.location='${url.path}?confirm=true'">Confirm Deletion</button></div>''',
+      );
     }
 
     htmlDoc.content = content;
@@ -812,19 +880,23 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var dump = await allRepositories.values
-        .map((repo) => MapEntry(repo.name, repo.selectAll()))
-        .toMapFromEntries()
-        .resolveAllValues();
+    var dump =
+        await allRepositories.values
+            .map((repo) => MapEntry(repo.name, repo.selectAll()))
+            .toMapFromEntries()
+            .resolveAllValues();
 
-    var dumpJson = dump.entries
-        .map((e) => MapEntry(e.key, _entitiesToJsonMap(e.value)))
-        .where((e) => e.value.isNotEmpty)
-        .toMapFromEntries();
+    var dumpJson =
+        dump.entries
+            .map((e) => MapEntry(e.key, _entitiesToJsonMap(e.value)))
+            .where((e) => e.value.isNotEmpty)
+            .toMapFromEntries();
 
     if (zip) {
-      var apiName =
-          apiRoot.name.toLowerCase().trim().replaceAll(RegExp(r'\W+'), '_');
+      var apiName = apiRoot.name.toLowerCase().trim().replaceAll(
+        RegExp(r'\W+'),
+        '_',
+      );
 
       var zipTime = DateTime.now().millisecondsSinceEpoch;
 
@@ -836,7 +908,10 @@ class APIDBModule extends APIModule {
         var dumpJsonBytes = Json.encodeToBytes(dumpJson);
 
         var archiveFile = ArchiveFile(
-            '$zipName/dump.json', dumpJsonBytes.length, dumpJsonBytes);
+          '$zipName/dump.json',
+          dumpJsonBytes.length,
+          dumpJsonBytes,
+        );
         archive.addFile(archiveFile);
       }
 
@@ -847,9 +922,11 @@ class APIDBModule extends APIModule {
 
       var zipFileName = '$zipName.zip';
 
-      return APIResponse.ok(zipData, mimeType: 'application/zip', headers: {
-        'Content-Disposition': 'attachment; filename="$zipFileName"'
-      });
+      return APIResponse.ok(
+        zipData,
+        mimeType: 'application/zip',
+        headers: {'Content-Disposition': 'attachment; filename="$zipFileName"'},
+      );
     }
 
     return APIResponse.ok(dumpJson, mimeType: 'json');
@@ -868,16 +945,18 @@ class APIDBModule extends APIModule {
 
     var reflectionFactory = ReflectionFactory();
 
-    var enumReflection =
-        reflectionFactory.getRegisterEnumReflection(typeInfo.type);
+    var enumReflection = reflectionFactory.getRegisterEnumReflection(
+      typeInfo.type,
+    );
     if (enumReflection != null) {
       return enumReflection.name(o);
     }
 
     var entityType = typeInfo.entityType ?? typeInfo.listEntityType?.type;
 
-    var classReflection =
-        reflectionFactory.getRegisterClassReflection(entityType);
+    var classReflection = reflectionFactory.getRegisterClassReflection(
+      entityType,
+    );
     if (classReflection != null) {
       var entityHandler = classReflection.entityHandler;
 
@@ -933,11 +1012,12 @@ class APIDBModule extends APIModule {
     return fieldsEntries;
   }
 
-  String _buildTop(
-      {String? apiRootName,
-      String? apiRootVersion,
-      String? table,
-      Type? entityType}) {
+  String _buildTop({
+    String? apiRootName,
+    String? apiRootVersion,
+    String? table,
+    Type? entityType,
+  }) {
     var html = StringBuffer();
 
     apiRootName = apiRootName?.trim();
@@ -946,7 +1026,8 @@ class APIDBModule extends APIModule {
     html.write('<b>DB');
     if (apiRootName != null && apiRootName.isNotEmpty) {
       html.write(
-          '[$apiRootName${apiRootVersion != null && apiRootVersion.isNotEmpty ? '/$apiRootVersion' : ''}]');
+        '[$apiRootName${apiRootVersion != null && apiRootVersion.isNotEmpty ? '/$apiRootVersion' : ''}]',
+      );
     }
     html.write(':</b> &nbsp; ');
 
@@ -954,7 +1035,8 @@ class APIDBModule extends APIModule {
 
     if (table != null && table.isNotEmpty && entityType != null) {
       html.write(
-          ' &nbsp;|&nbsp; <a href="${basePath}select/$table">Select / $entityType</a></li>');
+        ' &nbsp;|&nbsp; <a href="${basePath}select/$table">Select / $entityType</a></li>',
+      );
     }
 
     html.write(' &nbsp;|&nbsp; <a href="${basePath}dump">Dump</a>');
@@ -969,7 +1051,8 @@ class APIDBModule extends APIModule {
 
     html.write('<br><hr>');
     html.write(
-        '<a href="https://pub.dev/packages/bones_api" target="_blank">Bones_API/${BonesAPI.VERSION}</a>');
+      '<a href="https://pub.dev/packages/bones_api" target="_blank">Bones_API/${BonesAPI.VERSION}</a>',
+    );
 
     return html.toString();
   }

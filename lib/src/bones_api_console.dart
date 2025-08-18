@@ -18,8 +18,11 @@ class APIConsole {
   /// This is used for the `server` header.
   final String version;
 
-  APIConsole(this.apiRoot,
-      {this.name = 'APIConsole', this.version = BonesAPI.VERSION}) {
+  APIConsole(
+    this.apiRoot, {
+    this.name = 'APIConsole',
+    this.version = BonesAPI.VERSION,
+  }) {
     BonesAPI.boot();
   }
 

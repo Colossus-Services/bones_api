@@ -12,9 +12,7 @@ part 'bones_api_test_utils_test.reflection.g.dart';
 final _log = logging.Logger('APITestConfig');
 
 const Map<String, dynamic> apiConfigMemory = <String, dynamic>{
-  'db': {
-    'sql.memory': {},
-  },
+  'db': {'sql.memory': {}},
   'dialect': 'generic',
 };
 
@@ -25,9 +23,7 @@ const Map<String, dynamic> apiConfigPostgres = <String, dynamic>{
       'database': 'bones_api_test_postgres',
       'username': 'postgres',
       'password': '123456',
-      'populate': {
-        'tables': 'db-tables-postgres.sql',
-      }
+      'populate': {'tables': 'db-tables-postgres.sql'},
     },
   },
   'dialect': 'PostgreSQL',
@@ -40,9 +36,7 @@ const Map<String, dynamic> apiConfigMysql = <String, dynamic>{
       'database': 'bones_api_test_mysql',
       'username': 'mysql',
       'password': '123456',
-      'populate': {
-        'tables': 'db-tables-postgres.sql',
-      }
+      'populate': {'tables': 'db-tables-postgres.sql'},
     },
   },
   'dialect': 'MySQL',
@@ -56,8 +50,11 @@ APITestConfigDB _getAPITestConfig(String dbType) {
   var containerPrefix = 'bones_api_test_$dbType';
 
   if (dbType == 'postgres') {
-    return APITestConfigDockerPostgreSQL(apiConfigPostgres,
-        dockerHost: dockerHostLocal, containerNamePrefix: containerPrefix);
+    return APITestConfigDockerPostgreSQL(
+      apiConfigPostgres,
+      dockerHost: dockerHostLocal,
+      containerNamePrefix: containerPrefix,
+    );
   } else if (dbType == 'mysql') {
     return APITestConfigDockerMySQL(
       apiConfigMysql,
@@ -78,15 +75,19 @@ Future<void> main() async {
   var apiTestConfigPostgres = _getAPITestConfig('postgres');
   var apiTestConfigMySQL = _getAPITestConfig('mysql');
 
-  await [apiTestConfigMemory, apiTestConfigPostgres, apiTestConfigMySQL]
-      .resolveSupported();
+  await [
+    apiTestConfigMemory,
+    apiTestConfigPostgres,
+    apiTestConfigMySQL,
+  ].resolveSupported();
 
   group('APITestConfig (basic start/stop)', () {
     Future<void> testDB(APITestConfigDB apiTestConfig) async {
       expect(apiTestConfig.isSupported, isTrue);
 
-      var apiRootStarter = apiTestConfig
-          .createAPIRootStarter((apiConfig) => MyAPI.withConfig(apiConfig));
+      var apiRootStarter = apiTestConfig.createAPIRootStarter(
+        (apiConfig) => MyAPI.withConfig(apiConfig),
+      );
 
       expect(await apiRootStarter.start(), isTrue);
 
@@ -98,15 +99,16 @@ Future<void> main() async {
         expect(api.apiConfig['dialect'], isNotEmpty);
 
         expect(
-            api.getModule('base')!.apiInfo().toJson(),
-            equals({
-              'name': 'base',
-              'routes': [
-                {'name': 'time', 'uri': '/base/time'},
-                {'name': 'foo', 'method': 'GET', 'uri': '/base/foo'},
-                {'name': 'foo', 'method': 'POST', 'uri': '/base/foo'}
-              ]
-            }));
+          api.getModule('base')!.apiInfo().toJson(),
+          equals({
+            'name': 'base',
+            'routes': [
+              {'name': 'time', 'uri': '/base/time'},
+              {'name': 'foo', 'method': 'GET', 'uri': '/base/foo'},
+              {'name': 'foo', 'method': 'POST', 'uri': '/base/foo'},
+            ],
+          }),
+        );
 
         var adapter = await DBSQLAdapter.fromConfig(api.apiConfig['db']);
         print(adapter);
@@ -119,8 +121,9 @@ Future<void> main() async {
 
         expect(adapter.disposePoolElement(connection!), isTrue);
 
-        var fullCreateTableSQLs =
-            await adapter.generateFullCreateTableSQLs(title: 'Test');
+        var fullCreateTableSQLs = await adapter.generateFullCreateTableSQLs(
+          title: 'Test',
+        );
 
         // No repositories:
         expect(fullCreateTableSQLs, equals(''));
@@ -129,24 +132,37 @@ Future<void> main() async {
       }
     }
 
-    test('memory', () => testDB(apiTestConfigMemory),
-        skip: apiTestConfigMemory.unsupportedReason);
+    test(
+      'memory',
+      () => testDB(apiTestConfigMemory),
+      skip: apiTestConfigMemory.unsupportedReason,
+    );
 
-    test('postgres', () => testDB(apiTestConfigPostgres),
-        skip: apiTestConfigPostgres.unsupportedReason,
-        tags: ['docker', 'slow']);
+    test(
+      'postgres',
+      () => testDB(apiTestConfigPostgres),
+      skip: apiTestConfigPostgres.unsupportedReason,
+      tags: ['docker', 'slow'],
+    );
 
-    test('mysql', () => testDB(apiTestConfigMySQL),
-        skip: apiTestConfigMySQL.unsupportedReason, tags: ['docker', 'slow']);
+    test(
+      'mysql',
+      () => testDB(apiTestConfigMySQL),
+      skip: apiTestConfigMySQL.unsupportedReason,
+      tags: ['docker', 'slow'],
+    );
   });
 }
 
 class MyAPI extends APIRoot {
   MyAPI.withConfig([dynamic apiConfig])
-      : super('example', '1.0',
-            apiConfig: apiConfig,
-            preApiRequestHandlers: [_preRequest],
-            posApiRequestHandlers: [_posRequest]);
+    : super(
+        'example',
+        '1.0',
+        apiConfig: apiConfig,
+        preApiRequestHandlers: [_preRequest],
+        posApiRequestHandlers: [_posRequest],
+      );
 
   static APIResponse<T>? _preRequest<T>(APIRoot apiRoot, APIRequest request) {
     if (request.pathPartFirst.startsWith('pre')) {
@@ -176,10 +192,14 @@ class MyBaseModule extends APIModule {
   void configure() {
     routes.get('foo', (request) => APIResponse.ok('Hi[GET]!'));
     routes.post(
-        'foo', (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'));
+      'foo',
+      (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'),
+    );
 
-    routes.any('time',
-        (request) => APIResponse.ok(DateTime.now(), mimeType: 'text/plain'));
+    routes.any(
+      'time',
+      (request) => APIResponse.ok(DateTime.now(), mimeType: 'text/plain'),
+    );
   }
 }
 

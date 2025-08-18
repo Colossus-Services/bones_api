@@ -53,56 +53,63 @@ class DBObjectMemoryAdapter
 
     DBObjectAdapter.boot();
 
-    DBObjectAdapter.registerAdapter([
-      'object.memory',
-      'obj.memory',
-    ], DBObjectMemoryAdapter, _instantiate);
+    DBObjectAdapter.registerAdapter(
+      ['object.memory', 'obj.memory'],
+      DBObjectMemoryAdapter,
+      _instantiate,
+    );
   }
 
-  static FutureOr<DBObjectMemoryAdapter?> _instantiate(config,
-      {int? minConnections,
-      int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+  static FutureOr<DBObjectMemoryAdapter?> _instantiate(
+    config, {
+    int? minConnections,
+    int? maxConnections,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     try {
-      return DBObjectMemoryAdapter.fromConfig(config,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath);
+      return DBObjectMemoryAdapter.fromConfig(
+        config,
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath,
+      );
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
     }
   }
 
-  DBObjectMemoryAdapter(
-      {super.generateTables,
-      super.populateTables,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.parentRepositoryProvider,
-      super.workingPath,
-      super.log})
-      : super(
-          'object.memory',
-          1,
-          3,
-          const DBAdapterCapability(
-              dialect: DBDialect('object'),
-              transactions: true,
-              transactionAbort: true,
-              constraintSupport: false,
-              multiIsolateSupport: false,
-              connectivity: DBAdapterCapabilityConnectivity.none),
-        ) {
+  DBObjectMemoryAdapter({
+    super.generateTables,
+    super.populateTables,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.parentRepositoryProvider,
+    super.workingPath,
+    super.log,
+  }) : super(
+         'object.memory',
+         1,
+         3,
+         const DBAdapterCapability(
+           dialect: DBDialect('object'),
+           transactions: true,
+           transactionAbort: true,
+           constraintSupport: false,
+           multiIsolateSupport: false,
+           connectivity: DBAdapterCapabilityConnectivity.none,
+         ),
+       ) {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
   static FutureOr<DBObjectMemoryAdapter> fromConfig(
-      Map<String, dynamic>? config,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+    Map<String, dynamic>? config, {
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var populate = config?['populate'];
@@ -113,7 +120,8 @@ class DBObjectMemoryAdapter
     Object? populateSourceVariables;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+      generateTables =
+          populate.getAsBool('generateTables', ignoreCase: true) ??
           populate.getAsBool('generate-tables', ignoreCase: true) ??
           populate.getAsBool('generate_tables', ignoreCase: true) ??
           false;
@@ -171,8 +179,11 @@ class DBObjectMemoryAdapter
   Map<String, int> get tablesVersions =>
       _tables.map((key, value) => MapEntry(key, value.version));
 
-  Map<Object, Map<String, dynamic>>? _getTableMap(String table, bool autoCreate,
-      {bool relationship = false}) {
+  Map<Object, Map<String, dynamic>>? _getTableMap(
+    String table,
+    bool autoCreate, {
+    bool relationship = false,
+  }) {
     var map = _tables[table];
     if (map != null) {
       return map;
@@ -232,8 +243,10 @@ class DBObjectMemoryAdapter
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID}) {
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  }) {
     //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
@@ -247,13 +260,15 @@ class DBObjectMemoryAdapter
         var targetId =
             '${relationship.targetTable}_${relationship.targetField}';
 
-        tableScheme = TableScheme(table,
-            relationship: true,
-            idFieldName: sourceId,
-            fieldsTypes: {
-              sourceId: relationship.sourceFieldType,
-              targetId: relationship.targetFieldType,
-            });
+        tableScheme = TableScheme(
+          table,
+          relationship: true,
+          idFieldName: sourceId,
+          fieldsTypes: {
+            sourceId: relationship.sourceFieldType,
+            targetId: relationship.targetFieldType,
+          },
+        );
 
         _log.info('relationship> $tableScheme');
 
@@ -261,20 +276,24 @@ class DBObjectMemoryAdapter
       }
 
       throw StateError(
-          "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
+        "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!",
+      );
     }
 
     var idFieldName = entityHandler.idFieldName();
 
     var entityFieldsTypes = entityHandler.fieldsTypes();
 
-    var fieldsTypes =
-        entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
+    var fieldsTypes = entityFieldsTypes.map(
+      (key, value) => MapEntry(key, value.type),
+    );
 
-    tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes);
+    tableScheme = TableScheme(
+      table,
+      relationship: relationship != null,
+      idFieldName: idFieldName,
+      fieldsTypes: fieldsTypes,
+    );
 
     _log.info('$tableScheme');
 
@@ -300,8 +319,8 @@ class DBObjectMemoryAdapter
     _openTransactionsContexts[conn] = DateTime.now();
 
     transaction.transactionFuture
-        // ignore: discarded_futures
-        .then(
+    // ignore: discarded_futures
+    .then(
       // ignore: discarded_futures
       (res) => resolveTransactionResult(res, transaction, conn),
       onError: (e, s) {
@@ -321,10 +340,11 @@ class DBObjectMemoryAdapter
 
   @override
   bool cancelTransaction(
-      Transaction transaction,
-      DBObjectMemoryAdapterContext? connection,
-      Object? error,
-      StackTrace? stackTrace) {
+    Transaction transaction,
+    DBObjectMemoryAdapterContext? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  ) {
     if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
     _rollbackTables(connection.tablesVersions);
@@ -336,7 +356,9 @@ class DBObjectMemoryAdapter
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBObjectMemoryAdapterContext? connection) {
+    Transaction transaction,
+    DBObjectMemoryAdapterContext? connection,
+  ) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
@@ -401,20 +423,32 @@ class DBObjectMemoryAdapter
 
   @override
   FutureOr<int> doCount(
-      TransactionOperation op, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<int, int>? preFinish}) {
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  }) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doCountImpl(
         op,
-        (conn) => _doCountImpl(op, table, matcher, parameters)
-            .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+        table,
+        matcher,
+        parameters,
+      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    );
   }
 
-  int _doCountImpl(TransactionOperation op, String table,
-      EntityMatcher? matcher, Object? parameters) {
+  int _doCountImpl(
+    TransactionOperation op,
+    String table,
+    EntityMatcher? matcher,
+    Object? parameters,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -432,15 +466,26 @@ class DBObjectMemoryAdapter
 
   @override
   FutureOr<List<I>> doExistIDs<I extends Object>(
-      TransactionOperation op, String entityName, String table, List<I> ids) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<I> ids,
+  ) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doExistIDsImpl(
         op,
-        (conn) => _doExistIDsImpl(op, table, ids)
-            .resolveMapped((res) => _finishOperation(op, res, null)));
+        table,
+        ids,
+      ).resolveMapped((res) => _finishOperation(op, res, null)),
+    );
   }
 
   List<I> _doExistIDsImpl<I extends Object>(
-      TransactionOperation op, String table, List<I> ids) {
+    TransactionOperation op,
+    String table,
+    List<I> ids,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
@@ -451,15 +496,25 @@ class DBObjectMemoryAdapter
 
   @override
   FutureOr<R?> doSelectByID<R>(
-          TransactionOperation op, String entityName, String table, Object id,
-          {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>
-      executeTransactionOperation<R?>(
-          op,
-          (conn) => _doSelectByIDImpl<R>(table, id, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  }) => executeTransactionOperation<R?>(
+    op,
+    (conn) => _doSelectByIDImpl<R>(
+      table,
+      id,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
-      String table, Object id, String entityName) {
+    String table,
+    Object id,
+    String entityName,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return null;
 
@@ -473,48 +528,64 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
-          String table, List<Object> ids,
-          {PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectByIDsImpl<R>(table, ids, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<Object> ids, {
+    PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectByIDsImpl<R>(
+      table,
+      ids,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
-      String table, List<Object> ids, String entityName) {
+    String table,
+    List<Object> ids,
+    String entityName,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
-    var entries = ids
-        .map((id) {
-          var entry = map[id];
+    var entries =
+        ids
+            .map((id) {
+              var entry = map[id];
 
-          if (entry == null) {
-            return null;
-          }
+              if (entry == null) {
+                return null;
+              }
 
-          return entry;
-        })
-        .nonNulls
-        .toList();
+              return entry;
+            })
+            .nonNulls
+            .toList();
 
     return entries;
   }
 
   @override
   FutureOr<List<R>> doSelectAll<R>(
-          TransactionOperation op, String entityName, String table,
-          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectAllImpl<R>(table, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectAllImpl<R>(
+      table,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
-      String table, String entityName) {
+    String table,
+    String entityName,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
@@ -523,23 +594,31 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
-          String table, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish}) =>
-      executeTransactionOperation(
-          op,
-          (conn) => _doDeleteImpl<R>(op, table, matcher, parameters)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doDeleteImpl<R>(
+      op,
+      table,
+      matcher,
+      parameters,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
-      TransactionOperation op,
-      String table,
-      EntityMatcher<dynamic> matcher,
-      Object? parameters) {
+    TransactionOperation op,
+    String table,
+    EntityMatcher<dynamic> matcher,
+    Object? parameters,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
@@ -560,22 +639,33 @@ class DBObjectMemoryAdapter
   }
 
   @override
-  FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
-          String table, O o, Map<String, dynamic> fields,
-          {String? idFieldName, PreFinishDBOperation? preFinish}) =>
-      executeTransactionOperation<dynamic>(op,
-          (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish));
+  FutureOr<dynamic> doInsert<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+  }) => executeTransactionOperation<dynamic>(
+    op,
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+  );
 
   FutureOr<dynamic> _doInsertImpl<O>(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      PreFinishDBOperation? preFinish) {
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    PreFinishDBOperation? preFinish,
+  ) {
     var map = _getTableMap(table, true)!;
 
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     var id = entry[idField];
@@ -592,36 +682,48 @@ class DBObjectMemoryAdapter
   }
 
   void _logTransactionOperation(
-      String method, TransactionOperation op, Object query) {
+    String method,
+    TransactionOperation op,
+    Object query,
+  ) {
     if (log) {
       _log.info('[transaction:${op.transactionId}] $method> $query');
     }
   }
 
   @override
-  FutureOr<dynamic> doUpdate<O>(TransactionOperation op, String entityName,
-          String table, O o, Object id, Map<String, dynamic> fields,
-          {String? idFieldName,
-          PreFinishDBOperation? preFinish,
-          bool allowAutoInsert = false}) =>
-      executeTransactionOperation(
-          op,
-          (conn) =>
-              _doUpdateImpl(op, table, fields, entityName, id, preFinish));
+  FutureOr<dynamic> doUpdate<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+    bool allowAutoInsert = false,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+  );
 
   FutureOr<dynamic> _doUpdateImpl(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      Object id,
-      PreFinishDBOperation? preFinish) {
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    Object id,
+    PreFinishDBOperation? preFinish,
+  ) {
     _logTransactionOperation('doUpdate', op, 'UPDATE INTO $table OBJECT `$id`');
 
     var map = _getTableMap(table, true)!;
 
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -631,14 +733,21 @@ class DBObjectMemoryAdapter
     return _finishOperation(op, id, preFinish);
   }
 
-  Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
-      {String? entityName, String? table, EntityRepository? entityRepository}) {
-    entityRepository ??=
-        getEntityRepository(name: entityName, tableName: table);
+  Map<String, dynamic> _normalizeEntityJSON(
+    Map<String, dynamic> entityJson, {
+    String? entityName,
+    String? table,
+    EntityRepository? entityRepository,
+  }) {
+    entityRepository ??= getEntityRepository(
+      name: entityName,
+      tableName: table,
+    );
 
     if (entityRepository == null) {
       throw StateError(
-          "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table");
+        "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table",
+      );
     }
 
     var entityHandler = entityRepository.entityHandler;
@@ -648,8 +757,11 @@ class DBObjectMemoryAdapter
         return MapEntry(key, value);
       }
 
-      var fieldType =
-          entityHandler.getFieldType(null, key, resolveFiledName: false);
+      var fieldType = entityHandler.getFieldType(
+        null,
+        key,
+        resolveFiledName: false,
+      );
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType) {
@@ -658,7 +770,8 @@ class DBObjectMemoryAdapter
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           if (value is EntityReference) {
@@ -677,44 +790,57 @@ class DBObjectMemoryAdapter
         } else if (fieldType.isEntityReferenceListType) {
           var listEntityType = fieldType.arguments0!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           value = fieldEntityRepository.getEntityID(value);
@@ -727,16 +853,25 @@ class DBObjectMemoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
-          Object? previousError) =>
-      DBObjectMemoryAdapterException('error', '$error',
-          parentError: error,
-          parentStackTrace: stackTrace,
-          previousError: previousError,
-          operation: operation);
+  Object resolveError(
+    Object error,
+    StackTrace stackTrace,
+    Object? operation,
+    Object? previousError,
+  ) => DBObjectMemoryAdapterException(
+    'error',
+    '$error',
+    parentError: error,
+    parentStackTrace: stackTrace,
+    previousError: previousError,
+    operation: operation,
+  );
 
   FutureOr<R> _finishOperation<T, R>(
-      TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) {
     if (preFinish != null) {
       return preFinish(res).resolveMapped((res2) => op.finish(res2));
     } else {
@@ -744,19 +879,24 @@ class DBObjectMemoryAdapter
     }
   }
 
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f) {
+  FutureOr<R> executeTransactionOperation<R>(
+    TransactionOperation op,
+    FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f,
+  ) {
     var transaction = op.transaction;
 
     if (isTransactionWithSingleOperation(op)) {
-      return executeWithPool(f,
-          onError: (e, s) => transaction.notifyExecutionError(
-                e,
-                s,
-                errorResolver: resolveError,
-                operation: op,
-                debugInfo: () => op.toString(),
-              ));
+      return executeWithPool(
+        f,
+        onError:
+            (e, s) => transaction.notifyExecutionError(
+              e,
+              s,
+              errorResolver: resolveError,
+              operation: op,
+              debugInfo: () => op.toString(),
+            ),
+      );
     }
 
     if (transaction.isOpen) {
@@ -772,8 +912,10 @@ class DBObjectMemoryAdapter
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
-            ? () => closeTransaction(transaction,
-                transaction.context as DBObjectMemoryAdapterContext?)
+            ? () => closeTransaction(
+              transaction,
+              transaction.context as DBObjectMemoryAdapterContext?,
+            )
             : null,
       );
     }
@@ -797,9 +939,12 @@ class DBObjectMemoryAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectMemoryAdapterException';
 
-  DBObjectMemoryAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBObjectMemoryAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }

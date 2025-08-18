@@ -89,14 +89,23 @@ abstract class APIPlatform {
   ///
   /// Depending on the [APIPlatform] implementation this
   /// can be an `environment` variable or an URL `queryParameters`.
-  String? getProperty(String? key,
-      {String? defaultValue, bool caseSensitive = false});
+  String? getProperty(
+    String? key, {
+    String? defaultValue,
+    bool caseSensitive = false,
+  });
 
   /// Alias to [getProperty] with a casting to [T].
-  T? getPropertyAs<T>(String? key,
-      {String? defaultValue, bool caseSensitive = false}) {
-    var val = getProperty(key,
-        defaultValue: defaultValue, caseSensitive: caseSensitive);
+  T? getPropertyAs<T>(
+    String? key, {
+    String? defaultValue,
+    bool caseSensitive = false,
+  }) {
+    var val = getProperty(
+      key,
+      defaultValue: defaultValue,
+      caseSensitive: caseSensitive,
+    );
     if (val == null) return null;
 
     if (val is! T) {
@@ -143,41 +152,45 @@ class APIPlatformCapability {
   final int maxSafeInteger;
   final int minSafeInteger;
 
-  APIPlatformCapability(
-      {required this.canReadFile,
-      this.int64 = false,
-      this.double64 = false,
-      this.int53 = false,
-      this.double53 = false,
-      this.int32 = false,
-      this.double32 = false,
-      int? maxSafeInteger,
-      int? minSafeInteger})
-      : maxSafeInteger = maxSafeInteger ??
-            (int64
-                ? int64Max.toInt()
-                : (int53
-                    ? int53Max.toInt()
-                    : (int32
-                        ? int32Max.toInt()
-                        : throw StateError(
-                            'maxSafeInteger error: Platform `int` not defined!')))),
-        minSafeInteger = minSafeInteger ??
-            (int64
-                ? int64Min.toInt()
-                : (int53
-                    ? int53Min.toInt()
-                    : (int32
-                        ? int32Min.toInt()
-                        : throw StateError(
-                            'minSafeInteger error: Platform `int` not defined!'))));
+  APIPlatformCapability({
+    required this.canReadFile,
+    this.int64 = false,
+    this.double64 = false,
+    this.int53 = false,
+    this.double53 = false,
+    this.int32 = false,
+    this.double32 = false,
+    int? maxSafeInteger,
+    int? minSafeInteger,
+  }) : maxSafeInteger =
+           maxSafeInteger ??
+           (int64
+               ? int64Max.toInt()
+               : (int53
+                   ? int53Max.toInt()
+                   : (int32
+                       ? int32Max.toInt()
+                       : throw StateError(
+                         'maxSafeInteger error: Platform `int` not defined!',
+                       )))),
+       minSafeInteger =
+           minSafeInteger ??
+           (int64
+               ? int64Min.toInt()
+               : (int53
+                   ? int53Min.toInt()
+                   : (int32
+                       ? int32Min.toInt()
+                       : throw StateError(
+                         'minSafeInteger error: Platform `int` not defined!',
+                       ))));
 
   APIPlatformCapability.bits64({required bool canReadFile})
-      : this(canReadFile: canReadFile, int64: true, double64: true);
+    : this(canReadFile: canReadFile, int64: true, double64: true);
 
   APIPlatformCapability.bits53({required bool canReadFile})
-      : this(canReadFile: canReadFile, int53: true, double53: true);
+    : this(canReadFile: canReadFile, int53: true, double53: true);
 
   APIPlatformCapability.bits32({required bool canReadFile})
-      : this(canReadFile: canReadFile, int32: true, double32: true);
+    : this(canReadFile: canReadFile, int32: true, double32: true);
 }

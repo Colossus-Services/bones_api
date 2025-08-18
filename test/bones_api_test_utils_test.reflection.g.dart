@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.3
+// BUILDER: reflection_factory/2.6.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.3');
+  static final Version _version = Version.parse('2.6.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -65,7 +65,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   MyInfoModule$reflection._([MyInfoModule? object])
-      : super(MyInfoModule, r'MyInfoModule', object);
+    : super(MyInfoModule, r'MyInfoModule', object);
 
   static bool _registered = false;
   @override
@@ -78,7 +78,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -137,20 +137,22 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   ConstructorReflection<MyInfoModule>? _constructorImpl(
-      String constructorName) {
+    String constructorName,
+  ) {
     var lc = constructorName.trim().toLowerCase();
 
     switch (lc) {
       case '':
         return ConstructorReflection<MyInfoModule>(
-            this,
-            MyInfoModule,
-            '',
-            () => MyInfoModule.new,
-            const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
-            null,
-            null,
-            null);
+          this,
+          MyInfoModule,
+          '',
+          () => MyInfoModule.new,
+          const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -186,20 +188,22 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'name',
     'routes',
     'security',
-    'version'
+    'version',
   ];
 
   @override
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<MyInfoModule, dynamic>>
-      _fieldsNoObject = {};
+  _fieldsNoObject = {};
 
   final Map<String, FieldReflection<MyInfoModule, dynamic>> _fieldsObject = {};
 
   @override
-  FieldReflection<MyInfoModule, T>? field<T>(String fieldName,
-      [MyInfoModule? obj]) {
+  FieldReflection<MyInfoModule, T>? field<T>(
+    String fieldName, [
+    MyInfoModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _fieldObjectImpl<T>(fieldName);
@@ -236,7 +240,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   FieldReflection<MyInfoModule, dynamic>? _fieldImpl(
-      String fieldName, MyInfoModule? obj) {
+    String fieldName,
+    MyInfoModule? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -318,8 +324,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
         return FieldReflection<MyInfoModule, APIRouteBuilder<APIModule>>(
           this,
           APIModule,
-          const __TR<APIRouteBuilder<APIModule>>(
-              APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
+          const __TR<APIRouteBuilder<APIModule>>(APIRouteBuilder, <__TR>[
+            __TR<APIModule>(APIModule),
+          ]),
           'routes',
           false,
           (o) => () => o!.routes,
@@ -418,8 +425,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(MyInfoModule? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    MyInfoModule? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'apiRoot': obj?.apiRoot,
@@ -468,21 +477,23 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'initialize',
     'initializeDependencies',
     'resolveRoute',
-    'toUpperCase'
+    'toUpperCase',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<MyInfoModule, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<MyInfoModule, dynamic>> _methodsObject =
       {};
 
   @override
-  MethodReflection<MyInfoModule, R>? method<R>(String methodName,
-      [MyInfoModule? obj]) {
+  MethodReflection<MyInfoModule, R>? method<R>(
+    String methodName, [
+    MyInfoModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _methodObjectImpl<R>(methodName);
@@ -519,7 +530,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   MethodReflection<MyInfoModule, dynamic>? _methodImpl(
-      String methodName, MyInfoModule? obj) {
+    String methodName,
+    MyInfoModule? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -527,351 +540,420 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     switch (lc) {
       case 'configure':
         return MethodReflection<MyInfoModule, void>(
-            this,
-            MyInfoModule,
-            'configure',
-            __TR.tVoid,
-            false,
-            (o) => o!.configure,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          MyInfoModule,
+          'configure',
+          __TR.tVoid,
+          false,
+          (o) => o!.configure,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'echo':
         return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
-            this,
-            MyInfoModule,
-            'echo',
-            const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
-              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
-            ]),
-            false,
-            (o) => o!.echo,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'msg', false, true),
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          MyInfoModule,
+          'echo',
+          const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          ]),
+          false,
+          (o) => o!.echo,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'msg', false, true),
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'touppercase':
         return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
-            this,
-            MyInfoModule,
-            'toUpperCase',
-            const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
-              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
-            ]),
-            false,
-            (o) => o!.toUpperCase,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'msg', false, true)],
-            null,
-            null,
-            null);
+          this,
+          MyInfoModule,
+          'toUpperCase',
+          const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          ]),
+          false,
+          (o) => o!.toUpperCase,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'msg', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'ensureconfigured':
         return MethodReflection<MyInfoModule, void>(
-            this,
-            APIModule,
-            'ensureConfigured',
-            __TR.tVoid,
-            false,
-            (o) => o!.ensureConfigured,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'ensureConfigured',
+          __TR.tVoid,
+          false,
+          (o) => o!.ensureConfigured,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'initialize':
         return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
-            this,
-            APIModule,
-            'initialize',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.initialize,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          APIModule,
+          'initialize',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.initialize,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getrouteshandlersnames':
         return MethodReflection<MyInfoModule, Iterable<String>>(
-            this,
-            APIModule,
-            'getRoutesHandlersNames',
-            const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
-            false,
-            (o) => o!.getRoutesHandlersNames,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'method': __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method',
-                  true, false)
-            },
-            null);
+          this,
+          APIModule,
+          'getRoutesHandlersNames',
+          const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
+          false,
+          (o) => o!.getRoutesHandlersNames,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'method': __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroute':
         return MethodReflection<MyInfoModule, APIModule>(
-            this,
-            APIModule,
-            'addRoute',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  true),
-              __PR(__TR.tString, 'name', false, true),
-              __PR(
-                  __TR<APIRouteFunction<dynamic>>(
-                      APIRouteFunction, <__TR>[__TR.tDynamic]),
-                  'function',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'config': __PR(
-                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
-              'parameters': __PR(
-                  __TR<Map<String, TypeInfo>>(Map, <__TR>[
-                    __TR.tString,
-                    __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic])
-                  ]),
-                  'parameters',
-                  true,
-                  false),
-              'rules': __PR(
-                  __TR<Iterable<APIRouteRule>>(
-                      Iterable, <__TR>[__TR<APIRouteRule>(APIRouteRule)]),
-                  'rules',
-                  true,
-                  false)
-            },
-            null);
+          this,
+          APIModule,
+          'addRoute',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRoute,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              true,
+            ),
+            __PR(__TR.tString, 'name', false, true),
+            __PR(
+              __TR<APIRouteFunction<dynamic>>(APIRouteFunction, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'function',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'config': __PR(
+              __TR<APIRouteConfig>(APIRouteConfig),
+              'config',
+              true,
+              false,
+            ),
+            'parameters': __PR(
+              __TR<Map<String, TypeInfo>>(Map, <__TR>[
+                __TR.tString,
+                __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+              ]),
+              'parameters',
+              true,
+              false,
+            ),
+            'rules': __PR(
+              __TR<Iterable<APIRouteRule>>(Iterable, <__TR>[
+                __TR<APIRouteRule>(APIRouteRule),
+              ]),
+              'rules',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroutehandler':
         return MethodReflection<MyInfoModule, APIModule>(
-            this,
-            APIModule,
-            'addRouteHandler',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRouteHandler,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<APIRouteHandler<dynamic>>(
-                      APIRouteHandler, <__TR>[__TR.tDynamic]),
-                  'routeHandler',
-                  false,
-                  true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'addRouteHandler',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRouteHandler,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'routeHandler',
+              false,
+              true,
+            ),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'getroutehandler':
         return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandler',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandler,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'name', false, true)],
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandler',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandler,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'name', false, true)],
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          ],
+          null,
+          null,
+        );
       case 'getroutehandlerbyrequest':
         return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandlerByRequest',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandlerByRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandlerByRequest',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandlerByRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
+          null,
+          null,
+        );
       case 'resolveroute':
         return MethodReflection<MyInfoModule, String>(
-            this,
-            APIModule,
-            'resolveRoute',
-            __TR.tString,
-            false,
-            (o) => o!.resolveRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'resolveRoute',
+          __TR.tString,
+          false,
+          (o) => o!.resolveRoute,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'call':
         return MethodReflection<MyInfoModule, FutureOr<APIResponse<dynamic>>>(
-            this,
-            APIModule,
-            'call',
-            const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
-              __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
-            ]),
-            false,
-            (o) => o!.call,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'call',
+          const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
+            __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic]),
+          ]),
+          false,
+          (o) => o!.call,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'acceptsrequest':
         return MethodReflection<MyInfoModule, bool>(
-            this,
-            APIModule,
-            'acceptsRequest',
-            __TR.tBool,
-            false,
-            (o) => o!.acceptsRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'acceptsRequest',
+          __TR.tBool,
+          false,
+          (o) => o!.acceptsRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'apiinfo':
         return MethodReflection<MyInfoModule, APIModuleInfo>(
-            this,
-            APIModule,
-            'apiInfo',
-            const __TR<APIModuleInfo>(APIModuleInfo),
-            false,
-            (o) => o!.apiInfo,
-            obj,
-            null,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'apiInfo',
+          const __TR<APIModuleInfo>(APIModuleInfo),
+          false,
+          (o) => o!.apiInfo,
+          obj,
+          null,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false),
+          ],
+          null,
+          null,
+        );
       case 'ensureinitialized':
         return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitialized',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitialized,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitialized',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitialized,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'ensureinitializedasync':
         return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitializedAsync',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitializedAsync,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitializedAsync',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitializedAsync,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'doinitialization':
         return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'doInitialization',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.doInitialization,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'doInitialization',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.doInitialization,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'initializedependencies':
         return MethodReflection<MyInfoModule, FutureOr<List<Initializable>>>(
-            this,
-            Initializable,
-            'initializeDependencies',
-            const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
-              __TR<List<Initializable>>(
-                  List, <__TR>[__TR<Initializable>(Initializable)])
+          this,
+          Initializable,
+          'initializeDependencies',
+          const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
+            __TR<List<Initializable>>(List, <__TR>[
+              __TR<Initializable>(Initializable),
             ]),
-            false,
-            (o) => o!.initializeDependencies,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.initializeDependencies,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'checkinitialized':
         return MethodReflection<MyInfoModule, void>(
-            this,
-            Initializable,
-            'checkInitialized',
-            __TR.tVoid,
-            false,
-            (o) => o!.checkInitialized,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Initializable,
+          'checkInitialized',
+          __TR.tVoid,
+          false,
+          (o) => o!.checkInitialized,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'executeinitialized':
         return MethodReflection<MyInfoModule, FutureOr<dynamic>>(
-            this,
-            Initializable,
-            'executeInitialized',
-            __TR.tFutureOrDynamic,
-            false,
-            (o) => o!.executeInitialized,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<ExecuteInitializedCallback<dynamic>>(
-                      ExecuteInitializedCallback, <__TR>[__TR.tDynamic]),
-                  'callback',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'executeInitialized',
+          __TR.tFutureOrDynamic,
+          false,
+          (o) => o!.executeInitialized,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<ExecuteInitializedCallback<dynamic>>(
+                ExecuteInitializedCallback,
+                <__TR>[__TR.tDynamic],
+              ),
+              'callback',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       default:
         return null;
     }
@@ -900,10 +982,13 @@ extension MyInfoModule$reflectionExtension on MyInfoModule {
       reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 
   /// Returns an encoded JSON [String] for type [MyInfoModule]. (Generated by [ReflectionFactory])
-  String toJsonEncoded(
-          {bool pretty = false, bool duplicatedEntitiesAsID = false}) =>
-      reflection.toJsonEncoded(
-          pretty: pretty, duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
 
   /// Returns a JSON for type [MyInfoModule] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
@@ -911,12 +996,14 @@ extension MyInfoModule$reflectionExtension on MyInfoModule {
 }
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
-      MyInfoModule$reflection(),
-    ];
+  MyInfoModule$reflection(),
+];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
-    List<Reflection>.unmodifiable(_listSiblingsReflection());
+List<Reflection> _siblingsReflection() =>
+    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
+      _listSiblingsReflection(),
+    );
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

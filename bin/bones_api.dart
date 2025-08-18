@@ -26,15 +26,21 @@ void main(List<String> args) async {
   await commandInfo.configure();
   await commandCreate.configure();
 
-  var commandRunner = CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
-    ..addCommand(MyCommandServe())
-    ..addCommand(MyCommandConsole())
-    ..addCommand(MyCommandInspect())
-    ..addCommand(commandInfo)
-    ..addCommand(commandCreate);
+  var commandRunner =
+      CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
+        ..addCommand(MyCommandServe())
+        ..addCommand(MyCommandConsole())
+        ..addCommand(MyCommandInspect())
+        ..addCommand(commandInfo)
+        ..addCommand(commandCreate);
 
-  commandRunner.argParser.addFlag('version',
-      abbr: 'v', negatable: false, defaultsTo: false, help: 'Show version.');
+  commandRunner.argParser.addFlag(
+    'version',
+    abbr: 'v',
+    negatable: false,
+    defaultsTo: false,
+    help: 'Show version.',
+  );
 
   {
     var argsResult = commandRunner.argParser.parse(args);
@@ -59,13 +65,19 @@ abstract class CommandSourceFileBase extends Command<bool> {
   ArgParser get argParser => _argParser;
 
   CommandSourceFileBase() {
-    argParser.addFlag('verbose',
-        abbr: 'v', help: 'Verbose mode.', defaultsTo: false, negatable: false);
+    argParser.addFlag(
+      'verbose',
+      abbr: 'v',
+      help: 'Verbose mode.',
+      defaultsTo: false,
+      negatable: false,
+    );
 
     argParser.addOption(
       'directory',
       abbr: 'd',
-      help: 'Project directory.\n'
+      help:
+          'Project directory.\n'
           '(defaults to current directory)',
     );
   }
@@ -127,59 +139,86 @@ class MyCommandServe extends CommandSourceFileBase {
   final String name = 'serve';
 
   MyCommandServe() {
-    argParser.addOption('address',
-        abbr: 'a',
-        help: 'Server bind address.',
-        defaultsTo: 'localhost',
-        valueHelp: 'localhost|*');
+    argParser.addOption(
+      'address',
+      abbr: 'a',
+      help: 'Server bind address.',
+      defaultsTo: 'localhost',
+      valueHelp: 'localhost|*',
+    );
 
-    argParser.addOption('port',
-        abbr: 'p', help: 'Server listen port (HTTP).', defaultsTo: '8080');
+    argParser.addOption(
+      'port',
+      abbr: 'p',
+      help: 'Server listen port (HTTP).',
+      defaultsTo: '8080',
+    );
 
-    argParser.addOption('secure-port',
-        abbr: 's',
-        help: 'Server listen secure port (HTTPS).',
-        aliases: ['secureport']);
+    argParser.addOption(
+      'secure-port',
+      abbr: 's',
+      help: 'Server listen secure port (HTTPS).',
+      aliases: ['secureport'],
+    );
 
     argParser.addOption('lib', help: 'Project APIRoot Library file name.');
 
-    argParser.addOption('class',
-        abbr: 'c', help: 'Project APIRoot Class name.');
+    argParser.addOption(
+      'class',
+      abbr: 'c',
+      help: 'Project APIRoot Class name.',
+    );
 
-    argParser.addOption('config',
-        abbr: 'i', help: 'API Configuration.', valueHelp: 'file|url|json');
+    argParser.addOption(
+      'config',
+      abbr: 'i',
+      help: 'API Configuration.',
+      valueHelp: 'file|url|json',
+    );
 
-    argParser.addMultiOption('domain',
-        abbr: 'f',
-        help: 'Domain root directory (for static files).',
-        valueHelp: 'domain=directory');
+    argParser.addMultiOption(
+      'domain',
+      abbr: 'f',
+      help: 'Domain root directory (for static files).',
+      valueHelp: 'domain=directory',
+    );
 
-    argParser.addFlag('lets-encrypt',
-        abbr: 'l',
-        help: "Enables Let's Encrypt (through package `shelf_letsencrypt`).",
-        aliases: ['letsencrypt']);
+    argParser.addFlag(
+      'lets-encrypt',
+      abbr: 'l',
+      help: "Enables Let's Encrypt (through package `shelf_letsencrypt`).",
+      aliases: ['letsencrypt'],
+    );
 
-    argParser.addFlag('lets-encrypt-production',
-        help: "Enables Let's Encrypt in PRODUCTION mode. Default mode: staging",
-        aliases: ['letsencrypt-production']);
+    argParser.addFlag(
+      'lets-encrypt-production',
+      help: "Enables Let's Encrypt in PRODUCTION mode. Default mode: staging",
+      aliases: ['letsencrypt-production'],
+    );
 
-    argParser.addOption('lets-encrypt-dir',
-        help: "The Let's Encrypt certificates directory.",
-        aliases: [
-          'letsencrypt-dir',
-          'lets-encrypt-directory',
-          'letsencrypt-directory'
-        ]);
+    argParser.addOption(
+      'lets-encrypt-dir',
+      help: "The Let's Encrypt certificates directory.",
+      aliases: [
+        'letsencrypt-dir',
+        'lets-encrypt-directory',
+        'letsencrypt-directory',
+      ],
+    );
 
-    argParser.addFlag('hotreload',
-        abbr: 'r',
-        help:
-            'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed).');
+    argParser.addFlag(
+      'hotreload',
+      abbr: 'r',
+      help:
+          'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed).',
+    );
 
-    argParser.addFlag('build',
-        abbr: 'b',
-        help:
-            'Allows automatic reflection build if the inspector detects the need at startup.');
+    argParser.addFlag(
+      'build',
+      abbr: 'b',
+      help:
+          'Allows automatic reflection build if the inspector detects the need at startup.',
+    );
   }
 
   String? get argLibName => argResults!['lib'];
@@ -209,17 +248,19 @@ class MyCommandServe extends CommandSourceFileBase {
     var val = argResults!['domain'];
     if (val == null) return <String, String>{};
 
-    var values = (val is List ? val : [val])
-        .map((e) => e != null ? '$e'.trim() : '')
-        .where((e) => e.isNotEmpty)
-        .toList();
+    var values =
+        (val is List ? val : [val])
+            .map((e) => e != null ? '$e'.trim() : '')
+            .where((e) => e.isNotEmpty)
+            .toList();
 
-    var entries = values.map((e) {
-      var parts = e.split('=');
-      var domain = parts[0].trim();
-      var path = parts.length > 1 ? parts[1].trim() : '';
-      return MapEntry(domain, path);
-    }).toList();
+    var entries =
+        values.map((e) {
+          var parts = e.split('=');
+          var domain = parts[0].trim();
+          var path = parts.length > 1 ? parts[1].trim() : '';
+          return MapEntry(domain, path);
+        }).toList();
 
     return Map<String, String>.fromEntries(entries);
   }
@@ -247,8 +288,9 @@ class MyCommandServe extends CommandSourceFileBase {
 
       if (filePubSpec.existsSync()) {
         directory = Directory.current.absolute.path;
-        parametersMessage
-            .add('** Using current directory as Project directory.');
+        parametersMessage.add(
+          '** Using current directory as Project directory.',
+        );
       }
     }
 
@@ -292,60 +334,64 @@ class MyCommandServe extends CommandSourceFileBase {
       var hotReloadAllowed = await APIHotReload.get().isHotReloadAllowed();
       if (!hotReloadAllowed) {
         await _spawnDartVMForHotReload(
-            spawner,
-            directory,
-            apiRootLib,
-            apiRootClass!,
-            address,
-            port,
-            securePort,
-            letsEncrypt,
-            letsEncryptProduction,
-            letsEncryptDir,
-            apiConfig,
-            domains,
-            allowBuild,
-            parametersMessage);
+          spawner,
+          directory,
+          apiRootLib,
+          apiRootClass!,
+          address,
+          port,
+          securePort,
+          letsEncrypt,
+          letsEncryptProduction,
+          letsEncryptDir,
+          apiConfig,
+          domains,
+          allowBuild,
+          parametersMessage,
+        );
         return true;
       }
     }
 
     return await _spawnAPIServerIsolate(
-        parametersMessage,
-        directory,
-        apiRootLib,
-        apiRootClass!,
-        spawner,
-        address,
-        port,
-        securePort,
-        letsEncrypt,
-        letsEncryptProduction,
-        letsEncryptDir,
-        hotReload,
-        allowBuild,
-        apiConfig,
-        domains);
+      parametersMessage,
+      directory,
+      apiRootLib,
+      apiRootClass!,
+      spawner,
+      address,
+      port,
+      securePort,
+      letsEncrypt,
+      letsEncryptProduction,
+      letsEncryptDir,
+      hotReload,
+      allowBuild,
+      apiConfig,
+      domains,
+    );
   }
 
   Future<bool> _spawnAPIServerIsolate(
-      List<String> parametersMessage,
-      String directory,
-      String? apiRootLib,
-      String apiRootClass,
-      DartSpawner spawner,
-      String address,
-      String port,
-      String securePort,
-      bool letsEncrypt,
-      bool letsEncryptProduction,
-      String letsEncryptDir,
-      bool hotReload,
-      bool allowBuild,
-      String apiConfig,
-      Map<String, String> domains) async {
+    List<String> parametersMessage,
+    String directory,
+    String? apiRootLib,
+    String apiRootClass,
+    DartSpawner spawner,
+    String address,
+    String port,
+    String securePort,
+    bool letsEncrypt,
+    bool letsEncryptProduction,
+    String letsEncryptDir,
+    bool hotReload,
+    bool allowBuild,
+    String apiConfig,
+    Map<String, String> domains,
+  ) async {
     print(
-        '________________________________________________________________________________');
+      '________________________________________________________________________________',
+    );
     print('[Bones_API/${BonesAPI.VERSION}] :: CLI :: serve\n');
 
     if (parametersMessage.isNotEmpty) {
@@ -367,12 +413,14 @@ class MyCommandServe extends CommandSourceFileBase {
 
     print('Building API Server...');
 
-    var projectBonesAPIVersions =
-        spawner.getProjectDependencyVersion('bones_api');
+    var projectBonesAPIVersions = spawner.getProjectDependencyVersion(
+      'bones_api',
+    );
 
     if (projectBonesAPIVersions == null) {
       throw StateError(
-          'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory');
+        'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory',
+      );
     }
 
     var projectPackageName = (await spawner.projectPackageName)!;
@@ -383,12 +431,18 @@ class MyCommandServe extends CommandSourceFileBase {
     if (projectLibraryName.isEmpty) projectLibraryName = projectPackageName;
 
     if (projectLibraryName.endsWith('.dart')) {
-      projectLibraryName =
-          projectLibraryName.substring(0, projectLibraryName.length - 5);
+      projectLibraryName = projectLibraryName.substring(
+        0,
+        projectLibraryName.length - 5,
+      );
     }
 
     var dartScript = buildDartScript(
-        spawner.id, projectPackageName, projectLibraryName, apiRootClass);
+      spawner.id,
+      projectPackageName,
+      projectLibraryName,
+      apiRootClass,
+    );
 
     print('Spawning API Server Isolate...\n');
 
@@ -400,8 +454,9 @@ class MyCommandServe extends CommandSourceFileBase {
 
     var domainsInline = '';
     if (domains.isNotEmpty) {
-      domainsInline =
-          domains.entries.map((e) => '${e.key}=${e.value}').join('&');
+      domainsInline = domains.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('&');
     }
 
     var process = await spawner.spawnDartScript(
@@ -416,7 +471,7 @@ class MyCommandServe extends CommandSourceFileBase {
         '$hotReload',
         hotReloadIgnoreIsolate,
         apiConfig,
-        domainsInline
+        domainsInline,
       ],
       usesSpawnedMain: true,
       debugName: apiRootClass,
@@ -427,7 +482,8 @@ class MyCommandServe extends CommandSourceFileBase {
     await Future.delayed(Duration(milliseconds: 500));
 
     print(
-        '________________________________________________________________________________');
+      '________________________________________________________________________________',
+    );
     print('API Server exit: $exit');
 
     return true;
@@ -449,7 +505,8 @@ class MyCommandServe extends CommandSourceFileBase {
       }
 
       print(
-          '\n--------------------------------------------------------------------------------');
+        '\n--------------------------------------------------------------------------------',
+      );
     }
 
     return reflectionOK;
@@ -459,22 +516,26 @@ class MyCommandServe extends CommandSourceFileBase {
     print('** Running reflection build:');
     print(' \$> dart run build_runner build\n');
     print(
-        ' >------------------------------------------------------------------------------');
+      ' >------------------------------------------------------------------------------',
+    );
 
     var projectDirectory = await spawner.projectDirectory;
 
     var outputCount = <int>[0];
 
     var dartProcess = await spawner.runProcess(
-        'dart', ['run', 'build_runner', 'build'],
-        workingDirectory: projectDirectory.path,
-        redirectOutput: true,
-        stdoutFilter: (o) => _filterOutput(o, outputCount),
-        stderrFilter: (o) => _filterOutput(o, outputCount));
+      'dart',
+      ['run', 'build_runner', 'build'],
+      workingDirectory: projectDirectory.path,
+      redirectOutput: true,
+      stdoutFilter: (o) => _filterOutput(o, outputCount),
+      stderrFilter: (o) => _filterOutput(o, outputCount),
+    );
 
     var ok = await dartProcess.checkExitCode(0);
     print(
-        '\n >------------------------------------------------------------------------------');
+      '\n >------------------------------------------------------------------------------',
+    );
     print(' > Reflection build: ${ok ? 'OK' : 'Error!'}');
 
     if (ok) {
@@ -486,8 +547,10 @@ class MyCommandServe extends CommandSourceFileBase {
 
   String _filterOutput(String o, List<int> count) {
     var c = ++count[0];
-    var o2 =
-        o.replaceAllMapped(RegExp(r'(\r?\n)'), (m) => '${m.group(1)!} >> ');
+    var o2 = o.replaceAllMapped(
+      RegExp(r'(\r?\n)'),
+      (m) => '${m.group(1)!} >> ',
+    );
     if (c == 1) {
       o2 = ' >> $o2';
     }
@@ -495,22 +558,24 @@ class MyCommandServe extends CommandSourceFileBase {
   }
 
   Future<void> _spawnDartVMForHotReload(
-      DartSpawner spawner,
-      String directory,
-      String? apiRootLib,
-      String apiRootClass,
-      String address,
-      String port,
-      String securePort,
-      bool letsEncrypt,
-      bool letsEncryptProduction,
-      String letsEncryptDir,
-      String apiConfig,
-      Map<String, String> domains,
-      bool allowBuild,
-      List<String> parametersMessage) async {
+    DartSpawner spawner,
+    String directory,
+    String? apiRootLib,
+    String apiRootClass,
+    String address,
+    String port,
+    String securePort,
+    bool letsEncrypt,
+    bool letsEncryptProduction,
+    String letsEncryptDir,
+    String apiConfig,
+    Map<String, String> domains,
+    bool allowBuild,
+    List<String> parametersMessage,
+  ) async {
     print(
-        '________________________________________________________________________________');
+      '________________________________________________________________________________',
+    );
     print('[Bones_API/${BonesAPI.VERSION}]\n');
 
     if (parametersMessage.isNotEmpty) {
@@ -523,47 +588,53 @@ class MyCommandServe extends CommandSourceFileBase {
     print('Enabling Hot Reload...');
     print('Starting a Dart VM with `--enable-vm-service` for Hot Reload...');
     print(
-        '================================================================================');
+      '================================================================================',
+    );
 
     var process = await spawner.runDartVM(
-        'bones_api',
-        [
-          'serve',
-          '--directory',
-          directory,
-          if (apiRootLib != null) ...['--lib', apiRootLib],
-          '--class',
-          apiRootClass,
-          '--address',
-          address,
-          '--port',
-          port,
-          '--secure-port',
-          securePort,
-          if (letsEncrypt) '--lets-encrypt',
-          if (letsEncryptProduction) '--lets-encrypt-production',
-          if (letsEncryptDir.isNotEmpty) ...[
-            '--lets-encrypt-dir',
-            letsEncryptDir
-          ],
-          if (allowBuild) '--build',
-          '--hotreload',
-          if (apiConfig.isNotEmpty) ...['--config', apiConfig],
-          if (domains.isNotEmpty)
-            ...domains.entries.expand((e) => ['--domain', e.key, e.value]),
+      'bones_api',
+      [
+        'serve',
+        '--directory',
+        directory,
+        if (apiRootLib != null) ...['--lib', apiRootLib],
+        '--class',
+        apiRootClass,
+        '--address',
+        address,
+        '--port',
+        port,
+        '--secure-port',
+        securePort,
+        if (letsEncrypt) '--lets-encrypt',
+        if (letsEncryptProduction) '--lets-encrypt-production',
+        if (letsEncryptDir.isNotEmpty) ...[
+          '--lets-encrypt-dir',
+          letsEncryptDir,
         ],
-        enableVMService: true,
-        handleSignals: true,
-        redirectOutput: true,
-        onSignal: (s) => print('\n## SIGNAL: $s'));
+        if (allowBuild) '--build',
+        '--hotreload',
+        if (apiConfig.isNotEmpty) ...['--config', apiConfig],
+        if (domains.isNotEmpty)
+          ...domains.entries.expand((e) => ['--domain', e.key, e.value]),
+      ],
+      enableVMService: true,
+      handleSignals: true,
+      redirectOutput: true,
+      onSignal: (s) => print('\n## SIGNAL: $s'),
+    );
 
     var exitCode = await process.exitCode;
 
     exit(exitCode);
   }
 
-  String buildDartScript(int isolateID, String projectPackageName,
-      String projectLibraryName, String apiRootClass) {
+  String buildDartScript(
+    int isolateID,
+    String projectPackageName,
+    String projectLibraryName,
+    String apiRootClass,
+  ) {
     var script = '''
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/bones_api_dart_spawner.dart';
@@ -666,7 +737,8 @@ class MyCommandInspect extends CommandSourceFileBase {
       reflectionOK = false;
 
       print(
-          '--------------------------------------------------------------------------------');
+        '--------------------------------------------------------------------------------',
+      );
       print('\nReflection files inspection:');
     }
 
@@ -711,8 +783,12 @@ class MyCommandConsole extends CommandSourceFileBase {
   final String name = 'console';
 
   MyCommandConsole() {
-    argParser.addOption('class',
-        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
+    argParser.addOption(
+      'class',
+      abbr: 'c',
+      help: 'Project APIRoot Class name',
+      defaultsTo: 'API',
+    );
   }
 
   String? get argClass => argResults!['class'];
@@ -736,19 +812,25 @@ class MyCommandConsole extends CommandSourceFileBase {
 
     var spawner = DartSpawner(directory: Directory(directory));
 
-    var projectBonesAPIVersions =
-        spawner.getProjectDependencyVersion('bones_api');
+    var projectBonesAPIVersions = spawner.getProjectDependencyVersion(
+      'bones_api',
+    );
 
     if (projectBonesAPIVersions == null) {
       throw StateError(
-          'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory');
+        'Target project (`${spawner.projectPackageName}`) is not using package `bones_api`: $directory',
+      );
     }
 
     var projectPackageName = (await spawner.projectPackageName)!;
     var projectLibraryName = (await spawner.projectLibraryName)!;
 
     var dartScript = buildDartScript(
-        spawner.id, projectPackageName, projectLibraryName, apiRootClass);
+      spawner.id,
+      projectPackageName,
+      projectLibraryName,
+      apiRootClass,
+    );
 
     var process = await spawner.spawnDartScript(
       dartScript,
@@ -764,8 +846,12 @@ class MyCommandConsole extends CommandSourceFileBase {
     return true;
   }
 
-  String buildDartScript(int isolateID, String projectPackageName,
-      String projectLibraryName, String apiRootClass) {
+  String buildDartScript(
+    int isolateID,
+    String projectPackageName,
+    String projectLibraryName,
+    String apiRootClass,
+  ) {
     var script = '''
 import 'dart:async';
 import 'dart:convert';
@@ -834,8 +920,9 @@ mixin DefaultTemplate {
 
   Future<bool> configure() async {
     if (_defaultTemplateUri == null) {
-      var resource =
-          Resource('package:bones_api/src/template/bones_api_template.tar.gz');
+      var resource = Resource(
+        'package:bones_api/src/template/bones_api_template.tar.gz',
+      );
       _defaultTemplateUri = await resource.uriResolved;
     }
 

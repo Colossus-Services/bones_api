@@ -52,21 +52,26 @@ class DBObjectDirectoryAdapter
 
     DBObjectAdapter.boot();
 
-    DBObjectAdapter.registerAdapter([
-      'object.directory',
-      'obj.dir',
-    ], DBObjectDirectoryAdapter, _instantiate);
+    DBObjectAdapter.registerAdapter(
+      ['object.directory', 'obj.dir'],
+      DBObjectDirectoryAdapter,
+      _instantiate,
+    );
   }
 
-  static FutureOr<DBObjectDirectoryAdapter?> _instantiate(config,
-      {int? minConnections,
-      int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+  static FutureOr<DBObjectDirectoryAdapter?> _instantiate(
+    config, {
+    int? minConnections,
+    int? maxConnections,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     try {
-      return DBObjectDirectoryAdapter.fromConfig(config,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath);
+      return DBObjectDirectoryAdapter.fromConfig(
+        config,
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath,
+      );
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
@@ -75,46 +80,51 @@ class DBObjectDirectoryAdapter
 
   final Directory directory;
 
-  DBObjectDirectoryAdapter(this.directory,
-      {super.generateTables,
-      super.populateTables,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.parentRepositoryProvider,
-      super.workingPath,
-      super.log})
-      : super(
-          'object.directory',
-          1,
-          3,
-          const DBAdapterCapability(
-              dialect: DBDialect('object'),
-              transactions: true,
-              transactionAbort: true,
-              constraintSupport: false,
-              multiIsolateSupport: true,
-              connectivity: DBAdapterCapabilityConnectivity.none),
-        ) {
+  DBObjectDirectoryAdapter(
+    this.directory, {
+    super.generateTables,
+    super.populateTables,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.parentRepositoryProvider,
+    super.workingPath,
+    super.log,
+  }) : super(
+         'object.directory',
+         1,
+         3,
+         const DBAdapterCapability(
+           dialect: DBDialect('object'),
+           transactions: true,
+           transactionAbort: true,
+           constraintSupport: false,
+           multiIsolateSupport: true,
+           connectivity: DBAdapterCapabilityConnectivity.none,
+         ),
+       ) {
     boot();
 
     if (!directory.existsSync()) {
       throw ArgumentError(
-          "[DBObjectDirectoryAdapter]: Directory doesn't exists: $directory");
+        "[DBObjectDirectoryAdapter]: Directory doesn't exists: $directory",
+      );
     }
 
     var modeString = directory.statSync().modeString();
     if (!modeString.contains('rw')) {
       throw StateError(
-          "[DBObjectDirectoryAdapter]: Can't read+write the directory: $directory");
+        "[DBObjectDirectoryAdapter]: Can't read+write the directory: $directory",
+      );
     }
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
   static FutureOr<DBObjectDirectoryAdapter> fromConfig(
-      Map<String, dynamic>? config,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+    Map<String, dynamic>? config, {
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var directoryPath = config?['path'] ?? config?['directory'];
@@ -131,7 +141,8 @@ class DBObjectDirectoryAdapter
     Object? populateSourceVariables;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+      generateTables =
+          populate.getAsBool('generateTables', ignoreCase: true) ??
           populate.getAsBool('generate-tables', ignoreCase: true) ??
           populate.getAsBool('generate_tables', ignoreCase: true) ??
           false;
@@ -194,8 +205,10 @@ class DBObjectDirectoryAdapter
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID}) {
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  }) {
     //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
@@ -209,13 +222,15 @@ class DBObjectDirectoryAdapter
         var targetId =
             '${relationship.targetTable}_${relationship.targetField}';
 
-        tableScheme = TableScheme(table,
-            relationship: true,
-            idFieldName: sourceId,
-            fieldsTypes: {
-              sourceId: relationship.sourceFieldType,
-              targetId: relationship.targetFieldType,
-            });
+        tableScheme = TableScheme(
+          table,
+          relationship: true,
+          idFieldName: sourceId,
+          fieldsTypes: {
+            sourceId: relationship.sourceFieldType,
+            targetId: relationship.targetFieldType,
+          },
+        );
 
         _log.info('relationship> $tableScheme');
 
@@ -223,20 +238,24 @@ class DBObjectDirectoryAdapter
       }
 
       throw StateError(
-          "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
+        "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!",
+      );
     }
 
     var idFieldName = entityHandler.idFieldName();
 
     var entityFieldsTypes = entityHandler.fieldsTypes();
 
-    var fieldsTypes =
-        entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
+    var fieldsTypes = entityFieldsTypes.map(
+      (key, value) => MapEntry(key, value.type),
+    );
 
-    tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes);
+    tableScheme = TableScheme(
+      table,
+      relationship: relationship != null,
+      idFieldName: idFieldName,
+      fieldsTypes: fieldsTypes,
+    );
 
     _log.info('$tableScheme');
 
@@ -253,7 +272,7 @@ class DBObjectDirectoryAdapter
       true;
 
   final Map<DBObjectDirectoryAdapterContext, DateTime>
-      _openTransactionsContexts = <DBObjectDirectoryAdapterContext, DateTime>{};
+  _openTransactionsContexts = <DBObjectDirectoryAdapterContext, DateTime>{};
 
   @override
   DBObjectDirectoryAdapterContext openTransaction(Transaction transaction) {
@@ -262,8 +281,8 @@ class DBObjectDirectoryAdapter
     _openTransactionsContexts[conn] = DateTime.now();
 
     transaction.transactionFuture
-        // ignore: discarded_futures
-        .then(
+    // ignore: discarded_futures
+    .then(
       // ignore: discarded_futures
       (res) => resolveTransactionResult(res, transaction, conn),
       onError: (e, s) {
@@ -283,10 +302,11 @@ class DBObjectDirectoryAdapter
 
   @override
   bool cancelTransaction(
-      Transaction transaction,
-      DBObjectDirectoryAdapterContext? connection,
-      Object? error,
-      StackTrace? stackTrace) {
+    Transaction transaction,
+    DBObjectDirectoryAdapterContext? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  ) {
     _openTransactionsContexts.remove(connection);
     return true;
   }
@@ -296,7 +316,9 @@ class DBObjectDirectoryAdapter
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBObjectDirectoryAdapterContext? connection) {
+    Transaction transaction,
+    DBObjectDirectoryAdapterContext? connection,
+  ) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
@@ -314,20 +336,32 @@ class DBObjectDirectoryAdapter
 
   @override
   FutureOr<int> doCount(
-      TransactionOperation op, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<int, int>? preFinish}) {
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  }) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doCountImpl(
         op,
-        (conn) => _doCountImpl(op, table, matcher, parameters)
-            .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+        table,
+        matcher,
+        parameters,
+      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    );
   }
 
-  int _doCountImpl(TransactionOperation op, String table,
-      EntityMatcher? matcher, Object? parameters) {
+  int _doCountImpl(
+    TransactionOperation op,
+    String table,
+    EntityMatcher? matcher,
+    Object? parameters,
+  ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return 0;
 
@@ -347,10 +381,11 @@ class DBObjectDirectoryAdapter
   }
 
   List<File> _listTableFiles(Directory tableDir) {
-    var list = tableDir.listSync(recursive: false).whereType<File>().where((e) {
-      var path = e.path;
-      return path.endsWith('.json') && !path.startsWith('.');
-    }).toList();
+    var list =
+        tableDir.listSync(recursive: false).whereType<File>().where((e) {
+          var path = e.path;
+          return path.endsWith('.json') && !path.startsWith('.');
+        }).toList();
     return list;
   }
 
@@ -364,37 +399,59 @@ class DBObjectDirectoryAdapter
 
   @override
   FutureOr<List<I>> doExistIDs<I extends Object>(
-      TransactionOperation op, String entityName, String table, List<I> ids) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<I> ids,
+  ) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doExistIDsImpl(
         op,
-        (conn) => _doExistIDsImpl(op, table, ids)
-            .resolveMapped((res) => _finishOperation(op, res, null)));
+        table,
+        ids,
+      ).resolveMapped((res) => _finishOperation(op, res, null)),
+    );
   }
 
   List<I> _doExistIDsImpl<I extends Object>(
-      TransactionOperation op, String table, List<I> ids) {
+    TransactionOperation op,
+    String table,
+    List<I> ids,
+  ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
-    var existIDs = ids.where((id) {
-      var objFile = _resolveObjectFile(table, id);
-      return objFile.existsSync();
-    }).toList();
+    var existIDs =
+        ids.where((id) {
+          var objFile = _resolveObjectFile(table, id);
+          return objFile.existsSync();
+        }).toList();
 
     return existIDs;
   }
 
   @override
   FutureOr<R?> doSelectByID<R>(
-          TransactionOperation op, String entityName, String table, Object id,
-          {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>
-      executeTransactionOperation<R?>(
-          op,
-          (conn) => _doSelectByIDImpl<R>(table, id, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  }) => executeTransactionOperation<R?>(
+    op,
+    (conn) => _doSelectByIDImpl<R>(
+      table,
+      id,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
-      String table, Object id, String entityName) async {
+    String table,
+    Object id,
+    String entityName,
+  ) async {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return null;
 
@@ -403,17 +460,26 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
-          String table, List<Object> ids,
-          {PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectByIDsImpl<R>(table, ids, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<Object> ids, {
+    PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectByIDsImpl<R>(
+      table,
+      ids,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
-      String table, List<Object> ids, String entityName) async {
+    String table,
+    List<Object> ids,
+    String entityName,
+  ) async {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
@@ -425,48 +491,63 @@ class DBObjectDirectoryAdapter
 
   @override
   FutureOr<List<R>> doSelectAll<R>(
-          TransactionOperation op, String entityName, String table,
-          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectAllImpl<R>(table, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectAllImpl<R>(
+      table,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
-      String table, String entityName) {
+    String table,
+    String entityName,
+  ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
     var files = _listTableFiles(tableDir);
 
-    var entries = files.map((f) {
-      var fileName = pack_path.split(f.path).last;
-      var id = pack_path.withoutExtension(fileName);
-      return _readObject(table, id);
-    }).resolveAllNotNull();
+    var entries =
+        files.map((f) {
+          var fileName = pack_path.split(f.path).last;
+          var id = pack_path.withoutExtension(fileName);
+          return _readObject(table, id);
+        }).resolveAllNotNull();
 
     return entries;
   }
 
   @override
-  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
-          String table, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish}) =>
-      executeTransactionOperation(
-          op,
-          (conn) => _doDeleteImpl<R>(op, table, matcher, parameters)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doDeleteImpl<R>(
+      op,
+      table,
+      matcher,
+      parameters,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
-      TransactionOperation op,
-      String table,
-      EntityMatcher<dynamic> matcher,
-      Object? parameters) async {
+    TransactionOperation op,
+    String table,
+    EntityMatcher<dynamic> matcher,
+    Object? parameters,
+  ) async {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
@@ -493,31 +574,43 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
-          String table, O o, Map<String, dynamic> fields,
-          {String? idFieldName, PreFinishDBOperation? preFinish}) =>
-      executeTransactionOperation<dynamic>(op,
-          (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish));
+  FutureOr<dynamic> doInsert<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+  }) => executeTransactionOperation<dynamic>(
+    op,
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+  );
 
   FutureOr<dynamic> _doInsertImpl<O>(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      PreFinishDBOperation? preFinish) {
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    PreFinishDBOperation? preFinish,
+  ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) {
       tableDir.createSync();
     }
 
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     var id = entry[idField];
 
     _log.info(
-        '[transaction:${op.transactionId}] doInsert> INSERT INTO $table OBJECT `$id`');
+      '[transaction:${op.transactionId}] doInsert> INSERT INTO $table OBJECT `$id`',
+    );
 
     if (id == null) {
       throw StateError("Can't determine object ID to store it: $fields");
@@ -529,33 +622,43 @@ class DBObjectDirectoryAdapter
   }
 
   @override
-  FutureOr<dynamic> doUpdate<O>(TransactionOperation op, String entityName,
-          String table, O o, Object id, Map<String, dynamic> fields,
-          {String? idFieldName,
-          PreFinishDBOperation? preFinish,
-          bool allowAutoInsert = false}) =>
-      executeTransactionOperation(
-          op,
-          (conn) =>
-              _doUpdateImpl(op, table, fields, entityName, id, preFinish));
+  FutureOr<dynamic> doUpdate<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+    bool allowAutoInsert = false,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+  );
 
   FutureOr<dynamic> _doUpdateImpl(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      Object id,
-      PreFinishDBOperation? preFinish) {
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    Object id,
+    PreFinishDBOperation? preFinish,
+  ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) {
       tableDir.createSync();
     }
 
     _log.info(
-        '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`');
+      '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
+    );
 
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -566,7 +669,10 @@ class DBObjectDirectoryAdapter
   }
 
   Future<void> _saveObject(
-      String table, Object? id, Map<String, dynamic> obj) async {
+    String table,
+    Object? id,
+    Map<String, dynamic> obj,
+  ) async {
     var file = _resolveObjectFile(table, id);
     var enc = dart_convert.json.encode(obj);
     await file.writeAsString(enc);
@@ -619,14 +725,21 @@ class DBObjectDirectoryAdapter
     return table;
   }
 
-  Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
-      {String? entityName, String? table, EntityRepository? entityRepository}) {
-    entityRepository ??=
-        getEntityRepository(name: entityName, tableName: table);
+  Map<String, dynamic> _normalizeEntityJSON(
+    Map<String, dynamic> entityJson, {
+    String? entityName,
+    String? table,
+    EntityRepository? entityRepository,
+  }) {
+    entityRepository ??= getEntityRepository(
+      name: entityName,
+      tableName: table,
+    );
 
     if (entityRepository == null) {
       throw StateError(
-          "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table");
+        "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table",
+      );
     }
 
     var entityHandler = entityRepository.entityHandler;
@@ -639,8 +752,11 @@ class DBObjectDirectoryAdapter
         return MapEntry(key, dataURLBase64.toString());
       }
 
-      var fieldType =
-          entityHandler.getFieldType(null, key, resolveFiledName: false);
+      var fieldType = entityHandler.getFieldType(
+        null,
+        key,
+        resolveFiledName: false,
+      );
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType) {
@@ -649,7 +765,8 @@ class DBObjectDirectoryAdapter
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           if (value is EntityReference) {
@@ -668,44 +785,57 @@ class DBObjectDirectoryAdapter
         } else if (fieldType.isEntityReferenceListType) {
           var listEntityType = fieldType.arguments0!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           value = fieldEntityRepository.getEntityID(value);
@@ -718,16 +848,25 @@ class DBObjectDirectoryAdapter
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
-          Object? previousError) =>
-      DBObjectDirectoryAdapterException('error', '$error',
-          parentError: error,
-          parentStackTrace: stackTrace,
-          previousError: previousError,
-          operation: operation);
+  Object resolveError(
+    Object error,
+    StackTrace stackTrace,
+    Object? operation,
+    Object? previousError,
+  ) => DBObjectDirectoryAdapterException(
+    'error',
+    '$error',
+    parentError: error,
+    parentStackTrace: stackTrace,
+    previousError: previousError,
+    operation: operation,
+  );
 
   FutureOr<R> _finishOperation<T, R>(
-      TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) {
     if (preFinish != null) {
       return preFinish(res).resolveMapped((res2) => op.finish(res2));
     } else {
@@ -735,19 +874,24 @@ class DBObjectDirectoryAdapter
     }
   }
 
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f) {
+  FutureOr<R> executeTransactionOperation<R>(
+    TransactionOperation op,
+    FutureOr<R> Function(DBObjectDirectoryAdapterContext connection) f,
+  ) {
     var transaction = op.transaction;
 
     if (isTransactionWithSingleOperation(op)) {
-      return executeWithPool(f,
-          onError: (e, s) => transaction.notifyExecutionError(
-                e,
-                s,
-                errorResolver: resolveError,
-                operation: op,
-                debugInfo: () => op.toString(),
-              ));
+      return executeWithPool(
+        f,
+        onError:
+            (e, s) => transaction.notifyExecutionError(
+              e,
+              s,
+              errorResolver: resolveError,
+              operation: op,
+              debugInfo: () => op.toString(),
+            ),
+      );
     }
 
     if (transaction.isOpen) {
@@ -763,8 +907,10 @@ class DBObjectDirectoryAdapter
       transaction.open(
         () => openTransaction(transaction),
         callCloseTransactionRequired
-            ? () => closeTransaction(transaction,
-                transaction.context as DBObjectDirectoryAdapterContext?)
+            ? () => closeTransaction(
+              transaction,
+              transaction.context as DBObjectDirectoryAdapterContext?,
+            )
             : null,
       );
     }
@@ -785,9 +931,12 @@ class DBObjectDirectoryAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectDirectoryAdapterException';
 
-  DBObjectDirectoryAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBObjectDirectoryAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }

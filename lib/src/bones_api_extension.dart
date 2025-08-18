@@ -14,8 +14,9 @@ import 'bones_api_utils.dart';
 /// [ReflectionFactory] extension.
 extension ReflectionFactoryExtension on ReflectionFactory {
   /// Returns the registered [ClassReflectionEntityHandler] for [classType].
-  ClassReflectionEntityHandler<O>? getRegisterEntityHandler<O>(
-      [Type? classType]) {
+  ClassReflectionEntityHandler<O>? getRegisterEntityHandler<O>([
+    Type? classType,
+  ]) {
     var classReflection = getRegisterClassReflection<O>(classType);
     return classReflection?.entityHandler;
   }
@@ -24,16 +25,20 @@ extension ReflectionFactoryExtension on ReflectionFactory {
   ///
   /// - Requires a registered [ClassReflection] for [O] or [classType].
   /// - Uses a [ClassReflectionEntityHandler] for [O] or [classType].
-  FutureOr<O?> createFromMap<O>(Map<String, dynamic> map,
-      {Type? classType,
-      EntityProvider? entityProvider,
-      EntityCache? entityCache,
-      EntityResolutionRules? resolutionRules}) {
+  FutureOr<O?> createFromMap<O>(
+    Map<String, dynamic> map, {
+    Type? classType,
+    EntityProvider? entityProvider,
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  }) {
     var entityHandler = getRegisterEntityHandler<O>(classType);
-    return entityHandler?.createFromMap(map,
-        entityProvider: entityProvider,
-        entityCache: entityCache,
-        resolutionRules: resolutionRules);
+    return entityHandler?.createFromMap(
+      map,
+      entityProvider: entityProvider,
+      entityCache: entityCache,
+      resolutionRules: resolutionRules,
+    );
   }
 }
 
@@ -46,8 +51,9 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
   ClassReflectionEntityHandler<O> get entityHandler {
     var classReflection = withoutObjectInstance();
 
-    var entityHandler = _expandoEntityHandlers[classReflection]
-        as ClassReflectionEntityHandler<O>?;
+    var entityHandler =
+        _expandoEntityHandlers[classReflection]
+            as ClassReflectionEntityHandler<O>?;
 
     if (entityHandler == null) {
       entityHandler = _createEntityHandler();
@@ -74,20 +80,41 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
   EntityReferenceList<O> toEntityReferenceList(List<O> entities) =>
       EntityReferenceList<O>.fromEntities(entities);
 
-  bool isValidFieldValue<V>(String key,
-          {O? obj, V? value, bool nullValue = false}) =>
-      entityHandler.isValidFieldValue(obj ?? object!, key,
-          value: value, nullValue: nullValue);
+  bool isValidFieldValue<V>(
+    String key, {
+    O? obj,
+    V? value,
+    bool nullValue = false,
+  }) => entityHandler.isValidFieldValue(
+    obj ?? object!,
+    key,
+    value: value,
+    nullValue: nullValue,
+  );
 
-  EntityFieldInvalid? validateFieldValue<V>(String key,
-          {O? obj, V? value, bool nullValue = false}) =>
-      entityHandler.validateFieldValue(obj ?? object!, key,
-          value: value, nullValue: nullValue);
+  EntityFieldInvalid? validateFieldValue<V>(
+    String key, {
+    O? obj,
+    V? value,
+    bool nullValue = false,
+  }) => entityHandler.validateFieldValue(
+    obj ?? object!,
+    key,
+    value: value,
+    nullValue: nullValue,
+  );
 
-  void checkFieldValue<V>(String key,
-          {O? obj, V? value, bool nullValue = false}) =>
-      entityHandler.checkFieldValue(obj ?? object!, key,
-          value: value, nullValue: nullValue);
+  void checkFieldValue<V>(
+    String key, {
+    O? obj,
+    V? value,
+    bool nullValue = false,
+  }) => entityHandler.checkFieldValue(
+    obj ?? object!,
+    key,
+    value: value,
+    nullValue: nullValue,
+  );
 
   bool allFieldsValids({O? obj}) =>
       entityHandler.allFieldsValids(obj ?? object!);
@@ -99,27 +126,35 @@ extension ClassReflectionExtension<O> on ClassReflection<O> {
       entityHandler.checkAllFieldsValues(obj ?? object!);
 
   /// Creates an instance [O] from [map].
-  FutureOr<O> createFromMap(Map<String, dynamic> map,
-          {EntityProvider? entityProvider,
-          EntityCache? entityCache,
-          EntityResolutionRules? resolutionRules}) =>
-      entityHandler.createFromMap(map,
-          entityProvider: entityProvider,
-          entityCache: entityCache,
-          resolutionRules: resolutionRules);
+  FutureOr<O> createFromMap(
+    Map<String, dynamic> map, {
+    EntityProvider? entityProvider,
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  }) => entityHandler.createFromMap(
+    map,
+    entityProvider: entityProvider,
+    entityCache: entityCache,
+    resolutionRules: resolutionRules,
+  );
 
-  O createFromMapSync(Map<String, dynamic> map,
-      {EntityProvider? entityProvider,
-      EntityCache? entityCache,
-      EntityResolutionRules? resolutionRules}) {
+  O createFromMapSync(
+    Map<String, dynamic> map, {
+    EntityProvider? entityProvider,
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  }) {
     // ignore: discarded_futures
-    var o = createFromMap(map,
-        entityProvider: entityProvider,
-        entityCache: entityCache,
-        resolutionRules: resolutionRules);
+    var o = createFromMap(
+      map,
+      entityProvider: entityProvider,
+      entityCache: entityCache,
+      resolutionRules: resolutionRules,
+    );
     if (o is Future) {
       throw StateError(
-          "createFromMapSync> sub-call to `createFromMap` returned a `Future` for: $map");
+        "createFromMapSync> sub-call to `createFromMap` returned a `Future` for: $map",
+      );
     }
     return o;
   }
@@ -177,8 +212,12 @@ extension MapGetterExtension<K, V> on Map<K, V> {
   /// See [TypeParser.parserFor].
   T? getAs<T>(K key, {T? defaultValue, bool ignoreCase = false}) {
     var parser = TypeParser.parserFor<T>();
-    return getParsed(key, parser == null ? null : (o) => parser(o),
-        defaultValue: defaultValue, ignoreCase: ignoreCase);
+    return getParsed(
+      key,
+      parser == null ? null : (o) => parser(o),
+      defaultValue: defaultValue,
+      ignoreCase: ignoreCase,
+    );
   }
 
   /// Gets a [key] value ignoring case.
@@ -225,129 +264,194 @@ extension MapGetterExtension<K, V> on Map<K, V> {
   ///
   /// - [def] is the default value if the value is invalid.
   bool? getAsBool(K key, {bool? defaultValue, bool ignoreCase = false}) =>
-      getParsed(key, TypeParser.parseBool,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+      getParsed(
+        key,
+        TypeParser.parseBool,
+        defaultValue: defaultValue,
+        ignoreCase: ignoreCase,
+      );
 
   /// Gets the value of the first matching [keys], parsing as [bool].
   ///
   /// - [def] is the default value if the value is invalid.
-  bool? getMultiKeyAsBool(List<K> keys,
-          {bool? defaultValue, bool ignoreCase = false}) =>
-      getMultiKeyParsed(keys, TypeParser.parseBool,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  bool? getMultiKeyAsBool(
+    List<K> keys, {
+    bool? defaultValue,
+    bool ignoreCase = false,
+  }) => getMultiKeyParsed(
+    keys,
+    TypeParser.parseBool,
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [int].
   ///
   /// - [def] is the default value if the value is invalid.
   int? getAsInt(K key, {int? defaultValue, bool ignoreCase = false}) =>
-      getParsed(key, TypeParser.parseInt,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+      getParsed(
+        key,
+        TypeParser.parseInt,
+        defaultValue: defaultValue,
+        ignoreCase: ignoreCase,
+      );
 
   /// Gets the value of the first matching [keys], parsing as [int].
   ///
   /// - [def] is the default value if the value is invalid.
-  int? getMultiKeyAsInt(List<K> keys,
-          {int? defaultValue, bool ignoreCase = false}) =>
-      getMultiKeyParsed(keys, TypeParser.parseInt,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  int? getMultiKeyAsInt(
+    List<K> keys, {
+    int? defaultValue,
+    bool ignoreCase = false,
+  }) => getMultiKeyParsed(
+    keys,
+    TypeParser.parseInt,
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [double].
   ///
   /// - [def] is the default value if the value is invalid.
   double? getAsDouble(K key, {double? defaultValue, bool ignoreCase = false}) =>
-      getParsed(key, TypeParser.parseDouble,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+      getParsed(
+        key,
+        TypeParser.parseDouble,
+        defaultValue: defaultValue,
+        ignoreCase: ignoreCase,
+      );
 
   /// Gets the value of the first matching [keys], parsing as [double].
   ///
   /// - [def] is the default value if the value is invalid.
-  double? getMultiKeyAsDouble(List<K> keys,
-          {double? defaultValue, bool ignoreCase = false}) =>
-      getMultiKeyParsed(keys, TypeParser.parseDouble,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  double? getMultiKeyAsDouble(
+    List<K> keys, {
+    double? defaultValue,
+    bool ignoreCase = false,
+  }) => getMultiKeyParsed(
+    keys,
+    TypeParser.parseDouble,
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing to [num] type.
   ///
   /// - [def] is the default value if the value is invalid.
   num? getAsNum(K key, {num? defaultValue, bool ignoreCase = false}) =>
-      getParsed(key, TypeParser.parseNum,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+      getParsed(
+        key,
+        TypeParser.parseNum,
+        defaultValue: defaultValue,
+        ignoreCase: ignoreCase,
+      );
 
   /// Gets the value of the first matching [keys], parsing as [num].
   ///
   /// - [def] is the default value if the value is invalid.
-  num? getMultiKeyAsNum(List<K> keys,
-          {num? defaultValue, bool ignoreCase = false}) =>
-      getMultiKeyParsed(keys, TypeParser.parseNum,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  num? getMultiKeyAsNum(
+    List<K> keys, {
+    num? defaultValue,
+    bool ignoreCase = false,
+  }) => getMultiKeyParsed(
+    keys,
+    TypeParser.parseNum,
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [String].
   ///
   /// - [def] is the default value if the value is invalid.
   String? getAsString(K key, {String? defaultValue, bool ignoreCase = false}) =>
-      getParsed(key, TypeParser.parseString,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+      getParsed(
+        key,
+        TypeParser.parseString,
+        defaultValue: defaultValue,
+        ignoreCase: ignoreCase,
+      );
 
   /// Gets the value of the first matching [keys], parsing as [num].
   ///
   /// - [def] is the default value if the value is invalid.
-  String? getMultiKeyAsString(List<K> keys,
-          {String? defaultValue, bool ignoreCase = false}) =>
-      getMultiKeyParsed(keys, TypeParser.parseString,
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  String? getMultiKeyAsString(
+    List<K> keys, {
+    String? defaultValue,
+    bool ignoreCase = false,
+  }) => getMultiKeyParsed(
+    keys,
+    TypeParser.parseString,
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [List].
   ///
   /// - [def] is the default value if the value is invalid.
   /// - [elementParser] is the parser to use for each element in the [List].
-  List<E>? getAsList<E>(K key,
-          {List<E>? def,
-          TypeElementParser<E>? elementParser,
-          List<E>? defaultValue,
-          bool ignoreCase = false}) =>
-      getParsed(
-          key,
-          (l) => TypeParser.parseList<E>(l,
-              def: def, elementParser: elementParser),
-          defaultValue: defaultValue,
-          ignoreCase: ignoreCase);
+  List<E>? getAsList<E>(
+    K key, {
+    List<E>? def,
+    TypeElementParser<E>? elementParser,
+    List<E>? defaultValue,
+    bool ignoreCase = false,
+  }) => getParsed(
+    key,
+    (l) => TypeParser.parseList<E>(l, def: def, elementParser: elementParser),
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [Map].
   ///
   /// - [def] is the default value if the value is invalid.
   /// - [keyParser] is the parser to use for each key in the [Map].
   /// - [valueParser] is the parser to use for each value in the [Map].
-  Map<K, V>? getAsMap(K key,
-          {Map<K, V>? def,
-          TypeElementParser<K>? keyParser,
-          TypeElementParser<V>? valueParser,
-          Map<K, V>? defaultValue,
-          bool ignoreCase = false}) =>
-      getParsed(
-          key,
-          (m) => TypeParser.parseMap<K, V>(m,
-              def: def, keyParser: keyParser, valueParser: valueParser),
-          defaultValue: defaultValue,
-          ignoreCase: ignoreCase);
+  Map<K, V>? getAsMap(
+    K key, {
+    Map<K, V>? def,
+    TypeElementParser<K>? keyParser,
+    TypeElementParser<V>? valueParser,
+    Map<K, V>? defaultValue,
+    bool ignoreCase = false,
+  }) => getParsed(
+    key,
+    (m) => TypeParser.parseMap<K, V>(
+      m,
+      def: def,
+      keyParser: keyParser,
+      valueParser: valueParser,
+    ),
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing as [Set].
   ///
   /// - [def] is the default value if the value is invalid.
   /// - [elementParser] is the parser to use for each element in the [Set].
-  Set<E>? getAsSet<E>(K key,
-          {Set<E>? def,
-          TypeElementParser<E>? elementParser,
-          Set<E>? defaultValue,
-          bool ignoreCase = false}) =>
-      getParsed(key,
-          (s) => TypeParser.parseSet(s, def: def, elementParser: elementParser),
-          defaultValue: defaultValue, ignoreCase: ignoreCase);
+  Set<E>? getAsSet<E>(
+    K key, {
+    Set<E>? def,
+    TypeElementParser<E>? elementParser,
+    Set<E>? defaultValue,
+    bool ignoreCase = false,
+  }) => getParsed(
+    key,
+    (s) => TypeParser.parseSet(s, def: def, elementParser: elementParser),
+    defaultValue: defaultValue,
+    ignoreCase: ignoreCase,
+  );
 
   /// Gets a [key] value parsing with [parser].
   ///
   /// - [defaultValue] is the default value if the value is invalid.
-  T? getParsed<T>(K key, TypeElementParser<T>? parser,
-      {T? defaultValue, bool ignoreCase = false}) {
+  T? getParsed<T>(
+    K key,
+    TypeElementParser<T>? parser, {
+    T? defaultValue,
+    bool ignoreCase = false,
+  }) {
     var value = ignoreCase ? getIgnoreCase(key) : this[key];
 
     T? v;
@@ -364,8 +468,12 @@ extension MapGetterExtension<K, V> on Map<K, V> {
   }
 
   /// Same as [getParsed] but accepts multiple [keys].
-  T? getMultiKeyParsed<T>(List<K> keys, TypeElementParser<T>? parser,
-      {T? defaultValue, bool ignoreCase = false}) {
+  T? getMultiKeyParsed<T>(
+    List<K> keys,
+    TypeElementParser<T>? parser, {
+    T? defaultValue,
+    bool ignoreCase = false,
+  }) {
     V? value;
     if (ignoreCase) {
       for (var k in keys) {
@@ -386,7 +494,8 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       v = value;
     } else {
       throw ArgumentError(
-          "Can't parse key('${keys.join("','")}') value as `$T`: $value");
+        "Can't parse key('${keys.join("','")}') value as `$T`: $value",
+      );
     }
 
     return v ?? defaultValue;
@@ -411,7 +520,7 @@ extension MapMultiValueExtension<K> on Map<K, Object> {
     } else if (prev is List) {
       this[keyMatch] = <String>[
         ...prev.where((e) => e != null).map((e) => e!.toString()),
-        value
+        value,
       ];
     }
   }
@@ -467,9 +576,10 @@ extension TypeReflectionEntityExtension<T> on TypeReflection<T> {
       isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
 
   /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
-  bool get isValidListEntityOrReferenceType => isListEntityOrReference
-      ? EntityHandler.isValidEntityType(arguments0!.type)
-      : false;
+  bool get isValidListEntityOrReferenceType =>
+      isListEntityOrReference
+          ? EntityHandler.isValidEntityType(arguments0!.type)
+          : false;
 
   /// Returns `true` if [type] is equals to [EntityReference].
   bool get isEntityReferenceType => type == EntityReference;
@@ -518,9 +628,10 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
 
   /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
-  bool get isValidListEntityOrReferenceType => isListEntityOrReference
-      ? EntityHandler.isValidEntityType(arguments0!.type)
-      : false;
+  bool get isValidListEntityOrReferenceType =>
+      isListEntityOrReference
+          ? EntityHandler.isValidEntityType(arguments0!.type)
+          : false;
 
   /// Returns `true` if [type] is equals to [EntityReference].
   bool get isEntityReferenceType => type == EntityReference;
@@ -609,12 +720,14 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     return parse<E>(value);
   }
 
-  V? resolveValue<V>(Object? value,
-      {EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache}) {
+  V? resolveValue<V>(
+    Object? value, {
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+  }) {
     Object? resolvedValue = value;
 
     var forceToEntityReference = false;
@@ -661,263 +774,304 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     if (forceToEntityReferenceList) {
       var t = isEntityReferenceListType ? arguments0! : this;
 
-      resolvedValue = t.toEntityReferenceList(value,
-          entityHandler: entityHandler,
-          entityProvider: entityProvider,
-          entityHandlerProvider: entityHandlerProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+      resolvedValue = t.toEntityReferenceList(
+        value,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     } else if (forceToEntityReference) {
       var t = isEntityReferenceType ? arguments0! : this;
 
-      resolvedValue = t.toEntityReference(value,
-          entityHandler: entityHandler,
-          entityProvider: entityProvider,
-          entityHandlerProvider: entityHandlerProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+      resolvedValue = t.toEntityReference(
+        value,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     }
 
     return resolvedValue as V?;
   }
 
-  EntityReference<T> toEntityReference(Object? o,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache}) {
+  EntityReference<T> toEntityReference(
+    Object? o, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+  }) {
     if (isEntityReferenceType) {
       var entityType = arguments0;
 
       throw StateError(
-          "This `TypeInfo` is an `EntityReference` type! `toEntityReference` should be called in the type argument#0 of this `TypeInfo`: $entityType");
+        "This `TypeInfo` is an `EntityReference` type! `toEntityReference` should be called in the type argument#0 of this `TypeInfo`: $entityType",
+      );
     }
 
     EntityReference<E> castCall<E>() {
       EntityHandler<E>? oEntityHandler;
       if (entityHandler != null) {
-        oEntityHandler = entityHandler is EntityHandler<E>
-            ? (entityHandler as EntityHandler<E>)
-            : entityHandler.getEntityHandler<E>(type: type);
+        oEntityHandler =
+            entityHandler is EntityHandler<E>
+                ? (entityHandler as EntityHandler<E>)
+                : entityHandler.getEntityHandler<E>(type: type);
       }
 
       return _toEntityReferenceImpl<E>(
-          o,
-          type,
-          typeName,
-          oEntityHandler,
-          entityProvider,
-          entityHandlerProvider,
-          entityFetcher as EntityFetcher<E>?,
-          entityCache);
+        o,
+        type,
+        typeName,
+        oEntityHandler,
+        entityProvider,
+        entityHandlerProvider,
+        entityFetcher as EntityFetcher<E>?,
+        entityCache,
+      );
     }
 
     return callCasted<EntityReference>(castCall) as EntityReference<T>;
   }
 
   EntityReference<E> _toEntityReferenceImpl<E>(
-      Object? o,
-      Type? type,
-      String? typeName,
-      EntityHandler<E>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<E>? entityFetcher,
-      EntityCache? entityCache) {
+    Object? o,
+    Type? type,
+    String? typeName,
+    EntityHandler<E>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<E>? entityFetcher,
+    EntityCache? entityCache,
+  ) {
     type ??= this.type;
 
     if (o == null) {
       return EntityReference<E>.asNull(
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is EntityReference) {
       return o as EntityReference<E>;
     } else if (o.isEntityIDType) {
       var id = entityHandler?.resolveID(o) ?? o;
-      return EntityReference<E>.fromID(id,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+      return EntityReference<E>.fromID(
+        id,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is Map<String, dynamic>) {
-      return EntityReference<E>.fromJson(o,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+      return EntityReference<E>.fromJson(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     } else {
-      return EntityReference<E>.from(o,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entityFetcher: entityFetcher,
-          entityCache: entityCache);
+      return EntityReference<E>.from(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     }
   }
 
   List<E>? toCastedList<E>(Object? val) {
     return callCasted<List?>(<A>() {
-      if (val is List<A>) {
-        return val;
-      } else if (val is Iterable<A>) {
-        return val.toList();
-      } else if (val is A) {
-        return <A>[val];
-      } else {
-        return null;
-      }
-    }) as List<E>?;
+          if (val is List<A>) {
+            return val;
+          } else if (val is Iterable<A>) {
+            return val.toList();
+          } else if (val is A) {
+            return <A>[val];
+          } else {
+            return null;
+          }
+        })
+        as List<E>?;
   }
 
-  EntityReferenceList<T> toEntityReferenceList(Object? o,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache}) {
+  EntityReferenceList<T> toEntityReferenceList(
+    Object? o, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+  }) {
     if (isEntityReferenceListType) {
       var entityType = arguments0;
 
       throw StateError(
-          "This `TypeInfo` is an `EntityReferenceList` type! `toEntityReferenceList` should be called in the type argument#0 of this `TypeInfo`: $entityType");
+        "This `TypeInfo` is an `EntityReferenceList` type! `toEntityReferenceList` should be called in the type argument#0 of this `TypeInfo`: $entityType",
+      );
     }
 
     if (entityFetcher != null && entitiesFetcher == null) {
-      entitiesFetcher = (ids, type) => ids
-          // ignore: discarded_futures
-          .map((id) => id == null ? null : entityFetcher(id, type))
-          .toList()
-          // ignore: discarded_futures
-          .resolveAll();
+      entitiesFetcher =
+          (ids, type) =>
+              ids
+                  // ignore: discarded_futures
+                  .map((id) => id == null ? null : entityFetcher(id, type))
+                  .toList()
+                  // ignore: discarded_futures
+                  .resolveAll();
     }
 
     EntityReferenceList<E> castCall<E>() {
       EntityHandler<E>? oEntityHandler;
       if (entityHandler != null) {
-        oEntityHandler = entityHandler is EntityHandler<E>
-            ? (entityHandler as EntityHandler<E>)
-            : entityHandler.getEntityHandler<E>(type: type);
+        oEntityHandler =
+            entityHandler is EntityHandler<E>
+                ? (entityHandler as EntityHandler<E>)
+                : entityHandler.getEntityHandler<E>(type: type);
       }
 
       return _toEntityReferenceListImpl<E>(
-          o,
-          type,
-          typeName,
-          oEntityHandler,
-          entityProvider,
-          entityHandlerProvider,
-          entitiesFetcher as EntitiesFetcher<E>?,
-          entityCache);
+        o,
+        type,
+        typeName,
+        oEntityHandler,
+        entityProvider,
+        entityHandlerProvider,
+        entitiesFetcher as EntitiesFetcher<E>?,
+        entityCache,
+      );
     }
 
     return callCasted<EntityReferenceList>(castCall) as EntityReferenceList<T>;
   }
 
   EntityReferenceList<E> _toEntityReferenceListImpl<E>(
-      Object? o,
-      Type? type,
-      String? typeName,
-      EntityHandler<E>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<E>? entitiesFetcher,
-      EntityCache? entityCache) {
+    Object? o,
+    Type? type,
+    String? typeName,
+    EntityHandler<E>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<E>? entitiesFetcher,
+    EntityCache? entityCache,
+  ) {
     type ??= this.type;
 
     if (o == null) {
       return EntityReferenceList<E>.asNull(
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher,
-          entityCache: entityCache);
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is EntityReferenceList) {
       return o as EntityReferenceList<E>;
     } else if (o.isEntityIDType) {
       var ids = entityHandler?.resolveIDs(o) ?? [o];
-      return EntityReferenceList<E>.fromIDs(ids,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher,
-          entityCache: entityCache);
+      return EntityReferenceList<E>.fromIDs(
+        ids,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is List) {
       if (o is List<E> || o is List<E?>) {
-        return EntityReferenceList<E>.fromEntities(o as dynamic,
-            type: type,
-            typeName: typeName,
-            entityHandler: entityHandler,
-            entityHandlerProvider: entityHandlerProvider,
-            entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher,
-            entityCache: entityCache);
+        return EntityReferenceList<E>.fromEntities(
+          o as dynamic,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+        );
       } else if (o is List<Map<String, dynamic>?> ||
           o.every((Object? e) => e == null || e is Map<String, Object?>)) {
-        var entitiesMaps = o is List<Map<String, dynamic>?>
-            ? o
-            : o.cast<Map<String, dynamic>?>();
-        return EntityReferenceList<E>.fromEntitiesMaps(entitiesMaps,
-            type: type,
-            typeName: typeName,
-            entityHandler: entityHandler,
-            entityHandlerProvider: entityHandlerProvider,
-            entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher,
-            entityCache: entityCache);
+        var entitiesMaps =
+            o is List<Map<String, dynamic>?>
+                ? o
+                : o.cast<Map<String, dynamic>?>();
+        return EntityReferenceList<E>.fromEntitiesMaps(
+          entitiesMaps,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+        );
       } else if (o.every((Object? e) => e == null || e.isEntityIDType)) {
-        return EntityReferenceList<E>.fromIDs(o,
-            type: type,
-            typeName: typeName,
-            entityHandler: entityHandler,
-            entityHandlerProvider: entityHandlerProvider,
-            entityProvider: entityProvider,
-            entitiesFetcher: entitiesFetcher,
-            entityCache: entityCache);
+        return EntityReferenceList<E>.fromIDs(
+          o,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+        );
       } else {
         throw StateError(
-            "Can't resolve `EntityReferenceList` values: (${o.runtimeTypeNameUnsafe} -> ${o.map((e) => (e as Object?).runtimeTypeNameUnsafe)}) $o");
+          "Can't resolve `EntityReferenceList` values: (${o.runtimeTypeNameUnsafe} -> ${o.map((e) => (e as Object?).runtimeTypeNameUnsafe)}) $o",
+        );
       }
     } else if (o is Map<String, dynamic>) {
-      return EntityReferenceList<E>.fromJson(o,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher,
-          entityCache: entityCache);
+      return EntityReferenceList<E>.fromJson(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+      );
     } else {
-      return EntityReferenceList<E>.from(o,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityHandlerProvider: entityHandlerProvider,
-          entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher,
-          entityCache: entityCache);
+      return EntityReferenceList<E>.from(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityHandlerProvider: entityHandlerProvider,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+      );
     }
   }
 }

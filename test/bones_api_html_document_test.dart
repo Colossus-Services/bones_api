@@ -10,7 +10,7 @@ void main() {
         top: 'Top:<hr>',
         content: [
           'This is just a test: ',
-          ['a', 'b', 'c']
+          ['a', 'b', 'c'],
         ],
         footer: '<hr>\nFooter!',
       );

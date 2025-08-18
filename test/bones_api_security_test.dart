@@ -53,9 +53,12 @@ void main() {
 
       expect(token.username, equals('foo'));
       expect(
-          token.token.length,
-          allOf(greaterThanOrEqualTo(2 + 512 - 48),
-              lessThanOrEqualTo(2 + 512 + 48)));
+        token.token.length,
+        allOf(
+          greaterThanOrEqualTo(2 + 512 - 48),
+          lessThanOrEqualTo(2 + 512 + 48),
+        ),
+      );
     });
 
     test('authenticate', () {
@@ -68,32 +71,40 @@ void main() {
         expect(credential.usernameEntity, isNotEmpty);
 
         expect(
-            credential.copy(withUsernameEntity: false).usernameEntity, isNull);
+          credential.copy(withUsernameEntity: false).usernameEntity,
+          isNull,
+        );
       }
 
       expect(
-          apiSecurity.authenticate(APICredential('bar', passwordHash: 'bar')),
-          isNotNull);
+        apiSecurity.authenticate(APICredential('bar', passwordHash: 'bar')),
+        isNotNull,
+      );
 
       expect(
-          apiSecurity.authenticate(APICredential('foo', passwordHash: 'bar')),
-          isNull);
+        apiSecurity.authenticate(APICredential('foo', passwordHash: 'bar')),
+        isNull,
+      );
 
       expect(
-          apiSecurity.authenticate(APICredential('foo', token: 'TK$fooSha256')),
-          isNotNull);
+        apiSecurity.authenticate(APICredential('foo', token: 'TK$fooSha256')),
+        isNotNull,
+      );
 
       expect(
-          apiSecurity.authenticate(APICredential('bar', token: 'TK$barSha256')),
-          isNotNull);
+        apiSecurity.authenticate(APICredential('bar', token: 'TK$barSha256')),
+        isNotNull,
+      );
 
       expect(
-          apiSecurity
-              .authenticate(APICredential('baz`', token: 'TK$fooSha256')),
-          isNull);
+        apiSecurity.authenticate(APICredential('baz`', token: 'TK$fooSha256')),
+        isNull,
+      );
 
       expect(
-          apiSecurity.authenticate(APICredential('foo', token: 'any')), isNull);
+        apiSecurity.authenticate(APICredential('foo', token: 'any')),
+        isNull,
+      );
     });
 
     test('authenticateByRequest', () async {
@@ -168,8 +179,11 @@ void main() {
       }
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('foo', passwordHash: 'foo');
 
         expect(apiSecurity.authenticateByRequest(request), isNotNull);
@@ -178,8 +192,11 @@ void main() {
       }
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('', token: 'invalidToken');
 
         var credentials = await apiSecurity.resolveRequestCredentials(request);
@@ -189,8 +206,11 @@ void main() {
       }
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('', token: 'TK$fooSha256');
 
         var credentials = await apiSecurity.resolveRequestCredentials(request);
@@ -200,8 +220,11 @@ void main() {
       }
 
       {
-        var request = APIRequest(APIRequestMethod.GET, 'foo',
-            parameters: {'user': 'foo', 'pass': '123456'});
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          parameters: {'user': 'foo', 'pass': '123456'},
+        );
 
         var credentials = await apiSecurity.resolveRequestCredentials(request);
         expect(credentials, isNotEmpty);
@@ -215,8 +238,11 @@ void main() {
       var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('foo', passwordHash: 'foo');
 
         var response = await apiSecurity.doRequestAuthentication(request);
@@ -240,20 +266,21 @@ void main() {
             .replaceFirst(RegExp('^RTK.+'), 'RTK...');
 
         expect(
-            json,
-            equals({
-              'token': {
-                'username': 'foo',
-                'token': 'TK$fooSha256',
-                'issueTime': '...',
-                'duration': 10800,
-                'expireTime': '...',
-                'refreshToken': 'RTK...'
-              },
-              'permissions': [
-                {'type': 'basic', 'enabled': true}
-              ]
-            }));
+          json,
+          equals({
+            'token': {
+              'username': 'foo',
+              'token': 'TK$fooSha256',
+              'issueTime': '...',
+              'duration': 10800,
+              'expireTime': '...',
+              'refreshToken': 'RTK...',
+            },
+            'permissions': [
+              {'type': 'basic', 'enabled': true},
+            ],
+          }),
+        );
       }
     });
 
@@ -261,8 +288,11 @@ void main() {
       var apiSecurity = _MyAPISecurity(sharedStore: SharedStore.notShared());
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('foo', passwordHash: 'foo');
 
         expect(apiSecurity.authenticateByRequest(request), isNotNull);
@@ -275,8 +305,11 @@ void main() {
       }
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
         request.credential = APICredential('foo', token: fooSha256);
 
         expect(apiSecurity.resumeAuthenticationByRequest(request), isNotNull);
@@ -285,8 +318,11 @@ void main() {
       }
 
       {
-        var request =
-            APIRequest(APIRequestMethod.GET, 'foo', sessionID: 'SID123abc');
+        var request = APIRequest(
+          APIRequestMethod.GET,
+          'foo',
+          sessionID: 'SID123abc',
+        );
 
         expect(apiSecurity.resumeAuthenticationByRequest(request), isNotNull);
         expect(request.authentication, isNotNull);
@@ -335,18 +371,23 @@ void main() {
       {
         expect(APIRoutePublicRule().toJson(), equals({'rule': 'public'}));
 
-        expect(APIRouteNotAuthenticatedRule().toJson(),
-            equals({'rule': 'not_authenticated'}));
-
-        expect(APIRouteAuthenticatedRule().toJson(),
-            equals({'rule': 'authenticated'}));
+        expect(
+          APIRouteNotAuthenticatedRule().toJson(),
+          equals({'rule': 'not_authenticated'}),
+        );
 
         expect(
-            APIRoutePermissionTypeRule(['basic']).toJson(),
-            equals({
-              'rule': 'permission',
-              'types': ['basic']
-            }));
+          APIRouteAuthenticatedRule().toJson(),
+          equals({'rule': 'authenticated'}),
+        );
+
+        expect(
+          APIRoutePermissionTypeRule(['basic']).toJson(),
+          equals({
+            'rule': 'permission',
+            'types': ['basic'],
+          }),
+        );
       }
 
       {
@@ -363,7 +404,9 @@ void main() {
 
         expect(APIRoutePermissionTypeRule(['basic']).validate(request), isTrue);
         expect(
-            APIRoutePermissionTypeRule(['admin']).validate(request), isFalse);
+          APIRoutePermissionTypeRule(['admin']).validate(request),
+          isFalse,
+        );
       }
 
       {
@@ -375,9 +418,13 @@ void main() {
         expect(APIRouteAuthenticatedRule().validate(request), isFalse);
 
         expect(
-            APIRoutePermissionTypeRule(['basic']).validate(request), isFalse);
+          APIRoutePermissionTypeRule(['basic']).validate(request),
+          isFalse,
+        );
         expect(
-            APIRoutePermissionTypeRule(['admin']).validate(request), isFalse);
+          APIRoutePermissionTypeRule(['admin']).validate(request),
+          isFalse,
+        );
       }
     });
   });
@@ -387,7 +434,9 @@ void _testSecureRandom(SecureRandom random, int i) {
   test('[$i] nextInt', () {
     for (var i = 0; i < 1000; ++i) {
       expect(
-          random.nextInt(100), allOf(greaterThanOrEqualTo(0), lessThan(100)));
+        random.nextInt(100),
+        allOf(greaterThanOrEqualTo(0), lessThan(100)),
+      );
     }
   });
 
@@ -472,7 +521,9 @@ class _MyAPISecurity extends APISecurity {
 
   @override
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential, List<APIPermission>? previousPermissions) {
+    APICredential credential,
+    List<APIPermission>? previousPermissions,
+  ) {
     return [
       APIPermission('basic'),
       if (credential.username.startsWith('admin')) APIPermission('admin'),
@@ -490,7 +541,9 @@ class _MyAPISecurity2 extends APISecurity {
 
   @override
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential, List<APIPermission>? previousPermissions) {
+    APICredential credential,
+    List<APIPermission>? previousPermissions,
+  ) {
     return [
       APIPermission('basic'),
       if (credential.username.startsWith('admin')) APIPermission('admin'),

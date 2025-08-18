@@ -8,11 +8,7 @@ void main() {
       var apiPlatform = APIPlatform.get();
       expect(apiPlatform, isNotNull);
 
-      expect(
-          apiPlatform.type,
-          anyOf(
-            APIPlatformType.browser,
-          ));
+      expect(apiPlatform.type, anyOf(APIPlatformType.browser));
 
       var capability = apiPlatform.capability;
       expect(capability.canReadFile, isTrue);
@@ -21,14 +17,20 @@ void main() {
       expect(capability.double53, isTrue);
 
       expect(
-          apiPlatform.resolveFilePath('pubspec.yaml'),
-          allOf(contains('pubspec.yaml'),
-              anyOf(startsWith('http:'), startsWith('https:'))));
+        apiPlatform.resolveFilePath('pubspec.yaml'),
+        allOf(
+          contains('pubspec.yaml'),
+          anyOf(startsWith('http:'), startsWith('https:')),
+        ),
+      );
 
       expect(
-          apiPlatform.getProperty('__TEST__UNKNOWN_PROPERTY_KEY__',
-              defaultValue: 'def_browser'),
-          equals('def_browser'));
+        apiPlatform.getProperty(
+          '__TEST__UNKNOWN_PROPERTY_KEY__',
+          defaultValue: 'def_browser',
+        ),
+        equals('def_browser'),
+      );
     });
   });
 }

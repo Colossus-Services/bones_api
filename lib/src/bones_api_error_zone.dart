@@ -26,15 +26,25 @@ Zone createErrorZone({
   var zoneId = ++_errorZoneIDCount;
 
   var zoneSpecification = ZoneSpecification(
-    handleUncaughtError: (self, parent, zone, error, stackTrace) =>
-        _handleUncaughtError(uncaughtErrorTitle, printErrorToStderr,
-            onUncaughtError, self, parent, zone, error, stackTrace),
+    handleUncaughtError:
+        (self, parent, zone, error, stackTrace) => _handleUncaughtError(
+          uncaughtErrorTitle,
+          printErrorToStderr,
+          onUncaughtError,
+          self,
+          parent,
+          zone,
+          error,
+          stackTrace,
+        ),
   );
 
   parentZone ??= Zone.current;
 
-  var zone = parentZone
-      .fork(specification: zoneSpecification, zoneValues: {'zoneID': zoneId});
+  var zone = parentZone.fork(
+    specification: zoneSpecification,
+    zoneValues: {'zoneID': zoneId},
+  );
   return zone;
 }
 
@@ -58,41 +68,60 @@ extension ErrorZoneExtension on Zone {
     return completer.future;
   }
 
-  FutureOr<R?> asyncTry<R>(FutureOr<R?> Function() tryBlock,
-      {FutureOr<R?> Function(R? r)? then,
-      Function? onError,
-      FutureOr<void> Function()? onFinally}) {
-    return run(() => async_extension.asyncTry<R>(tryBlock,
-        then: then, onError: onError, onFinally: onFinally));
+  FutureOr<R?> asyncTry<R>(
+    FutureOr<R?> Function() tryBlock, {
+    FutureOr<R?> Function(R? r)? then,
+    Function? onError,
+    FutureOr<void> Function()? onFinally,
+  }) {
+    return run(
+      () => async_extension.asyncTry<R>(
+        tryBlock,
+        then: then,
+        onError: onError,
+        onFinally: onFinally,
+      ),
+    );
   }
 }
 
 void _handleUncaughtError(
-    String uncaughtErrorTitle,
-    bool printErrorToStderr,
-    OnUncaughtError? onUncaughtError,
-    Zone self,
-    ZoneDelegate parent,
-    Zone zone,
-    Object error,
-    StackTrace stackTrace) {
+  String uncaughtErrorTitle,
+  bool printErrorToStderr,
+  OnUncaughtError? onUncaughtError,
+  Zone self,
+  ZoneDelegate parent,
+  Zone zone,
+  Object error,
+  StackTrace stackTrace,
+) {
   if (onUncaughtError != null) {
     onUncaughtError(error, stackTrace);
   } else {
-    printZoneError(error, stackTrace,
-        title: uncaughtErrorTitle, printErrorToStderr: printErrorToStderr);
+    printZoneError(
+      error,
+      stackTrace,
+      title: uncaughtErrorTitle,
+      printErrorToStderr: printErrorToStderr,
+    );
   }
 }
 
 /// Prints an [error] and [stackTrace].
 ///
 /// See [printToZoneStderr].
-void printZoneError(Object error, StackTrace stackTrace,
-    {String? title, String? message, bool printErrorToStderr = true}) {
+void printZoneError(
+  Object error,
+  StackTrace stackTrace, {
+  String? title,
+  String? message,
+  bool printErrorToStderr = true,
+}) {
   var s = StringBuffer();
 
   s.write(
-      '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n');
+    '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n',
+  );
 
   if (title != null) {
     s.write('$title\n\n');
@@ -105,12 +134,14 @@ void printZoneError(Object error, StackTrace stackTrace,
 
   if (message != null && message.isNotEmpty) {
     s.write(
-        '------------------------------------------------------------------------------\n\n');
+      '------------------------------------------------------------------------------\n\n',
+    );
     s.write('$message\n');
   }
 
   s.write(
-      '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n');
+    '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n',
+  );
 
   if (printErrorToStderr) {
     printToZoneStderr(s);
@@ -159,7 +190,9 @@ class ZoneField<T extends Object> {
   /// Creates a new [contextZone] to store values.
   Zone createContextZone({Map<Object?, Object?>? zoneValues}) {
     var zone = parentZone.fork(
-        specification: ZoneSpecification(), zoneValues: zoneValues);
+      specification: ZoneSpecification(),
+      zoneValues: zoneValues,
+    );
 
     _zones.addLast(zone);
     return zone;
@@ -167,24 +200,29 @@ class ZoneField<T extends Object> {
 
   /// Same as [createContextZone] handling Uncaught Errors.
   /// See [ZoneSpecification.handleUncaughtError].
-  Zone createSafeContextZone(
-      {ZoneSpecification? zoneSpecification,
-      Map<Object?, Object?>? zoneValues,
-      void Function(Object error, StackTrace stackTrace)?
-          handleUncaughtError}) {
+  Zone createSafeContextZone({
+    ZoneSpecification? zoneSpecification,
+    Map<Object?, Object?>? zoneValues,
+    void Function(Object error, StackTrace stackTrace)? handleUncaughtError,
+  }) {
     if (zoneSpecification == null) {
       if (handleUncaughtError == null) {
         throw ArgumentError(
-            "One of the parameters, `zoneSpecification` or `handleUncaughtError`, must be provided!");
+          "One of the parameters, `zoneSpecification` or `handleUncaughtError`, must be provided!",
+        );
       }
 
       zoneSpecification = ZoneSpecification(
-          handleUncaughtError: (self, parent, zone, error, stack) =>
-              handleUncaughtError(error, stack));
+        handleUncaughtError:
+            (self, parent, zone, error, stack) =>
+                handleUncaughtError(error, stack),
+      );
     }
 
     var zone = parentZone.fork(
-        specification: zoneSpecification, zoneValues: zoneValues);
+      specification: zoneSpecification,
+      zoneValues: zoneValues,
+    );
 
     _zones.addLast(zone);
     return zone;

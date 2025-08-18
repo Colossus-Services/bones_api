@@ -10,16 +10,21 @@ void main() {
       var capability = apiPlatform.capability;
 
       expect(capability.int32 || capability.int53 || capability.int64, isTrue);
-      expect(capability.double32 || capability.double53 || capability.double64,
-          isTrue);
+      expect(
+        capability.double32 || capability.double53 || capability.double64,
+        isTrue,
+      );
 
       expect(apiPlatform.getProperty(null), isNull);
       expect(apiPlatform.getProperty(null, defaultValue: 'def'), equals('def'));
 
       expect(
-          apiPlatform.getProperty('__TEST__UNKNOWN_PROPERTY_KEY__',
-              defaultValue: 'def_generic'),
-          equals('def_generic'));
+        apiPlatform.getProperty(
+          '__TEST__UNKNOWN_PROPERTY_KEY__',
+          defaultValue: 'def_generic',
+        ),
+        equals('def_generic'),
+      );
     });
   });
 }

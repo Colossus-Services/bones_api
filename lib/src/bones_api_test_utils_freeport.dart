@@ -20,8 +20,10 @@ Future<int> resolveFreePort(int port) {
   _initFreePorts.add(initPort);
 
   return getFreeListenPort(
-          ports: [initPort], startPort: startPort, endPort: endPort)
-      .then((freePort) => freePort ?? port);
+    ports: [initPort],
+    startPort: startPort,
+    endPort: endPort,
+  ).then((freePort) => freePort ?? port);
 }
 
 var _rand = Random();

@@ -62,16 +62,19 @@ class SQLEntry {
   /// The columns or referenced columns in this entry.
   final List<SQLColumn>? columns;
 
-  SQLEntry(this.type, this.sql,
-      {String? comment,
-      List<String>? tables,
-      List<String>? referenceTables,
-      this.columns})
-      : comment = comment != null && comment.isNotEmpty ? comment : null,
-        tables =
-            tables ?? columns?.map((e) => e.table).nonNulls.toSet().toList(),
-        referenceTables = referenceTables ??
-            columns?.map((e) => e.referenceTable).nonNulls.toSet().toList();
+  SQLEntry(
+    this.type,
+    this.sql, {
+    String? comment,
+    List<String>? tables,
+    List<String>? referenceTables,
+    this.columns,
+  }) : comment = comment != null && comment.isNotEmpty ? comment : null,
+       tables =
+           tables ?? columns?.map((e) => e.table).nonNulls.toSet().toList(),
+       referenceTables =
+           referenceTables ??
+           columns?.map((e) => e.referenceTable).nonNulls.toSet().toList();
 
   @override
   String toString() => comment == null ? sql : '$sql  -- $comment';
@@ -156,8 +159,10 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   List<SQLBuilder>? get extraSQLBuilders;
 
   /// All the `SQL`s of this builder tree node.
-  List<SQLBuilder> get allSQLBuilders =>
-      <SQLBuilder>[this, ...?extraSQLBuilders?.expand((e) => e.allSQLBuilders)];
+  List<SQLBuilder> get allSQLBuilders => <SQLBuilder>[
+    this,
+    ...?extraSQLBuilders?.expand((e) => e.allSQLBuilders),
+  ];
 
   /// Build the `SQL`.
   String buildSQL({bool multiline = true, bool ifNotExists = true});
@@ -165,9 +170,12 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// Build all the `SQL`s, including the [extraSQLBuilders].
   List<String> buildAllSQLs({bool multiline = true, bool ifNotExists = true}) {
     var allSQLBuilders = this.allSQLBuilders;
-    var sqls = allSQLBuilders
-        .map((e) => e.buildSQL(multiline: multiline, ifNotExists: ifNotExists))
-        .toList();
+    var sqls =
+        allSQLBuilders
+            .map(
+              (e) => e.buildSQL(multiline: multiline, ifNotExists: ifNotExists),
+            )
+            .toList();
     return sqls;
   }
 }
@@ -183,9 +191,13 @@ class CreateIndexSQL extends SQLBuilder {
   /// The name of the index;
   final String? indexName;
 
-  CreateIndexSQL(SQLDialect dialect, this.table, this.column, this.indexName,
-      {String q = '"'})
-      : super(dialect, q);
+  CreateIndexSQL(
+    SQLDialect dialect,
+    this.table,
+    this.column,
+    this.indexName, {
+    String q = '"',
+  }) : super(dialect, q);
 
   @override
   String get mainTable => table;
@@ -254,9 +266,13 @@ abstract class TableSQL extends SQLBuilder {
   /// The parent table;
   final String? parentTable;
 
-  TableSQL(SQLDialect dialect, this.table, this.entries,
-      {String q = '"', this.parentTable})
-      : super(dialect, q);
+  TableSQL(
+    SQLDialect dialect,
+    this.table,
+    this.entries, {
+    String q = '"',
+    this.parentTable,
+  }) : super(dialect, q);
 
   @override
   String get mainTable => table;
@@ -279,28 +295,37 @@ class CreateTableSQL extends TableSQL {
   /// The associated [EntityRepository] of this table.
   EntityRepository? entityRepository;
 
-  CreateTableSQL(super.dialect, super.table, super.entries,
-      {super.q,
-      this.indexes,
-      this.alterTables,
-      this.relationships,
-      super.parentTable,
-      this.entityRepository});
+  CreateTableSQL(
+    super.dialect,
+    super.table,
+    super.entries, {
+    super.q,
+    this.indexes,
+    this.alterTables,
+    this.relationships,
+    super.parentTable,
+    this.entityRepository,
+  });
 
   List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables => _referenceTables ??= <String>{
-        ...entries.expand((e) => e.referenceTables ?? <String>[]),
-      }.toList();
+  List<String> get referenceTables =>
+      _referenceTables ??=
+          <String>{
+            ...entries.expand((e) => e.referenceTables ?? <String>[]),
+          }.toList();
 
   List<String>? _relationshipsTables;
 
   /// Returns the tables of the [relationships].
-  List<String> get relationshipsTables => _relationshipsTables ??= <String>{
-        ...?relationships
-            ?.expand((e) => e.referenceTables.where((t) => t != table)),
-      }.toList();
+  List<String> get relationshipsTables =>
+      _relationshipsTables ??=
+          <String>{
+            ...?relationships?.expand(
+              (e) => e.referenceTables.where((t) => t != table),
+            ),
+          }.toList();
 
   List<String>? _referenceAndRelationshipTables;
 
@@ -313,8 +338,11 @@ class CreateTableSQL extends TableSQL {
   List<String> get dependentTables => referenceAndRelationshipTables;
 
   @override
-  List<SQLBuilder> get extraSQLBuilders =>
-      <SQLBuilder>[...?indexes, ...?relationships, ...?alterTables];
+  List<SQLBuilder> get extraSQLBuilders => <SQLBuilder>[
+    ...?indexes,
+    ...?relationships,
+    ...?alterTables,
+  ];
 
   /// Returns the `CONSTRAINT` [entries].
   List<SQLEntry> get constraints =>
@@ -328,26 +356,37 @@ class CreateTableSQL extends TableSQL {
 
   /// Converts the [constraints] to [AlterTableSQL].
   /// This helps to execute the dependente constraints.
-  List<AlterTableSQL> constraintsAsAlterTable(
-      {bool recursive = true, bool onlyDependents = true}) {
+  List<AlterTableSQL> constraintsAsAlterTable({
+    bool recursive = true,
+    bool onlyDependents = true,
+  }) {
     var constraints = this.constraints;
 
     if (onlyDependents) {
-      constraints = constraints
-          .where((c) => c.referenceTables?.any((t) => t != table) ?? false)
-          .toList();
+      constraints =
+          constraints
+              .where((c) => c.referenceTables?.any((t) => t != table) ?? false)
+              .toList();
     }
 
     var alterTablesConstraint = <AlterTableSQL>[];
 
     for (var c in constraints) {
-      var e = SQLEntry('ADD', 'ADD ${c.sql}',
-          comment: c.comment,
-          tables: c.tables,
-          columns: c.columns,
-          referenceTables: c.referenceTables);
-      var alterTable =
-          AlterTableSQL(dialect, table, [e], q: q, parentTable: table);
+      var e = SQLEntry(
+        'ADD',
+        'ADD ${c.sql}',
+        comment: c.comment,
+        tables: c.tables,
+        columns: c.columns,
+        referenceTables: c.referenceTables,
+      );
+      var alterTable = AlterTableSQL(
+        dialect,
+        table,
+        [e],
+        q: q,
+        parentTable: table,
+      );
       alterTablesConstraint.add(alterTable);
     }
 
@@ -359,9 +398,9 @@ class CreateTableSQL extends TableSQL {
     alterTables.addAll(alterTablesConstraint);
 
     if (recursive) {
-      var extraSQLs = allSQLBuilders
-          .whereType<CreateTableSQL>()
-          .where((e) => !identical(e, this));
+      var extraSQLs = allSQLBuilders.whereType<CreateTableSQL>().where(
+        (e) => !identical(e, this),
+      );
       for (var e in extraSQLs) {
         e.constraintsAsAlterTable(recursive: false);
       }
@@ -382,7 +421,8 @@ class CreateTableSQL extends TableSQL {
     }
     sql.write('$q$table$q ($ln');
 
-    var maxLine = entries
+    var maxLine =
+        entries
             .where((e) => e.type != 'CONSTRAINT')
             .map((e) => e.sql.length)
             .max +
@@ -449,11 +489,7 @@ class CreateTableSQL extends TableSQL {
     var refsStr = refs.isNotEmpty ? 'refs: $refs' : null;
     var relsStr = rels.isNotEmpty ? 'rels: $rels' : null;
 
-    return 'CREATE TABLE $table {${[
-      if (parentStr != null) parentStr,
-      if (refsStr != null) refsStr,
-      if (relsStr != null) relsStr,
-    ].join(', ')}}';
+    return 'CREATE TABLE $table {${[if (parentStr != null) parentStr, if (refsStr != null) refsStr, if (relsStr != null) relsStr].join(', ')}}';
   }
 }
 
@@ -464,18 +500,29 @@ class AlterTableSQL extends TableSQL {
   List<AlterTableSQL>? constraints;
 
   @override
-  List<SQLBuilder> get extraSQLBuilders =>
-      <SQLBuilder>[...?indexes, ...?constraints];
+  List<SQLBuilder> get extraSQLBuilders => <SQLBuilder>[
+    ...?indexes,
+    ...?constraints,
+  ];
 
-  AlterTableSQL(super.dialect, super.table, super.entries,
-      {super.q, this.indexes, this.constraints, super.parentTable});
+  AlterTableSQL(
+    super.dialect,
+    super.table,
+    super.entries, {
+    super.q,
+    this.indexes,
+    this.constraints,
+    super.parentTable,
+  });
 
   List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables => _referenceTables ??= <String>{
-        ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls
-      }.toList();
+  List<String> get referenceTables =>
+      _referenceTables ??=
+          <String>{
+            ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls,
+          }.toList();
 
   @override
   List<String> get dependentTables => referenceTables;
@@ -496,8 +543,10 @@ class AlterTableSQL extends TableSQL {
       var line = e.sql;
 
       if (ifNotExists) {
-        var lineTrimUC =
-            line.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+        var lineTrimUC = line.trim().toUpperCase().replaceAll(
+          RegExp(r'\s+'),
+          ' ',
+        );
         if (lineTrimUC.startsWith('ADD COLUMN ') &&
             !lineTrimUC.contains(' IF NOT EXISTS ')) {
           line = 'ADD COLUMN IF NOT EXISTS ${line.substring(11)}';
@@ -554,10 +603,7 @@ class AlterTableSQL extends TableSQL {
     var parentStr = parentTable != null ? 'parent: $parentTable' : null;
     var refsStr = refs.isNotEmpty ? 'refs: $refs' : null;
 
-    return 'ALTER TABLE $table {${[
-      if (parentStr != null) parentStr,
-      if (refsStr != null) refsStr,
-    ].join(', ')}}';
+    return 'ALTER TABLE $table {${[if (parentStr != null) parentStr, if (refsStr != null) refsStr].join(', ')}}';
   }
 }
 
@@ -579,28 +625,31 @@ extension SQLBuilderIterableMapEntryExtension<K>
     var allSQLs = expand((e) => e.value.allSQLBuilders).toList();
     allSQLs.bestOrder();
 
-    var ordered = sorted((a, b) {
-      var i1 = allSQLs.indexOf(a.value);
-      var i2 = allSQLs.indexOf(b.value);
-      var cmp = i1.compareTo(i2);
-      return cmp;
-    }).toList();
+    var ordered =
+        sorted((a, b) {
+          var i1 = allSQLs.indexOf(a.value);
+          var i2 = allSQLs.indexOf(b.value);
+          var cmp = i1.compareTo(i2);
+          return cmp;
+        }).toList();
 
     return ordered;
   }
 
-  List<MapEntry<K, CreateTableSQL>> toHierarchicalOrder(
-      {bool verbose = false}) {
-    var allSQLs = expand((e) => e.value.allSQLBuilders)
-        .toList()
-        .toHierarchicalOrder(verbose: verbose);
+  List<MapEntry<K, CreateTableSQL>> toHierarchicalOrder({
+    bool verbose = false,
+  }) {
+    var allSQLs = expand(
+      (e) => e.value.allSQLBuilders,
+    ).toList().toHierarchicalOrder(verbose: verbose);
 
-    var ordered = sorted((a, b) {
-      var i1 = allSQLs.indexOf(a.value);
-      var i2 = allSQLs.indexOf(b.value);
-      var cmp = i1.compareTo(i2);
-      return cmp;
-    }).toList();
+    var ordered =
+        sorted((a, b) {
+          var i1 = allSQLs.indexOf(a.value);
+          var i2 = allSQLs.indexOf(b.value);
+          var cmp = i1.compareTo(i2);
+          return cmp;
+        }).toList();
 
     return ordered;
   }
@@ -625,10 +674,11 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     for (var sql in this) {
       if (processed.add(sql)) {
         var dependentTables = sql.dependentTables;
-        var dependentSQLs = dependentTables
-            ?.map((t) => createTables.getCreateTable(t))
-            .nonNulls
-            .toList();
+        var dependentSQLs =
+            dependentTables
+                ?.map((t) => createTables.getCreateTable(t))
+                .nonNulls
+                .toList();
 
         var unprocessedDependencies =
             dependentSQLs?.where((s) => !processed.contains(s)).toList();
@@ -721,34 +771,36 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   }
 
   Map<SQLBuilder, List<String>> _entriesReferences() =>
-      map((e) => MapEntry(e, _referenceTablesInList(e.referenceTables)))
-          .toMapFromEntries();
+      map(
+        (e) => MapEntry(e, _referenceTablesInList(e.referenceTables)),
+      ).toMapFromEntries();
 
   Map<SQLBuilder, List<String>> _entriesRelationships() =>
       whereType<CreateTableSQL>()
           .map(
-              (e) => MapEntry(e, _referenceTablesInList(e.relationshipsTables)))
+            (e) => MapEntry(e, _referenceTablesInList(e.relationshipsTables)),
+          )
           .toMapFromEntries();
 
   /// Sorts the SQLs by table name.
   void sortByName() => sort((a, b) {
-        var cmp = a.mainTable.compareTo(b.mainTable);
-        if (cmp == 0) {
-          var create1 = a is CreateTableSQL;
-          var create2 = b is CreateTableSQL;
+    var cmp = a.mainTable.compareTo(b.mainTable);
+    if (cmp == 0) {
+      var create1 = a is CreateTableSQL;
+      var create2 = b is CreateTableSQL;
 
-          if (create1 && !create2) {
-            return -1;
-          } else if (!create1 && create2) {
-            return 1;
-          } else {
-            var sql1 = a.buildSQL();
-            var sql2 = b.buildSQL();
-            cmp = sql1.compareTo(sql2);
-          }
-        }
-        return cmp;
-      });
+      if (create1 && !create2) {
+        return -1;
+      } else if (!create1 && create2) {
+        return 1;
+      } else {
+        var sql1 = a.buildSQL();
+        var sql2 = b.buildSQL();
+        cmp = sql1.compareTo(sql2);
+      }
+    }
+    return cmp;
+  });
 
   /// Sorts the SQLs in the best execution order,
   /// to avoid reference issues.
@@ -762,34 +814,40 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         whereType<TableSQL>().where((e) => e.parentTable != null).toList();
     removeAll(withParents);
 
-    var withRelationship = whereType<CreateTableSQL>()
-        .where((e) => e.relationshipsTables.isNotEmpty)
-        .toList();
+    var withRelationship =
+        whereType<CreateTableSQL>()
+            .where((e) => e.relationshipsTables.isNotEmpty)
+            .toList();
     removeAll(withRelationship);
 
-    var withReference = where((e) {
-      var referenceTables = e.referenceTables;
-      return referenceTables != null && referenceTables.isNotEmpty;
-    }).toList();
+    var withReference =
+        where((e) {
+          var referenceTables = e.referenceTables;
+          return referenceTables != null && referenceTables.isNotEmpty;
+        }).toList();
     removeAll(withReference);
 
     withParents._bestOrderLoop(
-        entriesReferences: entriesReferences,
-        entriesRelationships: entriesRelationships);
+      entriesReferences: entriesReferences,
+      entriesRelationships: entriesRelationships,
+    );
 
     withReference._bestOrderLoop(
-        entriesReferences: entriesReferences,
-        entriesRelationships: entriesRelationships);
+      entriesReferences: entriesReferences,
+      entriesRelationships: entriesRelationships,
+    );
 
     withRelationship._bestOrderLoop(
-        entriesReferences: entriesReferences,
-        entriesRelationships: entriesRelationships);
+      entriesReferences: entriesReferences,
+      entriesRelationships: entriesRelationships,
+    );
 
     _bestOrderLoop();
 
-    refsGetter(SQLBuilder e) => e is CreateTableSQL
-        ? e.referenceAndRelationshipTables
-        : e.referenceTables ?? [];
+    refsGetter(SQLBuilder e) =>
+        e is CreateTableSQL
+            ? e.referenceAndRelationshipTables
+            : e.referenceTables ?? [];
 
     _addByRefPos(withReference, addAtEnd: true);
     _addByRefPos(withRelationship, addAtEnd: true, refsGetter: refsGetter);
@@ -827,18 +885,22 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     withParents.clear();
 
     var ok = _bestOrderLoop(
-        entriesReferences: entriesReferences,
-        entriesRelationships: entriesRelationships);
+      entriesReferences: entriesReferences,
+      entriesRelationships: entriesRelationships,
+    );
 
     if (!ok) {
       _log.info(
-          "`SQLBuilder.bestOrder`: sort loop detected: ${map((e) => e.mainTable).toList()}");
+        "`SQLBuilder.bestOrder`: sort loop detected: ${map((e) => e.mainTable).toList()}",
+      );
     }
   }
 
-  int _addByRefPos(List<SQLBuilder> list,
-      {List<String> Function(SQLBuilder e)? refsGetter,
-      bool addAtEnd = false}) {
+  int _addByRefPos(
+    List<SQLBuilder> list, {
+    List<String> Function(SQLBuilder e)? refsGetter,
+    bool addAtEnd = false,
+  }) {
     refsGetter ??= (e) => e.referenceTables ?? [];
 
     var count = 0;
@@ -879,9 +941,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     return count;
   }
 
-  bool _bestOrderLoop(
-      {Map<SQLBuilder, List<String>>? entriesReferences,
-      Map<SQLBuilder, List<String>>? entriesRelationships}) {
+  bool _bestOrderLoop({
+    Map<SQLBuilder, List<String>>? entriesReferences,
+    Map<SQLBuilder, List<String>>? entriesRelationships,
+  }) {
     entriesReferences ??= _entriesReferences();
     entriesRelationships ??= _entriesRelationships();
 
@@ -910,8 +973,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     return false;
   }
 
-  int _bestOrderImpl(final Map<SQLBuilder, List<String>> entriesReferences,
-      final Map<SQLBuilder, List<String>> entriesRelationships) {
+  int _bestOrderImpl(
+    final Map<SQLBuilder, List<String>> entriesReferences,
+    final Map<SQLBuilder, List<String>> entriesRelationships,
+  ) {
     final length = this.length;
 
     final moveLimit = length * 2;
@@ -975,8 +1040,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         var rel1 = a is CreateTableSQL ? a.relationshipsTables.length : 0;
         var rel2 = b is CreateTableSQL ? b.relationshipsTables.length : 0;
 
-        var cmp =
-            (ref1 + rel1).clamp(0, 1).compareTo((ref2 + rel2).clamp(0, 1));
+        var cmp = (ref1 + rel1)
+            .clamp(0, 1)
+            .compareTo((ref2 + rel2).clamp(0, 1));
         return cmp;
       }
       return a.compareTo(b);
@@ -1024,11 +1090,16 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   }
 
   void _quickSort(
-          SQLBuilderComparator compare, SQLBuilderSelector pivotSelector) =>
-      _quickSortPart(compare, pivotSelector, 0, length - 1);
+    SQLBuilderComparator compare,
+    SQLBuilderSelector pivotSelector,
+  ) => _quickSortPart(compare, pivotSelector, 0, length - 1);
 
-  void _quickSortPart(SQLBuilderComparator compare,
-      SQLBuilderSelector pivotSelector, int lo, int hi) {
+  void _quickSortPart(
+    SQLBuilderComparator compare,
+    SQLBuilderSelector pivotSelector,
+    int lo,
+    int hi,
+  ) {
     if (hi <= lo) {
       return;
     }
@@ -1038,8 +1109,12 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     _quickSortPart(compare, pivotSelector, j + 1, hi);
   }
 
-  int _quickSortPartition(SQLBuilderComparator compare,
-      SQLBuilderSelector pivotSelector, int lo, int hi) {
+  int _quickSortPartition(
+    SQLBuilderComparator compare,
+    SQLBuilderSelector pivotSelector,
+    int lo,
+    int hi,
+  ) {
     var i = lo;
     var j = hi + 1;
     var p = _quickSortSelectPivot(pivotSelector, lo, hi);
@@ -1106,10 +1181,11 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     graph.populate(
       this,
       inputsProvider: (step, sql) => getCreateTables(sql.dependentTables),
-      outputsProvider: (step, sql) => [
-        ...?sql.extraSQLBuilders,
-        //if (sql is CreateTableSQL) ...getCreateTables(sql.relationshipsTables)
-      ],
+      outputsProvider:
+          (step, sql) => [
+            ...?sql.extraSQLBuilders,
+            //if (sql is CreateTableSQL) ...getCreateTables(sql.relationshipsTables)
+          ],
     );
 
     return graph;
@@ -1122,14 +1198,15 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     var graph = toGraph();
 
-    var sqlBuildOrder = graph
-        .walkOutputsOrderFrom(
-          graph.rootValues,
-          sortByInputDependency: true,
-          expandSideRoots: true,
-          maxExpansion: 1,
-        )
-        .toListOfValues();
+    var sqlBuildOrder =
+        graph
+            .walkOutputsOrderFrom(
+              graph.rootValues,
+              sortByInputDependency: true,
+              expandSideRoots: true,
+              maxExpansion: 1,
+            )
+            .toListOfValues();
 
     var invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
 
@@ -1155,7 +1232,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
       var asciiArtTree = graph.toASCIIArtTree(sortByInputDependency: true);
 
       var treeText = asciiArtTree.generate(
-          expandGraphs: false, hideReferences: true, expandSideBranches: true);
+        expandGraphs: false,
+        hideReferences: true,
+        expandSideBranches: true,
+      );
 
       _log.info("`SQLBuilder` graph:\n\n$treeText");
 
@@ -1175,7 +1255,8 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
       }
     } else if (invalidSQLsOrders.isNotEmpty) {
       _log.warning(
-          "The `SQLBuilder` instances (${invalidSQLsOrders.length}) are not in a valid order!");
+        "The `SQLBuilder` instances (${invalidSQLsOrders.length}) are not in a valid order!",
+      );
     }
 
     return sqlBuildOrder;
@@ -1190,18 +1271,27 @@ abstract mixin class SQLGenerator {
   /// The generated SQL dialect name.
   String get dialectName;
 
-  EntityRepository<O>? getEntityRepository<O extends Object>(
-      {O? obj, Type? type, String? name, String? tableName});
+  EntityRepository<O>? getEntityRepository<O extends Object>({
+    O? obj,
+    Type? type,
+    String? name,
+    String? tableName,
+  });
 
   EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type);
 
   EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
-      TypeInfo typeInfo);
+    TypeInfo typeInfo,
+  );
 
   String getTableForEntityRepository(EntityRepository entityRepository);
 
-  String? typeToSQLType(TypeInfo type, String column,
-      {List<EntityField>? entityFieldAnnotations, bool isID = false}) {
+  String? typeToSQLType(
+    TypeInfo type,
+    String column, {
+    List<EntityField>? entityFieldAnnotations,
+    bool isID = false,
+  }) {
     if (type.isString) {
       var maximum = entityFieldAnnotations?.maximum.firstOrNull;
       return maximum != null && maximum > 0 ? 'VARCHAR($maximum)' : 'VARCHAR';
@@ -1291,8 +1381,10 @@ abstract mixin class SQLGenerator {
     }
   }
 
-  String? primaryKeyTypeToSQLType(Type type,
-      {List<EntityField>? entityFieldAnnotations}) {
+  String? primaryKeyTypeToSQLType(
+    Type type, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     if (type.isNumericOrDynamicNumberType) {
       return 'SERIAL PRIMARY KEY';
     } else if (type == String) {
@@ -1308,8 +1400,11 @@ abstract mixin class SQLGenerator {
   }
 
   /// Returns `true` if [columnType] is a sibling of the [tableRepository].
-  bool isSiblingEntityType(EntityRepository tableRepository, Type columnType,
-      {EntityRepository? columnRepository}) {
+  bool isSiblingEntityType(
+    EntityRepository tableRepository,
+    Type columnType, {
+    EntityRepository? columnRepository,
+  }) {
     columnRepository ??= getEntityRepositoryByType(columnType);
     if (columnRepository == null) return false;
 
@@ -1331,8 +1426,10 @@ abstract mixin class SQLGenerator {
 
   /// Returns info for the column: table -> idName: sqlType
   MapEntry<String, MapEntry<String, String>>? entityTypeToSQLType(
-      TypeInfo type, String? column,
-      {List<EntityField>? entityFieldAnnotations}) {
+    TypeInfo type,
+    String? column, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     var typeEntityRepository = getEntityRepositoryByTypeInfo(type);
     if (typeEntityRepository == null) return null;
 
@@ -1340,13 +1437,17 @@ abstract mixin class SQLGenerator {
 
     var idName = entityHandler.idFieldName();
     var idType = entityHandler.idType();
-    var idEntityAnnotations = entityHandler
-        .getFieldEntityAnnotations(null, idName)
-        ?.whereType<EntityField>()
-        .toList();
+    var idEntityAnnotations =
+        entityHandler
+            .getFieldEntityAnnotations(null, idName)
+            ?.whereType<EntityField>()
+            .toList();
 
-    var sqlType = foreignKeyTypeToSQLType(TypeInfo.fromType(idType), idName,
-        entityFieldAnnotations: idEntityAnnotations);
+    var sqlType = foreignKeyTypeToSQLType(
+      TypeInfo.fromType(idType),
+      idName,
+      entityFieldAnnotations: idEntityAnnotations,
+    );
 
     if (sqlType == null) return null;
 
@@ -1355,20 +1456,30 @@ abstract mixin class SQLGenerator {
     return MapEntry(table, MapEntry(idName, sqlType));
   }
 
-  String? foreignKeyTypeToSQLType(TypeInfo idType, String idName,
-      {List<EntityField>? entityFieldAnnotations}) {
+  String? foreignKeyTypeToSQLType(
+    TypeInfo idType,
+    String idName, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     if (idType.isInt) {
       idType = TypeInfo.tBigInt;
     }
 
-    var sqlType = typeToSQLType(idType, idName,
-        entityFieldAnnotations: entityFieldAnnotations, isID: true);
+    var sqlType = typeToSQLType(
+      idType,
+      idName,
+      entityFieldAnnotations: entityFieldAnnotations,
+      isID: true,
+    );
     return sqlType;
   }
 
   /// Returns: ENUM: valuesNames
-  MapEntry<String, List<String>>? enumTypeToSQLType(Type type, String column,
-      {List<EntityField>? entityFieldAnnotations}) {
+  MapEntry<String, List<String>>? enumTypeToSQLType(
+    Type type,
+    String column, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     var reflectionFactory = ReflectionFactory();
     var enumReflection = reflectionFactory.getRegisterEnumReflection(type);
 
@@ -1381,12 +1492,18 @@ abstract mixin class SQLGenerator {
   }
 
   AlterTableSQL generateAddColumnAlterTableSQL(
-      String table, String fieldName, TypeInfo fieldType,
-      {List<EntityField>? entityFieldAnnotations}) {
+    String table,
+    String fieldName,
+    TypeInfo fieldType, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
-    var fieldSQLType = typeToSQLType(fieldType, columnName,
-        entityFieldAnnotations: entityFieldAnnotations);
+    var fieldSQLType = typeToSQLType(
+      fieldType,
+      columnName,
+      entityFieldAnnotations: entityFieldAnnotations,
+    );
 
     var comment = '${fieldType.toString(withT: false)} $fieldName';
 
@@ -1395,8 +1512,11 @@ abstract mixin class SQLGenerator {
     String? refColumn;
 
     if (fieldSQLType == null) {
-      entityType = entityTypeToSQLType(fieldType, columnName,
-          entityFieldAnnotations: entityFieldAnnotations);
+      entityType = entityTypeToSQLType(
+        fieldType,
+        columnName,
+        entityFieldAnnotations: entityFieldAnnotations,
+      );
       if (entityType != null) {
         fieldSQLType = entityType.value.value;
 
@@ -1408,22 +1528,32 @@ abstract mixin class SQLGenerator {
     }
 
     if (fieldSQLType == null) {
-      var enumType = enumTypeToSQLType(fieldType.type, columnName,
-          entityFieldAnnotations: entityFieldAnnotations);
+      var enumType = enumTypeToSQLType(
+        fieldType.type,
+        columnName,
+        entityFieldAnnotations: entityFieldAnnotations,
+      );
       if (enumType != null) {
         var type = enumType.key;
         var values = enumType.value;
 
-        fieldSQLType =
-            _buildEnumSQLType(type, fieldSQLType, values, q, columnName);
+        fieldSQLType = _buildEnumSQLType(
+          type,
+          fieldSQLType,
+          values,
+          q,
+          columnName,
+        );
 
         comment += ' enum(${values.join(', ')})';
       }
     }
 
     var columnEntry = SQLEntry(
-        'ADD', ' ADD COLUMN $q$columnName$q $fieldSQLType',
-        comment: comment);
+      'ADD',
+      ' ADD COLUMN $q$columnName$q $fieldSQLType',
+      comment: comment,
+    );
 
     List<CreateIndexSQL>? indexes;
     List<AlterTableSQL>? constraints;
@@ -1432,15 +1562,21 @@ abstract mixin class SQLGenerator {
       if (entityFieldAnnotations.hasUnique) {
         var constrainUniqueName = '${table}__${columnName}__unique';
 
-        var uniqueEntry = SQLEntry('CONSTRAINT',
-            ' ADD CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
-            columns: [
-              SQLColumn(table, columnName,
-                  referenceTable: refTable!, referenceColumn: refColumn!)
-            ]);
+        var uniqueEntry = SQLEntry(
+          'CONSTRAINT',
+          ' ADD CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+          columns: [
+            SQLColumn(
+              table,
+              columnName,
+              referenceTable: refTable!,
+              referenceColumn: refColumn!,
+            ),
+          ],
+        );
 
         constraints = [
-          AlterTableSQL(dialect, table, [uniqueEntry])
+          AlterTableSQL(dialect, table, [uniqueEntry]),
         ];
       } else if (entityFieldAnnotations.hasIndexed) {
         var indexName = '${table}__${columnName}__idx';
@@ -1459,26 +1595,40 @@ abstract mixin class SQLGenerator {
 
       constraints ??= [];
 
-      var constraintEntry = SQLEntry('CONSTRAINT',
-          ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
-          comment: '$fieldName @ $refTableName.$refField',
-          columns: [
-            SQLColumn(table, columnName,
-                referenceTable: refTableName, referenceColumn: refField)
-          ]);
+      var constraintEntry = SQLEntry(
+        'CONSTRAINT',
+        ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
+        comment: '$fieldName @ $refTableName.$refField',
+        columns: [
+          SQLColumn(
+            table,
+            columnName,
+            referenceTable: refTableName,
+            referenceColumn: refField,
+          ),
+        ],
+      );
 
       constraints.add(AlterTableSQL(dialect, table, [constraintEntry]));
     }
 
-    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry],
-        indexes: indexes, constraints: constraints);
+    var alterTableSQL = AlterTableSQL(
+      dialect,
+      table,
+      [columnEntry],
+      indexes: indexes,
+      constraints: constraints,
+    );
 
     return alterTableSQL;
   }
 
   AlterTableSQL generateAddUniqueConstraintAlterTableSQL(
-      String table, String fieldName, TypeInfo fieldType,
-      {List<EntityField>? entityFieldAnnotations}) {
+    String table,
+    String fieldName,
+    TypeInfo fieldType, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
 
@@ -1487,8 +1637,10 @@ abstract mixin class SQLGenerator {
     var comment = '${fieldType.toString(withT: false)} $fieldName UNIQUE';
 
     var columnEntry = SQLEntry(
-        'ADD', ' ADD CONSTRAINT $q$constraintName$q UNIQUE ($q$columnName$q)',
-        comment: comment);
+      'ADD',
+      ' ADD CONSTRAINT $q$constraintName$q UNIQUE ($q$columnName$q)',
+      comment: comment,
+    );
 
     var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry]);
 
@@ -1496,58 +1648,84 @@ abstract mixin class SQLGenerator {
   }
 
   AlterTableSQL generateAddEnumConstraintAlterTableSQL(
-      String table, String fieldName, TypeInfo fieldType,
-      {List<EntityField>? entityFieldAnnotations}) {
+    String table,
+    String fieldName,
+    TypeInfo fieldType, {
+    List<EntityField>? entityFieldAnnotations,
+  }) {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
 
     var constraintName = '${table}_${fieldName}_check';
 
-    var fieldSQLType = typeToSQLType(fieldType, columnName,
-        entityFieldAnnotations: entityFieldAnnotations);
+    var fieldSQLType = typeToSQLType(
+      fieldType,
+      columnName,
+      entityFieldAnnotations: entityFieldAnnotations,
+    );
 
-    var enumType = enumTypeToSQLType(fieldType.type, columnName,
-        entityFieldAnnotations: entityFieldAnnotations);
+    var enumType = enumTypeToSQLType(
+      fieldType.type,
+      columnName,
+      entityFieldAnnotations: entityFieldAnnotations,
+    );
 
     if (enumType == null) {
       throw StateError(
-          "Can't find column `$table`.`$columnName` `EnumReflection` for type: $fieldType");
+        "Can't find column `$table`.`$columnName` `EnumReflection` for type: $fieldType",
+      );
     }
 
     var type = enumType.key;
     var values = enumType.value;
 
-    fieldSQLType = _buildEnumSQLType(type, fieldSQLType, values, q, columnName,
-        withSqlType: false);
+    fieldSQLType = _buildEnumSQLType(
+      type,
+      fieldSQLType,
+      values,
+      q,
+      columnName,
+      withSqlType: false,
+    );
 
     var comment =
         '${fieldType.toString(withT: false)} $fieldName enum(${values.join(', ')})';
 
     var columnEntry = SQLEntry(
-        'ADD', ' ADD CONSTRAINT $q$constraintName$q $fieldSQLType',
-        comment: comment);
+      'ADD',
+      ' ADD CONSTRAINT $q$constraintName$q $fieldSQLType',
+      comment: comment,
+    );
 
     var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry]);
 
     return alterTableSQL;
   }
 
-  FutureOr<List<SQLBuilder>> generateCreateTableSQLs(
-      {bool ifNotExists = true, bool sortColumns = true});
+  FutureOr<List<SQLBuilder>> generateCreateTableSQLs({
+    bool ifNotExists = true,
+    bool sortColumns = true,
+  });
 
-  CreateTableSQL generateCreateTableSQL(
-      {EntityRepository? entityRepository,
-      Object? obj,
-      Type? type,
-      String? name,
-      String? tableName,
-      bool ifNotExists = true,
-      bool sortColumns = true}) {
-    entityRepository ??=
-        getEntityRepository(type: type, obj: obj, name: name, tableName: name);
+  CreateTableSQL generateCreateTableSQL({
+    EntityRepository? entityRepository,
+    Object? obj,
+    Type? type,
+    String? name,
+    String? tableName,
+    bool ifNotExists = true,
+    bool sortColumns = true,
+  }) {
+    entityRepository ??= getEntityRepository(
+      type: type,
+      obj: obj,
+      name: name,
+      tableName: name,
+    );
     if (entityRepository == null) {
       throw ArgumentError(
-          "Can't resolve `EntityRepository`> obj: $obj ; type: $type ; name: $name ; tableName: $tableName");
+        "Can't resolve `EntityRepository`> obj: $obj ; type: $type ; name: $name ; tableName: $tableName",
+      );
     }
 
     var q = dialect.elementQuote;
@@ -1561,27 +1739,34 @@ abstract mixin class SQLGenerator {
     var idType = entityHandler.idType();
 
     var idColumnName = normalizeColumnName(idFieldName);
-    var idAnnotations = entityHandler
-        .getFieldEntityAnnotations(null, idFieldName)
-        ?.whereType<EntityField>()
-        .toList();
+    var idAnnotations =
+        entityHandler
+            .getFieldEntityAnnotations(null, idFieldName)
+            ?.whereType<EntityField>()
+            .toList();
 
-    var idTypeSQL =
-        primaryKeyTypeToSQLType(idType, entityFieldAnnotations: idAnnotations);
+    var idTypeSQL = primaryKeyTypeToSQLType(
+      idType,
+      entityFieldAnnotations: idAnnotations,
+    );
 
     var sqlEntries = <SQLEntry>[
-      SQLEntry('COLUMN', ' $q$idColumnName$q $idTypeSQL',
-          comment: '$idType $idFieldName',
-          columns: [SQLColumn(table, idColumnName)]),
+      SQLEntry(
+        'COLUMN',
+        ' $q$idColumnName$q $idTypeSQL',
+        comment: '$idType $idFieldName',
+        columns: [SQLColumn(table, idColumnName)],
+      ),
     ];
 
     var indexSQLs = <CreateIndexSQL>[];
 
-    var fieldsEntries = entityHandler
-        .fieldsTypes()
-        .entries
-        .where((e) => !e.value.isListEntityOrReference)
-        .toList();
+    var fieldsEntries =
+        entityHandler
+            .fieldsTypes()
+            .entries
+            .where((e) => !e.value.isListEntityOrReference)
+            .toList();
 
     if (sortColumns) {
       fieldsEntries.sort((a, b) => a.key.compareTo(b.key));
@@ -1595,10 +1780,11 @@ abstract mixin class SQLGenerator {
       var fieldType = e.value;
       if (fieldName == idFieldName) continue;
 
-      var entityFieldAnnotations = entityHandler
-          .getFieldEntityAnnotations(null, fieldName)
-          ?.whereType<EntityField>()
-          .toList();
+      var entityFieldAnnotations =
+          entityHandler
+              .getFieldEntityAnnotations(null, fieldName)
+              ?.whereType<EntityField>()
+              .toList();
 
       if (entityFieldAnnotations != null && entityFieldAnnotations.hasHidden) {
         continue;
@@ -1610,12 +1796,18 @@ abstract mixin class SQLGenerator {
       String? refTable;
       String? refColumn;
 
-      var fieldSQLType = typeToSQLType(fieldType, columnName,
-          entityFieldAnnotations: entityFieldAnnotations);
+      var fieldSQLType = typeToSQLType(
+        fieldType,
+        columnName,
+        entityFieldAnnotations: entityFieldAnnotations,
+      );
 
       if (fieldSQLType == null) {
-        var entityType = entityTypeToSQLType(fieldType, columnName,
-            entityFieldAnnotations: entityFieldAnnotations);
+        var entityType = entityTypeToSQLType(
+          fieldType,
+          columnName,
+          entityFieldAnnotations: entityFieldAnnotations,
+        );
         if (entityType != null) {
           var fieldEntityType = fieldType.entityType;
           if (fieldEntityType != null &&
@@ -1633,14 +1825,22 @@ abstract mixin class SQLGenerator {
       }
 
       if (fieldSQLType == null) {
-        var enumType = enumTypeToSQLType(fieldType.type, columnName,
-            entityFieldAnnotations: entityFieldAnnotations);
+        var enumType = enumTypeToSQLType(
+          fieldType.type,
+          columnName,
+          entityFieldAnnotations: entityFieldAnnotations,
+        );
         if (enumType != null) {
           var type = enumType.key;
           var values = enumType.value;
 
-          fieldSQLType =
-              _buildEnumSQLType(type, fieldSQLType, values, q, columnName);
+          fieldSQLType = _buildEnumSQLType(
+            type,
+            fieldSQLType,
+            values,
+            q,
+            columnName,
+          );
 
           comment += ' enum(${values.join(', ')})';
         }
@@ -1651,27 +1851,45 @@ abstract mixin class SQLGenerator {
         continue;
       }
 
-      sqlEntries.add(SQLEntry('COLUMN', ' $q$columnName$q $fieldSQLType',
+      sqlEntries.add(
+        SQLEntry(
+          'COLUMN',
+          ' $q$columnName$q $fieldSQLType',
           comment: comment,
           columns: [
-            SQLColumn(table, columnName,
-                referenceTable: refTable, referenceColumn: refColumn)
-          ]));
+            SQLColumn(
+              table,
+              columnName,
+              referenceTable: refTable,
+              referenceColumn: refColumn,
+            ),
+          ],
+        ),
+      );
 
       if (entityFieldAnnotations != null) {
         if (entityFieldAnnotations.hasUnique) {
           var constrainUniqueName = '${table}__${columnName}__unique';
 
-          sqlEntries.add(SQLEntry('CONSTRAINT',
+          sqlEntries.add(
+            SQLEntry(
+              'CONSTRAINT',
               ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
               columns: [
-                SQLColumn(table, columnName,
-                    referenceTable: refTable, referenceColumn: refColumn)
-              ]));
+                SQLColumn(
+                  table,
+                  columnName,
+                  referenceTable: refTable,
+                  referenceColumn: refColumn,
+                ),
+              ],
+            ),
+          );
         } else if (entityFieldAnnotations.hasIndexed) {
           var indexName = '${table}__${columnName}__idx';
-          indexSQLs
-              .add(CreateIndexSQL(dialect, table, columnName, indexName, q: q));
+          indexSQLs.add(
+            CreateIndexSQL(dialect, table, columnName, indexName, q: q),
+          );
         }
       }
     }
@@ -1687,13 +1905,21 @@ abstract mixin class SQLGenerator {
 
       var constrainName = '${table}__${columnName}__fkey';
 
-      sqlEntries.add(SQLEntry('CONSTRAINT',
+      sqlEntries.add(
+        SQLEntry(
+          'CONSTRAINT',
           ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
           comment: '$fieldName @ $refTableName.$refField',
           columns: [
-            SQLColumn(table, columnName,
-                referenceTable: refTableName, referenceColumn: refField)
-          ]));
+            SQLColumn(
+              table,
+              columnName,
+              referenceTable: refTableName,
+              referenceColumn: refField,
+            ),
+          ],
+        ),
+      );
     }
 
     sqlEntries.sort((a, b) {
@@ -1707,32 +1933,42 @@ abstract mixin class SQLGenerator {
       }
     });
 
-    var createSQL = CreateTableSQL(dialect, table, sqlEntries,
-        q: q, entityRepository: entityRepository, indexes: indexSQLs);
+    var createSQL = CreateTableSQL(
+      dialect,
+      table,
+      sqlEntries,
+      q: q,
+      entityRepository: entityRepository,
+      indexes: indexSQLs,
+    );
 
     var relationshipSQLs = <CreateTableSQL>[];
 
-    var relationshipEntries = entityHandler
-        .fieldsTypes()
-        .entries
-        .where((e) => e.value.isListEntityOrReference)
-        .toList();
+    var relationshipEntries =
+        entityHandler
+            .fieldsTypes()
+            .entries
+            .where((e) => e.value.isListEntityOrReference)
+            .toList();
 
     for (var e in relationshipEntries) {
       var fieldName = e.key;
       var fieldType = e.value.arguments0!;
 
-      var entityFieldAnnotations = entityHandler
-          .getFieldEntityAnnotations(null, fieldName)
-          ?.whereType<EntityField>()
-          .toList();
+      var entityFieldAnnotations =
+          entityHandler
+              .getFieldEntityAnnotations(null, fieldName)
+              ?.whereType<EntityField>()
+              .toList();
 
       var columnName = normalizeColumnName(fieldName);
 
       var srcFieldName = normalizeColumnName(table);
       var relSrcType = foreignKeyTypeToSQLType(
-          TypeInfo.fromType(idType), srcFieldName,
-          entityFieldAnnotations: entityFieldAnnotations);
+        TypeInfo.fromType(idType),
+        srcFieldName,
+        entityFieldAnnotations: entityFieldAnnotations,
+      );
 
       var relDstType = entityTypeToSQLType(fieldType, null);
       if (relDstType == null) continue;
@@ -1750,43 +1986,76 @@ abstract mixin class SQLGenerator {
       var constrainDstName = '${relName}__${dstFieldName}__fkey';
 
       var sqlRelEntries = <SQLEntry>[
-        SQLEntry('COLUMN', ' $q$srcFieldName$q $relSrcType NOT NULL',
-            comment: '$entityType.${e.key}',
-            columns: [
-              SQLColumn(relName, srcFieldName,
-                  referenceTable: table, referenceColumn: idColumnName)
-            ]),
-        SQLEntry('COLUMN', ' $q$dstFieldName$q $relDstTypeSQL NOT NULL',
-            comment:
-                '${e.value.toString(withT: false)} @ $relDstTable.$relDstTableId',
-            columns: [
-              SQLColumn(relName, dstFieldName,
-                  referenceTable: relDstTable, referenceColumn: relDstTableId)
-            ]),
-        SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$srcFieldName$q, $q$dstFieldName$q)',
-            columns: [
-              SQLColumn(relName, srcFieldName),
-              SQLColumn(relName, dstFieldName)
-            ]),
-        SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON DELETE CASCADE',
-            comment: ' $srcFieldName @ $table.$idColumnName',
-            columns: [
-              SQLColumn(relName, srcFieldName,
-                  referenceTable: table, referenceColumn: idColumnName)
-            ]),
-        SQLEntry('CONSTRAINT',
-            ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON DELETE CASCADE',
-            comment: ' $dstFieldName @ $relDstTable.$relDstTableId',
-            columns: [
-              SQLColumn(relName, dstFieldName,
-                  referenceTable: relDstTable, referenceColumn: relDstTableId)
-            ])
+        SQLEntry(
+          'COLUMN',
+          ' $q$srcFieldName$q $relSrcType NOT NULL',
+          comment: '$entityType.${e.key}',
+          columns: [
+            SQLColumn(
+              relName,
+              srcFieldName,
+              referenceTable: table,
+              referenceColumn: idColumnName,
+            ),
+          ],
+        ),
+        SQLEntry(
+          'COLUMN',
+          ' $q$dstFieldName$q $relDstTypeSQL NOT NULL',
+          comment:
+              '${e.value.toString(withT: false)} @ $relDstTable.$relDstTableId',
+          columns: [
+            SQLColumn(
+              relName,
+              dstFieldName,
+              referenceTable: relDstTable,
+              referenceColumn: relDstTableId,
+            ),
+          ],
+        ),
+        SQLEntry(
+          'CONSTRAINT',
+          ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$srcFieldName$q, $q$dstFieldName$q)',
+          columns: [
+            SQLColumn(relName, srcFieldName),
+            SQLColumn(relName, dstFieldName),
+          ],
+        ),
+        SQLEntry(
+          'CONSTRAINT',
+          ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON DELETE CASCADE',
+          comment: ' $srcFieldName @ $table.$idColumnName',
+          columns: [
+            SQLColumn(
+              relName,
+              srcFieldName,
+              referenceTable: table,
+              referenceColumn: idColumnName,
+            ),
+          ],
+        ),
+        SQLEntry(
+          'CONSTRAINT',
+          ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON DELETE CASCADE',
+          comment: ' $dstFieldName @ $relDstTable.$relDstTableId',
+          columns: [
+            SQLColumn(
+              relName,
+              dstFieldName,
+              referenceTable: relDstTable,
+              referenceColumn: relDstTableId,
+            ),
+          ],
+        ),
       ];
 
-      var relSQL = CreateTableSQL(dialect, relName, sqlRelEntries,
-          q: q, parentTable: table);
+      var relSQL = CreateTableSQL(
+        dialect,
+        relName,
+        sqlRelEntries,
+        q: q,
+        parentTable: table,
+      );
       relationshipSQLs.add(relSQL);
     }
 
@@ -1795,9 +2064,14 @@ abstract mixin class SQLGenerator {
     return createSQL;
   }
 
-  String? _buildEnumSQLType(String type, String? fieldSQLType,
-      List<String> values, String q, String columnName,
-      {bool withSqlType = true}) {
+  String? _buildEnumSQLType(
+    String type,
+    String? fieldSQLType,
+    List<String> values,
+    String q,
+    String columnName, {
+    bool withSqlType = true,
+  }) {
     if (type == 'ENUM') {
       fieldSQLType = withSqlType ? type : 'ENUM';
       fieldSQLType += '(${values.map((e) => "'$e'").join(',')})';
@@ -1815,14 +2089,16 @@ abstract mixin class SQLGenerator {
       StringUtils.toLowerCaseUnderscore(fieldName, simple: true);
 
   /// Generate a full text with all the SQLs to create the tables.
-  Future<String> generateFullCreateTableSQLs(
-      {String? title,
-      bool withDate = true,
-      bool ifNotExists = true,
-      bool sortColumns = true}) async {
+  Future<String> generateFullCreateTableSQLs({
+    String? title,
+    bool withDate = true,
+    bool ifNotExists = true,
+    bool sortColumns = true,
+  }) async {
     return generateCreateTableSQLs(
-            ifNotExists: ifNotExists, sortColumns: sortColumns)
-        .resolveMapped((allSQLs) {
+      ifNotExists: ifNotExists,
+      sortColumns: sortColumns,
+    ).resolveMapped((allSQLs) {
       if (allSQLs.isEmpty) return '';
 
       var dialect = allSQLs.first.dialect;
@@ -1846,7 +2122,8 @@ abstract mixin class SQLGenerator {
         if (s is CreateTableSQL && s.entityRepository != null) {
           var sqlEntityRepository = s.entityRepository!;
           fullSQL.write(
-              '-- Entity: ${sqlEntityRepository.type} @ ${sqlEntityRepository.name}\n\n');
+            '-- Entity: ${sqlEntityRepository.type} @ ${sqlEntityRepository.name}\n\n',
+          );
         }
 
         var sql = s.buildSQL(multiline: s is! AlterTableSQL);

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.3
+// BUILDER: reflection_factory/2.6.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.3');
+  static final Version _version = Version.parse('2.6.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -71,7 +71,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   AboutModule$reflection._([AboutModule? object])
-      : super(AboutModule, r'AboutModule', object);
+    : super(AboutModule, r'AboutModule', object);
 
   static bool _registered = false;
   @override
@@ -84,7 +84,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
@@ -148,14 +148,15 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     switch (lc) {
       case '':
         return ConstructorReflection<AboutModule>(
-            this,
-            AboutModule,
-            '',
-            () => AboutModule.new,
-            const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
-            null,
-            null,
-            null);
+          this,
+          AboutModule,
+          '',
+          () => AboutModule.new,
+          const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -191,20 +192,22 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     'name',
     'routes',
     'security',
-    'version'
+    'version',
   ];
 
   @override
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<AboutModule, dynamic>>
-      _fieldsNoObject = {};
+  _fieldsNoObject = {};
 
   final Map<String, FieldReflection<AboutModule, dynamic>> _fieldsObject = {};
 
   @override
-  FieldReflection<AboutModule, T>? field<T>(String fieldName,
-      [AboutModule? obj]) {
+  FieldReflection<AboutModule, T>? field<T>(
+    String fieldName, [
+    AboutModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _fieldObjectImpl<T>(fieldName);
@@ -241,7 +244,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   FieldReflection<AboutModule, dynamic>? _fieldImpl(
-      String fieldName, AboutModule? obj) {
+    String fieldName,
+    AboutModule? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -323,8 +328,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
         return FieldReflection<AboutModule, APIRouteBuilder<APIModule>>(
           this,
           APIModule,
-          const __TR<APIRouteBuilder<APIModule>>(
-              APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
+          const __TR<APIRouteBuilder<APIModule>>(APIRouteBuilder, <__TR>[
+            __TR<APIModule>(APIModule),
+          ]),
           'routes',
           false,
           (o) => () => o!.routes,
@@ -423,8 +429,10 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(AboutModule? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    AboutModule? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'apiRoot': obj?.apiRoot,
@@ -472,20 +480,22 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     'getRoutesHandlersNames',
     'initialize',
     'initializeDependencies',
-    'resolveRoute'
+    'resolveRoute',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<AboutModule, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<AboutModule, dynamic>> _methodsObject = {};
 
   @override
-  MethodReflection<AboutModule, R>? method<R>(String methodName,
-      [AboutModule? obj]) {
+  MethodReflection<AboutModule, R>? method<R>(
+    String methodName, [
+    AboutModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _methodObjectImpl<R>(methodName);
@@ -522,7 +532,9 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   MethodReflection<AboutModule, dynamic>? _methodImpl(
-      String methodName, AboutModule? obj) {
+    String methodName,
+    AboutModule? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -530,331 +542,399 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     switch (lc) {
       case 'configure':
         return MethodReflection<AboutModule, void>(
-            this,
-            AboutModule,
-            'configure',
-            __TR.tVoid,
-            false,
-            (o) => o!.configure,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          AboutModule,
+          'configure',
+          __TR.tVoid,
+          false,
+          (o) => o!.configure,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'about':
         return MethodReflection<AboutModule, APIResponse<String>>(
-            this,
-            AboutModule,
-            'about',
-            const __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
-            false,
-            (o) => o!.about,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          AboutModule,
+          'about',
+          const __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          false,
+          (o) => o!.about,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'ensureconfigured':
         return MethodReflection<AboutModule, void>(
-            this,
-            APIModule,
-            'ensureConfigured',
-            __TR.tVoid,
-            false,
-            (o) => o!.ensureConfigured,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'ensureConfigured',
+          __TR.tVoid,
+          false,
+          (o) => o!.ensureConfigured,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'initialize':
         return MethodReflection<AboutModule, FutureOr<InitializationResult>>(
-            this,
-            APIModule,
-            'initialize',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.initialize,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          APIModule,
+          'initialize',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.initialize,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getrouteshandlersnames':
         return MethodReflection<AboutModule, Iterable<String>>(
-            this,
-            APIModule,
-            'getRoutesHandlersNames',
-            const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
-            false,
-            (o) => o!.getRoutesHandlersNames,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'method': __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method',
-                  true, false)
-            },
-            null);
+          this,
+          APIModule,
+          'getRoutesHandlersNames',
+          const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
+          false,
+          (o) => o!.getRoutesHandlersNames,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'method': __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroute':
         return MethodReflection<AboutModule, APIModule>(
-            this,
-            APIModule,
-            'addRoute',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  true),
-              __PR(__TR.tString, 'name', false, true),
-              __PR(
-                  __TR<APIRouteFunction<dynamic>>(
-                      APIRouteFunction, <__TR>[__TR.tDynamic]),
-                  'function',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'config': __PR(
-                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
-              'parameters': __PR(
-                  __TR<Map<String, TypeInfo>>(Map, <__TR>[
-                    __TR.tString,
-                    __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic])
-                  ]),
-                  'parameters',
-                  true,
-                  false),
-              'rules': __PR(
-                  __TR<Iterable<APIRouteRule>>(
-                      Iterable, <__TR>[__TR<APIRouteRule>(APIRouteRule)]),
-                  'rules',
-                  true,
-                  false)
-            },
-            null);
+          this,
+          APIModule,
+          'addRoute',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRoute,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              true,
+            ),
+            __PR(__TR.tString, 'name', false, true),
+            __PR(
+              __TR<APIRouteFunction<dynamic>>(APIRouteFunction, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'function',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'config': __PR(
+              __TR<APIRouteConfig>(APIRouteConfig),
+              'config',
+              true,
+              false,
+            ),
+            'parameters': __PR(
+              __TR<Map<String, TypeInfo>>(Map, <__TR>[
+                __TR.tString,
+                __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+              ]),
+              'parameters',
+              true,
+              false,
+            ),
+            'rules': __PR(
+              __TR<Iterable<APIRouteRule>>(Iterable, <__TR>[
+                __TR<APIRouteRule>(APIRouteRule),
+              ]),
+              'rules',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroutehandler':
         return MethodReflection<AboutModule, APIModule>(
-            this,
-            APIModule,
-            'addRouteHandler',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRouteHandler,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<APIRouteHandler<dynamic>>(
-                      APIRouteHandler, <__TR>[__TR.tDynamic]),
-                  'routeHandler',
-                  false,
-                  true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'addRouteHandler',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRouteHandler,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'routeHandler',
+              false,
+              true,
+            ),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'getroutehandler':
         return MethodReflection<AboutModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandler',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandler,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'name', false, true)],
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandler',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandler,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'name', false, true)],
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          ],
+          null,
+          null,
+        );
       case 'getroutehandlerbyrequest':
         return MethodReflection<AboutModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandlerByRequest',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandlerByRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandlerByRequest',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandlerByRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
+          null,
+          null,
+        );
       case 'resolveroute':
         return MethodReflection<AboutModule, String>(
-            this,
-            APIModule,
-            'resolveRoute',
-            __TR.tString,
-            false,
-            (o) => o!.resolveRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'resolveRoute',
+          __TR.tString,
+          false,
+          (o) => o!.resolveRoute,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'call':
         return MethodReflection<AboutModule, FutureOr<APIResponse<dynamic>>>(
-            this,
-            APIModule,
-            'call',
-            const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
-              __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
-            ]),
-            false,
-            (o) => o!.call,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'call',
+          const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
+            __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic]),
+          ]),
+          false,
+          (o) => o!.call,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'acceptsrequest':
         return MethodReflection<AboutModule, bool>(
-            this,
-            APIModule,
-            'acceptsRequest',
-            __TR.tBool,
-            false,
-            (o) => o!.acceptsRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'acceptsRequest',
+          __TR.tBool,
+          false,
+          (o) => o!.acceptsRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'apiinfo':
         return MethodReflection<AboutModule, APIModuleInfo>(
-            this,
-            APIModule,
-            'apiInfo',
-            const __TR<APIModuleInfo>(APIModuleInfo),
-            false,
-            (o) => o!.apiInfo,
-            obj,
-            null,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'apiInfo',
+          const __TR<APIModuleInfo>(APIModuleInfo),
+          false,
+          (o) => o!.apiInfo,
+          obj,
+          null,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false),
+          ],
+          null,
+          null,
+        );
       case 'ensureinitialized':
         return MethodReflection<AboutModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitialized',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitialized,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitialized',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitialized,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'ensureinitializedasync':
         return MethodReflection<AboutModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitializedAsync',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitializedAsync,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitializedAsync',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitializedAsync,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'doinitialization':
         return MethodReflection<AboutModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'doInitialization',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.doInitialization,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'doInitialization',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.doInitialization,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'initializedependencies':
         return MethodReflection<AboutModule, FutureOr<List<Initializable>>>(
-            this,
-            Initializable,
-            'initializeDependencies',
-            const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
-              __TR<List<Initializable>>(
-                  List, <__TR>[__TR<Initializable>(Initializable)])
+          this,
+          Initializable,
+          'initializeDependencies',
+          const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
+            __TR<List<Initializable>>(List, <__TR>[
+              __TR<Initializable>(Initializable),
             ]),
-            false,
-            (o) => o!.initializeDependencies,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.initializeDependencies,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'checkinitialized':
         return MethodReflection<AboutModule, void>(
-            this,
-            Initializable,
-            'checkInitialized',
-            __TR.tVoid,
-            false,
-            (o) => o!.checkInitialized,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Initializable,
+          'checkInitialized',
+          __TR.tVoid,
+          false,
+          (o) => o!.checkInitialized,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'executeinitialized':
         return MethodReflection<AboutModule, FutureOr<dynamic>>(
-            this,
-            Initializable,
-            'executeInitialized',
-            __TR.tFutureOrDynamic,
-            false,
-            (o) => o!.executeInitialized,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<ExecuteInitializedCallback<dynamic>>(
-                      ExecuteInitializedCallback, <__TR>[__TR.tDynamic]),
-                  'callback',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'executeInitialized',
+          __TR.tFutureOrDynamic,
+          false,
+          (o) => o!.executeInitialized,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<ExecuteInitializedCallback<dynamic>>(
+                ExecuteInitializedCallback,
+                <__TR>[__TR.tDynamic],
+              ),
+              'callback',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       default:
         return null;
     }
@@ -880,7 +960,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   UserModule$reflection._([UserModule? object])
-      : super(UserModule, r'UserModule', object);
+    : super(UserModule, r'UserModule', object);
 
   static bool _registered = false;
   @override
@@ -893,7 +973,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -957,23 +1037,27 @@ class UserModule$reflection extends ClassReflection<UserModule>
     switch (lc) {
       case '':
         return ConstructorReflection<UserModule>(
-            this,
-            UserModule,
-            '',
-            () => UserModule.new,
-            const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          '',
+          () => UserModule.new,
+          const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
   }
 
   static const List<Object> _classAnnotations = const [
-    APIEntityAccessRules(EntityAccessRules.blockFields(User, ['email'],
-        condition: _blockUserEmailCondition)),
-    APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
+    APIEntityAccessRules(
+      EntityAccessRules.blockFields(User, [
+        'email',
+      ], condition: _blockUserEmailCondition),
+    ),
+    APIEntityResolutionRules(EntityResolutionRules.fetchEager([User])),
   ];
 
   @override
@@ -1004,20 +1088,22 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'name',
     'routes',
     'security',
-    'version'
+    'version',
   ];
 
   @override
   List<String> get fieldsNames => _fieldsNames;
 
   static final Map<String, FieldReflection<UserModule, dynamic>>
-      _fieldsNoObject = {};
+  _fieldsNoObject = {};
 
   final Map<String, FieldReflection<UserModule, dynamic>> _fieldsObject = {};
 
   @override
-  FieldReflection<UserModule, T>? field<T>(String fieldName,
-      [UserModule? obj]) {
+  FieldReflection<UserModule, T>? field<T>(
+    String fieldName, [
+    UserModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _fieldObjectImpl<T>(fieldName);
@@ -1054,7 +1140,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   FieldReflection<UserModule, dynamic>? _fieldImpl(
-      String fieldName, UserModule? obj) {
+    String fieldName,
+    UserModule? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -1136,8 +1224,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
         return FieldReflection<UserModule, APIRouteBuilder<APIModule>>(
           this,
           APIModule,
-          const __TR<APIRouteBuilder<APIModule>>(
-              APIRouteBuilder, <__TR>[__TR<APIModule>(APIModule)]),
+          const __TR<APIRouteBuilder<APIModule>>(APIRouteBuilder, <__TR>[
+            __TR<APIModule>(APIModule),
+          ]),
           'routes',
           false,
           (o) => () => o!.routes,
@@ -1236,8 +1325,10 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(UserModule? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    UserModule? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'apiRoot': obj?.apiRoot,
@@ -1300,20 +1391,22 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'notARouteAsync',
     'resolveRoute',
     'returnAPIResponseError',
-    'throwAPIResponseError'
+    'throwAPIResponseError',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<UserModule, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<UserModule, dynamic>> _methodsObject = {};
 
   @override
-  MethodReflection<UserModule, R>? method<R>(String methodName,
-      [UserModule? obj]) {
+  MethodReflection<UserModule, R>? method<R>(
+    String methodName, [
+    UserModule? obj,
+  ]) {
     if (obj == null) {
       if (object != null) {
         return _methodObjectImpl<R>(methodName);
@@ -1350,7 +1443,9 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   MethodReflection<UserModule, dynamic>? _methodImpl(
-      String methodName, UserModule? obj) {
+    String methodName,
+    UserModule? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -1358,572 +1453,672 @@ class UserModule$reflection extends ClassReflection<UserModule>
     switch (lc) {
       case 'configure':
         return MethodReflection<UserModule, void>(
-            this,
-            UserModule,
-            'configure',
-            __TR.tVoid,
-            false,
-            (o) => o!.configure,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          UserModule,
+          'configure',
+          __TR.tVoid,
+          false,
+          (o) => o!.configure,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'notaroute':
         return MethodReflection<UserModule, String>(
-            this,
-            UserModule,
-            'notARoute',
-            __TR.tString,
-            false,
-            (o) => o!.notARoute,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'n', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'notARoute',
+          __TR.tString,
+          false,
+          (o) => o!.notARoute,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'n', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'notarouteasync':
         return MethodReflection<UserModule, Future<String>>(
-            this,
-            UserModule,
-            'notARouteAsync',
-            __TR.tFutureString,
-            false,
-            (o) => o!.notARouteAsync,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'n', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'notARouteAsync',
+          __TR.tFutureString,
+          false,
+          (o) => o!.notARouteAsync,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'n', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getuser':
         return MethodReflection<UserModule, APIResponse<User>>(
-            this,
-            UserModule,
-            'getUser',
-            const __TR<APIResponse<User>>(
-                APIResponse, <__TR>[__TR<User>(User)]),
-            false,
-            (o) => o!.getUser,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'getUser',
+          const __TR<APIResponse<User>>(APIResponse, <__TR>[__TR<User>(User)]),
+          false,
+          (o) => o!.getUser,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'echouser':
         return MethodReflection<UserModule, APIResponse<User>>(
-            this,
-            UserModule,
-            'echoUser',
-            const __TR<APIResponse<User>>(
-                APIResponse, <__TR>[__TR<User>(User)]),
-            false,
-            (o) => o!.echoUser,
-            obj,
-            const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'echoUser',
+          const __TR<APIResponse<User>>(APIResponse, <__TR>[__TR<User>(User)]),
+          false,
+          (o) => o!.echoUser,
+          obj,
+          const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'echolistuser':
         return MethodReflection<UserModule, APIResponse<List<User>>>(
-            this,
-            UserModule,
-            'echoListUser',
-            const __TR<APIResponse<List<User>>>(APIResponse, <__TR>[
-              __TR<List<User>>(List, <__TR>[__TR<User>(User)])
-            ]),
-            false,
-            (o) => o!.echoListUser,
-            obj,
-            const <__PR>[
-              __PR(__TR<List<User>>(List, <__TR>[__TR<User>(User)]), 'users',
-                  false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'echoListUser',
+          const __TR<APIResponse<List<User>>>(APIResponse, <__TR>[
+            __TR<List<User>>(List, <__TR>[__TR<User>(User)]),
+          ]),
+          false,
+          (o) => o!.echoListUser,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<List<User>>(List, <__TR>[__TR<User>(User)]),
+              'users',
+              false,
+              true,
+            ),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'echolistuser2':
         return MethodReflection<UserModule, APIResponse<List<User>>>(
-            this,
-            UserModule,
-            'echoListUser2',
-            const __TR<APIResponse<List<User>>>(APIResponse, <__TR>[
-              __TR<List<User>>(List, <__TR>[__TR<User>(User)])
-            ]),
-            false,
-            (o) => o!.echoListUser2,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'msg', false, true),
-              __PR(__TR<List<User>>(List, <__TR>[__TR<User>(User)]), 'users',
-                  false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'echoListUser2',
+          const __TR<APIResponse<List<User>>>(APIResponse, <__TR>[
+            __TR<List<User>>(List, <__TR>[__TR<User>(User)]),
+          ]),
+          false,
+          (o) => o!.echoListUser2,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'msg', false, true),
+            __PR(
+              __TR<List<User>>(List, <__TR>[__TR<User>(User)]),
+              'users',
+              false,
+              true,
+            ),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'getdynamic':
         return MethodReflection<UserModule, APIResponse<dynamic>>(
-            this,
-            UserModule,
-            'getDynamic',
-            const __TR<APIResponse<dynamic>>(
-                APIResponse, <__TR>[__TR.tDynamic]),
-            false,
-            (o) => o!.getDynamic,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'getDynamic',
+          const __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic]),
+          false,
+          (o) => o!.getDynamic,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getuserasync':
         return MethodReflection<UserModule, Future<APIResponse<User>>>(
-            this,
-            UserModule,
-            'getUserAsync',
-            const __TR<Future<APIResponse<User>>>(Future, <__TR>[
-              __TR<APIResponse<User>>(APIResponse, <__TR>[__TR<User>(User)])
-            ]),
-            false,
-            (o) => o!.getUserAsync,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'getUserAsync',
+          const __TR<Future<APIResponse<User>>>(Future, <__TR>[
+            __TR<APIResponse<User>>(APIResponse, <__TR>[__TR<User>(User)]),
+          ]),
+          false,
+          (o) => o!.getUserAsync,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'gedynamicasync':
         return MethodReflection<UserModule, Future<APIResponse<dynamic>>>(
-            this,
-            UserModule,
-            'geDynamicAsync',
-            const __TR<Future<APIResponse>>(Future, <__TR>[
-              __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
-            ]),
-            false,
-            (o) => o!.geDynamicAsync,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'geDynamicAsync',
+          const __TR<Future<APIResponse>>(Future, <__TR>[
+            __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic]),
+          ]),
+          false,
+          (o) => o!.geDynamicAsync,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'gedynamicasync2':
         return MethodReflection<UserModule, Future<dynamic>>(
-            this,
-            UserModule,
-            'geDynamicAsync2',
-            __TR.tFutureDynamic,
-            false,
-            (o) => o!.geDynamicAsync2,
-            obj,
-            const <__PR>[__PR(__TR.tInt, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'geDynamicAsync2',
+          __TR.tFutureDynamic,
+          false,
+          (o) => o!.geDynamicAsync2,
+          obj,
+          const <__PR>[__PR(__TR.tInt, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getcontextentityresolutionrules':
-        return MethodReflection<UserModule,
-                Future<APIResponse<Map<dynamic, dynamic>>>>(
-            this,
-            UserModule,
-            'getContextEntityResolutionRules',
-            const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
-              __TR<APIResponse<Map>>(APIResponse, <__TR>[
-                __TR<Map<dynamic, dynamic>>(
-                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
-              ])
+        return MethodReflection<
+          UserModule,
+          Future<APIResponse<Map<dynamic, dynamic>>>
+        >(
+          this,
+          UserModule,
+          'getContextEntityResolutionRules',
+          const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
+            __TR<APIResponse<Map>>(APIResponse, <__TR>[
+              __TR<Map<dynamic, dynamic>>(Map, <__TR>[
+                __TR.tDynamic,
+                __TR.tDynamic,
+              ]),
             ]),
-            false,
-            (o) => o!.getContextEntityResolutionRules,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.getContextEntityResolutionRules,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'getrequestentityresolutionrules':
-        return MethodReflection<UserModule,
-                Future<APIResponse<Map<dynamic, dynamic>>>>(
-            this,
-            UserModule,
-            'getRequestEntityResolutionRules',
-            const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
-              __TR<APIResponse<Map>>(APIResponse, <__TR>[
-                __TR<Map<dynamic, dynamic>>(
-                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
-              ])
+        return MethodReflection<
+          UserModule,
+          Future<APIResponse<Map<dynamic, dynamic>>>
+        >(
+          this,
+          UserModule,
+          'getRequestEntityResolutionRules',
+          const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
+            __TR<APIResponse<Map>>(APIResponse, <__TR>[
+              __TR<Map<dynamic, dynamic>>(Map, <__TR>[
+                __TR.tDynamic,
+                __TR.tDynamic,
+              ]),
             ]),
-            false,
-            (o) => o!.getRequestEntityResolutionRules,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.getRequestEntityResolutionRules,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'getrequestentityaccessrules':
-        return MethodReflection<UserModule,
-                Future<APIResponse<Map<dynamic, dynamic>>>>(
-            this,
-            UserModule,
-            'getRequestEntityAccessRules',
-            const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
-              __TR<APIResponse<Map>>(APIResponse, <__TR>[
-                __TR<Map<dynamic, dynamic>>(
-                    Map, <__TR>[__TR.tDynamic, __TR.tDynamic])
-              ])
+        return MethodReflection<
+          UserModule,
+          Future<APIResponse<Map<dynamic, dynamic>>>
+        >(
+          this,
+          UserModule,
+          'getRequestEntityAccessRules',
+          const __TR<Future<APIResponse<Map>>>(Future, <__TR>[
+            __TR<APIResponse<Map>>(APIResponse, <__TR>[
+              __TR<Map<dynamic, dynamic>>(Map, <__TR>[
+                __TR.tDynamic,
+                __TR.tDynamic,
+              ]),
             ]),
-            false,
-            (o) => o!.getRequestEntityAccessRules,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.getRequestEntityAccessRules,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'returnapiresponseerror':
         return MethodReflection<UserModule, Future<APIResponse<String>>>(
-            this,
-            UserModule,
-            'returnAPIResponseError',
-            const __TR<Future<APIResponse<String>>>(Future, <__TR>[
-              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
-            ]),
-            false,
-            (o) => o!.returnAPIResponseError,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'message', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'returnAPIResponseError',
+          const __TR<Future<APIResponse<String>>>(Future, <__TR>[
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          ]),
+          false,
+          (o) => o!.returnAPIResponseError,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'message', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'throwapiresponseerror':
         return MethodReflection<UserModule, Future<APIResponse<String>>>(
-            this,
-            UserModule,
-            'throwAPIResponseError',
-            const __TR<Future<APIResponse<String>>>(Future, <__TR>[
-              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
-            ]),
-            false,
-            (o) => o!.throwAPIResponseError,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'message', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'throwAPIResponseError',
+          const __TR<Future<APIResponse<String>>>(Future, <__TR>[
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          ]),
+          false,
+          (o) => o!.throwAPIResponseError,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'message', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'asyncerror':
         return MethodReflection<UserModule, Future<APIResponse<String>>>(
-            this,
-            UserModule,
-            'asyncError',
-            const __TR<Future<APIResponse<String>>>(Future, <__TR>[
-              __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString])
-            ]),
-            false,
-            (o) => o!.asyncError,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'message', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserModule,
+          'asyncError',
+          const __TR<Future<APIResponse<String>>>(Future, <__TR>[
+            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          ]),
+          false,
+          (o) => o!.asyncError,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'message', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'ensureconfigured':
         return MethodReflection<UserModule, void>(
-            this,
-            APIModule,
-            'ensureConfigured',
-            __TR.tVoid,
-            false,
-            (o) => o!.ensureConfigured,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'ensureConfigured',
+          __TR.tVoid,
+          false,
+          (o) => o!.ensureConfigured,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'initialize':
         return MethodReflection<UserModule, FutureOr<InitializationResult>>(
-            this,
-            APIModule,
-            'initialize',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.initialize,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          APIModule,
+          'initialize',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.initialize,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getrouteshandlersnames':
         return MethodReflection<UserModule, Iterable<String>>(
-            this,
-            APIModule,
-            'getRoutesHandlersNames',
-            const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
-            false,
-            (o) => o!.getRoutesHandlersNames,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'method': __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method',
-                  true, false)
-            },
-            null);
+          this,
+          APIModule,
+          'getRoutesHandlersNames',
+          const __TR<Iterable<String>>(Iterable, <__TR>[__TR.tString]),
+          false,
+          (o) => o!.getRoutesHandlersNames,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'method': __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroute':
         return MethodReflection<UserModule, APIModule>(
-            this,
-            APIModule,
-            'addRoute',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  true),
-              __PR(__TR.tString, 'name', false, true),
-              __PR(
-                  __TR<APIRouteFunction<dynamic>>(
-                      APIRouteFunction, <__TR>[__TR.tDynamic]),
-                  'function',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'config': __PR(
-                  __TR<APIRouteConfig>(APIRouteConfig), 'config', true, false),
-              'parameters': __PR(
-                  __TR<Map<String, TypeInfo>>(Map, <__TR>[
-                    __TR.tString,
-                    __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic])
-                  ]),
-                  'parameters',
-                  true,
-                  false),
-              'rules': __PR(
-                  __TR<Iterable<APIRouteRule>>(
-                      Iterable, <__TR>[__TR<APIRouteRule>(APIRouteRule)]),
-                  'rules',
-                  true,
-                  false)
-            },
-            null);
+          this,
+          APIModule,
+          'addRoute',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRoute,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              true,
+            ),
+            __PR(__TR.tString, 'name', false, true),
+            __PR(
+              __TR<APIRouteFunction<dynamic>>(APIRouteFunction, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'function',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'config': __PR(
+              __TR<APIRouteConfig>(APIRouteConfig),
+              'config',
+              true,
+              false,
+            ),
+            'parameters': __PR(
+              __TR<Map<String, TypeInfo>>(Map, <__TR>[
+                __TR.tString,
+                __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+              ]),
+              'parameters',
+              true,
+              false,
+            ),
+            'rules': __PR(
+              __TR<Iterable<APIRouteRule>>(Iterable, <__TR>[
+                __TR<APIRouteRule>(APIRouteRule),
+              ]),
+              'rules',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'addroutehandler':
         return MethodReflection<UserModule, APIModule>(
-            this,
-            APIModule,
-            'addRouteHandler',
-            const __TR<APIModule>(APIModule),
-            false,
-            (o) => o!.addRouteHandler,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<APIRouteHandler<dynamic>>(
-                      APIRouteHandler, <__TR>[__TR.tDynamic]),
-                  'routeHandler',
-                  false,
-                  true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'addRouteHandler',
+          const __TR<APIModule>(APIModule),
+          false,
+          (o) => o!.addRouteHandler,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+                __TR.tDynamic,
+              ]),
+              'routeHandler',
+              false,
+              true,
+            ),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'getroutehandler':
         return MethodReflection<UserModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandler',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandler,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'name', false, true)],
-            const <__PR>[
-              __PR(__TR<APIRequestMethod>(APIRequestMethod), 'method', true,
-                  false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandler',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandler,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'name', false, true)],
+          const <__PR>[
+            __PR(
+              __TR<APIRequestMethod>(APIRequestMethod),
+              'method',
+              true,
+              false,
+            ),
+          ],
+          null,
+          null,
+        );
       case 'getroutehandlerbyrequest':
         return MethodReflection<UserModule, APIRouteHandler<dynamic>?>(
-            this,
-            APIModule,
-            'getRouteHandlerByRequest',
-            const __TR<APIRouteHandler<dynamic>>(
-                APIRouteHandler, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getRouteHandlerByRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
-            null,
-            null);
+          this,
+          APIModule,
+          'getRouteHandlerByRequest',
+          const __TR<APIRouteHandler<dynamic>>(APIRouteHandler, <__TR>[
+            __TR.tDynamic,
+          ]),
+          true,
+          (o) => o!.getRouteHandlerByRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          const <__PR>[__PR(__TR.tString, 'routeName', true, false)],
+          null,
+          null,
+        );
       case 'resolveroute':
         return MethodReflection<UserModule, String>(
-            this,
-            APIModule,
-            'resolveRoute',
-            __TR.tString,
-            false,
-            (o) => o!.resolveRoute,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'resolveRoute',
+          __TR.tString,
+          false,
+          (o) => o!.resolveRoute,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'call':
         return MethodReflection<UserModule, FutureOr<APIResponse<dynamic>>>(
-            this,
-            APIModule,
-            'call',
-            const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
-              __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic])
-            ]),
-            false,
-            (o) => o!.call,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'request', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'call',
+          const __TR<FutureOr<APIResponse>>(FutureOr, <__TR>[
+            __TR<APIResponse<dynamic>>(APIResponse, <__TR>[__TR.tDynamic]),
+          ]),
+          false,
+          (o) => o!.call,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'acceptsrequest':
         return MethodReflection<UserModule, bool>(
-            this,
-            APIModule,
-            'acceptsRequest',
-            __TR.tBool,
-            false,
-            (o) => o!.acceptsRequest,
-            obj,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true)
-            ],
-            null,
-            null,
-            null);
+          this,
+          APIModule,
+          'acceptsRequest',
+          __TR.tBool,
+          false,
+          (o) => o!.acceptsRequest,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', false, true),
+          ],
+          null,
+          null,
+          null,
+        );
       case 'apiinfo':
         return MethodReflection<UserModule, APIModuleInfo>(
-            this,
-            APIModule,
-            'apiInfo',
-            const __TR<APIModuleInfo>(APIModuleInfo),
-            false,
-            (o) => o!.apiInfo,
-            obj,
-            null,
-            const <__PR>[
-              __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false)
-            ],
-            null,
-            null);
+          this,
+          APIModule,
+          'apiInfo',
+          const __TR<APIModuleInfo>(APIModuleInfo),
+          false,
+          (o) => o!.apiInfo,
+          obj,
+          null,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'apiRequest', true, false),
+          ],
+          null,
+          null,
+        );
       case 'ensureinitialized':
         return MethodReflection<UserModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitialized',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitialized,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitialized',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitialized,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'ensureinitializedasync':
         return MethodReflection<UserModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'ensureInitializedAsync',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.ensureInitializedAsync,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'ensureInitializedAsync',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.ensureInitializedAsync,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'doinitialization':
         return MethodReflection<UserModule, FutureOr<InitializationResult>>(
-            this,
-            Initializable,
-            'doInitialization',
-            const __TR<FutureOr<InitializationResult>>(FutureOr,
-                <__TR>[__TR<InitializationResult>(InitializationResult)]),
-            false,
-            (o) => o!.doInitialization,
-            obj,
-            null,
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'doInitialization',
+          const __TR<FutureOr<InitializationResult>>(FutureOr, <__TR>[
+            __TR<InitializationResult>(InitializationResult),
+          ]),
+          false,
+          (o) => o!.doInitialization,
+          obj,
+          null,
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'initializedependencies':
         return MethodReflection<UserModule, FutureOr<List<Initializable>>>(
-            this,
-            Initializable,
-            'initializeDependencies',
-            const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
-              __TR<List<Initializable>>(
-                  List, <__TR>[__TR<Initializable>(Initializable)])
+          this,
+          Initializable,
+          'initializeDependencies',
+          const __TR<FutureOr<List<Initializable>>>(FutureOr, <__TR>[
+            __TR<List<Initializable>>(List, <__TR>[
+              __TR<Initializable>(Initializable),
             ]),
-            false,
-            (o) => o!.initializeDependencies,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          ]),
+          false,
+          (o) => o!.initializeDependencies,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'checkinitialized':
         return MethodReflection<UserModule, void>(
-            this,
-            Initializable,
-            'checkInitialized',
-            __TR.tVoid,
-            false,
-            (o) => o!.checkInitialized,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Initializable,
+          'checkInitialized',
+          __TR.tVoid,
+          false,
+          (o) => o!.checkInitialized,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'executeinitialized':
         return MethodReflection<UserModule, FutureOr<dynamic>>(
-            this,
-            Initializable,
-            'executeInitialized',
-            __TR.tFutureOrDynamic,
-            false,
-            (o) => o!.executeInitialized,
-            obj,
-            const <__PR>[
-              __PR(
-                  __TR<ExecuteInitializedCallback<dynamic>>(
-                      ExecuteInitializedCallback, <__TR>[__TR.tDynamic]),
-                  'callback',
-                  false,
-                  true)
-            ],
-            null,
-            const <String, __PR>{
-              'parent': __PR(
-                  __TR<Initializable>(Initializable), 'parent', true, false)
-            },
-            null);
+          this,
+          Initializable,
+          'executeInitialized',
+          __TR.tFutureOrDynamic,
+          false,
+          (o) => o!.executeInitialized,
+          obj,
+          const <__PR>[
+            __PR(
+              __TR<ExecuteInitializedCallback<dynamic>>(
+                ExecuteInitializedCallback,
+                <__TR>[__TR.tDynamic],
+              ),
+              'callback',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'parent': __PR(
+              __TR<Initializable>(Initializable),
+              'parent',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       default:
         return null;
     }
@@ -1952,10 +2147,13 @@ extension AboutModule$reflectionExtension on AboutModule {
       reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 
   /// Returns an encoded JSON [String] for type [AboutModule]. (Generated by [ReflectionFactory])
-  String toJsonEncoded(
-          {bool pretty = false, bool duplicatedEntitiesAsID = false}) =>
-      reflection.toJsonEncoded(
-          pretty: pretty, duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
 
   /// Returns a JSON for type [AboutModule] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
@@ -1975,10 +2173,13 @@ extension UserModule$reflectionExtension on UserModule {
       reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 
   /// Returns an encoded JSON [String] for type [UserModule]. (Generated by [ReflectionFactory])
-  String toJsonEncoded(
-          {bool pretty = false, bool duplicatedEntitiesAsID = false}) =>
-      reflection.toJsonEncoded(
-          pretty: pretty, duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
 
   /// Returns a JSON for type [UserModule] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
@@ -1986,13 +2187,15 @@ extension UserModule$reflectionExtension on UserModule {
 }
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
-      AboutModule$reflection(),
-      UserModule$reflection(),
-    ];
+  AboutModule$reflection(),
+  UserModule$reflection(),
+];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
-    List<Reflection>.unmodifiable(_listSiblingsReflection());
+List<Reflection> _siblingsReflection() =>
+    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
+      _listSiblingsReflection(),
+    );
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

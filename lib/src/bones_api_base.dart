@@ -32,17 +32,23 @@ final _log = logging.Logger('APIRoot');
 /// An [APIRoot] [APIRequest] handler.
 ///
 /// See [APIRoot.preApiRequestHandlers] and [APIRoot.posApiRequestHandlers].
-typedef APIRequestHandler = FutureOr<APIResponse<T>?> Function<T>(
-    APIRoot apiRoot, APIRequest request);
+typedef APIRequestHandler =
+    FutureOr<APIResponse<T>?> Function<T>(APIRoot apiRoot, APIRequest request);
 
 /// An [APIRoot] logger function.
-typedef APILogger = void Function(APIRoot apiRoot, String type, String? message,
-    [Object? error, StackTrace? stackTrace]);
+typedef APILogger =
+    void Function(
+      APIRoot apiRoot,
+      String type,
+      String? message, [
+      Object? error,
+      StackTrace? stackTrace,
+    ]);
 
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.9.7';
+  static const String VERSION = '1.9.8';
 
   static bool _boot = false;
 
@@ -65,13 +71,19 @@ abstract class APIRoot with Initializable, Closable {
 
     BonesAPI.boot();
 
-    APIModuleProxyCaller.registerTargetResolver(
-        <T>(target, moduleName, responsesAsJson, errorHandler) {
+    APIModuleProxyCaller.registerTargetResolver(<T>(
+      target,
+      moduleName,
+      responsesAsJson,
+      errorHandler,
+    ) {
       if (target is APIRoot) {
-        return APIModuleProxyDirectCaller<T>(target,
-            moduleName: moduleName ?? '',
-            responsesAsJson: responsesAsJson,
-            errorHandler: errorHandler);
+        return APIModuleProxyDirectCaller<T>(
+          target,
+          moduleName: moduleName ?? '',
+          responsesAsJson: responsesAsJson,
+          errorHandler: errorHandler,
+        );
       }
       return null;
     });
@@ -90,7 +102,8 @@ abstract class APIRoot with Initializable, Closable {
     } else if (_instances.length == 2) {
       if (singleton) {
         throw StateError(
-            "Multiple APIRoot instances> singleton: $singleton ; length: ${_instances.length} ; names: ${_instances.keys.toList()}");
+          "Multiple APIRoot instances> singleton: $singleton ; length: ${_instances.length} ; names: ${_instances.keys.toList()}",
+        );
       }
       return _instances.values.last;
     } else {
@@ -100,7 +113,8 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns the [APIRoot] by associated [APIRequest] [zone].
   static ({APIRoot? apiRoot, APIRequest? apiRequest}) getByAPIRequestZone(
-      Zone zone) {
+    Zone zone,
+  ) {
     var lng = _instances.length;
 
     if (lng == 1) {
@@ -124,8 +138,11 @@ abstract class APIRoot with Initializable, Closable {
   /// Returns an [APIRoot] instance with [name].
   ///
   /// - If [caseSensitive] is `false` will ignore [name] case.
-  static APIRoot? getByName(String name,
-      {bool caseSensitive = false, bool lastAsDefault = false}) {
+  static APIRoot? getByName(
+    String name, {
+    bool caseSensitive = false,
+    bool lastAsDefault = false,
+  }) {
     var apiRoot = _instances[name];
     if (apiRoot != null) return apiRoot;
 
@@ -142,12 +159,15 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Returns an [APIRoot] instance by [type].
-  static A? getByType<A extends APIRoot>(
-      {Type? type, bool lastAsDefault = false}) {
+  static A? getByType<A extends APIRoot>({
+    Type? type,
+    bool lastAsDefault = false,
+  }) {
     type ??= A;
 
-    var apiRoot =
-        _instances.values.firstWhereOrNull((e) => e.runtimeType == type);
+    var apiRoot = _instances.values.firstWhereOrNull(
+      (e) => e.runtimeType == type,
+    );
     if (apiRoot != null) return apiRoot as A;
 
     apiRoot = _instances.values.firstWhereOrNull((e) => e is A);
@@ -157,13 +177,18 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Returns the first [APIRoot] matched by [matcher].
-  static APIRoot? getWhere(bool Function(APIRoot apiRoot) matcher,
-          {bool lastAsDefault = false}) =>
+  static APIRoot? getWhere(
+    bool Function(APIRoot apiRoot) matcher, {
+    bool lastAsDefault = false,
+  }) =>
       _instances.values.firstWhereOrNull(matcher) ??
       (lastAsDefault ? get(singleton: false) : null);
 
-  static APIRoot? getWithinName(String part,
-      {bool lastAsDefault = false, bool caseSensitive = false}) {
+  static APIRoot? getWithinName(
+    String part, {
+    bool lastAsDefault = false,
+    bool caseSensitive = false,
+  }) {
     if (!caseSensitive) {
       part = part.toLowerCase();
     }
@@ -203,25 +228,30 @@ abstract class APIRoot with Initializable, Closable {
   /// The logger of this [APIRoot] instance. See [APILogger].
   APILogger? logger;
 
-  APIRoot(this.name, this.version,
-      {dynamic apiConfig,
-      APIConfigProvider? apiConfigProvider,
-      Iterable<APIRequestHandler>? preApiRequestHandlers,
-      Iterable<APIRequestHandler>? posApiRequestHandlers})
-      : preApiRequestHandlers =
-            LinkedHashSet.from(preApiRequestHandlers ?? <APIRequestHandler>{}),
-        posApiRequestHandlers =
-            LinkedHashSet.from(posApiRequestHandlers ?? <APIRequestHandler>{}),
-        apiConfig =
-            APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+  APIRoot(
+    this.name,
+    this.version, {
+    dynamic apiConfig,
+    APIConfigProvider? apiConfigProvider,
+    Iterable<APIRequestHandler>? preApiRequestHandlers,
+    Iterable<APIRequestHandler>? posApiRequestHandlers,
+  }) : preApiRequestHandlers = LinkedHashSet.from(
+         preApiRequestHandlers ?? <APIRequestHandler>{},
+       ),
+       posApiRequestHandlers = LinkedHashSet.from(
+         posApiRequestHandlers ?? <APIRequestHandler>{},
+       ),
+       apiConfig =
+           APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
     _setupInstance();
   }
 
   /// The global ID of the [sharedStore].
   String get sharedStoreID => 'SharedStore[$name/$version]';
 
-  late final SharedStoreField _sharedStoreField =
-      SharedStoreField(sharedStoreID);
+  late final SharedStoreField _sharedStoreField = SharedStoreField(
+    sharedStoreID,
+  );
 
   /// The [SharedStore] of this [APIRoot]. This [SharedStore] will be
   /// automatically shared among `Isolate` copies.
@@ -285,8 +315,12 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Logs to [logger], if present.
-  void log(String type, String? message,
-      [Object? error, StackTrace? stackTrace]) {
+  void log(
+    String type,
+    String? message, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
     var logger = this.logger;
     if (logger != null) {
       logger(this, type, message, error, stackTrace);
@@ -404,11 +438,12 @@ abstract class APIRoot with Initializable, Closable {
     var ret = _ensureModulesLoaded();
     if (ret is Future) {
       _log.warning(
-          "Accessing `$caller` before fully load modules! "
-          "Ensure that `initialize` is completed before acces the list of modules. "
-          "`APIRoot`: $this",
-          null,
-          StackTrace.current);
+        "Accessing `$caller` before fully load modules! "
+        "Ensure that `initialize` is completed before acces the list of modules. "
+        "`APIRoot`: $this",
+        null,
+        StackTrace.current,
+      );
     }
   }
 
@@ -438,19 +473,29 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Perform an API call.
-  FutureOr<APIResponse<T>> doCall<T>(APIRequestMethod method, String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload}) {
-    var request = APIRequest(method, path,
-        parameters: parameters, headers: headers, payload: payload);
+  FutureOr<APIResponse<T>> doCall<T>(
+    APIRequestMethod method,
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+  }) {
+    var request = APIRequest(
+      method,
+      path,
+      parameters: parameters,
+      headers: headers,
+      payload: payload,
+    );
     return call(request);
   }
 
   /// Attempt to process [request] using an [APIRequestHandler] at [handlers].
   FutureOr<APIResponse<T>?> callHandlers<T>(
-      Iterable<APIRequestHandler> handlers, APIRequest request,
-      [String handlersType = 'external']) {
+    Iterable<APIRequestHandler> handlers,
+    APIRequest request, [
+    String handlersType = 'external',
+  ]) {
     if (handlers.isEmpty) return null;
 
     Iterator<APIRequestHandler> handlersIterator = handlers.iterator;
@@ -466,13 +511,24 @@ abstract class APIRoot with Initializable, Closable {
         if (response is APIResponse) {
           return response;
         } else if (response is Future<APIResponse<T>?>) {
-          return response.then((resp) {
-            if (resp != null) return resp;
-            return _callHandlersAsync(handlersIterator, request, handlersType);
-          }, onError: (e, s) {
-            _logCallHandlersError(handlersType, handler, e, s);
-            return _callHandlersAsync(handlersIterator, request, handlersType);
-          });
+          return response.then(
+            (resp) {
+              if (resp != null) return resp;
+              return _callHandlersAsync(
+                handlersIterator,
+                request,
+                handlersType,
+              );
+            },
+            onError: (e, s) {
+              _logCallHandlersError(handlersType, handler, e, s);
+              return _callHandlersAsync(
+                handlersIterator,
+                request,
+                handlersType,
+              );
+            },
+          );
         } else {
           continue;
         }
@@ -486,17 +542,22 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   void _logCallHandlersError(
-          String handlersType, APIRequestHandler handler, error, stackTrace) =>
-      log(
-          'APIRoot',
-          'Error calling `APIRequestHandler` ($handlersType): $handler',
-          error,
-          stackTrace);
+    String handlersType,
+    APIRequestHandler handler,
+    error,
+    stackTrace,
+  ) => log(
+    'APIRoot',
+    'Error calling `APIRequestHandler` ($handlersType): $handler',
+    error,
+    stackTrace,
+  );
 
   Future<APIResponse<T>?> _callHandlersAsync<T>(
-      Iterator<APIRequestHandler> handlersIterator,
-      APIRequest request,
-      String handlersType) async {
+    Iterator<APIRequestHandler> handlersIterator,
+    APIRequest request,
+    String handlersType,
+  ) async {
     while (handlersIterator.moveNext()) {
       var handler = handlersIterator.current;
 
@@ -524,11 +585,15 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   /// Calls the API.
-  FutureOr<APIResponse<T>> call<T>(APIRequest request,
-      {bool externalCall = false}) {
+  FutureOr<APIResponse<T>> call<T>(
+    APIRequest request, {
+    bool externalCall = false,
+  }) {
     if (request.method == APIRequestMethod.OPTIONS) {
-      throw ArgumentError("Can't perform a call with an `OPTIONS` method. "
-          "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
+      throw ArgumentError(
+        "Can't perform a call with an `OPTIONS` method. "
+        "Requests with method `OPTIONS` are reserved for CORS or other informational requests.",
+      );
     }
 
     var modulesLoadAsync = _ensureModulesLoaded();
@@ -543,18 +608,29 @@ abstract class APIRoot with Initializable, Closable {
   /// Returns the current [APIRequest] of the current [call].
   final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
 
-  static void _uncaughtAsynchronousError(Zone self, ZoneDelegate parent,
-      Zone zone, Object error, StackTrace stackTrace) {
+  static void _uncaughtAsynchronousError(
+    Zone self,
+    ZoneDelegate parent,
+    Zone zone,
+    Object error,
+    StackTrace stackTrace,
+  ) {
     var request = zone['APIRequest'];
-    _log.severe("Uncaught asynchronous error while calling: $request", error,
-        stackTrace);
+    _log.severe(
+      "Uncaught asynchronous error while calling: $request",
+      error,
+      stackTrace,
+    );
   }
 
-  static final _callZoneSpecification =
-      ZoneSpecification(handleUncaughtError: _uncaughtAsynchronousError);
+  static final _callZoneSpecification = ZoneSpecification(
+    handleUncaughtError: _uncaughtAsynchronousError,
+  );
 
   FutureOr<APIResponse<T>> _callZoned<T>(
-      APIRequest request, bool externalCall) {
+    APIRequest request,
+    bool externalCall,
+  ) {
     var callZone = currentAPIRequest.createSafeContextZone(
       zoneSpecification: _callZoneSpecification,
       zoneValues: {'APIRequest': request},
@@ -573,15 +649,22 @@ abstract class APIRoot with Initializable, Closable {
         if (response is Future<APIResponse<T>>) {
           return response.then(
             (response) => _callZonedReturn(callZone, request, response),
-            onError: (e, s) => _callZonedReturn(
-                callZone, request, _resolveErrorAPIResponse(e, s)),
+            onError:
+                (e, s) => _callZonedReturn(
+                  callZone,
+                  request,
+                  _resolveErrorAPIResponse(e, s),
+                ),
           );
         } else {
           return _callZonedReturn(callZone, request, response);
         }
       } catch (e, s) {
         return _callZonedReturn(
-            callZone, request, _resolveErrorAPIResponse(e, s));
+          callZone,
+          request,
+          _resolveErrorAPIResponse(e, s),
+        );
       }
     });
   }
@@ -593,7 +676,10 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   FutureOr<APIResponse<T>> _callZonedReturn<T>(
-      Zone callZone, APIRequest request, APIResponse<T> response) {
+    Zone callZone,
+    APIRequest request,
+    APIResponse<T> response,
+  ) {
     currentAPIRequest.disposeContextZone(callZone);
 
     response._apiRequest = request;
@@ -606,22 +692,29 @@ abstract class APIRoot with Initializable, Closable {
       var original = identical(request.credential, request.originalCredential);
 
       if (original) {
-        var credential = request.credential =
-            request.credential?.copy(withUsernameEntity: false);
+        var credential =
+            request.credential = request.credential?.copy(
+              withUsernameEntity: false,
+            );
 
         request.originalCredential = credential;
       } else {
-        request.originalCredential =
-            request.originalCredential?.copy(withUsernameEntity: false);
+        request.originalCredential = request.originalCredential?.copy(
+          withUsernameEntity: false,
+        );
       }
     }
 
     var preResponse = callHandlers<T>(
-        preApiRequestHandlers, request, 'preApiRequestHandlers');
+      preApiRequestHandlers,
+      request,
+      'preApiRequestHandlers',
+    );
 
     if (preResponse != null) {
-      return preResponse
-          .resolveMapped((response) => response ?? _callAPI(request));
+      return preResponse.resolveMapped(
+        (response) => response ?? _callAPI(request),
+      );
     } else {
       return _callAPI(request);
     }
@@ -644,7 +737,9 @@ abstract class APIRoot with Initializable, Closable {
   static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;
 
   FutureOr<APIResponse<T>> _callImpl<T>(
-      APIRequest apiRequest, APISecurity? apiSecurity) {
+    APIRequest apiRequest,
+    APISecurity? apiSecurity,
+  ) {
     var pathPartRoot = apiRequest.pathParts[0];
 
     if (pathPartRoot == 'API-INFO') {
@@ -665,9 +760,15 @@ abstract class APIRoot with Initializable, Closable {
   }
 
   Future<APIAuthentication?> callAuthenticate(
-      String email, String password) async {
-    var auth = await call(APIRequest.get('/authenticate',
-        parameters: {'email': email, 'password': password}));
+    String email,
+    String password,
+  ) async {
+    var auth = await call(
+      APIRequest.get(
+        '/authenticate',
+        parameters: {'email': email, 'password': password},
+      ),
+    );
     if (auth.isNotOK) return null;
 
     var authentication = APIAuthentication.fromJson(auth.payload);
@@ -701,7 +802,9 @@ abstract class APIRoot with Initializable, Closable {
       APIRootInfo(this, apiRequest);
 
   FutureOr<APIResponse<T>> _callModule<T>(
-      APIModule? module, APIRequest request) {
+    APIModule? module,
+    APIRequest request,
+  ) {
     if (module == null) {
       var def = defaultModuleName;
       if (def != null) {
@@ -718,7 +821,10 @@ abstract class APIRoot with Initializable, Closable {
 
   FutureOr<APIResponse<T>> onNoRouteForPath<T>(APIRequest request) {
     var posResponse = callHandlers<T>(
-        posApiRequestHandlers, request, 'posApiRequestHandlers');
+      posApiRequestHandlers,
+      request,
+      'posApiRequestHandlers',
+    );
 
     if (posResponse != null) {
       return posResponse.resolveMapped((response) {
@@ -747,7 +853,8 @@ abstract class APIRoot with Initializable, Closable {
         return _securityModule = module;
       } else {
         throw StateError(
-            "Can't find security module with name: $securityModuleName");
+          "Can't find security module with name: $securityModuleName",
+        );
       }
     }
 
@@ -790,11 +897,13 @@ class _APIRootEntityRulesContextProvider implements EntityRulesContextProvider {
   final ZoneField<APIRequest> currentAPIRequest;
 
   _APIRootEntityRulesContextProvider(this.apiRoot)
-      : currentAPIRequest = apiRoot.currentAPIRequest;
+    : currentAPIRequest = apiRoot.currentAPIRequest;
 
   @override
-  EntityResolutionRules? getContextEntityResolutionRules(
-      {Zone? contextZone, Object? contextIdentifier}) {
+  EntityResolutionRules? getContextEntityResolutionRules({
+    Zone? contextZone,
+    Object? contextIdentifier,
+  }) {
     var request = currentAPIRequest.get(contextZone) ?? currentAPIRequest.get();
     if (request == null) return null;
 
@@ -877,8 +986,8 @@ class APIRouteConfig {
 }
 
 /// An API route handler
-typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
-    APIRequest request);
+typedef APIRouteFunction<T> =
+    FutureOr<APIResponse<T>> Function(APIRequest request);
 
 /// A route handler, with its [function] and [rules].
 abstract class APIRouteHandler<T> {
@@ -892,10 +1001,15 @@ abstract class APIRouteHandler<T> {
 
   APIRouteConfig config;
 
-  APIRouteHandler(this.module, this.requestMethod, this.routeName,
-      this.parameters, Iterable<APIRouteRule>? rules, APIRouteConfig? config)
-      : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]),
-        config = config ?? APIRouteConfig.defaultConfig;
+  APIRouteHandler(
+    this.module,
+    this.requestMethod,
+    this.routeName,
+    this.parameters,
+    Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
+  ) : rules = List<APIRouteRule>.unmodifiable(rules ?? <APIRouteRule>[]),
+      config = config ?? APIRouteConfig.defaultConfig;
 
   EntityResolutionRules? _entityResolutionRules;
 
@@ -904,15 +1018,17 @@ abstract class APIRouteHandler<T> {
       _entityResolutionRules ??= _entityResolutionRulesIml();
 
   EntityResolutionRules _entityResolutionRulesIml() {
-    var resolutionRules1 = rules
-        .whereType<APIEntityResolutionRules>()
-        .map((e) => e.resolutionRules)
-        .toList();
+    var resolutionRules1 =
+        rules
+            .whereType<APIEntityResolutionRules>()
+            .map((e) => e.resolutionRules)
+            .toList();
 
-    var resolutionRules2 = rules
-        .whereType<APIEntityRules>()
-        .expand((e) => e.entityResolutionRules)
-        .toList();
+    var resolutionRules2 =
+        rules
+            .whereType<APIEntityRules>()
+            .expand((e) => e.entityResolutionRules)
+            .toList();
 
     if (resolutionRules1.isEmpty && resolutionRules2.isEmpty) {
       return EntityResolutionRules.innocuous;
@@ -925,7 +1041,7 @@ abstract class APIRouteHandler<T> {
   }
 
   static final Map<EntityAccessRules, EntityAccessRules>
-      _entityAccessRulesCached = {};
+  _entityAccessRulesCached = {};
 
   EntityAccessRules? _entityAccessRules;
 
@@ -934,15 +1050,17 @@ abstract class APIRouteHandler<T> {
       _entityAccessRules ??= _entityAccessRulesImpl();
 
   EntityAccessRules _entityAccessRulesImpl() {
-    var accessRules1 = rules
-        .whereType<APIEntityAccessRules>()
-        .map((e) => e.accessRules)
-        .toList();
+    var accessRules1 =
+        rules
+            .whereType<APIEntityAccessRules>()
+            .map((e) => e.accessRules)
+            .toList();
 
-    var accessRules2 = rules
-        .whereType<APIEntityRules>()
-        .expand((e) => e.entityAccessRules)
-        .toList();
+    var accessRules2 =
+        rules
+            .whereType<APIEntityRules>()
+            .expand((e) => e.entityAccessRules)
+            .toList();
 
     if (accessRules1.isEmpty && accessRules2.isEmpty) {
       return EntityAccessRules.innocuous;
@@ -956,7 +1074,9 @@ abstract class APIRouteHandler<T> {
     if (allRules.isInnocuous) return EntityAccessRules.innocuous;
 
     return _entityAccessRulesCached.putIfAbsent(
-        allRules, () => allRules.cached);
+      allRules,
+      () => allRules.cached,
+    );
   }
 
   /// Calls this route.
@@ -965,10 +1085,12 @@ abstract class APIRouteHandler<T> {
 
     if (!checkRules(request)) {
       _log.warning(
-          "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules");
+        "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules",
+      );
 
       return APIResponse.unauthorized(
-          payloadDynamic: 'UNAUTHORIZED: Rules issues $rules');
+        payloadDynamic: 'UNAUTHORIZED: Rules issues $rules',
+      );
     }
 
     if (config.log && _log.isLoggable(logging.Level.INFO)) {
@@ -977,8 +1099,9 @@ abstract class APIRouteHandler<T> {
 
     final initTime = DateTime.now();
 
-    return callImpl(request)
-        .resolveMapped((response) => callResponse(response, initTime));
+    return callImpl(
+      request,
+    ).resolveMapped((response) => callResponse(response, initTime));
   }
 
   FutureOr<APIResponse<T>> callImpl(APIRequest request);
@@ -989,10 +1112,12 @@ abstract class APIRouteHandler<T> {
 
       if (time.inMilliseconds > 1000 && !config.slowCall) {
         _log.warning(
-            "SLOW RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)");
+          "SLOW RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)",
+        );
       } else {
         _log.info(
-            "RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)");
+          "RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)",
+        );
       }
     }
 
@@ -1028,9 +1153,15 @@ abstract class APIRouteHandler<T> {
 class APIRouteHandlerFunction<T> extends APIRouteHandler<T> {
   final APIRouteFunction<T> function;
 
-  APIRouteHandlerFunction(super.module, super.requestMethod, super.routeName,
-      this.function, super.parameters, super.rules, super.config)
-      : super();
+  APIRouteHandlerFunction(
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    this.function,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
 
   @override
   FutureOr<APIResponse<T>> callImpl(APIRequest request) => function(request);
@@ -1062,9 +1193,10 @@ class APIRouteInfo {
 
   /// Returns the [Uri] of the route.
   Uri get uri {
-    var baseUri = apiRequest != null
-        ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
-        : Uri.base;
+    var baseUri =
+        apiRequest != null
+            ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
+            : Uri.base;
     var module = routeHandler.module;
     var path = '${module.name}/$name';
 
@@ -1073,12 +1205,13 @@ class APIRouteInfo {
     var scheme = baseUri.scheme;
 
     var uri = Uri(
-        scheme: scheme,
-        host: baseUri.host,
-        port: baseUri.port,
-        userInfo: baseUri.userInfo,
-        path: path,
-        queryParameters: parameters);
+      scheme: scheme,
+      host: baseUri.host,
+      port: baseUri.port,
+      userInfo: baseUri.userInfo,
+      path: path,
+      queryParameters: parameters,
+    );
 
     return uri;
   }
@@ -1103,18 +1236,19 @@ class APIRouteInfo {
   List<APIRouteRule> get rules => routeHandler.rules;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        if (method != null) 'method': method!.name,
-        if (parameters != null && parameters!.isNotEmpty)
-          'parameters': parametersAsJson,
-        'uri': uriAsJson,
-        if (rules.isNotEmpty) 'rules': rules,
-      };
+    'name': name,
+    if (method != null) 'method': method!.name,
+    if (parameters != null && parameters!.isNotEmpty)
+      'parameters': parametersAsJson,
+    'uri': uriAsJson,
+    if (rules.isNotEmpty) 'rules': rules,
+  };
 
-  Map<String, String> get parametersAsJson =>
-      Map<String, String>.fromEntries(parameters!.entries
-          .where((e) => !e.value.isOf(APIRequest))
-          .map((e) => MapEntry(e.key, e.value.toString(withT: false))));
+  Map<String, String> get parametersAsJson => Map<String, String>.fromEntries(
+    parameters!.entries
+        .where((e) => !e.value.isOf(APIRequest))
+        .map((e) => MapEntry(e.key, e.value.toString(withT: false))),
+  );
 }
 
 APIResponse<T> _responseNotFoundNoRouteForPath<T>(APIRequest request) {
@@ -1280,11 +1414,8 @@ class APIMetric {
   int get hashCode => name.hashCode;
 
   @override
-  String toString() => 'APIMetric[$name]{${[
-        if (duration != null) 'duration: $duration',
-        if (n != null) 'n: $n',
-        if (description != null) 'description: "$description"'
-      ].join(', ')}';
+  String toString() =>
+      'APIMetric[$name]{${[if (duration != null) 'duration: $duration', if (n != null) 'n: $n', if (description != null) 'description: "$description"'].join(', ')}';
 }
 
 /// Base class for an [APIMetric] set.
@@ -1304,10 +1435,18 @@ abstract class APIMetricSet {
   /// Set a metric.
   ///
   /// This usually is transformed to a `Server-Timing` header.
-  APIMetric setMetric(String name,
-          {Duration? duration, String? description, int? n}) =>
-      metrics[name] =
-          APIMetric(name, duration: duration, description: description, n: n);
+  APIMetric setMetric(
+    String name, {
+    Duration? duration,
+    String? description,
+    int? n,
+  }) =>
+      metrics[name] = APIMetric(
+        name,
+        duration: duration,
+        description: description,
+        n: n,
+      );
 
   /// Returns a metric.
   APIMetric? getMetric(String name) => metrics[name];
@@ -1328,7 +1467,9 @@ abstract class APIMetricSet {
     var startedMetrics = _startedMetrics ??= {};
 
     var time = startedMetrics.putIfAbsent(
-        name, () => (start: DateTime.now(), description: description));
+      name,
+      () => (start: DateTime.now(), description: description),
+    );
     return time.start;
   }
 
@@ -1477,45 +1618,51 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// The [APIRouteHandler] used to call the route for this [APIRequest].
   APIRouteHandler? get routeHandler => _routeHandler;
 
-  APIRequest(this.method, this.path,
-      {this.protocol,
-      Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      this.payload,
-      Object? payloadMimeType,
-      this.payloadFileExtension,
-      this.sessionID,
-      this.newSession = false,
-      this.credential,
-      String? scheme,
-      APIRequesterSource? requesterSource,
-      String? requesterAddress,
-      this.keepAlive = false,
-      DateTime? time,
-      this.parsingDuration,
-      Uri? requestedUri,
-      this.originalRequest,
-      super.metrics})
-      : parameters = parameters ?? <String, dynamic>{},
-        _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
-        headers = headers ?? <String, dynamic>{},
-        _pathParts = _buildPathParts(path),
-        scheme = scheme?.trim(),
-        originalCredential = credential,
-        requesterSource = _resolveRestSource(requesterAddress),
-        _requesterAddress = requesterAddress,
-        requestedUri = requestedUri ??
-            Uri(
-                host: requesterSource == APIRequesterSource.local
-                    ? 'localhost'
-                    : null,
-                path: path,
-                queryParameters: parameters?.map((key, value) => MapEntry(
-                    key,
-                    value is List
-                        ? value.map((e) => '$e').toList()
-                        : '$value'))),
-        time = time ?? DateTime.now();
+  APIRequest(
+    this.method,
+    this.path, {
+    this.protocol,
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    this.payload,
+    Object? payloadMimeType,
+    this.payloadFileExtension,
+    this.sessionID,
+    this.newSession = false,
+    this.credential,
+    String? scheme,
+    APIRequesterSource? requesterSource,
+    String? requesterAddress,
+    this.keepAlive = false,
+    DateTime? time,
+    this.parsingDuration,
+    Uri? requestedUri,
+    this.originalRequest,
+    super.metrics,
+  }) : parameters = parameters ?? <String, dynamic>{},
+       _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
+       headers = headers ?? <String, dynamic>{},
+       _pathParts = _buildPathParts(path),
+       scheme = scheme?.trim(),
+       originalCredential = credential,
+       requesterSource = _resolveRestSource(requesterAddress),
+       _requesterAddress = requesterAddress,
+       requestedUri =
+           requestedUri ??
+           Uri(
+             host:
+                 requesterSource == APIRequesterSource.local
+                     ? 'localhost'
+                     : null,
+             path: path,
+             queryParameters: parameters?.map(
+               (key, value) => MapEntry(
+                 key,
+                 value is List ? value.map((e) => '$e').toList() : '$value',
+               ),
+             ),
+           ),
+       time = time ?? DateTime.now();
 
   static APIRequesterSource _resolveRestSource(String? requestAddress) {
     if (requestAddress == null) return APIRequesterSource.unknown;
@@ -1563,8 +1710,10 @@ class APIRequest extends APIMetricSet with APIPayload {
     return APIRequest.fromArgs(args);
   }
 
-  static final RegExp _regexpHeaderPrefix =
-      RegExp(r'^header[-_]', caseSensitive: false);
+  static final RegExp _regexpHeaderPrefix = RegExp(
+    r'^header[-_]',
+    caseSensitive: false,
+  );
 
   /// Constructs an [APIRequest] parsing [args].
   factory APIRequest.fromArgs(List<String> args) {
@@ -1588,112 +1737,153 @@ class APIRequest extends APIMetricSet with APIPayload {
     }
 
     var methodVal = arguments.parameters.remove('method');
-    var method = methodVal != null
-        ? parseAPIRequestMethod(methodVal.toString().toLowerCase()) ??
-            APIRequestMethod.GET
-        : APIRequestMethod.GET;
+    var method =
+        methodVal != null
+            ? parseAPIRequestMethod(methodVal.toString().toLowerCase()) ??
+                APIRequestMethod.GET
+            : APIRequestMethod.GET;
 
     var payload = arguments.parameters.remove('payload');
 
-    var parameters = Map.fromEntries(arguments.parameters.entries
-        .where((e) => !_regexpHeaderPrefix.hasMatch(e.key)));
+    var parameters = Map.fromEntries(
+      arguments.parameters.entries.where(
+        (e) => !_regexpHeaderPrefix.hasMatch(e.key),
+      ),
+    );
 
     for (var f in arguments.flags) {
       parameters[f] = true;
     }
 
-    var headers = Map.fromEntries(arguments.parameters.entries
-        .where((e) => _regexpHeaderPrefix.hasMatch(e.key))
-        .map((e) => MapEntry(e.key.substring(7), e.value)));
+    var headers = Map.fromEntries(
+      arguments.parameters.entries
+          .where((e) => _regexpHeaderPrefix.hasMatch(e.key))
+          .map((e) => MapEntry(e.key.substring(7), e.value)),
+    );
 
-    return APIRequest(method, path,
-        parameters: parameters, headers: headers, payload: payload);
+    return APIRequest(
+      method,
+      path,
+      parameters: parameters,
+      headers: headers,
+      payload: payload,
+    );
   }
 
   /// Creates a request of `GET` method.
-  factory APIRequest.get(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.GET, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        credential: credential);
+  factory APIRequest.get(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.GET,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      credential: credential,
+    );
   }
 
   /// Creates a request of `POST` method.
-  factory APIRequest.post(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      Object? payloadMimeType,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.POST, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadMimeType: payloadMimeType,
-        credential: credential);
+  factory APIRequest.post(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    Object? payloadMimeType,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.POST,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadMimeType: payloadMimeType,
+      credential: credential,
+    );
   }
 
   /// Creates a request of `PUT` method.
-  factory APIRequest.put(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      Object? payloadMimeType,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.PUT, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadMimeType: payloadMimeType,
-        credential: credential);
+  factory APIRequest.put(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    Object? payloadMimeType,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.PUT,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadMimeType: payloadMimeType,
+      credential: credential,
+    );
   }
 
   /// Creates a request of `DELETE` method.
-  factory APIRequest.delete(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      Object? payloadMimeType,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.DELETE, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadMimeType: payloadMimeType,
-        credential: credential);
+  factory APIRequest.delete(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    Object? payloadMimeType,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.DELETE,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadMimeType: payloadMimeType,
+      credential: credential,
+    );
   }
 
   /// Creates a request of `PATCH` method.
-  factory APIRequest.patch(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      Object? payloadMimeType,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.PATCH, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadMimeType: payloadMimeType,
-        credential: credential);
+  factory APIRequest.patch(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    Object? payloadMimeType,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.PATCH,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadMimeType: payloadMimeType,
+      credential: credential,
+    );
   }
 
   /// Creates a request of `HEAD` method.
-  factory APIRequest.head(String path,
-      {Map<String, dynamic>? parameters,
-      Map<String, dynamic>? headers,
-      dynamic payload,
-      APICredential? credential}) {
-    return APIRequest(APIRequestMethod.HEAD, path,
-        parameters: parameters ?? <String, dynamic>{},
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        credential: credential);
+  factory APIRequest.head(
+    String path, {
+    Map<String, dynamic>? parameters,
+    Map<String, dynamic>? headers,
+    dynamic payload,
+    APICredential? credential,
+  }) {
+    return APIRequest(
+      APIRequestMethod.HEAD,
+      path,
+      parameters: parameters ?? <String, dynamic>{},
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      credential: credential,
+    );
   }
 
   /// The elapsed time of this request.
@@ -1804,12 +1994,14 @@ class APIRequest extends APIMetricSet with APIPayload {
     return def;
   }
 
-  V? getParameterIgnoreCaseFirstOf<V>(String name1,
-      [String? name2,
-      String? name3,
-      String? name4,
-      String? name5,
-      String? name6]) {
+  V? getParameterIgnoreCaseFirstOf<V>(
+    String name1, [
+    String? name2,
+    String? name3,
+    String? name4,
+    String? name5,
+    String? name6,
+  ]) {
     var val = getParameterFirstOf(name1, name2, name3, name4, name5);
     if (val != null) return val;
 
@@ -2074,9 +2266,10 @@ class APIRequest extends APIMetricSet with APIPayload {
   @override
   String toString({bool withHeaders = true, bool withPayload = true}) {
     var headersStr = withHeaders ? ', headers: $headers' : '';
-    var payloadStr = withPayload && hasPayload
-        ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
-        : '';
+    var payloadStr =
+        withPayload && hasPayload
+            ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
+            : '';
 
     return 'APIRequest#$id{ method: ${method.name}, '
         'path: $path, '
@@ -2273,7 +2466,7 @@ class WeakEtag extends Etag {
   final String delimiter;
 
   WeakEtag(List<String> values, {this.delimiter = ','})
-      : values = values.asUnmodifiableListView();
+    : values = values.asUnmodifiableListView();
 
   factory WeakEtag.parse(String s, {String delimiter = ','}) {
     if (s.isEmpty) return WeakEtag([]);
@@ -2581,24 +2774,25 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   /// Constructs an [APIResponse].
   ///
   /// - [payloadDynamic] is only used if [payload] is `null` and [T] accepts the [payloadDynamic] value.
-  APIResponse(this.status,
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? payloadMimeType,
-      this.payloadETag,
-      this.cacheControl,
-      this.payloadFileExtension,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      this.error,
-      this.stackTrace,
-      super.metrics})
-      : headers = headers ?? <String, dynamic>{},
-        payload = _resolvePayload(payload, payloadDynamic),
-        _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
-        keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
-        keepAliveMaxRequests = keepAliveMaxRequests ?? 1000;
+  APIResponse(
+    this.status, {
+    Map<String, dynamic>? headers,
+    T? payload,
+    Object? payloadDynamic,
+    Object? payloadMimeType,
+    this.payloadETag,
+    this.cacheControl,
+    this.payloadFileExtension,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    this.error,
+    this.stackTrace,
+    super.metrics,
+  }) : headers = headers ?? <String, dynamic>{},
+       payload = _resolvePayload(payload, payloadDynamic),
+       _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
+       keepAliveTimeout = keepAliveTimeout ?? const Duration(seconds: 10),
+       keepAliveMaxRequests = keepAliveMaxRequests ?? 1000;
 
   static T? _resolvePayload<T>(T? payload, Object? payloadDynamic) {
     if (payload != null) return payload;
@@ -2612,7 +2806,8 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
 
   /// Copy this response casting the [payload] to [E].
   APIResponse<E> cast<E>({E? payload, Object? error}) {
-    return APIResponse<E>(status,
+    return APIResponse<E>(
+        status,
         payload: payload ?? (this.payload as E?),
         payloadMimeType: payloadMimeType,
         payloadFileExtension: payloadFileExtension,
@@ -2623,7 +2818,8 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
         keepAliveMaxRequests: keepAliveMaxRequests,
         error: error ?? this.error,
         stackTrace: stackTrace,
-        metrics: _metrics)
+        metrics: _metrics,
+      )
       .._requiresAuthentication = _requiresAuthentication
       .._authenticationType = _authenticationType
       .._authenticationRealm = _authenticationRealm
@@ -2631,25 +2827,28 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   }
 
   /// Copy this response.
-  APIResponse<T> copy(
-      {APIResponseStatus? status,
-      T? payload,
-      Object? payloadDynamic,
-      bool nullPayload = false,
-      Etag? payloadETag,
-      String? payloadFileExtension,
-      CacheControl? cacheControl,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Object? error,
-      StackTrace? stackTrace,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(status ?? this.status,
-        payload: nullPayload
-            ? null
-            : (payload ?? (payloadDynamic == null ? this.payload : null)),
+  APIResponse<T> copy({
+    APIResponseStatus? status,
+    T? payload,
+    Object? payloadDynamic,
+    bool nullPayload = false,
+    Etag? payloadETag,
+    String? payloadFileExtension,
+    CacheControl? cacheControl,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+        status ?? this.status,
+        payload:
+            nullPayload
+                ? null
+                : (payload ?? (payloadDynamic == null ? this.payload : null)),
         payloadDynamic: nullPayload ? null : payloadDynamic,
         payloadMimeType: mimeType ?? payloadMimeType,
         payloadFileExtension: payloadFileExtension,
@@ -2660,7 +2859,8 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
         keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
         error: error,
         stackTrace: stackTrace,
-        metrics: metrics ?? _metrics)
+        metrics: metrics ?? _metrics,
+      )
       .._requiresAuthentication = _requiresAuthentication
       .._authenticationType = _authenticationType
       .._authenticationRealm = _authenticationRealm
@@ -2668,279 +2868,318 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   }
 
   /// Creates a response of status `OK`.
-  factory APIResponse.ok(T? payload,
-      {Object? payloadDynamic,
-      Etag? payloadETag,
-      CacheControl? cacheControl,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      String? fileExtension,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.OK,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        payloadFileExtension: fileExtension,
-        payloadETag: payloadETag,
-        cacheControl: cacheControl,
-        keepAliveTimeout: keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests,
-        metrics: metrics);
+  factory APIResponse.ok(
+    T? payload, {
+    Object? payloadDynamic,
+    Etag? payloadETag,
+    CacheControl? cacheControl,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    String? fileExtension,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.OK,
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadDynamic: payloadDynamic,
+      payloadMimeType: mimeType,
+      payloadFileExtension: fileExtension,
+      payloadETag: payloadETag,
+      cacheControl: cacheControl,
+      keepAliveTimeout: keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to an `OK` response.
-  APIResponse<T> asOk(
-      {T? payload,
-      Object? payloadDynamic,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      String? fileExtension,
-      Etag? eTag,
-      CacheControl? cacheControl,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asOk({
+    T? payload,
+    Object? payloadDynamic,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    String? fileExtension,
+    Etag? eTag,
+    CacheControl? cacheControl,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.ok(
-        payload ?? (payloadDynamic == null ? this.payload : null),
-        payloadDynamic: payloadDynamic,
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        fileExtension: fileExtension ?? payloadFileExtension,
-        payloadETag: eTag ?? payloadETag,
-        cacheControl: cacheControl ?? this.cacheControl,
-        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      payload ?? (payloadDynamic == null ? this.payload : null),
+      payloadDynamic: payloadDynamic,
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      fileExtension: fileExtension ?? payloadFileExtension,
+      payloadETag: eTag ?? payloadETag,
+      cacheControl: cacheControl ?? this.cacheControl,
+      keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `NOT_FOUND`.
-  factory APIResponse.notFound(
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? mimeType,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.NOT_FOUND,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        keepAliveTimeout: keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests,
-        metrics: metrics);
+  factory APIResponse.notFound({
+    Map<String, dynamic>? headers,
+    T? payload,
+    Object? payloadDynamic,
+    Object? mimeType,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.NOT_FOUND,
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadDynamic: payloadDynamic,
+      payloadMimeType: mimeType,
+      keepAliveTimeout: keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to a `NOT_FOUND` response.
-  APIResponse<T> asNotFound(
-      {T? payload,
-      Object? payloadDynamic,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asNotFound({
+    T? payload,
+    Object? payloadDynamic,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.notFound(
-        payload: payload ?? (payloadDynamic == null ? this.payload : null),
-        payloadDynamic: payloadDynamic,
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      payload: payload ?? (payloadDynamic == null ? this.payload : null),
+      payloadDynamic: payloadDynamic,
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `NOT_FOUND`.
-  factory APIResponse.notModified(
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? mimeType,
-      Etag? eTag,
-      CacheControl? cacheControl,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.NOT_MODIFIED,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        payloadETag: eTag,
-        cacheControl: cacheControl,
-        keepAliveTimeout: keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests,
-        metrics: metrics);
+  factory APIResponse.notModified({
+    Map<String, dynamic>? headers,
+    T? payload,
+    Object? payloadDynamic,
+    Object? mimeType,
+    Etag? eTag,
+    CacheControl? cacheControl,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.NOT_MODIFIED,
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadDynamic: payloadDynamic,
+      payloadMimeType: mimeType,
+      payloadETag: eTag,
+      cacheControl: cacheControl,
+      keepAliveTimeout: keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to a `NOT_MODIFIED` response.
-  APIResponse<T> asNotModified(
-      {T? payload,
-      Object? payloadDynamic,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Etag? eTag,
-      CacheControl? cacheControl,
-      Duration? keepAliveTimeout,
-      int? keepAliveMaxRequests,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asNotModified({
+    T? payload,
+    Object? payloadDynamic,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Etag? eTag,
+    CacheControl? cacheControl,
+    Duration? keepAliveTimeout,
+    int? keepAliveMaxRequests,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.notModified(
-        payload: payload ?? (payloadDynamic == null ? this.payload : null),
-        payloadDynamic: payloadDynamic,
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        eTag: eTag ?? payloadETag,
-        cacheControl: cacheControl ?? this.cacheControl,
-        keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
-        keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      payload: payload ?? (payloadDynamic == null ? this.payload : null),
+      payloadDynamic: payloadDynamic,
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      eTag: eTag ?? payloadETag,
+      cacheControl: cacheControl ?? this.cacheControl,
+      keepAliveTimeout: keepAliveTimeout ?? this.keepAliveTimeout,
+      keepAliveMaxRequests: keepAliveMaxRequests ?? this.keepAliveMaxRequests,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `UNAUTHORIZED`.
-  factory APIResponse.unauthorized(
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? mimeType,
-      Object? error,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.UNAUTHORIZED,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        error: error,
-        metrics: metrics);
+  factory APIResponse.unauthorized({
+    Map<String, dynamic>? headers,
+    T? payload,
+    Object? payloadDynamic,
+    Object? mimeType,
+    Object? error,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.UNAUTHORIZED,
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadDynamic: payloadDynamic,
+      payloadMimeType: mimeType,
+      error: error,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to an `UNAUTHORIZED` response.
-  APIResponse<T> asUnauthorized(
-      {T? payload,
-      Object? payloadDynamic,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asUnauthorized({
+    T? payload,
+    Object? payloadDynamic,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.unauthorized(
-        payload: payload ?? (payloadDynamic == null ? this.payload : null),
-        payloadDynamic: payloadDynamic,
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      payload: payload ?? (payloadDynamic == null ? this.payload : null),
+      payloadDynamic: payloadDynamic,
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   @Deprecated("Use `redirect`")
-  factory APIResponse.redirecy(Uri location,
-      {Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse.redirect(location,
-        headers: headers, mimeType: mimeType, metrics: metrics);
+  factory APIResponse.redirecy(
+    Uri location, {
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse.redirect(
+      location,
+      headers: headers,
+      mimeType: mimeType,
+      metrics: metrics,
+    );
   }
 
   /// Creates a response of status `REDIRECT`.
-  factory APIResponse.redirect(Uri location,
-      {Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.REDIRECT,
-        headers: headers ?? <String, dynamic>{},
-        payloadDynamic: location,
-        payloadMimeType: mimeType,
-        metrics: metrics);
+  factory APIResponse.redirect(
+    Uri location, {
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.REDIRECT,
+      headers: headers ?? <String, dynamic>{},
+      payloadDynamic: location,
+      payloadMimeType: mimeType,
+      metrics: metrics,
+    );
   }
 
   @Deprecated("Use `asRedirect`")
-  APIResponse<T> asRedirecy(
-      {Uri? location,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asRedirecy({
+    Uri? location,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
     return asRedirect(
-        location: location,
-        headers: headers,
-        mimeType: mimeType,
-        metrics: metrics);
+      location: location,
+      headers: headers,
+      mimeType: mimeType,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to an `REDIRECT` response.
-  APIResponse<T> asRedirect(
-      {Uri? location,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse.redirect(location ?? Uri.parse('$payload'.trim()),
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+  APIResponse<T> asRedirect({
+    Uri? location,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse.redirect(
+      location ?? Uri.parse('$payload'.trim()),
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates a response of status `BAD_REQUEST`.
-  factory APIResponse.badRequest(
-      {Map<String, dynamic>? headers,
-      T? payload,
-      Object? payloadDynamic,
-      Object? mimeType,
-      Object? error,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.BAD_REQUEST,
-        headers: headers ?? <String, dynamic>{},
-        payload: payload,
-        payloadDynamic: payloadDynamic,
-        payloadMimeType: mimeType,
-        error: error,
-        metrics: metrics);
+  factory APIResponse.badRequest({
+    Map<String, dynamic>? headers,
+    T? payload,
+    Object? payloadDynamic,
+    Object? mimeType,
+    Object? error,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.BAD_REQUEST,
+      headers: headers ?? <String, dynamic>{},
+      payload: payload,
+      payloadDynamic: payloadDynamic,
+      payloadMimeType: mimeType,
+      error: error,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to an `BAD_REQUEST` response.
-  APIResponse<T> asBadRequest(
-      {T? payload,
-      Object? payloadDynamic,
-      Map<String, dynamic>? headers,
-      Object? mimeType,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asBadRequest({
+    T? payload,
+    Object? payloadDynamic,
+    Map<String, dynamic>? headers,
+    Object? mimeType,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.badRequest(
-        payload: payload ?? (payloadDynamic == null ? this.payload : null),
-        payloadDynamic: payloadDynamic,
-        headers: headers ?? this.headers,
-        mimeType: mimeType ?? payloadMimeType,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      payload: payload ?? (payloadDynamic == null ? this.payload : null),
+      payloadDynamic: payloadDynamic,
+      headers: headers ?? this.headers,
+      mimeType: mimeType ?? payloadMimeType,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates an error response.
-  factory APIResponse.error(
-      {Map<String, dynamic>? headers,
-      dynamic error,
-      StackTrace? stackTrace,
-      Map<String, APIMetric>? metrics}) {
-    return APIResponse(APIResponseStatus.ERROR,
-        headers: headers ?? <String, dynamic>{},
-        error: error,
-        stackTrace: stackTrace,
-        metrics: metrics);
+  factory APIResponse.error({
+    Map<String, dynamic>? headers,
+    dynamic error,
+    StackTrace? stackTrace,
+    Map<String, APIMetric>? metrics,
+  }) {
+    return APIResponse(
+      APIResponseStatus.ERROR,
+      headers: headers ?? <String, dynamic>{},
+      error: error,
+      stackTrace: stackTrace,
+      metrics: metrics,
+    );
   }
 
   /// Transform this response to an `ERROR` response.
-  APIResponse<T> asError(
-      {Map<String, dynamic>? headers,
-      dynamic error,
-      StackTrace? stackTrace,
-      Map<String, APIMetric>? metrics}) {
+  APIResponse<T> asError({
+    Map<String, dynamic>? headers,
+    dynamic error,
+    StackTrace? stackTrace,
+    Map<String, APIMetric>? metrics,
+  }) {
     return APIResponse.error(
-        headers: headers ?? this.headers,
-        error: error ?? this.error,
-        stackTrace: stackTrace ?? this.stackTrace,
-        metrics: metrics ?? _metrics)
-      .._copyStartedMetrics(this);
+      headers: headers ?? this.headers,
+      error: error ?? this.error,
+      stackTrace: stackTrace ?? this.stackTrace,
+      metrics: metrics ?? _metrics,
+    ).._copyStartedMetrics(this);
   }
 
   /// Creates a response based into [o] value.
@@ -2967,8 +3206,11 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   /// Depending of the serve implementation (usually HTTP),
   /// it will send to the client the request for authentication
   /// (in HTTP is the headers `WWW-Authenticate`).
-  APIResponse<T> requireAuthentication(
-      {bool require = true, String type = 'Basic', String realm = 'API'}) {
+  APIResponse<T> requireAuthentication({
+    bool require = true,
+    String type = 'Basic',
+    String realm = 'API',
+  }) {
     _requiresAuthentication = require;
     _authenticationType = type;
     _authenticationRealm = realm;
@@ -3036,11 +3278,13 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
       getHeader('Access-Control-Allow-Methods') != null;
 
   /// Sets the `CORS` (Cross-origin Resource Sharing) headers of this response.
-  void setCORS(APIRequest request,
-      {bool allowCredentials = true,
-      List<String>? allowMethods,
-      List<String>? allowHeaders,
-      List<String>? exposeHeaders}) {
+  void setCORS(
+    APIRequest request, {
+    bool allowCredentials = true,
+    List<String>? allowMethods,
+    List<String>? allowHeaders,
+    List<String>? exposeHeaders,
+  }) {
     var origin = request.origin;
 
     var localhost = false;
@@ -3064,10 +3308,12 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
         allowCredentials ? 'true' : 'false';
 
     if (localhost) {
-      headers["Access-Control-Allow-Headers"] = allowHeaders?.join(', ') ??
+      headers["Access-Control-Allow-Headers"] =
+          allowHeaders?.join(', ') ??
           'Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt';
     } else {
-      headers["Access-Control-Allow-Headers"] = allowHeaders?.join(', ') ??
+      headers["Access-Control-Allow-Headers"] =
+          allowHeaders?.join(', ') ??
           'Content-Type, Access-Control-Allow-Headers, Authorization';
     }
 
@@ -3101,7 +3347,7 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   void dispose() {
     super.dispose();
 
-    this._apiRequest?.dispose();
-    this._apiRequest = null;
+    _apiRequest?.dispose();
+    _apiRequest = null;
   }
 }

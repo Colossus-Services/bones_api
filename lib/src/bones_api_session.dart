@@ -29,8 +29,11 @@ class APISession {
     return random;
   }
 
-  static String generateSessionID(
-      {int length = 128, int variableLength = 32, String? prefix}) {
+  static String generateSessionID({
+    int length = 128,
+    int variableLength = 32,
+    String? prefix,
+  }) {
     if (length < 32) {
       length = 32;
     }
@@ -41,10 +44,12 @@ class APISession {
       prefix = 'SID';
     }
 
-    return APIToken.generateToken(length,
-        variableLength: variableLength,
-        prefix: prefix,
-        random: _sessionIdRandom);
+    return APIToken.generateToken(
+      length,
+      variableLength: variableLength,
+      prefix: prefix,
+      random: _sessionIdRandom,
+    );
   }
 
   String id;
@@ -91,25 +96,29 @@ class APISessionSet {
 
   late final Duration autoCheckInterval;
 
-  APISessionSet(this.timeout,
-      {Duration? autoCheckInterval,
-      APIRoot? apiRoot,
-      SharedStoreField? sharedStoreField,
-      SharedStoreReference? sharedStoreReference,
-      SharedStore? sharedStore,
-      String? sharedStoreID,
-      SharedStoreProviderSync? storeProvider})
-      : _sharedStoreField = SharedStoreField.tryFrom(
-                sharedStoreField: sharedStoreField,
-                sharedStoreReference: sharedStoreReference,
-                sharedStore: sharedStore ?? apiRoot?.sharedStore,
-                sharedStoreID: sharedStoreID,
-                storeProvider: storeProvider) ??
-            SharedStoreField.fromSharedStore(SharedStore.notShared()) {
+  APISessionSet(
+    this.timeout, {
+    Duration? autoCheckInterval,
+    APIRoot? apiRoot,
+    SharedStoreField? sharedStoreField,
+    SharedStoreReference? sharedStoreReference,
+    SharedStore? sharedStore,
+    String? sharedStoreID,
+    SharedStoreProviderSync? storeProvider,
+  }) : _sharedStoreField =
+           SharedStoreField.tryFrom(
+             sharedStoreField: sharedStoreField,
+             sharedStoreReference: sharedStoreReference,
+             sharedStore: sharedStore ?? apiRoot?.sharedStore,
+             sharedStoreID: sharedStoreID,
+             storeProvider: storeProvider,
+           ) ??
+           SharedStoreField.fromSharedStore(SharedStore.notShared()) {
     var autoCheckIntervalResolved = autoCheckInterval;
     if (autoCheckIntervalResolved == null) {
-      autoCheckIntervalResolved =
-          Duration(milliseconds: timeout.inMilliseconds ~/ 3);
+      autoCheckIntervalResolved = Duration(
+        milliseconds: timeout.inMilliseconds ~/ 3,
+      );
       if (autoCheckIntervalResolved.inMinutes > 5) {
         autoCheckIntervalResolved = Duration(minutes: 5);
       }
@@ -140,9 +149,9 @@ class APISessionSet {
     return _sharedSessionsField
         .sharedMapCached(timeout: _cacheTimeout)
         .resolveMapped((sharedSessions) {
-      _sharedSessions[this] = sharedSessions;
-      return sharedSessions;
-    });
+          _sharedSessions[this] = sharedSessions;
+          return sharedSessions;
+        });
   }
 
   FutureOr<int> get length => _resolveSharedSessions().length();

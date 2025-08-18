@@ -19,7 +19,7 @@ class APITestConfig {
   final Map<String, dynamic> apiConfigMap;
 
   APITestConfig(Map<String, dynamic> apiConfig)
-      : apiConfigMap = deepCopyMap<String, dynamic>(apiConfig)!;
+    : apiConfigMap = deepCopyMap<String, dynamic>(apiConfig)!;
 
   /// Resolves if this configuration test is supported.
   /// See [isSupported].
@@ -56,7 +56,8 @@ class APITestConfig {
 
   /// Creates an [APIRootStarter] using this [APITestConfig] as pre-initialization and stopper.
   APIRootStarter<A> createAPIRootStarter<A extends APIRoot>(
-      A Function(APIConfig? apiConfig) apiRootInstantiator) {
+    A Function(APIConfig? apiConfig) apiRootInstantiator,
+  ) {
     return APIRootStarter.fromInstantiator(
       apiRootInstantiator,
       apiConfig: () => APIConfig(apiConfigMap),
@@ -143,12 +144,13 @@ mixin APITestConfigBase on APITestConfig {
 
 /// An [APITestConfig] for `Docker` containers.
 abstract class APITestConfigDocker<C extends DockerContainer>
-    extends APITestConfig with APITestConfigBase {
+    extends APITestConfig
+    with APITestConfigBase {
   /// The [DockerHost] for [DockerCommander].
   DockerHost dockerHost;
 
   APITestConfigDocker(this.dockerHost, Map<String, dynamic> apiConfigMap)
-      : super(apiConfigMap);
+    : super(apiConfigMap);
 
   /// The [DockerContainer] that was started.
   C? container;
@@ -188,12 +190,14 @@ abstract class APITestConfigDocker<C extends DockerContainer>
     var logsStdout = container.stdout?.asString;
     var logsStderr = container.stderr?.asString;
 
-    _log.info('Container $container LOGS:\n'
-        '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< [LOGS STDOUT]\n'
-        '$logsStdout\n'
-        '======================================================== [LOGS STDERR]\n'
-        '$logsStderr\n'
-        '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> [LOGS END]');
+    _log.info(
+      'Container $container LOGS:\n'
+      '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< [LOGS STDOUT]\n'
+      '$logsStdout\n'
+      '======================================================== [LOGS STDERR]\n'
+      '$logsStderr\n'
+      '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> [LOGS END]',
+    );
 
     _log.info('** STARTED> $this');
 
@@ -299,7 +303,7 @@ abstract class APITestConfigDB extends APITestConfig with APITestConfigDBMixin {
   final String dbType;
 
   APITestConfigDB(this.dbType, Map<String, dynamic> apiConfig)
-      : super(apiConfig);
+    : super(apiConfig);
 }
 
 @Deprecated("Renamed to 'APITestConfigDBSQLMemory'")
@@ -309,9 +313,10 @@ typedef APITestConfigDBMemory = APITestConfigDBSQLMemory;
 class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
   final EntityRepositoryProvider? parentRepositoryProvider;
 
-  APITestConfigDBSQLMemory(Map<String, dynamic> apiConfig,
-      {this.parentRepositoryProvider})
-      : super('memory', apiConfig);
+  APITestConfigDBSQLMemory(
+    Map<String, dynamic> apiConfig, {
+    this.parentRepositoryProvider,
+  }) : super('memory', apiConfig);
 
   @override
   Map<String, dynamic> get dbConfig =>
@@ -326,8 +331,9 @@ class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
   FutureOr<bool> startImpl() {
     _started = false;
 
-    sqlAdapter =
-        DBSQLMemoryAdapter(parentRepositoryProvider: parentRepositoryProvider);
+    sqlAdapter = DBSQLMemoryAdapter(
+      parentRepositoryProvider: parentRepositoryProvider,
+    );
 
     _log.info('** STARTED> $this');
 
@@ -354,17 +360,19 @@ class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
 
     var tables = allRepositories.map((e) => e.name).toList();
 
-    var tablesSchemes = await tables
-        .map((t) => sqlAdapter.getTableScheme(t))
-        .toList()
-        .resolveAll();
+    var tablesSchemes =
+        await tables
+            .map((t) => sqlAdapter.getTableScheme(t))
+            .toList()
+            .resolveAll();
 
-    var relationshipTables = tablesSchemes.nonNulls
-        .expand((e) => e.tableRelationshipReference.values.expand((e) => e));
+    var relationshipTables = tablesSchemes.nonNulls.expand(
+      (e) => e.tableRelationshipReference.values.expand((e) => e),
+    );
 
     var allTables = [
       ...tables,
-      ...relationshipTables.map((e) => e.relationshipTable)
+      ...relationshipTables.map((e) => e.relationshipTable),
     ];
 
     return allTables;
@@ -419,23 +427,30 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
   final bool cleanContainer;
 
   APITestConfigDockerDB(
-      DockerHost dockerHost, this.dbType, Map<String, dynamic> apiConfig,
-      {String? containerNamePrefix, this.cleanContainer = true})
-      : containerNamePrefix =
-            containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
-        super(dockerHost, apiConfig);
+    DockerHost dockerHost,
+    this.dbType,
+    Map<String, dynamic> apiConfig, {
+    String? containerNamePrefix,
+    this.cleanContainer = true,
+  }) : containerNamePrefix =
+           containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
+       super(dockerHost, apiConfig);
 
   @override
   Future<C> createContainer(DockerCommander dockerCommander) async {
     var dbPort = await this.dbPort;
 
     _log.info(
-        'Initializing $dbType container at port: $dbPort (cleanContainer: $cleanContainer)');
+      'Initializing $dbType container at port: $dbPort (cleanContainer: $cleanContainer)',
+    );
 
     var containerConfig = createDBContainerConfig(dbPort);
 
-    var container = await containerConfig.run(dockerCommander,
-        name: '${containerNamePrefix}_$dbPort', cleanContainer: cleanContainer);
+    var container = await containerConfig.run(
+      dockerCommander,
+      name: '${containerNamePrefix}_$dbPort',
+      cleanContainer: cleanContainer,
+    );
 
     _log.info('Container initialized: $container');
 
@@ -451,6 +466,11 @@ abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
     extends APITestConfigDockerDB<C>
     with APITestConfigDBSQLMixin
     implements APITestConfigDBSQL, WithRuntimeTypeNameSafe {
-  APITestConfigDockerDBSQL(super.dockerHost, super.dbType, super.apiConfig,
-      {super.containerNamePrefix, super.cleanContainer});
+  APITestConfigDockerDBSQL(
+    super.dockerHost,
+    super.dbType,
+    super.apiConfig, {
+    super.containerNamePrefix,
+    super.cleanContainer,
+  });
 }

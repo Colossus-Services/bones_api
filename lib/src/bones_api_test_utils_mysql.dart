@@ -16,14 +16,19 @@ class APITestConfigDockerMySQL
 
   final String version;
 
-  APITestConfigDockerMySQL(Map<String, dynamic> apiConfig,
-      {DockerHost? dockerHost,
-      String? containerNamePrefix,
-      this.forceNativePasswordAuthentication = true,
-      this.version = 'latest',
-      super.cleanContainer})
-      : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig,
-            containerNamePrefix: containerNamePrefix) {
+  APITestConfigDockerMySQL(
+    Map<String, dynamic> apiConfig, {
+    DockerHost? dockerHost,
+    String? containerNamePrefix,
+    this.forceNativePasswordAuthentication = true,
+    this.version = 'latest',
+    super.cleanContainer,
+  }) : super(
+         dockerHost ?? DockerHostLocal(),
+         'MySQL',
+         apiConfig,
+         containerNamePrefix: containerNamePrefix,
+       ) {
     DBMySQLAdapter.boot();
   }
 

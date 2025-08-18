@@ -34,7 +34,7 @@ enum DBAdapterCapabilityConnectivity {
   none,
   unsecure,
   secure,
-  secureAndUnsecure;
+  secureAndUnsecure,
 }
 
 /// [DBAdapter] capabilities.
@@ -70,7 +70,8 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
     required this.connectivity,
   });
 
-  String get info => 'transactions: $transactions, '
+  String get info =>
+      'transactions: $transactions, '
       'transactionAbort: $transactionAbort, '
       'constraintSupport: $constraintSupport, '
       'multiIsolateSupport: $multiIsolateSupport, '
@@ -83,12 +84,14 @@ class DBAdapterCapability implements WithRuntimeTypeNameSafe {
   String toString() => 'DBAdapterCapability[${dialect.name}]{$info}@$dialect';
 }
 
-typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>>
-    = FutureOr<A?> Function(Map<String, dynamic> config,
-        {int? minConnections,
-        int? maxConnections,
-        EntityRepositoryProvider? parentRepositoryProvider,
-        String? workingPath});
+typedef DBAdapterInstantiator<C extends Object, A extends DBAdapter<C>> =
+    FutureOr<A?> Function(
+      Map<String, dynamic> config, {
+      int? minConnections,
+      int? maxConnections,
+      EntityRepositoryProvider? parentRepositoryProvider,
+      String? workingPath,
+    });
 
 typedef PreFinishDBOperation<T, R> = FutureOr<R> Function(T result);
 
@@ -135,20 +138,21 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       adapterRegister.registeredAdaptersTypes;
 
   static void registerAdapter<C extends Object, A extends DBAdapter<C>>(
-          List<String> names,
-          Type type,
-          DBAdapterInstantiator<C, A> adapterInstantiator) =>
-      adapterRegister.registerAdapter(names, type, adapterInstantiator);
+    List<String> names,
+    Type type,
+    DBAdapterInstantiator<C, A> adapterInstantiator,
+  ) => adapterRegister.registerAdapter(names, type, adapterInstantiator);
 
   static DBAdapterInstantiator<C, A>?
-      getAdapterInstantiator<C extends Object, A extends DBAdapter<C>>(
-              {String? name, Type? type}) =>
-          adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
+  getAdapterInstantiator<C extends Object, A extends DBAdapter<C>>({
+    String? name,
+    Type? type,
+  }) => adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfig<C extends Object,
-              A extends DBAdapter<C>>(Map<String, dynamic> config) =>
-          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
+  getAdapterInstantiatorsFromConfig<C extends Object, A extends DBAdapter<C>>(
+    Map<String, dynamic> config,
+  ) => adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
   static final WeakList<DBAdapter> _instances = WeakList<DBAdapter>();
 
@@ -206,15 +210,18 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   final int instanceID = ++_instanceIDCount;
 
   DBAdapter(
-      this.name, this.minConnections, this.maxConnections, this.capability,
-      {this.parentRepositoryProvider,
-      this.connectivity = DBAdapterConnectivity.any,
-      Object? populateSource,
-      Object? populateSourceVariables,
-      String? workingPath})
-      : _populateSource = populateSource,
-        _populateSourceVariables = populateSourceVariables,
-        _workingPath = workingPath {
+    this.name,
+    this.minConnections,
+    this.maxConnections,
+    this.capability, {
+    this.parentRepositoryProvider,
+    this.connectivity = DBAdapterConnectivity.any,
+    Object? populateSource,
+    Object? populateSourceVariables,
+    String? workingPath,
+  }) : _populateSource = populateSource,
+       _populateSourceVariables = populateSourceVariables,
+       _workingPath = workingPath {
     boot();
 
     _instances.add(this);
@@ -223,40 +230,46 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends DBAdapter<C>>(
-      Map<String, dynamic> config,
-      {int minConnections = 1,
-      int maxConnections = 3,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+    Map<String, dynamic> config, {
+    int minConnections = 1,
+    int maxConnections = 3,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var instantiators = getAdapterInstantiatorsFromConfig(config);
 
     if (instantiators.isEmpty) {
       throw StateError(
-          "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}");
+        "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}",
+      );
     }
 
-    return instantiateAdaptor<Object, DBAdapter<Object>>(instantiators, config,
-            minConnections: minConnections,
-            maxConnections: maxConnections,
-            parentRepositoryProvider: parentRepositoryProvider,
-            workingPath: workingPath)
-        .resolveMapped((adapter) => adapter as A);
+    return instantiateAdaptor<Object, DBAdapter<Object>>(
+      instantiators,
+      config,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
+      parentRepositoryProvider: parentRepositoryProvider,
+      workingPath: workingPath,
+    ).resolveMapped((adapter) => adapter as A);
   }
 
   static FutureOr<A>
-      instantiateAdaptor<C extends Object, A extends DBAdapter<C>>(
-          List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
-              instantiators,
-          Map<String, dynamic> config,
-          {int minConnections = 1,
-          int maxConnections = 3,
-          EntityRepositoryProvider? parentRepositoryProvider,
-          String? workingPath}) {
+  instantiateAdaptor<C extends Object, A extends DBAdapter<C>>(
+    List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
+    instantiators,
+    Map<String, dynamic> config, {
+    int minConnections = 1,
+    int maxConnections = 3,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     if (instantiators.isEmpty) {
       throw StateError(
-          "No `$A` instantiator for `config` keys: ${config.keys.toList()}");
+        "No `$A` instantiator for `config` keys: ${config.keys.toList()}",
+      );
     }
 
     var asyncInstantiators = <Future<A>>[];
@@ -265,11 +278,13 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       var f = e.key;
       var conf = e.value;
 
-      var ret = f(conf,
-          minConnections: minConnections,
-          maxConnections: maxConnections,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath);
+      var ret = f(
+        conf,
+        minConnections: minConnections,
+        maxConnections: maxConnections,
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath,
+      );
 
       if (ret == null) {
         continue;
@@ -287,7 +302,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         }
 
         throw StateError(
-            "Can't async instantiate an `$A` for `config`: $config");
+          "Can't async instantiate an `$A` for `config`: $config",
+        );
       });
     }
 
@@ -298,7 +314,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   FutureOr<InitializationResult> initialize() {
     if (auxiliaryMode && !capability.multiIsolateSupport) {
       _log.severe(
-          "Can't initialize adapter in `DBAdapter.auxiliaryMode`: $this");
+        "Can't initialize adapter in `DBAdapter.auxiliaryMode`: $this",
+      );
       return InitializationResult.error(this);
     }
 
@@ -348,19 +365,23 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       _populateSourceImpl(_populateSource, _populateSourceVariables);
 
   FutureOr<InitializationResult> _populateSourceImpl(
-      Object? populateSource, Object? populateSourceVariables) {
+    Object? populateSource,
+    Object? populateSourceVariables,
+  ) {
     _disposePopulateData();
 
     if (populateSource == null) {
       return _initializationResultOK(withEntityRepositories: false);
     }
 
-    return populateFromSource(populateSource,
-            workingPath: _workingPath,
-            resolutionRules: EntityResolutionRules(allowReadFile: true),
-            variables: populateSourceVariables)
-        .resolveMapped(
-            (val) => _initializationResultOK(withEntityRepositories: true));
+    return populateFromSource(
+      populateSource,
+      workingPath: _workingPath,
+      resolutionRules: EntityResolutionRules(allowReadFile: true),
+      variables: populateSourceVariables,
+    ).resolveMapped(
+      (val) => _initializationResultOK(withEntityRepositories: true),
+    );
   }
 
   void _disposePopulateData() {
@@ -368,16 +389,23 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     _populateSourceVariables = null;
   }
 
-  InitializationResult _initializationResultOK(
-          {required bool withEntityRepositories}) =>
-      InitializationResult.ok(this, dependencies: [
-        if (parentRepositoryProvider != null) parentRepositoryProvider!,
-        if (withEntityRepositories) ...entityRepositories,
-      ]);
+  InitializationResult _initializationResultOK({
+    required bool withEntityRepositories,
+  }) => InitializationResult.ok(
+    this,
+    dependencies: [
+      if (parentRepositoryProvider != null) parentRepositoryProvider!,
+      if (withEntityRepositories) ...entityRepositories,
+    ],
+  );
 
   @override
-  FutureOr<O?> getEntityByID<O>(dynamic id,
-      {Type? type, bool sync = false, EntityResolutionRules? resolutionRules}) {
+  FutureOr<O?> getEntityByID<O>(
+    dynamic id, {
+    Type? type,
+    bool sync = false,
+    EntityResolutionRules? resolutionRules,
+  }) {
     if (id == null || type == null) return null;
 
     var entityRepository = getEntityRepositoryByType(type);
@@ -394,7 +422,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     _log.warning(
-        "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type @ $this");
+      "Can't get entity by ID($id). Can't find `EntityRepository` for type: $type @ $this",
+    );
 
     return null;
   }
@@ -407,8 +436,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>
       entityRepositories
-          .map((r) => MapEntry<EntityRepository, String>(
-              r, getTableForEntityRepository(r)))
+          .map(
+            (r) => MapEntry<EntityRepository, String>(
+              r,
+              getTableForEntityRepository(r),
+            ),
+          )
           .toMapFromEntries();
 
   @override
@@ -434,8 +467,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
   }
 
-  EntityRepository? _geAdapterEntityRepository(
-      {String? entityName, String? tableName, Type? entityType}) {
+  EntityRepository? _geAdapterEntityRepository({
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+  }) {
     EntityRepository? entityRepository;
 
     if (entityName != null) {
@@ -456,14 +492,24 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  FutureOr<TypeInfo?> getFieldType(String field,
-      {String? entityName, String? tableName, Type? entityType}) {
+  FutureOr<TypeInfo?> getFieldType(
+    String field, {
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+  }) {
     var entityRepository = _geAdapterEntityRepository(
-        entityName: entityName, tableName: tableName, entityType: entityType);
+      entityName: entityName,
+      tableName: tableName,
+      entityType: entityType,
+    );
 
     if (entityRepository != null) {
-      var type = entityRepository.entityHandler
-          .getFieldType(null, field, resolveFiledName: true);
+      var type = entityRepository.entityHandler.getFieldType(
+        null,
+        field,
+        resolveFiledName: true,
+      );
       return type;
     }
 
@@ -471,11 +517,13 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  Object? getEntityID(Object entity,
-      {String? entityName,
-      String? tableName,
-      Type? entityType,
-      EntityHandler? entityHandler}) {
+  Object? getEntityID(
+    Object entity, {
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+    EntityHandler? entityHandler,
+  }) {
     if (entity is num) {
       return entity;
     }
@@ -483,7 +531,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     entityType ??= entity.runtimeType;
 
     entityHandler ??= getEntityHandler(
-        entityName: entityName, tableName: tableName, entityType: entityType);
+      entityName: entityName,
+      tableName: tableName,
+      entityType: entityType,
+    );
 
     if (entityHandler == null) return null;
 
@@ -495,59 +546,101 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
   }
 
-  EntityHandler<T>? getEntityHandler<T>(
-      {String? entityName, String? tableName, Type? entityType}) {
+  EntityHandler<T>? getEntityHandler<T>({
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+  }) {
     var entityRepository = _geAdapterEntityRepository(
-        entityName: entityName, tableName: tableName, entityType: entityType);
+      entityName: entityName,
+      tableName: tableName,
+      entityType: entityType,
+    );
 
     var entityHandler = entityRepository?.entityHandler;
     return entityHandler as EntityHandler<T>?;
   }
 
-  void checkEntityFields<O>(O o, String entityName, String table,
-      {EntityHandler<O>? entityHandler}) {}
+  void checkEntityFields<O>(
+    O o,
+    String entityName,
+    String table, {
+    EntityHandler<O>? entityHandler,
+  }) {}
 
   FutureOr<int> doCount(
-      TransactionOperation op, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<int, int>? preFinish});
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  });
 
   FutureOr<List<I>> doExistIDs<I extends Object>(
-      TransactionOperation op, String entityName, String table, List<I> ids);
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<I> ids,
+  );
 
   FutureOr<R?> doSelectByID<R>(
-      TransactionOperation op, String entityName, String table, Object id,
-      {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish});
+    TransactionOperation op,
+    String entityName,
+    String table,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  });
 
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
-      String table, List<Object> ids,
-      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-          preFinish});
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<Object> ids, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  });
 
   FutureOr<List<R>> doSelectAll<R>(
-      TransactionOperation op, String entityName, String table,
-      {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-          preFinish});
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  });
 
-  FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
-      String table, O o, Map<String, dynamic> fields,
-      {String? idFieldName, PreFinishDBOperation<dynamic, dynamic>? preFinish});
+  FutureOr<dynamic> doInsert<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation<dynamic, dynamic>? preFinish,
+  });
 
-  FutureOr<dynamic> doUpdate<O>(TransactionOperation op, String entityName,
-      String table, O o, Object id, Map<String, dynamic> fields,
-      {String? idFieldName,
-      PreFinishDBOperation<dynamic, dynamic>? preFinish,
-      bool allowAutoInsert = false});
+  FutureOr<dynamic> doUpdate<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation<dynamic, dynamic>? preFinish,
+    bool allowAutoInsert = false,
+  });
 
-  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
-      String table, EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish});
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  });
 
   bool isTransactionWithSingleOperation(TransactionOperation op) {
     var transaction = op.transaction;
@@ -565,14 +658,21 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   bool get throwTransactionResultWithError;
 
   FutureOr<dynamic> resolveTransactionResult(
-      dynamic result, Transaction transaction, C? connection) async {
+    dynamic result,
+    Transaction transaction,
+    C? connection,
+  ) async {
     // When aborted `_transactionCompleter.complete` will be called
     // with the error (not calling `completeError`), since it's
     // running in another error zone (won't reach `onError`):
     if (result is TransactionAbortedError) {
       if (cancelTransactionResultWithError) {
         await cancelTransaction(
-            transaction, connection, result, result.stackTrace);
+          transaction,
+          connection,
+          result,
+          result.stackTrace,
+        );
 
         if (throwTransactionResultWithError) {
           throw result;
@@ -587,8 +687,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     return result;
   }
 
-  FutureOr<bool> cancelTransaction(Transaction transaction, C? connection,
-      Object? error, StackTrace? stackTrace);
+  FutureOr<bool> cancelTransaction(
+    Transaction transaction,
+    C? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  );
 
   bool get callCloseTransactionRequired;
 
@@ -727,25 +831,31 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   final Map<String, DBRepositoryAdapter> _repositoriesAdapters =
       <String, DBRepositoryAdapter>{};
 
-  DBRepositoryAdapter<O>? createRepositoryAdapter<O>(String name,
-      {String? tableName, Type? type}) {
+  DBRepositoryAdapter<O>? createRepositoryAdapter<O>(
+    String name, {
+    String? tableName,
+    Type? type,
+  }) {
     if (isClosed) {
       return null;
     }
 
     return _repositoriesAdapters.putIfAbsent(
-            name, () => instantiateRepositoryAdapter<O>(name, tableName, type))
+          name,
+          () => instantiateRepositoryAdapter<O>(name, tableName, type),
+        )
         as DBRepositoryAdapter<O>;
   }
 
   DBRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
-      String name, String? tableName, Type? type) {
+    String name,
+    String? tableName,
+    Type? type,
+  ) {
     return DBRepositoryAdapter<O>(this, name, tableName: tableName, type: type);
   }
 
-  DBRepositoryAdapter<O>? getRepositoryAdapterByName<O>(
-    String name,
-  ) {
+  DBRepositoryAdapter<O>? getRepositoryAdapterByName<O>(String name) {
     if (isClosed) return null;
     return _repositoriesAdapters[name] as DBRepositoryAdapter<O>?;
   }
@@ -758,8 +868,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   DBRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(String tableName) {
     if (isClosed) return null;
-    return _repositoriesAdapters.values
-            .firstWhereOrNull((e) => e.tableName == tableName)
+    return _repositoriesAdapters.values.firstWhereOrNull(
+          (e) => e.tableName == tableName,
+        )
         as DBRepositoryAdapter<O>?;
   }
 
@@ -782,7 +893,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
   @override
   void registerEntityRepository<O extends Object>(
-      EntityRepository<O> entityRepository) {
+    EntityRepository<O> entityRepository,
+  ) {
     checkNotClosed();
 
     _entityRepositories[entityRepository.type] = entityRepository;
@@ -804,8 +916,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   bool _callingGetEntityRepository = false;
 
   @override
-  EntityRepository<O>? getEntityRepository<O extends Object>(
-      {O? obj, Type? type, String? name, String? tableName}) {
+  EntityRepository<O>? getEntityRepository<O extends Object>({
+    O? obj,
+    Type? type,
+    String? name,
+    String? tableName,
+  }) {
     if (isClosed) return null;
 
     if (_callingGetEntityRepository) return null;
@@ -813,16 +929,27 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     try {
       return _getEntityRepositoryImpl<O>(
-              obj: obj, type: type, name: name, tableName: tableName) ??
-          EntityRepositoryProvider.globalProvider
-              .getEntityRepository<O>(obj: obj, type: type, name: name);
+            obj: obj,
+            type: type,
+            name: name,
+            tableName: tableName,
+          ) ??
+          EntityRepositoryProvider.globalProvider.getEntityRepository<O>(
+            obj: obj,
+            type: type,
+            name: name,
+          );
     } finally {
       _callingGetEntityRepository = false;
     }
   }
 
-  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>(
-      {O? obj, Type? type, String? name, String? tableName}) {
+  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>({
+    O? obj,
+    Type? type,
+    String? name,
+    String? tableName,
+  }) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[O];
       if (entityRepository != null && !entityRepository.isClosed) {
@@ -844,9 +971,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
 
       if (name != null) {
-        entityRepository = _entityRepositoriesByName[name] ??
-            _entityRepositoriesByNameSimplified[
-                EntityAccessor.simplifiedName(name)];
+        entityRepository =
+            _entityRepositoriesByName[name] ??
+            _entityRepositoriesByNameSimplified[EntityAccessor.simplifiedName(
+              name,
+            )];
 
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
@@ -854,10 +983,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
 
       if (tableName != null) {
-        entityRepository = _entityRepositoriesByDBTableName[tableName] ??
+        entityRepository =
+            _entityRepositoriesByDBTableName[tableName] ??
             _entityRepositoriesByName[tableName] ??
-            _entityRepositoriesByNameSimplified[
-                EntityAccessor.simplifiedName(tableName)];
+            _entityRepositoriesByNameSimplified[EntityAccessor.simplifiedName(
+              tableName,
+            )];
 
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
@@ -866,23 +997,28 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     var entityRepository = parentRepositoryProvider?.getEntityRepository<O>(
-        obj: obj, type: type, name: name);
+      obj: obj,
+      type: type,
+      name: name,
+    );
 
     if (entityRepository != null) {
       return entityRepository;
     }
 
     return _knownEntityRepositoryProviders.getEntityRepository<O>(
-        obj: obj,
-        type: type,
-        name: name,
-        entityRepositoryProvider: this,
-        removeClosedProviders: true);
+      obj: obj,
+      type: type,
+      name: name,
+      entityRepositoryProvider: this,
+      removeClosedProviders: true,
+    );
   }
 
   @override
   EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
-      TypeInfo typeInfo) {
+    TypeInfo typeInfo,
+  ) {
     var entityType = typeInfo.entityType;
     if (entityType == null) return null;
 
@@ -898,15 +1034,17 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
 
     try {
       return _getEntityRepositoryByTypeImpl<O>(type) ??
-          EntityRepositoryProvider.globalProvider
-              .getEntityRepositoryByType<O>(type);
+          EntityRepositoryProvider.globalProvider.getEntityRepositoryByType<O>(
+            type,
+          );
     } finally {
       _callingGetEntityRepository = false;
     }
   }
 
   EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
-      Type type) {
+    Type type,
+  ) {
     if (!isClosed) {
       var entityRepository = _entityRepositories[type];
       if (entityRepository != null && !entityRepository.isClosed) {
@@ -914,15 +1052,18 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
     }
 
-    var entityRepository =
-        parentRepositoryProvider?.getEntityRepositoryByType<O>(type);
+    var entityRepository = parentRepositoryProvider
+        ?.getEntityRepositoryByType<O>(type);
 
     if (entityRepository != null) {
       return entityRepository;
     }
 
-    return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(type,
-        entityRepositoryProvider: this, removeClosedProviders: true);
+    return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(
+      type,
+      entityRepositoryProvider: this,
+      removeClosedProviders: true,
+    );
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -934,9 +1075,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }
 
   @override
-  Map<Type, EntityRepository> allRepositories(
-      {Map<Type, EntityRepository>? allRepositories,
-      Set<EntityRepositoryProvider>? traversedProviders}) {
+  Map<Type, EntityRepository> allRepositories({
+    Map<Type, EntityRepository>? allRepositories,
+    Set<EntityRepositoryProvider>? traversedProviders,
+  }) {
     allRepositories ??= <Type, EntityRepository>{};
     traversedProviders ??= <EntityRepositoryProvider>{};
 
@@ -1039,9 +1181,10 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
   DBAdapterRegister({this.superRegister});
 
   /// Creates a child register.
-  DBAdapterRegister<C2, A2>
-      createRegister<C2 extends Object, A2 extends DBAdapter<C2>>() =>
-          DBAdapterRegister<C2, A2>(superRegister: this);
+  DBAdapterRegister<C2, A2> createRegister<
+    C2 extends Object,
+    A2 extends DBAdapter<C2>
+  >() => DBAdapterRegister<C2, A2>(superRegister: this);
 
   final Map<String, DBAdapterInstantiator<C, A>> _registeredAdaptersByName = {};
   final Map<Type, DBAdapterInstantiator<C, A>> _registeredAdaptersByType = {};
@@ -1052,8 +1195,11 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
   List<Type> get registeredAdaptersTypes =>
       _registeredAdaptersByType.keys.toList();
 
-  void registerAdapter(List<String> names, Type type,
-      DBAdapterInstantiator<C, A> adapterInstantiator) {
+  void registerAdapter(
+    List<String> names,
+    Type type,
+    DBAdapterInstantiator<C, A> adapterInstantiator,
+  ) {
     for (var name in names) {
       _registeredAdaptersByName[name] = adapterInstantiator;
     }
@@ -1063,12 +1209,14 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
     superRegister?.registerAdapter(names, type, adapterInstantiator);
   }
 
-  DBAdapterInstantiator<C2, A2>?
-      getAdapterInstantiator<C2 extends C, A2 extends DBAdapter<C2>>(
-          {String? name, Type? type}) {
+  DBAdapterInstantiator<C2, A2>? getAdapterInstantiator<
+    C2 extends C,
+    A2 extends DBAdapter<C2>
+  >({String? name, Type? type}) {
     if (name == null && type == null) {
       throw ArgumentError(
-          'One of the parameters `name` or `type` should NOT be null!');
+        'One of the parameters `name` or `type` should NOT be null!',
+      );
     }
 
     if (name != null) {
@@ -1089,34 +1237,42 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
   }
 
   List<MapEntry<DBAdapterInstantiator<C2, A2>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfig<C2 extends C, A2 extends DBAdapter<C2>>(
-              Map<String, dynamic> config) =>
-          getAdapterInstantiatorsFromConfigImpl<C2, A2>(
-              config, registeredAdaptersNames, getAdapterInstantiator);
+  getAdapterInstantiatorsFromConfig<C2 extends C, A2 extends DBAdapter<C2>>(
+    Map<String, dynamic> config,
+  ) => getAdapterInstantiatorsFromConfigImpl<C2, A2>(
+    config,
+    registeredAdaptersNames,
+    getAdapterInstantiator,
+  );
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfigImpl<C extends Object,
-                  A extends DBAdapter<C>>(
-              Map<String, dynamic> config,
-              List<String> registeredAdaptersNames,
-              DBAdapterInstantiator<C, A>? Function({String? name, Type? type})
-                  getAdapterInstantiator) =>
-          registeredAdaptersNames
-              .where((n) => config.containsKey(n))
-              .map((n) {
-                var instantiator = getAdapterInstantiator(name: n);
-                if (instantiator == null) return null;
-                var conf = config[n] ?? <String, dynamic>{};
-                if (conf is! Map) return null;
-                return MapEntry<DBAdapterInstantiator<C, A>,
-                        Map<String, dynamic>>(
-                    instantiator,
-                    conf.map((key, value) => MapEntry<String, dynamic>(
-                        key.toString(), value as dynamic)));
-              })
-              .nonNulls
-              .toList()
-            ..sort((a, b) => a.value.length.compareTo(b.value.length));
+  getAdapterInstantiatorsFromConfigImpl<
+    C extends Object,
+    A extends DBAdapter<C>
+  >(
+    Map<String, dynamic> config,
+    List<String> registeredAdaptersNames,
+    DBAdapterInstantiator<C, A>? Function({String? name, Type? type})
+    getAdapterInstantiator,
+  ) =>
+      registeredAdaptersNames
+          .where((n) => config.containsKey(n))
+          .map((n) {
+            var instantiator = getAdapterInstantiator(name: n);
+            if (instantiator == null) return null;
+            var conf = config[n] ?? <String, dynamic>{};
+            if (conf is! Map) return null;
+            return MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>(
+              instantiator,
+              conf.map(
+                (key, value) =>
+                    MapEntry<String, dynamic>(key.toString(), value as dynamic),
+              ),
+            );
+          })
+          .nonNulls
+          .toList()
+        ..sort((a, b) => a.value.length.compareTo(b.value.length));
 }
 
 /// An adapter for [EntityRepository] and [DBAdapter].
@@ -1129,10 +1285,13 @@ class DBRepositoryAdapter<O> with Initializable {
 
   final Type type;
 
-  DBRepositoryAdapter(this.databaseAdapter, this.name,
-      {String? tableName, Type? type})
-      : tableName = tableName ?? name,
-        type = type ?? O;
+  DBRepositoryAdapter(
+    this.databaseAdapter,
+    this.name, {
+    String? tableName,
+    Type? type,
+  }) : tableName = tableName ?? name,
+       type = type ?? O;
 
   @override
   FutureOr<InitializationResult> initialize() =>
@@ -1153,67 +1312,112 @@ class DBRepositoryAdapter<O> with Initializable {
   void checkEntityFields(O o, EntityHandler<O> entityHandler) => databaseAdapter
       .checkEntityFields<O>(o, name, tableName, entityHandler: entityHandler);
 
-  FutureOr<int> doCount(TransactionOperation op,
-          {EntityMatcher? matcher,
-          Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          PreFinishDBOperation<int, int>? preFinish}) =>
-      databaseAdapter.doCount(op, name, tableName,
-          matcher: matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          preFinish: preFinish);
+  FutureOr<int> doCount(
+    TransactionOperation op, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  }) => databaseAdapter.doCount(
+    op,
+    name,
+    tableName,
+    matcher: matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    preFinish: preFinish,
+  );
 
   FutureOr<List<I>> doExistIDs<I extends Object>(
-          TransactionOperation op, List<I> ids) =>
-      databaseAdapter.doExistIDs<I>(op, name, tableName, ids);
+    TransactionOperation op,
+    List<I> ids,
+  ) => databaseAdapter.doExistIDs<I>(op, name, tableName, ids);
 
-  FutureOr<R?> doSelectByID<R>(TransactionOperation op, Object id,
-          {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>
-      databaseAdapter.doSelectByID<R>(op, name, tableName, id,
-          preFinish: preFinish);
+  FutureOr<R?> doSelectByID<R>(
+    TransactionOperation op,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  }) => databaseAdapter.doSelectByID<R>(
+    op,
+    name,
+    tableName,
+    id,
+    preFinish: preFinish,
+  );
 
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, List<Object> ids,
-          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      databaseAdapter.doSelectByIDs<R>(op, name, tableName, ids,
-          preFinish: preFinish);
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    List<Object> ids, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => databaseAdapter.doSelectByIDs<R>(
+    op,
+    name,
+    tableName,
+    ids,
+    preFinish: preFinish,
+  );
 
-  FutureOr<List<R>> doSelectAll<R>(TransactionOperation op,
-          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
+  FutureOr<List<R>> doSelectAll<R>(
+    TransactionOperation op, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) =>
       databaseAdapter.doSelectAll<R>(op, name, tableName, preFinish: preFinish);
 
   FutureOr<dynamic> doInsert(
-          TransactionOperation op, O o, Map<String, dynamic> fields,
-          {String? idFieldName,
-          PreFinishDBOperation<dynamic, dynamic>? preFinish}) =>
-      databaseAdapter.doInsert(op, name, tableName, o, fields,
-          idFieldName: idFieldName, preFinish: preFinish);
+    TransactionOperation op,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation<dynamic, dynamic>? preFinish,
+  }) => databaseAdapter.doInsert(
+    op,
+    name,
+    tableName,
+    o,
+    fields,
+    idFieldName: idFieldName,
+    preFinish: preFinish,
+  );
 
   FutureOr<dynamic> doUpdate(
-          TransactionOperation op, O o, Object id, Map<String, dynamic> fields,
-          {String? idFieldName,
-          PreFinishDBOperation<dynamic, dynamic>? preFinish,
-          bool allowAutoInsert = false}) =>
-      databaseAdapter.doUpdate(op, name, tableName, o, id, fields,
-          idFieldName: idFieldName,
-          preFinish: preFinish,
-          allowAutoInsert: allowAutoInsert);
+    TransactionOperation op,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation<dynamic, dynamic>? preFinish,
+    bool allowAutoInsert = false,
+  }) => databaseAdapter.doUpdate(
+    op,
+    name,
+    tableName,
+    o,
+    id,
+    fields,
+    idFieldName: idFieldName,
+    preFinish: preFinish,
+    allowAutoInsert: allowAutoInsert,
+  );
 
-  FutureOr<R> doDelete<R>(TransactionOperation op, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish}) =>
-      databaseAdapter.doDelete<R>(op, name, tableName, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          preFinish: preFinish);
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) => databaseAdapter.doDelete<R>(
+    op,
+    name,
+    tableName,
+    matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    preFinish: preFinish,
+  );
 
   @override
   String toString() =>
@@ -1224,22 +1428,26 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     with EntityFieldAccessor<O> {
   final DBRepositoryAdapter<O> repositoryAdapter;
 
-  DBEntityRepository(DBAdapter super.adapter, super.name, super.entityHandler,
-      {DBRepositoryAdapter<O>? repositoryAdapter, super.type})
-      : repositoryAdapter =
-            repositoryAdapter ?? adapter.createRepositoryAdapter<O>(name)!;
+  DBEntityRepository(
+    DBAdapter super.adapter,
+    super.name,
+    super.entityHandler, {
+    DBRepositoryAdapter<O>? repositoryAdapter,
+    super.type,
+  }) : repositoryAdapter =
+           repositoryAdapter ?? adapter.createRepositoryAdapter<O>(name)!;
 
   @override
   FutureOr<InitializationResult> initialize() => provider
-          .executeInitialized(
-              () => repositoryAdapter.ensureInitialized(parent: this),
-              parent: this)
-          .resolveMapped((result) {
-        return InitializationResult.ok(this, dependencies: [
-          provider,
-          repositoryAdapter,
-          ...result.dependencies
-        ]);
+      .executeInitialized(
+        () => repositoryAdapter.ensureInitialized(parent: this),
+        parent: this,
+      )
+      .resolveMapped((result) {
+        return InitializationResult.ok(
+          this,
+          dependencies: [provider, repositoryAdapter, ...result.dependencies],
+        );
       });
 
   DBDialect get dialect => repositoryAdapter.dialect;
@@ -1250,25 +1458,31 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   @override
   Map<String, dynamic> information({bool extended = false}) => {
-        'dialect': dialectName,
-        'table': name,
-        if (extended) 'adapter': repositoryAdapter.information(extended: true),
-      };
+    'dialect': dialectName,
+    'table': name,
+    if (extended) 'adapter': repositoryAdapter.information(extended: true),
+  };
 
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
-    return count(matcher: ConditionID(id), transaction: transaction)
-        .resolveMapped((count) => count > 0);
+    return count(
+      matcher: ConditionID(id),
+      transaction: transaction,
+    ).resolveMapped((count) => count > 0);
   }
 
   @override
-  FutureOr<Iterable<I>> existIDs<I extends Object>(List<I?> ids,
-      {Transaction? transaction}) {
+  FutureOr<Iterable<I>> existIDs<I extends Object>(
+    List<I?> ids, {
+    Transaction? transaction,
+  }) {
     var idsNotNull = ids is List<I> ? ids : ids.nonNulls.toList();
     if (idsNotNull.isEmpty) return <I>[];
 
-    var cachedEntityByIDs =
-        transaction?.getCachedEntitiesByIDs(idsNotNull, type: type);
+    var cachedEntityByIDs = transaction?.getCachedEntitiesByIDs(
+      idsNotNull,
+      type: type,
+    );
 
     var cachedIDs = cachedEntityByIDs?.keys.whereType<I>().toList();
 
@@ -1284,20 +1498,22 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     checkNotClosed();
 
-    var op = TransactionOperationCount(name, operationExecutor,
-        matcher: ConditionIdIN(notCachedIDs), transaction: transaction);
+    var op = TransactionOperationCount(
+      name,
+      operationExecutor,
+      matcher: ConditionIdIN(notCachedIDs),
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter
-          .doExistIDs(op, notCachedIDs)
-          .resolveMapped((ids) {
-        return [
-          ...?cachedIDs,
-          ...ids,
-        ];
+      return repositoryAdapter.doExistIDs(op, notCachedIDs).resolveMapped((
+        ids,
+      ) {
+        return [...?cachedIDs, ...ids];
       });
     } catch (e, s) {
-      var message = 'existIDs> '
+      var message =
+          'existIDs> '
           'cachedIDs: $cachedIDs ; '
           'notCachedIDs: $notCachedIDs ; '
           'op: $op';
@@ -1307,8 +1523,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<dynamic> ensureStored(o,
-      {Transaction? transaction, TransactionOperation? operation}) {
+  FutureOr<dynamic> ensureStored(
+    o, {
+    Transaction? transaction,
+    TransactionOperation? operation,
+  }) {
     checkNotClosed();
 
     var id = getID(o, entityHandler: entityHandler);
@@ -1331,17 +1550,24 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<dynamic> _ensureStoredImpl(
-      o, Transaction? transaction, TransactionOperation? parentOperation) {
+    o,
+    Transaction? transaction,
+    TransactionOperation? parentOperation,
+  ) {
     if (transaction != null) {
-      var storeOp =
-          transaction.firstOperationWithEntity<TransactionOperationStore>(o);
+      var storeOp = transaction
+          .firstOperationWithEntity<TransactionOperationStore>(o);
 
       if (storeOp != null) {
         return storeOp.waitFinish(parentOperation: parentOperation).then((ok) {
           var id = getEntityID(storeOp.entity) ?? getEntityID(o);
           if (id == null && !ok) {
             throw RecursiveRelationshipLoopError.fromTransaction(
-                transaction, storeOp, parentOperation, o);
+              transaction,
+              storeOp,
+              parentOperation,
+              o,
+            );
           }
           return id;
         });
@@ -1352,8 +1578,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<bool> ensureReferencesStored(O o,
-      {Transaction? transaction, TransactionOperation? operation}) {
+  FutureOr<bool> ensureReferencesStored(
+    O o, {
+    Transaction? transaction,
+    TransactionOperation? operation,
+  }) {
     throw UnsupportedError("Relationships not supported for: $this");
   }
 
@@ -1364,25 +1593,33 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   DBAdapter get operationExecutor => repositoryAdapter.databaseAdapter;
 
   @override
-  FutureOr<int> count(
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Transaction? transaction}) {
+  FutureOr<int> count({
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Transaction? transaction,
+  }) {
     checkNotClosed();
 
-    var op = TransactionOperationCount(name, operationExecutor,
-        matcher: matcher, transaction: transaction);
+    var op = TransactionOperationCount(
+      name,
+      operationExecutor,
+      matcher: matcher,
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter.doCount(op,
-          matcher: matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      return repositoryAdapter.doCount(
+        op,
+        matcher: matcher,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
     } catch (e, s) {
-      var message = 'count> '
+      var message =
+          'count> '
           'matcher: $matcher ; '
           'parameters: $parameters ; '
           'positionalParameters: $positionalParameters ; '
@@ -1394,22 +1631,31 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<Iterable<O>> select(EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Transaction? transaction,
-      int? limit,
-      EntityResolutionRules? resolutionRules}) {
+  FutureOr<Iterable<O>> select(
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Transaction? transaction,
+    int? limit,
+    EntityResolutionRules? resolutionRules,
+  }) {
     if (matcher is ConditionID) {
-      return _selectByID(transaction, matcher, parameters ?? namedParameters,
-              resolutionRules)
-          .resolveMapped((res) => res != null ? <O>[res] : <O>[]);
+      return _selectByID(
+        transaction,
+        matcher,
+        parameters ?? namedParameters,
+        resolutionRules,
+      ).resolveMapped((res) => res != null ? <O>[res] : <O>[]);
     }
 
     if (matcher is ConditionIdIN) {
       return _selectByIDs(
-          transaction, matcher, parameters ?? namedParameters, resolutionRules);
+        transaction,
+        matcher,
+        parameters ?? namedParameters,
+        resolutionRules,
+      );
     }
 
     if (matcher is ConditionANY) {
@@ -1417,20 +1663,25 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     throw UnsupportedError(
-        "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)");
+      "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)",
+    );
   }
 
   @override
-  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(EntityMatcher matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Transaction? transaction,
-      int? limit}) {
+  FutureOr<Iterable<I>> selectIDsBy<I extends Object>(
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Transaction? transaction,
+    int? limit,
+  }) {
     if (matcher is ConditionID) {
       var id = matcher.idValue;
-      return existsID(id, transaction: transaction)
-          .resolveMapped((exists) => exists ? [id] : []);
+      return existsID(
+        id,
+        transaction: transaction,
+      ).resolveMapped((exists) => exists ? [id] : []);
     }
 
     if (matcher is ConditionIdIN) {
@@ -1439,11 +1690,16 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     throw UnsupportedError(
-        "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)");
+      "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)",
+    );
   }
 
-  FutureOr<O?> _selectByID(Transaction? transaction, ConditionID matcher,
-      Object? parameters, EntityResolutionRules? resolutionRules) {
+  FutureOr<O?> _selectByID(
+    Transaction? transaction,
+    ConditionID matcher,
+    Object? parameters,
+    EntityResolutionRules? resolutionRules,
+  ) {
     var id = matcher.idValue ?? matcher.getID(parameters);
 
     if (id == null && parameters != null) {
@@ -1452,23 +1708,35 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (id == null) return null;
 
-    final resolutionRulesResolved =
-        resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved = resolveEntityResolutionRules(
+      resolutionRules,
+    );
 
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher,
-        transaction: transaction);
+      name,
+      canPropagate,
+      operationExecutor,
+      matcher,
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter.doSelectByID<O?>(op, id, preFinish: (results) {
-        return resolveEntities(op.transaction, [results],
-                resolutionRules: resolutionRulesResolved)
-            .resolveMapped((os) => os.firstOrNull);
-      });
+      return repositoryAdapter.doSelectByID<O?>(
+        op,
+        id,
+        preFinish: (results) {
+          return resolveEntities(
+            op.transaction,
+            [results],
+            resolutionRules: resolutionRulesResolved,
+          ).resolveMapped((os) => os.firstOrNull);
+        },
+      );
     } catch (e, s) {
-      var message = '_selectByID> '
+      var message =
+          '_selectByID> '
           'matcher: $matcher ; '
           'id: $id ; '
           'op: $op';
@@ -1478,29 +1746,43 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<List<O>> _selectByIDs(
-      Transaction? transaction,
-      ConditionIdIN matcher,
-      Object? parameters,
-      EntityResolutionRules? resolutionRules) {
+    Transaction? transaction,
+    ConditionIdIN matcher,
+    Object? parameters,
+    EntityResolutionRules? resolutionRules,
+  ) {
     var ids = matcher.idsValues.nonNulls.toList();
     if (ids.isEmpty) return <O>[];
 
-    final resolutionRulesResolved =
-        resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved = resolveEntityResolutionRules(
+      resolutionRules,
+    );
 
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher,
-        transaction: transaction);
+      name,
+      canPropagate,
+      operationExecutor,
+      matcher,
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter.doSelectByIDs<O>(op, ids, preFinish: (results) {
-        return resolveEntities(op.transaction, results,
-            resolutionRules: resolutionRulesResolved);
-      });
+      return repositoryAdapter.doSelectByIDs<O>(
+        op,
+        ids,
+        preFinish: (results) {
+          return resolveEntities(
+            op.transaction,
+            results,
+            resolutionRules: resolutionRulesResolved,
+          );
+        },
+      );
     } catch (e, s) {
-      var message = '_selectByIDs> '
+      var message =
+          '_selectByIDs> '
           'matcher: $matcher ; '
           'id: $ids ; '
           'op: $op';
@@ -1509,24 +1791,39 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
-  FutureOr<List<O>> _selectAll(Transaction? transaction, ConditionANY matcher,
-      EntityResolutionRules? resolutionRules) {
-    final resolutionRulesResolved =
-        resolveEntityResolutionRules(resolutionRules);
+  FutureOr<List<O>> _selectAll(
+    Transaction? transaction,
+    ConditionANY matcher,
+    EntityResolutionRules? resolutionRules,
+  ) {
+    final resolutionRulesResolved = resolveEntityResolutionRules(
+      resolutionRules,
+    );
 
     var canPropagate = hasReferencedEntities(resolutionRulesResolved);
 
     var op = TransactionOperationSelect(
-        name, canPropagate, operationExecutor, matcher,
-        transaction: transaction);
+      name,
+      canPropagate,
+      operationExecutor,
+      matcher,
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter.doSelectAll<O>(op, preFinish: (results) {
-        return resolveEntities(op.transaction, results,
-            resolutionRules: resolutionRulesResolved);
-      });
+      return repositoryAdapter.doSelectAll<O>(
+        op,
+        preFinish: (results) {
+          return resolveEntities(
+            op.transaction,
+            results,
+            resolutionRules: resolutionRulesResolved,
+          );
+        },
+      );
     } catch (e, s) {
-      var message = '_selectAll> '
+      var message =
+          '_selectAll> '
           'matcher: $matcher ; '
           'op: $op';
       _log.severe(message, e, s);
@@ -1535,11 +1832,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   @override
-  FutureOr<Iterable<O>> selectAll(
-          {Transaction? transaction,
-          int? limit,
-          EntityResolutionRules? resolutionRules}) =>
-      select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
+  FutureOr<Iterable<O>> selectAll({
+    Transaction? transaction,
+    int? limit,
+    EntityResolutionRules? resolutionRules,
+  }) => select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
 
   @override
   bool hasReferencedEntities([EntityResolutionRulesResolved? resolutionRules]) {
@@ -1559,8 +1856,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty) {
         var anyEager =
             resolutionRules.isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
-                resolutionRules
-                    .isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
+            resolutionRules.isAnyEagerEntityTypeInfo(
+              fieldsListEntityRef.values,
+            );
         return anyEager;
       } else {
         return true;
@@ -1569,8 +1867,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     var eagerEntityTypes = resolutionRules.eagerEntityTypes;
     if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty) {
-      var anyEager = resolutionRules
-              .isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
+      var anyEager =
+          resolutionRules.isAnyEagerEntityTypeInfo(fieldsEntityRef.values) ||
           resolutionRules.isAnyEagerEntityTypeInfo(fieldsListEntityRef.values);
       return anyEager;
     }
@@ -1604,14 +1902,17 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<List<O>> resolveEntities(
-      Transaction transaction, Iterable<Map<String, dynamic>?>? results,
-      {EntityResolutionRules? resolutionRules}) {
+    Transaction transaction,
+    Iterable<Map<String, dynamic>?>? results, {
+    EntityResolutionRules? resolutionRules,
+  }) {
     if (results == null) return <O>[];
 
     if (results is List && results.isEmpty) return <O>[];
 
-    final resolutionRulesResolved =
-        resolveEntityResolutionRules(resolutionRules);
+    final resolutionRulesResolved = resolveEntityResolutionRules(
+      resolutionRules,
+    );
 
     Iterable<Map<String, dynamic>> entries;
     if (results is! Iterable<Map<String, dynamic>>) {
@@ -1624,80 +1925,107 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (fieldsListEntity.isNotEmpty) {
       var retTableScheme = repositoryAdapter.getTableScheme();
-      var retRelationshipFields =
-          _getRelationshipFields(fieldsListEntity, retTableScheme);
+      var retRelationshipFields = _getRelationshipFields(
+        fieldsListEntity,
+        retTableScheme,
+      );
 
       var ret = retTableScheme
           .resolveOther<List<O>, Map<String, TableRelationshipReference>>(
-              retRelationshipFields, (tableScheme, relationshipFields) {
-        if (relationshipFields.isNotEmpty) {
-          entries = entries is List ? entries : entries.toList();
+            retRelationshipFields,
+            (tableScheme, relationshipFields) {
+              if (relationshipFields.isNotEmpty) {
+                entries = entries is List ? entries : entries.toList();
 
-          var resolveRelationshipsFields = _resolveRelationshipFields(
-            transaction,
-            tableScheme,
-            entries,
-            relationshipFields,
-            fieldsListEntity,
-            resolutionRulesResolved,
+                var resolveRelationshipsFields = _resolveRelationshipFields(
+                  transaction,
+                  tableScheme,
+                  entries,
+                  relationshipFields,
+                  fieldsListEntity,
+                  resolutionRulesResolved,
+                );
+
+                return resolveRelationshipsFields.resolveWith(
+                  () => _resolveEntitiesSubEntities(
+                    transaction,
+                    resolutionRulesResolved,
+                    entries,
+                  ),
+                );
+              } else {
+                return _resolveEntitiesSubEntities(
+                  transaction,
+                  resolutionRulesResolved,
+                  entries,
+                );
+              }
+            },
           );
-
-          return resolveRelationshipsFields.resolveWith(() =>
-              _resolveEntitiesSubEntities(
-                  transaction, resolutionRulesResolved, entries));
-        } else {
-          return _resolveEntitiesSubEntities(
-              transaction, resolutionRulesResolved, entries);
-        }
-      });
 
       return _resolveEntitiesFutures(transaction, ret);
     } else {
       var ret = _resolveEntitiesSubEntities(
-          transaction, resolutionRulesResolved, entries);
+        transaction,
+        resolutionRulesResolved,
+        entries,
+      );
       return _resolveEntitiesFutures(transaction, ret);
     }
   }
 
   FutureOr<List<O>> _resolveEntitiesFutures(
-      Transaction transaction, FutureOr<List<O>> entitiesAsync) {
+    Transaction transaction,
+    FutureOr<List<O>> entitiesAsync,
+  ) {
     if (entitiesAsync is List<O>) {
       transaction.cacheEntities<O>(entitiesAsync, getEntityID);
       return trackEntities(entitiesAsync);
     }
 
-    return entitiesAsync
-        .resolveMapped((e) => e.resolveAll().resolveMapped((entities) {
-              transaction.cacheEntities<O>(entities, getEntityID);
-              return trackEntities(entities);
-            }));
+    return entitiesAsync.resolveMapped(
+      (e) => e.resolveAll().resolveMapped((entities) {
+        transaction.cacheEntities<O>(entities, getEntityID);
+        return trackEntities(entities);
+      }),
+    );
   }
 
   FutureOr<List<O>> _resolveEntitiesSimple(
-      Transaction transaction,
-      EntityResolutionRulesResolved resolutionRulesResolved,
-      Iterable<Map<String, dynamic>> results) {
+    Transaction transaction,
+    EntityResolutionRulesResolved resolutionRulesResolved,
+    Iterable<Map<String, dynamic>> results,
+  ) {
     final entityProvider = TransactionEntityProvider(
-        transaction, provider, resolutionRulesResolved);
+      transaction,
+      provider,
+      resolutionRulesResolved,
+    );
 
     return results.forEachAsync((e) {
       // ignore: discarded_futures
-      return entityHandler.createFromMap(e,
-          entityProvider: entityProvider,
-          entityCache: transaction,
-          entityRepositoryProvider: provider,
-          entityHandlerProvider: entityHandler.provider,
-          resolutionRules: resolutionRulesResolved);
+      return entityHandler.createFromMap(
+        e,
+        entityProvider: entityProvider,
+        entityCache: transaction,
+        entityRepositoryProvider: provider,
+        entityHandlerProvider: entityHandler.provider,
+        resolutionRules: resolutionRulesResolved,
+      );
     });
   }
 
   FutureOr<List<O>> _resolveEntitiesSubEntities(
-      Transaction transaction,
-      EntityResolutionRulesResolved resolutionRulesResolved,
-      Iterable<Map<String, dynamic>> results) {
+    Transaction transaction,
+    EntityResolutionRulesResolved resolutionRulesResolved,
+    Iterable<Map<String, dynamic>> results,
+  ) {
     if (_fieldsEntity.isEmpty) {
       return _resolveEntitiesSimple(
-          transaction, resolutionRulesResolved, results);
+        transaction,
+        resolutionRulesResolved,
+        results,
+      );
     }
 
     var resultsList =
@@ -1705,38 +2033,53 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (resultsList.length == 1) {
       return _resolveEntitiesSimple(
-          transaction, resolutionRulesResolved, resultsList);
+        transaction,
+        resolutionRulesResolved,
+        resultsList,
+      );
     }
 
-    var fieldsEntityRepositories =
-        _resolveFieldsEntityRepositories(resolutionRulesResolved);
+    var fieldsEntityRepositories = _resolveFieldsEntityRepositories(
+      resolutionRulesResolved,
+    );
 
     if (fieldsEntityRepositories.isEmpty) {
       return _resolveEntitiesSimple(
-          transaction, resolutionRulesResolved, results);
+        transaction,
+        resolutionRulesResolved,
+        results,
+      );
     }
 
-    var fieldsEntitiesAsync =
-        _fieldsEntityColumnsAll().resolveMapped((fieldsColumns) {
-      return fieldsEntityRepositories.entries.forEachAsync((e) {
-        var field = e.key;
-        var repo = e.value;
+    var fieldsEntitiesAsync = _fieldsEntityColumnsAll().resolveMapped((
+      fieldsColumns,
+    ) {
+      return fieldsEntityRepositories.entries
+          .forEachAsync((e) {
+            var field = e.key;
+            var repo = e.value;
 
-        var tableColumn = fieldsColumns[field]!;
+            var tableColumn = fieldsColumns[field]!;
 
-        var ids = resultsList.map((e) => e[tableColumn]).toList();
-        var idsUniques = ids.nonNulls.toSet().toList();
+            var ids = resultsList.map((e) => e[tableColumn]).toList();
+            var idsUniques = ids.nonNulls.toSet().toList();
 
-        var entities = repo
-            .selectByIDs(idsUniques,
-                transaction: transaction,
-                resolutionRules: resolutionRulesResolved)
-            .resolveMapped((entities) => idsUniques
-                .mapIndexed((i, id) => MapEntry(id, entities[i]))
-                .toList());
+            var entities = repo
+                .selectByIDs(
+                  idsUniques,
+                  transaction: transaction,
+                  resolutionRules: resolutionRulesResolved,
+                )
+                .resolveMapped(
+                  (entities) =>
+                      idsUniques
+                          .mapIndexed((i, id) => MapEntry(id, entities[i]))
+                          .toList(),
+                );
 
-        return MapEntry(tableColumn, entities);
-      }).resolveMapped((l) => l.resolveAllValues());
+            return MapEntry(tableColumn, entities);
+          })
+          .resolveMapped((l) => l.resolveAllValues());
     });
 
     return fieldsEntitiesAsync.resolveMapped((fieldsEntities) {
@@ -1755,7 +2098,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       }
 
       return _resolveEntitiesSimple(
-          transaction, resolutionRulesResolved, resultsList);
+        transaction,
+        resolutionRulesResolved,
+        resultsList,
+      );
     });
   }
 
@@ -1769,9 +2115,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         .map((f, _) => MapEntry(f, _resolveEntityFieldToTableColumn(f)))
         .resolveAllValues()
         .resolveMapped((fieldsColumns) {
-      _fieldsEntityColumnsAllCache = fieldsColumns;
-      return fieldsColumns;
-    });
+          _fieldsEntityColumnsAllCache = fieldsColumns;
+          return fieldsColumns;
+        });
   }
 
   Map<String, TypeInfo> get _fieldsEntity =>
@@ -1782,8 +2128,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   int? _fieldsEntityNoRefLengthCache;
 
-  int get _fieldsEntityNoRefLength => _fieldsEntityNoRefLengthCache ??=
-      _fieldsEntity.length - _fieldsEntityRef.length;
+  int get _fieldsEntityNoRefLength =>
+      _fieldsEntityNoRefLengthCache ??=
+          _fieldsEntity.length - _fieldsEntityRef.length;
 
   Map<String, TypeInfo> get _fieldsListEntity =>
       entityHandler.fieldsWithTypeListEntityOrReference();
@@ -1793,36 +2140,39 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   int? _fieldsListEntityNoRefLengthCache;
 
-  int get _fieldsListEntityNoRefLength => _fieldsListEntityNoRefLengthCache ??=
-      _fieldsListEntity.length - _fieldsListEntityRef.length;
+  int get _fieldsListEntityNoRefLength =>
+      _fieldsListEntityNoRefLengthCache ??=
+          _fieldsListEntity.length - _fieldsListEntityRef.length;
 
   Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
 
   Map<String, EntityRepository<Object>> _fieldsEntityRepositoriesAll() =>
-      _fieldsEntityRepositories ??= _fieldsEntity.entries
-          .map((e) {
-            var repo = _resolveEntityRepository(e.value);
-            return repo != null ? MapEntry(e.key, repo) : null;
-          })
-          .nonNulls
-          .toMapFromEntries();
+      _fieldsEntityRepositories ??=
+          _fieldsEntity.entries
+              .map((e) {
+                var repo = _resolveEntityRepository(e.value);
+                return repo != null ? MapEntry(e.key, repo) : null;
+              })
+              .nonNulls
+              .toMapFromEntries();
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
-      EntityResolutionRulesResolved resolutionRulesResolved) {
+    EntityResolutionRulesResolved resolutionRulesResolved,
+  ) {
     if (resolutionRulesResolved.isInnocuous && _fieldsEntityNoRefLength == 0) {
       return {};
     }
 
-    final fieldsEntity = this._fieldsEntity;
+    final fieldsEntity = _fieldsEntity;
 
-    return _fieldsEntityRepositoriesAll()
-        .entries
+    return _fieldsEntityRepositoriesAll().entries
         .map((e) {
           var fieldType = fieldsEntity[e.key]!;
           if (fieldType.isEntityReferenceType) {
             var entityType = fieldType.arguments0!.type;
-            var eagerEntityType =
-                resolutionRulesResolved.isEagerEntityType(entityType);
+            var eagerEntityType = resolutionRulesResolved.isEagerEntityType(
+              entityType,
+            );
             if (!eagerEntityType) return null;
           }
           return e;
@@ -1854,17 +2204,19 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       final fieldType = fieldsListEntity[fieldName]!;
       final targetTable = tableRelationshipReference.targetTable;
 
-      final targetRepositoryAdapter = databaseAdapter
-              .getRepositoryAdapterByTableName(targetTable) ??
+      final targetRepositoryAdapter =
+          databaseAdapter.getRepositoryAdapterByTableName(targetTable) ??
           (throw StateError(
-              "Can't find `DBRepositoryAdapter` for target table: $targetTable"));
+            "Can't find `DBRepositoryAdapter` for target table: $targetTable",
+          ));
 
       final targetType = targetRepositoryAdapter.type;
 
-      final targetEntityRepository = provider
-              .getEntityRepositoryByType(targetType) ??
+      final targetEntityRepository =
+          provider.getEntityRepositoryByType(targetType) ??
           (throw StateError(
-              "Can't find `EntityRepository` for target type: $targetType (`$targetTable`)"));
+            "Can't find `EntityRepository` for target type: $targetType (`$targetTable`)",
+          ));
 
       final targetEntityHandler = targetEntityRepository.entityHandler;
 
@@ -1872,7 +2224,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         for (var r in results) {
           var id = r[idFieldName];
 
-          var values = relationships[id] ??
+          var values =
+              relationships[id] ??
               targetEntityHandler.castList(<dynamic>[], targetType)!;
 
           r[fieldName] = values;
@@ -1882,8 +2235,13 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       }
 
       // ignore: discarded_futures
-      var relationshipsAsync = selectRelationships(null, fieldName,
-          oIds: ids, fieldType: fieldType, transaction: transaction);
+      var relationshipsAsync = selectRelationships(
+        null,
+        fieldName,
+        oIds: ids,
+        fieldType: fieldType,
+        transaction: transaction,
+      );
 
       // ignore: discarded_futures
       return relationshipsAsync.resolveMapped((relationships) {
@@ -1892,10 +2250,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         }
 
         if (fieldType.isEntityReferenceListType &&
-            !resolutionRulesResolved
-                .isEagerEntityType(fieldType.arguments0!.type)) {
-          var relationshipsEntities =
-              relationships.map((key, value) => MapEntry(key, value.asList));
+            !resolutionRulesResolved.isEagerEntityType(
+              fieldType.arguments0!.type,
+            )) {
+          var relationshipsEntities = relationships.map(
+            (key, value) => MapEntry(key, value.asList),
+          );
 
           return resolveRelationshipEntities(relationshipsEntities);
         }
@@ -1904,13 +2264,19 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             relationships.values.expand((e) => e).toSet().toList();
 
         // ignore: discarded_futures
-        var targetsAsync = targetEntityRepository.selectByIDs(allTargetIds,
-            transaction: transaction, resolutionRules: resolutionRulesResolved);
+        var targetsAsync = targetEntityRepository.selectByIDs(
+          allTargetIds,
+          transaction: transaction,
+          resolutionRules: resolutionRulesResolved,
+        );
 
         // ignore: discarded_futures
         return targetsAsync.resolveMapped((targets) {
-          var allTargetsById = Map.fromEntries(targets.nonNulls
-              .map((e) => MapEntry(targetEntityRepository.getEntityID(e)!, e)));
+          var allTargetsById = Map.fromEntries(
+            targets.nonNulls.map(
+              (e) => MapEntry(targetEntityRepository.getEntityID(e)!, e),
+            ),
+          );
 
           var relationshipsEntities = relationships.map((id, targetIds) {
             var targetEntities =
@@ -1931,33 +2297,39 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   // ignore: unused_element
   String _resolveTableColumnToEntityField(String tableField, [O? o]) {
     var fieldsNames = entityHandler.fieldsNames(o);
-    var entityFieldName =
-        entityHandler.resolveFiledName(fieldsNames, tableField);
+    var entityFieldName = entityHandler.resolveFiledName(
+      fieldsNames,
+      tableField,
+    );
     if (entityFieldName == null) {
       throw StateError(
-          "Can't resolve the table column `$tableField` to one of the entity `${entityHandler.type}` fields: $fieldsNames");
+        "Can't resolve the table column `$tableField` to one of the entity `${entityHandler.type}` fields: $fieldsNames",
+      );
     }
     return entityFieldName;
   }
 
-  FutureOr<String> _resolveEntityFieldToTableColumn(String entityField) =>
-      repositoryAdapter.getTableScheme().resolveMapped((tableScheme) {
-        var tableField = tableScheme.resolveTableFieldName(entityField);
-        if (tableField == null) {
-          throw StateError(
-              "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}");
-        }
-        return tableField;
-      });
+  FutureOr<String> _resolveEntityFieldToTableColumn(
+    String entityField,
+  ) => repositoryAdapter.getTableScheme().resolveMapped((tableScheme) {
+    var tableField = tableScheme.resolveTableFieldName(entityField);
+    if (tableField == null) {
+      throw StateError(
+        "Can't resolve entity `${entityHandler.type}` field `$entityField` to one of the table `${tableScheme.name}` columns: ${tableScheme.fieldsNames}",
+      );
+    }
+    return tableField;
+  });
 
   final Expando<
-          MapEntry<Map<String, TypeInfo>,
-              Map<String, TableRelationshipReference>>>
-      _relationshipFieldsCache = Expando();
+    MapEntry<Map<String, TypeInfo>, Map<String, TableRelationshipReference>>
+  >
+  _relationshipFieldsCache = Expando();
 
   FutureOr<Map<String, TableRelationshipReference>> _getRelationshipFields(
-      Map<String, TypeInfo> fieldsListEntity,
-      [FutureOr<TableScheme>? retTableScheme]) {
+    Map<String, TypeInfo> fieldsListEntity, [
+    FutureOr<TableScheme>? retTableScheme,
+  ]) {
     retTableScheme ??= repositoryAdapter.getTableScheme();
 
     return retTableScheme.resolveMapped((tableScheme) {
@@ -1969,37 +2341,44 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         }
       }
 
-      var relationshipFields =
-          _getRelationshipFieldsImpl(fieldsListEntity, tableScheme);
+      var relationshipFields = _getRelationshipFieldsImpl(
+        fieldsListEntity,
+        tableScheme,
+      );
 
-      _relationshipFieldsCache[tableScheme] =
-          MapEntry(fieldsListEntity, relationshipFields);
+      _relationshipFieldsCache[tableScheme] = MapEntry(
+        fieldsListEntity,
+        relationshipFields,
+      );
 
       return relationshipFields;
     });
   }
 
   Map<String, TableRelationshipReference> _getRelationshipFieldsImpl(
-      Map<String, TypeInfo<dynamic>> fieldsListEntity,
-      TableScheme tableScheme) {
+    Map<String, TypeInfo<dynamic>> fieldsListEntity,
+    TableScheme tableScheme,
+  ) {
     var databaseAdapter = repositoryAdapter.databaseAdapter;
 
-    var entries = fieldsListEntity.entries.map((e) {
-      var fieldName = e.key;
-      var targetType = e.value.arguments0!.type;
+    var entries =
+        fieldsListEntity.entries.map((e) {
+          var fieldName = e.key;
+          var targetType = e.value.arguments0!.type;
 
-      var targetRepositoryAdapter =
-          databaseAdapter.getRepositoryAdapterByType(targetType);
-      if (targetRepositoryAdapter == null) return null;
+          var targetRepositoryAdapter = databaseAdapter
+              .getRepositoryAdapterByType(targetType);
+          if (targetRepositoryAdapter == null) return null;
 
-      var relationship = tableScheme.getTableRelationshipReference(
-          sourceTable: tableName,
-          sourceField: fieldName,
-          targetTable: targetRepositoryAdapter.name);
-      if (relationship == null) return null;
+          var relationship = tableScheme.getTableRelationshipReference(
+            sourceTable: tableName,
+            sourceField: fieldName,
+            targetTable: targetRepositoryAdapter.name,
+          );
+          if (relationship == null) return null;
 
-      return MapEntry(e.key, relationship);
-    }).nonNulls;
+          return MapEntry(e.key, relationship);
+        }).nonNulls;
 
     var relationshipFields =
         Map<String, TableRelationshipReference>.fromEntries(entries);
@@ -2024,7 +2403,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       _storeImpl(o, transaction, null);
 
   FutureOr<dynamic> _storeImpl(
-      O o, Transaction? transaction, TransactionOperation? parentOperation) {
+    O o,
+    Transaction? transaction,
+    TransactionOperation? parentOperation,
+  ) {
     checkNotClosed();
 
     checkEntityFields(o);
@@ -2034,24 +2416,37 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
 
     var canPropagate = hasReferencedEntities(
-        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+      resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager),
+    );
 
-    var op = TransactionOperationStore(name, canPropagate, operationExecutor, o,
-        transaction: transaction, parentOperation: parentOperation);
+    var op = TransactionOperationStore(
+      name,
+      canPropagate,
+      operationExecutor,
+      o,
+      transaction: transaction,
+      parentOperation: parentOperation,
+    );
 
     try {
       var idFieldsName = entityHandler.idFieldName(o);
       var fields = entityHandler.getFields(o);
 
-      return repositoryAdapter
-          .doInsert(op, o, fields, idFieldName: idFieldsName, preFinish: (id) {
-        entityHandler.setID(o, id);
+      return repositoryAdapter.doInsert(
+        op,
+        o,
+        fields,
+        idFieldName: idFieldsName,
+        preFinish: (id) {
+          entityHandler.setID(o, id);
 
-        trackEntity(o);
-        return id; // pre-finish
-      });
+          trackEntity(o);
+          return id; // pre-finish
+        },
+      );
     } catch (e, s) {
-      var message = 'store> '
+      var message =
+          'store> '
           'o: $o ; '
           'transaction: $transaction ; '
           'op: $op';
@@ -2060,14 +2455,24 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
-  FutureOr<dynamic> _update(O o, Transaction? transaction,
-      TransactionOperation? parentOperation, bool allowAutoInsert) {
+  FutureOr<dynamic> _update(
+    O o,
+    Transaction? transaction,
+    TransactionOperation? parentOperation,
+    bool allowAutoInsert,
+  ) {
     var canPropagate = hasReferencedEntities(
-        resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager));
+      resolveEntityResolutionRules(EntityResolutionRules.instanceAllEager),
+    );
 
     var op = TransactionOperationUpdate(
-        name, canPropagate, operationExecutor, o,
-        transaction: transaction, parentOperation: parentOperation);
+      name,
+      canPropagate,
+      operationExecutor,
+      o,
+      transaction: transaction,
+      parentOperation: parentOperation,
+    );
 
     var idFieldsName = entityHandler.idFieldName(o);
     var id = entityHandler.getID(o);
@@ -2083,39 +2488,57 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       fields.removeWhere((key, value) => !changedFields.contains(key));
     }
 
-    return repositoryAdapter.doUpdate(op, o, id, fields,
-        idFieldName: idFieldsName,
-        allowAutoInsert: allowAutoInsert, preFinish: (id) {
-      trackEntity(o);
-      return id; // pre-finish
-    });
+    return repositoryAdapter.doUpdate(
+      op,
+      o,
+      id,
+      fields,
+      idFieldName: idFieldsName,
+      allowAutoInsert: allowAutoInsert,
+      preFinish: (id) {
+        trackEntity(o);
+        return id; // pre-finish
+      },
+    );
   }
 
   @override
   FutureOr<bool> setRelationship<E extends Object>(
-      O o, String field, List<E> values,
-      {TypeInfo? fieldType, Transaction? transaction}) {
+    O o,
+    String field,
+    List<E> values, {
+    TypeInfo? fieldType,
+    Transaction? transaction,
+  }) {
     throw UnsupportedError("Relationship not supported for: $this");
   }
 
   @override
-  FutureOr<Iterable<dynamic>> selectRelationship<E>(O? o, String field,
-          {Object? oId, TypeInfo? fieldType, Transaction? transaction}) =>
-      <dynamic>[];
+  FutureOr<Iterable<dynamic>> selectRelationship<E>(
+    O? o,
+    String field, {
+    Object? oId,
+    TypeInfo? fieldType,
+    Transaction? transaction,
+  }) => <dynamic>[];
 
   @override
   FutureOr<Map<dynamic, Iterable<dynamic>>> selectRelationships<E>(
-          List<O>? os, String field,
-          {List<dynamic>? oIds,
-          TypeInfo? fieldType,
-          Transaction? transaction}) =>
-      <dynamic, Iterable<dynamic>>{};
+    List<O>? os,
+    String field, {
+    List<dynamic>? oIds,
+    TypeInfo? fieldType,
+    Transaction? transaction,
+  }) => <dynamic, Iterable<dynamic>>{};
 
   EntityRepository<E>? _resolveEntityRepository<E extends Object>(
-      TypeInfo type) {
-    var entityRepository = entityHandler.getEntityRepositoryByTypeInfo(type,
-        entityRepositoryProvider: provider,
-        entityHandlerProvider: entityHandler.provider);
+    TypeInfo type,
+  ) {
+    var entityRepository = entityHandler.getEntityRepositoryByTypeInfo(
+      type,
+      entityRepositoryProvider: provider,
+      entityHandlerProvider: entityHandler.provider,
+    );
     if (entityRepository != null) {
       return entityRepository as EntityRepository<E>;
     }
@@ -2126,9 +2549,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var typeEntityHandler = entityHandler.getEntityHandler(type: entityType);
 
     if (typeEntityHandler != null) {
-      entityRepository = typeEntityHandler.getEntityRepositoryByType(entityType,
-          entityRepositoryProvider: provider,
-          entityHandlerProvider: entityHandler.provider);
+      entityRepository = typeEntityHandler.getEntityRepositoryByType(
+        entityType,
+        entityRepositoryProvider: provider,
+        entityHandlerProvider: entityHandler.provider,
+      );
       if (entityRepository != null) {
         return entityRepository as EntityRepository<E>;
       }
@@ -2142,43 +2567,57 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     checkNotClosed();
 
     return Transaction.executeBlock((transaction) {
-      var result = os
-          .map((o) => store(o, transaction: transaction))
-          .toList(growable: false)
-          .resolveAll();
+      var result =
+          os
+              .map((o) => store(o, transaction: transaction))
+              .toList(growable: false)
+              .resolveAll();
 
       return result;
     }, transaction: transaction);
   }
 
   @override
-  FutureOr<Iterable<O>> delete(EntityMatcher<O> matcher,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Transaction? transaction}) {
+  FutureOr<Iterable<O>> delete(
+    EntityMatcher<O> matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Transaction? transaction,
+  }) {
     checkNotClosed();
 
-    var canPropagate =
-        hasReferencedEntities(resolveEntityResolutionRules(null));
+    var canPropagate = hasReferencedEntities(
+      resolveEntityResolutionRules(null),
+    );
 
     var op = TransactionOperationDelete(
-        name, canPropagate, operationExecutor, matcher,
-        transaction: transaction);
+      name,
+      canPropagate,
+      operationExecutor,
+      matcher,
+      transaction: transaction,
+    );
 
     try {
-      return repositoryAdapter.doDelete(op, matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters, preFinish: (results) {
-        return resolveEntities(op.transaction, results)
-            .resolveMapped((entities) {
-          untrackEntities(entities, deleted: true);
-          return entities;
-        });
-      });
+      return repositoryAdapter.doDelete(
+        op,
+        matcher,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        preFinish: (results) {
+          return resolveEntities(op.transaction, results).resolveMapped((
+            entities,
+          ) {
+            untrackEntities(entities, deleted: true);
+            return entities;
+          });
+        },
+      );
     } catch (e, s) {
-      var message = 'delete> '
+      var message =
+          'delete> '
           'matcher: $matcher ; '
           'parameters: $parameters ; '
           'positionalParameters: $positionalParameters ; '
@@ -2230,18 +2669,20 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
   }
 
   FutureOr<A> buildAdapter() => DBAdapter.fromConfig(
-        adapterConfig,
-        parentRepositoryProvider: this,
-        workingPath: workingPath,
-      );
+    adapterConfig,
+    parentRepositoryProvider: this,
+    workingPath: workingPath,
+  );
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() {
-    return requiredEntityRepositoryProviders().resolveOther(requiredAdapters(),
-        (requiredRepoProviders, requiredAdapters) {
-      var dependencies = [...requiredRepoProviders, ...requiredAdapters];
-      return dependencies;
-    });
+    return requiredEntityRepositoryProviders().resolveOther(
+      requiredAdapters(),
+      (requiredRepoProviders, requiredAdapters) {
+        var dependencies = [...requiredRepoProviders, ...requiredAdapters];
+        return dependencies;
+      },
+    );
   }
 
   @override
@@ -2253,14 +2694,17 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
       if (duplicatedError != null) return duplicatedError;
 
       return extraDependencies().resolveMapped((extraDependencies) {
-        return InitializationResult.ok(this,
-            dependencies: [adapter, ...repositories, ...extraDependencies]);
+        return InitializationResult.ok(
+          this,
+          dependencies: [adapter, ...repositories, ...extraDependencies],
+        );
       });
     });
   }
 
   InitializationResult? _checkDuplicatedRepositories(
-      List<EntityRepository<Object>> repositories) {
+    List<EntityRepository<Object>> repositories,
+  ) {
     var repositoriesByType = repositories.groupBy((r) => (r.type, r.name));
 
     var duplicatedRepositoriesGroups =
@@ -2275,13 +2719,16 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
       var repoName = e.key.$2;
       var repos = e.value;
       _log.warning(
-          "Found duplicated repositores for `$repoType` (`$repoName`):\n  -- ${repos.join('\n  -- ')}");
+        "Found duplicated repositores for `$repoType` (`$repoName`):\n  -- ${repos.join('\n  -- ')}",
+      );
     }
 
     var duplicatedRepos = duplicatedRepositoriesGroups.expand((e) => e.value);
 
-    return InitializationResult.error(this,
-        "Duplicated repositories:\n  -- ${duplicatedRepos.join('\n  -- ')}");
+    return InitializationResult.error(
+      this,
+      "Duplicated repositories:\n  -- ${duplicatedRepos.join('\n  -- ')}",
+    );
   }
 
   /// List of adapters that need to be initialized to [buildRepositories].
@@ -2289,7 +2736,7 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
 
   /// List of [EntityRepositoryProvider] that need to be initialized to [buildRepositories].
   FutureOr<List<EntityRepositoryProvider>>
-      requiredEntityRepositoryProviders() => <EntityRepositoryProvider>[];
+  requiredEntityRepositoryProviders() => <EntityRepositoryProvider>[];
 
   /// Builds the [EntityRepository], called by [initialize].
   /// See [extraDependencies].
@@ -2335,12 +2782,14 @@ class DBAdapterException implements DBException, WithRuntimeTypeNameSafe {
   @override
   final Object? operation;
 
-  DBAdapterException(this.type, this.message,
-      {this.parentError,
-      this.parentStackTrace,
-      this.operation,
-      this.previousError})
-      : super();
+  DBAdapterException(
+    this.type,
+    this.message, {
+    this.parentError,
+    this.parentStackTrace,
+    this.operation,
+    this.previousError,
+  }) : super();
 
   String? resolveToString(Object? o, {String indent = '-- '}) {
     if (o == null) {

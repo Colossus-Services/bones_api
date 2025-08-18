@@ -60,8 +60,9 @@ void main() {
           request1.parameters['username'] = 'foo';
           request1.parameters['password'] = 'foo';
 
-          var authentication1 =
-              await apiSecurity.authenticateByRequest(request1);
+          var authentication1 = await apiSecurity.authenticateByRequest(
+            request1,
+          );
           if (authentication1 == null) {
             throw StateError("Null `authentication1`");
           }
@@ -79,8 +80,9 @@ void main() {
           request2.parameters['username'] = 'foo';
           request2.parameters['password'] = 'not_foo';
 
-          var authentication2 =
-              await apiSecurity.authenticateByRequest(request2);
+          var authentication2 = await apiSecurity.authenticateByRequest(
+            request2,
+          );
           if (authentication2 != null) {
             throw StateError("Expected null `authentication2`");
           }
@@ -89,12 +91,18 @@ void main() {
             throw StateError("Expected null `request2.authentication`");
           }
 
-          var request3 = APIRequest(APIRequestMethod.GET, 'foo',
-              credential:
-                  APICredential('foo', token: requestAuthentication1.tokenKey));
+          var request3 = APIRequest(
+            APIRequestMethod.GET,
+            'foo',
+            credential: APICredential(
+              'foo',
+              token: requestAuthentication1.tokenKey,
+            ),
+          );
 
-          var authentication3 =
-              await apiSecurity.authenticateByRequest(request3);
+          var authentication3 = await apiSecurity.authenticateByRequest(
+            request3,
+          );
           if (authentication3 == null) {
             throw StateError("Null `authentication3`");
           }
@@ -107,8 +115,9 @@ void main() {
           request4.parameters['username'] = 'foo';
           request4.parameters['password'] = 'foo';
 
-          var authentication4 =
-              await apiSecurity.authenticateByRequest(request4);
+          var authentication4 = await apiSecurity.authenticateByRequest(
+            request4,
+          );
           if (authentication4 == null) {
             throw StateError("Null `authentication4`");
           }
@@ -128,20 +137,28 @@ void main() {
           request5.parameters['logout'] = 'true';
           request5.parameters['token'] = requestAuthentication1.tokenKey;
 
-          var authentication5 = await apiSecurity
-              .authenticateByRequest(request5, allowLogout: true);
+          var authentication5 = await apiSecurity.authenticateByRequest(
+            request5,
+            allowLogout: true,
+          );
           if (authentication5 != null) {
             throw StateError("Not `null` `authentication5`");
           }
 
           await Future.delayed(Duration(milliseconds: 1000));
 
-          var request6 = APIRequest(APIRequestMethod.GET, 'foo',
-              credential:
-                  APICredential('foo', token: requestAuthentication1.tokenKey));
+          var request6 = APIRequest(
+            APIRequestMethod.GET,
+            'foo',
+            credential: APICredential(
+              'foo',
+              token: requestAuthentication1.tokenKey,
+            ),
+          );
 
-          var authentication6 =
-              await apiSecurity.authenticateByRequest(request6);
+          var authentication6 = await apiSecurity.authenticateByRequest(
+            request6,
+          );
           if (authentication6 != null) {
             throw StateError("Not `null` `authentication6`");
           }
@@ -188,7 +205,9 @@ class _MyAPISecurity extends APISecurity {
 
   @override
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential, List<APIPermission>? previousPermissions) {
+    APICredential credential,
+    List<APIPermission>? previousPermissions,
+  ) {
     return [
       APIPermission('basic'),
       if (credential.username.startsWith('admin')) APIPermission('admin'),

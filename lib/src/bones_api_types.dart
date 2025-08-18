@@ -24,11 +24,13 @@ class Time implements Comparable<Time> {
   final int millisecond;
   final int microsecond;
 
-  Time(this.hour,
-      [this.minute = 0,
-      this.second = 0,
-      this.millisecond = 0,
-      this.microsecond = 0]) {
+  Time(
+    this.hour, [
+    this.minute = 0,
+    this.second = 0,
+    this.millisecond = 0,
+    this.microsecond = 0,
+  ]) {
     if (hour < 0 || hour > 24) {
       throw ArgumentError.value(hour, 'hour', 'Not in range: 0..24');
     }
@@ -43,12 +45,18 @@ class Time implements Comparable<Time> {
 
     if (millisecond < 0 || millisecond > 1000) {
       throw ArgumentError.value(
-          millisecond, 'millisecond', 'Not in range: 0..999');
+        millisecond,
+        'millisecond',
+        'Not in range: 0..999',
+      );
     }
 
     if (microsecond < 0 || microsecond > 1000) {
       throw ArgumentError.value(
-          microsecond, 'microsecond', 'Not in range: 0..999');
+        microsecond,
+        'microsecond',
+        'Not in range: 0..999',
+      );
     }
   }
 
@@ -57,11 +65,17 @@ class Time implements Comparable<Time> {
     var h = duration.inHours;
     var m = duration.inMinutes - Duration(hours: h).inMinutes;
     var s = duration.inSeconds - Duration(hours: h, minutes: m).inSeconds;
-    var ms = duration.inMilliseconds -
+    var ms =
+        duration.inMilliseconds -
         Duration(hours: h, minutes: m, seconds: s).inMilliseconds;
-    var mic = duration.inMicroseconds -
-        Duration(hours: h, minutes: m, seconds: s, milliseconds: ms)
-            .inMicroseconds;
+    var mic =
+        duration.inMicroseconds -
+        Duration(
+          hours: h,
+          minutes: m,
+          seconds: s,
+          milliseconds: ms,
+        ).inMicroseconds;
     return Time(h, m, s, ms, mic);
   }
 
@@ -168,12 +182,14 @@ class Time implements Comparable<Time> {
         return Time.parse(s, allowFromBytes: false);
       } catch (_) {
         throw FormatException(
-            'Invalid bytes or string format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}');
+          'Invalid bytes or string format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}',
+        );
       }
     }
 
     throw FormatException(
-        'Invalid bytes format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}');
+      'Invalid bytes format: ${bytes.runtimeTypeNameUnsafe}:${bytes.toList()}',
+    );
   }
 
   /// Parses [s] to [Time].
@@ -284,8 +300,11 @@ class Time implements Comparable<Time> {
   }
 
   @override
-  String toString(
-      {bool withSeconds = true, bool? withMillisecond, bool? withMicrosecond}) {
+  String toString({
+    bool withSeconds = true,
+    bool? withMillisecond,
+    bool? withMicrosecond,
+  }) {
     var h = _intToPaddedString(hour);
     var m = _intToPaddedString(minute);
     var s = _intToPaddedString(second);
@@ -312,23 +331,48 @@ class Time implements Comparable<Time> {
       n.toString().padLeft(padding, '0');
 
   /// Creates a new [Time] from this one by updating individual properties.
-  Time copyWith(
-          {int? hour,
-          int? minute,
-          int? second,
-          int? millisecond,
-          int? microsecond}) =>
-      Time(hour ?? this.hour, minute ?? this.minute, second ?? this.second,
-          millisecond ?? this.millisecond, microsecond ?? this.microsecond);
+  Time copyWith({
+    int? hour,
+    int? minute,
+    int? second,
+    int? millisecond,
+    int? microsecond,
+  }) => Time(
+    hour ?? this.hour,
+    minute ?? this.minute,
+    second ?? this.second,
+    millisecond ?? this.millisecond,
+    microsecond ?? this.microsecond,
+  );
 
   /// Converts this [Time] to [DateTime].
-  DateTime toDateTime(int year,
-          [int month = 1, int day = 1, bool utc = true]) =>
+  DateTime toDateTime(
+    int year, [
+    int month = 1,
+    int day = 1,
+    bool utc = true,
+  ]) =>
       utc
           ? DateTime.utc(
-              year, month, day, hour, minute, second, millisecond, microsecond)
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond,
+            microsecond,
+          )
           : DateTime(
-              year, month, day, hour, minute, second, millisecond, microsecond);
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            millisecond,
+            microsecond,
+          );
 
   /// Returns the total minutes of this [Time] period.
   int get totalMinutes => (hour * 60) + minute;
@@ -344,11 +388,12 @@ class Time implements Comparable<Time> {
 
   /// Converts `this` instance to [Duration].
   Duration get asDuration => Duration(
-      hours: hour,
-      minutes: minute,
-      seconds: second,
-      milliseconds: millisecond,
-      microseconds: microsecond);
+    hours: hour,
+    minutes: minute,
+    seconds: second,
+    milliseconds: millisecond,
+    microseconds: microsecond,
+  );
 
   @override
   int compareTo(Time other) {
@@ -478,12 +523,11 @@ extension DateTimeToTimeExtension on DateTime {
     bool withSecond = true,
     bool withMillisecond = true,
     bool withMicrosecond = true,
-  }) =>
-      Time(
-        hour,
-        withMinute ? minute : 0,
-        withSecond ? second : 0,
-        withMillisecond ? millisecond : 0,
-        withMicrosecond ? microsecond : 0,
-      );
+  }) => Time(
+    hour,
+    withMinute ? minute : 0,
+    withSecond ? second : 0,
+    withMillisecond ? millisecond : 0,
+    withMicrosecond ? microsecond : 0,
+  );
 }

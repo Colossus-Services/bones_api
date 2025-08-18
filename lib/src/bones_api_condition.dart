@@ -31,8 +31,10 @@ abstract class ConditionElement {
   /// - Uses [parent.isInner] to resolve it.
   bool get isInner => parent?.isInner ?? true;
 
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters});
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  });
 
   late List<ConditionParameter> _parameters;
 
@@ -42,9 +44,10 @@ abstract class ConditionElement {
       List<ConditionParameter>.unmodifiable([]);
 
   void _setParameters(Iterable<ConditionParameter> parameters) {
-    _parameters = parameters.isEmpty
-        ? _emptyParameters
-        : List<ConditionParameter>.unmodifiable(parameters);
+    _parameters =
+        parameters.isEmpty
+            ? _emptyParameters
+            : List<ConditionParameter>.unmodifiable(parameters);
   }
 }
 
@@ -56,17 +59,17 @@ class ConditionParameter extends ConditionElement {
   String? contextKey;
   int? contextKeyPosition;
 
-  ConditionParameter()
-      : index = null,
-        key = null;
+  ConditionParameter() : index = null, key = null;
 
   ConditionParameter.index(this.index) : key = null;
 
   ConditionParameter.key(this.key) : index = null;
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     if (isPositional) {
@@ -95,11 +98,12 @@ class ConditionParameter extends ConditionElement {
 
   bool get hasKey => key != null;
 
-  Object? getValue(
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Map<String, Object?>? encodingParameters}) {
+  Object? getValue({
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Map<String, Object?>? encodingParameters,
+  }) {
     if (parameters != null) {
       if (parameters is! Map && parameters is! Iterable) {
         var obj = parameters as dynamic;
@@ -110,14 +114,17 @@ class ConditionParameter extends ConditionElement {
       }
 
       if (parameters is Map) {
-        namedParameters ??= parameters is Map<String, Object?>
-            ? parameters
-            : parameters.map<String, Object?>(
-                (key, value) => MapEntry<String, Object?>('$key', value));
+        namedParameters ??=
+            parameters is Map<String, Object?>
+                ? parameters
+                : parameters.map<String, Object?>(
+                  (key, value) => MapEntry<String, Object?>('$key', value),
+                );
       } else if (parameters is Iterable) {
-        positionalParameters ??= parameters is List
-            ? parameters
-            : parameters.toList(growable: false);
+        positionalParameters ??=
+            parameters is List
+                ? parameters
+                : parameters.toList(growable: false);
       }
     }
 
@@ -172,154 +179,221 @@ class ConditionParameter extends ConditionElement {
     return null;
   }
 
-  bool matches(Object? value,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool matches(
+    Object? value, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        : value;
+    var otherValue =
+        value is ConditionParameter
+            ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
+            : value;
 
     if (myValue is Iterable) {
       if (otherValue is Iterable) {
-        var equals = isEqualsIterableDeep(myValue, otherValue,
-            valueEquality: (a, b) => EntityHandler.equalsValuesBasic(a, b,
-                entityHandler: entityHandler));
+        var equals = isEqualsIterableDeep(
+          myValue,
+          otherValue,
+          valueEquality:
+              (a, b) => EntityHandler.equalsValuesBasic(
+                a,
+                b,
+                entityHandler: entityHandler,
+              ),
+        );
         return equals;
       } else {
-        var contains = myValue
-            .where((v) => EntityHandler.equalsValuesBasic(v, otherValue,
-                entityHandler: entityHandler))
-            .isNotEmpty;
+        var contains =
+            myValue
+                .where(
+                  (v) => EntityHandler.equalsValuesBasic(
+                    v,
+                    otherValue,
+                    entityHandler: entityHandler,
+                  ),
+                )
+                .isNotEmpty;
         return contains;
       }
     } else if (otherValue is Iterable) {
-      var contains = otherValue
-          .where((v) => EntityHandler.equalsValuesBasic(v, myValue,
-              entityHandler: entityHandler))
-          .isNotEmpty;
+      var contains =
+          otherValue
+              .where(
+                (v) => EntityHandler.equalsValuesBasic(
+                  v,
+                  myValue,
+                  entityHandler: entityHandler,
+                ),
+              )
+              .isNotEmpty;
       return contains;
     }
 
-    return EntityHandler.equalsValuesBasic(myValue, otherValue,
-        entityHandler: entityHandler);
+    return EntityHandler.equalsValuesBasic(
+      myValue,
+      otherValue,
+      entityHandler: entityHandler,
+    );
   }
 
-  bool greaterThan(Object? value,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool greaterThan(
+    Object? value, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        : value;
+    var otherValue =
+        value is ConditionParameter
+            ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
+            : value;
 
-    return EntityHandler.graterThanValue(myValue, otherValue,
-        entityHandler: entityHandler);
+    return EntityHandler.graterThanValue(
+      myValue,
+      otherValue,
+      entityHandler: entityHandler,
+    );
   }
 
-  bool greaterThanOrEqual(Object? value,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool greaterThanOrEqual(
+    Object? value, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        : value;
+    var otherValue =
+        value is ConditionParameter
+            ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
+            : value;
 
-    return EntityHandler.graterThanOrEqualValue(myValue, otherValue,
-        entityHandler: entityHandler);
+    return EntityHandler.graterThanOrEqualValue(
+      myValue,
+      otherValue,
+      entityHandler: entityHandler,
+    );
   }
 
-  bool lessThan(Object? value,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool lessThan(
+    Object? value, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        : value;
+    var otherValue =
+        value is ConditionParameter
+            ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
+            : value;
 
-    return EntityHandler.lessThanValue(myValue, otherValue,
-        entityHandler: entityHandler);
+    return EntityHandler.lessThanValue(
+      myValue,
+      otherValue,
+      entityHandler: entityHandler,
+    );
   }
 
-  bool lessThanOrEqual(Object? value,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool lessThanOrEqual(
+    Object? value, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters)
-        : value;
+    var otherValue =
+        value is ConditionParameter
+            ? value.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
+            : value;
 
-    return EntityHandler.lessThanOrEqualValue(myValue, otherValue,
-        entityHandler: entityHandler);
+    return EntityHandler.lessThanOrEqualValue(
+      myValue,
+      otherValue,
+      entityHandler: entityHandler,
+    );
   }
 
-  bool matchesIn(List values,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool matchesIn(
+    List values, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     var myValue = getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
     if (myValue is List) {
       for (var v1 in myValue) {
         for (var v2 in values) {
-          var otherValue = v2 is ConditionParameter
-              ? v2.getValue(
-                  parameters: parameters,
-                  positionalParameters: positionalParameters,
-                  namedParameters: namedParameters)
-              : v2;
+          var otherValue =
+              v2 is ConditionParameter
+                  ? v2.getValue(
+                    parameters: parameters,
+                    positionalParameters: positionalParameters,
+                    namedParameters: namedParameters,
+                  )
+                  : v2;
 
-          var match = EntityHandler.equalsValuesBasic(v1, otherValue,
-              entityHandler: entityHandler);
+          var match = EntityHandler.equalsValuesBasic(
+            v1,
+            otherValue,
+            entityHandler: entityHandler,
+          );
           if (match) return true;
         }
       }
@@ -327,15 +401,20 @@ class ConditionParameter extends ConditionElement {
       return false;
     } else {
       for (var v2 in values) {
-        var otherValue = v2 is ConditionParameter
-            ? v2.getValue(
-                parameters: parameters,
-                positionalParameters: positionalParameters,
-                namedParameters: namedParameters)
-            : v2;
+        var otherValue =
+            v2 is ConditionParameter
+                ? v2.getValue(
+                  parameters: parameters,
+                  positionalParameters: positionalParameters,
+                  namedParameters: namedParameters,
+                )
+                : v2;
 
-        var match = EntityHandler.equalsValuesBasic(myValue, otherValue,
-            entityHandler: entityHandler);
+        var match = EntityHandler.equalsValuesBasic(
+          myValue,
+          otherValue,
+          entityHandler: entityHandler,
+        );
         if (match) return true;
       }
 
@@ -381,28 +460,34 @@ class ConditionParameter extends ConditionElement {
 }
 
 abstract class EntityMatcher<O> {
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters});
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  });
 
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters});
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  });
 }
 
 abstract class Condition<O> extends ConditionElement
     with EntityFieldAccessor<O>
     implements EntityMatcher<O> {
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters});
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  });
 
   Condition._();
 
@@ -415,7 +500,8 @@ abstract class Condition<O> extends ConditionElement
   }
 
   static final RegExp _conditionParameterRegExp = RegExp(
-      r'\{\s*"ConditionParameter":\s*"(?:(#(?:-?\d+)?)|(:\w*)|\?)"\s*\}');
+    r'\{\s*"ConditionParameter":\s*"(?:(#(?:-?\d+)?)|(:\w*)|\?)"\s*\}',
+  );
 
   static String encodeConditionValue(dynamic o) {
     var s = Json.encode(o, toEncodable: toJsonEncodable);
@@ -454,155 +540,215 @@ abstract class Condition<O> extends ConditionElement
 
   bool get isIDCondition => false;
 
-  bool greaterThanConditionValue(Object? value1, Object? value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      TypeInfo? keyType,
-      EntityHandler? keyEntityHandler}) {
+  bool greaterThanConditionValue(
+    Object? value1,
+    Object? value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.greaterThan(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value1.greaterThan(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else if (value2 is ConditionParameter) {
-      return value2.lessThan(value1,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value2.lessThan(
+        value1,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else {
-      var match = EntityHandler.graterThanValue(value1, value2,
-          entityHandler: keyEntityHandler);
+      var match = EntityHandler.graterThanValue(
+        value1,
+        value2,
+        entityHandler: keyEntityHandler,
+      );
       return match;
     }
   }
 
-  bool greaterThanOrEqualConditionValue(Object? value1, Object? value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      TypeInfo? keyType,
-      EntityHandler? keyEntityHandler}) {
+  bool greaterThanOrEqualConditionValue(
+    Object? value1,
+    Object? value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.greaterThanOrEqual(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value1.greaterThanOrEqual(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else if (value2 is ConditionParameter) {
-      return value2.lessThanOrEqual(value1,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value2.lessThanOrEqual(
+        value1,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else {
-      var match = EntityHandler.graterThanOrEqualValue(value1, value2,
-          entityHandler: keyEntityHandler);
+      var match = EntityHandler.graterThanOrEqualValue(
+        value1,
+        value2,
+        entityHandler: keyEntityHandler,
+      );
       return match;
     }
   }
 
-  bool lessThanConditionValue(Object? value1, Object? value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      TypeInfo? keyType,
-      EntityHandler? keyEntityHandler}) {
+  bool lessThanConditionValue(
+    Object? value1,
+    Object? value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.lessThan(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value1.lessThan(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else if (value2 is ConditionParameter) {
-      return value2.greaterThan(value1,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value2.greaterThan(
+        value1,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else {
-      var match = EntityHandler.lessThanValue(value1, value2,
-          entityHandler: keyEntityHandler);
+      var match = EntityHandler.lessThanValue(
+        value1,
+        value2,
+        entityHandler: keyEntityHandler,
+      );
       return match;
     }
   }
 
-  bool lessThanOrEqualConditionValue(Object? value1, Object? value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      TypeInfo? keyType,
-      EntityHandler? keyEntityHandler}) {
+  bool lessThanOrEqualConditionValue(
+    Object? value1,
+    Object? value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.lessThanOrEqual(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value1.lessThanOrEqual(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else if (value2 is ConditionParameter) {
-      return value2.greaterThanOrEqual(value1,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value2.greaterThanOrEqual(
+        value1,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else {
-      var match = EntityHandler.lessThanOrEqualValue(value1, value2,
-          entityHandler: keyEntityHandler);
+      var match = EntityHandler.lessThanOrEqualValue(
+        value1,
+        value2,
+        entityHandler: keyEntityHandler,
+      );
       return match;
     }
   }
 
-  bool equalsConditionValue(Object? value1, Object? value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      TypeInfo? keyType,
-      EntityHandler? keyEntityHandler}) {
+  bool equalsConditionValue(
+    Object? value1,
+    Object? value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.matches(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value1.matches(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else if (value2 is ConditionParameter) {
-      return value2.matches(value1,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: keyEntityHandler);
+      return value2.matches(
+        value1,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: keyEntityHandler,
+      );
     } else {
-      var match = EntityHandler.equalsValuesBasic(value1, value2,
-          entityHandler: keyEntityHandler);
+      var match = EntityHandler.equalsValuesBasic(
+        value1,
+        value2,
+        entityHandler: keyEntityHandler,
+      );
       return match;
     }
   }
 
-  bool inConditionValues(Object? value1, List value2,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      EntityHandler? entityHandler}) {
+  bool inConditionValues(
+    Object? value1,
+    List value2, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  }) {
     if (value1 is ConditionParameter) {
-      return value1.matchesIn(value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          entityHandler: entityHandler);
+      return value1.matchesIn(
+        value2,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        entityHandler: entityHandler,
+      );
     } else if (value1 is List) {
       for (var v2 in value2) {
         if (v2 is ConditionParameter) {
-          var match = v2.matchesIn(value1,
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-              entityHandler: entityHandler);
+          var match = v2.matchesIn(
+            value1,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+            entityHandler: entityHandler,
+          );
           if (match) return true;
         } else {
           for (var v1 in value1) {
-            var match = EntityHandler.equalsValuesBasic(v1, v2,
-                entityHandler: entityHandler);
+            var match = EntityHandler.equalsValuesBasic(
+              v1,
+              v2,
+              entityHandler: entityHandler,
+            );
             if (match) return true;
           }
         }
@@ -612,15 +758,20 @@ abstract class Condition<O> extends ConditionElement
     } else {
       for (var v2 in value2) {
         if (v2 is ConditionParameter) {
-          var match = v2.matches(value1,
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-              entityHandler: entityHandler);
+          var match = v2.matches(
+            value1,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+            entityHandler: entityHandler,
+          );
           if (match) return true;
         } else {
-          var match = EntityHandler.equalsValuesBasic(value1, v2,
-              entityHandler: entityHandler);
+          var match = EntityHandler.equalsValuesBasic(
+            value1,
+            v2,
+            entityHandler: entityHandler,
+          );
           if (match) return true;
         }
       }
@@ -641,9 +792,9 @@ abstract class GroupCondition<O> extends Condition<O> {
   final List<Condition> conditions;
 
   GroupCondition(Iterable<Condition> conditions)
-      : conditions =
-            conditions is List<Condition> ? conditions : conditions.toList(),
-        super._() {
+    : conditions =
+          conditions is List<Condition> ? conditions : conditions.toList(),
+      super._() {
     for (var c in conditions) {
       c._parent = this;
     }
@@ -653,8 +804,10 @@ abstract class GroupCondition<O> extends Condition<O> {
   bool get isIDCondition => conditions.every((e) => e.isIDCondition);
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     var parametersSize0 = parameters.length;
@@ -682,21 +835,25 @@ class GroupConditionAND<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     if (conditions.isEmpty) {
       return false;
     }
 
     for (var c in conditions) {
-      var matches = c.matchesEntity(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      var matches = c.matchesEntity(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
 
       if (!matches) return false;
     }
@@ -705,21 +862,25 @@ class GroupConditionAND<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     if (conditions.isEmpty) {
       return false;
     }
 
     for (var c in conditions) {
-      var matches = c.matchesEntityMap(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      var matches = c.matchesEntityMap(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
 
       if (!matches) return false;
     }
@@ -747,21 +908,25 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     if (conditions.isEmpty) {
       return false;
     }
 
     for (var c in conditions) {
-      var matches = c.matchesEntity(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      var matches = c.matchesEntity(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
 
       if (matches) return true;
     }
@@ -770,21 +935,25 @@ class GroupConditionOR<O> extends GroupCondition<O> {
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     if (conditions.isEmpty) {
       return false;
     }
 
     for (var c in conditions) {
-      var matches = c.matchesEntityMap(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      var matches = c.matchesEntityMap(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
 
       if (matches) return true;
     }
@@ -805,28 +974,34 @@ class ConditionANY<O> extends Condition<O> {
         .._markResolved(resolved, _parent);
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     _markResolved();
   }
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     return true;
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     return true;
   }
 
@@ -848,8 +1023,10 @@ class ConditionID<O> extends Condition<O> {
         .._markResolved(resolved, _parent);
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     var idValue = this.idValue;
@@ -864,44 +1041,55 @@ class ConditionID<O> extends Condition<O> {
   }
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var id = getID(o, entityHandler: entityHandler);
 
     var idValue = this.idValue;
 
     if (idValue is ConditionParameter) {
-      return idValue.matches(id,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      return idValue.matches(
+        id,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
     } else {
       return id == idValue;
     }
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var idField = entityHandler?.idFieldName() ?? 'id';
     var id = o[idField];
 
     var idValue = this.idValue;
 
     if (idValue is ConditionParameter) {
-      return idValue.matches(id,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+      return idValue.matches(
+        id,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
     } else {
-      return EntityHandler.equalsValuesBasic(id, idValue,
-          entityHandler: entityHandler);
+      return EntityHandler.equalsValuesBasic(
+        id,
+        idValue,
+        entityHandler: entityHandler,
+      );
     }
   }
 
@@ -915,21 +1103,24 @@ class ConditionIdIN<O> extends Condition<O> {
   List<dynamic> idsValues;
 
   ConditionIdIN([dynamic ids])
-      : idsValues = KeyConditionINBase.valuesAsList(ids),
-        super._();
+    : idsValues = KeyConditionINBase.valuesAsList(ids),
+      super._();
 
   @override
   bool get isIDCondition => true;
 
   @override
-  ConditionIdIN<T> cast<T>() => this is ConditionIdIN<T>
-      ? this as ConditionIdIN<T>
-      : ConditionIdIN<T>(idsValues)
-    .._markResolved(resolved, _parent);
+  ConditionIdIN<T> cast<T>() =>
+      this is ConditionIdIN<T>
+            ? this as ConditionIdIN<T>
+            : ConditionIdIN<T>(idsValues)
+        .._markResolved(resolved, _parent);
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     var idsValues = this.idsValues;
@@ -942,40 +1133,57 @@ class ConditionIdIN<O> extends Condition<O> {
   }
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var id = getID(o, entityHandler: entityHandler);
     return _matchesID(
-        idsValues, id, parameters, positionalParameters, namedParameters);
+      idsValues,
+      id,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var idField = entityHandler?.idFieldName() ?? 'id';
     var id = o[idField];
     return _matchesID(
-        idsValues, id, parameters, positionalParameters, namedParameters);
+      idsValues,
+      id,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
   }
 
   bool _matchesID(
-      List<dynamic> idsValues,
-      id,
-      Object? parameters,
-      List<dynamic>? positionalParameters,
-      Map<String, Object?>? namedParameters) {
+    List<dynamic> idsValues,
+    id,
+    Object? parameters,
+    List<dynamic>? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
     return idsValues.any((p) {
       return p is ConditionParameter
-          ? p.matches(id,
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters)
+          ? p.matches(
+            id,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
           : id == p;
     });
   }
@@ -987,8 +1195,9 @@ class ConditionIdIN<O> extends Condition<O> {
 }
 
 abstract class ConditionKey {
-  static final RegExp _keyRegExp =
-      RegExp(r'''(?:"([^"]*?)"|'([^.]*?)'|(\w+)|\[\s*(\d+)\s*\])''');
+  static final RegExp _keyRegExp = RegExp(
+    r'''(?:"([^"]*?)"|'([^.]*?)'|(\w+)|\[\s*(\d+)\s*\])''',
+  );
 
   static List<ConditionKey> parse(String keys) {
     keys = keys.trim();
@@ -996,30 +1205,31 @@ abstract class ConditionKey {
       throw ArgumentError('Empty key');
     }
 
-    var list = _keyRegExp.allMatches(keys).map((m) {
-      var s1 = m.group(1);
-      if (s1 != null) {
-        return ConditionKeyField(s1);
-      }
+    var list =
+        _keyRegExp.allMatches(keys).map((m) {
+          var s1 = m.group(1);
+          if (s1 != null) {
+            return ConditionKeyField(s1);
+          }
 
-      var s2 = m.group(2);
-      if (s2 != null) {
-        return ConditionKeyField(s2);
-      }
+          var s2 = m.group(2);
+          if (s2 != null) {
+            return ConditionKeyField(s2);
+          }
 
-      var field = m.group(3);
-      if (field != null) {
-        return ConditionKeyField(field);
-      }
+          var field = m.group(3);
+          if (field != null) {
+            return ConditionKeyField(field);
+          }
 
-      var index = m.group(4);
-      if (index != null) {
-        var idx = int.parse(index);
-        return ConditionKeyIndex(idx);
-      }
+          var index = m.group(4);
+          if (index != null) {
+            var idx = int.parse(index);
+            return ConditionKeyIndex(idx);
+          }
 
-      throw StateError('Invalid match: $m');
-    }).toList();
+          throw StateError('Invalid match: $m');
+        }).toList();
 
     return list;
   }
@@ -1073,8 +1283,10 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   }
 
   @override
-  void resolve(
-      {Condition? parent, required List<ConditionParameter> parameters}) {
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
     _parent = parent;
 
     var value = this.value;
@@ -1114,8 +1326,11 @@ abstract class KeyCondition<O, V> extends Condition<O> {
 
       if (key is ConditionKeyField) {
         var objEntityHandler = entityHandler?.getEntityHandler(obj: obj);
-        value = fieldAccessor.getField(obj, key.name,
-            entityHandler: objEntityHandler);
+        value = fieldAccessor.getField(
+          obj,
+          key.name,
+          entityHandler: objEntityHandler,
+        );
       } else if (key is ConditionKeyIndex) {
         var index = key.index;
 
@@ -1123,7 +1338,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
           value = obj.elementAt(index);
         } else {
           throw StateError(
-              "Can't access index[$index] of type: ${(obj as Object?).runtimeTypeNameUnsafe}");
+            "Can't access index[$index] of type: ${(obj as Object?).runtimeTypeNameUnsafe}",
+          );
         }
       }
 
@@ -1138,13 +1354,16 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     return obj;
   }
 
-  KeyConditionValue? getEntityMapKeyValue(Map<String, dynamic>? entityMap,
-      [EntityHandler<O>? entityHandler]) {
+  KeyConditionValue? getEntityMapKeyValue(
+    Map<String, dynamic>? entityMap, [
+    EntityHandler<O>? entityHandler,
+  ]) {
     if (entityMap == null || entityMap.isEmpty) return null;
 
     dynamic value = entityMap;
-    TypeInfo? valueType =
-        TypeInfo.from(entityHandler?.type ?? entityMap.runtimeType);
+    TypeInfo? valueType = TypeInfo.from(
+      entityHandler?.type ?? entityMap.runtimeType,
+    );
     EntityHandler? valueEntityHandler = entityHandler;
 
     for (var key in keys) {
@@ -1158,40 +1377,55 @@ abstract class KeyCondition<O, V> extends Condition<O> {
         if (value is Map) {
           keyValue = value[keyName];
         } else if (value is Iterable) {
-          keyValue = value.map((e) {
-            if (e is Map) {
-              return e[keyName];
-            } else {
-              var handler = entityHandler?.getEntityHandler(obj: e);
-              if (handler != null) {
-                var v = handler.getField(e, keyName);
-                return v;
-              } else {
-                return e;
-              }
-            }
-          }).toList();
+          keyValue =
+              value.map((e) {
+                if (e is Map) {
+                  return e[keyName];
+                } else {
+                  var handler = entityHandler?.getEntityHandler(obj: e);
+                  if (handler != null) {
+                    var v = handler.getField(e, keyName);
+                    return v;
+                  } else {
+                    return e;
+                  }
+                }
+              }).toList();
         } else {
           throw StateError(
-              "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}");
+            "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}",
+          );
         }
 
-        keyType =
-            _resolveValueType(keyName, valueType, valueEntityHandler, keyValue);
-        keyEntityHandler =
-            _resolveValueEntityHandler(keyType, valueEntityHandler);
+        keyType = _resolveValueType(
+          keyName,
+          valueType,
+          valueEntityHandler,
+          keyValue,
+        );
+        keyEntityHandler = _resolveValueEntityHandler(
+          keyType,
+          valueEntityHandler,
+        );
       } else if (key is ConditionKeyIndex) {
         var index = key.index;
 
         if (value is Iterable) {
           keyValue = value.elementAt(index);
-          keyType =
-              _resolveValueType(null, valueType, valueEntityHandler, keyValue);
-          keyEntityHandler =
-              _resolveValueEntityHandler(keyType, valueEntityHandler);
+          keyType = _resolveValueType(
+            null,
+            valueType,
+            valueEntityHandler,
+            keyValue,
+          );
+          keyEntityHandler = _resolveValueEntityHandler(
+            keyType,
+            valueEntityHandler,
+          );
         } else {
           throw StateError(
-              "Can't access index[$index] for type: ${(value as Object?).runtimeTypeNameUnsafe}");
+            "Can't access index[$index] for type: ${(value as Object?).runtimeTypeNameUnsafe}",
+          );
         }
       }
 
@@ -1218,7 +1452,9 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   }
 
   EntityHandler? _resolveValueEntityHandler(
-      TypeInfo? objType, EntityHandler? objEntityHandler) {
+    TypeInfo? objType,
+    EntityHandler? objEntityHandler,
+  ) {
     if (objType == null) return null;
 
     if (objType.isListEntityOrReference) {
@@ -1229,19 +1465,28 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       return objEntityHandler.getEntityHandler(type: objType.type);
     }
 
-    var classReflection =
-        ReflectionFactory().getRegisterClassReflection(objType.type);
+    var classReflection = ReflectionFactory().getRegisterClassReflection(
+      objType.type,
+    );
 
     return classReflection?.entityHandler ??
-        EntityHandlerProvider.globalProvider
-            .getEntityHandler(type: objType.type);
+        EntityHandlerProvider.globalProvider.getEntityHandler(
+          type: objType.type,
+        );
   }
 
-  TypeInfo? _resolveValueType(String? keyName, TypeInfo? objType,
-      EntityHandler? objEntityHandler, Object? value) {
+  TypeInfo? _resolveValueType(
+    String? keyName,
+    TypeInfo? objType,
+    EntityHandler? objEntityHandler,
+    Object? value,
+  ) {
     if (keyName != null) {
-      var type =
-          objEntityHandler?.getFieldType(null, keyName, resolveFiledName: true);
+      var type = objEntityHandler?.getFieldType(
+        null,
+        keyName,
+        resolveFiledName: true,
+      );
       if (type != null) return type;
     }
 
@@ -1250,7 +1495,11 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     } else if (value is List) {
       if (value.isNotEmpty) {
         return _resolveValueType(
-            keyName, objType, objEntityHandler, value.first);
+          keyName,
+          objType,
+          objEntityHandler,
+          value.first,
+        );
       } else {
         return TypeInfo.from(value);
       }
@@ -1276,39 +1525,50 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionEQ(super.keys, dynamic super.value);
 
   @override
-  KeyConditionEQ<T> cast<T>() => this is KeyConditionEQ<T>
-      ? this as KeyConditionEQ<T>
-      : KeyConditionEQ<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionEQ<T> cast<T>() =>
+      this is KeyConditionEQ<T>
+            ? this as KeyConditionEQ<T>
+            : KeyConditionEQ<T>(keys, value)
+        .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return equalsConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return equalsConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return equalsConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return equalsConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1321,39 +1581,50 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionNotEQ(super.keys, dynamic super.value);
 
   @override
-  KeyConditionNotEQ<T> cast<T>() => this is KeyConditionNotEQ<T>
-      ? this as KeyConditionNotEQ<T>
-      : KeyConditionNotEQ<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionNotEQ<T> cast<T>() =>
+      this is KeyConditionNotEQ<T>
+            ? this as KeyConditionNotEQ<T>
+            : KeyConditionNotEQ<T>(keys, value)
+        .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return !equalsConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return !equalsConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1366,39 +1637,50 @@ class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
   KeyConditionGreaterThan(super.keys, dynamic super.value);
 
   @override
-  KeyConditionGreaterThan<T> cast<T>() => this is KeyConditionGreaterThan<T>
-      ? this as KeyConditionGreaterThan<T>
-      : KeyConditionGreaterThan<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionGreaterThan<T> cast<T>() =>
+      this is KeyConditionGreaterThan<T>
+            ? this as KeyConditionGreaterThan<T>
+            : KeyConditionGreaterThan<T>(keys, value)
+        .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return greaterThanConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return greaterThanConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return greaterThanConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return greaterThanConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1413,38 +1695,48 @@ class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
   @override
   KeyConditionGreaterThanOrEqual<T> cast<T>() =>
       this is KeyConditionGreaterThanOrEqual<T>
-          ? this as KeyConditionGreaterThanOrEqual<T>
-          : KeyConditionGreaterThanOrEqual<T>(keys, value)
+            ? this as KeyConditionGreaterThanOrEqual<T>
+            : KeyConditionGreaterThanOrEqual<T>(keys, value)
         .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return greaterThanOrEqualConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return greaterThanOrEqualConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return greaterThanOrEqualConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return greaterThanOrEqualConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1457,39 +1749,50 @@ class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
   KeyConditionLessThan(super.keys, dynamic super.value);
 
   @override
-  KeyConditionLessThan<T> cast<T>() => this is KeyConditionLessThan<T>
-      ? this as KeyConditionLessThan<T>
-      : KeyConditionLessThan<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionLessThan<T> cast<T>() =>
+      this is KeyConditionLessThan<T>
+            ? this as KeyConditionLessThan<T>
+            : KeyConditionLessThan<T>(keys, value)
+        .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return lessThanConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return lessThanConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return lessThanConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return lessThanConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1504,38 +1807,48 @@ class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
   @override
   KeyConditionLessThanOrEqual<T> cast<T>() =>
       this is KeyConditionLessThanOrEqual<T>
-          ? this as KeyConditionLessThanOrEqual<T>
-          : KeyConditionLessThanOrEqual<T>(keys, value)
+            ? this as KeyConditionLessThanOrEqual<T>
+            : KeyConditionLessThanOrEqual<T>(keys, value)
         .._markResolved(resolved, _parent);
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return lessThanOrEqualConditionValue(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    return lessThanOrEqualConditionValue(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return lessThanOrEqualConditionValue(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler);
+    return lessThanOrEqualConditionValue(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      keyType: keyValue?.type,
+      keyEntityHandler: keyValue?.entityHandler,
+    );
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1559,42 +1872,54 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
   final bool not;
 
-  KeyConditionINBase(List<ConditionKey> keys, dynamic values,
-      {this.not = false})
-      : super(keys, valuesAsList(values));
+  KeyConditionINBase(
+    List<ConditionKey> keys,
+    dynamic values, {
+    this.not = false,
+  }) : super(keys, valuesAsList(values));
 
   @override
   KeyConditionINBase<T> cast<T>();
 
   @override
-  bool matchesEntity(O o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    var inValues = inConditionValues(keyValue, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters);
+    var inValues = inConditionValues(
+      keyValue,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
 
     return inValues != not;
   }
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-      {EntityHandler<O>? entityHandler,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters}) {
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    var inValues = inConditionValues(keyValue?.value, value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: entityHandler);
+    var inValues = inConditionValues(
+      keyValue?.value,
+      value,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      entityHandler: entityHandler,
+    );
 
     return inValues != not;
   }
@@ -1609,20 +1934,22 @@ class KeyConditionIN<O> extends KeyConditionINBase<O> {
   KeyConditionIN(super.keys, super.values);
 
   @override
-  KeyConditionIN<T> cast<T>() => this is KeyConditionIN<T>
-      ? this as KeyConditionIN<T>
-      : KeyConditionIN<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionIN<T> cast<T>() =>
+      this is KeyConditionIN<T>
+            ? this as KeyConditionIN<T>
+            : KeyConditionIN<T>(keys, value)
+        .._markResolved(resolved, _parent);
 }
 
 class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
   KeyConditionNotIN(super.keys, super.values) : super(not: true);
 
   @override
-  KeyConditionNotIN<T> cast<T>() => this is KeyConditionNotIN<T>
-      ? this as KeyConditionNotIN<T>
-      : KeyConditionNotIN<T>(keys, value)
-    .._markResolved(resolved, _parent);
+  KeyConditionNotIN<T> cast<T>() =>
+      this is KeyConditionNotIN<T>
+            ? this as KeyConditionNotIN<T>
+            : KeyConditionNotIN<T>(keys, value)
+        .._markResolved(resolved, _parent);
 }
 
 class ConditionParseCache<O> {
@@ -1679,26 +2006,32 @@ class ConditionQuery<O> implements EntityMatcher<O> {
   Condition<O> get condition => parse<O>(query);
 
   @override
-  bool matchesEntity(O o,
-          {EntityHandler<O>? entityHandler,
-          Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
-      condition.matchesEntity(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => condition.matchesEntity(
+    o,
+    entityHandler: entityHandler,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
 
   @override
-  bool matchesEntityMap(Map<String, dynamic> o,
-          {EntityHandler<O>? entityHandler,
-          Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters}) =>
-      condition.matchesEntityMap(o,
-          entityHandler: entityHandler,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters);
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => condition.matchesEntityMap(
+    o,
+    entityHandler: entityHandler,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
 }

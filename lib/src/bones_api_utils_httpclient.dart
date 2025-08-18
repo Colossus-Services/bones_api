@@ -5,8 +5,10 @@ import 'package:mercury_client/mercury_client.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 /// Decodes [queryString], allowing single and multiple values per key.
-Map<String, dynamic> decodeQueryStringParameters(String? queryString,
-    {String? charset}) {
+Map<String, dynamic> decodeQueryStringParameters(
+  String? queryString, {
+  String? charset,
+}) {
   if (queryString == null || queryString.isEmpty) return {};
 
   var encoding = getCharsetEncoding(charset);
@@ -76,16 +78,26 @@ Future<HttpResponse> getURL(String url, {HttpClient? client, String? method}) {
   return client.requestURL(httpMethod, url);
 }
 
-FutureOr<String?> getURLAsString(String url,
-    {HttpClient? client, String? method}) {
+FutureOr<String?> getURLAsString(
+  String url, {
+  HttpClient? client,
+  String? method,
+}) {
   var response = getURL(url, client: client, method: method);
-  return response.then((response) => response.bodyAsString,
-      onError: (e) => null);
+  return response.then(
+    (response) => response.bodyAsString,
+    onError: (e) => null,
+  );
 }
 
-FutureOr<List<int>?> getURLAsByteArray(String url,
-    {HttpClient? client, String? method}) {
+FutureOr<List<int>?> getURLAsByteArray(
+  String url, {
+  HttpClient? client,
+  String? method,
+}) {
   var response = getURL(url, client: client, method: method);
-  return response.then((response) => response.body?.asByteArrayAsync,
-      onError: (e) => null);
+  return response.then(
+    (response) => response.body?.asByteArrayAsync,
+    onError: (e) => null,
+  );
 }

@@ -37,9 +37,11 @@ class APIServerResponseCache {
     int maxContentLength = defaultMaxContentLength,
     int maxMemorySize = defaultMaxMemorySize,
     this.fileStatTimeout = _FileStat.defaultStatTimeout,
-  })  : maxContentLength = maxContentLength.clamp(0, 1024 * 1024 * 1024 * 8),
-        maxMemorySize =
-            maxMemorySize.clamp(1024 * 1024, 1024 * 1024 * 1024 * 32);
+  }) : maxContentLength = maxContentLength.clamp(0, 1024 * 1024 * 1024 * 8),
+       maxMemorySize = maxMemorySize.clamp(
+         1024 * 1024,
+         1024 * 1024 * 1024 * 32,
+       );
 
   final Map<_CachedResponseKey, Object> _cachedResponses = {};
 
@@ -51,8 +53,10 @@ class APIServerResponseCache {
 
   /// Clears all the cached entries.
   void clear() {
-    _log.info(() =>
-        "Cleared Cache> Remove Entries: $cachedResponsesLength, Freed Memory: ${totalMemorySize.asBestUnit}");
+    _log.info(
+      () =>
+          "Cleared Cache> Remove Entries: $cachedResponsesLength, Freed Memory: ${totalMemorySize.asBestUnit}",
+    );
 
     _cachedResponses.clear();
     _totalCachedResponsesMemorySize = 0;
@@ -61,25 +65,42 @@ class APIServerResponseCache {
   Handler middleware(Handler innerHandler) {
     return (request) {
       final requestInit = DateTime.now();
-      var cachedResponse =
-          getCachedResponse(request, requestInitTime: requestInit);
+      var cachedResponse = getCachedResponse(
+        request,
+        requestInitTime: requestInit,
+      );
 
       if (cachedResponse is Future<Response?>) {
-        return cachedResponse.then((cachedResponse) =>
-            _middlewareCachedResponse(
-                innerHandler, request, requestInit, cachedResponse));
+        return cachedResponse.then(
+          (cachedResponse) => _middlewareCachedResponse(
+            innerHandler,
+            request,
+            requestInit,
+            cachedResponse,
+          ),
+        );
       } else {
         return _middlewareCachedResponse(
-            innerHandler, request, requestInit, cachedResponse);
+          innerHandler,
+          request,
+          requestInit,
+          cachedResponse,
+        );
       }
     };
   }
 
-  FutureOr<Response> _middlewareCachedResponse(Handler innerHandler,
-      Request request, DateTime requestInit, Response? cachedResponse) {
+  FutureOr<Response> _middlewareCachedResponse(
+    Handler innerHandler,
+    Request request,
+    DateTime requestInit,
+    Response? cachedResponse,
+  ) {
     if (cachedResponse != null) {
-      _log.info(() =>
-          "CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${cachedResponse.statusCode}]> /${request.url.path} (${cachedResponse.contentLengthHeader})");
+      _log.info(
+        () =>
+            "CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${cachedResponse.statusCode}]> /${request.url.path} (${cachedResponse.contentLengthHeader})",
+      );
       return cachedResponse;
     }
 
@@ -87,10 +108,15 @@ class APIServerResponseCache {
   }
 
   Future<Response> _middlewareUncachedResponse(
-      Handler innerHandler, Request request, DateTime requestInit) {
+    Handler innerHandler,
+    Request request,
+    DateTime requestInit,
+  ) {
     return Future.sync(() => innerHandler(request)).then((response) {
-      _log.info(() =>
-          "UN-CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})");
+      _log.info(
+        () =>
+            "UN-CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})",
+      );
 
       var cachedResponse = cacheResponse(request, response);
       if (cachedResponse != null) {
@@ -141,15 +167,18 @@ class APIServerResponseCache {
 
   void _expire(_CachedResponseKey key, Object prev) {
     _log.info(
-        () => "REMOVED $key > File modified: ${prev.file?.path ?? key.path}");
+      () => "REMOVED $key > File modified: ${prev.file?.path ?? key.path}",
+    );
     _cachedResponses.remove(key);
 
     if (key.statusCode == 200) {
       var key304 = _CachedResponseKey(304, key.path);
       var prev304 = _cachedResponses.remove(key304);
       if (prev304 != null) {
-        _log.info(() =>
-            "REMOVED $key304 > File modified: ${prev304.file?.path ?? key.path}");
+        _log.info(
+          () =>
+              "REMOVED $key304 > File modified: ${prev304.file?.path ?? key.path}",
+        );
       }
     }
   }
@@ -179,13 +208,17 @@ class APIServerResponseCache {
 
       _cachedResponses[key] = [...cachedEntries, cachedResponse];
 
-      _log.info(() =>
-          "CACHE[entries: $cachedResponsesLength, memory: ${totalMemorySize.asBestUnit}] Added alternative: $cachedResponse");
+      _log.info(
+        () =>
+            "CACHE[entries: $cachedResponsesLength, memory: ${totalMemorySize.asBestUnit}] Added alternative: $cachedResponse",
+      );
     } else {
       _cachedResponses[key] = cachedResponse;
 
-      _log.info(() =>
-          "CACHE[entries: $cachedResponsesLength, memory: ${totalMemorySize.asBestUnit}] Added: $cachedResponse");
+      _log.info(
+        () =>
+            "CACHE[entries: $cachedResponsesLength, memory: ${totalMemorySize.asBestUnit}] Added: $cachedResponse",
+      );
     }
 
     _totalCachedResponsesMemorySize += cachedResponse.memorySize;
@@ -235,14 +268,18 @@ class APIServerResponseCache {
       }
     }
 
-    _log.info(() =>
-        "Cache Cleaning> Removed Entries: $totalRemoved ; Freed Memory: ${totalMemoryRemoved.asBestUnit}");
+    _log.info(
+      () =>
+          "Cache Cleaning> Removed Entries: $totalRemoved ; Freed Memory: ${totalMemoryRemoved.asBestUnit}",
+    );
 
     return true;
   }
 
-  FutureOr<Response?> getCachedResponse(Request request,
-      {DateTime? requestInitTime}) {
+  FutureOr<Response?> getCachedResponse(
+    Request request, {
+    DateTime? requestInitTime,
+  }) {
     var method = request.method;
     if (method != 'GET') {
       return null;
@@ -251,11 +288,16 @@ class APIServerResponseCache {
     var cached304 = _getCachedResponse304(request, requestInitTime);
 
     return cached304.resolveResponseAsync(
-        request, requestInitTime, _getCachedResponse200Then404);
+      request,
+      requestInitTime,
+      _getCachedResponse200Then404,
+    );
   }
 
   FutureOr<Response?> _getCachedResponse304(
-      Request request, DateTime? requestInitTime) {
+    Request request,
+    DateTime? requestInitTime,
+  ) {
     final key304 = _CachedResponseKey.status304(request);
     if (key304 == null) return null;
 
@@ -264,13 +306,19 @@ class APIServerResponseCache {
   }
 
   FutureOr<Response?> _getCachedResponse200Then404(
-      Request request, DateTime? requestInitTime) {
-    return _getCachedResponse200(request, requestInitTime)
-        .resolveResponseAsync(request, requestInitTime, _getCachedResponse404);
+    Request request,
+    DateTime? requestInitTime,
+  ) {
+    return _getCachedResponse200(
+      request,
+      requestInitTime,
+    ).resolveResponseAsync(request, requestInitTime, _getCachedResponse404);
   }
 
   FutureOr<Response?> _getCachedResponse200(
-      Request request, DateTime? requestInitTime) {
+    Request request,
+    DateTime? requestInitTime,
+  ) {
     final key200 = _CachedResponseKey.status200(request);
 
     var cached200 = _getAsync(key200);
@@ -278,14 +326,21 @@ class APIServerResponseCache {
     return cached200
         .toValidResponseAsync(request, requestInitTime)
         .resolveResponseAsync(
+          request,
+          requestInitTime,
+          (request, requestInitTime) => _getCachedResponse200Alternative(
             request,
             requestInitTime,
-            (request, requestInitTime) => _getCachedResponse200Alternative(
-                request, requestInitTime, cached200));
+            cached200,
+          ),
+        );
   }
 
   FutureOr<Response?> _getCachedResponse200Alternative(
-      Request request, DateTime? requestInitTime, FutureOr<Object?> cached200) {
+    Request request,
+    DateTime? requestInitTime,
+    FutureOr<Object?> cached200,
+  ) {
     if (cached200 == null) return null;
 
     return cached200.resolveMapped((cached200) {
@@ -309,7 +364,9 @@ class APIServerResponseCache {
   }
 
   FutureOr<Response?> _getCachedResponse404(
-      Request request, DateTime? requestInitTime) {
+    Request request,
+    DateTime? requestInitTime,
+  ) {
     final key404 = _CachedResponseKey.status404(request);
 
     var cached404 = _getAsync(key404);
@@ -351,12 +408,13 @@ class APIServerResponseCache {
     var file = response.context['file'];
 
     var cachedResponse = _CachedResponse200(
-        path: path,
-        file: file,
-        headers: headers,
-        content: content,
-        contentEncoding: contentEncoding,
-        encoding: encoding);
+      path: path,
+      file: file,
+      headers: headers,
+      content: content,
+      contentEncoding: contentEncoding,
+      encoding: encoding,
+    );
 
     assert(cachedResponse.statusCode == 200);
     assert(cachedResponse.key.statusCode == 200);
@@ -464,7 +522,7 @@ class APIServerResponseCache {
   }
 
   Future<(List<int> content, String? contentEncoding, Encoding? encoding)>
-      _copyBody(Response response) async {
+  _copyBody(Response response) async {
     var body = extractBody(response);
 
     var content = await _streamToList(body.read());
@@ -483,7 +541,8 @@ class APIServerResponseCache {
   }
 
   @override
-  String toString() => 'APIServerResponseCache{ '
+  String toString() =>
+      'APIServerResponseCache{ '
       'maxContentLength: ${maxContentLength.asBestUnit}, '
       'maxMemorySize: ${maxMemorySize.asBestUnit}, '
       'fileStatTimeout: ${fileStatTimeout.asBestUnit}, '
@@ -505,8 +564,10 @@ class _CachedResponseKey {
     var requestIfModifiableSince = request.ifModifiedSinceHeader;
     if (requestIfModifiableSince == null) return null;
 
-    return _CachedResponseKey304(request.url.path,
-        requestIfModifiableSince: requestIfModifiableSince);
+    return _CachedResponseKey304(
+      request.url.path,
+      requestIfModifiableSince: requestIfModifiableSince,
+    );
   }
 
   factory _CachedResponseKey.status404(Request request) =>
@@ -530,7 +591,7 @@ class _CachedResponseKey304 extends _CachedResponseKey {
   final String? requestIfModifiableSince;
 
   _CachedResponseKey304(String path, {this.requestIfModifiableSince})
-      : super(304, path);
+    : super(304, path);
 }
 
 abstract class WithMemorySize {
@@ -693,12 +754,12 @@ abstract class _CachedResponse
 
   final DateTime date = DateTime.now();
 
-  _CachedResponse(
-      {required this.statusCode,
-      required this.path,
-      required Object? file,
-      required _FileStat? fileStat})
-      : _fileStat = fileStat ?? _FileStat.from(file) {
+  _CachedResponse({
+    required this.statusCode,
+    required this.path,
+    required Object? file,
+    required _FileStat? fileStat,
+  }) : _fileStat = fileStat ?? _FileStat.from(file) {
     key = _resolveKey();
     memorySize = _computeMemorySize();
     _lastUsageTime = date;
@@ -739,9 +800,9 @@ abstract class _CachedResponse
   bool isFileModified({Duration timeout = _FileStat.defaultStatTimeout}) =>
       fileStat?.isFileModified(timeout: timeout) ?? false;
 
-  FutureOr<bool> isFileModifiedAsync(
-          {Duration timeout = _FileStat.defaultStatTimeout}) =>
-      fileStat?.isFileModifiedAsync(timeout: timeout) ?? false;
+  FutureOr<bool> isFileModifiedAsync({
+    Duration timeout = _FileStat.defaultStatTimeout,
+  }) => fileStat?.isFileModifiedAsync(timeout: timeout) ?? false;
 
   _CachedResponse? resolveAlternative(Request request) => null;
 
@@ -752,8 +813,10 @@ abstract class _CachedResponse
     return null;
   }
 
-  void configureMetricsHeaders(Map<String, List<String>> headers,
-      {DateTime? requestInitTime}) {
+  void configureMetricsHeaders(
+    Map<String, List<String>> headers, {
+    DateTime? requestInitTime,
+  }) {
     var cacheTime = date.elapsedTime;
 
     if (requestInitTime != null) {
@@ -834,8 +897,8 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
     List<int>? content,
     this.contentEncoding,
     this.encoding,
-  })  : content = content?.asUint8List.asUnmodifiableView(),
-        super();
+  }) : content = content?.asUint8List.asUnmodifiableView(),
+       super();
 
   @override
   int _computeMemorySize() =>
@@ -922,11 +985,12 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     headers2[HttpHeaders.contentLengthHeader] = ['${decompressContent.length}'];
 
     return _CachedResponse200(
-        path: path,
-        file: file,
-        fileStat: fileStat,
-        headers: headers2,
-        content: decompressContent);
+      path: path,
+      file: file,
+      fileStat: fileStat,
+      headers: headers2,
+      content: decompressContent,
+    );
   }
 
   _CachedResponse200? compressedCopy() {
@@ -942,12 +1006,13 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     headers2[HttpHeaders.contentLengthHeader] = ['${compressContent.length}'];
 
     return _CachedResponse200(
-        path: path,
-        file: file,
-        fileStat: fileStat,
-        headers: headers2,
-        content: compressContent,
-        contentEncoding: compressedEncoding);
+      path: path,
+      file: file,
+      fileStat: fileStat,
+      headers: headers2,
+      content: compressContent,
+      contentEncoding: compressedEncoding,
+    );
   }
 
   @override
@@ -1007,7 +1072,8 @@ class _CachedResponse200 extends _CachedResponseWithBody {
   }
 
   @override
-  String toString() => '[200]{ '
+  String toString() =>
+      '[200]{ '
       'headers: ${headers.length}, '
       'content: $contentLength, '
       '${contentEncoding != null ? 'Content-Encoding: $contentEncoding, ' : ''}'
@@ -1056,8 +1122,10 @@ class _CachedResponse304 extends _CachedResponse {
   }) : super(statusCode: 304);
 
   @override
-  _CachedResponseKey _resolveKey() => _CachedResponseKey304(path,
-      requestIfModifiableSince: requestIfModifiableSince);
+  _CachedResponseKey _resolveKey() => _CachedResponseKey304(
+    path,
+    requestIfModifiableSince: requestIfModifiableSince,
+  );
 
   @override
   int _computeMemorySize() =>
@@ -1067,7 +1135,8 @@ class _CachedResponse304 extends _CachedResponse {
   bool validate(Request request) {
     var requestIfModifiableSince = request.ifModifiedSinceHeader;
 
-    var ok = requestIfModifiableSince != null &&
+    var ok =
+        requestIfModifiableSince != null &&
         requestIfModifiableSince == this.requestIfModifiableSince;
 
     return ok;
@@ -1092,7 +1161,8 @@ class _CachedResponse304 extends _CachedResponse {
   }
 
   @override
-  String toString() => '[304]{ '
+  String toString() =>
+      '[304]{ '
       'If-Modifiable-Since: $requestIfModifiableSince, '
       'memory: ${memorySize.asBestUnit} '
       '}'
@@ -1133,7 +1203,8 @@ class _CachedResponse404 extends _CachedResponseWithBody {
   }
 
   @override
-  String toString() => '[404]{ '
+  String toString() =>
+      '[404]{ '
       'content: $contentLength, '
       '${contentEncoding != null ? 'Content-Encoding: $contentEncoding, ' : ''}'
       'memory: ${memorySize.asBestUnit} '
@@ -1267,8 +1338,9 @@ extension _ObjectExtension on Object? {
     return false;
   }
 
-  FutureOr<bool> isFileModifiedAsync(
-      {Duration timeout = _FileStat.defaultStatTimeout}) {
+  FutureOr<bool> isFileModifiedAsync({
+    Duration timeout = _FileStat.defaultStatTimeout,
+  }) {
     var self = this;
     if (self == null) return false;
 
@@ -1320,7 +1392,9 @@ extension _ObjectExtension on Object? {
 
 extension _FutureOrObjectExtension on FutureOr<Object?> {
   FutureOr<Response?> toValidResponseAsync(
-      Request request, DateTime? requestInitTime) {
+    Request request,
+    DateTime? requestInitTime,
+  ) {
     final self = this;
     if (self == null) return null;
 
@@ -1396,7 +1470,7 @@ extension _FutureOrResponseExtension on FutureOr<Response?> {
     Request request,
     DateTime? requestInitTime,
     FutureOr<Response?> Function(Request request, DateTime? requestInitTime)
-        alternative,
+    alternative,
   ) {
     final self = this;
 

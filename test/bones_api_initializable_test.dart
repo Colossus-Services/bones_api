@@ -117,8 +117,9 @@ class _Init with Initializable {
   T inContext<T extends _Init>(T Function() instantiator) =>
       context.putIfAbsent(T, instantiator) as T;
 
-  List<T> inContextAsList<T extends _Init>(T Function() instantiator) =>
-      <T>[inContext<T>(instantiator)];
+  List<T> inContextAsList<T extends _Init>(T Function() instantiator) => <T>[
+    inContext<T>(instantiator),
+  ];
 
   DateTime? initDate;
 
@@ -141,9 +142,9 @@ class _InitAsync extends _Init {
 
   @override
   Future<InitializationResult> initialize() => Future.delayed(delay, () {
-        initDate = DateTime.now();
-        return InitializationResult.ok(this);
-      });
+    initDate = DateTime.now();
+    return InitializationResult.ok(this);
+  });
 }
 
 class _InitA extends _Init {
@@ -154,8 +155,9 @@ class _InitB extends _Init {
   _InitB([Map<Type, _Init>? context]) : super(context ?? <Type, _Init>{});
 
   @override
-  FutureOr<List<Initializable>> initializeDependencies() =>
-      <Initializable>[context.putIfAbsent(_InitA, () => _InitA(context))];
+  FutureOr<List<Initializable>> initializeDependencies() => <Initializable>[
+    context.putIfAbsent(_InitA, () => _InitA(context)),
+  ];
 }
 
 class _InitC extends _Init {
@@ -187,8 +189,9 @@ class _InitDAsync extends _InitAsync {
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() => Future.delayed(
-      Duration(milliseconds: 200),
-      () => inContextAsList<_InitEAsync>(() => _InitEAsync(context)));
+    Duration(milliseconds: 200),
+    () => inContextAsList<_InitEAsync>(() => _InitEAsync(context)),
+  );
 }
 
 class _InitEAsync extends _InitAsync {
@@ -196,8 +199,9 @@ class _InitEAsync extends _InitAsync {
 
   @override
   FutureOr<List<Initializable>> initializeDependencies() => Future.delayed(
-      Duration(milliseconds: 200),
-      () => inContextAsList<_InitDAsync>(() => _InitDAsync(context)));
+    Duration(milliseconds: 200),
+    () => inContextAsList<_InitDAsync>(() => _InitDAsync(context)),
+  );
 }
 
 class _InitDAsync2 extends _InitAsync {
@@ -205,11 +209,12 @@ class _InitDAsync2 extends _InitAsync {
 
   @override
   Future<InitializationResult> initialize() => Future.delayed(delay, () {
-        initDate = DateTime.now();
-        return InitializationResult.ok(this,
-            dependencies:
-                inContextAsList<_InitEAsync2>(() => _InitEAsync2(context)));
-      });
+    initDate = DateTime.now();
+    return InitializationResult.ok(
+      this,
+      dependencies: inContextAsList<_InitEAsync2>(() => _InitEAsync2(context)),
+    );
+  });
 }
 
 class _InitEAsync2 extends _InitAsync {
@@ -217,9 +222,10 @@ class _InitEAsync2 extends _InitAsync {
 
   @override
   Future<InitializationResult> initialize() => Future.delayed(delay, () {
-        initDate = DateTime.now();
-        return InitializationResult.ok(this,
-            dependencies:
-                inContextAsList<_InitDAsync2>(() => _InitDAsync2(context)));
-      });
+    initDate = DateTime.now();
+    return InitializationResult.ok(
+      this,
+      dependencies: inContextAsList<_InitDAsync2>(() => _InitDAsync2(context)),
+    );
+  });
 }

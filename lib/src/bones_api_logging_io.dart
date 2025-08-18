@@ -21,11 +21,13 @@ class LoggerHandlerIO extends LoggerHandler {
   LoggerHandlerIO(super.logger) {
     var apiPlatform = APIPlatform.get();
 
-    logMaxFileLength =
-        apiPlatform.getPropertyAs<int>('bones_api.log.max_file_length');
+    logMaxFileLength = apiPlatform.getPropertyAs<int>(
+      'bones_api.log.max_file_length',
+    );
 
-    logMaxRotationFiles =
-        apiPlatform.getPropertyAs<int>('bones_api.log.max_rotation_files');
+    logMaxRotationFiles = apiPlatform.getPropertyAs<int>(
+      'bones_api.log.max_rotation_files',
+    );
   }
 
   @override
@@ -56,8 +58,9 @@ class LoggerHandlerIO extends LoggerHandler {
 
   Future<bool>? _scheduledFlushPrintMessageQueue;
 
-  Future<bool> _scheduleFlushPrintMessageQueue(
-      {Duration delay = const Duration(milliseconds: 20)}) {
+  Future<bool> _scheduleFlushPrintMessageQueue({
+    Duration delay = const Duration(milliseconds: 20),
+  }) {
     var scheduled = _scheduledFlushPrintMessageQueue;
     if (scheduled != null) return scheduled;
 
@@ -69,8 +72,9 @@ class LoggerHandlerIO extends LoggerHandler {
   }
 
   @override
-  FutureOr<bool> flushMessages(
-      {Duration? delay = const Duration(milliseconds: 20)}) {
+  FutureOr<bool> flushMessages({
+    Duration? delay = const Duration(milliseconds: 20),
+  }) {
     if (_printMessageQueue.isEmpty) {
       if (delay == null) return false;
 
@@ -81,7 +85,8 @@ class LoggerHandlerIO extends LoggerHandler {
     }
 
     return _scheduleFlushPrintMessageQueue(
-        delay: delay ?? Duration(milliseconds: 20));
+      delay: delay ?? Duration(milliseconds: 20),
+    );
   }
 
   @override
@@ -143,10 +148,15 @@ class LoggerHandlerIO extends LoggerHandler {
   }
 
   void _logToFile(LogFileRotate logFileRotate, logging.Level l, String ms) =>
-      logBuffered(logFileRotate, (l, ms) async {
-        var all = ms.join('');
-        logFileRotate.write(all);
-      }, l, ms);
+      logBuffered(
+        logFileRotate,
+        (l, ms) async {
+          var all = ms.join('');
+          logFileRotate.write(all);
+        },
+        l,
+        ms,
+      );
 }
 
 LoggerHandler createLoggerHandler(logging.Logger logger) {
@@ -181,10 +191,10 @@ class LogFileRotate {
     int? maxRotationFiles,
     Duration? maxAge,
     Duration? checkInterval,
-  })  : maxLength = maxLength ?? defaultMaxLength,
-        maxRotationFiles = maxRotationFiles ?? defaultMaxRotationFiles,
-        maxAge = maxAge ?? defaultMaxAge,
-        checkInterval = checkInterval ?? defaultCheckInterval {
+  }) : maxLength = maxLength ?? defaultMaxLength,
+       maxRotationFiles = maxRotationFiles ?? defaultMaxRotationFiles,
+       maxAge = maxAge ?? defaultMaxAge,
+       checkInterval = checkInterval ?? defaultCheckInterval {
     parentPath = file.parent.path;
     var filePath = file.path;
 
@@ -318,7 +328,8 @@ class LogFileRotate {
 
     // Call asynchronously to avoid logging while rotating:
     _logInfoAsync(
-        "Log rotated: ${file.path} -> ${pack_path.basename(file1.path)}${nextFile.i > 1 ? ' (1 .. ${nextFile.i})' : ''}");
+      "Log rotated: ${file.path} -> ${pack_path.basename(file1.path)}${nextFile.i > 1 ? ' (1 .. ${nextFile.i})' : ''}",
+    );
 
     return true;
   }
@@ -343,7 +354,8 @@ class LogFileRotate {
 
       if (await file.exists()) {
         _logSevereAsync(
-            "Destination file already exists! Can't rotate file: ${filePrev.path} -> ${file.path}");
+          "Destination file already exists! Can't rotate file: ${filePrev.path} -> ${file.path}",
+        );
       }
 
       await filePrev.rename(file.path);
@@ -379,7 +391,8 @@ class LogFileRotate {
     }
 
     _logWarningAsync(
-        "Can't define the next log rotation file for: ${file.path}");
+      "Can't define the next log rotation file for: ${file.path}",
+    );
 
     return null;
   }

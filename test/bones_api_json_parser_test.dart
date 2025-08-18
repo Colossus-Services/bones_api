@@ -14,11 +14,15 @@ void main() {
     test('extended', () async {
       var jsonParser = JsonParser(extendedGrammar: true);
 
-      expect(jsonParser.parse('{a: 1, b: 2, c: 3}'),
-          equals({'a': 1, 'b': 2, 'c': 3}));
+      expect(
+        jsonParser.parse('{a: 1, b: 2, c: 3}'),
+        equals({'a': 1, 'b': 2, 'c': 3}),
+      );
 
-      expect(jsonParser.parse('{ a : 1 , b : 2 , c : 3 }'),
-          equals({'a': 1, 'b': 2, 'c': 3}));
+      expect(
+        jsonParser.parse('{ a : 1 , b : 2 , c : 3 }'),
+        equals({'a': 1, 'b': 2, 'c': 3}),
+      );
 
       _testJson(jsonParser);
       _testJson(jsonParser, quote: "'");
@@ -45,28 +49,36 @@ void _testJson(JsonParser jsonParser, {String quote = '"'}) {
   expect(jsonParser.parse(' [ 1 , 2 , 3 ]'), equals([1, 2, 3]));
 
   expect(
-      jsonParser.parse(
-          '{${quote}a$quote: 1, ${quote}b$quote: 2, ${quote}c$quote: 3}'),
-      equals({'a': 1, 'b': 2, 'c': 3}));
+    jsonParser.parse(
+      '{${quote}a$quote: 1, ${quote}b$quote: 2, ${quote}c$quote: 3}',
+    ),
+    equals({'a': 1, 'b': 2, 'c': 3}),
+  );
 
   expect(
-      jsonParser.parse(
-          '{ ${quote}a$quote : 1 , ${quote}b$quote : 2 , ${quote}c$quote : 3 }'),
-      equals({'a': 1, 'b': 2, 'c': 3}));
+    jsonParser.parse(
+      '{ ${quote}a$quote : 1 , ${quote}b$quote : 2 , ${quote}c$quote : 3 }',
+    ),
+    equals({'a': 1, 'b': 2, 'c': 3}),
+  );
 
   expect(
-      jsonParser.parse(
-          '{ ${quote}a$quote : [ 1 , 2] , ${quote}b$quote : [ 3 , 4 ] }'),
-      equals({
-        'a': [1, 2],
-        'b': [3, 4]
-      }));
+    jsonParser.parse(
+      '{ ${quote}a$quote : [ 1 , 2] , ${quote}b$quote : [ 3 , 4 ] }',
+    ),
+    equals({
+      'a': [1, 2],
+      'b': [3, 4],
+    }),
+  );
 
   expect(
-      jsonParser.parse(
-          '[ { ${quote}a$quote: 1  , ${quote}b$quote: 2} , { ${quote}c$quote: 3  , ${quote}d$quote: 4} ]'),
-      equals([
-        {'a': 1, 'b': 2},
-        {'c': 3, 'd': 4}
-      ]));
+    jsonParser.parse(
+      '[ { ${quote}a$quote: 1  , ${quote}b$quote: 2} , { ${quote}c$quote: 3  , ${quote}d$quote: 4} ]',
+    ),
+    equals([
+      {'a': 1, 'b': 2},
+      {'c': 3, 'd': 4},
+    ]),
+  );
 }

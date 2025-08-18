@@ -38,8 +38,9 @@ void main() {
 
     test('basic', () async {
       {
-        var resp = APIResponse<List>.unauthorized(error: "Not allowed")
-            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+        var resp = APIResponse<List>.unauthorized(
+          error: "Not allowed",
+        ).requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
 
         expect(resp, isA<APIResponse<List>>());
         expect(resp.error, equals("Not allowed"));
@@ -65,8 +66,9 @@ void main() {
       }
 
       {
-        var resp = APIResponse<List>.unauthorized(payloadDynamic: "Not allowed")
-            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+        var resp = APIResponse<List>.unauthorized(
+          payloadDynamic: "Not allowed",
+        ).requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
 
         expect(resp, isA<APIResponse<List>>());
         expect(resp.payload, isNull);
@@ -103,9 +105,11 @@ void main() {
       var res = await api.call(apiRequest);
       expect(res.toString(), equals('Hi[GET]!'));
       expect(
-          res.toInfos(),
-          equals(
-              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 8 }'));
+        res.toInfos(),
+        equals(
+          'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 8 }',
+        ),
+      );
 
       expect(res.payloadLength, equals(8));
     });
@@ -130,9 +134,11 @@ void main() {
       var res = await api.call(apiRequest);
       expect(res.toString(), equals('Pre request: /pre-request/foo'));
       expect(
-          res.toInfos(),
-          equals(
-              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }'));
+        res.toInfos(),
+        equals(
+          'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }',
+        ),
+      );
 
       expect(res.payloadLength, equals(29));
     });
@@ -145,37 +151,46 @@ void main() {
       var res = await api.call(apiRequest);
       expect(res.toString(), equals('Pos request: /pos-request/bar'));
       expect(
-          res.toInfos(),
-          equals(
-              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }'));
+        res.toInfos(),
+        equals(
+          'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 29 }',
+        ),
+      );
 
       expect(res.payloadLength, equals(29));
     });
 
     test('foo[POST]', () async {
-      var res =
-          await api.call(APIRequest.post('/base/foo', parameters: {'a': 1}));
+      var res = await api.call(
+        APIRequest.post('/base/foo', parameters: {'a': 1}),
+      );
       expect(res.toString(), equals('Hi[POST]! {a: 1}'));
     });
 
     test('time', () async {
       var res = await api.call(APIRequest.post('/base/time'));
-      expect(res.toString(),
-          matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')));
+      expect(
+        res.toString(),
+        matches(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$')),
+      );
 
       expect(
-          res.toInfos(),
-          equals(
-              'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }'),
-          reason: 'Payload: <<${res.payload}>>');
+        res.toInfos(),
+        equals(
+          'APIResponse{ status: APIResponseStatus.OK, headers: {}, payloadLength: 26, payloadMimeType: text/plain }',
+        ),
+        reason: 'Payload: <<${res.payload}>>',
+      );
 
       expect(res.payloadMimeType.toString(), equals('text/plain'));
     });
 
     test('404 module', () async {
       var res = await api.call(APIRequest.get('/service/baseX/foo'));
-      expect(res.toString(),
-          equals('NOT FOUND: No route for path "/service/baseX/foo"'));
+      expect(
+        res.toString(),
+        equals('NOT FOUND: No route for path "/service/baseX/foo"'),
+      );
     });
 
     test('404 route', () async {
@@ -241,16 +256,17 @@ void main() {
       var starterStatus = 0;
 
       var starter = APIRootStarter<MyAPI>.fromInstantiator(
-          (apiConfig) => MyAPI.withConfig(apiConfig),
-          apiConfig: () => APIConfig({'test': 'fromStarter'}),
-          preInitializer: () {
-            starterStatus = 1;
-            return true;
-          },
-          stopper: () {
-            starterStatus = -1;
-            return true;
-          });
+        (apiConfig) => MyAPI.withConfig(apiConfig),
+        apiConfig: () => APIConfig({'test': 'fromStarter'}),
+        preInitializer: () {
+          starterStatus = 1;
+          return true;
+        },
+        stopper: () {
+          starterStatus = -1;
+          return true;
+        },
+      );
 
       expect(starter.isStarted, isFalse);
       expect(starter.isStopped, isFalse);
@@ -278,8 +294,13 @@ void main() {
   group('APIServer', () {
     final api = MyAPI();
 
-    final apiServer = APIServer(api, 'localhost', 5544,
-        decompressPayload: true, maxPayloadLength: 100);
+    final apiServer = APIServer(
+      api,
+      'localhost',
+      5544,
+      decompressPayload: true,
+      maxPayloadLength: 100,
+    );
 
     setUp(() async {
       await apiServer.start();
@@ -289,34 +310,42 @@ void main() {
       expect(APIServerConfig.parseDomains(MapEntry('', '')), isEmpty);
 
       expect(
-          APIServerConfig.parseDomains(MapEntry('foo.com', '/var/www'))
-              .map((key, value) => MapEntry(key, value.path)),
-          equals({'foo.com': '/var/www'}));
+        APIServerConfig.parseDomains(
+          MapEntry('foo.com', '/var/www'),
+        ).map((key, value) => MapEntry(key, value.path)),
+        equals({'foo.com': '/var/www'}),
+      );
 
       expect(
-          APIServerConfig.parseDomains(
-                  MapEntry('foo.com', Directory('/var/www0')))
-              .map((key, value) => MapEntry(key, value.path)),
-          equals({'foo.com': '/var/www0'}));
+        APIServerConfig.parseDomains(
+          MapEntry('foo.com', Directory('/var/www0')),
+        ).map((key, value) => MapEntry(key, value.path)),
+        equals({'foo.com': '/var/www0'}),
+      );
 
       expect(
-          APIServerConfig.parseDomains('foo.com=/var/www&bar.com=/var/www2')
-              .map((key, value) => MapEntry(key, value.path)),
-          equals({'foo.com': '/var/www', 'bar.com': '/var/www2'}));
+        APIServerConfig.parseDomains(
+          'foo.com=/var/www&bar.com=/var/www2',
+        ).map((key, value) => MapEntry(key, value.path)),
+        equals({'foo.com': '/var/www', 'bar.com': '/var/www2'}),
+      );
 
       expect(
-          APIServerConfig.parseDomains(
-                  r'r/(\w+\.)?foo.com/=/var/www&bar.com=/var/www2')
-              .map((key, value) => MapEntry(key, value.path)),
-          equals({
-            RegExp(r'(\w+\.)?foo.com'): '/var/www',
-            'bar.com': '/var/www2'
-          }));
+        APIServerConfig.parseDomains(
+          r'r/(\w+\.)?foo.com/=/var/www&bar.com=/var/www2',
+        ).map((key, value) => MapEntry(key, value.path)),
+        equals({
+          RegExp(r'(\w+\.)?foo.com'): '/var/www',
+          'bar.com': '/var/www2',
+        }),
+      );
 
       expect(
-          APIServerConfig.parseDomains('bar.com=/var/www2')
-              .map((key, value) => MapEntry(key, value.path)),
-          equals({'bar.com': '/var/www2'}));
+        APIServerConfig.parseDomains(
+          'bar.com=/var/www2',
+        ).map((key, value) => MapEntry(key, value.path)),
+        equals({'bar.com': '/var/www2'}),
+      );
     });
 
     test('foo[GET] /base', () async {
@@ -325,141 +354,187 @@ void main() {
     });
 
     test('foo[POST] /base', () async {
-      var res = await _getURL('${apiServer.url}base/foo',
-          method: APIRequestMethod.POST, parameters: {'a': 1});
+      var res = await _getURL(
+        '${apiServer.url}base/foo',
+        method: APIRequestMethod.POST,
+        parameters: {'a': 1},
+      );
       expect(res.toString(), equals('(200, Hi[POST]! {a: 1})'));
     });
 
     test('time /base', () async {
-      var res = await _getURL('${apiServer.url}base/time',
-          method: APIRequestMethod.POST, expectedContentType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/time',
+        method: APIRequestMethod.POST,
+        expectedContentType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          matches(
-              RegExp(r'^\(200, \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\)$')));
+        res.toString(),
+        matches(RegExp(r'^\(200, \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\)$')),
+      );
     });
 
     test('404 module /base', () async {
-      var res = await _getURL('${apiServer.url}baseX/foo',
-          method: APIRequestMethod.GET);
-      expect(res.toString(),
-          equals('(404, NOT FOUND: No route for path "/baseX/foo")'));
+      var res = await _getURL(
+        '${apiServer.url}baseX/foo',
+        method: APIRequestMethod.GET,
+      );
+      expect(
+        res.toString(),
+        equals('(404, NOT FOUND: No route for path "/baseX/foo")'),
+      );
     });
 
     test('404 route /base', () async {
-      var res = await _getURL('${apiServer.url}base/bar',
-          method: APIRequestMethod.GET);
+      var res = await _getURL(
+        '${apiServer.url}base/bar',
+        method: APIRequestMethod.GET,
+      );
       expect(res.toString(), equals('(404, 404: /base/bar)'));
     });
 
     test('unauthorized /base', () async {
-      var res = await _getURL('${apiServer.url}base/auth',
-          method: APIRequestMethod.GET);
+      var res = await _getURL(
+        '${apiServer.url}base/auth',
+        method: APIRequestMethod.GET,
+      );
       expect(res.toString(), equals('(403, Forbidden)'));
     });
 
     test('error /base', () async {
-      var res = await _getURL('${apiServer.url}base/err',
-          method: APIRequestMethod.GET);
+      var res = await _getURL(
+        '${apiServer.url}base/err',
+        method: APIRequestMethod.GET,
+      );
       expect(res.$1, equals(500));
       expect(res.toString(), contains('Bad state: Error!'));
     });
 
     test('put /base', () async {
-      var res = await _getURL('${apiServer.url}base/put',
-          method: APIRequestMethod.PUT);
+      var res = await _getURL(
+        '${apiServer.url}base/put',
+        method: APIRequestMethod.PUT,
+      );
       expect(res.toString(), equals('(200, PUT)'));
     });
 
     test('delete /base', () async {
-      var res = await _getURL('${apiServer.url}base/delete',
-          method: APIRequestMethod.DELETE);
+      var res = await _getURL(
+        '${apiServer.url}base/delete',
+        method: APIRequestMethod.DELETE,
+      );
       expect(res.toString(), equals('(200, DELETE)'));
     });
 
     test('patch /base', () async {
-      var res = await _getURL('${apiServer.url}base/patch',
-          method: APIRequestMethod.PATCH);
+      var res = await _getURL(
+        '${apiServer.url}base/patch',
+        method: APIRequestMethod.PATCH,
+      );
       expect(res.toString(), equals('(200, PATCH)'));
     });
 
     test('head /base', () async {
-      var res = await _getURL('${apiServer.url}base/head',
-          method: APIRequestMethod.HEAD);
+      var res = await _getURL(
+        '${apiServer.url}base/head',
+        method: APIRequestMethod.HEAD,
+      );
       expect(res.toString(), equals('(200, )'));
     });
 
     test('upload(bytes) /base', () async {
-      var res = await _getURL('${apiServer.url}base/upload',
-          method: APIRequestMethod.POST,
-          payload: List.generate(64, (i) => i),
-          payloadType: 'application/octet-stream');
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: List.generate(64, (i) => i),
+        payloadType: 'application/octet-stream',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, Payload> mimeType: application/octet-stream ; length: 64)'));
+        res.toString(),
+        equals(
+          '(200, Payload> mimeType: application/octet-stream ; length: 64)',
+        ),
+      );
     });
 
     test('upload(json) /base', () async {
-      var res = await _getURL('${apiServer.url}base/upload',
-          method: APIRequestMethod.POST,
-          payload: convert.JsonUtf8Encoder().convert({
-            'á': 1,
-            'b': [2, 20]
-          }),
-          payloadType: 'application/json');
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: convert.JsonUtf8Encoder().convert({
+          'á': 1,
+          'b': [2, 20],
+        }),
+        payloadType: 'application/json',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, Payload> mimeType: application/json ; length: 19<<{á: 1, b: [2, 20]}>>)'));
+        res.toString(),
+        equals(
+          '(200, Payload> mimeType: application/json ; length: 19<<{á: 1, b: [2, 20]}>>)',
+        ),
+      );
     });
 
     test('upload(text:utf8) /base', () async {
-      var res = await _getURL('${apiServer.url}base/upload',
-          method: APIRequestMethod.POST,
-          payload: convert.utf8.encode('utf8: áÁ'),
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: convert.utf8.encode('utf8: áÁ'),
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, Payload> mimeType: text/plain ; length: 10<<utf8: áÁ>>)'));
+        res.toString(),
+        equals('(200, Payload> mimeType: text/plain ; length: 10<<utf8: áÁ>>)'),
+      );
     });
 
     test('upload(text:latin1) /base', () async {
-      var res = await _getURL('${apiServer.url}base/upload',
-          method: APIRequestMethod.POST,
-          payload: convert.utf8.encode('utf8: áÁ'),
-          payloadType: 'text/plain; charset=latin1');
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: convert.utf8.encode('utf8: áÁ'),
+        payloadType: 'text/plain; charset=latin1',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 14<<utf8: Ã¡Ã>>)'));
+        res.toString(),
+        equals(
+          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 14<<utf8: Ã¡Ã>>)',
+        ),
+      );
     });
 
     test('upload(text:latin1) /base', () async {
-      var res = await _getURL('${apiServer.url}base/upload',
-          method: APIRequestMethod.POST,
-          payload: convert.latin1.encode('utf8: áÁ'),
-          payloadType: 'text/plain; charset=latin1');
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: convert.latin1.encode('utf8: áÁ'),
+        payloadType: 'text/plain; charset=latin1',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: áÁ>>)'));
+        res.toString(),
+        equals(
+          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: áÁ>>)',
+        ),
+      );
     });
 
     test('payload(Hello World!) /base', () async {
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          payload: convert.utf8.encode('Hello World!'),
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        payload: convert.utf8.encode('Hello World!'),
+        payloadType: 'text/plain',
+      );
       expect(res.toString(), equals('(200, PAYLOAD: 12 <<Hello World!>>)'));
     });
 
     test('payload(empty) /base', () async {
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          payload: Uint8List(0),
-          payloadType: 'application/octet-stream');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        payload: Uint8List(0),
+        payloadType: 'application/octet-stream',
+      );
       expect(res.toString(), equals('(200, PAYLOAD: empty)'));
     });
 
@@ -467,26 +542,35 @@ void main() {
       var payload = convert.utf8.encode('Hello World With GZip!');
       var payloadGZip = GZipEncoder().encode(payload);
 
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          headers: {'Content-Encoding': 'gzip'},
-          payload: payloadGZip,
-          payloadType: 'text/plain');
-      expect(res.toString(),
-          equals('(200, PAYLOAD: 22 <<Hello World With GZip!>>)'));
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        headers: {'Content-Encoding': 'gzip'},
+        payload: payloadGZip,
+        payloadType: 'text/plain',
+      );
+      expect(
+        res.toString(),
+        equals('(200, PAYLOAD: 22 <<Hello World With GZip!>>)'),
+      );
     });
 
     test('payload(large content) /base', () async {
       const largePayload =
           'This is a large content, over maxPayloadLength: 100> ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          payload: convert.utf8.encode(largePayload),
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        payload: convert.utf8.encode(largePayload),
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          allOf(startsWith('(500, ERROR processing request:'),
-              contains('Payload size (115) exceeds `maxPayloadLength` (100)')));
+        res.toString(),
+        allOf(
+          startsWith('(500, ERROR processing request:'),
+          contains('Payload size (115) exceeds `maxPayloadLength` (100)'),
+        ),
+      );
     });
 
     test('payload+gzip /base', () async {
@@ -495,15 +579,19 @@ void main() {
       var payload = convert.utf8.encode(content);
       var payloadGZip = GZipEncoder().encode(payload);
 
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          headers: {'Content-Encoding': 'gzip'},
-          payload: payloadGZip,
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        headers: {'Content-Encoding': 'gzip'},
+        payload: payloadGZip,
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, PAYLOAD: 90 <<This is a normal content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)'));
+        res.toString(),
+        equals(
+          '(200, PAYLOAD: 90 <<This is a normal content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)',
+        ),
+      );
     });
 
     test('payload+gzip(large content) /base', () async {
@@ -512,17 +600,22 @@ void main() {
       var payload = convert.utf8.encode(largePayload);
       var payloadGZip = GZipEncoder().encode(payload);
 
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          headers: {'Content-Encoding': 'gzip'},
-          payload: payloadGZip,
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        headers: {'Content-Encoding': 'gzip'},
+        payload: payloadGZip,
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          allOf(
-              startsWith('(500, ERROR processing request:'),
-              contains(
-                  "Can't decompress payload of size 48: GZip payload uncompressed size (117) exceeds `maxPayloadLength` (100).")));
+        res.toString(),
+        allOf(
+          startsWith('(500, ERROR processing request:'),
+          contains(
+            "Can't decompress payload of size 48: GZip payload uncompressed size (117) exceeds `maxPayloadLength` (100).",
+          ),
+        ),
+      );
     });
 
     test('payload+zlib /base', () async {
@@ -531,15 +624,19 @@ void main() {
       var payload = convert.utf8.encode(largePayload);
       var payloadZlib = ZLibEncoder().encode(payload);
 
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          headers: {'Content-Encoding': 'deflate'},
-          payload: payloadZlib,
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        headers: {'Content-Encoding': 'deflate'},
+        payload: payloadZlib,
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          equals(
-              '(200, PAYLOAD: 89 <<This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)'));
+        res.toString(),
+        equals(
+          '(200, PAYLOAD: 89 <<This is a large content: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>>)',
+        ),
+      );
     });
 
     test('payload+zlib(large content) /base', () async {
@@ -548,36 +645,52 @@ void main() {
       var payload = convert.utf8.encode(largePayload);
       var payloadZlib = ZLibEncoder().encode(payload);
 
-      var res = await _getURL('${apiServer.url}base/payload',
-          method: APIRequestMethod.POST,
-          headers: {'Content-Encoding': 'deflate'},
-          payload: payloadZlib,
-          payloadType: 'text/plain');
+      var res = await _getURL(
+        '${apiServer.url}base/payload',
+        method: APIRequestMethod.POST,
+        headers: {'Content-Encoding': 'deflate'},
+        payload: payloadZlib,
+        payloadType: 'text/plain',
+      );
       expect(
-          res.toString(),
-          allOf(
-              startsWith('(500, ERROR processing request:'),
-              contains(
-                  "Decompressed `deflate` payload size (117) exceeds `maxPayloadLength` (100)")));
+        res.toString(),
+        allOf(
+          startsWith('(500, ERROR processing request:'),
+          contains(
+            "Decompressed `deflate` payload size (117) exceeds `maxPayloadLength` (100)",
+          ),
+        ),
+      );
     });
 
     test('get /info', () async {
-      var res = await _getURL('${apiServer.url}info/echo',
-          method: APIRequestMethod.GET, parameters: {'msg': 'Hello!'});
+      var res = await _getURL(
+        '${apiServer.url}info/echo',
+        method: APIRequestMethod.GET,
+        parameters: {'msg': 'Hello!'},
+      );
 
-      expect(res.toString(),
-          equals('(200, [method: GET ; msg: HELLO! ; agent: BonesAPI/Test])'));
+      expect(
+        res.toString(),
+        equals('(200, [method: GET ; msg: HELLO! ; agent: BonesAPI/Test])'),
+      );
 
-      var res2 = await _getURL('${apiServer.url}info/echo',
-          method: APIRequestMethod.POST, parameters: {'msg': 'Hello!'});
+      var res2 = await _getURL(
+        '${apiServer.url}info/echo',
+        method: APIRequestMethod.POST,
+        parameters: {'msg': 'Hello!'},
+      );
 
-      expect(res2.toString(),
-          equals('(200, [method: POST ; msg: HELLO! ; agent: BonesAPI/Test])'));
+      expect(
+        res2.toString(),
+        equals('(200, [method: POST ; msg: HELLO! ; agent: BonesAPI/Test])'),
+      );
     });
 
     test('proxy: toUpperCase', () async {
       var infoProxy = MyInfoModuleProxy(
-          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+        mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()),
+      );
 
       expect(await infoProxy.toUpperCase('abc'), equals('Upper case: ABC'));
 
@@ -588,40 +701,54 @@ void main() {
 
     test('proxy: withPayload', () async {
       var infoProxy = MyInfoModuleProxy(
-          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+        mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()),
+      );
 
       expect(await infoProxy.withPayload(null), equals('Payload length: -1'));
 
-      expect(await infoProxy.withPayload([0, 1, 2, 3].asUint8List),
-          equals('Payload length: 4'));
+      expect(
+        await infoProxy.withPayload([0, 1, 2, 3].asUint8List),
+        equals('Payload length: 4'),
+      );
 
-      expect(await infoProxy.withPayload([0].asUint8List),
-          equals('Payload length: 1'));
+      expect(
+        await infoProxy.withPayload([0].asUint8List),
+        equals('Payload length: 1'),
+      );
 
-      expect(await infoProxy.withPayload(<int>[].asUint8List),
-          equals('Payload length: 0'));
+      expect(
+        await infoProxy.withPayload(<int>[].asUint8List),
+        equals('Payload length: 0'),
+      );
     });
 
     test('proxy: mapKeys', () async {
       var infoProxy = MyInfoModuleProxy(
-          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+        mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()),
+      );
 
-      expect(await infoProxy.mapKeys({'a': 1, 'b': '2', 'c': true}),
-          equals(['a', 'b', 'c']));
+      expect(
+        await infoProxy.mapKeys({'a': 1, 'b': '2', 'c': true}),
+        equals(['a', 'b', 'c']),
+      );
     });
 
     test('proxy: listMultiplier', () async {
       var infoProxy = MyInfoModuleProxy(
-          mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()));
+        mercury_client.HttpClient(apiServer.url, _MyHttpClientRequester()),
+      );
 
       expect(
-          await infoProxy.listMultiplier([1, 2, 3], 10), equals([10, 20, 30]));
+        await infoProxy.listMultiplier([1, 2, 3], 10),
+        equals([10, 20, 30]),
+      );
     });
 
     test('/API-INFO', () async {
       var res = await _getURL('${apiServer.url}API-INFO');
 
-      var expectedInfo = '(200, {"name":"example","version":"1.0","modules":['
+      var expectedInfo =
+          '(200, {"name":"example","version":"1.0","modules":['
           '{"name":"base","routes":['
           '{"name":"time","uri":"http://localhost:0/base/time"},'
           '{"name":"auth","uri":"http://localhost:0/base/auth"},'
@@ -645,7 +772,9 @@ void main() {
           ']})';
 
       expectedInfo = expectedInfo.replaceAll(
-          'localhost:0', '${apiServer.address}:${apiServer.port}');
+        'localhost:0',
+        '${apiServer.address}:${apiServer.port}',
+      );
 
       expect(res.toString(), equals(expectedInfo));
     });
@@ -701,8 +830,12 @@ void main() {
     });
 
     test('create [localhost, 5545]', () async {
-      var apiServer =
-          APIServer.create(api, ['--address', 'localhost', '-p', '5546']);
+      var apiServer = APIServer.create(api, [
+        '--address',
+        'localhost',
+        '-p',
+        '5546',
+      ]);
       expect(apiServer, isNotNull);
       expect(apiServer.address, equals('localhost'));
       expect(apiServer.port, equals(5546));
@@ -732,8 +865,12 @@ void main() {
     final api = MyAPI();
 
     test('run + stop', () async {
-      final apiServer =
-          await APIServer.run(api, ['X', '5546'], argsOffset: 1, verbose: true);
+      final apiServer = await APIServer.run(
+        api,
+        ['X', '5546'],
+        argsOffset: 1,
+        verbose: true,
+      );
       expect(apiServer, isNotNull);
       expect(apiServer.address, equals('localhost'));
       expect(apiServer.port, equals(5546));
@@ -762,8 +899,9 @@ void main() {
     });
 
     test('foo[GET] /index.html', () async {
-      var (status, data, headers) =
-          await _getUrlAndHeaders('${apiServer.url}/index.html');
+      var (status, data, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/index.html',
+      );
       expect(status, equals(200));
       expect(data, equals('<html>Hello World!</html>\n'));
 
@@ -773,15 +911,17 @@ void main() {
       expect(headers['x-api-server-cache'], isNull);
 
       var (status2, data2, headers2) = await _getUrlAndHeaders(
-          '${apiServer.url}/index.html',
-          headers: {'If-Modified-Since': lastModified!});
+        '${apiServer.url}/index.html',
+        headers: {'If-Modified-Since': lastModified!},
+      );
 
       expect(status2, equals(304));
       expect(data2, equals(''));
       expect(headers2['x-api-server-cache'], isNotEmpty);
 
-      var (status3, data3, headers3) =
-          await _getUrlAndHeaders('${apiServer.url}/index.html');
+      var (status3, data3, headers3) = await _getUrlAndHeaders(
+        '${apiServer.url}/index.html',
+      );
 
       expect(status3, equals(200));
       expect(data3, equals(data));
@@ -804,23 +944,22 @@ void main() {
       var res1 = await apiConsole.processRequestLine('base/foo');
       expect(res1.toString(), equals('Hi[GET]!'));
 
-      var res2 =
-          await apiConsole.processRequestLine('base/foo --method post -a 1');
+      var res2 = await apiConsole.processRequestLine(
+        'base/foo --method post -a 1',
+      );
       expect(res2.toString(), equals('Hi[POST]! {a: 1}'));
     });
 
     test('run', () async {
       var apiConsole = APIConsole(api);
 
-      var commandsConst = const [
-        'base/foo',
-        'base/foo --method post -a 2',
-      ];
+      var commandsConst = const ['base/foo', 'base/foo --method post -a 2'];
 
       var commands = commandsConst.toList();
 
-      var responses = await apiConsole
-          .run(() => commands.isNotEmpty ? commands.removeAt(0) : null);
+      var responses = await apiConsole.run(
+        () => commands.isNotEmpty ? commands.removeAt(0) : null,
+      );
 
       print(responses);
 
@@ -835,10 +974,11 @@ void main() {
       var commands2 = commandsConst.toList();
 
       var responses2 = await apiConsole.run(
-          () => commands2.isNotEmpty ? commands2.removeAt(0) : null,
-          onRequest: (req) => onRequests.add(req),
-          onResponse: (res) => onResponses.add(res),
-          returnResponses: false);
+        () => commands2.isNotEmpty ? commands2.removeAt(0) : null,
+        onRequest: (req) => onRequests.add(req),
+        onResponse: (res) => onResponses.add(res),
+        returnResponses: false,
+      );
 
       print(onRequests);
       print(onResponses);
@@ -846,8 +986,10 @@ void main() {
       expect(responses2, isEmpty);
 
       expect(onRequests.map((e) => e.path), equals(['base/foo', 'base/foo']));
-      expect(onResponses.map((e) => '$e'),
-          equals(['Hi[GET]!', 'Hi[POST]! {a: 2}']));
+      expect(
+        onResponses.map((e) => '$e'),
+        equals(['Hi[GET]!', 'Hi[POST]! {a: 2}']),
+      );
     });
   });
 }
@@ -858,10 +1000,13 @@ class MyAPI extends APIRoot {
   factory MyAPI() => _instance ??= MyAPI.withConfig();
 
   MyAPI.withConfig([dynamic apiConfig])
-      : super('example', '1.0',
-            apiConfig: apiConfig,
-            preApiRequestHandlers: [_preRequest],
-            posApiRequestHandlers: [_posRequest]);
+    : super(
+        'example',
+        '1.0',
+        apiConfig: apiConfig,
+        preApiRequestHandlers: [_preRequest],
+        posApiRequestHandlers: [_posRequest],
+      );
 
   static APIResponse<T>? _preRequest<T>(APIRoot apiRoot, APIRequest request) {
     if (request.pathPartFirst.startsWith('pre')) {
@@ -891,15 +1036,21 @@ class MyBaseModule extends APIModule {
   void configure() {
     routes.get('foo', (request) => APIResponse.ok('Hi[GET]!'));
     routes.post(
-        'foo', (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'));
+      'foo',
+      (request) => APIResponse.ok('Hi[POST]! ${request.parameters}'),
+    );
 
-    routes.any('time',
-        (request) => APIResponse.ok(DateTime.now(), mimeType: 'text/plain'));
+    routes.any(
+      'time',
+      (request) => APIResponse.ok(DateTime.now(), mimeType: 'text/plain'),
+    );
 
     routes.any('auth', (request) => APIResponse.unauthorized());
 
-    routes.any('404',
-        (request) => APIResponse.notFound(payload: '404: ${request.path}'));
+    routes.any(
+      '404',
+      (request) => APIResponse.notFound(payload: '404: ${request.path}'),
+    );
 
     routes.any('err', (request) => throw StateError('Error!'));
 
@@ -909,11 +1060,14 @@ class MyBaseModule extends APIModule {
     routes.head('head', (request) => APIResponse.ok('HEAD'));
 
     routes.post(
-        'upload',
-        (request) => APIResponse.ok('Payload> '
-            'mimeType: ${request.payloadMimeType} ; '
-            'length: ${request.payloadAsBytes?.length}'
-            '${(request.payloadMimeType?.isStringType ?? false) ? '<<${request.payload}>>' : ''}'));
+      'upload',
+      (request) => APIResponse.ok(
+        'Payload> '
+        'mimeType: ${request.payloadMimeType} ; '
+        'length: ${request.payloadAsBytes?.length}'
+        '${(request.payloadMimeType?.isStringType ?? false) ? '<<${request.payload}>>' : ''}',
+      ),
+    );
 
     routes.post('payload', (request) {
       var payloadBytes = request.payloadAsBytes;
@@ -967,31 +1121,37 @@ class MyInfoModule extends APIModule {
   }
 }
 
-Future<(int, String)> _getURL(String url,
-    {APIRequestMethod? method,
-    Map<String, dynamic>? parameters,
-    Map<String, String>? headers,
-    List<int>? payload,
-    String? payloadType,
-    String? expectedContentType}) async {
-  var (status, content, _) = await _getUrlAndHeaders(url,
-      method: method,
-      parameters: parameters,
-      headers: headers,
-      payload: payload,
-      payloadType: payloadType,
-      expectedContentType: expectedContentType);
+Future<(int, String)> _getURL(
+  String url, {
+  APIRequestMethod? method,
+  Map<String, dynamic>? parameters,
+  Map<String, String>? headers,
+  List<int>? payload,
+  String? payloadType,
+  String? expectedContentType,
+}) async {
+  var (status, content, _) = await _getUrlAndHeaders(
+    url,
+    method: method,
+    parameters: parameters,
+    headers: headers,
+    payload: payload,
+    payloadType: payloadType,
+    expectedContentType: expectedContentType,
+  );
   return (status, content);
 }
 
 /// Simple HTTP get URL function.
-Future<(int, String, HttpHeaders)> _getUrlAndHeaders(String url,
-    {APIRequestMethod? method,
-    Map<String, dynamic>? parameters,
-    Map<String, String>? headers,
-    List<int>? payload,
-    String? payloadType,
-    String? expectedContentType}) async {
+Future<(int, String, HttpHeaders)> _getUrlAndHeaders(
+  String url, {
+  APIRequestMethod? method,
+  Map<String, dynamic>? parameters,
+  Map<String, String>? headers,
+  List<int>? payload,
+  String? payloadType,
+  String? expectedContentType,
+}) async {
   method ??= APIRequestMethod.GET;
 
   var uri = Uri.parse(url);
@@ -1093,10 +1253,11 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
 
   @override
   Future<mercury_client.HttpResponse> doHttpRequest(
-      mercury_client.HttpClient client,
-      mercury_client.HttpRequest request,
-      mercury_client.ProgressListener? progressListener,
-      bool log) async {
+    mercury_client.HttpClient client,
+    mercury_client.HttpRequest request,
+    mercury_client.ProgressListener? progressListener,
+    bool log,
+  ) async {
     (int, String) response;
 
     if (request.method == mercury_client.HttpMethod.POST) {
@@ -1113,11 +1274,12 @@ class _MyHttpClientRequester extends mercury_client.HttpClientRequester {
     var responseContent = response.$2;
 
     return mercury_client.HttpResponse(
-        mercury_client.getHttpMethod(request.method.name)!,
-        request.url,
-        request.requestURL,
-        200,
-        mercury_client.HttpBody.from(responseContent));
+      mercury_client.getHttpMethod(request.method.name)!,
+      request.url,
+      request.requestURL,
+      200,
+      mercury_client.HttpBody.from(responseContent),
+    );
   }
 }
 

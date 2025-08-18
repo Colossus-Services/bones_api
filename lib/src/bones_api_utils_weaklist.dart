@@ -8,9 +8,10 @@ class WeakList<E extends Object> extends ListBase<E?> {
   /// The interval that [purge] will force a full check of the entries.
   final Duration purgeInterval;
 
-  WeakList(
-      {bool autoPurge = true, this.purgeInterval = const Duration(seconds: 30)})
-      : allowAutoPurge = autoPurge;
+  WeakList({
+    bool autoPurge = true,
+    this.purgeInterval = const Duration(seconds: 30),
+  }) : allowAutoPurge = autoPurge;
 
   final List<WeakReference<E>> _entries = <WeakReference<E>>[];
 

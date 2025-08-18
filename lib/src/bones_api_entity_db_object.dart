@@ -19,7 +19,7 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
   }
 
   static final DBAdapterRegister<Object, DBObjectAdapter<Object>>
-      adapterRegister = DBAdapter.adapterRegister.createRegister();
+  adapterRegister = DBAdapter.adapterRegister.createRegister();
 
   static List<String> get registeredAdaptersNames =>
       adapterRegister.registeredAdaptersNames;
@@ -28,22 +28,26 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
       adapterRegister.registeredAdaptersTypes;
 
   static void registerAdapter<C extends Object, A extends DBObjectAdapter<C>>(
-      List<String> names,
-      Type type,
-      DBAdapterInstantiator<C, A> adapterInstantiator) {
+    List<String> names,
+    Type type,
+    DBAdapterInstantiator<C, A> adapterInstantiator,
+  ) {
     boot();
     adapterRegister.registerAdapter(names, type, adapterInstantiator);
   }
 
   static DBAdapterInstantiator<C, A>?
-      getAdapterInstantiator<C extends Object, A extends DBObjectAdapter<C>>(
-              {String? name, Type? type}) =>
-          adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
+  getAdapterInstantiator<C extends Object, A extends DBObjectAdapter<C>>({
+    String? name,
+    Type? type,
+  }) => adapterRegister.getAdapterInstantiator<C, A>(name: name, type: type);
 
   static List<MapEntry<DBAdapterInstantiator<C, A>, Map<String, dynamic>>>
-      getAdapterInstantiatorsFromConfig<C extends Object,
-              A extends DBObjectAdapter<C>>(Map<String, dynamic> config) =>
-          adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
+  getAdapterInstantiatorsFromConfig<
+    C extends Object,
+    A extends DBObjectAdapter<C>
+  >(Map<String, dynamic> config) =>
+      adapterRegister.getAdapterInstantiatorsFromConfig<C, A>(config);
 
   static bool? parseConfigLog(Map<String, dynamic>? config) {
     var log = config?['log'];
@@ -53,47 +57,56 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
   final bool log;
 
   DBObjectAdapter(
-      super.name, super.minConnections, super.maxConnections, super.capability,
-      {bool generateTables = false,
-      Object? populateTables,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.parentRepositoryProvider,
-      super.connectivity,
-      super.workingPath,
-      this.log = false}) {
+    super.name,
+    super.minConnections,
+    super.maxConnections,
+    super.capability, {
+    bool generateTables = false,
+    Object? populateTables,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.parentRepositoryProvider,
+    super.connectivity,
+    super.workingPath,
+    this.log = false,
+  }) {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
   static FutureOr<A> fromConfig<C extends Object, A extends DBObjectAdapter<C>>(
-      Map<String, dynamic> config,
-      {int minConnections = 1,
-      int maxConnections = 3,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+    Map<String, dynamic> config, {
+    int minConnections = 1,
+    int maxConnections = 3,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var instantiators = getAdapterInstantiatorsFromConfig<C, A>(config);
 
     if (instantiators.isEmpty) {
       throw StateError(
-          "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}");
+        "Can't find `$A` instantiator for `config` keys: ${config.keys.toList()}",
+      );
     }
 
-    return DBAdapter.instantiateAdaptor<C, A>(instantiators, config,
-        minConnections: minConnections,
-        maxConnections: maxConnections,
-        parentRepositoryProvider: parentRepositoryProvider,
-        workingPath: workingPath);
+    return DBAdapter.instantiateAdaptor<C, A>(
+      instantiators,
+      config,
+      minConnections: minConnections,
+      maxConnections: maxConnections,
+      parentRepositoryProvider: parentRepositoryProvider,
+      workingPath: workingPath,
+    );
   }
 
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
     return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider
+      if (parentRepositoryProvider != null) parentRepositoryProvider,
     ];
   }
 }
@@ -103,9 +116,12 @@ class DBObjectAdapterException extends DBAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectAdapterException';
 
-  DBObjectAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBObjectAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }

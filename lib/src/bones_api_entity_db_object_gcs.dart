@@ -55,23 +55,26 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     DBObjectAdapter.boot();
 
-    DBObjectAdapter.registerAdapter([
-      'object.gcs',
-      'obj.gcs',
-      'object.gcp',
-      'obj.gcp',
-    ], DBObjectGCSAdapter, _instantiate);
+    DBObjectAdapter.registerAdapter(
+      ['object.gcs', 'obj.gcs', 'object.gcp', 'obj.gcp'],
+      DBObjectGCSAdapter,
+      _instantiate,
+    );
   }
 
-  static FutureOr<DBObjectGCSAdapter?> _instantiate(config,
-      {int? minConnections,
-      int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+  static FutureOr<DBObjectGCSAdapter?> _instantiate(
+    config, {
+    int? minConnections,
+    int? maxConnections,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     try {
-      return DBObjectGCSAdapter.fromConfig(config,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath);
+      return DBObjectGCSAdapter.fromConfig(
+        config,
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath,
+      );
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
@@ -87,29 +90,33 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   late final gcs.Storage storage;
   late final gcs.Bucket bucket;
 
-  DBObjectGCSAdapter(http.Client client, this.projectName, this.bucketName,
-      {this.cacheDirectory,
-      this.cacheLimit,
-      super.generateTables,
-      super.populateTables,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.parentRepositoryProvider,
-      super.workingPath,
-      super.log})
-      : super(
-          'object.gcs',
-          1,
-          3,
-          const DBAdapterCapability(
-              dialect: DBDialect('object'),
-              transactions: true,
-              transactionAbort: true,
-              constraintSupport: false,
-              multiIsolateSupport: true,
-              connectivity: DBAdapterCapabilityConnectivity.secure),
-          connectivity: DBAdapterConnectivity.secure,
-        ) {
+  DBObjectGCSAdapter(
+    http.Client client,
+    this.projectName,
+    this.bucketName, {
+    this.cacheDirectory,
+    this.cacheLimit,
+    super.generateTables,
+    super.populateTables,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.parentRepositoryProvider,
+    super.workingPath,
+    super.log,
+  }) : super(
+         'object.gcs',
+         1,
+         3,
+         const DBAdapterCapability(
+           dialect: DBDialect('object'),
+           transactions: true,
+           transactionAbort: true,
+           constraintSupport: false,
+           multiIsolateSupport: true,
+           connectivity: DBAdapterCapabilityConnectivity.secure,
+         ),
+         connectivity: DBAdapterConnectivity.secure,
+       ) {
     boot();
 
     storage = gcs.Storage(client, projectName);
@@ -121,9 +128,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     _checkCacheDirectoryLimit();
   }
 
-  static Future<DBObjectGCSAdapter> fromConfig(Map<String, dynamic>? config,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) async {
+  static Future<DBObjectGCSAdapter> fromConfig(
+    Map<String, dynamic>? config, {
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) async {
     boot();
 
     var credential = config?.getIgnoreCase('credential');
@@ -157,9 +166,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       if (limitStr != null && limitStr.isNotEmpty) {
         limitStr = limitStr.replaceAll(RegExp(r'\s'), '').toLowerCase();
 
-        var nPart = limitStr.length > 1
-            ? limitStr.substring(0, limitStr.length - 1)
-            : limitStr;
+        var nPart =
+            limitStr.length > 1
+                ? limitStr.substring(0, limitStr.length - 1)
+                : limitStr;
 
         int unit;
         if (limitStr.endsWith('g')) {
@@ -194,7 +204,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Object? populateSourceVariables;
 
     if (populate is Map) {
-      generateTables = populate.getAsBool('generateTables', ignoreCase: true) ??
+      generateTables =
+          populate.getAsBool('generateTables', ignoreCase: true) ??
           populate.getAsBool('generate-tables', ignoreCase: true) ??
           populate.getAsBool('generate_tables', ignoreCase: true) ??
           false;
@@ -224,7 +235,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   static Future<auth.AutoRefreshingAuthClient> createGCSClient(
-      credential) async {
+    credential,
+  ) async {
     if (credential is String) {
       var credentialLC = credential.toLowerCase();
       if (credentialLC == 'metadata' || credentialLC == 'metadata.server') {
@@ -232,12 +244,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
     }
 
-    final accountCredentials =
-        auth.ServiceAccountCredentials.fromJson(credential);
+    final accountCredentials = auth.ServiceAccountCredentials.fromJson(
+      credential,
+    );
 
     try {
       var client = await auth.clientViaServiceAccount(
-          accountCredentials, gcs.Storage.SCOPES);
+        accountCredentials,
+        gcs.Storage.SCOPES,
+      );
       return client;
     } catch (e) {
       throw StateError("Error creating GCP client: $e");
@@ -282,8 +297,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID}) {
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  }) {
     //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
@@ -297,13 +314,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         var targetId =
             '${relationship.targetTable}_${relationship.targetField}';
 
-        tableScheme = TableScheme(table,
-            relationship: true,
-            idFieldName: sourceId,
-            fieldsTypes: {
-              sourceId: relationship.sourceFieldType,
-              targetId: relationship.targetFieldType,
-            });
+        tableScheme = TableScheme(
+          table,
+          relationship: true,
+          idFieldName: sourceId,
+          fieldsTypes: {
+            sourceId: relationship.sourceFieldType,
+            targetId: relationship.targetFieldType,
+          },
+        );
 
         _log.info('relationship> $tableScheme');
 
@@ -311,20 +330,24 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
 
       throw StateError(
-          "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
+        "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!",
+      );
     }
 
     var idFieldName = entityHandler.idFieldName();
 
     var entityFieldsTypes = entityHandler.fieldsTypes();
 
-    var fieldsTypes =
-        entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
+    var fieldsTypes = entityFieldsTypes.map(
+      (key, value) => MapEntry(key, value.type),
+    );
 
-    tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes);
+    tableScheme = TableScheme(
+      table,
+      relationship: relationship != null,
+      idFieldName: idFieldName,
+      fieldsTypes: fieldsTypes,
+    );
 
     _log.info('$tableScheme');
 
@@ -350,8 +373,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     _openTransactionsContexts[conn] = DateTime.now();
 
     transaction.transactionFuture
-        // ignore: discarded_futures
-        .then(
+    // ignore: discarded_futures
+    .then(
       // ignore: discarded_futures
       (res) => resolveTransactionResult(res, transaction, conn),
       onError: (e, s) {
@@ -371,10 +394,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   bool cancelTransaction(
-      Transaction transaction,
-      DBObjectGCSAdapterContext? connection,
-      Object? error,
-      StackTrace? stackTrace) {
+    Transaction transaction,
+    DBObjectGCSAdapterContext? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  ) {
     _openTransactionsContexts.remove(connection);
     return true;
   }
@@ -384,7 +408,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBObjectGCSAdapterContext? connection) {
+    Transaction transaction,
+    DBObjectGCSAdapterContext? connection,
+  ) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
@@ -405,20 +431,32 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   FutureOr<int> doCount(
-      TransactionOperation op, String entityName, String table,
-      {EntityMatcher? matcher,
-      Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      PreFinishDBOperation<int, int>? preFinish}) {
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    EntityMatcher? matcher,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<int, int>? preFinish,
+  }) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doCountImpl(
         op,
-        (conn) => _doCountImpl(op, table, matcher, parameters)
-            .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+        table,
+        matcher,
+        parameters,
+      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    );
   }
 
-  Future<int> _doCountImpl(TransactionOperation op, String table,
-      EntityMatcher? matcher, Object? parameters) async {
+  Future<int> _doCountImpl(
+    TransactionOperation op,
+    String table,
+    EntityMatcher? matcher,
+    Object? parameters,
+  ) async {
     if (matcher != null) {
       if (matcher is ConditionID) {
         var id = matcher.idValue ?? matcher.getID(parameters);
@@ -447,48 +485,79 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   FutureOr<List<I>> doExistIDs<I extends Object>(
-      TransactionOperation op, String entityName, String table, List<I> ids) {
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<I> ids,
+  ) {
     return executeTransactionOperation(
+      op,
+      (conn) => _doExistIDsImpl(
         op,
-        (conn) => _doExistIDsImpl(op, table, ids)
-            .resolveMapped((res) => _finishOperation(op, res, null)));
+        table,
+        ids,
+      ).resolveMapped((res) => _finishOperation(op, res, null)),
+    );
   }
 
   FutureOr<List<I>> _doExistIDsImpl<I extends Object>(
-      TransactionOperation op, String table, List<I> ids) {
-    return ids.forEachAsync((id) async {
-      var objFile = _resolveObjectFilePath(table, id);
+    TransactionOperation op,
+    String table,
+    List<I> ids,
+  ) {
+    return ids
+        .forEachAsync((id) async {
+          var objFile = _resolveObjectFilePath(table, id);
 
-      var objInfo = await _getObjectInfo(objFile);
-      return objInfo != null && objInfo.length > 0 ? id : null;
-    }).resolveMapped((ids) => ids.nonNulls.toList());
+          var objInfo = await _getObjectInfo(objFile);
+          return objInfo != null && objInfo.length > 0 ? id : null;
+        })
+        .resolveMapped((ids) => ids.nonNulls.toList());
   }
 
   @override
   FutureOr<R?> doSelectByID<R>(
-          TransactionOperation op, String entityName, String table, Object id,
-          {PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish}) =>
-      executeTransactionOperation<R?>(
-          op,
-          (conn) => _doSelectByIDImpl<R>(table, id, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table,
+    Object id, {
+    PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
+  }) => executeTransactionOperation<R?>(
+    op,
+    (conn) => _doSelectByIDImpl<R>(
+      table,
+      id,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
-          String table, Object id, String entityName) =>
-      _readObject(table, id);
+    String table,
+    Object id,
+    String entityName,
+  ) => _readObject(table, id);
 
   @override
-  FutureOr<List<R>> doSelectByIDs<R>(TransactionOperation op, String entityName,
-          String table, List<Object> ids,
-          {PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectByIDsImpl<R>(table, ids, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<List<R>> doSelectByIDs<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    List<Object> ids, {
+    PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectByIDsImpl<R>(
+      table,
+      ids,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
-      String table, List<Object> ids, String entityName) async {
+    String table,
+    List<Object> ids,
+    String entityName,
+  ) async {
     var entries =
         await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
 
@@ -497,45 +566,60 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   @override
   FutureOr<List<R>> doSelectAll<R>(
-          TransactionOperation op, String entityName, String table,
-          {PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>?
-              preFinish}) =>
-      executeTransactionOperation<List<R>>(
-          op,
-          (conn) => _doSelectAllImpl<R>(table, entityName)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+    TransactionOperation op,
+    String entityName,
+    String table, {
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
+  }) => executeTransactionOperation<List<R>>(
+    op,
+    (conn) => _doSelectAllImpl<R>(
+      table,
+      entityName,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   Future<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
-      String table, String entityName) async {
+    String table,
+    String entityName,
+  ) async {
     var files = await _listTableFiles(table);
 
-    var entries = files.map((f) {
-      var fileName = f.split('/').last;
-      var id = pack_path.withoutExtension(fileName);
-      return _readObject(table, id);
-    }).resolveAllNotNull();
+    var entries =
+        files.map((f) {
+          var fileName = f.split('/').last;
+          var id = pack_path.withoutExtension(fileName);
+          return _readObject(table, id);
+        }).resolveAllNotNull();
 
     return entries;
   }
 
   @override
-  FutureOr<R> doDelete<R>(TransactionOperation op, String entityName,
-          String table, EntityMatcher matcher,
-          {Object? parameters,
-          List? positionalParameters,
-          Map<String, Object?>? namedParameters,
-          PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>?
-              preFinish}) =>
-      executeTransactionOperation(
-          op,
-          (conn) => _doDeleteImpl<R>(op, table, matcher, parameters)
-              .resolveMapped((res) => _finishOperation(op, res, preFinish)));
+  FutureOr<R> doDelete<R>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    EntityMatcher matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doDeleteImpl<R>(
+      op,
+      table,
+      matcher,
+      parameters,
+    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+  );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
-      TransactionOperation op,
-      String table,
-      EntityMatcher<dynamic> matcher,
-      Object? parameters) async {
+    TransactionOperation op,
+    String table,
+    EntityMatcher<dynamic> matcher,
+    Object? parameters,
+  ) async {
     if (matcher is ConditionID) {
       var id = matcher.idValue ?? matcher.getID(parameters);
 
@@ -555,26 +639,38 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   @override
-  FutureOr<dynamic> doInsert<O>(TransactionOperation op, String entityName,
-          String table, O o, Map<String, dynamic> fields,
-          {String? idFieldName, PreFinishDBOperation? preFinish}) =>
-      executeTransactionOperation<dynamic>(op,
-          (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish));
+  FutureOr<dynamic> doInsert<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+  }) => executeTransactionOperation<dynamic>(
+    op,
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+  );
 
   FutureOr<dynamic> _doInsertImpl<O>(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      PreFinishDBOperation? preFinish) async {
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    PreFinishDBOperation? preFinish,
+  ) async {
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     var id = entry[idField];
 
     _log.info(
-        '[transaction:${op.transactionId}] doInsert> INSERT INTO $table OBJECT `$id`');
+      '[transaction:${op.transactionId}] doInsert> INSERT INTO $table OBJECT `$id`',
+    );
 
     if (id == null) {
       throw StateError("Can't determine object ID to store it: $fields");
@@ -586,28 +682,38 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   @override
-  FutureOr<dynamic> doUpdate<O>(TransactionOperation op, String entityName,
-          String table, O o, Object id, Map<String, dynamic> fields,
-          {String? idFieldName,
-          PreFinishDBOperation? preFinish,
-          bool allowAutoInsert = false}) =>
-      executeTransactionOperation(
-          op,
-          (conn) =>
-              _doUpdateImpl(op, table, fields, entityName, id, preFinish));
+  FutureOr<dynamic> doUpdate<O>(
+    TransactionOperation op,
+    String entityName,
+    String table,
+    O o,
+    Object id,
+    Map<String, dynamic> fields, {
+    String? idFieldName,
+    PreFinishDBOperation? preFinish,
+    bool allowAutoInsert = false,
+  }) => executeTransactionOperation(
+    op,
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+  );
 
   FutureOr<dynamic> _doUpdateImpl(
-      TransactionOperation op,
-      String table,
-      Map<String, dynamic> fields,
-      String entityName,
-      Object id,
-      PreFinishDBOperation? preFinish) async {
+    TransactionOperation op,
+    String table,
+    Map<String, dynamic> fields,
+    String entityName,
+    Object id,
+    PreFinishDBOperation? preFinish,
+  ) async {
     _log.info(
-        '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`');
+      '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
+    );
 
-    var entry =
-        _normalizeEntityJSON(fields, entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      fields,
+      entityName: entityName,
+      table: table,
+    );
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -633,7 +739,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   Future<bool> _saveObject(
-      String table, Object? id, Map<String, dynamic> obj) async {
+    String table,
+    Object? id,
+    Map<String, dynamic> obj,
+  ) async {
     if (!_isValidId(id)) return false;
 
     var file = _resolveObjectFilePath(table, id);
@@ -662,8 +771,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
     }
 
-    var objInfo = await bucket.writeBytes(file, jsonBytes,
-        contentType: _objectContentType);
+    var objInfo = await bucket.writeBytes(
+      file,
+      jsonBytes,
+      contentType: _objectContentType,
+    );
     var ok = objInfo.length == jsonBytes.length;
 
     cacheFile = _resolveCacheObjectFile(table, id, autoCreateDir: true);
@@ -742,7 +854,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     if (cacheLimit <= 0) return;
 
     if (!force) {
-      var estimatedTotal = _checkCacheDirectoryLimitLastTotal +
+      var estimatedTotal =
+          _checkCacheDirectoryLimitLastTotal +
           _checkCacheDirectoryLimitUntrackedTotal;
 
       var inLimit = estimatedTotal <= cacheLimit;
@@ -766,10 +879,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var files =
         list.whereType<File>().where((f) => f.path.endsWith(".json")).toList();
 
-    var filesStats = await files
-        .map((f) => MapEntry(f, f.stat()))
-        .toMapFromEntries()
-        .resolveAllValues();
+    var filesStats =
+        await files
+            .map((f) => MapEntry(f, f.stat()))
+            .toMapFromEntries()
+            .resolveAllValues();
 
     var totalSize = filesStats.values.map((s) => s.size).sum;
 
@@ -779,7 +893,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     if (totalSize <= cacheLimit) {
       var r = (totalSize / cacheLimit) * 100;
       _log.info(
-          '[CACHE] Limit check: OK ($totalSize / $cacheLimit bytes ${r.toStringAsFixed(2)}%)  (${filesStats.length} files)');
+        '[CACHE] Limit check: OK ($totalSize / $cacheLimit bytes ${r.toStringAsFixed(2)}%)  (${filesStats.length} files)',
+      );
       return;
     }
 
@@ -789,7 +904,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     final delNeededSize = ((totalSize * 0.80) - cacheLimit).toInt();
 
     _log.info(
-        '[CACHE] Reached limit: $totalSize / $cacheLimit bytes (${entries.length} files)! Releasing $delNeededSize bytes...');
+      '[CACHE] Reached limit: $totalSize / $cacheLimit bytes (${entries.length} files)! Releasing $delNeededSize bytes...',
+    );
 
     var del = <File>[];
     var delSize = 0;
@@ -829,18 +945,25 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return tableStr;
   }
 
-  File? _resolveCacheObjectFile(String table, Object? id,
-      {bool autoCreateDir = false}) {
-    var tableDir =
-        _resolveCacheTableDirectory(table, autoCreateDir: autoCreateDir);
+  File? _resolveCacheObjectFile(
+    String table,
+    Object? id, {
+    bool autoCreateDir = false,
+  }) {
+    var tableDir = _resolveCacheTableDirectory(
+      table,
+      autoCreateDir: autoCreateDir,
+    );
     if (tableDir == null) return null;
     var idStr = _normalizeID(id);
     var file = File(pack_path.join(tableDir.path, '$idStr.json'));
     return file;
   }
 
-  Directory? _resolveCacheTableDirectory(String table,
-      {bool autoCreateDir = false}) {
+  Directory? _resolveCacheTableDirectory(
+    String table, {
+    bool autoCreateDir = false,
+  }) {
     var cacheDirectory = this.cacheDirectory;
     if (cacheDirectory == null) return null;
     var tableStr = _normalizeTableName(table);
@@ -879,14 +1002,21 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return table;
   }
 
-  Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
-      {String? entityName, String? table, EntityRepository? entityRepository}) {
-    entityRepository ??=
-        getEntityRepository(name: entityName, tableName: table);
+  Map<String, dynamic> _normalizeEntityJSON(
+    Map<String, dynamic> entityJson, {
+    String? entityName,
+    String? table,
+    EntityRepository? entityRepository,
+  }) {
+    entityRepository ??= getEntityRepository(
+      name: entityName,
+      tableName: table,
+    );
 
     if (entityRepository == null) {
       throw StateError(
-          "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table");
+        "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table",
+      );
     }
 
     var entityHandler = entityRepository.entityHandler;
@@ -899,8 +1029,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         return MapEntry(key, dataURLBase64.toString());
       }
 
-      var fieldType =
-          entityHandler.getFieldType(null, key, resolveFiledName: false);
+      var fieldType = entityHandler.getFieldType(
+        null,
+        key,
+        resolveFiledName: false,
+      );
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType) {
@@ -909,7 +1042,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           if (value is EntityReference) {
@@ -928,44 +1062,57 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         } else if (fieldType.isEntityReferenceListType) {
           var listEntityType = fieldType.arguments0!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
 
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           value = fieldEntityRepository.getEntityID(value);
@@ -978,16 +1125,25 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return entityJsonNormalized;
   }
 
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
-          Object? previousError) =>
-      DBObjectGCSAdapterException('error', '$error',
-          parentError: error,
-          parentStackTrace: stackTrace,
-          previousError: previousError,
-          operation: operation);
+  Object resolveError(
+    Object error,
+    StackTrace stackTrace,
+    Object? operation,
+    Object? previousError,
+  ) => DBObjectGCSAdapterException(
+    'error',
+    '$error',
+    parentError: error,
+    parentStackTrace: stackTrace,
+    previousError: previousError,
+    operation: operation,
+  );
 
   FutureOr<R> _finishOperation<T, R>(
-      TransactionOperation op, T res, PreFinishDBOperation<T, R>? preFinish) {
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) {
     if (preFinish != null) {
       return preFinish(res).resolveMapped((res2) => op.finish(res2));
     } else {
@@ -995,19 +1151,24 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     }
   }
 
-  FutureOr<R> executeTransactionOperation<R>(TransactionOperation op,
-      FutureOr<R> Function(DBObjectGCSAdapterContext connection) f) {
+  FutureOr<R> executeTransactionOperation<R>(
+    TransactionOperation op,
+    FutureOr<R> Function(DBObjectGCSAdapterContext connection) f,
+  ) {
     var transaction = op.transaction;
 
     if (isTransactionWithSingleOperation(op)) {
-      return executeWithPool(f,
-          onError: (e, s) => transaction.notifyExecutionError(
-                e,
-                s,
-                errorResolver: resolveError,
-                operation: op,
-                debugInfo: () => op.toString(),
-              ));
+      return executeWithPool(
+        f,
+        onError:
+            (e, s) => transaction.notifyExecutionError(
+              e,
+              s,
+              errorResolver: resolveError,
+              operation: op,
+              debugInfo: () => op.toString(),
+            ),
+      );
     }
 
     if (transaction.isOpen) {
@@ -1024,7 +1185,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         () => openTransaction(transaction),
         callCloseTransactionRequired
             ? () => closeTransaction(
-                transaction, transaction.context as DBObjectGCSAdapterContext?)
+              transaction,
+              transaction.context as DBObjectGCSAdapterContext?,
+            )
             : null,
       );
     }
@@ -1045,33 +1208,26 @@ class DBObjectGCSAdapterException extends DBObjectAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBObjectGCSAdapterException';
 
-  DBObjectGCSAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBObjectGCSAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }
 
 extension _ObjectInfoExtension on gcs.ObjectInfo {
   List<int> get crc32CChecksumBytes {
     var n = crc32CChecksum;
-    return [
-      (n) & 0xFF,
-      (n >> 8) & 0xFF,
-      (n >> 16) & 0xFF,
-      (n >> 24) & 0xFF,
-    ];
+    return [(n) & 0xFF, (n >> 8) & 0xFF, (n >> 16) & 0xFF, (n >> 24) & 0xFF];
   }
 }
 
 extension _CrcValueExtension on CrcValue {
   List<int> get crc32CChecksumBytes {
     var n = toBigInt().toInt();
-    return [
-      (n >> 24) & 0xFF,
-      (n >> 16) & 0xFF,
-      (n >> 8) & 0xFF,
-      (n) & 0xFF,
-    ];
+    return [(n >> 24) & 0xFF, (n >> 16) & 0xFF, (n >> 8) & 0xFF, (n) & 0xFF];
   }
 }

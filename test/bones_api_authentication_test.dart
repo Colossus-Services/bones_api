@@ -83,8 +83,10 @@ void main() {
 
       expect(apiToken.username, equals('joe'));
 
-      expect(apiToken.token.length,
-          allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)));
+      expect(
+        apiToken.token.length,
+        allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)),
+      );
 
       expect(apiToken.token, startsWith('TK'));
       expect(apiToken.refreshToken, isNull);
@@ -103,8 +105,10 @@ void main() {
 
       expect(apiToken.username, equals('joe'));
 
-      expect(apiToken.token.length,
-          allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)));
+      expect(
+        apiToken.token.length,
+        allOf(greaterThanOrEqualTo(514), lessThanOrEqualTo(514 + 32)),
+      );
 
       expect(apiToken.token, startsWith('TK'));
       expect(apiToken.refreshToken, startsWith('RTK'));
@@ -122,8 +126,10 @@ void main() {
 
     test('basic', () async {
       var apiToken = APIToken('joe');
-      var authentication =
-          APIAuthentication(apiToken, permissions: [APIPermission('guest')]);
+      var authentication = APIAuthentication(
+        apiToken,
+        permissions: [APIPermission('guest')],
+      );
 
       print(authentication);
 
@@ -137,16 +143,18 @@ void main() {
       expect(authentication.enabledPermissions().length, equals(1));
 
       expect(
-          authentication
-              .enabledPermissionsWhere((p) => p.type.startsWith('g'))
-              .length,
-          equals(1));
+        authentication
+            .enabledPermissionsWhere((p) => p.type.startsWith('g'))
+            .length,
+        equals(1),
+      );
 
       expect(
-          authentication
-              .enabledPermissionsWhere((p) => p.type.startsWith('x'))
-              .length,
-          equals(0));
+        authentication
+            .enabledPermissionsWhere((p) => p.type.startsWith('x'))
+            .length,
+        equals(0),
+      );
 
       expect(authentication.containsPermissionOfType('guest'), isTrue);
       expect(authentication.containsPermissionOfType('admin'), isFalse);

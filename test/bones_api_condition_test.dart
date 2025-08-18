@@ -7,25 +7,36 @@ void main() {
 
     test('ConditionParameter', () async {
       expect(
-          KeyConditionEQ(ConditionKey.parse('foo'), ConditionParameter())
-              .encode(),
-          equals('foo == ?'));
+        KeyConditionEQ(
+          ConditionKey.parse('foo'),
+          ConditionParameter(),
+        ).encode(),
+        equals('foo == ?'),
+      );
 
       expect(
-          KeyConditionEQ(ConditionKey.parse('foo'), ConditionParameter.index(0))
-              .encode(),
-          equals('foo == ?#0'));
+        KeyConditionEQ(
+          ConditionKey.parse('foo'),
+          ConditionParameter.index(0),
+        ).encode(),
+        equals('foo == ?#0'),
+      );
 
       expect(
-          KeyConditionEQ(ConditionKey.parse('foo'), ConditionParameter.index(1))
-              .encode(),
-          equals('foo == ?#1'));
+        KeyConditionEQ(
+          ConditionKey.parse('foo'),
+          ConditionParameter.index(1),
+        ).encode(),
+        equals('foo == ?#1'),
+      );
 
       expect(
-          KeyConditionEQ(
-                  ConditionKey.parse('foo'), ConditionParameter.key('xy'))
-              .encode(),
-          equals('foo == ?:xy'));
+        KeyConditionEQ(
+          ConditionKey.parse('foo'),
+          ConditionParameter.key('xy'),
+        ).encode(),
+        equals('foo == ?:xy'),
+      );
     });
   });
 
@@ -33,16 +44,20 @@ void main() {
     var c = ConditionID(123);
     expect(c.idValue, equals(123));
 
-    var g = GroupConditionOR(
-        [ConditionID(10), ConditionID(ConditionParameter.key('id'))]);
+    var g = GroupConditionOR([
+      ConditionID(10),
+      ConditionID(ConditionParameter.key('id')),
+    ]);
 
     var parameters = <ConditionParameter>[];
     g.resolve(parameters: parameters);
 
     expect(g.conditions.length, equals(2));
     expect((g.conditions[0] as ConditionID).idValue, equals(10));
-    expect((g.conditions[1] as ConditionID).idValue,
-        equals(ConditionParameter.key('id')));
+    expect(
+      (g.conditions[1] as ConditionID).idValue,
+      equals(ConditionParameter.key('id')),
+    );
 
     expect(parameters, equals([ConditionParameter.key('id')]));
   });
@@ -53,145 +68,187 @@ void main() {
     test('key op value', () async {
       var conditionParser = ConditionParser();
 
-      expect(conditionParser.parse(' foo == true ').toString(),
-          equals('foo == true'));
-      expect(conditionParser.parse(' foo != false ').toString(),
-          equals('foo != false'));
+      expect(
+        conditionParser.parse(' foo == true ').toString(),
+        equals('foo == true'),
+      );
+      expect(
+        conditionParser.parse(' foo != false ').toString(),
+        equals('foo != false'),
+      );
 
-      expect(conditionParser.parse(' foo.x == 123 ').toString(),
-          equals('foo.x == 123'));
+      expect(
+        conditionParser.parse(' foo.x == 123 ').toString(),
+        equals('foo.x == 123'),
+      );
 
-      expect(conditionParser.parse(' foo.x != 123 ').toString(),
-          equals('foo.x != 123'));
+      expect(
+        conditionParser.parse(' foo.x != 123 ').toString(),
+        equals('foo.x != 123'),
+      );
 
-      expect(conditionParser.parse(' "a:b" == false ').toString(),
-          equals('"a:b" == false'));
-      expect(conditionParser.parse(" 'a  b' == 'xyz' ").toString(),
-          equals('"a  b" == "xyz"'));
+      expect(
+        conditionParser.parse(' "a:b" == false ').toString(),
+        equals('"a:b" == false'),
+      );
+      expect(
+        conditionParser.parse(" 'a  b' == 'xyz' ").toString(),
+        equals('"a  b" == "xyz"'),
+      );
 
-      expect(conditionParser.parse(' k_1 == 234 ').toString(),
-          equals('k_1 == 234'));
+      expect(
+        conditionParser.parse(' k_1 == 234 ').toString(),
+        equals('k_1 == 234'),
+      );
 
-      expect(conditionParser.parse(' ( foo == 123 ) ').toString(),
-          equals('foo == 123'));
+      expect(
+        conditionParser.parse(' ( foo == 123 ) ').toString(),
+        equals('foo == 123'),
+      );
 
-      expect(conditionParser.parse(' ( foo != 123 ) ').toString(),
-          equals('foo != 123'));
+      expect(
+        conditionParser.parse(' ( foo != 123 ) ').toString(),
+        equals('foo != 123'),
+      );
 
-      expect(conditionParser.parse(' ( foo == [1 , 2] ) ').toString(),
-          equals('foo == [1,2]'));
+      expect(
+        conditionParser.parse(' ( foo == [1 , 2] ) ').toString(),
+        equals('foo == [1,2]'),
+      );
 
-      expect(conditionParser.parse(' ( foo == {"a": 1 , "b": 2} ) ').toString(),
-          equals('foo == {"a":1,"b":2}'));
+      expect(
+        conditionParser.parse(' ( foo == {"a": 1 , "b": 2} ) ').toString(),
+        equals('foo == {"a":1,"b":2}'),
+      );
 
-      expect(conditionParser.parse(' ( foo =~ [1 , 2] ) ').toString(),
-          equals('foo =~ [1,2]'));
+      expect(
+        conditionParser.parse(' ( foo =~ [1 , 2] ) ').toString(),
+        equals('foo =~ [1,2]'),
+      );
 
-      expect(conditionParser.parse(' ( foo =~ 123 ) ').toString(),
-          equals('foo =~ [123]'));
+      expect(
+        conditionParser.parse(' ( foo =~ 123 ) ').toString(),
+        equals('foo =~ [123]'),
+      );
     });
 
     test('group AND', () async {
       var conditionParser = ConditionParser();
 
-      expect(conditionParser.parse(' foo == 123 && bar == false ').toString(),
-          equals('( foo == 123 && bar == false )'));
-
-      expect(conditionParser.parse(' (foo == 123 && bar == false) ').toString(),
-          equals('( foo == 123 && bar == false )'));
+      expect(
+        conditionParser.parse(' foo == 123 && bar == false ').toString(),
+        equals('( foo == 123 && bar == false )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' ( (foo == 123) && (bar == 456) ) ')
-              .toString(),
-          equals('( foo == 123 && bar == 456 )'));
+        conditionParser.parse(' (foo == 123 && bar == false) ').toString(),
+        equals('( foo == 123 && bar == false )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' ( (foo == 123 && foo == 321) && (bar == 456) ) ')
-              .toString(),
-          equals('( ( foo == 123 && foo == 321 ) && bar == 456 )'));
+        conditionParser.parse(' ( (foo == 123) && (bar == 456) ) ').toString(),
+        equals('( foo == 123 && bar == 456 )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' (foo == 123 && foo == 321) && (bar == 456) ')
-              .toString(),
-          equals('( ( foo == 123 && foo == 321 ) && bar == 456 )'));
+        conditionParser
+            .parse(' ( (foo == 123 && foo == 321) && (bar == 456) ) ')
+            .toString(),
+        equals('( ( foo == 123 && foo == 321 ) && bar == 456 )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' (foo == 123 && foo == 321) || bar == 456 ')
-              .toString(),
-          equals('( ( foo == 123 && foo == 321 ) || bar == 456 )'));
+        conditionParser
+            .parse(' (foo == 123 && foo == 321) && (bar == 456) ')
+            .toString(),
+        equals('( ( foo == 123 && foo == 321 ) && bar == 456 )'),
+      );
+
+      expect(
+        conditionParser
+            .parse(' (foo == 123 && foo == 321) || bar == 456 ')
+            .toString(),
+        equals('( ( foo == 123 && foo == 321 ) || bar == 456 )'),
+      );
     });
 
     test('group OR', () async {
       var conditionParser = ConditionParser();
 
-      expect(conditionParser.parse(' foo == 123 || bar == false ').toString(),
-          equals('( foo == 123 || bar == false )'));
+      expect(
+        conditionParser.parse(' foo == 123 || bar == false ').toString(),
+        equals('( foo == 123 || bar == false )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' foo == 123 || ( bar == false || baz == 123 ) ')
-              .toString(),
-          equals('( foo == 123 || ( bar == false || baz == 123 ) )'));
-
-      expect(conditionParser.parse('( foo == 123 || bar == false )').toString(),
-          equals('( foo == 123 || bar == false )'));
+        conditionParser
+            .parse(' foo == 123 || ( bar == false || baz == 123 ) ')
+            .toString(),
+        equals('( foo == 123 || ( bar == false || baz == 123 ) )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' ( (foo == 123) || (bar == 456) ) ')
-              .toString(),
-          equals('( foo == 123 || bar == 456 )'));
+        conditionParser.parse('( foo == 123 || bar == false )').toString(),
+        equals('( foo == 123 || bar == false )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' ( (foo == 123 || foo == 321) || (bar == 456) ) ')
-              .toString(),
-          equals('( ( foo == 123 || foo == 321 ) || bar == 456 )'));
+        conditionParser.parse(' ( (foo == 123) || (bar == 456) ) ').toString(),
+        equals('( foo == 123 || bar == 456 )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' (foo == 123 || foo == 321) || (bar == 456) ')
-              .toString(),
-          equals('( ( foo == 123 || foo == 321 ) || bar == 456 )'));
+        conditionParser
+            .parse(' ( (foo == 123 || foo == 321) || (bar == 456) ) ')
+            .toString(),
+        equals('( ( foo == 123 || foo == 321 ) || bar == 456 )'),
+      );
 
       expect(
-          conditionParser
-              .parse(' (foo == 123 || foo == 321) && bar == 456 ')
-              .toString(),
-          equals('( ( foo == 123 || foo == 321 ) && bar == 456 )'));
+        conditionParser
+            .parse(' (foo == 123 || foo == 321) || (bar == 456) ')
+            .toString(),
+        equals('( ( foo == 123 || foo == 321 ) || bar == 456 )'),
+      );
+
+      expect(
+        conditionParser
+            .parse(' (foo == 123 || foo == 321) && bar == 456 ')
+            .toString(),
+        equals('( ( foo == 123 || foo == 321 ) && bar == 456 )'),
+      );
     });
 
     test('group AND+OR', () {
       var conditionParser = ConditionParser();
 
       expect(
-          conditionParser
-              .parse(" level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
-              .toString(),
-          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+        conditionParser
+            .parse(" level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+            .toString(),
+        equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'),
+      );
 
       expect(
-          conditionParser
-              .parse(" level == 100 && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
-              .toString(),
-          equals(
-              '( level == 100 && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+        conditionParser
+            .parse(" level == 100 && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+            .toString(),
+        equals('( level == 100 && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'),
+      );
 
       expect(
-          conditionParser
-              .parse(" ( level == ? ) && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
-              .toString(),
-          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+        conditionParser
+            .parse(" ( level == ? ) && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) ")
+            .toString(),
+        equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'),
+      );
 
       expect(
-          conditionParser
-              .parse("( level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) )")
-              .toString(),
-          equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'));
+        conditionParser
+            .parse("( level == ? && ( roles =~ ?:rs1 || roles =~ ?:rs2 ) )")
+            .toString(),
+        equals('( level == ? && ( roles =~ [?:rs1] || roles =~ [?:rs2] ) )'),
+      );
     });
 
     test('ConditionParameter single', () async {
@@ -259,26 +316,36 @@ void main() {
       expect(c6.parameters.toString(), equals('[?, ?, ?]'));
       expect(c6.parameters.map((e) => e.contextPosition), equals([0, 1, 2]));
 
-      var c7 =
-          conditionParser.parse(' foo == ? || ( bar == ?:x || baz == ? ) ');
+      var c7 = conditionParser.parse(
+        ' foo == ? || ( bar == ?:x || baz == ? ) ',
+      );
       expect(
-          c7.toString(), equals('( foo == ? || ( bar == ?:x || baz == ? ) )'));
+        c7.toString(),
+        equals('( foo == ? || ( bar == ?:x || baz == ? ) )'),
+      );
       expect(c7.parameters.toString(), equals('[?, ?:x, ?]'));
       expect(c7.parameters.map((e) => e.contextPosition), equals([0, null, 2]));
-      expect(c7.parameters.map((e) => e.contextKey),
-          equals(['foo', 'bar', 'baz']));
+      expect(
+        c7.parameters.map((e) => e.contextKey),
+        equals(['foo', 'bar', 'baz']),
+      );
       expect(c7.parameters.map((e) => e.contextKeyPosition), equals([0, 1, 2]));
       expect(c7.parameters.map((e) => e.index), equals([null, null, null]));
       expect(c7.parameters.map((e) => e.key), equals([null, 'x', null]));
 
-      var c8 =
-          conditionParser.parse(' foo == ? || ( bar == ?#0 || baz == ? ) ');
+      var c8 = conditionParser.parse(
+        ' foo == ? || ( bar == ?#0 || baz == ? ) ',
+      );
       expect(
-          c8.toString(), equals('( foo == ? || ( bar == ?#0 || baz == ? ) )'));
+        c8.toString(),
+        equals('( foo == ? || ( bar == ?#0 || baz == ? ) )'),
+      );
       expect(c8.parameters.toString(), equals('[?, ?#0, ?]'));
       expect(c8.parameters.map((e) => e.contextPosition), equals([0, null, 2]));
-      expect(c8.parameters.map((e) => e.contextKey),
-          equals(['foo', 'bar', 'baz']));
+      expect(
+        c8.parameters.map((e) => e.contextKey),
+        equals(['foo', 'bar', 'baz']),
+      );
       expect(c8.parameters.map((e) => e.contextKeyPosition), equals([0, 1, 2]));
       expect(c8.parameters.map((e) => e.index), equals([null, 0, null]));
       expect(c8.parameters.map((e) => e.key), equals([null, null, null]));
@@ -289,30 +356,44 @@ void main() {
 
       var c1 = conditionParser.parse(' #ID == 123 ') as ConditionID;
       expect(c1.idValue, equals(123));
-      expect(c1.matchesEntityMap({'id': 123}, positionalParameters: [123]),
-          isTrue);
-      expect(c1.matchesEntityMap({'id': 123}, positionalParameters: [456]),
-          isTrue);
-      expect(c1.matchesEntityMap({'id': 456}, positionalParameters: [456]),
-          isFalse);
+      expect(
+        c1.matchesEntityMap({'id': 123}, positionalParameters: [123]),
+        isTrue,
+      );
+      expect(
+        c1.matchesEntityMap({'id': 123}, positionalParameters: [456]),
+        isTrue,
+      );
+      expect(
+        c1.matchesEntityMap({'id': 456}, positionalParameters: [456]),
+        isFalse,
+      );
 
       var c2 = conditionParser.parse(' #ID == ? ') as ConditionID;
       expect(c2.idValue.toString(), equals('?'));
 
-      expect(c2.matchesEntityMap({'id': 123}, positionalParameters: [123]),
-          isTrue);
-      expect(c2.matchesEntityMap({'id': 123}, positionalParameters: [456]),
-          isFalse);
-      expect(c2.matchesEntityMap({'id': 456}, positionalParameters: [456]),
-          isTrue);
+      expect(
+        c2.matchesEntityMap({'id': 123}, positionalParameters: [123]),
+        isTrue,
+      );
+      expect(
+        c2.matchesEntityMap({'id': 123}, positionalParameters: [456]),
+        isFalse,
+      );
+      expect(
+        c2.matchesEntityMap({'id': 456}, positionalParameters: [456]),
+        isTrue,
+      );
     });
 
     test('group complex', () async {
       var conditionParser = ConditionParser();
 
-      var c1 = conditionParser.parse(
-              ' address.countryCode == ? && address.state == ? && address.latitude > ?:lat1 && address.latitude < ?:lat2 && address.longitude >= ?:long1 && address.longitude <= ?:long2 ')
-          as GroupConditionAND;
+      var c1 =
+          conditionParser.parse(
+                ' address.countryCode == ? && address.state == ? && address.latitude > ?:lat1 && address.latitude < ?:lat2 && address.longitude >= ?:long1 && address.longitude <= ?:long2 ',
+              )
+              as GroupConditionAND;
 
       expect(c1.conditions.length, equals(6));
       expect(c1.conditions[0], isA<KeyConditionEQ>());
@@ -322,39 +403,45 @@ void main() {
       expect(c1.conditions[4], isA<KeyConditionGreaterThanOrEqual>());
       expect(c1.conditions[5], isA<KeyConditionLessThanOrEqual>());
 
-      var m1 = c1.matchesEntityMap({
-        'address': {
+      var m1 = c1.matchesEntityMap(
+        {
+          'address': {
+            'countryCode': 'BR',
+            'state': 'SP',
+            'latitude': 20.01,
+            'longitude': 30.01,
+          },
+        },
+        namedParameters: {
           'countryCode': 'BR',
           'state': 'SP',
-          'latitude': 20.01,
-          'longitude': 30.01,
+          'lat1': 20.01 - 1,
+          'lat2': 20.01 + 1,
+          'long1': 30.01 - 1,
+          'long2': 30.01 + 1,
         },
-      }, namedParameters: {
-        'countryCode': 'BR',
-        'state': 'SP',
-        'lat1': 20.01 - 1,
-        'lat2': 20.01 + 1,
-        'long1': 30.01 - 1,
-        'long2': 30.01 + 1,
-      });
+      );
 
       expect(m1, isTrue);
 
-      var m2 = c1.matchesEntityMap({
-        'address': {
+      var m2 = c1.matchesEntityMap(
+        {
+          'address': {
+            'countryCode': 'BR',
+            'state': 'SP',
+            'latitude': 20.01,
+            'longitude': 30.01,
+          },
+        },
+        namedParameters: {
           'countryCode': 'BR',
           'state': 'SP',
-          'latitude': 20.01,
-          'longitude': 30.01,
+          'lat1': 20.01 + 1,
+          'lat2': 20.01 + 2,
+          'long1': 30.01 - 1,
+          'long2': 30.01 + 1,
         },
-      }, namedParameters: {
-        'countryCode': 'BR',
-        'state': 'SP',
-        'lat1': 20.01 + 1,
-        'lat2': 20.01 + 2,
-        'long1': 30.01 - 1,
-        'long2': 30.01 + 1,
-      });
+      );
 
       expect(m2, isFalse);
     });
@@ -366,34 +453,48 @@ void main() {
     test('SQL Encoder', () async {
       var parser = ConditionParser();
 
-      var sqlEncoder =
-          ConditionSQLEncoder(_TestSchemeProvider(), sqlElementQuote: '"');
+      var sqlEncoder = ConditionSQLEncoder(
+        _TestSchemeProvider(),
+        sqlElementQuote: '"',
+      );
 
       {
         var sql = await sqlEncoder.encode(
-            parser.parse('email == ? && admin == ?'), 'account',
-            parameters: {'email': 'joe@m.com', 'admin': false});
+          parser.parse('email == ? && admin == ?'),
+          'account',
+          parameters: {'email': 'joe@m.com', 'admin': false},
+        );
 
-        expect(sql.outputString,
-            equals('( "ac"."email" = @email AND "ac"."admin" = @admin )'));
-        expect(sql.parametersPlaceholders,
-            equals({'email': 'joe@m.com', 'admin': false}));
+        expect(
+          sql.outputString,
+          equals('( "ac"."email" = @email AND "ac"."admin" = @admin )'),
+        );
+        expect(
+          sql.parametersPlaceholders,
+          equals({'email': 'joe@m.com', 'admin': false}),
+        );
         expect(sql.tableAliases, equals({'account': 'ac'}));
         expect(sql.fieldsReferencedTables, isEmpty);
       }
 
       {
         var sql = await sqlEncoder.encode(
-            parser.parse('email == ? && address.state == ?'), 'account',
-            parameters: {'email': 'joe@m.com', 'state': 'NY'});
+          parser.parse('email == ? && address.state == ?'),
+          'account',
+          parameters: {'email': 'joe@m.com', 'state': 'NY'},
+        );
 
-        expect(sql.outputString,
-            equals('( "ac"."email" = @email AND "ad"."state" = @state )'));
-        expect(sql.parametersPlaceholders,
-            equals({'email': 'joe@m.com', 'state': 'NY'}));
+        expect(
+          sql.outputString,
+          equals('( "ac"."email" = @email AND "ad"."state" = @state )'),
+        );
+        expect(
+          sql.parametersPlaceholders,
+          equals({'email': 'joe@m.com', 'state': 'NY'}),
+        );
         expect(sql.tableAliases, equals({'account': 'ac', 'address': 'ad'}));
         expect(sql.fieldsReferencedTables, {
-          TableFieldReference('account', 'address', int, 'address', 'id', int)
+          TableFieldReference('account', 'address', int, 'address', 'id', int),
         });
       }
     });
@@ -402,26 +503,34 @@ void main() {
   group('Condition match', () {
     test('KeyConditionEQ', () {
       expect(
-          KeyConditionEQ([ConditionKeyField('foo')], 123)
-              .matchesEntity({'foo': 123}),
-          isTrue);
+        KeyConditionEQ([
+          ConditionKeyField('foo'),
+        ], 123).matchesEntity({'foo': 123}),
+        isTrue,
+      );
 
       expect(
-          KeyConditionEQ([ConditionKeyField('foo')], 123)
-              .matchesEntity({'foo': 456}),
-          isFalse);
+        KeyConditionEQ([
+          ConditionKeyField('foo'),
+        ], 123).matchesEntity({'foo': 456}),
+        isFalse,
+      );
     });
 
     test('KeyConditionNotEQ', () {
       expect(
-          KeyConditionNotEQ([ConditionKeyField('foo')], 123)
-              .matchesEntity({'foo': 123}),
-          isFalse);
+        KeyConditionNotEQ([
+          ConditionKeyField('foo'),
+        ], 123).matchesEntity({'foo': 123}),
+        isFalse,
+      );
 
       expect(
-          KeyConditionNotEQ([ConditionKeyField('foo')], 123)
-              .matchesEntity({'foo': 456}),
-          isTrue);
+        KeyConditionNotEQ([
+          ConditionKeyField('foo'),
+        ], 123).matchesEntity({'foo': 456}),
+        isTrue,
+      );
     });
 
     test('KeyConditionIN', () {
@@ -434,8 +543,10 @@ void main() {
     });
 
     test('KeyConditionNotIN', () {
-      var conditionIN =
-          KeyConditionNotIN([ConditionKeyField('foo')], [1, 2, 3]);
+      var conditionIN = KeyConditionNotIN(
+        [ConditionKeyField('foo')],
+        [1, 2, 3],
+      );
 
       expect(conditionIN.matchesEntity({'foo': 1}), isFalse);
       expect(conditionIN.matchesEntity({'foo': 2}), isFalse);
@@ -445,48 +556,54 @@ void main() {
 
     test('GroupConditionAND', () {
       expect(
-          GroupConditionAND([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 123, 'bar': 456}),
-          isTrue);
+        GroupConditionAND([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 123, 'bar': 456}),
+        isTrue,
+      );
 
       expect(
-          GroupConditionAND([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 123, 'bar': 654}),
-          isFalse);
+        GroupConditionAND([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 123, 'bar': 654}),
+        isFalse,
+      );
 
       expect(
-          GroupConditionAND([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 321, 'bar': 654}),
-          isFalse);
+        GroupConditionAND([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 321, 'bar': 654}),
+        isFalse,
+      );
     });
 
     test('GroupConditionOR', () {
       expect(
-          GroupConditionOR([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 123, 'bar': 456}),
-          isTrue);
+        GroupConditionOR([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 123, 'bar': 456}),
+        isTrue,
+      );
 
       expect(
-          GroupConditionOR([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 123, 'bar': 654}),
-          isTrue);
+        GroupConditionOR([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 123, 'bar': 654}),
+        isTrue,
+      );
 
       expect(
-          GroupConditionOR([
-            KeyConditionEQ([ConditionKeyField('foo')], 123),
-            KeyConditionEQ([ConditionKeyField('bar')], 456),
-          ]).matchesEntity({'foo': 321, 'bar': 654}),
-          isFalse);
+        GroupConditionOR([
+          KeyConditionEQ([ConditionKeyField('foo')], 123),
+          KeyConditionEQ([ConditionKeyField('bar')], 456),
+        ]).matchesEntity({'foo': 321, 'bar': 654}),
+        isFalse,
+      );
     });
   });
 }
@@ -494,8 +611,10 @@ void main() {
 class _TestSchemeProvider extends SchemeProvider {
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID}) {
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  }) {
     switch (table) {
       case 'account':
         return TableScheme(
@@ -506,11 +625,17 @@ class _TestSchemeProvider extends SchemeProvider {
             'email': String,
             'pass': String,
             'address': int,
-            'admin': bool
+            'admin': bool,
           },
           fieldsReferencedTables: {
             'address': TableFieldReference(
-                'account', 'address', int, 'address', 'id', int)
+              'account',
+              'address',
+              int,
+              'address',
+              'id',
+              int,
+            ),
           },
         );
       case 'address':
@@ -521,7 +646,7 @@ class _TestSchemeProvider extends SchemeProvider {
             'id': int,
             'state': String,
             'city': String,
-            'street': String
+            'street': String,
           },
         );
       default:
@@ -548,8 +673,11 @@ class _TestSchemeProvider extends SchemeProvider {
   }
 
   @override
-  FutureOr<TypeInfo?> getFieldType(String field,
-      {String? entityName, String? tableName}) {
+  FutureOr<TypeInfo?> getFieldType(
+    String field, {
+    String? entityName,
+    String? tableName,
+  }) {
     var tableScheme =
         tableName != null ? getTableScheme(tableName) as TableScheme? : null;
     tableScheme ??=
@@ -562,11 +690,13 @@ class _TestSchemeProvider extends SchemeProvider {
   }
 
   @override
-  Object? getEntityID(Object entity,
-      {String? entityName,
-      String? tableName,
-      Type? entityType,
-      EntityHandler? entityHandler}) {
+  Object? getEntityID(
+    Object entity, {
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+    EntityHandler? entityHandler,
+  }) {
     if (entity is Entity) {
       return entity.getID();
     } else if (entity is Map) {

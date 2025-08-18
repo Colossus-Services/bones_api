@@ -31,8 +31,8 @@ class DBSQLMemoryAdapterContext
   final Map<String, Map<String, int>> tablesIndexesVersions;
 
   DBSQLMemoryAdapterContext(this.id, this.sqlAdapter)
-      : tablesVersions = sqlAdapter.tablesVersions,
-        tablesIndexesVersions = sqlAdapter.tablesIndexesVersions;
+    : tablesVersions = sqlAdapter.tablesVersions,
+      tablesIndexesVersions = sqlAdapter.tablesIndexesVersions;
 
   bool _closed = false;
 
@@ -65,61 +65,69 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     DBSQLAdapter.boot();
 
-    DBSQLAdapter.registerAdapter([
-      'sql.memory',
-      'sql.mem',
-    ], DBSQLMemoryAdapter, _instantiate);
+    DBSQLAdapter.registerAdapter(
+      ['sql.memory', 'sql.mem'],
+      DBSQLMemoryAdapter,
+      _instantiate,
+    );
   }
 
-  static FutureOr<DBSQLMemoryAdapter?> _instantiate(config,
-      {int? minConnections,
-      int? maxConnections,
-      EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+  static FutureOr<DBSQLMemoryAdapter?> _instantiate(
+    config, {
+    int? minConnections,
+    int? maxConnections,
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     try {
-      return DBSQLMemoryAdapter.fromConfig(config,
-          parentRepositoryProvider: parentRepositoryProvider,
-          workingPath: workingPath);
+      return DBSQLMemoryAdapter.fromConfig(
+        config,
+        parentRepositoryProvider: parentRepositoryProvider,
+        workingPath: workingPath,
+      );
     } catch (e, s) {
       _log.severe("Error instantiating from config", e, s);
       return null;
     }
   }
 
-  DBSQLMemoryAdapter(
-      {super.generateTables,
-      super.checkTables,
-      super.populateTables,
-      super.populateSource,
-      super.populateSourceVariables,
-      super.parentRepositoryProvider,
-      super.workingPath,
-      super.logSQL})
-      : super(
-          'sql.memory',
-          1,
-          3,
-          const DBSQLAdapterCapability(
-              dialect: SQLDialect(
-                'generic',
-                acceptsReturningSyntax: true,
-                acceptsInsertIgnore: true,
-              ),
-              transactions: true,
-              transactionAbort: true,
-              tableSQL: false,
-              constraintSupport: false,
-              multiIsolateSupport: false,
-              connectivity: DBAdapterCapabilityConnectivity.none),
-        ) {
+  DBSQLMemoryAdapter({
+    super.generateTables,
+    super.checkTables,
+    super.populateTables,
+    super.populateSource,
+    super.populateSourceVariables,
+    super.parentRepositoryProvider,
+    super.workingPath,
+    super.logSQL,
+  }) : super(
+         'sql.memory',
+         1,
+         3,
+         const DBSQLAdapterCapability(
+           dialect: SQLDialect(
+             'generic',
+             acceptsReturningSyntax: true,
+             acceptsInsertIgnore: true,
+           ),
+           transactions: true,
+           transactionAbort: true,
+           tableSQL: false,
+           constraintSupport: false,
+           multiIsolateSupport: false,
+           connectivity: DBAdapterCapabilityConnectivity.none,
+         ),
+       ) {
     boot();
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
-  static FutureOr<DBSQLMemoryAdapter> fromConfig(Map<String, dynamic>? config,
-      {EntityRepositoryProvider? parentRepositoryProvider,
-      String? workingPath}) {
+  static FutureOr<DBSQLMemoryAdapter> fromConfig(
+    Map<String, dynamic>? config, {
+    EntityRepositoryProvider? parentRepositoryProvider,
+    String? workingPath,
+  }) {
     boot();
 
     var retCheckTablesAndGenerateTables =
@@ -159,24 +167,31 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   SQLDialect get dialect => super.dialect as SQLDialect;
 
   @override
-  Object resolveError(Object error, StackTrace stackTrace, Object? operation,
-      Object? previousError) {
+  Object resolveError(
+    Object error,
+    StackTrace stackTrace,
+    Object? operation,
+    Object? previousError,
+  ) {
     if (error is DBSQLMemoryAdapterException) {
       return error;
     }
 
-    return DBSQLMemoryAdapterException('error', '$error',
-        parentError: error,
-        parentStackTrace: stackTrace,
-        previousError: previousError,
-        operation: operation);
+    return DBSQLMemoryAdapterException(
+      'error',
+      '$error',
+      parentError: error,
+      parentStackTrace: stackTrace,
+      previousError: previousError,
+      operation: operation,
+    );
   }
 
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
     return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider
+      if (parentRepositoryProvider != null) parentRepositoryProvider,
     ];
   }
 
@@ -232,12 +247,16 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   Map<String, int> get tablesVersions =>
       _tablesVersions ??= UnmodifiableMapView(
-          _tables.map((table, map) => MapEntry(table, map.version)));
+        _tables.map((table, map) => MapEntry(table, map.version)),
+      );
 
   final Map<String, int> _tablesIdCount = <String, int>{};
 
-  Map<Object, Map<String, dynamic>>? _getTableMap(String table, bool autoCreate,
-      {bool relationship = false}) {
+  Map<Object, Map<String, dynamic>>? _getTableMap(
+    String table,
+    bool autoCreate, {
+    bool relationship = false,
+  }) {
     var map = _tables[table];
     if (map != null) {
       return map;
@@ -264,7 +283,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   MapEntry<String, MapEntry<Object, MapEntry<String, Object>>>?
-      _findAnyReference(String referencedTable, Object? id) {
+  _findAnyReference(String referencedTable, Object? id) {
     if (id == null) return null;
 
     for (var e in _tables.entries) {
@@ -277,7 +296,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   MapEntry<Object, MapEntry<String, Object>>? _findReferenceInTable(
-      String table, String referencedTable, Object? id) {
+    String table,
+    String referencedTable,
+    Object? id,
+  ) {
     if (id == null) return null;
 
     var tableScheme = getTableScheme(table);
@@ -295,9 +317,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
         var tableMap = _getTableMap(ref.sourceTable, false);
 
-        var reference = tableMap?.entries
-            .where((e) => e.value[sourceField] == id)
-            .firstOrNull;
+        var reference =
+            tableMap?.entries
+                .where((e) => e.value[sourceField] == id)
+                .firstOrNull;
 
         if (reference != null) {
           var value = reference.value[sourceField];
@@ -344,27 +367,40 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  void checkEntityFields<O>(O o, String entityName, String table,
-      {EntityHandler<O>? entityHandler}) {
+  void checkEntityFields<O>(
+    O o,
+    String entityName,
+    String table, {
+    EntityHandler<O>? entityHandler,
+  }) {
     Map<Object, Map<String, dynamic>>? map = _getTableMap(table, false);
     if (map == null) return;
 
-    entityHandler ??=
-        getEntityHandler<O>(entityName: entityName, tableName: table);
+    entityHandler ??= getEntityHandler<O>(
+      entityName: entityName,
+      tableName: table,
+    );
     if (entityHandler == null) {
       throw StateError(
-          "Can't define `EntityHandler`> entityName: $entityName ; table: $table ; entityType: $O");
+        "Can't define `EntityHandler`> entityName: $entityName ; table: $table ; entityType: $O",
+      );
     }
 
-    var entityId = getEntityID(o!,
-        entityHandler: entityHandler, entityName: entityName, tableName: table);
+    var entityId = getEntityID(
+      o!,
+      entityHandler: entityHandler,
+      entityName: entityName,
+      tableName: table,
+    );
 
-    var fieldsEntityAnnotations =
-        entityHandler.getAllFieldsEntityAnnotations(o);
+    var fieldsEntityAnnotations = entityHandler.getAllFieldsEntityAnnotations(
+      o,
+    );
 
-    var uniques = fieldsEntityAnnotations?.entries
-        .where((e) => e.value.hasUnique)
-        .toList();
+    var uniques =
+        fieldsEntityAnnotations?.entries
+            .where((e) => e.value.hasUnique)
+            .toList();
     if (uniques == null || uniques.isEmpty) return;
 
     for (var e in uniques) {
@@ -373,34 +409,49 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       if (value == null) continue;
 
       if (_containsEntryWithConflictFieldValue(
-          map, entityHandler, entityId, field, value)) {
-        throw EntityFieldInvalid('unique', value,
-            fieldName: field, entityType: entityHandler.type, tableName: table);
+        map,
+        entityHandler,
+        entityId,
+        field,
+        value,
+      )) {
+        throw EntityFieldInvalid(
+          'unique',
+          value,
+          fieldName: field,
+          entityType: entityHandler.type,
+          tableName: table,
+        );
       }
     }
   }
 
   bool _containsEntryWithConflictFieldValue<O>(
-          Map<Object, Map<String, dynamic>> map,
-          EntityHandler<O> entityHandler,
-          Object? entityId,
-          String field,
-          value) =>
-      map.entries.any((e) {
-        if (entityId != null) {
-          var id = e.key;
-          if (entityId == id) return false;
-        }
+    Map<Object, Map<String, dynamic>> map,
+    EntityHandler<O> entityHandler,
+    Object? entityId,
+    String field,
+    value,
+  ) => map.entries.any((e) {
+    if (entityId != null) {
+      var id = e.key;
+      if (entityId == id) return false;
+    }
 
-        var elem = e.value;
-        var elemValue = elem[field];
-        var conflict = elemValue == value;
-        return conflict;
-      });
+    var elem = e.value;
+    var elemValue = elem[field];
+    var conflict = elemValue == value;
+    return conflict;
+  });
 
   @override
-  FutureOr<int> doCountSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBSQLMemoryAdapterContext connection) {
+  FutureOr<int> doCountSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return 0;
 
@@ -416,11 +467,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   FutureOr<List<I>> doExistIDsSQL<I extends Object>(
-      String entityName,
-      String table,
-      SQL sql,
-      Transaction transaction,
-      DBSQLMemoryAdapterContext connection) {
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
@@ -437,19 +489,26 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr doInsertRelationshipSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBSQLMemoryAdapterContext connection) {
+  FutureOr doInsertRelationshipSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     if (sql.isDummy) return null;
 
     var entry = _normalizeEntityJSON(
-        sql.namedParameters ?? sql.parametersByPlaceholder,
-        entityName: entityName,
-        table: table);
+      sql.namedParameters ?? sql.parametersByPlaceholder,
+      entityName: entityName,
+      table: table,
+    );
 
     var map = _getTableMap(table, true, relationship: true)!;
 
-    var prevEntry =
-        map.entries.firstWhereOrNull((e) => isEqualsDeep(e.value, entry));
+    var prevEntry = map.entries.firstWhereOrNull(
+      (e) => isEqualsDeep(e.value, entry),
+    );
     if (prevEntry != null) {
       return prevEntry.key;
     }
@@ -473,11 +532,14 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   Map<String, Map<String, int>>? _tablesIndexesVersions;
 
   Map<String, Map<String, int>> get tablesIndexesVersions =>
-      _tablesIndexesVersions ??= UnmodifiableMapView(_tablesIndexes.map(
+      _tablesIndexesVersions ??= UnmodifiableMapView(
+        _tablesIndexes.map(
           (table, fieldIndex) => MapEntry(
-              table,
-              fieldIndex
-                  .map((field, index) => MapEntry(field, index.version)))));
+            table,
+            fieldIndex.map((field, index) => MapEntry(field, index.version)),
+          ),
+        ),
+      );
 
   Map<String, MapHistory<Object, Set<Object>>> _getTableIndexes(String table) {
     var tableIndexes =
@@ -487,7 +549,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   MapHistory<Object, Set<Object>> _getTableFieldIndex(
-      String table, String field) {
+    String table,
+    String field,
+  ) {
     var tableIndexes = _getTableIndexes(table);
 
     var fieldIndex = tableIndexes[field] ??= MapHistory<Object, Set<Object>>();
@@ -501,8 +565,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     idsWithValue.add(id);
   }
 
-  bool _indexDeleteEntry(String table, Object id, String field, Object value,
-      {Map<String, MapHistory<Object, Set<Object>>>? tableIndexes}) {
+  bool _indexDeleteEntry(
+    String table,
+    Object id,
+    String field,
+    Object value, {
+    Map<String, MapHistory<Object, Set<Object>>>? tableIndexes,
+  }) {
     tableIndexes ??= _tablesIndexes[table];
     if (tableIndexes == null) return false;
 
@@ -522,16 +591,24 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr doInsertSQL(String entityName, String table, SQL sql,
-      Transaction transaction, DBSQLMemoryAdapterContext connection) {
+  FutureOr doInsertSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     if (sql.isDummy) return null;
 
     var map = _getTableMap(table, true)!;
 
     var id = nextID(table);
 
-    var entry = _normalizeEntityJSON(sql.parametersByPlaceholder,
-        entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      sql.parametersByPlaceholder,
+      entityName: entityName,
+      table: table,
+    );
 
     var tablesScheme = tablesSchemes[table];
 
@@ -545,14 +622,21 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     return id;
   }
 
-  Map<String, dynamic> _normalizeEntityJSON(Map<String, dynamic> entityJson,
-      {String? entityName, String? table, EntityRepository? entityRepository}) {
-    entityRepository ??=
-        getEntityRepository(name: entityName, tableName: table);
+  Map<String, dynamic> _normalizeEntityJSON(
+    Map<String, dynamic> entityJson, {
+    String? entityName,
+    String? table,
+    EntityRepository? entityRepository,
+  }) {
+    entityRepository ??= getEntityRepository(
+      name: entityName,
+      tableName: table,
+    );
 
     if (entityRepository == null) {
       throw StateError(
-          "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table");
+        "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table",
+      );
     }
 
     var entityHandler = entityRepository.entityHandler;
@@ -562,8 +646,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         return MapEntry(key, value);
       }
 
-      var fieldType =
-          entityHandler.getFieldType(null, key, resolveFiledName: false);
+      var fieldType = entityHandler.getFieldType(
+        null,
+        key,
+        resolveFiledName: false,
+      );
 
       if (fieldType != null) {
         if (fieldType.isEntityReferenceType && value is EntityReference) {
@@ -592,33 +679,41 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
           } else if (value.isEntitiesSet) {
             var entityType = fieldType.arguments0!;
             fieldType = entityType.callCasted(
-                <E>() => TypeInfo<List<E>>.fromType(List, [entityType]));
+              <E>() => TypeInfo<List<E>>.fromType(List, [entityType]),
+            );
             value = value.entities;
           }
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
-          var fieldListEntityRepository =
-              getEntityRepositoryByTypeInfo(listEntityType);
+          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
+            listEntityType,
+          );
 
           if (fieldListEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
+            );
           }
 
           var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map((v) => fieldListEntityRepository.isOfEntityType(v)
-                  ? fieldListEntityRepository.getEntityID(v)
-                  : v)
-              .toList();
+          value =
+              valIter
+                  .map(
+                    (v) =>
+                        fieldListEntityRepository.isOfEntityType(v)
+                            ? fieldListEntityRepository.getEntityID(v)
+                            : v,
+                  )
+                  .toList();
         } else if (!fieldType.isPrimitiveType &&
             EntityHandler.isValidEntityType(fieldType.type)) {
           var fieldEntityRepository = getEntityRepositoryByTypeInfo(fieldType);
           if (fieldEntityRepository == null) {
             throw StateError(
-                "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType");
+              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
+            );
           }
 
           value = fieldEntityRepository.getEntityID(value);
@@ -656,22 +751,32 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   @override
-  FutureOr doUpdateSQL(String entityName, String table, SQL sql, Object id,
-      Transaction transaction, DBSQLMemoryAdapterContext connection,
-      {bool allowAutoInsert = false}) {
+  FutureOr doUpdateSQL(
+    String entityName,
+    String table,
+    SQL sql,
+    Object id,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection, {
+    bool allowAutoInsert = false,
+  }) {
     if (sql.isDummy) return id;
 
     var map = _getTableMap(table, true)!;
 
     var prevEntry = map[id];
 
-    var entry = _normalizeEntityJSON(sql.parametersByPlaceholder,
-        entityName: entityName, table: table);
+    var entry = _normalizeEntityJSON(
+      sql.parametersByPlaceholder,
+      entityName: entityName,
+      table: table,
+    );
 
     if (prevEntry == null) {
       if (!allowAutoInsert) {
         throw StateError(
-            "Can't update not stored entity into table `$table`: $entry");
+          "Can't update not stored entity into table `$table`: $entry",
+        );
       }
 
       var tablesScheme = tablesSchemes[table];
@@ -695,8 +800,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   Object nextID(String table) {
-    return _tablesIdCount.update(table, (n) => n + 1,
-        ifAbsent: () => _getTableHighestID(table) + 1);
+    return _tablesIdCount.update(
+      table,
+      (n) => n + 1,
+      ifAbsent: () => _getTableHighestID(table) + 1,
+    );
   }
 
   void _disposeNextIDCounter(String table) => _tablesIdCount.remove(table);
@@ -714,11 +822,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doSelectSQL(
-      String entityName,
-      String table,
-      SQL sql,
-      Transaction transaction,
-      DBSQLMemoryAdapterContext connection) {
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var sel = _selectEntries(table, sql);
@@ -749,19 +858,23 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
             tableScheme.tableRelationshipReferenceLength == 0) ||
         condition.isIDCondition) {
       itr = map.values.where((e) {
-        return condition.matchesEntityMap(e,
-            positionalParameters: sql.positionalParameters,
-            namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
-            entityHandler: entityHandler);
+        return condition.matchesEntityMap(
+          e,
+          positionalParameters: sql.positionalParameters,
+          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+          entityHandler: entityHandler,
+        );
       });
     } else {
       itr = map.values.where((obj) {
         obj = _resolveEntityMap(obj, entityHandler, tableScheme);
 
-        return condition.matchesEntityMap(obj,
-            positionalParameters: sql.positionalParameters,
-            namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
-            entityHandler: entityHandler);
+        return condition.matchesEntityMap(
+          obj,
+          positionalParameters: sql.positionalParameters,
+          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+          entityHandler: entityHandler,
+        );
       });
     }
 
@@ -774,13 +887,16 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   List<Map<String, dynamic>> _filterReturnColumns(
-      SQL sql, List<Map<String, dynamic>> sel) {
+    SQL sql,
+    List<Map<String, dynamic>> sel,
+  ) {
     var returnColumns = sql.returnColumns;
 
     if (returnColumns != null && returnColumns.isNotEmpty) {
       return sel.map((e) {
         return Map<String, dynamic>.fromEntries(
-            e.entries.where((e) => returnColumns.contains(e.key)));
+          e.entries.where((e) => returnColumns.contains(e.key)),
+        );
       }).toList();
     }
 
@@ -788,9 +904,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     if (returnColumnsAliases != null && returnColumnsAliases.isNotEmpty) {
       return sel.map((e) {
-        return Map<String, dynamic>.fromEntries(e.entries
-            .where((e) => returnColumnsAliases.containsKey(e.key))
-            .map((e) => MapEntry(returnColumnsAliases[e.key]!, e.value)));
+        return Map<String, dynamic>.fromEntries(
+          e.entries
+              .where((e) => returnColumnsAliases.containsKey(e.key))
+              .map((e) => MapEntry(returnColumnsAliases[e.key]!, e.value)),
+        );
       }).toList();
     }
 
@@ -800,11 +918,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   FutureOr<Iterable<Map<String, dynamic>>> doDeleteSQL(
-      String entityName,
-      String table,
-      SQL sql,
-      Transaction transaction,
-      DBSQLMemoryAdapterContext connection) {
+    String entityName,
+    String table,
+    SQL sql,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext connection,
+  ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     var map = _getTableMap(table, false);
@@ -817,11 +936,14 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var entityHandler = getEntityHandler(tableName: table);
 
     if (tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0) {
-      var entries = map.entries.where((e) {
-        return sql.condition!.matchesEntityMap(e.value,
-            namedParameters: sql.parametersByPlaceholder,
-            entityHandler: entityHandler);
-      }).toList();
+      var entries =
+          map.entries.where((e) {
+            return sql.condition!.matchesEntityMap(
+              e.value,
+              namedParameters: sql.parametersByPlaceholder,
+              entityHandler: entityHandler,
+            );
+          }).toList();
 
       _checkNotReferencedEntities(entries, table, sql);
 
@@ -832,9 +954,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         .map((e) {
           var obj = _resolveEntityMap(e.value, entityHandler, tableScheme);
 
-          var match = sql.condition!.matchesEntityMap(obj,
-              namedParameters: sql.parametersByPlaceholder,
-              entityHandler: entityHandler);
+          var match = sql.condition!.matchesEntityMap(
+            obj,
+            namedParameters: sql.parametersByPlaceholder,
+            entityHandler: entityHandler,
+          );
 
           return match ? MapEntry(e.key, obj) : null;
         })
@@ -847,9 +971,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   void _checkNotReferencedEntities(
-      List<MapEntry<Object, Map<String, dynamic>>> entries,
-      String table,
-      SQL sql) {
+    List<MapEntry<Object, Map<String, dynamic>>> entries,
+    String table,
+    SQL sql,
+  ) {
     for (var e in entries) {
       var id = e.key;
 
@@ -859,17 +984,20 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         var refId = ref.value.key;
         var refFieldName = ref.value.value.key;
         var refFieldValue = ref.value.value.value;
-        throw DBSQLMemoryAdapterException("delete.constraint",
-            "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue",
-            operation: sql);
+        throw DBSQLMemoryAdapterException(
+          "delete.constraint",
+          "Can't delete $table(#$id). Referenced by: $refTable.#$refId.$refFieldName => #$refFieldValue",
+          operation: sql,
+        );
       }
     }
   }
 
   List<Map<String, dynamic>> _removeEntries(
-      String table,
-      List<MapEntry<Object, Map<String, dynamic>>> entries,
-      Map<Object, Map<String, dynamic>> tableMap) {
+    String table,
+    List<MapEntry<Object, Map<String, dynamic>>> entries,
+    Map<Object, Map<String, dynamic>> tableMap,
+  ) {
     if (entries.isEmpty) return <Map<String, dynamic>>[];
 
     var del = entries.map((e) => e.value).toList();
@@ -900,27 +1028,34 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     return del;
   }
 
-  Map<String, dynamic> _resolveEntityMap(Map<String, dynamic> obj,
-      EntityHandler<dynamic>? entityHandler, TableScheme tableScheme) {
-    var obj2 = HashMap.fromEntries(obj.entries.map((e) {
-      var key = e.key;
-      var value = e.value;
-      var refField = tableScheme.getFieldReferencedTable(key);
-      if (refField != null) {
-        value = _resolveEntityFieldReferencedTable(obj, key, refField);
-      }
-      return MapEntry(key, value);
-    }));
+  Map<String, dynamic> _resolveEntityMap(
+    Map<String, dynamic> obj,
+    EntityHandler<dynamic>? entityHandler,
+    TableScheme tableScheme,
+  ) {
+    var obj2 = HashMap.fromEntries(
+      obj.entries.map((e) {
+        var key = e.key;
+        var value = e.value;
+        var refField = tableScheme.getFieldReferencedTable(key);
+        if (refField != null) {
+          value = _resolveEntityFieldReferencedTable(obj, key, refField);
+        }
+        return MapEntry(key, value);
+      }),
+    );
 
-    var relationshipsTables = tableScheme.tableRelationshipReference.values
-        .expand((e) => e)
-        .where((e) => e.sourceTable == tableScheme.name)
-        .toList();
+    var relationshipsTables =
+        tableScheme.tableRelationshipReference.values
+            .expand((e) => e)
+            .where((e) => e.sourceTable == tableScheme.name)
+            .toList();
 
     if (relationshipsTables.isNotEmpty) {
       if (entityHandler == null) {
         throw StateError(
-            "Can't resolve relationship fields without an `EntityHandler` for `${tableScheme.name}`");
+          "Can't resolve relationship fields without an `EntityHandler` for `${tableScheme.name}`",
+        );
       }
 
       var fieldId = entityHandler.idFieldName();
@@ -934,7 +1069,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         var fieldType = e.value.arguments0!;
 
         var targetObjs = _resolveEntityFieldRelationshipTable(
-            tableScheme, relationshipsTables, id, fieldType, fieldKey);
+          tableScheme,
+          relationshipsTables,
+          id,
+          fieldType,
+          fieldKey,
+        );
         if (targetObjs != null) {
           obj2[fieldKey] = targetObjs;
         }
@@ -945,7 +1085,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   Object? _resolveEntityFieldReferencedTable(
-      Map<String, dynamic> obj, String key, TableFieldReference refField) {
+    Map<String, dynamic> obj,
+    String key,
+    TableFieldReference refField,
+  ) {
     var id = obj[key];
     if (id == null) return null;
 
@@ -964,11 +1107,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   List? _resolveEntityFieldRelationshipTable(
-      TableScheme tableScheme,
-      List<TableRelationshipReference> relationshipsTables,
-      Object id,
-      TypeInfo fieldType,
-      String fieldKey) {
+    TableScheme tableScheme,
+    List<TableRelationshipReference> relationshipsTables,
+    Object id,
+    TypeInfo fieldType,
+    String fieldKey,
+  ) {
     var sourceTable = tableScheme.name;
     var targetTable = getTableForType(fieldType);
 
@@ -976,19 +1120,22 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       return null;
     } else if (targetTable is Future) {
       throw StateError(
-          "Async response not supported when calling `getTableForType`");
+        "Async response not supported when calling `getTableForType`",
+      );
     }
 
     //print('!!! ** _resolveEntityFieldRelationshipTable> $sourceTable -> $targetTable');
 
     var relationshipTable = tableScheme.getTableRelationshipReference(
-        sourceTable: sourceTable,
-        sourceField: fieldKey,
-        targetTable: targetTable);
+      sourceTable: sourceTable,
+      sourceField: fieldKey,
+      targetTable: targetTable,
+    );
 
     if (relationshipTable == null) {
       throw StateError(
-          "Can't find relationship table for `$sourceTable`.`$fieldKey` -> `$targetTable`. Relationships tables: ${relationshipsTables.map((e) => e.relationshipTable).toList()}");
+        "Can't find relationship table for `$sourceTable`.`$fieldKey` -> `$targetTable`. Relationships tables: ${relationshipsTables.map((e) => e.relationshipTable).toList()}",
+      );
     }
 
     final relTable = relationshipTable.relationshipTable;
@@ -1001,18 +1148,21 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     final sourceRelationshipField = relationshipTable.sourceRelationshipField;
     final targetRelationshipField = relationshipTable.targetRelationshipField;
 
-    var sourceFieldIndex =
-        _getTableFieldIndex(relTable, sourceRelationshipField);
+    var sourceFieldIndex = _getTableFieldIndex(
+      relTable,
+      sourceRelationshipField,
+    );
 
     var relWithID = sourceFieldIndex[id];
     if (relWithID == null) {
       return [];
     }
 
-    var targetIds = relWithID
-        .map((relId) => relMap[relId]?[targetRelationshipField])
-        .nonNulls
-        .toList();
+    var targetIds =
+        relWithID
+            .map((relId) => relMap[relId]?[targetRelationshipField])
+            .nonNulls
+            .toList();
 
     if (targetIds.isEmpty) {
       return [];
@@ -1026,14 +1176,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     if (tableScheme2 != null && tableScheme2.hasTableReferences) {
       var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
 
-      targetObjs = targetObjs
-          .map((e) {
-            return e is! Map<String, Object?>
-                ? null
-                : _resolveEntityMap(e, entityHandler2, tableScheme2);
-          })
-          .nonNulls
-          .toList();
+      targetObjs =
+          targetObjs
+              .map((e) {
+                return e is! Map<String, Object?>
+                    ? null
+                    : _resolveEntityMap(e, entityHandler2, tableScheme2);
+              })
+              .nonNulls
+              .toList();
     }
 
     return targetObjs;
@@ -1050,8 +1201,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   bool _hasTableScheme(String table) => tablesSchemes.containsKey(table);
 
   @override
-  TableScheme? getTableScheme(String table,
-      {TableRelationshipReference? relationship, Object? contextID}) {
+  TableScheme? getTableScheme(
+    String table, {
+    TableRelationshipReference? relationship,
+    Object? contextID,
+  }) {
     // ignore: discarded_futures
     var ret = super.getTableScheme(table, relationship: relationship);
 
@@ -1064,8 +1218,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   TableScheme? getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID}) {
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  }) {
     //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
     var tableScheme = tablesSchemes[table];
@@ -1079,13 +1235,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         var targetId =
             '${relationship.targetTable}_${relationship.targetField}';
 
-        tableScheme = TableScheme(table,
-            relationship: true,
-            idFieldName: sourceId,
-            fieldsTypes: {
-              sourceId: relationship.sourceFieldType,
-              targetId: relationship.targetFieldType,
-            });
+        tableScheme = TableScheme(
+          table,
+          relationship: true,
+          idFieldName: sourceId,
+          fieldsTypes: {
+            sourceId: relationship.sourceFieldType,
+            targetId: relationship.targetFieldType,
+          },
+        );
 
         _log.info('relationship> $tableScheme');
 
@@ -1093,65 +1251,80 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       }
 
       throw StateError(
-          "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!");
+        "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!",
+      );
     }
 
     var idFieldName = entityHandler.idFieldName();
 
     var entityFieldsTypes = entityHandler.fieldsTypes();
 
-    var fieldsTypes =
-        entityFieldsTypes.map((key, value) => MapEntry(key, value.type));
+    var fieldsTypes = entityFieldsTypes.map(
+      (key, value) => MapEntry(key, value.type),
+    );
 
-    var fieldsReferencedTables = _findFieldsReferencedTables(table,
-        entityHandler: entityHandler, entityFieldsTypes: entityFieldsTypes);
+    var fieldsReferencedTables = _findFieldsReferencedTables(
+      table,
+      entityHandler: entityHandler,
+      entityFieldsTypes: entityFieldsTypes,
+    );
 
     var relationshipTables = _findRelationshipTables(table);
 
-    fieldsTypes.removeWhere((key, value) =>
-        relationshipTables.any((r) => r.relationshipField == key));
+    fieldsTypes.removeWhere(
+      (key, value) => relationshipTables.any((r) => r.relationshipField == key),
+    );
 
-    tableScheme = TableScheme(table,
-        relationship: relationship != null,
-        idFieldName: idFieldName,
-        fieldsTypes: fieldsTypes,
-        fieldsReferencedTables: fieldsReferencedTables,
-        relationshipTables: relationshipTables);
+    tableScheme = TableScheme(
+      table,
+      relationship: relationship != null,
+      idFieldName: idFieldName,
+      fieldsTypes: fieldsTypes,
+      fieldsReferencedTables: fieldsReferencedTables,
+      relationshipTables: relationshipTables,
+    );
 
     _log.info('$tableScheme');
 
     return tableScheme;
   }
 
-  Map<String, TableFieldReference> _findFieldsReferencedTables(String table,
-      {Type? entityType,
-      EntityHandler<dynamic>? entityHandler,
-      Map<String, TypeInfo>? entityFieldsTypes,
-      bool onlyCollectionReferences = false}) {
-    entityHandler ??=
-        getEntityHandler(tableName: table, entityType: entityType);
+  Map<String, TableFieldReference> _findFieldsReferencedTables(
+    String table, {
+    Type? entityType,
+    EntityHandler<dynamic>? entityHandler,
+    Map<String, TypeInfo>? entityFieldsTypes,
+    bool onlyCollectionReferences = false,
+  }) {
+    entityHandler ??= getEntityHandler(
+      tableName: table,
+      entityType: entityType,
+    );
 
     entityFieldsTypes ??= entityHandler!.fieldsTypes();
 
-    var relationshipFields =
-        Map<String, TypeInfo>.fromEntries(entityFieldsTypes.entries.where((e) {
-      var fieldType = e.value;
-      var isCollection =
-          fieldType.isCollection || fieldType.isEntityReferenceListType;
-      if (isCollection != onlyCollectionReferences) return false;
+    var relationshipFields = Map<String, TypeInfo>.fromEntries(
+      entityFieldsTypes.entries.where((e) {
+        var fieldType = e.value;
+        var isCollection =
+            fieldType.isCollection || fieldType.isEntityReferenceListType;
+        if (isCollection != onlyCollectionReferences) return false;
 
-      var entityType = _resolveEntityType(fieldType);
-      if (entityType == null || entityType.isBasicType) return false;
+        var entityType = _resolveEntityType(fieldType);
+        if (entityType == null || entityType.isBasicType) return false;
 
-      var typeEntityHandler =
-          entityHandler!.getEntityHandler(type: entityType.type);
-      return typeEntityHandler != null;
-    }));
+        var typeEntityHandler = entityHandler!.getEntityHandler(
+          type: entityType.type,
+        );
+        return typeEntityHandler != null;
+      }),
+    );
 
     var fieldsReferencedTables = relationshipFields.map((field, fieldType) {
       var targetEntityType = _resolveEntityType(fieldType)!;
-      var targetEntityHandler =
-          getEntityHandler(entityType: targetEntityType.type);
+      var targetEntityHandler = getEntityHandler(
+        entityType: targetEntityType.type,
+      );
 
       String? targetName;
       String? targetIdField;
@@ -1159,9 +1332,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       if (targetEntityHandler != null) {
         targetName = getEntityRepositoryByType(targetEntityHandler.type)?.name;
         targetIdField = targetEntityHandler.idFieldName();
-        targetIdType = targetEntityHandler
-            .getFieldType(null, targetIdField, resolveFiledName: false)
-            ?.type;
+        targetIdType =
+            targetEntityHandler
+                .getFieldType(null, targetIdField, resolveFiledName: false)
+                ?.type;
       }
 
       targetName ??= targetEntityType.type.toString().toLowerCase();
@@ -1169,7 +1343,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       targetIdType ??= int;
 
       var tableRef = TableFieldReference(
-          table, field, targetIdType, targetName, targetIdField, targetIdType);
+        table,
+        field,
+        targetIdType,
+        targetName,
+        targetIdField,
+        targetIdType,
+      );
       return MapEntry(field, tableRef);
     });
     return fieldsReferencedTables;
@@ -1194,16 +1374,20 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   Map<EntityRepository<Object>, Map<String, TableFieldReference>>
-      _allTablesReferences() {
+  _allTablesReferences() {
     var allRepositories = this.allRepositories();
 
-    var entries = allRepositories.values.map((r) {
-      var referencedTables = _findFieldsReferencedTables(r.name,
-          entityType: r.type,
-          entityHandler: r.entityHandler,
-          onlyCollectionReferences: true);
-      return MapEntry(r, referencedTables);
-    }).where((e) => e.value.isNotEmpty);
+    var entries = allRepositories.values
+        .map((r) {
+          var referencedTables = _findFieldsReferencedTables(
+            r.name,
+            entityType: r.type,
+            entityHandler: r.entityHandler,
+            onlyCollectionReferences: true,
+          );
+          return MapEntry(r, referencedTables);
+        })
+        .where((e) => e.value.isNotEmpty);
 
     var allTablesReferences = Map.fromEntries(entries);
     return allTablesReferences;
@@ -1218,42 +1402,44 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     allTablesReferences.removeWhere((repo, refs) => refs.isEmpty);
 
-    var relationships = allTablesReferences.entries.expand((e) {
-      var repo = e.key;
-      var refs = e.value;
+    var relationships =
+        allTablesReferences.entries.expand((e) {
+          var repo = e.key;
+          var refs = e.value;
 
-      return refs.values.map((ref) {
-        var sourceTable = ref.sourceTable;
-        var sourceField = ref.sourceField;
+          return refs.values.map((ref) {
+            var sourceTable = ref.sourceTable;
+            var sourceField = ref.sourceField;
 
-        var targetTable = ref.targetTable;
-        var targetField = ref.targetField;
+            var targetTable = ref.targetTable;
+            var targetField = ref.targetField;
 
-        var sourceEntityHandler = repo.entityHandler;
-        var sourceFieldId = sourceEntityHandler.idFieldName();
-        var sourceFieldIdType = sourceEntityHandler
-                .getFieldType(null, sourceFieldId, resolveFiledName: false)
-                ?.type ??
-            int;
+            var sourceEntityHandler = repo.entityHandler;
+            var sourceFieldId = sourceEntityHandler.idFieldName();
+            var sourceFieldIdType =
+                sourceEntityHandler
+                    .getFieldType(null, sourceFieldId, resolveFiledName: false)
+                    ?.type ??
+                int;
 
-        var relTable = '${sourceTable}__${sourceField}__rel';
-        var relSourceField = '${sourceTable}__$sourceFieldId';
-        var relTargetField = '${targetTable}__$targetField';
+            var relTable = '${sourceTable}__${sourceField}__rel';
+            var relSourceField = '${sourceTable}__$sourceFieldId';
+            var relTargetField = '${targetTable}__$targetField';
 
-        return TableRelationshipReference(
-          relTable,
-          sourceTable,
-          sourceFieldId,
-          sourceFieldIdType,
-          relSourceField,
-          targetTable,
-          ref.targetField,
-          ref.targetFieldType,
-          relTargetField,
-          relationshipField: sourceField,
-        );
-      });
-    }).toList();
+            return TableRelationshipReference(
+              relTable,
+              sourceTable,
+              sourceFieldId,
+              sourceFieldIdType,
+              relSourceField,
+              targetTable,
+              ref.targetField,
+              ref.targetFieldType,
+              relTargetField,
+              relationshipField: sourceField,
+            );
+          });
+        }).toList();
 
     return relationships;
   }
@@ -1277,8 +1463,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     _openTransactionsContexts[conn] = DateTime.now();
 
     transaction.transactionFuture
-        // ignore: discarded_futures
-        .then(
+    // ignore: discarded_futures
+    .then(
       // ignore: discarded_futures
       (res) => resolveTransactionResult(res, transaction, conn),
       onError: (e, s) {
@@ -1292,9 +1478,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   FutureOr<dynamic> resolveTransactionResult(
-      result, Transaction transaction, DBSQLMemoryAdapterContext? connection) {
-    var result2 =
-        super.resolveTransactionResult(result, transaction, connection);
+    result,
+    Transaction transaction,
+    DBSQLMemoryAdapterContext? connection,
+  ) {
+    var result2 = super.resolveTransactionResult(
+      result,
+      transaction,
+      connection,
+    );
 
     if (connection != null && result2 is! TransactionAbortedError) {
       var consolidated = _consolidateTransactionContext(connection);
@@ -1316,15 +1508,18 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   bool cancelTransaction(
-      Transaction transaction,
-      DBSQLMemoryAdapterContext? connection,
-      Object? error,
-      StackTrace? stackTrace) {
+    Transaction transaction,
+    DBSQLMemoryAdapterContext? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  ) {
     if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
 
     _rollbackTables(
-        connection.tablesVersions, connection.tablesIndexesVersions);
+      connection.tablesVersions,
+      connection.tablesIndexesVersions,
+    );
 
     // ignore: discarded_futures
     disposePoolElement(connection);
@@ -1336,7 +1531,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   @override
   FutureOr<void> closeTransaction(
-      Transaction transaction, DBSQLMemoryAdapterContext? connection) {
+    Transaction transaction,
+    DBSQLMemoryAdapterContext? connection,
+  ) {
     if (connection != null) {
       _consolidateTransactionContext(connection);
     }
@@ -1393,7 +1590,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   void _consolidateTableIndexes(
-      String table, Map<String, int> indexesTargetVersion) {
+    String table,
+    Map<String, int> indexesTargetVersion,
+  ) {
     var tableIndexes = _tablesIndexes[table];
 
     for (var e in indexesTargetVersion.entries) {
@@ -1430,7 +1629,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   void _rollbackTableIndexes(
-      String table, Map<String, int> indexesTargetVersion) {
+    String table,
+    Map<String, int> indexesTargetVersion,
+  ) {
     var tableIndexes = _tablesIndexes[table];
 
     for (var e in indexesTargetVersion.entries) {
@@ -1460,9 +1661,12 @@ class DBSQLMemoryAdapterException extends DBSQLAdapterException {
   @override
   String get runtimeTypeNameSafe => 'DBSQLMemoryAdapterException';
 
-  DBSQLMemoryAdapterException(super.type, super.message,
-      {super.parentError,
-      super.parentStackTrace,
-      super.operation,
-      super.previousError});
+  DBSQLMemoryAdapterException(
+    super.type,
+    super.message, {
+    super.parentError,
+    super.parentStackTrace,
+    super.operation,
+    super.previousError,
+  });
 }

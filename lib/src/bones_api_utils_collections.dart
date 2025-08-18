@@ -99,16 +99,22 @@ bool isEqualsDeep(Object? o1, Object? o2, {ValueEquality? valueEquality}) {
     if (o2 is Iterable) {
       return isEqualsIterableDeep(o1, o2, valueEquality: valueEquality);
     } else if (o2 is EntityReferenceList) {
-      return isEqualsIterableDeep(o1, o2.entities,
-          valueEquality: valueEquality);
+      return isEqualsIterableDeep(
+        o1,
+        o2.entities,
+        valueEquality: valueEquality,
+      );
     }
     return false;
   } else if (o1 is EntityReferenceList) {
     if (o2 is EntityReferenceList) {
       return o1 == o2;
     } else if (o2 is Iterable) {
-      return isEqualsIterableDeep(o1.entities, o2,
-          valueEquality: valueEquality);
+      return isEqualsIterableDeep(
+        o1.entities,
+        o2,
+        valueEquality: valueEquality,
+      );
     }
     return false;
   }
@@ -140,8 +146,11 @@ bool isEqualsListDeep(List? l1, List? l2, {ValueEquality? valueEquality}) {
 }
 
 /// Same as [isEqualsListDeep] but for [Iterable].
-bool isEqualsIterableDeep(Iterable? it1, Iterable? it2,
-    {ValueEquality? valueEquality}) {
+bool isEqualsIterableDeep(
+  Iterable? it1,
+  Iterable? it2, {
+  ValueEquality? valueEquality,
+}) {
   if (identical(it1, it2)) return true;
 
   if (it1 == null || it2 == null) return false;
@@ -203,8 +212,11 @@ bool isEqualsMapDeep(Map? m1, Map? m2, {ValueEquality? valueEquality}) {
   return true;
 }
 
-bool intersectsIterableDeep(Iterable? it1, Iterable? it2,
-    {ValueEquality? valueEquality}) {
+bool intersectsIterableDeep(
+  Iterable? it1,
+  Iterable? it2, {
+  ValueEquality? valueEquality,
+}) {
   if (identical(it1, it2)) return true;
 
   if (it1 == null || it2 == null) return false;
@@ -237,8 +249,9 @@ T? deepCopy<T>(T? o) {
   if (o is Iterable) return deepCopyList(o.toList(growable: false)) as T?;
   if (o is Map) return deepCopyMap(o) as T?;
 
-  var entityHandler =
-      EntityHandlerProvider.globalProvider.getEntityHandler(obj: o);
+  var entityHandler = EntityHandlerProvider.globalProvider.getEntityHandler(
+    obj: o,
+  );
 
   if (entityHandler != null) {
     // ignore: discarded_futures
@@ -314,7 +327,8 @@ Map<K, V>? deepCopyMap<K, V>(Map<K, V>? map) {
   if (K == dynamic || K == Object) {
     if (map is Map<String, Object?>) {
       return map.map<String, V>(
-              (k, V v) => MapEntry<String, V>(k as String, deepCopy(v) as V))
+            (k, V v) => MapEntry<String, V>(k as String, deepCopy(v) as V),
+          )
           as Map<K, V>;
     }
   }
@@ -322,7 +336,8 @@ Map<K, V>? deepCopyMap<K, V>(Map<K, V>? map) {
   if (map.isEmpty) return <K, V>{};
 
   return map.map<K, V>(
-      (K k, V v) => MapEntry<K, V>(deepCopy(k) as K, deepCopy(v) as V));
+    (K k, V v) => MapEntry<K, V>(deepCopy(k) as K, deepCopy(v) as V),
+  );
 }
 
 /// Returns an [Enum] name.
@@ -394,8 +409,11 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
 
   /// Same as [getCached] but accepts a [computer] that returns a [Future].
   /// See [checkCachedEntry], [checkCacheLimit] and [getCachedAsync].
-  FutureOr<V> getCachedAsync(K key, FutureOr<V> Function() computer,
-      {int? cacheLimit}) {
+  FutureOr<V> getCachedAsync(
+    K key,
+    FutureOr<V> Function() computer, {
+    int? cacheLimit,
+  }) {
     checkCachedEntry(key);
 
     var cached = this[key];
@@ -409,8 +427,11 @@ extension MapAsCacheExtension<K, V> on Map<K, V> {
     });
   }
 
-  FutureOr<V?> getCachedAsyncNullable(K key, FutureOr<V?> Function() computer,
-      {int? cacheLimit}) {
+  FutureOr<V?> getCachedAsyncNullable(
+    K key,
+    FutureOr<V?> Function() computer, {
+    int? cacheLimit,
+  }) {
     checkCachedEntry(key);
 
     var cached = this[key];
@@ -501,24 +522,26 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
           (context1.$6 == context2.$6 || context1.$6 == true);
     }
 
-    if (context1 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        ) &&
-        context2 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        )) {
+    if (context1
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            ) &&
+        context2
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            )) {
       return context1.$1 == context2.$1 &&
           (context1.$2 == context2.$2 || context1.$2 == true) &&
           (context1.$3 == context2.$3 || context1.$3 == true) &&
@@ -528,26 +551,28 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
           (context1.$7 == context2.$7 || context1.$7 == true);
     }
 
-    if (context1 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        ) &&
-        context2 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        )) {
+    if (context1
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            ) &&
+        context2
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            )) {
       return context1.$1 == context2.$1 &&
           (context1.$2 == context2.$2 || context1.$2 == true) &&
           (context1.$3 == context2.$3 || context1.$3 == true) &&
@@ -558,28 +583,30 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
           (context1.$8 == context2.$8 || context1.$8 == true);
     }
 
-    if (context1 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        ) &&
-        context2 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        )) {
+    if (context1
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            ) &&
+        context2
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            )) {
       return context1.$1 == context2.$1 &&
           (context1.$2 == context2.$2 || context1.$2 == true) &&
           (context1.$3 == context2.$3 || context1.$3 == true) &&
@@ -591,30 +618,32 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
           (context1.$9 == context2.$9 || context1.$9 == true);
     }
 
-    if (context1 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        ) &&
-        context2 is (
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?,
-          Object?
-        )) {
+    if (context1
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            ) &&
+        context2
+            is (
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+              Object?,
+            )) {
       return context1.$1 == context2.$1 &&
           (context1.$2 == context2.$2 || context1.$2 == true) &&
           (context1.$3 == context2.$3 || context1.$3 == true) &&
@@ -630,13 +659,15 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
     return false;
   }
 
-  Iterable<M> equivalentCaches(C context) => entries.where((e) {
+  Iterable<M> equivalentCaches(C context) => entries
+      .where((e) {
         var context2 = e.key;
         if (context2 == context) {
           return false;
         }
         return isEquivalentContext(context2, context);
-      }).map((e) => e.value as M);
+      })
+      .map((e) => e.value as M);
 
   M getCache(C context, M Function() cacheInstantiator) =>
       putIfAbsent(context, cacheInstantiator) as M;
@@ -660,16 +691,24 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
     return (null, cache);
   }
 
-  FutureOr<V> getMultiCachedAsync(K key, C context,
-      M Function() cacheInstantiator, FutureOr<V> Function() computer) {
+  FutureOr<V> getMultiCachedAsync(
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+    FutureOr<V> Function() computer,
+  ) {
     var (o, cache) = _getIfCached(key, context, cacheInstantiator);
     if (o != null) return o;
 
     return cache.getCachedAsync(key, computer);
   }
 
-  FutureOr<V?> getMultiCachedAsyncNullable(K key, C context,
-      M Function() cacheInstantiator, FutureOr<V?> Function() computer) {
+  FutureOr<V?> getMultiCachedAsyncNullable(
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+    FutureOr<V?> Function() computer,
+  ) {
     var (o, cache) = _getIfCached(key, context, cacheInstantiator);
     if (o != null) return o;
 
@@ -677,15 +716,23 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
   }
 
   V getMultiCached(
-      K key, C context, M Function() cacheInstantiator, V Function() computer) {
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+    V Function() computer,
+  ) {
     var (o, cache) = _getIfCached(key, context, cacheInstantiator);
     if (o != null) return o;
 
     return cache.getCached(key, computer);
   }
 
-  V? getMultiCachedNullable(K key, C context, M Function() cacheInstantiator,
-      V? Function() computer) {
+  V? getMultiCachedNullable(
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+    V? Function() computer,
+  ) {
     var (o, cache) = _getIfCached(key, context, cacheInstantiator);
     if (o != null) return o;
 
@@ -693,7 +740,11 @@ extension MapOfCachesExtension<K, V, C extends Record, M extends Map<K, V>>
   }
 
   void populateMultiCache(
-      K key, C context, M Function() cacheInstantiator, V value) {
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+    V value,
+  ) {
     var cache = getCache(context, cacheInstantiator);
     cache[key] = value;
   }
@@ -727,45 +778,48 @@ extension RecordExtension on Record {
       return 7;
     }
 
-    if (o is (
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?
-    )) {
+    if (o
+        is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+        )) {
       return 8;
     }
 
-    if (o is (
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?
-    )) {
+    if (o
+        is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+        )) {
       return 9;
     }
 
-    if (o is (
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?,
-      Object?
-    )) {
+    if (o
+        is (
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+          Object?,
+        )) {
       return 10;
     }
 
@@ -775,26 +829,26 @@ extension RecordExtension on Record {
 
 extension PopulateMultiCacheExtension<V extends Object> on Future<V> {
   Future<V> populateMultiCache<K, C extends Record, M extends Map<K, V>>(
-          Map<C, M> caches,
-          K key,
-          C context,
-          M Function() cacheInstantiator) async =>
-      then((o) {
-        caches.populateMultiCache(key, context, cacheInstantiator, o);
-        return o;
-      });
+    Map<C, M> caches,
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+  ) async => then((o) {
+    caches.populateMultiCache(key, context, cacheInstantiator, o);
+    return o;
+  });
 }
 
 extension PopulateMultiCacheNullableExtension<V extends Object> on Future<V?> {
   Future<V?> populateMultiCache<K, C extends Record, M extends Map<K, V>>(
-          Map<C, M> caches,
-          K key,
-          C context,
-          M Function() cacheInstantiator) async =>
-      then((o) {
-        if (o != null) {
-          caches.populateMultiCache(key, context, cacheInstantiator, o);
-        }
-        return o;
-      });
+    Map<C, M> caches,
+    K key,
+    C context,
+    M Function() cacheInstantiator,
+  ) async => then((o) {
+    if (o != null) {
+      caches.populateMultiCache(key, context, cacheInstantiator, o);
+    }
+    return o;
+  });
 }

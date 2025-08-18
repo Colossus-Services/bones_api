@@ -10,13 +10,10 @@ const Map<String, String> jsonEscapeChars = {
   'f': '\f',
   'n': '\n',
   'r': '\r',
-  't': '\t'
+  't': '\t',
 };
 
-const Map<String, String> jsonEscapeChars2 = {
-  ...jsonEscapeChars,
-  "'": "'",
-};
+const Map<String, String> jsonEscapeChars2 = {...jsonEscapeChars, "'": "'"};
 
 final jsonEscapeCharsString = jsonEscapeChars.keys.join();
 final jsonEscapeCharsString2 = jsonEscapeChars2.keys.join();
@@ -66,7 +63,8 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
 
   Parser<List> pair2() => keyToken2() & char(':').trim() & ref0(jsonValue2);
 
-  Parser<String> keyToken() => stringPrimitive().map((l) {
+  Parser<String> keyToken() =>
+      stringPrimitive().map((l) {
         return (l[1] as List).join();
       }).trim();
 
@@ -109,20 +107,19 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       string('\\u') & pattern('0-9A-Fa-f').times(4);
 
   Parser<String> characterUnicodeValue() => characterUnicode().map((each) {
-        Object each_1 = each[1] ?? '';
-        var s = each_1 is List ? each_1.join() : each_1.toString();
-        final charCode = int.parse(s, radix: 16);
-        return String.fromCharCode(charCode);
-      });
+    Object each_1 = each[1] ?? '';
+    var s = each_1 is List ? each_1.join() : each_1.toString();
+    final charCode = int.parse(s, radix: 16);
+    return String.fromCharCode(charCode);
+  });
 
   Parser<List> numberPrimitive() =>
       char('-').optional() &
       char('0').or(digit().plus()) &
       char('.').seq(digit().plus()).optional() &
-      pattern('eE')
-          .seq(pattern('-+').optional())
-          .seq(digit().plus())
-          .optional();
+      pattern(
+        'eE',
+      ).seq(pattern('-+').optional()).seq(digit().plus()).optional();
 
   Parser<String> wordPrimitive() =>
       ((letter() | char('_')) & word().star()).flatten();
@@ -133,9 +130,10 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
   Parser<List> stringPrimitiveExtra() =>
       char("'") & ref0(characterPrimitive2).star() & char("'");
 
-  Parser<List> stringPrimitive2() => <Parser<List>>[
+  Parser<List> stringPrimitive2() =>
+      <Parser<List>>[
         stringPrimitive(),
-        stringPrimitiveExtra()
+        stringPrimitiveExtra(),
       ].toChoiceParser();
 }
 
@@ -150,25 +148,25 @@ class JsonGrammarDefinition extends JsonGrammarLexer {
 
   @override
   Parser jsonValue() => [
-        stringValue(),
-        numberValue(),
-        ref0(objectValue),
-        ref0(arrayValue),
-        trueValue(),
-        falseValue(),
-        nullValue(),
-      ].toChoiceParser(failureJoiner: selectFarthestJoined);
+    stringValue(),
+    numberValue(),
+    ref0(objectValue),
+    ref0(arrayValue),
+    trueValue(),
+    falseValue(),
+    nullValue(),
+  ].toChoiceParser(failureJoiner: selectFarthestJoined);
 
   @override
   Parser jsonValue2() => [
-        stringValue2(),
-        numberValue(),
-        ref0(objectValue2),
-        ref0(arrayValue2),
-        trueValue(),
-        falseValue(),
-        nullValue(),
-      ].toChoiceParser(failureJoiner: selectFarthestJoined);
+    stringValue2(),
+    numberValue(),
+    ref0(objectValue2),
+    ref0(arrayValue2),
+    trueValue(),
+    falseValue(),
+    nullValue(),
+  ].toChoiceParser(failureJoiner: selectFarthestJoined);
 
   Parser<List<dynamic>> arrayValue() => _mapArrayValue(array());
 
@@ -209,13 +207,15 @@ class JsonGrammarDefinition extends JsonGrammarLexer {
   // ignore: prefer_void_to_null
   Parser<Null> nullValue() => nullToken().map((each) => null);
 
-  Parser<String> stringValue() => stringPrimitive().map<String>((l) {
+  Parser<String> stringValue() =>
+      stringPrimitive().map<String>((l) {
         var l_1 = l[1];
         if (l_1 is! List) return l_1?.toString() ?? '';
         return l_1.join();
       }).trim();
 
-  Parser<String> stringValue2() => stringPrimitive2().map<String>((l) {
+  Parser<String> stringValue2() =>
+      stringPrimitive2().map<String>((l) {
         var l_1 = l[1];
         if (l_1 is! List) return l_1?.toString() ?? '';
         return l_1.join();
@@ -232,8 +232,9 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   Parser start() => ref0(condition).end();
 
   Parser<Condition> condition() =>
-      (conditionGroup() | conditionParenthesis() | conditionMatch())
-          .map((v) => v as Condition);
+      (conditionGroup() | conditionParenthesis() | conditionMatch()).map(
+        (v) => v as Condition,
+      );
 
   Parser<Condition> conditionParenthesisOrValue() =>
       (conditionParenthesis() | conditionMatch()).map((v) {
@@ -241,9 +242,9 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
       });
 
   Parser<Condition> conditionParenthesis() => (char('(').trim() &
-              (conditionGroup() | conditionMatch()) &
-              char(')').trim())
-          .map((l) {
+          (conditionGroup() | conditionMatch()) &
+          char(')').trim())
+      .map((l) {
         return l[1] as Condition;
       });
 
@@ -254,23 +255,25 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
       (ref0(conditionParenthesisOrValue) &
               (string('&&').trim() & ref0(conditionParenthesisOrValue)).plus())
           .map((l) {
-        var v1 = l[0];
-        var v2 = (l[1] as List)
-            .expand((e) => e is List ? e : [e])
-            .whereType<Condition>();
-        return GroupConditionAND([v1, ...v2]);
-      });
+            var v1 = l[0];
+            var v2 =
+                (l[1] as List)
+                    .expand((e) => e is List ? e : [e])
+                    .whereType<Condition>();
+            return GroupConditionAND([v1, ...v2]);
+          });
 
   Parser<GroupConditionOR> conditionGroupOR() =>
       (ref0(conditionParenthesisOrValue) &
               (string('||').trim() & ref0(conditionParenthesisOrValue)).plus())
           .map((l) {
-        var v1 = l[0];
-        var v2 = (l[1] as List)
-            .expand((e) => e is List ? e : [e])
-            .whereType<Condition>();
-        return GroupConditionOR([v1, ...v2]);
-      });
+            var v1 = l[0];
+            var v2 =
+                (l[1] as List)
+                    .expand((e) => e is List ? e : [e])
+                    .whereType<Condition>();
+            return GroupConditionOR([v1, ...v2]);
+          });
 
   Parser<Condition> conditionMatch() =>
       (conditionID() | conditionKeyValue()).cast<Condition>();
@@ -307,18 +310,18 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   Parser<List<ConditionKey>> conditionKeys() =>
       (conditionKey() & (char('.') & conditionKey()).map((l) => l[1]).star())
           .map((l) {
-        var head = l[0] as ConditionKey;
-        var tail = (l[1] as List).cast<ConditionKey>();
-        return [head, ...tail];
-      });
+            var head = l[0] as ConditionKey;
+            var tail = (l[1] as List).cast<ConditionKey>();
+            return [head, ...tail];
+          });
 
   Parser<ConditionKey> conditionKey() =>
       (conditionKeyIndex() | conditionKeyField()).cast<ConditionKey>();
 
   Parser<ConditionKeyIndex> conditionKeyIndex() => (char('[').trim() &
-              (char('-').optional() & digit().plus()).flatten() &
-              char(']').trim())
-          .map((l) {
+          (char('-').optional() & digit().plus()).flatten() &
+          char(']').trim())
+      .map((l) {
         var idx = int.parse(l[1]);
         return ConditionKeyIndex(idx);
       });
@@ -341,22 +344,24 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
         return ConditionID(value);
       });
 
-  Parser<String> conditionOperator() => (string('==') |
-          string('!=') |
-          string('=~') |
-          string('!~') |
-          string('>=') |
-          string('<=') |
-          string('>') |
-          string('<'))
-      .flatten()
-      .trim();
+  Parser<String> conditionOperator() =>
+      (string('==') |
+              string('!=') |
+              string('=~') |
+              string('!~') |
+              string('>=') |
+              string('<=') |
+              string('>') |
+              string('<'))
+          .flatten()
+          .trim();
 
   Parser conditionValue() => (jsonValue2() | conditionParameter());
 
-  Parser conditionParameter() => (conditionParameterIndex() |
-      conditionParameterKey() |
-      conditionParameterPositional());
+  Parser conditionParameter() =>
+      (conditionParameterIndex() |
+          conditionParameterKey() |
+          conditionParameterPositional());
 
   Parser<ConditionParameter> conditionParameterIndex() =>
       (char('?') & (char('#') & digit().star().flatten())).trim().map((l) {
@@ -381,7 +386,7 @@ class JsonParser {
   final JsonGrammarDefinition _grammar;
 
   JsonParser({bool extendedGrammar = false})
-      : _grammar = JsonGrammarDefinition(extendedGrammar);
+    : _grammar = JsonGrammarDefinition(extendedGrammar);
 
   Parser<dynamic>? _grammarParserInstance;
 

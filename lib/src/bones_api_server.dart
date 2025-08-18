@@ -232,69 +232,99 @@ class APIServerConfig {
     bool? logQueue,
     this.serverResponseDelay,
     Object? args,
-  })  : development = development ?? false,
-        name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
-        version = version != null && version.trim().isNotEmpty
-            ? version
-            : BonesAPI.VERSION,
-        address = normalizeAddress(address, apiConfig: apiConfig),
-        port = resolvePort(port, apiConfig: apiConfig),
-        securePort = resolveSecurePort(securePort,
-            apiConfig: apiConfig, letsEncrypt: letsEncrypt),
-        domainsRoots = parseDomains(domains,
-            apiConfig: apiConfig,
-            documentRoot: documentRoot,
-            checkDirectoryExistence: true),
-        letsEncryptProduction = resolveLetsEncryptProduction(
-            letsEncryptProduction,
-            apiConfig: apiConfig),
-        allowRequestLetsEncryptCertificate =
-            resolveAllowRequestLetsEncryptCertificate(
-                allowRequestLetsEncryptCertificate,
-                apiConfig: apiConfig),
-        letsEncryptDirectory = resolveLetsEncryptDirectory(letsEncryptDirectory,
-            apiConfig: apiConfig, letsEncrypt: letsEncrypt),
-        apiCacheControl = normalizeHeaderValue(apiCacheControl,
-            defaultApiCacheControl, apiConfig, 'cache', 'api', 'cache_control'),
-        staticFilesCacheControl = normalizeHeaderValue(
-            staticFilesCacheControl,
-            defaultStaticFilesCacheControl,
-            apiConfig,
-            'cache',
-            'static_files',
-            'cache_control'),
-        longLivedStaticFilesCacheControl = normalizeHeaderValue(
-            longLivedStaticFilesCacheControl,
-            defaultLongLivedStaticFilesCacheControl,
-            apiConfig,
-            'cache',
-            'long_lived_static_files',
-            'cache_control'),
-        longLivedStaticFilesCached = resolveLongLivedStaticFiles(
-            longLivedStaticFilesCached,
-            def: defaultLongLivedStaticFilesCached,
-            apiConfig: apiConfig),
-        cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
-            cacheStaticFilesResponses,
-            apiConfig: apiConfig),
-        staticFilesCacheMaxMemorySize = resolveStaticFilesCacheMaxMemorySize(
-            staticFilesCacheMaxMemorySize,
-            apiConfig: apiConfig),
-        staticFilesCacheMaxContentLength =
-            resolveStaticFilesCacheMaxContentLength(
-                staticFilesCacheMaxContentLength,
-                apiConfig: apiConfig),
-        cookieless = resolveCookieless(cookieless, apiConfig: apiConfig),
-        useSessionID =
-            resolveUseSessionID(cookieless, useSessionID, apiConfig: apiConfig),
-        totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
-        maxPayloadLength =
-            resolveMaxPayloadLength(maxPayloadLength, apiConfig: apiConfig),
-        decompressPayload =
-            resolveDecompressPayload(decompressPayload, apiConfig: apiConfig),
-        logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
-        logQueue = resolveLogQueue(logQueue, apiConfig: apiConfig),
-        args = resolveArgs(args);
+  }) : development = development ?? false,
+       name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
+       version =
+           version != null && version.trim().isNotEmpty
+               ? version
+               : BonesAPI.VERSION,
+       address = normalizeAddress(address, apiConfig: apiConfig),
+       port = resolvePort(port, apiConfig: apiConfig),
+       securePort = resolveSecurePort(
+         securePort,
+         apiConfig: apiConfig,
+         letsEncrypt: letsEncrypt,
+       ),
+       domainsRoots = parseDomains(
+         domains,
+         apiConfig: apiConfig,
+         documentRoot: documentRoot,
+         checkDirectoryExistence: true,
+       ),
+       letsEncryptProduction = resolveLetsEncryptProduction(
+         letsEncryptProduction,
+         apiConfig: apiConfig,
+       ),
+       allowRequestLetsEncryptCertificate =
+           resolveAllowRequestLetsEncryptCertificate(
+             allowRequestLetsEncryptCertificate,
+             apiConfig: apiConfig,
+           ),
+       letsEncryptDirectory = resolveLetsEncryptDirectory(
+         letsEncryptDirectory,
+         apiConfig: apiConfig,
+         letsEncrypt: letsEncrypt,
+       ),
+       apiCacheControl = normalizeHeaderValue(
+         apiCacheControl,
+         defaultApiCacheControl,
+         apiConfig,
+         'cache',
+         'api',
+         'cache_control',
+       ),
+       staticFilesCacheControl = normalizeHeaderValue(
+         staticFilesCacheControl,
+         defaultStaticFilesCacheControl,
+         apiConfig,
+         'cache',
+         'static_files',
+         'cache_control',
+       ),
+       longLivedStaticFilesCacheControl = normalizeHeaderValue(
+         longLivedStaticFilesCacheControl,
+         defaultLongLivedStaticFilesCacheControl,
+         apiConfig,
+         'cache',
+         'long_lived_static_files',
+         'cache_control',
+       ),
+       longLivedStaticFilesCached = resolveLongLivedStaticFiles(
+         longLivedStaticFilesCached,
+         def: defaultLongLivedStaticFilesCached,
+         apiConfig: apiConfig,
+       ),
+       cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
+         cacheStaticFilesResponses,
+         apiConfig: apiConfig,
+       ),
+       staticFilesCacheMaxMemorySize = resolveStaticFilesCacheMaxMemorySize(
+         staticFilesCacheMaxMemorySize,
+         apiConfig: apiConfig,
+       ),
+       staticFilesCacheMaxContentLength =
+           resolveStaticFilesCacheMaxContentLength(
+             staticFilesCacheMaxContentLength,
+             apiConfig: apiConfig,
+           ),
+       cookieless = resolveCookieless(cookieless, apiConfig: apiConfig),
+       useSessionID = resolveUseSessionID(
+         cookieless,
+         useSessionID,
+         apiConfig: apiConfig,
+       ),
+       totalWorkers = resolveTotalWorkers(totalWorkers, apiConfig: apiConfig),
+       maxPayloadLength = resolveMaxPayloadLength(
+         maxPayloadLength,
+         apiConfig: apiConfig,
+       ),
+       decompressPayload = resolveDecompressPayload(
+         decompressPayload,
+         apiConfig: apiConfig,
+       ),
+       logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
+       logQueue = resolveLogQueue(logQueue, apiConfig: apiConfig),
+       args = resolveArgs(args);
 
   static ArgsSimple resolveArgs(Object? args) {
     if (args == null) return ArgsSimple();
@@ -324,9 +354,10 @@ class APIServerConfig {
     var letsEncrypt = a.flag('letsencrypt');
     var letsEncryptProduction =
         letsEncrypt ? a.flagOr('letsencrypt-production', null) : false;
-    var allowRequestLetsEncryptCertificate = letsEncrypt
-        ? a.flagOr('allow-request-letsencrypt-certificate', null)
-        : false;
+    var allowRequestLetsEncryptCertificate =
+        letsEncrypt
+            ? a.flagOr('allow-request-letsencrypt-certificate', null)
+            : false;
     var letsEncryptDirectory =
         letsEncrypt ? a.optionAsDirectory('letsencrypt-directory') : null;
 
@@ -334,24 +365,32 @@ class APIServerConfig {
     var totalWorkers = a.optionAsInt('total-workers');
 
     var cookieless = a.flagOr('cookieless', null);
-    var useSessionID =
-        a.flagOr('use-session-id', cookieless != null ? !cookieless : null);
+    var useSessionID = a.flagOr(
+      'use-session-id',
+      cookieless != null ? !cookieless : null,
+    );
 
     var apiCacheControl = a.optionAsString('api-cache-control');
-    var staticFilesCacheControl =
-        a.optionAsString('static-files-cache-control');
+    var staticFilesCacheControl = a.optionAsString(
+      'static-files-cache-control',
+    );
 
-    var longLivedStaticFilesCacheControl =
-        a.optionAsString('long-lived-static-files-cache-control');
-    var longLivedStaticFilesCached =
-        a.optionAsList('long-lived-static-files-cached');
+    var longLivedStaticFilesCacheControl = a.optionAsString(
+      'long-lived-static-files-cache-control',
+    );
+    var longLivedStaticFilesCached = a.optionAsList(
+      'long-lived-static-files-cached',
+    );
 
-    var cacheStaticFilesResponses =
-        a.optionAsBool('cache-static-files-responses');
-    var staticFilesCacheMaxMemorySize =
-        a.optionAsInt('static-files-cache-max-memory-size');
-    var staticFilesCacheMaxContentLength =
-        a.optionAsInt('static-files-cache-max-content-length');
+    var cacheStaticFilesResponses = a.optionAsBool(
+      'cache-static-files-responses',
+    );
+    var staticFilesCacheMaxMemorySize = a.optionAsInt(
+      'static-files-cache-max-memory-size',
+    );
+    var staticFilesCacheMaxContentLength = a.optionAsInt(
+      'static-files-cache-max-content-length',
+    );
 
     var maxPayloadLength = a.optionAsInt('max-payload-length');
     var decompressPayload = a.flagOr('decompress-payload', null);
@@ -446,8 +485,11 @@ class APIServerConfig {
     return port != null && port > 10 ? port : 80;
   }
 
-  static int resolveSecurePort(int? securePort,
-      {APIConfig? apiConfig, bool? letsEncrypt}) {
+  static int resolveSecurePort(
+    int? securePort, {
+    APIConfig? apiConfig,
+    bool? letsEncrypt,
+  }) {
     securePort ??= apiConfig?.getPath('server', 'securePort');
 
     return (letsEncrypt ?? false)
@@ -455,8 +497,15 @@ class APIServerConfig {
         : (securePort ?? -1);
   }
 
-  static String normalizeHeaderValue(String? header, String def,
-      [APIConfig? apiConfig, String? k0, String? k1, String? k2, String? k3]) {
+  static String normalizeHeaderValue(
+    String? header,
+    String def, [
+    APIConfig? apiConfig,
+    String? k0,
+    String? k1,
+    String? k2,
+    String? k3,
+  ]) {
     header = header?.trim();
     if (header != null && header.isNotEmpty) {
       return header;
@@ -469,46 +518,57 @@ class APIServerConfig {
     }
   }
 
-  static Map<String, Directory> resolveDomainsRoots(List domains,
-      [Directory? rootDir]) {
-    var domainsRoots = domains
-        .map((e) {
-          var s = e.toString();
-          var parts = s.split('=');
+  static Map<String, Directory> resolveDomainsRoots(
+    List domains, [
+    Directory? rootDir,
+  ]) {
+    var domainsRoots =
+        domains
+            .map((e) {
+              var s = e.toString();
+              var parts = s.split('=');
 
-          var domain = parts[0];
+              var domain = parts[0];
 
-          if (parts.length == 1) {
-            return rootDir != null ? MapEntry(domain, rootDir) : null;
-          } else {
-            var path = parts[1].trim();
-            var dir = path.isNotEmpty ? Directory(path) : rootDir;
-            return dir != null ? MapEntry(domain, dir) : null;
-          }
-        })
-        .nonNulls
-        .toMapFromEntries();
+              if (parts.length == 1) {
+                return rootDir != null ? MapEntry(domain, rootDir) : null;
+              } else {
+                var path = parts[1].trim();
+                var dir = path.isNotEmpty ? Directory(path) : rootDir;
+                return dir != null ? MapEntry(domain, dir) : null;
+              }
+            })
+            .nonNulls
+            .toMapFromEntries();
     return domainsRoots;
   }
 
-  static bool resolveLetsEncryptProduction(bool? letsEncryptProduction,
-      {APIConfig? apiConfig}) {
+  static bool resolveLetsEncryptProduction(
+    bool? letsEncryptProduction, {
+    APIConfig? apiConfig,
+  }) {
     letsEncryptProduction ??= apiConfig?.getPath('letsencrypt', 'production');
     letsEncryptProduction ??= false;
     return letsEncryptProduction;
   }
 
   static bool resolveAllowRequestLetsEncryptCertificate(
-      bool? allowRequestLetsEncryptCertificate,
-      {APIConfig? apiConfig}) {
-    allowRequestLetsEncryptCertificate ??=
-        apiConfig?.getPath('letsencrypt', 'allow-request-certificate');
+    bool? allowRequestLetsEncryptCertificate, {
+    APIConfig? apiConfig,
+  }) {
+    allowRequestLetsEncryptCertificate ??= apiConfig?.getPath(
+      'letsencrypt',
+      'allow-request-certificate',
+    );
     allowRequestLetsEncryptCertificate ??= false;
     return allowRequestLetsEncryptCertificate;
   }
 
-  static Directory? resolveLetsEncryptDirectory(Object? directory,
-      {APIConfig? apiConfig, bool letsEncrypt = false}) {
+  static Directory? resolveLetsEncryptDirectory(
+    Object? directory, {
+    APIConfig? apiConfig,
+    bool letsEncrypt = false,
+  }) {
     directory ??= apiConfig?.getPath('letsencrypt', 'directory');
 
     if (directory != null) {
@@ -594,8 +654,11 @@ class APIServerConfig {
     return cookieless ?? false;
   }
 
-  static bool resolveUseSessionID(bool? cookieless, bool? useSessionID,
-      {APIConfig? apiConfig}) {
+  static bool resolveUseSessionID(
+    bool? cookieless,
+    bool? useSessionID, {
+    APIConfig? apiConfig,
+  }) {
     cookieless = resolveCookieless(cookieless, apiConfig: apiConfig);
     if (cookieless) return false;
 
@@ -603,20 +666,27 @@ class APIServerConfig {
     return useSessionID ?? true;
   }
 
-  static int? resolveMaxPayloadLength(int? maxPayloadLength,
-      {APIConfig? apiConfig}) {
+  static int? resolveMaxPayloadLength(
+    int? maxPayloadLength, {
+    APIConfig? apiConfig,
+  }) {
     maxPayloadLength ??= apiConfig?.getPath('server', 'max_payload_length');
     return maxPayloadLength;
   }
 
-  static bool resolveDecompressPayload(bool? decompressPayload,
-      {APIConfig? apiConfig}) {
+  static bool resolveDecompressPayload(
+    bool? decompressPayload, {
+    APIConfig? apiConfig,
+  }) {
     decompressPayload ??= apiConfig?.getPath('server', 'decompress_payload');
     return decompressPayload ?? false;
   }
 
-  static List<Pattern> resolveLongLivedStaticFiles(Object? patterns,
-      {List<Pattern>? def, APIConfig? apiConfig}) {
+  static List<Pattern> resolveLongLivedStaticFiles(
+    Object? patterns, {
+    List<Pattern>? def,
+    APIConfig? apiConfig,
+  }) {
     List list;
 
     if (patterns is Iterable) {
@@ -625,7 +695,8 @@ class APIServerConfig {
       list = [patterns];
     } else {
       if (apiConfig != null) {
-        list = apiConfig
+        list =
+            apiConfig
                 .getAsMap('cache')
                 ?.getAsMap('long_lived_static_files')
                 ?.getAsList('cached') ??
@@ -635,23 +706,24 @@ class APIServerConfig {
       }
     }
 
-    List<Pattern> files = list
-        .map((e) {
-          if (e is RegExp) return e;
+    List<Pattern> files =
+        list
+            .map((e) {
+              if (e is RegExp) return e;
 
-          var s = e.toString().trim();
-          if (s.isEmpty) return null;
+              var s = e.toString().trim();
+              if (s.isEmpty) return null;
 
-          if (s.startsWith('re:')) {
-            return RegExp(s.substring(3));
-          } else if (s.startsWith('regexp:')) {
-            return RegExp(s.substring(7));
-          } else {
-            return s;
-          }
-        })
-        .nonNulls
-        .toList();
+              if (s.startsWith('re:')) {
+                return RegExp(s.substring(3));
+              } else if (s.startsWith('regexp:')) {
+                return RegExp(s.substring(7));
+              } else {
+                return s;
+              }
+            })
+            .nonNulls
+            .toList();
 
     if (list.isEmpty) {
       return def ?? [];
@@ -660,8 +732,10 @@ class APIServerConfig {
     return files;
   }
 
-  static bool resolveCacheStaticFilesResponses(bool? cache,
-      {APIConfig? apiConfig}) {
+  static bool resolveCacheStaticFilesResponses(
+    bool? cache, {
+    APIConfig? apiConfig,
+  }) {
     if (cache != null) return cache;
 
     if (apiConfig != null) {
@@ -680,8 +754,10 @@ class APIServerConfig {
     return cache;
   }
 
-  static int resolveStaticFilesCacheMaxMemorySize(int? max,
-      {APIConfig? apiConfig}) {
+  static int resolveStaticFilesCacheMaxMemorySize(
+    int? max, {
+    APIConfig? apiConfig,
+  }) {
     if (max != null) return max;
 
     if (apiConfig != null) {
@@ -694,8 +770,10 @@ class APIServerConfig {
     return max;
   }
 
-  static int resolveStaticFilesCacheMaxContentLength(int? max,
-      {APIConfig? apiConfig}) {
+  static int resolveStaticFilesCacheMaxContentLength(
+    int? max, {
+    APIConfig? apiConfig,
+  }) {
     if (max != null) return max;
 
     if (apiConfig != null) {
@@ -724,17 +802,23 @@ class APIServerConfig {
   /// Parses a set of domains to serve static files.
   ///
   /// - See: [APIServer.domainsRoots], [parseDomainPattern], [parseDomainDirectory].
-  static Map<Pattern, Directory> parseDomains(Object? o,
-      {APIConfig? apiConfig,
-      Object? documentRoot,
-      bool checkDirectoryExistence = false}) {
+  static Map<Pattern, Directory> parseDomains(
+    Object? o, {
+    APIConfig? apiConfig,
+    Object? documentRoot,
+    bool checkDirectoryExistence = false,
+  }) {
     o ??= apiConfig?.get('domains');
 
-    var documentRootDir = parseDomainDirectory(documentRoot,
-        checkDirectoryExistence: checkDirectoryExistence);
+    var documentRootDir = parseDomainDirectory(
+      documentRoot,
+      checkDirectoryExistence: checkDirectoryExistence,
+    );
 
-    var domains =
-        _parseDomains(o, checkDirectoryExistence: checkDirectoryExistence);
+    var domains = _parseDomains(
+      o,
+      checkDirectoryExistence: checkDirectoryExistence,
+    );
 
     var domains2 = {
       ...domains,
@@ -744,15 +828,22 @@ class APIServerConfig {
     return domains2;
   }
 
-  static Map<Pattern, Directory> _parseDomains(Object? o,
-      {bool checkDirectoryExistence = false}) {
+  static Map<Pattern, Directory> _parseDomains(
+    Object? o, {
+    bool checkDirectoryExistence = false,
+  }) {
     if (o == null) return {};
 
     if (o is Map) {
-      var map = o.map((key, value) => MapEntry(
+      var map = o.map(
+        (key, value) => MapEntry(
           parseDomainPattern(key),
-          parseDomainDirectory(value,
-              checkDirectoryExistence: checkDirectoryExistence)));
+          parseDomainDirectory(
+            value,
+            checkDirectoryExistence: checkDirectoryExistence,
+          ),
+        ),
+      );
       return _removeInvalidDomains(map);
     }
 
@@ -766,21 +857,28 @@ class APIServerConfig {
       values = [o];
     }
 
-    var entries = values
-        .map((e) => parseDomainEntry(e,
-            checkDirectoryExistence: checkDirectoryExistence))
-        .nonNulls
-        .toList();
+    var entries =
+        values
+            .map(
+              (e) => parseDomainEntry(
+                e,
+                checkDirectoryExistence: checkDirectoryExistence,
+              ),
+            )
+            .nonNulls
+            .toList();
     if (entries.isEmpty) return {};
 
-    var map =
-        _removeInvalidDomains(Map<Pattern, Directory?>.fromEntries(entries));
+    var map = _removeInvalidDomains(
+      Map<Pattern, Directory?>.fromEntries(entries),
+    );
 
     return map.isNotEmpty ? map : {};
   }
 
   static Map<Pattern, Directory> _removeInvalidDomains(
-      Map<Pattern, Directory?> domains) {
+    Map<Pattern, Directory?> domains,
+  ) {
     return domains.entries
         .map((e) {
           var domain = e.key;
@@ -797,14 +895,19 @@ class APIServerConfig {
   /// Parses a domain entry as [MapEntry].
   ///
   /// - See [APIServer.domainsRoots].
-  static MapEntry<Pattern, Directory?>? parseDomainEntry(Object? o,
-      {bool checkDirectoryExistence = false}) {
+  static MapEntry<Pattern, Directory?>? parseDomainEntry(
+    Object? o, {
+    bool checkDirectoryExistence = false,
+  }) {
     if (o == null) return null;
     if (o is MapEntry) {
       return MapEntry(
-          parseDomainPattern(o.key),
-          parseDomainDirectory(o.value,
-              checkDirectoryExistence: checkDirectoryExistence));
+        parseDomainPattern(o.key),
+        parseDomainDirectory(
+          o.value,
+          checkDirectoryExistence: checkDirectoryExistence,
+        ),
+      );
     }
 
     var s = o.toString();
@@ -814,9 +917,12 @@ class APIServerConfig {
     var path = parts.length > 1 ? parts[1].trim() : '';
 
     return MapEntry(
-        parseDomainPattern(domain),
-        parseDomainDirectory(path,
-            checkDirectoryExistence: checkDirectoryExistence));
+      parseDomainPattern(domain),
+      parseDomainDirectory(
+        path,
+        checkDirectoryExistence: checkDirectoryExistence,
+      ),
+    );
   }
 
   /// Parses a domain pattern.
@@ -843,8 +949,10 @@ class APIServerConfig {
   /// Parses a domain [Directory].
   ///
   /// - See [APIServer.domainsRoots].
-  static Directory? parseDomainDirectory(Object? dirPath,
-      {bool checkDirectoryExistence = false}) {
+  static Directory? parseDomainDirectory(
+    Object? dirPath, {
+    bool checkDirectoryExistence = false,
+  }) {
     if (dirPath == null) return null;
     if (dirPath is Directory) return dirPath;
     var p = dirPath.toString();
@@ -853,39 +961,40 @@ class APIServerConfig {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'version': version,
-        'address': address,
-        'port': port,
-        'securePort': securePort,
-        'domains': domainsRoots.map((k, v) => MapEntry(k, v.path)),
-        'letsEncrypt': letsEncrypt,
-        'letsEncryptProduction': letsEncryptProduction,
-        if (letsEncryptDirectory != null)
-          'letsEncryptDirectory': letsEncryptDirectory?.path,
-        'cookieless': cookieless,
-        'useSessionID': useSessionID,
-        'hotReload': hotReload,
-        'totalWorkers': totalWorkers,
-        'apiCacheControl': apiCacheControl,
-        'staticFilesCacheControl': staticFilesCacheControl,
-        'longLivedStaticFilesCacheControl': longLivedStaticFilesCacheControl,
-        'longLivedStaticFilesCached': longLivedStaticFilesCached.map((e) {
+    'name': name,
+    'version': version,
+    'address': address,
+    'port': port,
+    'securePort': securePort,
+    'domains': domainsRoots.map((k, v) => MapEntry(k, v.path)),
+    'letsEncrypt': letsEncrypt,
+    'letsEncryptProduction': letsEncryptProduction,
+    if (letsEncryptDirectory != null)
+      'letsEncryptDirectory': letsEncryptDirectory?.path,
+    'cookieless': cookieless,
+    'useSessionID': useSessionID,
+    'hotReload': hotReload,
+    'totalWorkers': totalWorkers,
+    'apiCacheControl': apiCacheControl,
+    'staticFilesCacheControl': staticFilesCacheControl,
+    'longLivedStaticFilesCacheControl': longLivedStaticFilesCacheControl,
+    'longLivedStaticFilesCached':
+        longLivedStaticFilesCached.map((e) {
           if (e is RegExp) {
             return 'regexp:${e.pattern}';
           } else {
             return e.toString();
           }
         }).toList(),
-        'cacheStaticFilesResponses': cacheStaticFilesResponses,
-        'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
-        'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
-        'maxPayloadLength': maxPayloadLength,
-        'decompressPayload': decompressPayload,
-        'logToConsole': logToConsole,
-        'logQueue': logQueue,
-        if (args.isNotEmpty) 'args': args.toList(),
-      };
+    'cacheStaticFilesResponses': cacheStaticFilesResponses,
+    'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
+    'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
+    'maxPayloadLength': maxPayloadLength,
+    'decompressPayload': decompressPayload,
+    'logToConsole': logToConsole,
+    'logQueue': logQueue,
+    if (args.isNotEmpty) 'args': args.toList(),
+  };
 
   factory APIServerConfig.fromJson(Map<String, dynamic> json) {
     return APIServerConfig(
@@ -967,42 +1076,41 @@ abstract class _APIServerBase extends APIServerConfig {
   }) : super(apiConfig: apiRoot.apiConfig);
 
   _APIServerBase.fromConfig(this.apiRoot, APIServerConfig apiServerConfig)
-      : super(
-          name: apiServerConfig.name,
-          version: apiServerConfig.version,
-          address: apiServerConfig.address,
-          port: apiServerConfig.port,
-          securePort: apiServerConfig.securePort,
-          domains: apiServerConfig.domainsRoots,
-          letsEncrypt: apiServerConfig.letsEncrypt,
-          letsEncryptProduction: apiServerConfig.letsEncryptProduction,
-          letsEncryptDirectory: apiServerConfig.letsEncryptDirectory,
-          allowRequestLetsEncryptCertificate:
-              apiServerConfig.allowRequestLetsEncryptCertificate,
-          hotReload: apiServerConfig.hotReload,
-          totalWorkers: apiServerConfig.totalWorkers,
-          cookieless: apiServerConfig.cookieless,
-          useSessionID: apiServerConfig.useSessionID,
-          apiCacheControl: apiServerConfig.apiCacheControl,
-          staticFilesCacheControl: apiServerConfig.staticFilesCacheControl,
-          longLivedStaticFilesCacheControl:
-              apiServerConfig.longLivedStaticFilesCacheControl,
-          longLivedStaticFilesCached:
-              apiServerConfig.longLivedStaticFilesCached,
-          cacheStaticFilesResponses: apiServerConfig.cacheStaticFilesResponses,
-          staticFilesCacheMaxMemorySize:
-              apiServerConfig.staticFilesCacheMaxMemorySize,
-          staticFilesCacheMaxContentLength:
-              apiServerConfig.staticFilesCacheMaxContentLength,
-          maxPayloadLength: apiServerConfig.maxPayloadLength,
-          decompressPayload: apiServerConfig.decompressPayload,
-          serverResponseDelay: apiServerConfig.serverResponseDelay,
-          logToConsole: apiServerConfig.logToConsole,
-          logQueue: apiServerConfig.logQueue,
-        );
+    : super(
+        name: apiServerConfig.name,
+        version: apiServerConfig.version,
+        address: apiServerConfig.address,
+        port: apiServerConfig.port,
+        securePort: apiServerConfig.securePort,
+        domains: apiServerConfig.domainsRoots,
+        letsEncrypt: apiServerConfig.letsEncrypt,
+        letsEncryptProduction: apiServerConfig.letsEncryptProduction,
+        letsEncryptDirectory: apiServerConfig.letsEncryptDirectory,
+        allowRequestLetsEncryptCertificate:
+            apiServerConfig.allowRequestLetsEncryptCertificate,
+        hotReload: apiServerConfig.hotReload,
+        totalWorkers: apiServerConfig.totalWorkers,
+        cookieless: apiServerConfig.cookieless,
+        useSessionID: apiServerConfig.useSessionID,
+        apiCacheControl: apiServerConfig.apiCacheControl,
+        staticFilesCacheControl: apiServerConfig.staticFilesCacheControl,
+        longLivedStaticFilesCacheControl:
+            apiServerConfig.longLivedStaticFilesCacheControl,
+        longLivedStaticFilesCached: apiServerConfig.longLivedStaticFilesCached,
+        cacheStaticFilesResponses: apiServerConfig.cacheStaticFilesResponses,
+        staticFilesCacheMaxMemorySize:
+            apiServerConfig.staticFilesCacheMaxMemorySize,
+        staticFilesCacheMaxContentLength:
+            apiServerConfig.staticFilesCacheMaxContentLength,
+        maxPayloadLength: apiServerConfig.maxPayloadLength,
+        decompressPayload: apiServerConfig.decompressPayload,
+        serverResponseDelay: apiServerConfig.serverResponseDelay,
+        logToConsole: apiServerConfig.logToConsole,
+        logQueue: apiServerConfig.logQueue,
+      );
 
   _APIServerBase.fromArgs(APIRoot apiRoot, List<String> args)
-      : this.fromConfig(apiRoot, APIServerConfig.fromArgs(args));
+    : this.fromConfig(apiRoot, APIServerConfig.fromArgs(args));
 
   /// The `server` header value.
   String get serverName => '$name/$version';
@@ -1049,16 +1157,19 @@ abstract class _APIServerBase extends APIServerConfig {
     _started = true;
     _starting = true;
 
-    return _startAsync = _startImpl().then((ok) {
-      _starting = false;
-      _startAsync = null;
-      return ok;
-    }, onError: (e, s) {
-      _starting = false;
-      _startAsync = null;
-      _log.severe("Initialization error", e, s);
-      throw e;
-    });
+    return _startAsync = _startImpl().then(
+      (ok) {
+        _starting = false;
+        _startAsync = null;
+        return ok;
+      },
+      onError: (e, s) {
+        _starting = false;
+        _startAsync = null;
+        _log.severe("Initialization error", e, s);
+        throw e;
+      },
+    );
   }
 
   Future<bool> _startImpl();
@@ -1137,8 +1248,10 @@ class APIServer extends _APIServerBase {
     var totalAuxiliaryWorkers = totalWorkers - 1;
 
     if (totalAuxiliaryWorkers >= 1) {
-      auxiliaryWorkers =
-          List.generate(totalAuxiliaryWorkers, (i) => _createWorker(i + 1));
+      auxiliaryWorkers = List.generate(
+        totalAuxiliaryWorkers,
+        (i) => _createWorker(i + 1),
+      );
     }
 
     _mainWorker = mainWorker;
@@ -1147,15 +1260,16 @@ class APIServer extends _APIServerBase {
     _auxiliaryWorkers.addAll(auxiliaryWorkers);
 
     Map<APIServerWorker, (Isolate?, PortListener?, SendPort?, Future<bool>?)>?
-        workersSpawns;
+    workersSpawns;
 
     if (totalAuxiliaryWorkers >= 1) {
       _log.info("Spawning $totalAuxiliaryWorkers parallel workers...");
 
-      workersSpawns = await _auxiliaryWorkers
-          .map((e) => MapEntry(e, e.spawnIsolate()))
-          .toMapFromEntries()
-          .resolveAllValues();
+      workersSpawns =
+          await _auxiliaryWorkers
+              .map((e) => MapEntry(e, e.spawnIsolate()))
+              .toMapFromEntries()
+              .resolveAllValues();
 
       _log.info("Spawned $totalAuxiliaryWorkers parallel workers.");
     }
@@ -1184,7 +1298,8 @@ class APIServer extends _APIServerBase {
 
         if (!ok) {
           _log.severe(
-              "Can't start #${worker.workerIndex}/$totalWorkers `APIServerWorker`> $this");
+            "Can't start #${worker.workerIndex}/$totalWorkers `APIServerWorker`> $this",
+          );
 
           return false;
         }
@@ -1239,19 +1354,23 @@ class APIServer extends _APIServerBase {
   }
 
   /// Converts a [request] to an [APIRequest].
-  static FutureOr<APIRequest> toAPIRequest(Request request,
-      {required bool cookieless,
-      required bool useSessionID,
-      int? maxPayloadLength,
-      bool? decompressPayload}) {
+  static FutureOr<APIRequest> toAPIRequest(
+    Request request, {
+    required bool cookieless,
+    required bool useSessionID,
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) {
     var requestTime = DateTime.now();
 
     var method = parseAPIRequestMethod(request.method) ?? APIRequestMethod.GET;
 
-    var headers = Map.fromEntries(request.headersAll.entries.map((e) {
-      var values = e.value;
-      return MapEntry(e.key, values.length == 1 ? values[0] : values);
-    }));
+    var headers = Map.fromEntries(
+      request.headersAll.entries.map((e) {
+        var values = e.value;
+        return MapEntry(e.key, values.length == 1 ? values[0] : values);
+      }),
+    );
 
     if (cookieless) {
       headers.remove('cookie');
@@ -1260,22 +1379,24 @@ class APIServer extends _APIServerBase {
     var requestedUri = request.requestedUri;
 
     var path = requestedUri.path;
-    var parameters =
-        Map.fromEntries(requestedUri.queryParametersAll.entries.map((e) {
-      var values = e.value;
-      return MapEntry(e.key, values.length == 1 ? values[0] : values);
-    }));
+    var parameters = Map.fromEntries(
+      requestedUri.queryParametersAll.entries.map((e) {
+        var values = e.value;
+        return MapEntry(e.key, values.length == 1 ? values[0] : values);
+      }),
+    );
 
     var scheme = request.requestedUri.scheme;
 
     var connectionInfo = _getConnectionInfo(request);
     var requesterAddress = connectionInfo?.remoteAddress.address;
 
-    var requesterSource = requesterAddress == null
-        ? APIRequesterSource.unknown
-        : (_isLocalAddress(requesterAddress)
-            ? APIRequesterSource.local
-            : APIRequesterSource.remote);
+    var requesterSource =
+        requesterAddress == null
+            ? APIRequesterSource.unknown
+            : (_isLocalAddress(requesterAddress)
+                ? APIRequesterSource.local
+                : APIRequesterSource.remote);
 
     String? sessionID;
     bool newSession = false;
@@ -1305,10 +1426,11 @@ class APIServer extends _APIServerBase {
 
     var parsingDuration = DateTime.now().difference(requestTime);
 
-    return _resolvePayload(request,
-            maxPayloadLength: maxPayloadLength,
-            decompressPayload: decompressPayload)
-        .resolveMapped((payloadResolved) {
+    return _resolvePayload(
+      request,
+      maxPayloadLength: maxPayloadLength,
+      decompressPayload: decompressPayload,
+    ).resolveMapped((payloadResolved) {
       var mimeType = payloadResolved?.$1;
       var payload = payloadResolved?.$2;
 
@@ -1317,9 +1439,10 @@ class APIServer extends _APIServerBase {
       if (mimeType != null && payload != null && mimeType.isFormURLEncoded) {
         var payloadMap = payload as Map<String, dynamic>;
 
-        parametersResolved = parameters.isEmpty
-            ? payloadMap
-            : <String, dynamic>{...parameters, ...payloadMap};
+        parametersResolved =
+            parameters.isEmpty
+                ? payloadMap
+                : <String, dynamic>{...parameters, ...payloadMap};
 
         payload = null;
         mimeType = null;
@@ -1327,23 +1450,26 @@ class APIServer extends _APIServerBase {
         parametersResolved = Map<String, dynamic>.from(parameters);
       }
 
-      var req = APIRequest(method, path,
-          protocol: 'HTTP/${request.protocolVersion}',
-          keepAlive: keepAlive,
-          parameters: parametersResolved,
-          requesterSource: requesterSource,
-          requesterAddress: requesterAddress,
-          headers: headers,
-          sessionID: sessionID,
-          newSession: newSession,
-          credential: credential,
-          scheme: scheme,
-          requestedUri: request.requestedUri,
-          originalRequest: request,
-          payload: payload,
-          payloadMimeType: mimeType,
-          time: requestTime,
-          parsingDuration: parsingDuration);
+      var req = APIRequest(
+        method,
+        path,
+        protocol: 'HTTP/${request.protocolVersion}',
+        keepAlive: keepAlive,
+        parameters: parametersResolved,
+        requesterSource: requesterSource,
+        requesterAddress: requesterAddress,
+        headers: headers,
+        sessionID: sessionID,
+        newSession: newSession,
+        credential: credential,
+        scheme: scheme,
+        requestedUri: request.requestedUri,
+        originalRequest: request,
+        payload: payload,
+        payloadMimeType: mimeType,
+        time: requestTime,
+        parsingDuration: parsingDuration,
+      );
 
       return req;
     });
@@ -1372,8 +1498,11 @@ class APIServer extends _APIServerBase {
   static final MimeType _mimeTypeTextPlain =
       MimeType.parse(MimeType.textPlain)!;
 
-  static FutureOr<(MimeType, Object)?> _resolvePayload(Request request,
-      {int? maxPayloadLength, bool? decompressPayload}) {
+  static FutureOr<(MimeType, Object)?> _resolvePayload(
+    Request request, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) {
     var contentLength = request.contentLength;
 
     if (maxPayloadLength != null &&
@@ -1381,7 +1510,8 @@ class APIServer extends _APIServerBase {
         contentLength != null &&
         contentLength > maxPayloadLength) {
       throw StateError(
-          "Can't read payload. `Content-Length` ($contentLength) exceeds `maxPayloadLength` ($maxPayloadLength).");
+        "Can't read payload. `Content-Length` ($contentLength) exceeds `maxPayloadLength` ($maxPayloadLength).",
+      );
     }
 
     var contentMimeType = _resolveContentMimeType(request);
@@ -1396,17 +1526,23 @@ class APIServer extends _APIServerBase {
         return (mimeType, '');
       }
 
-      return _resolvePayloadFromString(mimeType, request,
-          maxPayloadLength: maxPayloadLength,
-          decompressPayload: decompressPayload);
+      return _resolvePayloadFromString(
+        mimeType,
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      );
     } else {
       if (contentLength == 0) {
         return (mimeType, Uint8List(0));
       }
 
-      return _resolvePayloadBytes(mimeType, request,
-          maxPayloadLength: maxPayloadLength,
-          decompressPayload: decompressPayload);
+      return _resolvePayloadBytes(
+        mimeType,
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      );
     }
   }
 
@@ -1419,10 +1555,11 @@ class APIServer extends _APIServerBase {
       var requestedUri = request.requestedUri;
       mimeType = _resolveMimeTypeByExtension(requestedUri.path);
 
-      mimeType ??= requestedUri.queryParameters.entries
-          .map((e) => _resolveMimeTypeByExtension(e.value))
-          .nonNulls
-          .firstOrNull;
+      mimeType ??=
+          requestedUri.queryParameters.entries
+              .map((e) => _resolveMimeTypeByExtension(e.value))
+              .nonNulls
+              .firstOrNull;
     }
 
     return mimeType;
@@ -1439,53 +1576,71 @@ class APIServer extends _APIServerBase {
   }
 
   static Future<(MimeType, Object)?> _resolvePayloadFromString(
-          MimeType mimeType, Request request,
-          {int? maxPayloadLength, bool? decompressPayload}) =>
-      _loadPayloadString(mimeType, request,
-              maxPayloadLength: maxPayloadLength,
-              decompressPayload: decompressPayload)
-          .then((s) {
-        if (s == null) return null;
+    MimeType mimeType,
+    Request request, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) => _loadPayloadString(
+    mimeType,
+    request,
+    maxPayloadLength: maxPayloadLength,
+    decompressPayload: decompressPayload,
+  ).then((s) {
+    if (s == null) return null;
 
-        Object payload = s;
-        if (mimeType.isJSON) {
-          payload = json.decode(s);
-        } else if (mimeType.isFormURLEncoded) {
-          payload = decodeQueryStringParameters(s, charset: mimeType.charset);
-        }
+    Object payload = s;
+    if (mimeType.isJSON) {
+      payload = json.decode(s);
+    } else if (mimeType.isFormURLEncoded) {
+      payload = decodeQueryStringParameters(s, charset: mimeType.charset);
+    }
 
-        return (mimeType, payload);
-      });
+    return (mimeType, payload);
+  });
 
-  static Future<String?> _loadPayloadString(MimeType mimeType, Request request,
-          {int? maxPayloadLength, bool? decompressPayload}) =>
-      request.read().toList().then((bs) {
-        var allBytes = _loadPayloadBytes(request, bs,
-            maxPayloadLength: maxPayloadLength,
-            decompressPayload: decompressPayload);
+  static Future<String?> _loadPayloadString(
+    MimeType mimeType,
+    Request request, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) => request.read().toList().then((bs) {
+    var allBytes = _loadPayloadBytes(
+      request,
+      bs,
+      maxPayloadLength: maxPayloadLength,
+      decompressPayload: decompressPayload,
+    );
 
-        var encoding = mimeType.charsetEncoding ?? utf8;
+    var encoding = mimeType.charsetEncoding ?? utf8;
 
-        try {
-          return encoding.decode(allBytes);
-        } catch (_) {
-          return latin1.decode(allBytes);
-        }
-      });
+    try {
+      return encoding.decode(allBytes);
+    } catch (_) {
+      return latin1.decode(allBytes);
+    }
+  });
 
   static Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
-          MimeType mimeType, Request request,
-          {int? maxPayloadLength, bool? decompressPayload}) =>
-      request.read().toList().then((bs) {
-        var allBytes = _loadPayloadBytes(request, bs,
-            maxPayloadLength: maxPayloadLength,
-            decompressPayload: decompressPayload);
-        return (mimeType, allBytes);
-      });
+    MimeType mimeType,
+    Request request, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) => request.read().toList().then((bs) {
+    var allBytes = _loadPayloadBytes(
+      request,
+      bs,
+      maxPayloadLength: maxPayloadLength,
+      decompressPayload: decompressPayload,
+    );
+    return (mimeType, allBytes);
+  });
 
   static Uint8List _loadPayloadBytes(
-      Request request, List<List<int>> payloadBlocks,
-      {int? maxPayloadLength, bool? decompressPayload}) {
+    Request request,
+    List<List<int>> payloadBlocks, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
+  }) {
     maxPayloadLength ??= -1;
     decompressPayload ??= false;
 
@@ -1503,14 +1658,16 @@ class APIServer extends _APIServerBase {
 
       if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
         throw StateError(
-            "Payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+          "Payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).",
+        );
       }
     } else {
       var allBytesSz = payloadBlocks.map((e) => e.length).sum;
 
       if (maxPayloadLength >= 0 && allBytesSz > maxPayloadLength) {
         throw StateError(
-            "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).");
+          "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).",
+        );
       }
 
       bytes = Uint8List(allBytesSz);
@@ -1547,12 +1704,14 @@ class APIServer extends _APIServerBase {
           }
         default:
           throw UnsupportedError(
-              "Unknown `Content-Encoding`: $contentEncoding");
+            "Unknown `Content-Encoding`: $contentEncoding",
+          );
       }
 
       if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
         throw StateError(
-            "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).");
+          "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).",
+        );
       }
     }
 
@@ -1562,12 +1721,15 @@ class APIServer extends _APIServerBase {
   static Uint8List _decodePayloadGzip(Uint8List bytes, int maxPayloadLength) {
     if (maxPayloadLength >= 0) {
       final byteData = ByteData.sublistView(bytes);
-      var gzipUncompressedSize =
-          byteData.getUint32(bytes.length - 4, Endian.little);
+      var gzipUncompressedSize = byteData.getUint32(
+        bytes.length - 4,
+        Endian.little,
+      );
 
       if (gzipUncompressedSize < 0 || gzipUncompressedSize > maxPayloadLength) {
         throw StateError(
-            "Can't decompress payload of size ${bytes.length}: GZip payload uncompressed size ($gzipUncompressedSize) exceeds `maxPayloadLength` ($maxPayloadLength).");
+          "Can't decompress payload of size ${bytes.length}: GZip payload uncompressed size ($gzipUncompressedSize) exceeds `maxPayloadLength` ($maxPayloadLength).",
+        );
       }
     }
 
@@ -1682,16 +1844,21 @@ class APIServer extends _APIServerBase {
   /// Resolves a [payload] to an HTTP body (accepts [payload] as a [Future]).
   /// See [resolveBodySync].
   static FutureOr<Object?> resolveBody(
-      Object? payload, APIResponse apiResponse) {
+    Object? payload,
+    APIResponse apiResponse,
+  ) {
     if (payload == null) return null;
 
     if (payload is Future) {
-      return payload.then((value) {
-        if (value == null) return null;
-        return _resolveBodyImpl(value, apiResponse);
-      }, onError: (e, s) {
-        return apiResponse.asError(error: 'ERROR: $e\n$s');
-      });
+      return payload.then(
+        (value) {
+          if (value == null) return null;
+          return _resolveBodyImpl(value, apiResponse);
+        },
+        onError: (e, s) {
+          return apiResponse.asError(error: 'ERROR: $e\n$s');
+        },
+      );
     }
 
     return _resolveBodyImpl(payload, apiResponse);
@@ -1704,7 +1871,8 @@ class APIServer extends _APIServerBase {
 
     if (payload is Future) {
       throw ArgumentError(
-          "`payload` can't be a `Future`. Use `resolveBody` for asynchronous call.");
+        "`payload` can't be a `Future`. Use `resolveBody` for asynchronous call.",
+      );
     }
 
     return _resolveBodyImpl(payload, apiResponse);
@@ -1718,16 +1886,20 @@ class APIServer extends _APIServerBase {
     }
 
     if (payload is String) {
-      apiResponse.payloadMimeType ??=
-          resolveBestTextMimeType(payload, apiResponse.payloadFileExtension);
+      apiResponse.payloadMimeType ??= resolveBestTextMimeType(
+        payload,
+        apiResponse.payloadFileExtension,
+      );
       return payload;
     }
 
     if (payload is List<int> &&
         !(apiResponse.payloadMimeType?.isJSON ?? false)) {
-      apiResponse.payloadMimeType ??= lookupMimeType(
-              apiResponse.payloadFileExtension ?? 'bytes',
-              headerBytes: payload) ??
+      apiResponse.payloadMimeType ??=
+          lookupMimeType(
+            apiResponse.payloadFileExtension ?? 'bytes',
+            headerBytes: payload,
+          ) ??
           'application/octet-stream';
       return payload;
     }
@@ -1735,7 +1907,7 @@ class APIServer extends _APIServerBase {
     if (payload is Stream<List<int>>) {
       apiResponse.payloadMimeType ??=
           lookupMimeType(apiResponse.payloadFileExtension ?? 'bytes') ??
-              'application/octet-stream';
+          'application/octet-stream';
 
       return payload;
     }
@@ -1743,7 +1915,7 @@ class APIServer extends _APIServerBase {
     if (payload is DateTime || payload is Time) {
       apiResponse.payloadMimeType ??=
           lookupMimeType(apiResponse.payloadFileExtension ?? 'text') ??
-              'text/plain';
+          'text/plain';
       return payload.toString();
     }
 
@@ -1773,7 +1945,9 @@ class APIServer extends _APIServerBase {
   ///
   /// Returns either raw JSON bytes or GZip-compressed JSON bytes.
   static Uint8List _jsonEncodePayload(
-      APIResponse<dynamic> apiResponse, payload) {
+    APIResponse<dynamic> apiResponse,
+    payload,
+  ) {
     final apiRequest = apiResponse.apiRequest;
 
     final encodeInit = DateTime.now();
@@ -1784,18 +1958,31 @@ class APIServer extends _APIServerBase {
       if (routeHandler != null) {
         var accessRules = routeHandler.entityAccessRules;
         if (!accessRules.isInnocuous) {
-          Json.encodeToSink(payload, bytesSink,
-              toEncodableProvider: (o) => accessRules.toJsonEncodable(
-                  apiRequest, Json.defaultToEncodableJsonProvider(), o));
+          Json.encodeToSink(
+            payload,
+            bytesSink,
+            toEncodableProvider:
+                (o) => accessRules.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
+          );
 
           return _resolveJsonEncodePayloadBytes(
-              apiResponse, bytesSink, encodeInit);
+            apiResponse,
+            bytesSink,
+            encodeInit,
+          );
         }
       }
     }
 
-    Json.encodeToSink(payload, bytesSink,
-        toEncodable: ReflectionFactory.toJsonEncodable);
+    Json.encodeToSink(
+      payload,
+      bytesSink,
+      toEncodable: ReflectionFactory.toJsonEncodable,
+    );
 
     return _resolveJsonEncodePayloadBytes(apiResponse, bytesSink, encodeInit);
   }
@@ -1806,9 +1993,10 @@ class APIServer extends _APIServerBase {
   /// If GZip was applied, adds headers to [apiResponse].
   /// See [_defineGZipEncodedHeaders].
   static Uint8List _resolveJsonEncodePayloadBytes(
-      APIResponse<dynamic> apiResponse,
-      AutoGZipSink bytesSink,
-      DateTime encodeInit) {
+    APIResponse<dynamic> apiResponse,
+    AutoGZipSink bytesSink,
+    DateTime encodeInit,
+  ) {
     bytesSink.close();
 
     final bytes = bytesSink.toBytes();
@@ -1817,11 +2005,13 @@ class APIServer extends _APIServerBase {
       var inputLength = bytesSink.inputLength;
       var compressionCapacity = bytesSink.capacity;
 
-      _defineGZipEncodedHeaders(apiResponse.headers,
-          bodyLength: inputLength,
-          compressedBodyLength: bytes.length,
-          compressionCapacity: compressionCapacity,
-          gzipInit: encodeInit);
+      _defineGZipEncodedHeaders(
+        apiResponse.headers,
+        bodyLength: inputLength,
+        compressedBodyLength: bytes.length,
+        compressionCapacity: compressionCapacity,
+        gzipInit: encodeInit,
+      );
     }
 
     return bytes;
@@ -1848,25 +2038,28 @@ class APIServer extends _APIServerBase {
 
   @override
   String toString() {
-    var serverResponseDelayStr = serverResponseDelay != null
-        ? ', serverResponseDelay: ${serverResponseDelay!.toStringUnit()}'
-        : '';
+    var serverResponseDelayStr =
+        serverResponseDelay != null
+            ? ', serverResponseDelay: ${serverResponseDelay!.toStringUnit()}'
+            : '';
 
-    var domainsStr = domainsRoots.isNotEmpty
-        ? ', domains: [${domainsRoots.entries.map((e) {
-            var key = e.key;
-            var val = e.value;
+    var domainsStr =
+        domainsRoots.isNotEmpty
+            ? ', domains: [${domainsRoots.entries.map((e) {
+              var key = e.key;
+              var val = e.value;
 
-            return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
-          }).join(' ; ')}]'
-        : '';
+              return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
+            }).join(' ; ')}]'
+            : '';
 
-    var secureStr = securePort < 10
-        ? ''
-        : ', securePort: $securePort, '
-            'letsEncrypt: $letsEncrypt'
-            '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
-            'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
+    var secureStr =
+        securePort < 10
+            ? ''
+            : ', securePort: $securePort, '
+                'letsEncrypt: $letsEncrypt'
+                '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
+                'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
     return 'APIServer[${BonesAPI.VERSION}]{ '
         'apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), '
@@ -1883,8 +2076,11 @@ class APIServer extends _APIServerBase {
   }
 
   /// Creates an [APIServer] with [apiRoot].
-  static APIServer create(APIRoot apiRoot,
-      [List<String> args = const <String>[], int argsOffset = 0]) {
+  static APIServer create(
+    APIRoot apiRoot, [
+    List<String> args = const <String>[],
+    int argsOffset = 0,
+  ]) {
     if (argsOffset > args.length) {
       argsOffset = args.length;
     }
@@ -1922,8 +2118,14 @@ class APIServer extends _APIServerBase {
       port = int.parse(_parseArg(args, 'port', 'p', '8080', 1));
 
       var hotReloadStr =
-          _parseArg(args, 'hotreload', 'r', 'false', 2, flag: true)
-              .toLowerCase();
+          _parseArg(
+            args,
+            'hotreload',
+            'r',
+            'false',
+            2,
+            flag: true,
+          ).toLowerCase();
 
       hotReload = hotReloadStr == 'true' || hotReloadStr == 'hotreload';
 
@@ -1943,8 +2145,12 @@ class APIServer extends _APIServerBase {
   }
 
   /// Runs [apiRoot] and returns the [APIServer].
-  static Future<APIServer> run(APIRoot apiRoot, List<String> args,
-      {int argsOffset = 0, bool verbose = false}) async {
+  static Future<APIServer> run(
+    APIRoot apiRoot,
+    List<String> args, {
+    int argsOffset = 0,
+    bool verbose = false,
+  }) async {
     var apiServer = create(apiRoot, args, argsOffset);
 
     await apiServer.start();
@@ -1959,8 +2165,13 @@ class APIServer extends _APIServerBase {
   }
 
   static String _parseArg(
-      List<String> args, String name, String abbrev, String def, int index,
-      {bool flag = false}) {
+    List<String> args,
+    String name,
+    String abbrev,
+    String def,
+    int index, {
+    bool flag = false,
+  }) {
     if (args.isEmpty) return def;
 
     for (var i = 0; i < args.length; ++i) {
@@ -1992,8 +2203,10 @@ class APIServer extends _APIServerBase {
     return def;
   }
 
-  static String resolveServerTiming(Map<String, APIMetric> metrics,
-      [String? serverTiming]) {
+  static String resolveServerTiming(
+    Map<String, APIMetric> metrics, [
+    String? serverTiming,
+  ]) {
     var s = StringBuffer();
 
     if (serverTiming != null) {
@@ -2086,7 +2299,9 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   FutureOr<APIResponse<T>?> _handleStaticFiles<T>(
-      APIRoot apiRoot, APIRequest apiRequest) {
+    APIRoot apiRoot,
+    APIRequest apiRequest,
+  ) {
     if (domainsRoots.isEmpty) return null;
 
     for (var e in domainsRoots.entries) {
@@ -2099,18 +2314,21 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   FutureOr<APIResponse<T>> _serveFile<T>(
-      APIRequest apiRequest, Directory rootDirectory) {
+    APIRequest apiRequest,
+    Directory rootDirectory,
+  ) {
     var staticHandler = _getDirectoryStaticHandler(rootDirectory);
 
-    return staticHandler(apiRequest.toRequest())
-        .resolveMapped((response) => _APIResponseStaticFile<T>(response));
+    return staticHandler(
+      apiRequest.toRequest(),
+    ).resolveMapped((response) => _APIResponseStaticFile<T>(response));
   }
 
   final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
 
   Handler _getDirectoryStaticHandler(Directory rootDirectory) =>
-      _directoriesStaticHandlers[rootDirectory.path] ??=
-          _createDirectoryHandler(rootDirectory);
+      _directoriesStaticHandlers[rootDirectory
+          .path] ??= _createDirectoryHandler(rootDirectory);
 
   APIServerResponseCache? _responseCache;
 
@@ -2122,10 +2340,11 @@ final class APIServerWorker extends _APIServerBase {
     var gzipCompressionLevel = 4;
 
     if (cacheStaticFilesResponses) {
-      var responseCache = _responseCache = APIServerResponseCache(
-        maxMemorySize: staticFilesCacheMaxMemorySize,
-        maxContentLength: staticFilesCacheMaxContentLength,
-      );
+      var responseCache =
+          _responseCache = APIServerResponseCache(
+            maxMemorySize: staticFilesCacheMaxMemorySize,
+            maxContentLength: staticFilesCacheMaxContentLength,
+          );
 
       pipeline = pipeline.addMiddleware(responseCache.middleware);
 
@@ -2134,29 +2353,40 @@ final class APIServerWorker extends _APIServerBase {
     }
 
     pipeline = pipeline
-        .addMiddleware(createGzipMiddleware(
-          compressionLevel: gzipCompressionLevel,
-          addCompressionRatioHeader: true,
-          addServerTiming: true,
-        ))
-        .addMiddleware((innerHandler) =>
-            _staticFilesHeadersMiddleware(rootDirectory, innerHandler));
+        .addMiddleware(
+          createGzipMiddleware(
+            compressionLevel: gzipCompressionLevel,
+            addCompressionRatioHeader: true,
+            addServerTiming: true,
+          ),
+        )
+        .addMiddleware(
+          (innerHandler) =>
+              _staticFilesHeadersMiddleware(rootDirectory, innerHandler),
+        );
 
     var handler = pipeline.addHandler(
-        createStaticHandler(rootDirectory.path, defaultDocument: 'index.html'));
+      createStaticHandler(rootDirectory.path, defaultDocument: 'index.html'),
+    );
 
     return handler;
   }
 
   Handler _staticFilesHeadersMiddleware(
-          Directory rootDirectory, Handler innerHandler) =>
-      (request) {
-        return Future.sync(() => innerHandler(request)).then((response) =>
-            _configureStaticFilesHeaders(rootDirectory, request, response));
-      };
+    Directory rootDirectory,
+    Handler innerHandler,
+  ) => (request) {
+    return Future.sync(() => innerHandler(request)).then(
+      (response) =>
+          _configureStaticFilesHeaders(rootDirectory, request, response),
+    );
+  };
 
   Response _configureStaticFilesHeaders(
-      Directory rootDirectory, Request request, Response response) {
+    Directory rootDirectory,
+    Request request,
+    Response response,
+  ) {
     var statusCode = response.statusCode;
     if (statusCode < 200 || statusCode > 299) {
       return response.change(
@@ -2198,7 +2428,10 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   Map<String, Object>? _buildResponseContext(
-      Directory rootDirectory, Request request, Response response) {
+    Directory rootDirectory,
+    Request request,
+    Response response,
+  ) {
     var fileResolved = _resolveStaticFile(rootDirectory, request, response);
     if (fileResolved == null) return null;
 
@@ -2212,7 +2445,10 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   ({File? file, File? fileNotFound})? _resolveStaticFile(
-      Directory rootDirectory, Request request, Response response) {
+    Directory rootDirectory,
+    Request request,
+    Response response,
+  ) {
     final responseContext = response.context;
 
     var contextFile = responseContext['shelf_static:file'];
@@ -2259,7 +2495,7 @@ final class APIServerWorker extends _APIServerBase {
   String get workerDebugName => 'APIServerWorker#$id';
 
   Future<(Isolate?, PortListener?, SendPort?, Future<bool>?)>
-      spawnIsolate() async {
+  spawnIsolate() async {
     if (_started) {
       return (null, null, null, null);
     }
@@ -2272,11 +2508,10 @@ final class APIServerWorker extends _APIServerBase {
 
     var resumePortAsync = spawnPortListener.next();
 
-    final isolate = await Isolate.spawn(
-      _isolateInit,
-      (worker: this, mainWorkerPort: spawnPort.sendPort),
-      debugName: workerDebugName,
-    );
+    final isolate = await Isolate.spawn(_isolateInit, (
+      worker: this,
+      mainWorkerPort: spawnPort.sendPort,
+    ), debugName: workerDebugName);
 
     var exitPort = ReceivePort();
     var completer = Completer<bool>();
@@ -2289,7 +2524,8 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   static void _isolateInit(
-      ({APIServerWorker worker, SendPort mainWorkerPort}) params) async {
+    ({APIServerWorker worker, SendPort mainWorkerPort}) params,
+  ) async {
     final worker = params.worker;
     final mainWorkerPort = params.mainWorkerPort;
 
@@ -2342,7 +2578,8 @@ final class APIServerWorker extends _APIServerBase {
       var isLoggingDB = LoggerHandler.root.getLogDbTo() != null;
 
       _log.info(
-          "LOGGING> toConsole: $isLoggingToConsole ; all: $isLoggingAll ; error: $isLoggingError ; db: $isLoggingDB");
+        "LOGGING> toConsole: $isLoggingToConsole ; all: $isLoggingAll ; error: $isLoggingError ; db: $isLoggingDB",
+      );
     }
 
     if (appliedProps != null && appliedProps.isNotEmpty) {
@@ -2382,9 +2619,10 @@ final class APIServerWorker extends _APIServerBase {
       _log.info('Using `SESSIONID` cookies.');
     }
 
-    var workerInfo = totalWorkers > 1
-        ? '[${isMainWorker ? 'main' : 'auxiliary'} worker#$workerIndex/$totalWorkers]'
-        : '';
+    var workerInfo =
+        totalWorkers > 1
+            ? '[${isMainWorker ? 'main' : 'auxiliary'} worker#$workerIndex/$totalWorkers]'
+            : '';
 
     _log.info('Started HTTP Server$workerInfo at: $address:$port');
 
@@ -2428,7 +2666,11 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   void _letsEncryptLogger(
-      String level, Object? message, Object? error, StackTrace? stackTrace) {
+    String level,
+    Object? message,
+    Object? error,
+    StackTrace? stackTrace,
+  ) {
     switch (level) {
       case 'INFO':
         {
@@ -2444,8 +2686,10 @@ final class APIServerWorker extends _APIServerBase {
         }
       default:
         {
-          var logLevel = logging.Level.LEVELS.firstWhereOrNull(
-                  (e) => equalsIgnoreAsciiCase(e.name, level)) ??
+          var logLevel =
+              logging.Level.LEVELS.firstWhereOrNull(
+                (e) => equalsIgnoreAsciiCase(e.name, level),
+              ) ??
               logging.Level.INFO;
 
           _logLetsEncrypt.log(logLevel, message, error, stackTrace);
@@ -2460,7 +2704,8 @@ final class APIServerWorker extends _APIServerBase {
       throw StateError("Let's Encrypt directory not set!");
     } else if (!letsEncryptDirectory.existsSync()) {
       throw StateError(
-          "Let's Encrypt directory doesn't exists: $letsEncryptDirectory");
+        "Let's Encrypt directory doesn't exists: $letsEncryptDirectory",
+      );
     }
 
     _log.info("Let's Encrypt directory: ${letsEncryptDirectory.path}");
@@ -2483,8 +2728,10 @@ final class APIServerWorker extends _APIServerBase {
     final configDomains = this.domains;
     var configDomainsEmails = configDomains.map((d) => 'contact@$d').toList();
 
-    var domains =
-        Domain.fromDomainsNamesAndEmails(configDomains, configDomainsEmails);
+    var domains = Domain.fromDomainsNamesAndEmails(
+      configDomains,
+      configDomainsEmails,
+    );
 
     _log.info("Let's Encrypt domains: $configDomains");
 
@@ -2543,24 +2790,30 @@ final class APIServerWorker extends _APIServerBase {
   FutureOr<Response> _process(Request request) {
     APIRequest? apiRequest;
     try {
-      return APIServer.toAPIRequest(request,
-              cookieless: cookieless,
-              useSessionID: useSessionID,
-              maxPayloadLength: maxPayloadLength,
-              decompressPayload: decompressPayload)
-          .then((apiReq) {
-        apiRequest = apiReq;
-        return _processAPIRequest(request, apiReq);
-      }, onError: (e, s) {
-        return _errorProcessing(request, apiRequest, e, s);
-      });
+      return APIServer.toAPIRequest(
+        request,
+        cookieless: cookieless,
+        useSessionID: useSessionID,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      ).then(
+        (apiReq) {
+          apiRequest = apiReq;
+          return _processAPIRequest(request, apiReq);
+        },
+        onError: (e, s) {
+          return _errorProcessing(request, apiRequest, e, s);
+        },
+      );
     } catch (e, s) {
       return _errorProcessing(request, apiRequest, e, s);
     }
   }
 
   FutureOr<Response> _processAPIRequest(
-      Request request, APIRequest apiRequest) {
+    Request request,
+    APIRequest apiRequest,
+  ) {
     if (_starting) {
       return _processWhileInitializing(request, apiRequest);
     }
@@ -2579,7 +2832,9 @@ final class APIServerWorker extends _APIServerBase {
   static const initializationTimeout = Duration(seconds: 20);
 
   FutureOr<Response> _processWhileInitializing(
-      Request request, APIRequest apiRequest) {
+    Request request,
+    APIRequest apiRequest,
+  ) {
     final startAsync = _startAsync;
 
     // If is starting and there's no `_startAsync`,
@@ -2591,21 +2846,27 @@ final class APIServerWorker extends _APIServerBase {
     return startAsync
         .timeout(initializationTimeout, onTimeout: () => false)
         .then((ok) {
-      if (ok && !_starting) {
-        apiRequest.setMetric('APIServerWorker-initialization',
-            duration: apiRequest.elapsedTime);
-        return _processAPIRequest(request, apiRequest);
-      }
+          if (ok && !_starting) {
+            apiRequest.setMetric(
+              'APIServerWorker-initialization',
+              duration: apiRequest.elapsedTime,
+            );
+            return _processAPIRequest(request, apiRequest);
+          }
 
-      return Response(
-        HttpStatus.serviceUnavailable,
-        body: 'Server is still initializing. Please try again later.',
-      );
-    });
+          return Response(
+            HttpStatus.serviceUnavailable,
+            body: 'Server is still initializing. Please try again later.',
+          );
+        });
   }
 
   Response _errorProcessing(
-      Request request, APIRequest? apiRequest, Object error, StackTrace stack) {
+    Request request,
+    APIRequest? apiRequest,
+    Object error,
+    StackTrace stack,
+  ) {
     var requestStr = apiRequest ?? _requestToString(request);
 
     var message = 'ERROR processing request:\n\n$requestStr';
@@ -2643,7 +2904,9 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   FutureOr<Response> _processOPTIONSRequest(
-      Request request, APIRequest apiRequest) {
+    Request request,
+    APIRequest apiRequest,
+  ) {
     APIResponse apiResponse;
 
     if (!apiRoot.acceptsRequest(apiRequest)) {
@@ -2669,12 +2932,16 @@ final class APIServerWorker extends _APIServerBase {
       apiResponse = APIResponse.error(error: e, stackTrace: s);
     }
 
-    return apiResponse
-        .resolveMapped((res) => _processAPIResponse(request, apiRequest, res));
+    return apiResponse.resolveMapped(
+      (res) => _processAPIResponse(request, apiRequest, res),
+    );
   }
 
   FutureOr<Response> _processAPIResponse(
-      Request request, APIRequest apiRequest, APIResponse apiResponse) {
+    Request request,
+    APIRequest apiRequest,
+    APIResponse apiResponse,
+  ) {
     APIServer.setCORS(apiRequest, apiResponse);
 
     if (apiResponse is _APIResponseStaticFile) {
@@ -2688,7 +2955,8 @@ final class APIServerWorker extends _APIServerBase {
       final retPayloadOrig = retPayload;
 
       _log.info(
-          "[DEV] Response #${apiRequest.id} delayed in ${serverResponseDelay.toStringUnit()}: ${apiRequest.requestedUri}");
+        "[DEV] Response #${apiRequest.id} delayed in ${serverResponseDelay.toStringUnit()}: ${apiRequest.requestedUri}",
+      );
 
       retPayload = Future.delayed(serverResponseDelay, () async {
         var payload = await retPayloadOrig;
@@ -2700,12 +2968,19 @@ final class APIServerWorker extends _APIServerBase {
       if (payload is APIResponse) {
         var apiResponse2 = payload;
 
-        return APIServer.resolveBody(apiResponse2.payload, apiResponse2)
-            .resolveMapped((payload2) {
+        return APIServer.resolveBody(
+          apiResponse2.payload,
+          apiResponse2,
+        ).resolveMapped((payload2) {
           var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
 
           var response = _sendAPIResponse(
-              request, apiRequest, apiResponse2, headers, payload2);
+            request,
+            apiRequest,
+            apiResponse2,
+            headers,
+            payload2,
+          );
 
           apiResponse.disposeAsync();
 
@@ -2715,7 +2990,12 @@ final class APIServerWorker extends _APIServerBase {
         var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
 
         var response = _sendAPIResponse(
-            request, apiRequest, apiResponse, headers, payload);
+          request,
+          apiRequest,
+          apiResponse,
+          headers,
+          payload,
+        );
 
         return _processResponse(apiRequest, apiResponse, request, response);
       }
@@ -2723,7 +3003,9 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   Map<String, Object> _resolveAPIResponseHeaders(
-      APIResponse<dynamic> apiResponse, APIRequest apiRequest) {
+    APIResponse<dynamic> apiResponse,
+    APIRequest apiRequest,
+  ) {
     var headers = <String, Object>{};
 
     if (!apiResponse.hasCORS) {
@@ -2755,8 +3037,11 @@ final class APIServerWorker extends _APIServerBase {
 
     if (apiRequest.newSession && !cookieless) {
       var setSessionID = 'SESSIONID=${apiRequest.sessionID}';
-      headers.setMultiValue(HttpHeaders.setCookieHeader, setSessionID,
-          ignoreCase: true);
+      headers.setMultiValue(
+        HttpHeaders.setCookieHeader,
+        setSessionID,
+        ignoreCase: true,
+      );
     }
 
     var authentication = apiRequest.authentication;
@@ -2778,8 +3063,12 @@ final class APIServerWorker extends _APIServerBase {
     return headers;
   }
 
-  FutureOr<Response> _processResponse(APIRequest apiRequest,
-      APIResponse apiResponse, Request request, Response response) {
+  FutureOr<Response> _processResponse(
+    APIRequest apiRequest,
+    APIResponse apiResponse,
+    Request request,
+    Response response,
+  ) {
     apiResponse.disposeAsync();
     apiRequest.disposeAsync();
 
@@ -2795,13 +3084,17 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   bool _needToSendHeaderXAccessToken(
-      Map<String, Object> headers, String tokenKey) {
+    Map<String, Object> headers,
+    String tokenKey,
+  ) {
     var headerAuthorization = headers.getFirstValue('authorization');
     var notSentByAuthentication =
         headerAuthorization == null || !headerAuthorization.contains(tokenKey);
 
-    var headerAccessToken =
-        headers.getMultiValue('x-access-token', ignoreCase: true);
+    var headerAccessToken = headers.getMultiValue(
+      'x-access-token',
+      ignoreCase: true,
+    );
     var notSentByAccessToken =
         headerAccessToken == null || !headerAccessToken.contains(tokenKey);
 
@@ -2811,8 +3104,13 @@ final class APIServerWorker extends _APIServerBase {
     return needToSendHeaderXAccessToken;
   }
 
-  Response _sendAPIResponse(Request request, APIRequest apiRequest,
-      APIResponse apiResponse, Map<String, Object> headers, Object? payload) {
+  Response _sendAPIResponse(
+    Request request,
+    APIRequest apiRequest,
+    APIResponse apiResponse,
+    Map<String, Object> headers,
+    Object? payload,
+  ) {
     _setTransactionsMetrics(apiRequest, apiResponse);
 
     apiResponse.setMetric('API-call', duration: apiRequest.elapsedTime);
@@ -2848,9 +3146,10 @@ final class APIServerWorker extends _APIServerBase {
       headers['keep-alive'] = 'timeout=$timeout, max=$max';
     }
 
-    var allMetrics = apiRequest.hasMetrics
-        ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
-        : apiResponse.metrics;
+    var allMetrics =
+        apiRequest.hasMetrics
+            ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
+            : apiResponse.metrics;
 
     headers['server-timing'] = APIServer.resolveServerTiming(
       allMetrics,
@@ -2874,15 +3173,22 @@ final class APIServerWorker extends _APIServerBase {
         }
       case APIResponseStatus.UNAUTHORIZED:
         {
-          var wwwAuthenticate =
-              headers.getAsString('WWW-Authenticate', ignoreCase: true);
+          var wwwAuthenticate = headers.getAsString(
+            'WWW-Authenticate',
+            ignoreCase: true,
+          );
 
           if (wwwAuthenticate != null && wwwAuthenticate.isNotEmpty) {
-            return Response(401,
-                body: payload ?? apiResponse.error, headers: headers);
+            return Response(
+              401,
+              body: payload ?? apiResponse.error,
+              headers: headers,
+            );
           } else {
-            return Response.forbidden(payload ?? apiResponse.error,
-                headers: headers);
+            return Response.forbidden(
+              payload ?? apiResponse.error,
+              headers: headers,
+            );
           }
         }
       case APIResponseStatus.REDIRECT:
@@ -2901,8 +3207,11 @@ final class APIServerWorker extends _APIServerBase {
           return Response(307, body: body, headers: headers);
         }
       case APIResponseStatus.BAD_REQUEST:
-        return Response(400,
-            body: payload ?? apiResponse.error, headers: headers);
+        return Response(
+          400,
+          body: payload ?? apiResponse.error,
+          headers: headers,
+        );
       case APIResponseStatus.ERROR:
         {
           var error = apiResponse.error ?? '';
@@ -2922,7 +3231,9 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   void _setTransactionsMetrics(
-      APIRequest apiRequest, APIResponse<dynamic> apiResponse) {
+    APIRequest apiRequest,
+    APIResponse<dynamic> apiResponse,
+  ) {
     var transactions = apiRequest.transactions;
     if (transactions.isEmpty) return;
 
@@ -2941,33 +3252,41 @@ final class APIServerWorker extends _APIServerBase {
     for (var t in transactions) {
       var duration = t.duration;
       if (duration != null) {
-        apiResponse.setMetric('Transaction#${t.id}',
-            duration: duration, description: t.info);
+        apiResponse.setMetric(
+          'Transaction#${t.id}',
+          duration: duration,
+          description: t.info,
+        );
         total = total + duration;
       }
     }
 
-    apiResponse.setMetric('All-Transactions',
-        duration: total, n: transactions.length);
+    apiResponse.setMetric(
+      'All-Transactions',
+      duration: total,
+      n: transactions.length,
+    );
   }
 
   @override
   String toString() {
-    var domainsStr = domainsRoots.isNotEmpty
-        ? ', domains: [${domainsRoots.entries.map((e) {
-            var key = e.key;
-            var val = e.value;
+    var domainsStr =
+        domainsRoots.isNotEmpty
+            ? ', domains: [${domainsRoots.entries.map((e) {
+              var key = e.key;
+              var val = e.value;
 
-            return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
-          }).join(' ; ')}]'
-        : '';
+              return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
+            }).join(' ; ')}]'
+            : '';
 
-    var secureStr = securePort < 10
-        ? ''
-        : ', securePort: $securePort, '
-            'letsEncrypt: $letsEncrypt'
-            '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
-            'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
+    var secureStr =
+        securePort < 10
+            ? ''
+            : ', securePort: $securePort, '
+                'letsEncrypt: $letsEncrypt'
+                '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
+                'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
     return 'APIServerWorker{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }
@@ -2981,8 +3300,10 @@ class _APIResponseStaticFile<T> extends APIResponse<T> {
   Response fileResponse;
 
   _APIResponseStaticFile(this.fileResponse)
-      : super(parseAPIResponseStatus(fileResponse.statusCode) ??
-            APIResponseStatus.NOT_FOUND);
+    : super(
+        parseAPIResponseStatus(fileResponse.statusCode) ??
+            APIResponseStatus.NOT_FOUND,
+      );
 }
 
 extension _APIRequestExtension on APIRequest {
@@ -3012,14 +3333,16 @@ extension _APIRequestExtension on APIRequest {
 /// - [addServerTiming]: whether to append timing info to `Server-Timing`
 /// - [gzipInit]: start time of GZip encoding, required for timing
 /// - [serverTimingEntryName]: label used in the `Server-Timing` header
-void _defineGZipEncodedHeaders(Map<String, dynamic> headers,
-    {required int bodyLength,
-    required int compressedBodyLength,
-    required int compressionCapacity,
-    bool addCompressionRatioHeader = true,
-    bool addServerTiming = true,
-    DateTime? gzipInit,
-    String serverTimingEntryName = 'obj-json-gzip'}) {
+void _defineGZipEncodedHeaders(
+  Map<String, dynamic> headers, {
+  required int bodyLength,
+  required int compressedBodyLength,
+  required int compressionCapacity,
+  bool addCompressionRatioHeader = true,
+  bool addServerTiming = true,
+  DateTime? gzipInit,
+  String serverTimingEntryName = 'obj-json-gzip',
+}) {
   headers[HttpHeaders.contentEncodingHeader] = 'gzip';
   headers[HttpHeaders.contentLengthHeader] = compressedBodyLength.toString();
 

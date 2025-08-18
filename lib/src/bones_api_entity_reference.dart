@@ -13,8 +13,8 @@ final _log = logging.Logger('EntityReference');
 
 typedef EntityFetcher<T> = FutureOr<T?> Function(Object? id, Type type);
 
-typedef EntitiesFetcher<T> = FutureOr<List<T?>?> Function(
-    List<Object?> ids, Type type);
+typedef EntitiesFetcher<T> =
+    FutureOr<List<T?>?> Function(List<Object?> ids, Type type);
 
 abstract class EntityInstantiator<T> {
   T instantiate();
@@ -27,15 +27,25 @@ class EntityInstantiatorHandler<T> extends EntityInstantiator<T> {
   EntityCache? entityCache;
   EntityHandlerProvider? entityHandlerProvider;
 
-  EntityInstantiatorHandler(this.entityHandler, Object id, this._map,
-      {Type? type, this.entityCache, this.entityHandlerProvider}) {
+  EntityInstantiatorHandler(
+    this.entityHandler,
+    Object id,
+    this._map, {
+    Type? type,
+    this.entityCache,
+    this.entityHandlerProvider,
+  }) {
     final entityCache = this.entityCache;
 
     if (entityCache != null) {
       type ??= entityHandler.type;
 
-      entityCache.cacheEntityInstantiator<T>(id, instantiate,
-          type: type, overwrite: false);
+      entityCache.cacheEntityInstantiator<T>(
+        id,
+        instantiate,
+        type: type,
+        overwrite: false,
+      );
     }
   }
 
@@ -43,35 +53,40 @@ class EntityInstantiatorHandler<T> extends EntityInstantiator<T> {
 
   @override
   T instantiate() {
-    var instance = this._entity;
+    var instance = _entity;
     if (instance != null) return instance;
 
     var entityMap = this.entityMap;
 
-    var entity = entityHandler.createFromMapSync(entityMap,
-        entityCache: entityCache, entityHandlerProvider: entityHandlerProvider);
+    var entity = entityHandler.createFromMapSync(
+      entityMap,
+      entityCache: entityCache,
+      entityHandlerProvider: entityHandlerProvider,
+    );
 
-    this._entity = entity;
+    _entity = entity;
 
     return entity;
   }
 
   Map<String, dynamic> get entityMap {
-    var map = this._map;
+    var map = _map;
     if (map is Map<String, dynamic>) return map;
 
-    this._map = map = resolveEntityMap(map);
+    _map = map = resolveEntityMap(map);
     return map;
   }
 
   static Map<String, dynamic> resolveEntityMap(Object entity) {
-    var entityMap = entity is Map
-        ? entity
-        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+    var entityMap =
+        entity is Map
+            ? entity
+            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
 
-    var entityMapCast = entityMap is Map<String, dynamic>
-        ? entityMap
-        : entityMap.map((key, value) => MapEntry('$key', value));
+    var entityMapCast =
+        entityMap is Map<String, dynamic>
+            ? entityMap
+            : entityMap.map((key, value) => MapEntry('$key', value));
 
     return entityMapCast;
   }
@@ -95,18 +110,18 @@ abstract class EntityReferenceBase<T> {
   EntityCache? _entityCache;
 
   EntityReferenceBase._(
-      Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache)
-      : _type = type,
-        _typeName = typeName,
-        _entityHandlerObject = entityHandler ?? _entityHandlerUnresolved,
-        _entityHandlerProvider = entityHandlerProvider,
-        _entityProvider = entityProvider,
-        _entityCache = entityCache {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityCache? entityCache,
+  ) : _type = type,
+      _typeName = typeName,
+      _entityHandlerObject = entityHandler ?? _entityHandlerUnresolved,
+      _entityHandlerProvider = entityHandlerProvider,
+      _entityProvider = entityProvider,
+      _entityCache = entityCache {
     _resolveType();
     _resolveEntityHandler();
     _resolveEntityProvider();
@@ -147,11 +162,13 @@ abstract class EntityReferenceBase<T> {
     return typeName;
   }
 
-  static final String _typeEntityReferenceStr =
-      _getTypeNamePrefix(EntityReference);
+  static final String _typeEntityReferenceStr = _getTypeNamePrefix(
+    EntityReference,
+  );
 
-  static final String _typeEntityReferenceListStr =
-      _getTypeNamePrefix(EntityReferenceList);
+  static final String _typeEntityReferenceListStr = _getTypeNamePrefix(
+    EntityReferenceList,
+  );
 
   static String _getTypeNamePrefix(Type type) {
     var s = '$type<';
@@ -169,7 +186,8 @@ abstract class EntityReferenceBase<T> {
         (typeStr.startsWith(_typeEntityReferenceStr) ||
             typeStr.startsWith(_typeEntityReferenceListStr))) {
       throw StateError(
-          "Can't have an entity reference (`$runtimeType`) pointing to another reference type (`$type`).");
+        "Can't have an entity reference (`$runtimeType`) pointing to another reference type (`$type`).",
+      );
     }
 
     var typeName = this.typeName;
@@ -186,12 +204,14 @@ abstract class EntityReferenceBase<T> {
   void _checkValidEntityType(Type? type) {
     if (type == null) {
       throw StateError(
-          "Can't resolve `$runtimeType` type> T: $T ; type: $_type ; typeName: $_typeName");
+        "Can't resolve `$runtimeType` type> T: $T ; type: $_type ; typeName: $_typeName",
+      );
     }
 
     if (_isInvalidEntityType(type)) {
       throw StateError(
-          "Invalid `$runtimeType` type `$type`. Please declare it with a correct `T` ($T), `type` ($_type) or `typeName` ($_typeName).");
+        "Invalid `$runtimeType` type `$type`. Please declare it with a correct `T` ($T), `type` ($_type) or `typeName` ($_typeName).",
+      );
     }
   }
 
@@ -208,14 +228,16 @@ abstract class EntityReferenceBase<T> {
       var entityHandler = _resolveEntityHandler();
 
       if (entityHandler != null) {
-        var typeEntityHandler =
-            entityHandler.getEntityHandler(typeName: typeName);
+        var typeEntityHandler = entityHandler.getEntityHandler(
+          typeName: typeName,
+        );
         if (typeEntityHandler != null) {
           return typeEntityHandler.type;
         }
 
-        var entityRepository =
-            entityHandler.getEntityRepository(name: typeName);
+        var entityRepository = entityHandler.getEntityRepository(
+          name: typeName,
+        );
         if (entityRepository != null) {
           return entityRepository.type;
         }
@@ -268,7 +290,11 @@ abstract class EntityReferenceBase<T> {
 
   EntityHandler<T>? _resolveEntityHandlerImpl() =>
       _resolveEntityHandlerGlobal<T>(
-          _type, _typeName, _entityHandlerProvider, _entityProvider);
+        _type,
+        _typeName,
+        _entityHandlerProvider,
+        _entityProvider,
+      );
 
   static final Map<Type, String> _typesNames = {};
 
@@ -276,15 +302,18 @@ abstract class EntityReferenceBase<T> {
       _typesNames[type] ??= type.toString();
 
   static EntityHandler<T>? _resolveEntityHandlerGlobal<T>(
-      Type? type,
-      String? typeName,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityProvider? entityProvider) {
+    Type? type,
+    String? typeName,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityProvider? entityProvider,
+  ) {
     type ??= T;
 
     if (entityHandlerProvider != null) {
       var entityHandler = entityHandlerProvider.getEntityHandler<T>(
-          type: type, typeName: typeName);
+        type: type,
+        typeName: typeName,
+      );
 
       if (entityHandler != null) {
         return entityHandler;
@@ -293,8 +322,10 @@ abstract class EntityReferenceBase<T> {
 
     if (entityProvider is EntityHandlerProvider) {
       var handlerProvider = entityProvider as EntityHandlerProvider;
-      var entityHandler =
-          handlerProvider.getEntityHandler<T>(type: type, typeName: typeName);
+      var entityHandler = handlerProvider.getEntityHandler<T>(
+        type: type,
+        typeName: typeName,
+      );
 
       if (entityHandler != null) {
         return entityHandler;
@@ -313,8 +344,8 @@ abstract class EntityReferenceBase<T> {
     }
 
     if (typeName != null && typeName.isNotEmpty) {
-      var classReflection =
-          ReflectionFactory().getRegisterClassReflectionByName(typeName);
+      var classReflection = ReflectionFactory()
+          .getRegisterClassReflectionByName(typeName);
 
       if (classReflection != null) {
         var classEntityHandler = classReflection.entityHandler;
@@ -387,7 +418,8 @@ abstract class EntityReferenceBase<T> {
     if (_isInvalidEntity(entity)) {
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${(entity as Object?).runtimeTypeNameUnsafe}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+        "Invalid entity instance (${(entity as Object?).runtimeTypeNameUnsafe}) for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).",
+      );
     }
   }
 
@@ -435,53 +467,56 @@ abstract class EntityReferenceBase<T> {
 class EntityReference<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReference] with a null [entity] and null [id].
   /// See [isNull].
-  EntityReference.asNull(
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            null,
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entityFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReference.asNull({
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         null,
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entityFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReference] with the entity [id] (without a loaded [entity] instance).
   /// See [id] and [isIdSet].
-  EntityReference.fromID(Object? id,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            _normalizeID<T>(entityHandler, id),
-            null,
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entityFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReference.fromID(
+    Object? id, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         _normalizeID<T>(entityHandler, id),
+         null,
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entityFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   static Object? _normalizeID<T>(EntityHandler<T>? entityHandler, Object? id) {
     return entityHandler != null ? entityHandler.normalizeID(id) : id;
@@ -490,90 +525,98 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReference] with the [entity] instance.
   /// The [id] is resolved through the [entity] instance.
   /// See [entity] and [isEntitySet].
-  EntityReference.fromEntity(T? entity,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            entity,
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entityFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReference.fromEntity(
+    T? entity, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         entity,
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entityFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReference] with an [entity] instance from [entityMap].
-  EntityReference.fromEntityMap(Map<String, dynamic>? entityMap,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            null,
-            entityMap,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entityFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReference.fromEntityMap(
+    Map<String, dynamic>? entityMap, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         null,
+         entityMap,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entityFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReference] with an [entity] instance created from [entityInstantiator].
   EntityReference.fromEntityInstantiator(
-      Object id, EntityInstantiator<T>? entityInstantiator,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            id,
-            null,
-            null,
-            entityInstantiator,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entityFetcher,
-            entityCache,
-            checkGenericType);
+    Object id,
+    EntityInstantiator<T>? entityInstantiator, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         id,
+         null,
+         null,
+         entityInstantiator,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entityFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReference] from a JSON [Map].
   /// If [json] has an entry `EntityReference` it will be treated as a [Map] from [toJson],
   /// otherwise will be treated as an entity JSON (a [Map] from [entityToJson])
   /// and instantiated through [fromEntityMap].
-  factory EntityReference.fromJson(Map<String, dynamic> json,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache}) {
+  factory EntityReference.fromJson(
+    Map<String, dynamic> json, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+  }) {
     var entityReferenceType = json['EntityReference'];
 
     if (entityReferenceType != null) {
@@ -588,87 +631,24 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       if (entity != null) {
         if (id != null) {
           entityHandler ??= EntityReferenceBase._resolveEntityHandlerGlobal(
-              type, typeName, entityHandlerProvider, entityProvider);
+            type,
+            typeName,
+            entityHandlerProvider,
+            entityProvider,
+          );
 
           if (entityHandler != null) {
             var instantiator = EntityInstantiatorHandler(
-                entityHandler, id, entity,
-                entityCache: entityCache,
-                entityHandlerProvider: entityHandlerProvider);
-
-            return EntityReference<T>.fromEntityInstantiator(id, instantiator,
-                    type: type,
-                    typeName: typeName,
-                    entityHandler: entityHandler,
-                    entityProvider: entityProvider,
-                    entityHandlerProvider: entityHandlerProvider,
-                    entityFetcher: entityFetcher,
-                    entityCache: entityCache,
-                    checkGenericType: false)
-                ._autoCast();
-          }
-        }
-
-        var entityMapCast = _resolveEntityMap(entity);
-
-        return EntityReference<T>.fromEntityMap(entityMapCast,
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entityFetcher: entityFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
-      } else if (id != null) {
-        return EntityReference<T>.fromID(id,
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entityFetcher: entityFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
-      } else {
-        return EntityReference<T>.asNull(
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entityFetcher: entityFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
-      }
-    } else {
-      entityHandler ??= EntityReferenceBase._resolveEntityHandlerGlobal(
-          type, typeName, entityHandlerProvider, entityProvider);
-
-      if (entityHandler != null) {
-        var id = entityHandler.getIDFromMap(json);
-        if (id != null) {
-          var instantiator = EntityInstantiatorHandler(entityHandler, id, json,
+              entityHandler,
+              id,
+              entity,
               entityCache: entityCache,
-              entityHandlerProvider: entityHandlerProvider);
+              entityHandlerProvider: entityHandlerProvider,
+            );
 
-          return EntityReference<T>.fromEntityInstantiator(id, instantiator,
-                  type: type,
-                  typeName: typeName,
-                  entityHandler: entityHandler,
-                  entityProvider: entityProvider,
-                  entityHandlerProvider: entityHandlerProvider,
-                  entityFetcher: entityFetcher,
-                  entityCache: entityCache,
-                  checkGenericType: false)
-              ._autoCast();
-        }
-      }
-
-      return EntityReference<T>.fromEntityMap(json,
+            return EntityReference<T>.fromEntityInstantiator(
+              id,
+              instantiator,
               type: type,
               typeName: typeName,
               entityHandler: entityHandler,
@@ -676,75 +656,169 @@ class EntityReference<T> extends EntityReferenceBase<T> {
               entityHandlerProvider: entityHandlerProvider,
               entityFetcher: entityFetcher,
               entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
-    }
-  }
+              checkGenericType: false,
+            )._autoCast();
+          }
+        }
 
-  static Map<String, dynamic> _resolveEntityMap(Object entity) {
-    var entityMap = entity is Map
-        ? entity
-        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+        var entityMapCast = _resolveEntityMap(entity);
 
-    var entityMapCast = entityMap is Map<String, dynamic>
-        ? entityMap
-        : entityMap.map((key, value) => MapEntry('$key', value));
-    return entityMapCast;
-  }
-
-  /// Creates an [EntityReference] from [o] trying to resolve it in the best way.
-  factory EntityReference.from(Object? o,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache}) {
-    if (o == null) {
-      return EntityReference<T>.asNull(
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entityFetcher: entityFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
-    } else if (o is EntityReference) {
-      return o.cast<T>()._autoCast();
-    } else if (o.isEntityIDType) {
-      return EntityReference<T>.fromID(o,
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entityFetcher: entityFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
-    } else if (o is Map<String, dynamic>) {
-      return EntityReference<T>.fromJson(o,
+        return EntityReference<T>.fromEntityMap(
+          entityMapCast,
           type: type,
           typeName: typeName,
           entityHandler: entityHandler,
           entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
           entityFetcher: entityFetcher,
-          entityCache: entityCache);
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
+      } else if (id != null) {
+        return EntityReference<T>.fromID(
+          id,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entityFetcher: entityFetcher,
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
+      } else {
+        return EntityReference<T>.asNull(
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entityFetcher: entityFetcher,
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
+      }
+    } else {
+      entityHandler ??= EntityReferenceBase._resolveEntityHandlerGlobal(
+        type,
+        typeName,
+        entityHandlerProvider,
+        entityProvider,
+      );
+
+      if (entityHandler != null) {
+        var id = entityHandler.getIDFromMap(json);
+        if (id != null) {
+          var instantiator = EntityInstantiatorHandler(
+            entityHandler,
+            id,
+            json,
+            entityCache: entityCache,
+            entityHandlerProvider: entityHandlerProvider,
+          );
+
+          return EntityReference<T>.fromEntityInstantiator(
+            id,
+            instantiator,
+            type: type,
+            typeName: typeName,
+            entityHandler: entityHandler,
+            entityProvider: entityProvider,
+            entityHandlerProvider: entityHandlerProvider,
+            entityFetcher: entityFetcher,
+            entityCache: entityCache,
+            checkGenericType: false,
+          )._autoCast();
+        }
+      }
+
+      return EntityReference<T>.fromEntityMap(
+        json,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
+    }
+  }
+
+  static Map<String, dynamic> _resolveEntityMap(Object entity) {
+    var entityMap =
+        entity is Map
+            ? entity
+            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+
+    var entityMapCast =
+        entityMap is Map<String, dynamic>
+            ? entityMap
+            : entityMap.map((key, value) => MapEntry('$key', value));
+    return entityMapCast;
+  }
+
+  /// Creates an [EntityReference] from [o] trying to resolve it in the best way.
+  factory EntityReference.from(
+    Object? o, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+  }) {
+    if (o == null) {
+      return EntityReference<T>.asNull(
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
+    } else if (o is EntityReference) {
+      return o.cast<T>()._autoCast();
+    } else if (o.isEntityIDType) {
+      return EntityReference<T>.fromID(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
+    } else if (o is Map<String, dynamic>) {
+      return EntityReference<T>.fromJson(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is T) {
-      return EntityReference<T>.fromEntity(o as T,
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entityFetcher: entityFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+      return EntityReference<T>.fromEntity(
+        o as T,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityFetcher: entityFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     }
 
     throw StateError(
-        "`T`($T) and `o`($o) not of the same type. Can't resolve `EntityReference`!");
+      "`T`($T) and `o`($o) not of the same type. Can't resolve `EntityReference`!",
+    );
   }
 
   EntityFetcher<T>? _entityFetcher;
@@ -752,24 +826,30 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   Object? _id;
 
   EntityReference._(
-      Type? type,
-      String? typeName,
-      Object? id,
-      T? entity,
-      Map<String, dynamic>? entityMap,
-      EntityInstantiator<T>? entityInstantiator,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityFetcher<T>? entityFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType)
-      : _id = id,
-        _entity = entity,
-        _entityInstantiator = entityInstantiator,
-        _entityFetcher = entityFetcher,
-        super._(type, typeName, entityHandler, entityProvider,
-            entityHandlerProvider, entityCache) {
+    Type? type,
+    String? typeName,
+    Object? id,
+    T? entity,
+    Map<String, dynamic>? entityMap,
+    EntityInstantiator<T>? entityInstantiator,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<T>? entityFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType,
+  ) : _id = id,
+      _entity = entity,
+      _entityInstantiator = entityInstantiator,
+      _entityFetcher = entityFetcher,
+      super._(
+        type,
+        typeName,
+        entityHandler,
+        entityProvider,
+        entityHandlerProvider,
+        entityCache,
+      ) {
     if (entityMap != null) {
       // _id == null && _entity == null
       var entityHandler = this.entityHandler;
@@ -779,13 +859,15 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
         entityHandler
             // ignore: discarded_futures
-            .createFromMap(entityMap,
-                entityCache: entityCache,
-                entityHandlerProvider: entityHandlerProvider)
+            .createFromMap(
+              entityMap,
+              entityCache: entityCache,
+              entityHandlerProvider: entityHandlerProvider,
+            )
             // ignore: discarded_futures
             .resolveMapped((o) {
-          set(o);
-        });
+              set(o);
+            });
       } else {
         _id = entityMap['id'];
         _resolveID();
@@ -837,18 +919,19 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       return o as EntityReference<E>;
     } else {
       var entityReference = EntityReference<E>._(
-          o._type,
-          o._typeName,
-          o._id,
-          o._entity as E?,
-          null,
-          o._entityInstantiator as EntityInstantiator<E>?,
-          o._entityHandler as EntityHandler<E>?,
-          o._entityProvider,
-          o._entityHandlerProvider,
-          o._entityFetcher as EntityFetcher<E>?,
-          o._entityCache,
-          checkGenericType);
+        o._type,
+        o._typeName,
+        o._id,
+        o._entity as E?,
+        null,
+        o._entityInstantiator as EntityInstantiator<E>?,
+        o._entityHandler as EntityHandler<E>?,
+        o._entityProvider,
+        o._entityHandlerProvider,
+        o._entityFetcher as EntityFetcher<E>?,
+        o._entityCache,
+        checkGenericType,
+      );
 
       entityReference._entityTime = o._entityTime;
 
@@ -860,18 +943,19 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   @override
   EntityReference<T> copy({bool withEntity = true}) {
     var cp = EntityReference<T>._(
-        _type,
-        _typeName,
-        _id,
-        withEntity ? _entity : null,
-        null,
-        withEntity ? _entityInstantiator : null,
-        _entityHandler,
-        _entityProvider,
-        _entityHandlerProvider,
-        _entityFetcher,
-        _entityCache,
-        false);
+      _type,
+      _typeName,
+      _id,
+      withEntity ? _entity : null,
+      null,
+      withEntity ? _entityInstantiator : null,
+      _entityHandler,
+      _entityProvider,
+      _entityHandlerProvider,
+      _entityFetcher,
+      _entityCache,
+      false,
+    );
 
     if (withEntity) cp._entityTime = _entityTime;
 
@@ -946,7 +1030,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       _id = id;
     } else if (_id != id) {
       throw StateError(
-          "Instantiated entity with different id: `$id` != `$_id`");
+        "Instantiated entity with different id: `$id` != `$_id`",
+      );
     }
 
     return entity;
@@ -967,11 +1052,12 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
       if (entityProvider != null) {
         var entityByID =
-            // ignore: discarded_futures
-            entityProvider.getEntityByID<T>(id, type: type, sync: true);
+        // ignore: discarded_futures
+        entityProvider.getEntityByID<T>(id, type: type, sync: true);
         if (entityByID is Future) {
           throw StateError(
-              "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
+            "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider",
+          );
         }
         _entity = entity = entityByID;
       }
@@ -1080,14 +1166,9 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       };
     } else if (isIdSet) {
       var id = this.id!;
-      return <String, dynamic>{
-        'EntityReference': typeName,
-        'id': id,
-      };
+      return <String, dynamic>{'EntityReference': typeName, 'id': id};
     } else {
-      return <String, dynamic>{
-        'EntityReference': typeName,
-      };
+      return <String, dynamic>{'EntityReference': typeName};
     }
   }
 
@@ -1176,12 +1257,13 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   /// Same as [get] but won't return `null`.
   @override
   FutureOr<T> getNotNull() => get().resolveMapped((o) {
-        if (o == null) {
-          throw StateError(
-              "Null entity. Can't `get` entity `$type` with ID `$id`> entityProvider: $entityProvider ; entityFetcher: $_entityFetcher");
-        }
-        return o;
-      });
+    if (o == null) {
+      throw StateError(
+        "Null entity. Can't `get` entity `$type` with ID `$id`> entityProvider: $entityProvider ; entityFetcher: $_entityFetcher",
+      );
+    }
+    return o;
+  });
 
   /// Returns `true` if the [entity] is loaded.
   /// See [hasEntity].
@@ -1312,24 +1394,29 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var entityFetcher = _entityFetcher;
     if (entityFetcher != null) {
-      fetcher = (ids, type) => ids
-          .map((id) => entityFetcher(id, type)) // ignore: discarded_futures
-          .toList()
-          .resolveAll(); // ignore: discarded_futures
+      fetcher =
+          (ids, type) =>
+              ids
+                  .map(
+                    (id) => entityFetcher(id, type),
+                  ) // ignore: discarded_futures
+                  .toList()
+                  .resolveAll(); // ignore: discarded_futures
     }
 
     return EntityReferenceList<T>._(
-        type,
-        null,
-        id == null ? null : [id],
-        entity == null ? null : [entity],
-        null,
-        entityHandler,
-        entityProvider,
-        _entityHandlerProvider,
-        fetcher,
-        _entityCache,
-        false);
+      type,
+      null,
+      id == null ? null : [id],
+      entity == null ? null : [entity],
+      null,
+      entityHandler,
+      entityProvider,
+      _entityHandlerProvider,
+      fetcher,
+      _entityCache,
+      false,
+    );
   }
 
   @override
@@ -1379,75 +1466,79 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReferenceList] with null [entities] and null [ids].
   /// See [isNull], [ids] and [isIDsSet].
-  EntityReferenceList.asNull(
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entitiesFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReferenceList.asNull({
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entitiesFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an empty [EntityReferenceList] (like an empty list).
   /// See [isEmpty], [ids] and [isIDsSet].
-  EntityReferenceList.asEmpty(
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            <Object?>[],
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entitiesFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReferenceList.asEmpty({
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         <Object?>[],
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entitiesFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReferenceList] with the entities [ids] (without a loaded [entities] list).
   /// See [ids] and [isIDsSet].
-  EntityReferenceList.fromIDs(List<Object?>? ids,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            _normalizeIDs<T>(entityHandler, ids),
-            null,
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entitiesFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReferenceList.fromIDs(
+    List<Object?>? ids, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         _normalizeIDs<T>(entityHandler, ids),
+         null,
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entitiesFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   static _normalizeIDs<T>(EntityHandler<T>? entityHandler, List<Object?>? ids) {
     return entityHandler != null
@@ -1458,64 +1549,69 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Creates an [EntityReferenceList] with the [entities] instances list.
   /// The [ids] is resolved through the [entities] instance list.
   /// See [entities] and [isEntitiesSet].
-  EntityReferenceList.fromEntities(Iterable<T?>? entities,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            entities?.toList(),
-            null,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entitiesFetcher,
-            entityCache,
-            checkGenericType);
+  EntityReferenceList.fromEntities(
+    Iterable<T?>? entities, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         entities?.toList(),
+         null,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entitiesFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReferenceList] with an [entities] instance list from [entitiesMaps].
   EntityReferenceList.fromEntitiesMaps(
-      Iterable<Map<String, dynamic>?> entitiesMaps,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType = true})
-      : this._(
-            type,
-            typeName,
-            null,
-            null,
-            entitiesMaps.asList,
-            entityHandler,
-            entityProvider,
-            entityHandlerProvider,
-            entitiesFetcher,
-            entityCache,
-            checkGenericType);
+    Iterable<Map<String, dynamic>?> entitiesMaps, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType = true,
+  }) : this._(
+         type,
+         typeName,
+         null,
+         null,
+         entitiesMaps.asList,
+         entityHandler,
+         entityProvider,
+         entityHandlerProvider,
+         entitiesFetcher,
+         entityCache,
+         checkGenericType,
+       );
 
   /// Creates an [EntityReference] from a JSON [Map].
   /// If [json] has an entry `EntityReference` it will be treated as a [Map] from [toJson],
   /// otherwise will be treated as an entity JSON (a [Map] from [entitiesToJson])
   /// and instantiated through [fromEntityMap].
-  factory EntityReferenceList.fromJson(Map<String, dynamic> json,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache}) {
+  factory EntityReferenceList.fromJson(
+    Map<String, dynamic> json, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+  }) {
     var entityReferenceType = json['EntityReferenceList'];
 
     if (entityReferenceType != null) {
@@ -1528,152 +1624,167 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entities = json['entities'];
 
       if (entities != null && entities is List) {
-        var entitiesMaps = entities is List<Map<String, dynamic>?>
-            ? entities
-            : entities.map((e) {
-                var m = e is Map ? e : TypeParser.parseMap(e);
-                return m is Map<String, dynamic>
-                    ? m
-                    : m?.map((key, value) => MapEntry('$key', value));
-              }).toList(growable: false);
+        var entitiesMaps =
+            entities is List<Map<String, dynamic>?>
+                ? entities
+                : entities
+                    .map((e) {
+                      var m = e is Map ? e : TypeParser.parseMap(e);
+                      return m is Map<String, dynamic>
+                          ? m
+                          : m?.map((key, value) => MapEntry('$key', value));
+                    })
+                    .toList(growable: false);
 
-        return EntityReferenceList<T>.fromEntitiesMaps(entitiesMaps,
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entitiesFetcher: entitiesFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
+        return EntityReferenceList<T>.fromEntitiesMaps(
+          entitiesMaps,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
       } else if (ids != null && ids is List<Object?>) {
-        return EntityReferenceList<T>.fromIDs(ids,
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entitiesFetcher: entitiesFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
+        return EntityReferenceList<T>.fromIDs(
+          ids,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
       } else {
         return EntityReferenceList<T>.asEmpty(
-                type: type,
-                typeName: typeName,
-                entityHandler: entityHandler,
-                entityProvider: entityProvider,
-                entityHandlerProvider: entityHandlerProvider,
-                entitiesFetcher: entitiesFetcher,
-                entityCache: entityCache,
-                checkGenericType: false)
-            ._autoCast();
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityProvider: entityProvider,
+          entityHandlerProvider: entityHandlerProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+          checkGenericType: false,
+        )._autoCast();
       }
     } else {
       var entityReferenceType = json['EntityReference'];
 
       if (entityReferenceType != null) {
-        var entityReference =
-            EntityReference<T>.fromJson(json, entityCache: entityCache);
+        var entityReference = EntityReference<T>.fromJson(
+          json,
+          entityCache: entityCache,
+        );
 
         var isNull = entityReference.isNull;
         var id = entityReference.id;
         var entity = entityReference.entity;
 
         return EntityReferenceList<T>._(
-                entityReference.type,
-                null,
-                isNull || id == null ? null : [id],
-                isNull || entity == null ? null : [entity],
-                null,
-                entityReference.entityHandler,
-                entityReference.entityProvider,
-                entityReference._entityHandlerProvider,
-                null,
-                entityCache,
-                false)
-            ._autoCast();
+          entityReference.type,
+          null,
+          isNull || id == null ? null : [id],
+          isNull || entity == null ? null : [entity],
+          null,
+          entityReference.entityHandler,
+          entityReference.entityProvider,
+          entityReference._entityHandlerProvider,
+          null,
+          entityCache,
+          false,
+        )._autoCast();
       }
 
       return EntityReferenceList<T>.fromEntitiesMaps(
-              <Map<String, dynamic>>[json],
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entityHandlerProvider: entityHandlerProvider,
-              entitiesFetcher: entitiesFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+        <Map<String, dynamic>>[json],
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entityHandlerProvider: entityHandlerProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     }
   }
 
   /// Creates an [EntityReferenceList] from [o] trying to resolve it in the best way.
-  factory EntityReferenceList.from(Object? o,
-      {Type? type,
-      String? typeName,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntityCache? entityCache,
-      EntitiesFetcher<T>? entitiesFetcher}) {
+  factory EntityReferenceList.from(
+    Object? o, {
+    Type? type,
+    String? typeName,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityCache? entityCache,
+    EntitiesFetcher<T>? entitiesFetcher,
+  }) {
     if (o == null) {
       return EntityReferenceList<T>.asNull(
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entitiesFetcher: entitiesFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     } else if (o is EntityReferenceList) {
       return o.cast<T>()._autoCast();
     } else if (o is List &&
         o.every((Object? e) => e == null || e.isEntityIDType)) {
-      return EntityReferenceList<T>.fromIDs(o,
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entitiesFetcher: entitiesFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+      return EntityReferenceList<T>.fromIDs(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     } else if (o is Map<String, dynamic>) {
-      return EntityReferenceList<T>.fromJson(o,
-          type: type,
-          typeName: typeName,
-          entityHandler: entityHandler,
-          entityProvider: entityProvider,
-          entitiesFetcher: entitiesFetcher,
-          entityCache: entityCache);
+      return EntityReferenceList<T>.fromJson(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+      );
     } else if (o is List<T?>) {
-      return EntityReferenceList<T>.fromEntities(o,
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entitiesFetcher: entitiesFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+      return EntityReferenceList<T>.fromEntities(
+        o,
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     } else if (o is T) {
-      return EntityReferenceList<T>.fromEntities(<T>[o as T],
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entitiesFetcher: entitiesFetcher,
-              entityCache: entityCache,
-              checkGenericType: false)
-          ._autoCast();
+      return EntityReferenceList<T>.fromEntities(
+        <T>[o as T],
+        type: type,
+        typeName: typeName,
+        entityHandler: entityHandler,
+        entityProvider: entityProvider,
+        entitiesFetcher: entitiesFetcher,
+        entityCache: entityCache,
+        checkGenericType: false,
+      )._autoCast();
     }
 
     throw StateError(
-        "`T`($T) and `o`($o) not compatible types. Can't resolve `EntityReferenceList`!");
+      "`T`($T) and `o`($o) not compatible types. Can't resolve `EntityReferenceList`!",
+    );
   }
 
   EntitiesFetcher<T>? _entitiesFetcher;
@@ -1681,39 +1792,54 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   List<Object?>? _ids;
 
   EntityReferenceList._(
-      Type? type,
-      String? typeName,
-      List<Object?>? ids,
-      List<T?>? entities,
-      List<Map<String, dynamic>?>? entitiesMaps,
-      EntityHandler<T>? entityHandler,
-      EntityProvider? entityProvider,
-      EntityHandlerProvider? entityHandlerProvider,
-      EntitiesFetcher<T>? entitiesFetcher,
-      EntityCache? entityCache,
-      bool checkGenericType)
-      : _ids = ids,
-        _entities = entities,
-        _entitiesFetcher = entitiesFetcher,
-        super._(type, typeName, entityHandler, entityProvider,
-            entityHandlerProvider, entityCache) {
+    Type? type,
+    String? typeName,
+    List<Object?>? ids,
+    List<T?>? entities,
+    List<Map<String, dynamic>?>? entitiesMaps,
+    EntityHandler<T>? entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntitiesFetcher<T>? entitiesFetcher,
+    EntityCache? entityCache,
+    bool checkGenericType,
+  ) : _ids = ids,
+      _entities = entities,
+      _entitiesFetcher = entitiesFetcher,
+      super._(
+        type,
+        typeName,
+        entityHandler,
+        entityProvider,
+        entityHandlerProvider,
+        entityCache,
+      ) {
     if (entitiesMaps != null) {
       // _id == null && _entity == null
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        _ids = entitiesMaps
-            .map((map) =>
-                map == null ? null : entityHandler.resolveIDFromMap(map))
-            .toList();
+        _ids =
+            entitiesMaps
+                .map(
+                  (map) =>
+                      map == null ? null : entityHandler.resolveIDFromMap(map),
+                )
+                .toList();
 
         entityCache ??= JsonEntityCacheSimple();
 
         List<FutureOr<T?>> lAsync = entitiesMaps
-            .map((map) => map == null
-                ? null
-                // ignore: discarded_futures
-                : entityHandler.createFromMap(map, entityCache: entityCache))
+            .map(
+              (map) =>
+                  map == null
+                      ? null
+                      // ignore: discarded_futures
+                      : entityHandler.createFromMap(
+                        map,
+                        entityCache: entityCache,
+                      ),
+            )
             .toList(growable: false);
 
         // ignore: discarded_futures
@@ -1731,7 +1857,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     var ids = _ids;
     if (ids != null && ids.any((id) => id != null && !id.isEntityIDType)) {
       throw ArgumentError(
-          "Invalid IDs type: ${ids.runtimeTypeNameUnsafe} ${ids.map((id) => '<$id>')}");
+        "Invalid IDs type: ${ids.runtimeTypeNameUnsafe} ${ids.map((id) => '<$id>')}",
+      );
     }
 
     _resolveEntities();
@@ -1767,17 +1894,18 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       return o as EntityReferenceList<E>;
     } else {
       var entityReferenceList = EntityReferenceList<E>._(
-          o._type,
-          o._typeName,
-          o._ids,
-          _castListNullable<E>(o._entities),
-          null,
-          o._entityHandler as EntityHandler<E>?,
-          o._entityProvider,
-          o._entityHandlerProvider,
-          o._entitiesFetcher as EntitiesFetcher<E>?,
-          o._entityCache,
-          false);
+        o._type,
+        o._typeName,
+        o._ids,
+        _castListNullable<E>(o._entities),
+        null,
+        o._entityHandler as EntityHandler<E>?,
+        o._entityProvider,
+        o._entityHandlerProvider,
+        o._entitiesFetcher as EntitiesFetcher<E>?,
+        o._entityCache,
+        false,
+      );
 
       entityReferenceList._entitiesTime = o._entitiesTime;
 
@@ -1789,17 +1917,18 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   @override
   EntityReferenceList<T> copy({bool withEntity = true}) {
     var cp = EntityReferenceList<T>._(
-        _type,
-        _typeName,
-        _ids?.toList(),
-        withEntity ? _entities?.toList() : null,
-        null,
-        _entityHandler,
-        _entityProvider,
-        _entityHandlerProvider,
-        _entitiesFetcher,
-        _entityCache,
-        false);
+      _type,
+      _typeName,
+      _ids?.toList(),
+      withEntity ? _entities?.toList() : null,
+      null,
+      _entityHandler,
+      _entityProvider,
+      _entityHandlerProvider,
+      _entitiesFetcher,
+      _entityCache,
+      false,
+    );
 
     if (withEntity) cp._entitiesTime = _entitiesTime;
 
@@ -1848,13 +1977,15 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
   void _checkValidEntities(List<Object?> entities) {
     var invalidIdx = entities.indexWhere(
-        (e) => e != null && EntityReferenceBase._isInvalidEntity(e));
+      (e) => e != null && EntityReferenceBase._isInvalidEntity(e),
+    );
 
     if (invalidIdx >= 0) {
       var entity = entities[invalidIdx];
       var type = this.type;
       throw StateError(
-          "Invalid entity instance (${entity.runtimeTypeNameUnsafe}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).");
+        "Invalid entity instance (${entity.runtimeTypeNameUnsafe}) at index `$invalidIdx` for `EntityReference<$type>` (`T` ($T), `type` ($_type) or `typeName` ($_typeName)).",
+      );
     }
   }
 
@@ -1961,16 +2092,18 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
 
       if (ids != null && entityProvider != null) {
-        entities = ids.map((id) {
-          var entityByID =
+        entities =
+            ids.map((id) {
+              var entityByID =
               // ignore: discarded_futures
               entityProvider.getEntityByID<T>(id, type: type, sync: true);
-          if (entityByID is Future) {
-            throw StateError(
-                "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider");
-          }
-          return entityByID;
-        }).toList();
+              if (entityByID is Future) {
+                throw StateError(
+                  "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider",
+                );
+              }
+              return entityByID;
+            }).toList();
 
         if (entities.every((e) => e == null)) {
           entities = null;
@@ -2042,22 +2175,30 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     if (entities == null) return null;
 
     if (jsonEncoder != null) {
-      var jsonList = entities
-          .map((e) => e == null
-              ? null
-              : (jsonEncoder.toJson(e) as Map<String, dynamic>?))
-          .toList();
+      var jsonList =
+          entities
+              .map(
+                (e) =>
+                    e == null
+                        ? null
+                        : (jsonEncoder.toJson(e) as Map<String, dynamic>?),
+              )
+              .toList();
       return jsonList;
     }
 
     var entityHandler = this.entityHandler;
 
     if (entityHandler != null) {
-      var jsonList = entities
-          .map((e) => e == null
-              ? null
-              : (entityHandler.toJson(e) as Map<String, dynamic>?))
-          .toList();
+      var jsonList =
+          entities
+              .map(
+                (e) =>
+                    e == null
+                        ? null
+                        : (entityHandler.toJson(e) as Map<String, dynamic>?),
+              )
+              .toList();
       return jsonList;
     }
 
@@ -2112,9 +2253,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         if (hasAnyID) 'ids': ids,
       };
     } else {
-      return <String, dynamic>{
-        'EntityReferenceList': typeName,
-      };
+      return <String, dynamic>{'EntityReferenceList': typeName};
     }
   }
 
@@ -2144,8 +2283,9 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
   static final ListEquality _entitiesEquality = ListEquality();
 
-  static final ListEquality _listIdenticalEquality =
-      ListEquality(IdentityEquality());
+  static final ListEquality _listIdenticalEquality = ListEquality(
+    IdentityEquality(),
+  );
 
   /// Sets the [entities] [ids] and returns the current [ids].
   /// If the IDs is changing the previous loaded [entities] instance are disposed.
@@ -2217,12 +2357,13 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   /// Same as [get] but won't return `null`.
   @override
   FutureOr<List<T?>> getNotNull() => get().resolveMapped((l) {
-        if (l == null || l.every((e) => e == null)) {
-          throw StateError(
-              "Null entities. Can't `get` entities `$type` with IDs ${ids?.map((e) => '<$e>').toList() ?? '`null`'}> entityProvider: $entityProvider ; entitiesFetcher: $_entitiesFetcher");
-        }
-        return l;
-      });
+    if (l == null || l.every((e) => e == null)) {
+      throw StateError(
+        "Null entities. Can't `get` entities `$type` with IDs ${ids?.map((e) => '<$e>').toList() ?? '`null`'}> entityProvider: $entityProvider ; entitiesFetcher: $_entitiesFetcher",
+      );
+    }
+    return l;
+  });
 
   /// Returns `true` if the [entities] is loaded;
   @override
@@ -2262,10 +2403,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
     if (entityProvider == null) return entities;
 
-    var l = ids
-        .map((id) => entityProvider.getEntityByID<T>(id, type: type))
-        .toList()
-        .resolveAll();
+    var l =
+        ids
+            .map((id) => entityProvider.getEntityByID<T>(id, type: type))
+            .toList()
+            .resolveAll();
 
     return l;
   }
@@ -2501,9 +2643,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        var otherIDs = otherEntities
-            .map((e) => _getEntityIDImpl(entityHandler, e as T))
-            .toList();
+        var otherIDs =
+            otherEntities
+                .map((e) => _getEntityIDImpl(entityHandler, e as T))
+                .toList();
         return _idsEquality.equals(ids, otherIDs);
       }
 
@@ -2551,7 +2694,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     if (length != null) {
       if (length > 1) {
         throw StateError(
-            "Can't convert a list of length ($length) `> 1` to an `EntityReference<$T>.`");
+          "Can't convert a list of length ($length) `> 1` to an `EntityReference<$T>.`",
+        );
       } else if (length == 0) {
         ids = null;
         entities == null;
@@ -2564,24 +2708,26 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
     final entitiesFetcher = _entitiesFetcher;
     if (entitiesFetcher != null) {
-      fetcher = (id, type) =>
+      fetcher =
+          (id, type) =>
           // ignore: discarded_futures
           entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }
 
     return EntityReference<T>._(
-        type,
-        null,
-        id,
-        entity,
-        null,
-        null,
-        entityHandler,
-        entityProvider,
-        _entityHandlerProvider,
-        fetcher,
-        _entityCache,
-        false);
+      type,
+      null,
+      id,
+      entity,
+      null,
+      null,
+      entityHandler,
+      entityProvider,
+      _entityHandlerProvider,
+      fetcher,
+      _entityCache,
+      false,
+    );
   }
 
   @override
@@ -2720,12 +2866,12 @@ extension IterableOfIterableEntityReferenceListExtension<T>
 
 extension _ListExtension<T> on List<T> {
   List<T> mergeWith(List<T> other) => List<T>.generate(length, (i) {
-        T a = this[i];
-        if (a != null) return a;
+    T a = this[i];
+    if (a != null) return a;
 
-        T b = other[i];
-        return b;
-      });
+    T b = other[i];
+    return b;
+  });
 
   List<Object?> mergeWithOther<E>(List<E> other) {
     if (other is List<T>) {

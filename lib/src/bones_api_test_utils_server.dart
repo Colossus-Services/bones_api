@@ -45,7 +45,8 @@ Future<APIServer> runTestAPIServer<A extends APIRoot>(
   await apiServer.start();
 
   logPrintter(
-      '\n===========================================================================\n');
+    '\n===========================================================================\n',
+  );
   logPrintter('$testServerName\n');
   logPrintter('$apiServer\n');
   logPrintter('${apiServer.apiRoot}\n');
@@ -53,7 +54,8 @@ Future<APIServer> runTestAPIServer<A extends APIRoot>(
   logPrintter('URL: ${apiServer.url}');
   logPrintter('API-INFO URL: ${apiServer.apiInfoURL}\n');
   logPrintter(
-      '===========================================================================\n');
+    '===========================================================================\n',
+  );
 
   if (portCallback != null) {
     portCallback(port);

@@ -40,8 +40,12 @@ class APIPlatformBrowser extends APIPlatform {
     _log('WARNING', message);
   }
 
-  void _log(String type, Object? message,
-      [Object? error, StackTrace? stackTrace]) {
+  void _log(
+    String type,
+    Object? message, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
     print('[$type] $message');
     if (error != null) {
       stderrLn(error);
@@ -51,8 +55,12 @@ class APIPlatformBrowser extends APIPlatform {
     }
   }
 
-  void _logError(String type, Object? message,
-      [Object? error, StackTrace? stackTrace]) {
+  void _logError(
+    String type,
+    Object? message, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
     stderrLn('[WARNING] $message');
     if (error != null) {
       stderrLn(error);
@@ -146,8 +154,11 @@ class APIPlatformBrowser extends APIPlatform {
   }
 
   @override
-  String? getProperty(String? key,
-      {String? defaultValue, bool caseSensitive = false}) {
+  String? getProperty(
+    String? key, {
+    String? defaultValue,
+    bool caseSensitive = false,
+  }) {
     if (key == null) return defaultValue;
 
     var prev = _properties[key];

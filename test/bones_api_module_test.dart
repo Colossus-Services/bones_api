@@ -60,230 +60,266 @@ void main() {
       expect(userModule.allRoutesNames, equals({...userRoutes}));
 
       {
-        var apiRootInfoJson = (await apiRoot.call(APIRequest.get('/API-INFO')))
-            .payloadAs<APIRootInfo>()
-            .toJson();
-
-        expect(Map.from(apiRootInfoJson)..remove('modules'),
-            equals({'name': 'Test', 'version': '1.0'}));
+        var apiRootInfoJson =
+            (await apiRoot.call(
+              APIRequest.get('/API-INFO'),
+            )).payloadAs<APIRootInfo>().toJson();
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => e['name'])
-                .toList(),
-            equals(['about', 'user']));
+          Map.from(apiRootInfoJson)..remove('modules'),
+          equals({'name': 'Test', 'version': '1.0'}),
+        );
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => List.from(e['routes'])
-                    .cast<Map>()
-                    .map((e) => e['name'])
-                    .toList())
-                .toList(),
-            equals([aboutRoutes, userRoutes]));
+          List.from(
+            apiRootInfoJson['modules'],
+          ).cast<Map>().map((e) => e['name']).toList(),
+          equals(['about', 'user']),
+        );
+
+        expect(
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map(
+                (e) =>
+                    List.from(
+                      e['routes'],
+                    ).cast<Map>().map((e) => e['name']).toList(),
+              )
+              .toList(),
+          equals([aboutRoutes, userRoutes]),
+        );
       }
 
       {
         var apiRootInfoJson =
-            (await apiRoot.call(APIRequest.get('/API-INFO/about')))
-                .payloadAs<APIRootInfo>()
-                .toJson();
+            (await apiRoot.call(
+              APIRequest.get('/API-INFO/about'),
+            )).payloadAs<APIRootInfo>().toJson();
 
         expect(
-            Map.from(apiRootInfoJson)..remove('modules'),
-            equals(
-                {'name': 'Test', 'version': '1.0', 'selectedModule': 'about'}));
+          Map.from(apiRootInfoJson)..remove('modules'),
+          equals({'name': 'Test', 'version': '1.0', 'selectedModule': 'about'}),
+        );
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => e['name'])
-                .toList(),
-            equals(aboutRoutes));
+          List.from(
+            apiRootInfoJson['modules'],
+          ).cast<Map>().map((e) => e['name']).toList(),
+          equals(aboutRoutes),
+        );
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => List.from(e['routes'])
-                    .cast<Map>()
-                    .map((e) => e['name'])
-                    .toList())
-                .toList(),
-            equals([aboutRoutes]));
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map(
+                (e) =>
+                    List.from(
+                      e['routes'],
+                    ).cast<Map>().map((e) => e['name']).toList(),
+              )
+              .toList(),
+          equals([aboutRoutes]),
+        );
       }
 
       {
         var apiRootInfoJson =
-            (await apiRoot.call(APIRequest.get('/API-INFO/user')))
-                .payloadAs<APIRootInfo>()
-                .toJson();
+            (await apiRoot.call(
+              APIRequest.get('/API-INFO/user'),
+            )).payloadAs<APIRootInfo>().toJson();
 
         expect(
-            Map.from(apiRootInfoJson)..remove('modules'),
-            equals(
-                {'name': 'Test', 'version': '1.0', 'selectedModule': 'user'}));
+          Map.from(apiRootInfoJson)..remove('modules'),
+          equals({'name': 'Test', 'version': '1.0', 'selectedModule': 'user'}),
+        );
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => e['name'])
-                .toList(),
-            equals(['user']));
+          List.from(
+            apiRootInfoJson['modules'],
+          ).cast<Map>().map((e) => e['name']).toList(),
+          equals(['user']),
+        );
 
         expect(
-            List.from(apiRootInfoJson['modules'])
-                .cast<Map>()
-                .map((e) => List.from(e['routes'])
-                    .cast<Map>()
-                    .map((e) => e['name'])
-                    .toList())
-                .toList(),
-            equals([userRoutes]));
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map(
+                (e) =>
+                    List.from(
+                      e['routes'],
+                    ).cast<Map>().map((e) => e['name']).toList(),
+              )
+              .toList(),
+          equals([userRoutes]),
+        );
       }
 
-      expect((await apiRoot.call(APIRequest.get('/not'))).toString(),
-          equals('NOT FOUND: No route for path "/not"'));
+      expect(
+        (await apiRoot.call(APIRequest.get('/not'))).toString(),
+        equals('NOT FOUND: No route for path "/not"'),
+      );
 
       expect(
-          (await apiRoot.call(
-                  APIRequest.get('/user/getUser', parameters: {'id': 11})))
-              .payloadAs<User>()
-              .toJson(),
-          equals({
-            'email': 'joe@email.com',
-            'password': 'pass123',
-            'address': {
-              'state': 'SC',
-              'city': 'NY',
-              'street': '',
-              'number': 123,
-              'stores': [],
-              'closedStores': {'EntityReferenceList': 'Store'},
-              'latitude': 0.0,
-              'longitude': 0.0
-            },
-            'roles': [],
-            'level': null,
-            'wakeUpTime': null,
-            'userInfo': null,
-            'creationTime': 1633954394000
-          }));
+        (await apiRoot.call(
+          APIRequest.get('/user/getUser', parameters: {'id': 11}),
+        )).payloadAs<User>().toJson(),
+        equals({
+          'email': 'joe@email.com',
+          'password': 'pass123',
+          'address': {
+            'state': 'SC',
+            'city': 'NY',
+            'street': '',
+            'number': 123,
+            'stores': [],
+            'closedStores': {'EntityReferenceList': 'Store'},
+            'latitude': 0.0,
+            'longitude': 0.0,
+          },
+          'roles': [],
+          'level': null,
+          'wakeUpTime': null,
+          'userInfo': null,
+          'creationTime': 1633954394000,
+        }),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post(
+        (await apiRoot.call(
+          APIRequest.post('/user/echoUser', payload: _buildTestUser()),
+        )).payloadAs<User>().toJson(),
+        equals(_buildTestUserJson(10001, 'smith@email.com.echo', 101)),
+      );
+
+      expect(
+        (await apiRoot.call(
+          APIRequest.post(
             '/user/echoUser',
-            payload: _buildTestUser(),
-          )))
-              .payloadAs<User>()
-              .toJson(),
-          equals(_buildTestUserJson(10001, 'smith@email.com.echo', 101)));
+            payload: _buildTestUserJson(10002, 'jsmith@email.com', 102),
+            payloadMimeType: 'json',
+          ),
+        )).payloadAs<User>().toJson(),
+        equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102)),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/echoUser',
-                  payload: _buildTestUserJson(10002, 'jsmith@email.com', 102),
-                  payloadMimeType: 'json')))
-              .payloadAs<User>()
-              .toJson(),
-          equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102)));
+        (await apiRoot.call(
+          APIRequest.post(
+            '/user/echoUser',
+            payload: _buildTestUserJson(
+              10002,
+              'jsmith@email.com',
+              102,
+              userInfo: 'the info',
+              userInfoId: 1002,
+            ),
+            payloadMimeType: 'json',
+          ),
+        )).payloadAs<User>().toJson(),
+        equals(
+          _buildTestUserJson(
+            10002,
+            'jsmith@email.com.echo',
+            102,
+            userInfo: 'the info',
+            userInfoId: 1002,
+            userInfoRef: true,
+          ),
+        ),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/echoUser',
-                  payload: _buildTestUserJson(10002, 'jsmith@email.com', 102,
-                      userInfo: 'the info', userInfoId: 1002),
-                  payloadMimeType: 'json')))
-              .payloadAs<User>()
-              .toJson(),
-          equals(_buildTestUserJson(10002, 'jsmith@email.com.echo', 102,
-              userInfo: 'the info', userInfoId: 1002, userInfoRef: true)));
+        (await apiRoot.call(
+          APIRequest.post(
+            '/user/echoListUser',
+            payload: [
+              _buildTestUserJson(10003, 'jsmith3@email.com', 103),
+              _buildTestUserJson(10004, 'jsmith4@email.com', 104),
+            ],
+            payloadMimeType: 'json',
+          ),
+        )).payloadAs<List<User>>().map((e) => e.toJson()).toList(),
+        equals([
+          _buildTestUserJson(10003, 'jsmith3@email.com.echo[0]', 103),
+          _buildTestUserJson(10004, 'jsmith4@email.com.echo[1]', 104),
+        ]),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/echoListUser',
-                  payload: [
-                    _buildTestUserJson(10003, 'jsmith3@email.com', 103),
-                    _buildTestUserJson(10004, 'jsmith4@email.com', 104),
-                  ],
-                  payloadMimeType: 'json')))
-              .payloadAs<List<User>>()
-              .map((e) => e.toJson())
-              .toList(),
-          equals([
-            _buildTestUserJson(10003, 'jsmith3@email.com.echo[0]', 103),
-            _buildTestUserJson(10004, 'jsmith4@email.com.echo[1]', 104),
-          ]));
+        (await apiRoot.call(
+          APIRequest.post(
+            '/user/echoListUser2',
+            parameters: {'msg': 'the-msg'},
+            payload: [
+              _buildTestUserJson(10003, 'jsmith3@email.com', 103),
+              _buildTestUserJson(10004, 'jsmith4@email.com', 104),
+            ],
+            payloadMimeType: 'json',
+          ),
+        )).payloadAs<List<User>>().map((e) => e.toJson()).toList(),
+        equals([
+          _buildTestUserJson(10003, 'jsmith3@email.com.echo[0]{the-msg}', 103),
+          _buildTestUserJson(10004, 'jsmith4@email.com.echo[1]{the-msg}', 104),
+        ]),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/echoListUser2',
-                  parameters: {'msg': 'the-msg'},
-                  payload: [
-                    _buildTestUserJson(10003, 'jsmith3@email.com', 103),
-                    _buildTestUserJson(10004, 'jsmith4@email.com', 104),
-                  ],
-                  payloadMimeType: 'json')))
-              .payloadAs<List<User>>()
-              .map((e) => e.toJson())
-              .toList(),
-          equals([
-            _buildTestUserJson(
-                10003, 'jsmith3@email.com.echo[0]{the-msg}', 103),
-            _buildTestUserJson(
-                10004, 'jsmith4@email.com.echo[1]{the-msg}', 104),
-          ]));
+        (await apiRoot.call(
+          APIRequest.post(
+            '/user/echoListUser2',
+            payload: {
+              'msg': 'the-msg',
+              'users': [
+                _buildTestUserJson(10003, 'jsmith3@email.com', 103),
+                _buildTestUserJson(10004, 'jsmith4@email.com', 104),
+              ],
+            },
+            payloadMimeType: 'json',
+          ),
+        )).payloadAs<List<User>>().map((e) => e.toJson()).toList(),
+        equals([
+          _buildTestUserJson(10003, 'jsmith3@email.com.echo[0]{the-msg}', 103),
+          _buildTestUserJson(10004, 'jsmith4@email.com.echo[1]{the-msg}', 104),
+        ]),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post('/user/echoListUser2',
-                  payload: {
-                    'msg': 'the-msg',
-                    'users': [
-                      _buildTestUserJson(10003, 'jsmith3@email.com', 103),
-                      _buildTestUserJson(10004, 'jsmith4@email.com', 104),
-                    ]
-                  },
-                  payloadMimeType: 'json')))
-              .payloadAs<List<User>>()
-              .map((e) => e.toJson())
-              .toList(),
-          equals([
-            _buildTestUserJson(
-                10003, 'jsmith3@email.com.echo[0]{the-msg}', 103),
-            _buildTestUserJson(
-                10004, 'jsmith4@email.com.echo[1]{the-msg}', 104),
-          ]));
+        (await apiRoot.call(
+          APIRequest.post('/user/getContextEntityResolutionRules'),
+        )).payloadAs<Map>(),
+        equals({
+          'context.resolutionRules': {
+            'allowEntityFetch': true,
+            'eagerEntityTypes': ['User'],
+          },
+        }),
+      );
 
       expect(
-          (await apiRoot.call(
-                  APIRequest.post('/user/getContextEntityResolutionRules')))
-              .payloadAs<Map>(),
-          equals({
-            'context.resolutionRules': {
-              'allowEntityFetch': true,
-              'eagerEntityTypes': ['User']
-            }
-          }));
+        (await apiRoot.call(
+          APIRequest.post('/user/getRequestEntityResolutionRules'),
+        )).payloadAs<Map>(),
+        equals({
+          'resolutionRules': {
+            'allowEntityFetch': true,
+            'eagerEntityTypes': ['User'],
+          },
+        }),
+      );
 
       expect(
-          (await apiRoot.call(
-                  APIRequest.post('/user/getRequestEntityResolutionRules')))
-              .payloadAs<Map>(),
-          equals({
-            'resolutionRules': {
-              'allowEntityFetch': true,
-              'eagerEntityTypes': ['User']
-            }
-          }));
-
-      expect(
-          (await apiRoot
-                  .call(APIRequest.post('/user/getRequestEntityAccessRules')))
-              .payload,
-          equals({
-            'accessRules': {
-              'ruleType': 'block',
-              'entityType': 'User',
-              'entityFields': ['email']
-            }
-          }));
+        (await apiRoot.call(
+          APIRequest.post('/user/getRequestEntityAccessRules'),
+        )).payload,
+        equals({
+          'accessRules': {
+            'ruleType': 'block',
+            'entityType': 'User',
+            'entityFields': ['email'],
+          },
+        }),
+      );
 
       var logAPIRoot = logging.Logger('APIRoot');
 
@@ -298,35 +334,41 @@ void main() {
       var messageDate = 'Date: ${DateTime.now()}';
 
       expect(
-          (await apiRoot.call(APIRequest.post(
-            '/user/returnAPIResponseError',
-            payload: messageDate,
-          ))),
-          isA<APIResponse>().having(
-              (r) => r.error, 'error', equals('Return error: $messageDate')));
+        (await apiRoot.call(
+          APIRequest.post('/user/returnAPIResponseError', payload: messageDate),
+        )),
+        isA<APIResponse>().having(
+          (r) => r.error,
+          'error',
+          equals('Return error: $messageDate'),
+        ),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post(
-            '/user/throwAPIResponseError',
-            payload: messageDate,
-          ))),
-          isA<APIResponse>().having(
-              (r) => r.error, 'error', equals('Throw error: $messageDate')));
+        (await apiRoot.call(
+          APIRequest.post('/user/throwAPIResponseError', payload: messageDate),
+        )),
+        isA<APIResponse>().having(
+          (r) => r.error,
+          'error',
+          equals('Throw error: $messageDate'),
+        ),
+      );
 
       expect(
-          (await apiRoot.call(APIRequest.post(
-            '/user/asyncError',
-            payload: messageDate,
-          )))
-              .payloadAs<String>(),
-          equals('Message: $messageDate'));
+        (await apiRoot.call(
+          APIRequest.post('/user/asyncError', payload: messageDate),
+        )).payloadAs<String>(),
+        equals('Message: $messageDate'),
+      );
 
       expect(
-          (await severeLog.future).message,
-          allOf(
-            contains('Uncaught asynchronous error while calling:'),
-            contains('APIRequest#17{ method: POST, path: /user/asyncError'),
-          ));
+        (await severeLog.future).message,
+        allOf(
+          contains('Uncaught asynchronous error while calling:'),
+          contains('APIRequest#17{ method: POST, path: /user/asyncError'),
+        ),
+      );
 
       apiRoot.close();
     });
@@ -342,8 +384,10 @@ void main() {
 
     test('double', () {
       var t = TypeInfo(double);
-      expect(APIRouteBuilder.resolveValueByType(t, 123),
-          allOf(equals(123.0), isA<double>()));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, 123),
+        allOf(equals(123.0), isA<double>()),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, 12.3), equals(12.3));
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals(45.6));
       expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals(56.7));
@@ -369,15 +413,23 @@ void main() {
       var t = TypeInfo<List>(List);
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123]));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals(['123']));
-      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
-          equals([12, 34.5]));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+        equals([12, 34.5]),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals(['45.6']));
       expect(
-          APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals(['"56.7"']));
+        APIRouteBuilder.resolveValueByType(t, '"56.7"'),
+        equals(['"56.7"']),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals(['45', '6']));
+        APIRouteBuilder.resolveValueByType(t, '45, 6'),
+        equals(['45', '6']),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45;6'), equals(['45', '6']));
+        APIRouteBuilder.resolveValueByType(t, '45;6'),
+        equals(['45', '6']),
+      );
     });
 
     test('List<int>', () {
@@ -385,7 +437,9 @@ void main() {
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123]));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals([123]));
       expect(
-          APIRouteBuilder.resolveValueByType(t, [12, 34.5]), equals([12, 34]));
+        APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+        equals([12, 34]),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals([45]));
       expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals([56]));
       expect(APIRouteBuilder.resolveValueByType(t, '45, 6'), equals([45, 6]));
@@ -396,29 +450,43 @@ void main() {
       var t = TypeInfo<List<double>>(List, [double]);
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals([123.0]));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals([123.0]));
-      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
-          equals([12, 34.5]));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+        equals([12, 34.5]),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals([45.6]));
       expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals([56.7]));
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals([45.0, 6.0]));
+        APIRouteBuilder.resolveValueByType(t, '45, 6'),
+        equals([45.0, 6.0]),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45;6.1'), equals([45.0, 6.1]));
+        APIRouteBuilder.resolveValueByType(t, '45;6.1'),
+        equals([45.0, 6.1]),
+      );
     });
 
     test('Set', () {
       var t = TypeInfo<Set>(Set);
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123}));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({'123'}));
-      expect(APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
-          equals([12, 34.5]));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+        equals([12, 34.5]),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({'45.6'}));
       expect(
-          APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({'"56.7"'}));
+        APIRouteBuilder.resolveValueByType(t, '"56.7"'),
+        equals({'"56.7"'}),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({'45', '6'}));
+        APIRouteBuilder.resolveValueByType(t, '45, 6'),
+        equals({'45', '6'}),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45;6'), equals({'45', '6'}));
+        APIRouteBuilder.resolveValueByType(t, '45;6'),
+        equals({'45', '6'}),
+      );
     });
 
     test('Set<int>', () {
@@ -426,7 +494,9 @@ void main() {
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123}));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({123}));
       expect(
-          APIRouteBuilder.resolveValueByType(t, [12, 34.5]), equals({12, 34}));
+        APIRouteBuilder.resolveValueByType(t, [12, 34.5]),
+        equals({12, 34}),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({45}));
       expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({56}));
       expect(APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({45, 6}));
@@ -437,44 +507,71 @@ void main() {
       var t = TypeInfo<Set<double>>(Set, [double]);
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123.0}));
       expect(APIRouteBuilder.resolveValueByType(t, '123'), equals({123.0}));
-      expect(APIRouteBuilder.resolveValueByType(t, {12, 34.5}),
-          equals([12, 34.5]));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, {12, 34.5}),
+        equals([12, 34.5]),
+      );
       expect(APIRouteBuilder.resolveValueByType(t, '45.6'), equals({45.6}));
       expect(APIRouteBuilder.resolveValueByType(t, '"56.7"'), equals({56.7}));
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45, 6'), equals({45.0, 6.0}));
+        APIRouteBuilder.resolveValueByType(t, '45, 6'),
+        equals({45.0, 6.0}),
+      );
       expect(
-          APIRouteBuilder.resolveValueByType(t, '45;6.1'), equals({45.0, 6.1}));
+        APIRouteBuilder.resolveValueByType(t, '45;6.1'),
+        equals({45.0, 6.1}),
+      );
     });
 
     test('Map', () {
       var t = TypeInfo<Map>(Map);
       expect(APIRouteBuilder.resolveValueByType(t, 123), equals({123: null}));
       expect(
-          APIRouteBuilder.resolveValueByType(t, '123'), equals({'123': null}));
-      expect(APIRouteBuilder.resolveValueByType(t, [12, 34]),
-          equals({12: null, 34: null}));
-      expect(APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
-          equals({'a': '123', 'b': '456'}));
+        APIRouteBuilder.resolveValueByType(t, '123'),
+        equals({'123': null}),
+      );
+      expect(
+        APIRouteBuilder.resolveValueByType(t, [12, 34]),
+        equals({12: null, 34: null}),
+      );
+      expect(
+        APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
+        equals({'a': '123', 'b': '456'}),
+      );
     });
 
     test('Map<String,int>', () {
       var t = TypeInfo<Map<String, int>>(Map, [String, int]);
-      expect(APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
-          equals({'a': 123, 'b': 456}));
+      expect(
+        APIRouteBuilder.resolveValueByType(t, 'a:123 ; b:456'),
+        equals({'a': 123, 'b': 456}),
+      );
     });
   });
 }
 
 User _buildTestUser() {
-  return User('smith@email.com', '123456', Address('CA', 'NY', '', 101), [],
-      id: 10001,
-      creationTime:
-          DateTime.fromMillisecondsSinceEpoch(1665501194000, isUtc: true));
+  return User(
+    'smith@email.com',
+    '123456',
+    Address('CA', 'NY', '', 101),
+    [],
+    id: 10001,
+    creationTime: DateTime.fromMillisecondsSinceEpoch(
+      1665501194000,
+      isUtc: true,
+    ),
+  );
 }
 
-Map<String, Object?> _buildTestUserJson(int id, String email, int n,
-    {String? userInfo, int? userInfoId, bool userInfoRef = false}) {
+Map<String, Object?> _buildTestUserJson(
+  int id,
+  String email,
+  int n, {
+  String? userInfo,
+  int? userInfoId,
+  bool userInfoRef = false,
+}) {
   return {
     'id': id,
     'email': email,
@@ -487,26 +584,24 @@ Map<String, Object?> _buildTestUserJson(int id, String email, int n,
       'stores': [],
       'closedStores': {'EntityReferenceList': 'Store'},
       'latitude': 0.0,
-      'longitude': 0.0
+      'longitude': 0.0,
     },
     'roles': [],
     'level': null,
     'wakeUpTime': null,
-    'userInfo': (userInfo == null)
-        ? null
-        : (userInfoRef
-            ? {
-                'EntityReference': 'UserInfo',
-                if (userInfoId != null) 'id': userInfoId,
-                'entity': {
+    'userInfo':
+        (userInfo == null)
+            ? null
+            : (userInfoRef
+                ? {
+                  'EntityReference': 'UserInfo',
                   if (userInfoId != null) 'id': userInfoId,
-                  'info': userInfo,
+                  'entity': {
+                    if (userInfoId != null) 'id': userInfoId,
+                    'info': userInfo,
+                  },
                 }
-              }
-            : {
-                if (userInfoId != null) 'id': userInfoId,
-                'info': userInfo,
-              }),
-    'creationTime': 1665501194000
+                : {if (userInfoId != null) 'id': userInfoId, 'info': userInfo}),
+    'creationTime': 1665501194000,
   };
 }

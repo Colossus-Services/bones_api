@@ -11,13 +11,11 @@ import 'bones_api_entity_db_tests_base.dart';
 
 class MemoryTestConfig extends APITestConfigDBSQLMemory {
   MemoryTestConfig()
-      : super({
-          'db': {
-            'sql.memory': {
-              'port': 0,
-            }
-          }
-        });
+    : super({
+        'db': {
+          'sql.memory': {'port': 0},
+        },
+      });
 }
 
 Future<void> main() async {
@@ -28,8 +26,9 @@ Future<void> main() async {
 }
 
 Future<bool> _runTest(bool useReflection, bool populateSource) {
-  final tempObjectDir =
-      Directory.systemTemp.createTempSync("bones_api_tests_object_dir");
+  final tempObjectDir = Directory.systemTemp.createTempSync(
+    "bones_api_tests_object_dir",
+  );
 
   return runAdapterTests(
     'DBSQLMemory+obj.dir',
@@ -44,8 +43,10 @@ Future<bool> _runTest(bool useReflection, bool populateSource) {
         populateSourceVariables: populate?['variables'],
       );
     },
-    (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(tempObjectDir,
-        parentRepositoryProvider: provider)
+    (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(
+        tempObjectDir,
+        parentRepositoryProvider: provider,
+      )
       ..onClose.listen((_) {
         tempObjectDir.deleteSync(recursive: true);
       }),

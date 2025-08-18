@@ -45,31 +45,32 @@ class HTMLDocument {
   /// See [resolve]
   Object? footer;
 
-  HTMLDocument(
-      {String title = '',
-      String styles = '',
-      String bodyStyles = '',
-      String? bodyColor,
-      String? bodyBackgroundColor,
-      String? bodyFontFamily,
-      String? bodyPadding,
-      this.top,
-      this.content,
-      this.footer})
-      : title = title.trim(),
-        styles = styles.trim(),
-        _bodyStyles = bodyStyles.trim(),
-        bodyColor = bodyColor?.trim(),
-        bodyBackgroundColor = bodyBackgroundColor?.trim(),
-        bodyFontFamily = bodyFontFamily?.trim(),
-        bodyPadding = bodyPadding?.trim();
+  HTMLDocument({
+    String title = '',
+    String styles = '',
+    String bodyStyles = '',
+    String? bodyColor,
+    String? bodyBackgroundColor,
+    String? bodyFontFamily,
+    String? bodyPadding,
+    this.top,
+    this.content,
+    this.footer,
+  }) : title = title.trim(),
+       styles = styles.trim(),
+       _bodyStyles = bodyStyles.trim(),
+       bodyColor = bodyColor?.trim(),
+       bodyBackgroundColor = bodyBackgroundColor?.trim(),
+       bodyFontFamily = bodyFontFamily?.trim(),
+       bodyPadding = bodyPadding?.trim();
 
-  factory HTMLDocument.darkTheme(
-      {String title = '',
-      String? styles,
-      Object? top,
-      Object? content,
-      Object? footer}) {
+  factory HTMLDocument.darkTheme({
+    String title = '',
+    String? styles,
+    Object? top,
+    Object? content,
+    Object? footer,
+  }) {
     return HTMLDocument(
       title: title,
       styles: styles ?? _stylesDarkTheme(),
@@ -189,9 +190,11 @@ class HTMLDocument {
 
     var bodyStyles = this.bodyStyles;
 
-    html.write('<body'
-        '${bodyStyles.isNotEmpty ? ' style="$bodyStyles"' : ''}'
-        '>\n');
+    html.write(
+      '<body'
+      '${bodyStyles.isNotEmpty ? ' style="$bodyStyles"' : ''}'
+      '>\n',
+    );
 
     _writeObject(html, top);
     _writeObject(html, content);
@@ -311,8 +314,11 @@ class HTMLInput {
 
   String build() => _resolveInput(name, type, value);
 
-  static String _resolveInput(String name, TypeInfo<dynamic> type,
-      [Object? value]) {
+  static String _resolveInput(
+    String name,
+    TypeInfo<dynamic> type, [
+    Object? value,
+  ]) {
     var valStr = value != null ? '$value' : '';
     var valAttr = valStr.isNotEmpty ? ' value="$valStr"' : '';
 
@@ -349,8 +355,9 @@ class HTMLInput {
 
       var t = type.argumentType(0);
       if (t != null) {
-        var entityHandler =
-            ReflectionFactory().getRegisterEntityHandler(t.type);
+        var entityHandler = ReflectionFactory().getRegisterEntityHandler(
+          t.type,
+        );
 
         if (entityHandler != null) {
           var idType = entityHandler.idType();
@@ -385,8 +392,9 @@ class HTMLInput {
     } else {
       final reflectionFactory = ReflectionFactory();
 
-      var enumReflection =
-          reflectionFactory.getRegisterEnumReflection(type.type);
+      var enumReflection = reflectionFactory.getRegisterEnumReflection(
+        type.type,
+      );
 
       if (enumReflection != null) {
         var html = StringBuffer();
@@ -394,9 +402,11 @@ class HTMLInput {
 
         html.write('<option value=""></option>\n');
 
-        valStr = value != null
-            ? (enumReflection.name(value) ?? value.toString().split('.').last)
-            : '';
+        valStr =
+            value != null
+                ? (enumReflection.name(value) ??
+                    value.toString().split('.').last)
+                : '';
 
         for (var e in enumReflection.values) {
           var enumName = enumReflection.name(e) ?? '';
@@ -436,8 +446,9 @@ class HTMLInput {
           .toList();
     } else {
       if (type != null) {
-        var entityHandler =
-            ReflectionFactory().getRegisterEntityHandler(type.type);
+        var entityHandler = ReflectionFactory().getRegisterEntityHandler(
+          type.type,
+        );
 
         var ids = entityHandler?.resolveIDs(value);
         if (ids != null) return ids;

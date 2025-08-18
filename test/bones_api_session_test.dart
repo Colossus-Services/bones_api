@@ -14,16 +14,20 @@ void main() {
       final timeout = Duration(seconds: 3);
       final timeout2 = Duration(seconds: 4);
 
-      var apiSessionSet = APISessionSet(timeout,
-          sharedStore: SharedStore.fromSharedReference(sharedStoreRef));
+      var apiSessionSet = APISessionSet(
+        timeout,
+        sharedStore: SharedStore.fromSharedReference(sharedStoreRef),
+      );
 
       expect(apiSessionSet.length, equals(0));
 
       expect(await apiSessionSet.get("abc"), isNull);
 
       var isolate1 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         return apiSessionSet2.get("abc");
       });
 
@@ -37,8 +41,10 @@ void main() {
       expect(apiSessionSet.length, equals(1));
 
       var isolate2 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         return apiSessionSet2.get("abc");
       });
 
@@ -50,8 +56,10 @@ void main() {
       expect(s2?.id, equals('abc'));
 
       var isolate3 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         return apiSessionSet2.getMarkingAccess("abc");
       });
 
@@ -60,8 +68,10 @@ void main() {
       expect(await apiSessionSet.expiredSessions(), equals([]));
 
       var isolate4 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         return apiSessionSet2.expiredSessions();
       });
 
@@ -78,8 +88,10 @@ void main() {
       expect(await apiSessionSet.get("abc"), isNull);
 
       var isolate5 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         var s = await apiSessionSet2.getOrCreate("xyz");
         var l = await apiSessionSet2.length;
         return (s, l);
@@ -94,8 +106,10 @@ void main() {
       expect(s3?.id, equals('xyz'));
 
       var isolate6 = await Isolate.run(() async {
-        var apiSessionSet2 =
-            APISessionSet(timeout, sharedStoreReference: sharedStoreRef);
+        var apiSessionSet2 = APISessionSet(
+          timeout,
+          sharedStoreReference: sharedStoreRef,
+        );
         var s1 = await apiSessionSet2.get("xyz");
 
         await Future.delayed(timeout2);

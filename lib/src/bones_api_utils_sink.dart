@@ -11,7 +11,7 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
   final int minGZipLength;
 
   AutoGZipSink({this.minGZipLength = 512, int capacity = 1024})
-      : _sink = BytesSink(capacity: capacity);
+    : _sink = BytesSink(capacity: capacity);
 
   @override
   int get inputLength => _sink.inputLength;
@@ -81,14 +81,14 @@ class GZipSink extends ByteConversionSinkBuffered {
   }
 
   ByteConversionSink _createGZipEncoder(int level) => ZLibEncoder(
-        gzip: true,
-        level: level,
-        windowBits: ZLibOption.defaultWindowBits,
-        memLevel: ZLibOption.defaultMemLevel,
-        strategy: ZLibOption.strategyDefault,
-        dictionary: null,
-        raw: false,
-      ).startChunkedConversion(_bytesSink);
+    gzip: true,
+    level: level,
+    windowBits: ZLibOption.defaultWindowBits,
+    memLevel: ZLibOption.defaultMemLevel,
+    strategy: ZLibOption.strategyDefault,
+    dictionary: null,
+    raw: false,
+  ).startChunkedConversion(_bytesSink);
 
   @override
   int get length => _bytesSink.length;

@@ -15,20 +15,24 @@ class DBSQLEntityRepository<O extends Object>
       super.repositoryAdapter as DBSQLRepositoryAdapter<O>;
 
   DBSQLEntityRepository(
-      DBSQLAdapter super.adapter, super.name, super.entityHandler,
-      {DBSQLRepositoryAdapter<O>? super.repositoryAdapter, super.type});
+    DBSQLAdapter super.adapter,
+    super.name,
+    super.entityHandler, {
+    DBSQLRepositoryAdapter<O>? super.repositoryAdapter,
+    super.type,
+  });
 
   @override
   FutureOr<InitializationResult> initialize() => provider
-          .executeInitialized(
-              () => repositoryAdapter.ensureInitialized(parent: this),
-              parent: this)
-          .resolveMapped((result) {
-        return InitializationResult.ok(this, dependencies: [
-          provider,
-          repositoryAdapter,
-          ...result.dependencies
-        ]);
+      .executeInitialized(
+        () => repositoryAdapter.ensureInitialized(parent: this),
+        parent: this,
+      )
+      .resolveMapped((result) {
+        return InitializationResult.ok(
+          this,
+          dependencies: [provider, repositoryAdapter, ...result.dependencies],
+        );
       });
 
   @override
@@ -36,20 +40,23 @@ class DBSQLEntityRepository<O extends Object>
 
   @override
   Map<String, dynamic> information({bool extended = false}) => {
-        'queryType': 'SQL',
-        'dialect': dialectName,
-        'table': name,
-        if (extended) 'adapter': repositoryAdapter.information(extended: true),
-      };
+    'queryType': 'SQL',
+    'dialect': dialectName,
+    'table': name,
+    if (extended) 'adapter': repositoryAdapter.information(extended: true),
+  };
 
   // ignore: unused_element
   String _resolveTableColumnToEntityField(String tableField, [O? o]) {
     var fieldsNames = entityHandler.fieldsNames(o);
-    var entityFieldName =
-        entityHandler.resolveFiledName(fieldsNames, tableField);
+    var entityFieldName = entityHandler.resolveFiledName(
+      fieldsNames,
+      tableField,
+    );
     if (entityFieldName == null) {
       throw StateError(
-          "Can't resolve the table column `$tableField` to one of the entity `${entityHandler.type}` fields: $fieldsNames");
+        "Can't resolve the table column `$tableField` to one of the entity `${entityHandler.type}` fields: $fieldsNames",
+      );
     }
     return entityFieldName;
   }
@@ -66,10 +73,10 @@ abstract class DBSQLEntityRepositoryProvider<A extends DBSQLAdapter>
     extends DBEntityRepositoryProvider<A> {
   @override
   FutureOr<A> buildAdapter() => DBSQLAdapter.fromConfig(
-        adapterConfig,
-        parentRepositoryProvider: this,
-        workingPath: workingPath,
-      );
+    adapterConfig,
+    parentRepositoryProvider: this,
+    workingPath: workingPath,
+  );
 
   @override
   List<DBSQLEntityRepository> buildRepositories(DBSQLAdapter adapter);
@@ -77,8 +84,11 @@ abstract class DBSQLEntityRepositoryProvider<A extends DBSQLAdapter>
   FutureOr<List<SQLBuilder>> generateCreateTableSQLs() =>
       adapter.resolveMapped((adapter) => adapter.generateCreateTableSQLs());
 
-  FutureOr<String> generateFullCreateTableSQLs(
-          {String? title, bool withDate = true}) =>
-      adapter.resolveMapped((adapter) => adapter.generateFullCreateTableSQLs(
-          title: title, withDate: withDate));
+  FutureOr<String> generateFullCreateTableSQLs({
+    String? title,
+    bool withDate = true,
+  }) => adapter.resolveMapped(
+    (adapter) =>
+        adapter.generateFullCreateTableSQLs(title: title, withDate: withDate),
+  );
 }

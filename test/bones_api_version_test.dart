@@ -1,6 +1,5 @@
 @TestOn('vm')
 @Tags(['version'])
-
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
@@ -25,8 +24,9 @@ void main() {
       print('PubSpec.name: ${pubSpec.name}');
       print('PubSpec.version: ${pubSpec.version}');
 
-      var srcFile =
-          File(path.join(projectDirectory.path, 'lib/src/bones_api_base.dart'));
+      var srcFile = File(
+        path.join(projectDirectory.path, 'lib/src/bones_api_base.dart'),
+      );
 
       print(srcFile);
 
@@ -38,9 +38,12 @@ void main() {
 
       print('srcVersion: $srcVersion');
 
-      expect(pubSpec.version.toString(), equals(srcVersion),
-          reason:
-              'Bones_API.VERSION[$srcVersion] != PubSpec.version[${pubSpec.version}]');
+      expect(
+        pubSpec.version.toString(),
+        equals(srcVersion),
+        reason:
+            'Bones_API.VERSION[$srcVersion] != PubSpec.version[${pubSpec.version}]',
+      );
     });
   });
 }

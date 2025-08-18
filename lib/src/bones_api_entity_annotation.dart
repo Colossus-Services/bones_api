@@ -25,17 +25,17 @@ class EntityField extends EntityAnnotation {
   final String? regexp;
   final bool Function(Object? value)? validator;
 
-  const EntityField(
-      {bool hidden = false,
-      bool unique = false,
-      bool indexed = false,
-      this.minimum,
-      this.maximum,
-      this.validator,
-      this.regexp})
-      : _hidden = hidden,
-        _unique = unique,
-        _indexed = indexed;
+  const EntityField({
+    bool hidden = false,
+    bool unique = false,
+    bool indexed = false,
+    this.minimum,
+    this.maximum,
+    this.validator,
+    this.regexp,
+  }) : _hidden = hidden,
+       _unique = unique,
+       _indexed = indexed;
 
   const EntityField.visible() : this(hidden: false);
 
@@ -50,12 +50,12 @@ class EntityField extends EntityAnnotation {
   const EntityField.maximum(int maximum) : this(maximum: maximum);
 
   const EntityField.limits(int minimum, int maximum)
-      : this(minimum: minimum, maximum: maximum);
+    : this(minimum: minimum, maximum: maximum);
 
   const EntityField.regexp(String regexp) : this(regexp: regexp);
 
   const EntityField.validator(bool Function(Object? value) validator)
-      : this(validator: validator);
+    : this(validator: validator);
 
   /// Returns `true` if the annotated field should be hidden from storage.
   bool get isHidden => _hidden;
@@ -74,13 +74,20 @@ class EntityField extends EntityAnnotation {
       validateValue(value, fieldName: fieldName) == null;
 
   /// Returns a [EntityFieldInvalid] if [value] is invalid for this [EntityField] configuration.
-  EntityFieldInvalid? validateValue(Object? value,
-      {String? fieldName, Type? entityType}) {
+  EntityFieldInvalid? validateValue(
+    Object? value, {
+    String? fieldName,
+    Type? entityType,
+  }) {
     var validator = this.validator;
     if (validator != null) {
       if (!validator(value)) {
-        return EntityFieldInvalid('validator', value,
-            fieldName: fieldName, entityType: entityType);
+        return EntityFieldInvalid(
+          'validator',
+          value,
+          fieldName: fieldName,
+          entityType: entityType,
+        );
       }
     }
 
@@ -92,8 +99,12 @@ class EntityField extends EntityAnnotation {
       var valid = re.hasMatch(s);
 
       if (!valid) {
-        return EntityFieldInvalid('regexp(${re.pattern})', value,
-            entityType: entityType, fieldName: fieldName);
+        return EntityFieldInvalid(
+          'regexp(${re.pattern})',
+          value,
+          entityType: entityType,
+          fieldName: fieldName,
+        );
       }
     }
 
@@ -121,8 +132,12 @@ class EntityField extends EntityAnnotation {
 
         if (invalid) {
           valueStr ??= '$value';
-          return EntityFieldInvalid('maximum($maximum)', value,
-              entityType: entityType, fieldName: fieldName);
+          return EntityFieldInvalid(
+            'maximum($maximum)',
+            value,
+            entityType: entityType,
+            fieldName: fieldName,
+          );
         }
       }
 
@@ -148,8 +163,12 @@ class EntityField extends EntityAnnotation {
 
         if (invalid) {
           valueStr ??= '$value';
-          return EntityFieldInvalid('minimum($minimum)', value,
-              entityType: entityType, fieldName: fieldName);
+          return EntityFieldInvalid(
+            'minimum($minimum)',
+            value,
+            entityType: entityType,
+            fieldName: fieldName,
+          );
         }
       }
     }
@@ -237,35 +256,38 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
   /// The operation that caused the [Exception].
   final Object? operation;
 
-  EntityFieldInvalid(this.reason, this.value,
-      {this.entityType,
-      this.tableName,
-      this.fieldName,
-      this.subEntityErrors,
-      this.parentError,
-      this.parentStackTrace,
-      this.previousError,
-      this.operation});
+  EntityFieldInvalid(
+    this.reason,
+    this.value, {
+    this.entityType,
+    this.tableName,
+    this.fieldName,
+    this.subEntityErrors,
+    this.parentError,
+    this.parentStackTrace,
+    this.previousError,
+    this.operation,
+  });
 
-  EntityFieldInvalid copyWith(
-          {String? reason,
-          Object? value,
-          Type? entityType,
-          String? tableName,
-          String? fieldName,
-          Map<String, EntityFieldInvalid>? subEntityErrors,
-          Object? parentError,
-          StackTrace? parentStackTrace}) =>
-      EntityFieldInvalid(
-        reason ?? this.reason,
-        value ?? this.value,
-        entityType: entityType ?? this.entityType,
-        tableName: tableName ?? this.tableName,
-        fieldName: fieldName ?? this.fieldName,
-        subEntityErrors: subEntityErrors ?? this.subEntityErrors,
-        parentError: parentError ?? this.parentError,
-        parentStackTrace: parentStackTrace ?? this.parentStackTrace,
-      );
+  EntityFieldInvalid copyWith({
+    String? reason,
+    Object? value,
+    Type? entityType,
+    String? tableName,
+    String? fieldName,
+    Map<String, EntityFieldInvalid>? subEntityErrors,
+    Object? parentError,
+    StackTrace? parentStackTrace,
+  }) => EntityFieldInvalid(
+    reason ?? this.reason,
+    value ?? this.value,
+    entityType: entityType ?? this.entityType,
+    tableName: tableName ?? this.tableName,
+    fieldName: fieldName ?? this.fieldName,
+    subEntityErrors: subEntityErrors ?? this.subEntityErrors,
+    parentError: parentError ?? this.parentError,
+    parentStackTrace: parentStackTrace ?? this.parentStackTrace,
+  );
 
   String get message {
     var msg = 'reason: $reason ; value: <${value?.toString().truncate(100)}>';
@@ -280,23 +302,32 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     return msg;
   }
 
-  String? resolveToString(Object? o,
-      {String indent = '-- ', Set<Object>? processedObjects}) {
+  String? resolveToString(
+    Object? o, {
+    String indent = '-- ',
+    Set<Object>? processedObjects,
+  }) {
     if (o == null) {
       return null;
     }
 
     if (o is Iterable) {
-      var l = RecursiveToString.recursiveIterableToString(processedObjects, o,
-          (objs, e) => resolveToString(e, processedObjects: objs));
+      var l = RecursiveToString.recursiveIterableToString(
+        processedObjects,
+        o,
+        (objs, e) => resolveToString(e, processedObjects: objs),
+      );
 
       var s = l.join('\n$indent');
       return '$indent$s';
     } else if (o is RecursiveToString) {
       return o.toString(processedObjects: processedObjects);
     } else if (o is Function()) {
-      return RecursiveToString.recursiveToString(processedObjects, o,
-          () => resolveToString(o(), processedObjects: processedObjects));
+      return RecursiveToString.recursiveToString(
+        processedObjects,
+        o,
+        () => resolveToString(o(), processedObjects: processedObjects),
+      );
     } else {
       return o.toString();
     }
@@ -341,15 +372,19 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
 
     var operationStr = '';
     if (operation != null) {
-      var s = resolveToString(operation,
-          indent: '    -- ', processedObjects: processedObjects);
+      var s = resolveToString(
+        operation,
+        indent: '    -- ',
+        processedObjects: processedObjects,
+      );
 
       operationStr = '\n  -- Operation>>\n$s';
     }
 
-    var parentStr = parentError != null
-        ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
-        : '';
+    var parentStr =
+        parentError != null
+            ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
+            : '';
 
     return 'Invalid entity$entityStr field$fieldStr> $message$operationStr$parentStr';
   }
@@ -372,24 +407,31 @@ class RecursiveRelationshipLoopError extends Error
   final TransactionOperation? parentOp;
   final Object? entity;
 
-  RecursiveRelationshipLoopError(this.message,
-      {this.transaction, this.storeOp, this.parentOp, this.entity});
+  RecursiveRelationshipLoopError(
+    this.message, {
+    this.transaction,
+    this.storeOp,
+    this.parentOp,
+    this.entity,
+  });
 
   factory RecursiveRelationshipLoopError.fromTransaction(
-      Transaction transaction,
-      TransactionOperation storeOp,
-      TransactionOperation? parentOp,
-      Object entity) {
+    Transaction transaction,
+    TransactionOperation storeOp,
+    TransactionOperation? parentOp,
+    Object entity,
+  ) {
     return RecursiveRelationshipLoopError(
-        "Can't store `Transaction#${transaction.id}` with recursive relationship loop:\n"
-        "-- Parent operation: $parentOp\n"
-        "-- Store operation: $storeOp\n"
-        "-- Entity: $entity\n"
-        "-- Transaction:\n${transaction.toString()}",
-        transaction: transaction,
-        storeOp: storeOp,
-        parentOp: parentOp,
-        entity: entity);
+      "Can't store `Transaction#${transaction.id}` with recursive relationship loop:\n"
+      "-- Parent operation: $parentOp\n"
+      "-- Store operation: $storeOp\n"
+      "-- Entity: $entity\n"
+      "-- Transaction:\n${transaction.toString()}",
+      transaction: transaction,
+      storeOp: storeOp,
+      parentOp: parentOp,
+      entity: entity,
+    );
   }
 
   @override

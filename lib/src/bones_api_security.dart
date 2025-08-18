@@ -23,33 +23,39 @@ abstract class APISecurity {
 
   late final APITokenStore _tokenStore;
 
-  APISecurity(
-      {Duration? tokenDuration,
-      int? tokenLength,
-      APIRoot? apiRoot,
-      SharedStoreField? sharedStoreField,
-      SharedStoreReference? sharedStoreReference,
-      SharedStore? sharedStore,
-      String? sharedStoreID,
-      SharedStoreProviderSync? storeProvider})
-      : tokenDuration = tokenDuration ?? Duration(hours: 3),
-        tokenLength =
-            tokenLength != null && tokenLength > 32 ? tokenLength : 512,
-        _sharedStoreField = SharedStoreField.tryFrom(
-                sharedStoreField: sharedStoreField,
-                sharedStoreReference: sharedStoreReference,
-                sharedStore: sharedStore ?? apiRoot?.sharedStore,
-                sharedStoreID: sharedStoreID,
-                storeProvider: storeProvider) ??
-            SharedStoreField.fromSharedStore(SharedStore.notShared()) {
+  APISecurity({
+    Duration? tokenDuration,
+    int? tokenLength,
+    APIRoot? apiRoot,
+    SharedStoreField? sharedStoreField,
+    SharedStoreReference? sharedStoreReference,
+    SharedStore? sharedStore,
+    String? sharedStoreID,
+    SharedStoreProviderSync? storeProvider,
+  }) : tokenDuration = tokenDuration ?? Duration(hours: 3),
+       tokenLength =
+           tokenLength != null && tokenLength > 32 ? tokenLength : 512,
+       _sharedStoreField =
+           SharedStoreField.tryFrom(
+             sharedStoreField: sharedStoreField,
+             sharedStoreReference: sharedStoreReference,
+             sharedStore: sharedStore ?? apiRoot?.sharedStore,
+             sharedStoreID: sharedStoreID,
+             storeProvider: storeProvider,
+           ) ??
+           SharedStoreField.fromSharedStore(SharedStore.notShared()) {
     _tokenStore = resolveTokensStore();
   }
 
   APITokenStore resolveTokensStore() =>
       APITokenStore(sharedStoreField: _sharedStoreField);
 
-  String generateToken(String username) => APIToken.generateToken(512,
-      variableLength: 48, prefix: 'TK', random: secureRandom());
+  String generateToken(String username) => APIToken.generateToken(
+    512,
+    variableLength: 48,
+    prefix: 'TK',
+    random: secureRandom(),
+  );
 
   final Random _securePeriodRandom = Random();
   SecureRandom? _secureRandom;
@@ -74,16 +80,21 @@ abstract class APISecurity {
     _secureRandomUseCount = 0;
   }
 
-  APIToken createToken(String username) => APIToken(username,
-      token: generateToken(username),
-      duration: tokenDuration,
-      withRefreshToken: true);
+  APIToken createToken(String username) => APIToken(
+    username,
+    token: generateToken(username),
+    duration: tokenDuration,
+    withRefreshToken: true,
+  );
 
   FutureOr<APICredential> prepareCredential(APICredential credential) =>
       credential;
 
-  FutureOr<bool> logout(APICredential? credential,
-      {bool allTokens = false, APIRequest? request}) {
+  FutureOr<bool> logout(
+    APICredential? credential, {
+    bool allTokens = false,
+    APIRequest? request,
+  }) {
     if (credential == null) return false;
 
     if (!allTokens) {
@@ -105,13 +116,15 @@ abstract class APISecurity {
   }
 
   Future<APIAuthentication?> authenticateMultiple(
-      List<APICredential> credentials,
-      {APIRequest? request}) async {
+    List<APICredential> credentials, {
+    APIRequest? request,
+  }) async {
     if (credentials.isEmpty) return null;
 
     for (var credential in credentials) {
-      var auth = await prepareCredential(credential)
-          .resolveMapped((c) => _authenticateImpl(c, request: request));
+      var auth = await prepareCredential(
+        credential,
+      ).resolveMapped((c) => _authenticateImpl(c, request: request));
 
       if (auth != null) {
         return auth;
@@ -121,28 +134,36 @@ abstract class APISecurity {
     return null;
   }
 
-  FutureOr<APIAuthentication?> authenticate(APICredential? credential,
-      {APIRequest? request}) {
+  FutureOr<APIAuthentication?> authenticate(
+    APICredential? credential, {
+    APIRequest? request,
+  }) {
     if (credential == null) return null;
 
-    return prepareCredential(credential)
-        .resolveMapped((c) => _authenticateImpl(c, request: request));
+    return prepareCredential(
+      credential,
+    ).resolveMapped((c) => _authenticateImpl(c, request: request));
   }
 
-  FutureOr<APIAuthentication?> _authenticateImpl(APICredential credential,
-      {bool resume = false, APIRequest? request}) {
+  FutureOr<APIAuthentication?> _authenticateImpl(
+    APICredential credential, {
+    bool resume = false,
+    APIRequest? request,
+  }) {
     var requestPath = '';
     if (request != null) {
       requestPath = ' path: ${request.path} >';
     }
 
     _log.info(
-        "authenticate${resume ? '[resume]' : ''}>$requestPath ${credential.hasToken ? credential.token?.truncate(6) : credential.username}");
+      "authenticate${resume ? '[resume]' : ''}>$requestPath ${credential.hasToken ? credential.token?.truncate(6) : credential.username}",
+    );
 
     return checkCredential(credential).then((ok) {
       if (!ok) return null;
-      return _resolveAuthentication(credential, resume, request)
-          .resolveMapped((authentication) {
+      return _resolveAuthentication(credential, resume, request).resolveMapped((
+        authentication,
+      ) {
         if (request != null) {
           return resolveRequestAuthentication(request, authentication);
         } else {
@@ -153,12 +174,21 @@ abstract class APISecurity {
   }
 
   FutureOr<APIAuthentication?> _resolveAuthentication(
-      APICredential credential, bool resumed, APIRequest? request) {
+    APICredential credential,
+    bool resumed,
+    APIRequest? request,
+  ) {
     var token = credential.token;
 
     if (token == null) {
       return _resolveAuthenticationImpl(
-          credential, resumed, null, null, null, request);
+        credential,
+        resumed,
+        null,
+        null,
+        null,
+        request,
+      );
     }
 
     var prevToken = _tokenStore.get(token);
@@ -174,25 +204,35 @@ abstract class APISecurity {
         prevPermissions = prevToken.permissions;
       }
 
-      return _resolveAuthenticationImpl(credential, resumed, prevAPIToken,
-          prevData, prevPermissions, request);
+      return _resolveAuthenticationImpl(
+        credential,
+        resumed,
+        prevAPIToken,
+        prevData,
+        prevPermissions,
+        request,
+      );
     });
   }
 
   FutureOr<APIAuthentication?> _resolveAuthenticationImpl(
-      APICredential credential,
-      bool resumed,
-      APIToken? prevAPIToken,
-      Object? prevData,
-      List<APIPermission>? prevPermissions,
-      APIRequest? request) {
+    APICredential credential,
+    bool resumed,
+    APIToken? prevAPIToken,
+    Object? prevData,
+    List<APIPermission>? prevPermissions,
+    APIRequest? request,
+  ) {
     var permissions = getCredentialPermissions(credential, prevPermissions);
     var data = getAuthenticationData(credential, prevData);
 
     return permissions.resolveOther(data, (permissions, data) {
-      return createAuthentication(credential, permissions,
-              data: data, resumed: resumed)
-          .resolveMapped((authentication) {
+      return createAuthentication(
+        credential,
+        permissions,
+        data: data,
+        resumed: resumed,
+      ).resolveMapped((authentication) {
         var changedAPIToken = prevAPIToken != authentication.token;
         var changedData = !identical(prevData, data);
         var changedPermissions = !identical(prevPermissions, permissions);
@@ -206,11 +246,11 @@ abstract class APISecurity {
         return _tokenStore
             .storeAPIToken(authentication.token, data, permissions)
             .resolveMapped((apiTokenInfo) {
-          if (apiTokenInfo != null && changedAPIToken) {
-            onNewAPIToken(apiTokenInfo.apiToken, false, request: request);
-          }
-          return authentication;
-        });
+              if (apiTokenInfo != null && changedAPIToken) {
+                onNewAPIToken(apiTokenInfo.apiToken, false, request: request);
+              }
+              return authentication;
+            });
       });
     });
   }
@@ -218,22 +258,29 @@ abstract class APISecurity {
   void onNewAPIToken(APIToken token, bool refreshed, {APIRequest? request}) {}
 
   FutureOr<APIAuthentication> createAuthentication(
-      APICredential credential, List<APIPermission> permissions,
-      {Object? data, bool resumed = false}) {
+    APICredential credential,
+    List<APIPermission> permissions, {
+    Object? data,
+    bool resumed = false,
+  }) {
     if (credential.token == null) {
       return _createAuthenticationImpl(credential, permissions, data, resumed);
     }
 
-    var credentialToken =
-        APIToken.fromCredential(credential, duration: tokenDuration);
+    var credentialToken = APIToken.fromCredential(
+      credential,
+      duration: tokenDuration,
+    );
 
     return validateToken(credentialToken).resolveMapped((token) {
       if (token != null) {
-        return APIAuthentication(token,
-            permissions: permissions,
-            data: data,
-            resumed: resumed,
-            credential: credential);
+        return APIAuthentication(
+          token,
+          permissions: permissions,
+          data: data,
+          resumed: resumed,
+          credential: credential,
+        );
       }
 
       return _createAuthenticationImpl(credential, permissions, data, resumed);
@@ -241,36 +288,44 @@ abstract class APISecurity {
   }
 
   FutureOr<APIAuthentication> _createAuthenticationImpl(
-          APICredential credential,
-          List<APIPermission> permissions,
-          Object? data,
-          bool resumed) =>
-      getValidToken(credential.username, autoCreate: true)
-          .resolveMapped((token) {
-        return APIAuthentication(token!,
-            permissions: permissions,
-            data: data,
-            resumed: resumed,
-            credential: credential);
-      });
+    APICredential credential,
+    List<APIPermission> permissions,
+    Object? data,
+    bool resumed,
+  ) => getValidToken(credential.username, autoCreate: true).resolveMapped((
+    token,
+  ) {
+    return APIAuthentication(
+      token!,
+      permissions: permissions,
+      data: data,
+      resumed: resumed,
+      credential: credential,
+    );
+  });
 
-  FutureOr<APIAuthentication?> resumeAuthentication(APIToken? apiToken,
-      {APIRequest? request}) {
+  FutureOr<APIAuthentication?> resumeAuthentication(
+    APIToken? apiToken, {
+    APIRequest? request,
+  }) {
     if (apiToken == null) return null;
 
     var credential = APICredential(apiToken.username, token: apiToken.token);
 
-    return prepareCredential(credential)
-        .resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
+    return prepareCredential(
+      credential,
+    ).resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
   }
 
   FutureOr<APIAuthentication?> _resumeAuthenticationImpl(
-          APICredential credential,
-          {APIRequest? request}) =>
-      _authenticateImpl(credential, request: request, resume: true);
+    APICredential credential, {
+    APIRequest? request,
+  }) => _authenticateImpl(credential, request: request, resume: true);
 
-  FutureOr<APIToken?> getValidToken(String username,
-      {required bool autoCreate}) {
+  FutureOr<APIToken?> getValidToken(
+    String username, {
+    required bool autoCreate,
+  }) {
     return getUsernameValidTokens(username).resolveMapped((userTokens) {
       if (userTokens.isEmpty) {
         if (!autoCreate) return null;
@@ -323,8 +378,11 @@ abstract class APISecurity {
     return _tokenStore.get(token).resolveMapped((token) => token?.apiToken);
   }
 
-  FutureOr<APIToken?> refreshAPIToken(String? username, String? refreshToken,
-      {APIRequest? request}) {
+  FutureOr<APIToken?> refreshAPIToken(
+    String? username,
+    String? refreshToken, {
+    APIRequest? request,
+  }) {
     if (username == null ||
         refreshToken == null ||
         username.isEmpty ||
@@ -341,21 +399,25 @@ abstract class APISecurity {
 
         autoValidateAllTokens();
 
-        var newTokenCredential = APICredential(username,
-            token: token.token, refreshToken: token.refreshToken);
+        var newTokenCredential = APICredential(
+          username,
+          token: token.token,
+          refreshToken: token.refreshToken,
+        );
 
-        return getCredentialPermissions(newTokenCredential, null)
-            .resolveMapped((permission) {
-          return _tokenStore
-              .storeAPIToken(token, null, permission)
-              .resolveMapped((apiTokenInfo) {
-            var apiToken = apiTokenInfo?.apiToken;
-            if (apiToken != null) {
-              onNewAPIToken(apiToken, true, request: request);
-            }
-            return apiToken;
-          });
-        });
+        return getCredentialPermissions(newTokenCredential, null).resolveMapped(
+          (permission) {
+            return _tokenStore
+                .storeAPIToken(token, null, permission)
+                .resolveMapped((apiTokenInfo) {
+                  var apiToken = apiTokenInfo?.apiToken;
+                  if (apiToken != null) {
+                    onNewAPIToken(apiToken, true, request: request);
+                  }
+                  return apiToken;
+                });
+          },
+        );
       });
     });
   }
@@ -380,14 +442,16 @@ abstract class APISecurity {
     return _tokenStore
         .getByUsername(username, checkExpiredTokens: true)
         .resolveMapped((userTokens) {
-      if (userTokens.any((t) => t.token == token)) {
-        return true;
-      }
+          if (userTokens.any((t) => t.token == token)) {
+            return true;
+          }
 
-      return validateUnknownToken(username, token).resolveMapped((apiToken) {
-        return apiToken?.token == token;
-      });
-    });
+          return validateUnknownToken(username, token).resolveMapped((
+            apiToken,
+          ) {
+            return apiToken?.token == token;
+          });
+        });
   }
 
   DateTime _autoValidateAllTokensLastTime = DateTime.now();
@@ -431,11 +495,14 @@ abstract class APISecurity {
   FutureOr<bool> checkCredentialPassword(APICredential credential);
 
   FutureOr<List<APIPermission>> getCredentialPermissions(
-      APICredential credential, List<APIPermission>? previousPermissions);
+    APICredential credential,
+    List<APIPermission>? previousPermissions,
+  );
 
   FutureOr<Object?> getAuthenticationData(
-          APICredential credential, Object? previousData) =>
-      null;
+    APICredential credential,
+    Object? previousData,
+  ) => null;
 
   FutureOr<bool> disposeAuthenticationData(APICredential credential) {
     var disposeUsernameEntity = credential.usernameEntity != null;
@@ -473,12 +540,15 @@ abstract class APISecurity {
     });
   }
 
-  FutureOr<APIAuthentication?> authenticateByRequest(APIRequest request,
-      {bool allowLogout = false}) {
+  FutureOr<APIAuthentication?> authenticateByRequest(
+    APIRequest request, {
+    bool allowLogout = false,
+  }) {
     return resolveRequestCredentials(request).resolveMapped((credentials) {
       if (credentials.isEmpty) {
-        return resolveSessionCredential(request)
-            .resolveMapped((sessionCredential) {
+        return resolveSessionCredential(request).resolveMapped((
+          sessionCredential,
+        ) {
           if (sessionCredential != null) credentials.add(sessionCredential);
           return _authenticateByRequestImpl(credentials, request, allowLogout);
         });
@@ -489,18 +559,23 @@ abstract class APISecurity {
   }
 
   FutureOr<APIAuthentication?> _authenticateByRequestImpl(
-      List<APICredential> credentials, APIRequest request, bool allowLogout) {
+    List<APICredential> credentials,
+    APIRequest request,
+    bool allowLogout,
+  ) {
     if (credentials.isEmpty) {
       return null;
     }
 
-    var logout = allowLogout &&
+    var logout =
+        allowLogout &&
         (request.parameters.getAsBool('logout') ??
             request.parameters.getAsBool('logoff') ??
             false);
 
     if (logout) {
-      var allTokens = allowLogout &&
+      var allTokens =
+          allowLogout &&
           (request.parameters.getAsBool('all') ??
               request.parameters.getAsBool('allTokens', ignoreCase: true) ??
               false);
@@ -512,13 +587,13 @@ abstract class APISecurity {
       return this
           .logout(credential, allTokens: allTokens, request: request)
           .resolveMapped((ok) {
-        if (ok) {
-          request.credential = null;
-          onLogout(credential);
-        }
+            if (ok) {
+              request.credential = null;
+              onLogout(credential);
+            }
 
-        return null;
-      });
+            return null;
+          });
     }
 
     if (credentials.length == 1) {
@@ -548,7 +623,8 @@ abstract class APISecurity {
   void onLogout(APICredential credential) {}
 
   FutureOr<APIAuthentication?> resumeAuthenticationByRequest(
-      APIRequest request) {
+    APIRequest request,
+  ) {
     return getSessionAPIToken(request).resolveMapped((apiToken) {
       if (apiToken != null) {
         return resumeAuthentication(apiToken, request: request);
@@ -595,11 +671,15 @@ abstract class APISecurity {
     return list.last;
   }
 
-  late final APISessionSet _sessionSet =
-      APISessionSet(Duration(hours: 3), sharedStoreField: _sharedStoreField);
+  late final APISessionSet _sessionSet = APISessionSet(
+    Duration(hours: 3),
+    sharedStoreField: _sharedStoreField,
+  );
 
   FutureOr<APIAuthentication?> resolveRequestAuthentication(
-      APIRequest request, APIAuthentication? authentication) {
+    APIRequest request,
+    APIAuthentication? authentication,
+  ) {
     request.authentication = authentication;
     if (authentication == null) return null;
 
@@ -628,20 +708,21 @@ abstract class APISecurity {
       return _tokenStore
           .getByUsernames(usernames, checkExpiredTokens: true)
           .resolveMapped((validTokens) {
-        sessionTokens.removeWhere((t) => !validTokens.contains(t));
+            sessionTokens.removeWhere((t) => !validTokens.contains(t));
 
-        if (request.credential != null) {
-          var credentialUsername = request.credential!.username;
-          if (!usernames.contains(credentialUsername)) return null;
+            if (request.credential != null) {
+              var credentialUsername = request.credential!.username;
+              if (!usernames.contains(credentialUsername)) return null;
 
-          var tokensWithUsername = sessionTokens
-              .where((t) => t.username == credentialUsername)
-              .toSet();
-          return tokensWithUsername;
-        } else {
-          return sessionTokens;
-        }
-      });
+              var tokensWithUsername =
+                  sessionTokens
+                      .where((t) => t.username == credentialUsername)
+                      .toSet();
+              return tokensWithUsername;
+            } else {
+              return sessionTokens;
+            }
+          });
     });
   }
 
@@ -649,8 +730,9 @@ abstract class APISecurity {
     var response = APIResponse<T>.unauthorized(payloadDynamic: 'UNAUTHORIZED');
     response.startMetric('authentication');
 
-    return authenticateByRequest(request, allowLogout: true)
-        .then((authentication) {
+    return authenticateByRequest(request, allowLogout: true).then((
+      authentication,
+    ) {
       response.stopMetric('authentication');
 
       if (authentication == null) {
@@ -682,22 +764,31 @@ abstract class APISecurity {
         return _sessionSet.get(sessionID).resolveMapped((session) {
           var validToken = session?.getValidToken(tokenKey);
           return _resolveRequestCredentialsTokens(
-              request, credential, tokenKey, validToken);
+            request,
+            credential,
+            tokenKey,
+            validToken,
+          );
         });
       }
 
       return _resolveRequestCredentialsTokens(
-          request, credential, tokenKey, null);
+        request,
+        credential,
+        tokenKey,
+        null,
+      );
     }
 
     return _resolveRequestCredentialsImpl(request, [credential]);
   }
 
   FutureOr<List<APICredential>> _resolveRequestCredentialsTokens(
-      APIRequest request,
-      APICredential credential,
-      String tokenKey,
-      APIToken? validToken) {
+    APIRequest request,
+    APICredential credential,
+    String tokenKey,
+    APIToken? validToken,
+  ) {
     if (validToken != null) {
       var username = validToken.username;
       credential = credential.withUsername(username);
@@ -709,8 +800,10 @@ abstract class APISecurity {
           credential = credential.withUsername(username);
           return _resolveRequestCredentialsImpl(request, [credential]);
         } else {
-          return validateUnknownToken(credential.username, tokenKey)
-              .resolveMapped((validToken) {
+          return validateUnknownToken(
+            credential.username,
+            tokenKey,
+          ).resolveMapped((validToken) {
             if (validToken != null) {
               var username = validToken.username;
               credential = credential.withUsername(username);
@@ -723,7 +816,9 @@ abstract class APISecurity {
   }
 
   FutureOr<List<APICredential>> _resolveRequestCredentialsImpl(
-      APIRequest request, List<APICredential> credentials) {
+    APIRequest request,
+    List<APICredential> credentials,
+  ) {
     var username = getRequestParameterUsername(request).trim();
     var token = getRequestParameterToken(request).trim();
     var refreshToken =
@@ -734,11 +829,17 @@ abstract class APISecurity {
         var credential = APICredential(username, token: token);
         credentials.add(credential);
       } else if (refreshToken.isNotEmpty) {
-        return refreshAPIToken(username, refreshToken, request: request)
-            .resolveMapped((apiToken) {
+        return refreshAPIToken(
+          username,
+          refreshToken,
+          request: request,
+        ).resolveMapped((apiToken) {
           if (apiToken != null && !apiToken.isExpired()) {
-            var credential = APICredential(apiToken.username,
-                token: apiToken.token, refreshToken: apiToken.refreshToken);
+            var credential = APICredential(
+              apiToken.username,
+              token: apiToken.token,
+              refreshToken: apiToken.refreshToken,
+            );
             credentials.add(credential);
           }
           return credentials;
@@ -751,8 +852,10 @@ abstract class APISecurity {
     } else if (token.isNotEmpty) {
       return getAPIToken(token).resolveMapped((apiToken) {
         if (apiToken != null && !apiToken.isExpired()) {
-          var credential =
-              APICredential(apiToken.username, token: apiToken.token);
+          var credential = APICredential(
+            apiToken.username,
+            token: apiToken.token,
+          );
           credentials.add(credential);
         }
         return credentials;
@@ -763,61 +866,79 @@ abstract class APISecurity {
   }
 
   String getRequestParameterPassword(APIRequest request) {
-    return (request.getParameterIgnoreCaseFirstOf('password', 'pass',
-                'passphrase', 'passwordHash', 'passwordOrHash') ??
+    return (request.getParameterIgnoreCaseFirstOf(
+              'password',
+              'pass',
+              'passphrase',
+              'passwordHash',
+              'passwordOrHash',
+            ) ??
             '')
         .toString();
   }
 
   String getRequestParameterToken(APIRequest request) {
     var token = request.getParameterIgnoreCaseFirstOf(
-        'token', 'access_token', 'accessToken');
+      'token',
+      'access_token',
+      'accessToken',
+    );
 
     token ??= request.getHeaderFirstOf(
-        'x-token', 'token', 'x-access-token', 'access-token');
+      'x-token',
+      'token',
+      'x-access-token',
+      'access-token',
+    );
 
     return (token ?? '').toString();
   }
 
   String getRequestParameterRefreshToken(APIRequest request) {
     var refreshToken = request.getParameterIgnoreCaseFirstOf(
-        'refreshToken', 'refresh_token', 'refreshtoken');
+      'refreshToken',
+      'refresh_token',
+      'refreshtoken',
+    );
 
-    refreshToken ??=
-        request.getHeaderFirstOf('x-refresh-token', 'refresh-token');
+    refreshToken ??= request.getHeaderFirstOf(
+      'x-refresh-token',
+      'refresh-token',
+    );
 
     return (refreshToken ?? '').toString();
   }
 
   String getRequestParameterUsername(APIRequest request) {
     return (request.getParameterIgnoreCaseFirstOf(
-                'username', 'user', 'email', 'account') ??
+              'username',
+              'user',
+              'email',
+              'account',
+            ) ??
             '')
         .toString();
   }
 }
 
-typedef APITokenInfo = ({
-  APIToken apiToken,
-  Object? data,
-  List<APIPermission> permissions
-});
+typedef APITokenInfo =
+    ({APIToken apiToken, Object? data, List<APIPermission> permissions});
 
 /// The tokens store for the [APISecurity].
 class APITokenStore {
   final SharedStoreField _sharedStoreField;
 
-  APITokenStore(
-      {SharedStoreField? sharedStoreField,
-      SharedStore? sharedStore,
-      String? sharedStoreID,
-      SharedStoreProviderSync? storeProvider})
-      : _sharedStoreField = SharedStoreField.from(
-          sharedStoreField: sharedStoreField,
-          sharedStore: sharedStore,
-          sharedStoreID: sharedStoreID,
-          storeProvider: storeProvider,
-        ) {
+  APITokenStore({
+    SharedStoreField? sharedStoreField,
+    SharedStore? sharedStore,
+    String? sharedStoreID,
+    SharedStoreProviderSync? storeProvider,
+  }) : _sharedStoreField = SharedStoreField.from(
+         sharedStoreField: sharedStoreField,
+         sharedStore: sharedStore,
+         sharedStoreID: sharedStoreID,
+         storeProvider: storeProvider,
+       ) {
     // ignore: discarded_futures
     _resolveSharedTokens().then((_) async {
       _resolveSharedTokensByUsername();
@@ -830,17 +951,19 @@ class APITokenStore {
 
   late final SharedMapField<String, APITokenInfo> _sharedTokensField =
       SharedMapField(
-    sharedTokensID,
-    sharedStore: sharedStore,
-    onInitialize: _sharedTokensOnInitialize,
-    onAbsent: _sharedTokensOnAbsent,
-    onPut: _sharedTokensOnPut,
-    onRemove: _sharedTokensOnRemove,
-  );
+        sharedTokensID,
+        sharedStore: sharedStore,
+        onInitialize: _sharedTokensOnInitialize,
+        onAbsent: _sharedTokensOnAbsent,
+        onPut: _sharedTokensOnPut,
+        onRemove: _sharedTokensOnRemove,
+      );
 
   late final SharedMapField<String, List<APIToken>>
-      _sharedTokensByUsernameField =
-      SharedMapField('$sharedTokensID:byUsername', sharedStore: sharedStore);
+  _sharedTokensByUsernameField = SharedMapField(
+    '$sharedTokensID:byUsername',
+    sharedStore: sharedStore,
+  );
 
   FutureOr<void> _sharedTokensOnInitialize(SharedMap sharedTokens) {
     if (sharedTokens.isAuxiliaryInstance) return null;
@@ -854,14 +977,16 @@ class APITokenStore {
   }
 
   FutureOr<void> _sharedTokensOnPut(String token, APITokenInfo? tokenInfo) {
-    return _resolveSharedTokensByUsername()
-        .resolveMapped((sharedTokensByUsername) {
+    return _resolveSharedTokensByUsername().resolveMapped((
+      sharedTokensByUsername,
+    ) {
       if (tokenInfo == null) return null;
       final apiToken = tokenInfo.apiToken;
       final username = apiToken.username;
 
-      return sharedTokensByUsername
-          .putIfAbsent(username, []).resolveMapped((userTokens) {
+      return sharedTokensByUsername.putIfAbsent(username, []).resolveMapped((
+        userTokens,
+      ) {
         if (!userTokens!.contains(apiToken)) {
           userTokens.add(apiToken);
         }
@@ -870,8 +995,9 @@ class APITokenStore {
   }
 
   FutureOr<void> _sharedTokensOnRemove(String token, APITokenInfo? tokenInfo) {
-    return _resolveSharedTokensByUsername()
-        .resolveMapped((sharedTokensByUsername) {
+    return _resolveSharedTokensByUsername().resolveMapped((
+      sharedTokensByUsername,
+    ) {
       if (tokenInfo == null) return null;
 
       final apiToken = tokenInfo.apiToken;
@@ -894,7 +1020,7 @@ class APITokenStore {
       Expando();
 
   static final Expando<SharedMap<String, List<APIToken>>>
-      _sharedTokensByUsername = Expando();
+  _sharedTokensByUsername = Expando();
 
   FutureOr<SharedMap<String, APITokenInfo>> _resolveSharedTokens() {
     var sharedTokens = _sharedTokens[this];
@@ -911,17 +1037,22 @@ class APITokenStore {
 
     return _sharedTokensByUsernameField
         .sharedMapCached(timeout: _cacheTimeout)
-        .resolveMapped((sharedTokensByUsername) =>
-            _sharedTokensByUsername[this] = sharedTokensByUsername);
+        .resolveMapped(
+          (sharedTokensByUsername) =>
+              _sharedTokensByUsername[this] = sharedTokensByUsername,
+        );
   }
 
   FutureOr<APITokenInfo?> get(String token) => _resolveSharedTokens()
       .resolveMapped((sharedTokens) => sharedTokens.get(token));
 
-  FutureOr<List<APIToken>> getByUsername(String username,
-      {required bool checkExpiredTokens}) {
-    return _resolveSharedTokensByUsername()
-        .resolveMapped((sharedTokensByUsername) {
+  FutureOr<List<APIToken>> getByUsername(
+    String username, {
+    required bool checkExpiredTokens,
+  }) {
+    return _resolveSharedTokensByUsername().resolveMapped((
+      sharedTokensByUsername,
+    ) {
       return sharedTokensByUsername.get(username).resolveMapped((userTokens) {
         if (userTokens == null) return [];
 
@@ -930,25 +1061,30 @@ class APITokenStore {
         var expiredTokens = userTokens.removeExpiredTokens();
         if (expiredTokens.isEmpty) return userTokens;
 
-        return removeTokens(expiredTokens, removeFromUsernames: true)
-            .resolveWithValue(userTokens);
+        return removeTokens(
+          expiredTokens,
+          removeFromUsernames: true,
+        ).resolveWithValue(userTokens);
       });
     });
   }
 
-  FutureOr<List<APIToken>> getByUsernames(Iterable<String> usernames,
-          {required bool checkExpiredTokens}) =>
-      usernames
-          .toSet()
-          .map((username) =>
-              getByUsername(username, checkExpiredTokens: checkExpiredTokens))
-          .resolveAllJoined((l) => l.expand((l) => l).toList());
+  FutureOr<List<APIToken>> getByUsernames(
+    Iterable<String> usernames, {
+    required bool checkExpiredTokens,
+  }) => usernames
+      .toSet()
+      .map(
+        (username) =>
+            getByUsername(username, checkExpiredTokens: checkExpiredTokens),
+      )
+      .resolveAllJoined((l) => l.expand((l) => l).toList());
 
   FutureOr<List<APIToken>> allTokens() =>
       _resolveSharedTokens().resolveMapped((sharedTokens) {
-        return sharedTokens
-            .values()
-            .resolveMapped((l) => l.map((e) => e.apiToken).toList());
+        return sharedTokens.values().resolveMapped(
+          (l) => l.map((e) => e.apiToken).toList(),
+        );
       });
 
   FutureOr<List<APIToken>> validateAllTokens([DateTime? now]) {
@@ -960,27 +1096,36 @@ class APITokenStore {
       var expiredTokens = allTokens.removeExpiredTokens();
       if (expiredTokens.isEmpty) return allTokens;
 
-      return removeTokens(expiredTokens, removeFromUsernames: true)
-          .resolveWithValue(allTokens);
+      return removeTokens(
+        expiredTokens,
+        removeFromUsernames: true,
+      ).resolveWithValue(allTokens);
     });
   }
 
-  FutureOr<List<APIToken>> removeUsernameTokens(String username,
-      {required bool checkExpiredTokens}) {
-    return _resolveSharedTokensByUsername()
-        .resolveMapped((sharedTokensByUsername) {
-      return sharedTokensByUsername
-          .remove(username)
-          .resolveMapped((userTokens) {
+  FutureOr<List<APIToken>> removeUsernameTokens(
+    String username, {
+    required bool checkExpiredTokens,
+  }) {
+    return _resolveSharedTokensByUsername().resolveMapped((
+      sharedTokensByUsername,
+    ) {
+      return sharedTokensByUsername.remove(username).resolveMapped((
+        userTokens,
+      ) {
         if (userTokens == null) return [];
-        return removeTokens(userTokens, removeFromUsernames: true)
-            .resolveWithValue(userTokens);
+        return removeTokens(
+          userTokens,
+          removeFromUsernames: true,
+        ).resolveWithValue(userTokens);
       });
     });
   }
 
-  FutureOr<int> removeTokens(List<APIToken> apiTokens,
-      {required bool removeFromUsernames}) {
+  FutureOr<int> removeTokens(
+    List<APIToken> apiTokens, {
+    required bool removeFromUsernames,
+  }) {
     if (apiTokens.isEmpty) return 0;
 
     var tokens = apiTokens.map((e) => e.token).toList();
@@ -1004,11 +1149,12 @@ class APITokenStore {
 
         final apiToken = tokenInfo.apiToken;
 
-        return _resolveSharedTokensByUsername()
-            .resolveMapped((sharedTokensByUsername) {
-          return sharedTokensByUsername
-              .get(apiToken.username)
-              .resolveMapped((userTokens) {
+        return _resolveSharedTokensByUsername().resolveMapped((
+          sharedTokensByUsername,
+        ) {
+          return sharedTokensByUsername.get(apiToken.username).resolveMapped((
+            userTokens,
+          ) {
             if (userTokens != null) {
               var rm = userTokens.remove(apiToken);
               if (rm && userTokens.isEmpty) {
@@ -1029,7 +1175,7 @@ class APITokenStore {
           return sharedTokens.put(token, (
             apiToken: tokenInfo.apiToken,
             data: null,
-            permissions: tokenInfo.permissions
+            permissions: tokenInfo.permissions,
           ));
         }
 
@@ -1039,13 +1185,19 @@ class APITokenStore {
   }
 
   FutureOr<APITokenInfo?> storeAPIToken(
-      APIToken apiToken, Object? data, List<APIPermission> permissions) {
+    APIToken apiToken,
+    Object? data,
+    List<APIPermission> permissions,
+  ) {
     data = _toUnmodifiableData(data);
     permissions = permissions.asUnmodifiableListView();
 
     return _resolveSharedTokens().resolveMapped((sharedTokens) {
-      return sharedTokens.put(apiToken.token,
-          (apiToken: apiToken, data: data, permissions: permissions));
+      return sharedTokens.put(apiToken.token, (
+        apiToken: apiToken,
+        data: data,
+        permissions: permissions,
+      ));
     });
   }
 
@@ -1155,8 +1307,8 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   final Iterable<String> _requiredPermissionTypes;
 
   const APIRoutePermissionTypeRule(Iterable<String> requiredPermissionTypes)
-      : _requiredPermissionTypes = requiredPermissionTypes,
-        super();
+    : _requiredPermissionTypes = requiredPermissionTypes,
+      super();
 
   static final Expando<Set<String>> _expandoNormalizedTypes =
       Expando<Set<String>>();
@@ -1166,10 +1318,11 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
     var normalizedType = _expandoNormalizedTypes[this];
     if (normalizedType != null) return normalizedType;
 
-    normalizedType = _requiredPermissionTypes
-        .map(APIPermission.normalizeType)
-        .where(APIPermission.validateType)
-        .toSet();
+    normalizedType =
+        _requiredPermissionTypes
+            .map(APIPermission.normalizeType)
+            .where(APIPermission.validateType)
+            .toSet();
 
     _expandoNormalizedTypes[this] = normalizedType;
     return normalizedType;
@@ -1183,10 +1336,11 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
 
     var requiredPermissionTypes = this.requiredPermissionTypes;
 
-    var authPermissions = authentication
-        .enabledPermissionsOfTypes(requiredPermissionTypes)
-        .map((e) => e.type)
-        .toSet();
+    var authPermissions =
+        authentication
+            .enabledPermissionsOfTypes(requiredPermissionTypes)
+            .map((e) => e.type)
+            .toSet();
 
     return authPermissions.length == requiredPermissionTypes.length;
   }
@@ -1197,16 +1351,21 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
   }
 
   @override
-  Map<String, Object> toJson() =>
-      {'rule': 'permission', 'types': requiredPermissionTypes.toList()};
+  Map<String, Object> toJson() => {
+    'rule': 'permission',
+    'types': requiredPermissionTypes.toList(),
+  };
 }
 
 /// Defines an [EntityResolutionRules] for a route.
 class APIEntityResolutionRules extends APIRouteRule {
   final EntityResolutionRules resolutionRules;
 
-  const APIEntityResolutionRules(this.resolutionRules,
-      {super.globalRules, super.noGlobalRules});
+  const APIEntityResolutionRules(
+    this.resolutionRules, {
+    super.globalRules,
+    super.noGlobalRules,
+  });
 
   @override
   bool validate(APIRequest request) => true;
@@ -1217,16 +1376,20 @@ class APIEntityResolutionRules extends APIRouteRule {
   }
 
   @override
-  Map<String, Object> toJson() =>
-      <String, Object>{'resolutionRules': resolutionRules.toJson()};
+  Map<String, Object> toJson() => <String, Object>{
+    'resolutionRules': resolutionRules.toJson(),
+  };
 }
 
 /// Defines an [EntityAccessRules] for a route.
 class APIEntityAccessRules extends APIRouteRule {
   final EntityAccessRules accessRules;
 
-  const APIEntityAccessRules(this.accessRules,
-      {super.globalRules, super.noGlobalRules});
+  const APIEntityAccessRules(
+    this.accessRules, {
+    super.globalRules,
+    super.noGlobalRules,
+  });
 
   @override
   bool validate(APIRequest request) => true;
@@ -1237,8 +1400,9 @@ class APIEntityAccessRules extends APIRouteRule {
   }
 
   @override
-  Map<String, Object> toJson() =>
-      <String, Object>{'accessRules': accessRules.toJson()};
+  Map<String, Object> toJson() => <String, Object>{
+    'accessRules': accessRules.toJson(),
+  };
 }
 
 /// Defines an [EntityResolutionRules] for a route.
@@ -1262,13 +1426,14 @@ class APIEntityRules extends APIRouteRule {
   }
 
   @override
-  Map<String, Object> toJson() =>
-      <String, Object>{'rules': rules.map((e) => e.toJson()).toList()};
+  Map<String, Object> toJson() => <String, Object>{
+    'rules': rules.map((e) => e.toJson()).toList(),
+  };
 }
 
 class SecureRandom implements Random {
-  static final Random _globalRandom1 = Random()
-    ..advance(maxSteps: 211, random: Random());
+  static final Random _globalRandom1 =
+      Random()..advance(maxSteps: 211, random: Random());
 
   static int _seedCounter = 0;
 
@@ -1312,8 +1477,9 @@ class SecureRandom implements Random {
   /// current platform, returns a fallback ([_SecureRandomFallback]).
   ///
   /// - [forceFallbackSecureRandom] if `true` forces to return a [_SecureRandomFallback] instance.
-  static Random createPlatformSecureRandom(
-      {bool forceFallbackSecureRandom = false}) {
+  static Random createPlatformSecureRandom({
+    bool forceFallbackSecureRandom = false,
+  }) {
     if (forceFallbackSecureRandom) {
       return _SecureRandomFallback();
     }
@@ -1328,8 +1494,9 @@ class SecureRandom implements Random {
   final Random _random;
 
   SecureRandom({bool forceFallbackSecureRandom = false})
-      : _random = createPlatformSecureRandom(
-            forceFallbackSecureRandom: forceFallbackSecureRandom);
+    : _random = createPlatformSecureRandom(
+        forceFallbackSecureRandom: forceFallbackSecureRandom,
+      );
 
   @override
   bool nextBool() => _random.nextBool();

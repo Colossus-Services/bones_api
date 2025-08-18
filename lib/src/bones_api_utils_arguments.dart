@@ -11,13 +11,14 @@ class Arguments {
   /// The abbreviations used to [parse].
   Map<String, String> abbreviations;
 
-  Arguments(this.args,
-      {Map<String, dynamic>? parameters,
-      Set<String>? flags,
-      Map<String, String>? abbreviations})
-      : parameters = parameters ?? <String, dynamic>{},
-        flags = flags ?? <String>{},
-        abbreviations = abbreviations ?? <String, String>{};
+  Arguments(
+    this.args, {
+    Map<String, dynamic>? parameters,
+    Set<String>? flags,
+    Map<String, String>? abbreviations,
+  }) : parameters = parameters ?? <String, dynamic>{},
+       flags = flags ?? <String>{},
+       abbreviations = abbreviations ?? <String, String>{};
 
   /// The keys abbreviations.
   Map<String, String> get keysAbbreviations {
@@ -35,23 +36,27 @@ class Arguments {
   /// Converts this instances to a [String] line.
   ///
   /// The inverse of [parseLine].
-  String toArgumentsLine(
-          {bool abbreviateFlags = true, bool abbreviateParameters = false}) =>
-      toArgumentsList(
-              abbreviateFlags: abbreviateFlags,
-              abbreviateParameters: abbreviateParameters)
-          .join(' ');
+  String toArgumentsLine({
+    bool abbreviateFlags = true,
+    bool abbreviateParameters = false,
+  }) => toArgumentsList(
+    abbreviateFlags: abbreviateFlags,
+    abbreviateParameters: abbreviateParameters,
+  ).join(' ');
 
   /// Converts this instances to a [String] line.
   ///
   /// The inverse of [parse].
-  List<String> toArgumentsList(
-      {bool abbreviateFlags = true, bool abbreviateParameters = false}) {
+  List<String> toArgumentsList({
+    bool abbreviateFlags = true,
+    bool abbreviateParameters = false,
+  }) {
     var arguments = <String>[];
 
-    var keysAbbreviations = abbreviateFlags || abbreviateParameters
-        ? this.keysAbbreviations
-        : abbreviations;
+    var keysAbbreviations =
+        abbreviateFlags || abbreviateParameters
+            ? this.keysAbbreviations
+            : abbreviations;
 
     for (var f in flags) {
       if (abbreviateFlags) {
@@ -110,10 +115,12 @@ class Arguments {
     bool caseSensitive = false,
   }) {
     var args = splitArgumentsLine(argsLine);
-    return Arguments.parse(args,
-        flags: flags,
-        abbreviations: abbreviations,
-        caseSensitive: caseSensitive);
+    return Arguments.parse(
+      args,
+      flags: flags,
+      abbreviations: abbreviations,
+      caseSensitive: caseSensitive,
+    );
   }
 
   static final RegExp _namedParameter = RegExp(r'^--?(\w+)$');
@@ -184,10 +191,12 @@ class Arguments {
       }
     }
 
-    return Arguments(args,
-        parameters: parsedParams,
-        flags: parsedFlags,
-        abbreviations: abbreviations);
+    return Arguments(
+      args,
+      parameters: parsedParams,
+      flags: parsedFlags,
+      abbreviations: abbreviations,
+    );
   }
 
   static void _addToMap(Map<String, dynamic> map, String key, String value) {

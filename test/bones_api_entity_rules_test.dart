@@ -64,21 +64,23 @@ void main() {
       expect(EntityAccessRules.mask(User).isInnocuous, isFalse);
 
       expect(
-          EntityAccessRules.group([EntityAccessRules.block(User)]).isInnocuous,
-          isFalse);
+        EntityAccessRules.group([EntityAccessRules.block(User)]).isInnocuous,
+        isFalse,
+      );
 
       expect(
-          EntityAccessRules.group([EntityAccessRules.mask(Account)])
-              .isInnocuous,
-          isFalse);
+        EntityAccessRules.group([EntityAccessRules.mask(Account)]).isInnocuous,
+        isFalse,
+      );
 
       expect(
-          EntityAccessRules.group([
-            EntityAccessRules.block(User),
-            EntityAccessRules.block(Account),
-            EntityAccessRules.mask(Account)
-          ]).isInnocuous,
-          isFalse);
+        EntityAccessRules.group([
+          EntityAccessRules.block(User),
+          EntityAccessRules.block(Account),
+          EntityAccessRules.mask(Account),
+        ]).isInnocuous,
+        isFalse,
+      );
 
       expect(EntityAccessRules.group([]).simplified().isInnocuous, isTrue);
     });
@@ -244,18 +246,22 @@ void main() {
     void testBlockFields(bool cached) {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['password']),
-        EntityAccessRules.blockFields(User, ['email'], condition: (context) {
-          var apiRequest = context?.contextAs<APIRequest>();
-          var o = context?.object;
+        EntityAccessRules.blockFields(
+          User,
+          ['email'],
+          condition: (context) {
+            var apiRequest = context?.contextAs<APIRequest>();
+            var o = context?.object;
 
-          if (o is User) {
-            var username = apiRequest?.credential?.username;
-            var sameAccount = username == o.email;
-            return !sameAccount;
-          } else {
-            return true;
-          }
-        }),
+            if (o is User) {
+              var username = apiRequest?.credential?.username;
+              var sameAccount = username == o.email;
+              return !sameAccount;
+            } else {
+              return true;
+            }
+          },
+        ),
       ]);
 
       var r1s = r1.simplified();
@@ -272,16 +278,27 @@ void main() {
 
       expect(r1.isInnocuous, isFalse);
 
-      var user1 = User('joe@mail.com', '123456',
-          Address('NY', 'New York', 'Street A', 101), [],
-          id: 101);
+      var user1 = User(
+        'joe@mail.com',
+        '123456',
+        Address('NY', 'New York', 'Street A', 101),
+        [],
+        id: 101,
+      );
 
-      var user2 = User('smith@mail.com', '654321',
-          Address('NY', 'New York', 'Street A', 102), [],
-          id: 102);
+      var user2 = User(
+        'smith@mail.com',
+        '654321',
+        Address('NY', 'New York', 'Street A', 102),
+        [],
+        id: 102,
+      );
 
-      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
-          credential: APICredential('joe@mail.com'));
+      var apiRequest = APIRequest(
+        APIRequestMethod.GET,
+        '/foo',
+        credential: APICredential('joe@mail.com'),
+      );
 
       User$reflection.boot();
 
@@ -291,110 +308,56 @@ void main() {
       expect(j0['email'], equals(user1.email));
       expect(j0['password'], equals(user1.password));
 
-      var j1 = Json.toJson(
-        user1,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
+      var j1 =
+          Json.toJson(
+                user1,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
 
       expect(j1['id'], equals(101));
       expect(j1['email'], equals(user1.email));
       expect(j1['password'], isNull);
 
-      var j2 = Json.toJson(
-        user2,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
+      var j2 =
+          Json.toJson(
+                user2,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
 
       expect(j2['id'], equals(102));
       expect(j2['email'], isNull);
       expect(j2['password'], isNull);
     }
 
-    test('blockFields(condition) + toJsonEncodable',
-        () => testBlockFields(false));
+    test(
+      'blockFields(condition) + toJsonEncodable',
+      () => testBlockFields(false),
+    );
 
-    test('blockFields(condition) + toJsonEncodable (cached)',
-        () => testBlockFields(true));
+    test(
+      'blockFields(condition) + toJsonEncodable (cached)',
+      () => testBlockFields(true),
+    );
 
     void testMaskFieldsJson(bool cached) {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['password']),
-        EntityAccessRules.maskFields(User, ['email'], condition: (context) {
-          var apiRequest = context?.contextAs<APIRequest>();
-          var o = context?.object;
-
-          if (o is User) {
-            var username = apiRequest?.credential?.username;
-            var sameAccount = username == o.email;
-            return !sameAccount;
-          } else {
-            return true;
-          }
-        }, masker: (context, object, field, value) {
-          switch (field) {
-            case 'email':
-              return '@';
-            default:
-              return value;
-          }
-        }),
-      ]);
-
-      expect(r1.isInnocuous, isFalse);
-
-      var user1 = User('joe@mail.com', '123456',
-          Address('NY', 'New York', 'Street A', 101), [],
-          id: 101);
-
-      var user2 = User('smith@mail.com', '654321',
-          Address('NY', 'New York', 'Street A', 102), [],
-          id: 102);
-
-      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
-          credential: APICredential('joe@mail.com'));
-
-      User$reflection.boot();
-
-      var j0 = Json.toJson(user1) as Map;
-
-      expect(j0['id'], equals(101));
-      expect(j0['email'], equals(user1.email));
-      expect(j0['password'], equals(user1.password));
-
-      var j1 = Json.toJson(
-        user1,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
-
-      expect(j1['id'], equals(101));
-      expect(j1['email'], equals(user1.email));
-      expect(j1['password'], isNull);
-
-      var j2 = Json.toJson(
-        user2,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
-
-      expect(j2['id'], equals(102));
-      expect(j2['email'], equals('@'));
-      expect(j2['password'], isNull);
-    }
-
-    test('maskFields(condition) + toJsonEncodable',
-        () => testMaskFieldsJson(false));
-
-    test('maskFields(condition) + toJsonEncodable (cached)',
-        () => testMaskFieldsJson(true));
-
-    void testMaskFieldsSubgroupJson(bool cached) {
-      var r1 = EntityAccessRules.group([
-        EntityAccessRules.blockFields(User, ['password']),
-        EntityAccessRules.group([
-          EntityAccessRules.maskFields(User, ['email'], condition: (context) {
+        EntityAccessRules.maskFields(
+          User,
+          ['email'],
+          condition: (context) {
             var apiRequest = context?.contextAs<APIRequest>();
             var o = context?.object;
 
@@ -405,29 +368,41 @@ void main() {
             } else {
               return true;
             }
-          }, masker: (context, object, field, value) {
+          },
+          masker: (context, object, field, value) {
             switch (field) {
               case 'email':
                 return '@';
               default:
                 return value;
             }
-          })
-        ]),
+          },
+        ),
       ]);
 
       expect(r1.isInnocuous, isFalse);
 
-      var user1 = User('joe@mail.com', '123456',
-          Address('NY', 'New York', 'Street A', 101), [],
-          id: 101);
+      var user1 = User(
+        'joe@mail.com',
+        '123456',
+        Address('NY', 'New York', 'Street A', 101),
+        [],
+        id: 101,
+      );
 
-      var user2 = User('smith@mail.com', '654321',
-          Address('NY', 'New York', 'Street A', 102), [],
-          id: 102);
+      var user2 = User(
+        'smith@mail.com',
+        '654321',
+        Address('NY', 'New York', 'Street A', 102),
+        [],
+        id: 102,
+      );
 
-      var apiRequest = APIRequest(APIRequestMethod.GET, '/foo',
-          credential: APICredential('joe@mail.com'));
+      var apiRequest = APIRequest(
+        APIRequestMethod.GET,
+        '/foo',
+        credential: APICredential('joe@mail.com'),
+      );
 
       User$reflection.boot();
 
@@ -437,112 +412,277 @@ void main() {
       expect(j0['email'], equals(user1.email));
       expect(j0['password'], equals(user1.password));
 
-      var j1 = Json.toJson(
-        user1,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
+      var j1 =
+          Json.toJson(
+                user1,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
 
       expect(j1['id'], equals(101));
       expect(j1['email'], equals(user1.email));
       expect(j1['password'], isNull);
 
-      var j2 = Json.toJson(
-        user2,
-        toEncodableProvider: (o) => r1.toJsonEncodable(
-            apiRequest, Json.defaultToEncodableJsonProvider(), o),
-      ) as Map;
+      var j2 =
+          Json.toJson(
+                user2,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
 
       expect(j2['id'], equals(102));
       expect(j2['email'], equals('@'));
       expect(j2['password'], isNull);
     }
 
-    test('maskFields(condition,subgroup) + toJsonEncodable',
-        () => testMaskFieldsSubgroupJson(false));
+    test(
+      'maskFields(condition) + toJsonEncodable',
+      () => testMaskFieldsJson(false),
+    );
 
-    test('maskFields(condition,subgroup) + toJsonEncodable (cached)',
-        () => testMaskFieldsSubgroupJson(true));
+    test(
+      'maskFields(condition) + toJsonEncodable (cached)',
+      () => testMaskFieldsJson(true),
+    );
+
+    void testMaskFieldsSubgroupJson(bool cached) {
+      var r1 = EntityAccessRules.group([
+        EntityAccessRules.blockFields(User, ['password']),
+        EntityAccessRules.group([
+          EntityAccessRules.maskFields(
+            User,
+            ['email'],
+            condition: (context) {
+              var apiRequest = context?.contextAs<APIRequest>();
+              var o = context?.object;
+
+              if (o is User) {
+                var username = apiRequest?.credential?.username;
+                var sameAccount = username == o.email;
+                return !sameAccount;
+              } else {
+                return true;
+              }
+            },
+            masker: (context, object, field, value) {
+              switch (field) {
+                case 'email':
+                  return '@';
+                default:
+                  return value;
+              }
+            },
+          ),
+        ]),
+      ]);
+
+      expect(r1.isInnocuous, isFalse);
+
+      var user1 = User(
+        'joe@mail.com',
+        '123456',
+        Address('NY', 'New York', 'Street A', 101),
+        [],
+        id: 101,
+      );
+
+      var user2 = User(
+        'smith@mail.com',
+        '654321',
+        Address('NY', 'New York', 'Street A', 102),
+        [],
+        id: 102,
+      );
+
+      var apiRequest = APIRequest(
+        APIRequestMethod.GET,
+        '/foo',
+        credential: APICredential('joe@mail.com'),
+      );
+
+      User$reflection.boot();
+
+      var j0 = Json.toJson(user1) as Map;
+
+      expect(j0['id'], equals(101));
+      expect(j0['email'], equals(user1.email));
+      expect(j0['password'], equals(user1.password));
+
+      var j1 =
+          Json.toJson(
+                user1,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
+
+      expect(j1['id'], equals(101));
+      expect(j1['email'], equals(user1.email));
+      expect(j1['password'], isNull);
+
+      var j2 =
+          Json.toJson(
+                user2,
+                toEncodableProvider:
+                    (o) => r1.toJsonEncodable(
+                      apiRequest,
+                      Json.defaultToEncodableJsonProvider(),
+                      o,
+                    ),
+              )
+              as Map;
+
+      expect(j2['id'], equals(102));
+      expect(j2['email'], equals('@'));
+      expect(j2['password'], isNull);
+    }
+
+    test(
+      'maskFields(condition,subgroup) + toJsonEncodable',
+      () => testMaskFieldsSubgroupJson(false),
+    );
+
+    test(
+      'maskFields(condition,subgroup) + toJsonEncodable (cached)',
+      () => testMaskFieldsSubgroupJson(true),
+    );
 
     test('defaultMask', () {
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 'abc'),
-          equals(''));
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', 'abc'),
+        equals(''),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(null, Object(), 'x', 123), equals(0));
+        EntityAccessRules.defaultMask(null, Object(), 'x', 123),
+        equals(0),
+      );
 
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
-          equals(0.0));
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
+        equals(0.0),
+      );
 
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
-          equals(0.0));
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', 12.35),
+        equals(0.0),
+      );
 
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', true),
-          equals(false));
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', true),
+        equals(false),
+      );
 
       // Map
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <String, String>{'a': 'A'}),
-          allOf(isA<Map<String, String>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, String>{
+          'a': 'A',
+        }),
+        allOf(isA<Map<String, String>>(), equals({})),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <String, int>{'a': 123}),
-          allOf(isA<Map<String, int>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, int>{
+          'a': 123,
+        }),
+        allOf(isA<Map<String, int>>(), equals({})),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <String, double>{'a': 12.3}),
-          allOf(isA<Map<String, double>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, double>{
+          'a': 12.3,
+        }),
+        allOf(isA<Map<String, double>>(), equals({})),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <String, num>{'a': 12.3, 'b': 2}),
-          allOf(isA<Map<String, num>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, num>{
+          'a': 12.3,
+          'b': 2,
+        }),
+        allOf(isA<Map<String, num>>(), equals({})),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(null, Object(), 'x',
-              <String, Object>{'a': 12.3, 'b': 2, 'c': 'x'}),
-          allOf(isA<Map<String, Object>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, Object>{
+          'a': 12.3,
+          'b': 2,
+          'c': 'x',
+        }),
+        allOf(isA<Map<String, Object>>(), equals({})),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(null, Object(), 'x',
-              <String, dynamic>{'a': 12.3, 'b': 2, 'c': 'x', 'd': null}),
-          allOf(isA<Map<String, dynamic>>(), equals({})));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String, dynamic>{
+          'a': 12.3,
+          'b': 2,
+          'c': 'x',
+          'd': null,
+        }),
+        allOf(isA<Map<String, dynamic>>(), equals({})),
+      );
 
       // List
 
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', <String>['a']),
-          allOf(isA<List<String>>(), equals([])));
-
-      expect(EntityAccessRules.defaultMask(null, Object(), 'x', <int>[123]),
-          allOf(isA<List<int>>(), equals([])));
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', <String>['a']),
+        allOf(isA<List<String>>(), equals([])),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(null, Object(), 'x', <double>[12.34]),
-          allOf(isA<List<double>>(), equals([])));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <int>[123]),
+        allOf(isA<List<int>>(), equals([])),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(null, Object(), 'x', <num>[12.34, 456]),
-          allOf(isA<List<num>>(), equals([])));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <double>[12.34]),
+        allOf(isA<List<double>>(), equals([])),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <Object>[12.34, 456, 'x']),
-          allOf(isA<List<Object>>(), equals([])));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <num>[12.34, 456]),
+        allOf(isA<List<num>>(), equals([])),
+      );
 
       expect(
-          EntityAccessRules.defaultMask(
-              null, Object(), 'x', <dynamic>[12.34, 456, 'x', null]),
-          allOf(isA<List<dynamic>>(), equals([])));
+        EntityAccessRules.defaultMask(null, Object(), 'x', <Object>[
+          12.34,
+          456,
+          'x',
+        ]),
+        allOf(isA<List<Object>>(), equals([])),
+      );
+
+      expect(
+        EntityAccessRules.defaultMask(null, Object(), 'x', <dynamic>[
+          12.34,
+          456,
+          'x',
+          null,
+        ]),
+        allOf(isA<List<dynamic>>(), equals([])),
+      );
     });
 
     test('group: blockFields', () {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.blockFields(User, ['email', 'password']),
-        EntityAccessRules.blockFields(Account, ['user'])
+        EntityAccessRules.blockFields(Account, ['user']),
       ]);
 
       expect(r1.isInnocuous, isFalse);
@@ -574,7 +714,7 @@ void main() {
     test('group: allowFields', () {
       var r1 = EntityAccessRules.group([
         EntityAccessRules.allowFields(User, ['email', 'password']),
-        EntityAccessRules.allowFields(Account, ['user'])
+        EntityAccessRules.allowFields(Account, ['user']),
       ]);
 
       expect(r1.isInnocuous, isFalse);
@@ -701,8 +841,10 @@ void main() {
       expect(r2.allLazy, isNull);
       expect(r2.allowEntityFetch, isTrue);
       expect(r2.allowReadFile, isFalse);
-      expect(r2.toString(),
-          equals('EntityResolutionRules{allEager: true, allowEntityFetch}'));
+      expect(
+        r2.toString(),
+        equals('EntityResolutionRules{allEager: true, allowEntityFetch}'),
+      );
 
       var r3 = r1.merge(r2);
       expect(r3.isInnocuous, isFalse);
@@ -732,11 +874,17 @@ void main() {
       expect(EntityResolutionRules(allLazy: true).isInnocuous, isFalse);
       expect(EntityResolutionRules(allowReadFile: true).isInnocuous, isFalse);
       expect(
-          EntityResolutionRules(allowEntityFetch: true).isInnocuous, isFalse);
+        EntityResolutionRules(allowEntityFetch: true).isInnocuous,
+        isFalse,
+      );
       expect(
-          EntityResolutionRules(eagerEntityTypes: [User]).isInnocuous, isFalse);
+        EntityResolutionRules(eagerEntityTypes: [User]).isInnocuous,
+        isFalse,
+      );
       expect(
-          EntityResolutionRules(lazyEntityTypes: [User]).isInnocuous, isFalse);
+        EntityResolutionRules(lazyEntityTypes: [User]).isInnocuous,
+        isFalse,
+      );
 
       expect(EntityResolutionRules(eagerEntityTypes: []).isInnocuous, isTrue);
       expect(EntityResolutionRules(lazyEntityTypes: []).isInnocuous, isTrue);
@@ -980,10 +1128,9 @@ void main() {
 
     test('fetchTypes', () {
       {
-        var r1 = EntityResolutionRules.fetchTypes(eagerTypes: {
-          User: true,
-          Account: true,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          eagerTypes: {User: true, Account: true},
+        );
         expect(r1.allLazy, isNull);
         expect(r1.allEager, isNull);
         expect(r1.allowReadFile, isFalse);
@@ -991,9 +1138,11 @@ void main() {
         expect(r1.allowEntityFetch, isTrue);
         expect(r1.eagerEntityTypes, equals([User, Account]));
 
-        var r2 = EntityResolutionRules.fetchTypes(eagerTypes: {
-          [User, Account]: true,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          eagerTypes: {
+            [User, Account]: true,
+          },
+        );
         expect(r2.allLazy, isNull);
         expect(r2.allEager, isNull);
         expect(r2.allowReadFile, isFalse);
@@ -1005,18 +1154,18 @@ void main() {
       }
 
       {
-        var r1 = EntityResolutionRules.fetchTypes(eagerTypes: {
-          User: true,
-          Account: true,
-          UserInfo: false,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          eagerTypes: {User: true, Account: true, UserInfo: false},
+        );
         expect(r1.eagerEntityTypes, equals([User, Account]));
         expect(r1.lazyEntityTypes, equals([UserInfo]));
 
-        var r2 = EntityResolutionRules.fetchTypes(eagerTypes: {
-          [User, Account]: true,
-          [UserInfo]: false,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          eagerTypes: {
+            [User, Account]: true,
+            [UserInfo]: false,
+          },
+        );
         expect(r2.eagerEntityTypes, equals([User, Account]));
         expect(r2.lazyEntityTypes, equals([UserInfo]));
 
@@ -1024,15 +1173,19 @@ void main() {
       }
 
       {
-        var r1 = EntityResolutionRules.fetchTypes(allEager: true, eagerTypes: {
-          UserInfo: false,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          allEager: true,
+          eagerTypes: {UserInfo: false},
+        );
         expect(r1.eagerEntityTypes, isNull);
         expect(r1.lazyEntityTypes, equals([UserInfo]));
 
-        var r2 = EntityResolutionRules.fetchTypes(allEager: true, eagerTypes: {
-          [UserInfo]: false,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          allEager: true,
+          eagerTypes: {
+            [UserInfo]: false,
+          },
+        );
         expect(r2.eagerEntityTypes, isNull);
         expect(r2.lazyEntityTypes, equals([UserInfo]));
 
@@ -1040,15 +1193,19 @@ void main() {
       }
 
       {
-        var r1 = EntityResolutionRules.fetchTypes(allEager: true, lazyTypes: {
-          UserInfo: true,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          allEager: true,
+          lazyTypes: {UserInfo: true},
+        );
         expect(r1.eagerEntityTypes, isNull);
         expect(r1.lazyEntityTypes, equals([UserInfo]));
 
-        var r2 = EntityResolutionRules.fetchTypes(allEager: true, lazyTypes: {
-          [UserInfo]: true,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          allEager: true,
+          lazyTypes: {
+            [UserInfo]: true,
+          },
+        );
         expect(r2.eagerEntityTypes, isNull);
         expect(r2.lazyEntityTypes, equals([UserInfo]));
 
@@ -1056,15 +1213,19 @@ void main() {
       }
 
       {
-        var r1 = EntityResolutionRules.fetchTypes(allLazy: true, eagerTypes: {
-          UserInfo: true,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          allLazy: true,
+          eagerTypes: {UserInfo: true},
+        );
         expect(r1.eagerEntityTypes, equals([UserInfo]));
         expect(r1.lazyEntityTypes, isNull);
 
-        var r2 = EntityResolutionRules.fetchTypes(allLazy: true, eagerTypes: {
-          [UserInfo]: true,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          allLazy: true,
+          eagerTypes: {
+            [UserInfo]: true,
+          },
+        );
         expect(r2.eagerEntityTypes, equals([UserInfo]));
         expect(r2.lazyEntityTypes, isNull);
 
@@ -1072,15 +1233,19 @@ void main() {
       }
 
       {
-        var r1 = EntityResolutionRules.fetchTypes(allLazy: true, lazyTypes: {
-          UserInfo: false,
-        });
+        var r1 = EntityResolutionRules.fetchTypes(
+          allLazy: true,
+          lazyTypes: {UserInfo: false},
+        );
         expect(r1.eagerEntityTypes, equals([UserInfo]));
         expect(r1.lazyEntityTypes, isNull);
 
-        var r2 = EntityResolutionRules.fetchTypes(allLazy: true, lazyTypes: {
-          [UserInfo]: false,
-        });
+        var r2 = EntityResolutionRules.fetchTypes(
+          allLazy: true,
+          lazyTypes: {
+            [UserInfo]: false,
+          },
+        );
         expect(r2.eagerEntityTypes, equals([UserInfo]));
         expect(r2.lazyEntityTypes, isNull);
 
@@ -1121,8 +1286,10 @@ void main() {
 
     test('merge: allowReadFile 2', () {
       var r1 = EntityResolutionRules(allowReadFile: true);
-      var r2 =
-          EntityResolutionRules(allowReadFile: false, eagerEntityTypes: [User]);
+      var r2 = EntityResolutionRules(
+        allowReadFile: false,
+        eagerEntityTypes: [User],
+      );
 
       expect(r1.merge(r2).allowReadFile, isTrue);
       expect(r2.merge(r1).allowReadFile, isTrue);
@@ -1133,14 +1300,15 @@ void main() {
       var r2 = EntityResolutionRules.fetchLazy([User]);
 
       expect(
-          () => r1.merge(r2),
-          throwsA(isA<ValidateEntityRulesError>().having(
-              (e) => e.toString(),
-              'toString',
-              allOf(
-                contains('EntityResolutionRules'),
-                contains('Conflicting'),
-              ))));
+        () => r1.merge(r2),
+        throwsA(
+          isA<ValidateEntityRulesError>().having(
+            (e) => e.toString(),
+            'toString',
+            allOf(contains('EntityResolutionRules'), contains('Conflicting')),
+          ),
+        ),
+      );
 
       expect(() => r2.merge(r1), throwsA(isA<ValidateEntityRulesError>()));
     });
@@ -1150,14 +1318,26 @@ void main() {
       var r2 = EntityResolutionRules(allEager: false);
 
       expect(
-          () => r1.merge(r2),
-          throwsA(isA<MergeEntityRulesError>()
-              .having((e) => e.conflict, 'conflict', contains('allEager'))));
+        () => r1.merge(r2),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allEager'),
+          ),
+        ),
+      );
 
       expect(
-          () => r2.merge(r1),
-          throwsA(isA<MergeEntityRulesError>()
-              .having((e) => e.conflict, 'conflict', contains('allEager'))));
+        () => r2.merge(r1),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allEager'),
+          ),
+        ),
+      );
     });
 
     test('merge error: conflict allLazy', () {
@@ -1165,14 +1345,26 @@ void main() {
       var r2 = EntityResolutionRules(allLazy: false);
 
       expect(
-          () => r1.merge(r2),
-          throwsA(isA<MergeEntityRulesError>()
-              .having((e) => e.conflict, 'conflict', contains('allLazy'))));
+        () => r1.merge(r2),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allLazy'),
+          ),
+        ),
+      );
 
       expect(
-          () => r2.merge(r1),
-          throwsA(isA<MergeEntityRulesError>()
-              .having((e) => e.conflict, 'conflict', contains('allLazy'))));
+        () => r2.merge(r1),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allLazy'),
+          ),
+        ),
+      );
     });
 
     test('merge error: conflict allowEntityFetch', () {
@@ -1180,14 +1372,26 @@ void main() {
       var r2 = EntityResolutionRules(allowEntityFetch: false);
 
       expect(
-          () => r1.merge(r2),
-          throwsA(isA<MergeEntityRulesError>().having(
-              (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
+        () => r1.merge(r2),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allowEntityFetch'),
+          ),
+        ),
+      );
 
       expect(
-          () => r2.merge(r1),
-          throwsA(isA<MergeEntityRulesError>().having(
-              (e) => e.conflict, 'conflict', contains('allowEntityFetch'))));
+        () => r2.merge(r1),
+        throwsA(
+          isA<MergeEntityRulesError>().having(
+            (e) => e.conflict,
+            'conflict',
+            contains('allowEntityFetch'),
+          ),
+        ),
+      );
     });
 
     test('merge mergeTolerant: conflict allLazy', () {
@@ -1268,42 +1472,54 @@ void main() {
 
     test('merge mergeTolerant: conflict allowEntityFetch', () {
       {
-        var r1 =
-            EntityResolutionRules(allowEntityFetch: true, mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          allowEntityFetch: true,
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(allowEntityFetch: false);
 
         expect(r1.merge(r2).allowEntityFetch, isFalse);
         expect(r2.merge(r1).allowEntityFetch, isFalse);
       }
       {
-        var r1 =
-            EntityResolutionRules(allowEntityFetch: false, mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          allowEntityFetch: false,
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(allowEntityFetch: true);
 
         expect(r1.merge(r2).allowEntityFetch, isTrue);
         expect(r2.merge(r1).allowEntityFetch, isTrue);
       }
       {
-        var r1 =
-            EntityResolutionRules(allowEntityFetch: null, mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          allowEntityFetch: null,
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(allowEntityFetch: false);
 
         expect(r1.merge(r2).allowEntityFetch, isFalse);
         expect(r2.merge(r1).allowEntityFetch, isFalse);
       }
       {
-        var r1 =
-            EntityResolutionRules(allowEntityFetch: null, mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          allowEntityFetch: null,
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(allowEntityFetch: true);
 
         expect(r1.merge(r2).allowEntityFetch, isTrue);
         expect(r2.merge(r1).allowEntityFetch, isTrue);
       }
       {
-        var r1 =
-            EntityResolutionRules(allowEntityFetch: false, mergeTolerant: true);
-        var r2 =
-            EntityResolutionRules(allowEntityFetch: true, mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          allowEntityFetch: false,
+          mergeTolerant: true,
+        );
+        var r2 = EntityResolutionRules(
+          allowEntityFetch: true,
+          mergeTolerant: true,
+        );
 
         expect(r1.merge(r2).allowEntityFetch, isFalse);
         expect(r2.merge(r1).allowEntityFetch, isFalse);
@@ -1313,7 +1529,9 @@ void main() {
     test('merge mergeTolerant: conflict eagerEntityTypes/lazyEntityTypes', () {
       {
         var r1 = EntityResolutionRules(
-            eagerEntityTypes: [User], mergeTolerant: true);
+          eagerEntityTypes: [User],
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(lazyEntityTypes: [User]);
 
         expect(r1.merge(r2).eagerEntityTypes, isNull);
@@ -1323,8 +1541,10 @@ void main() {
         expect(r2.merge(r1).lazyEntityTypes, equals([User]));
       }
       {
-        var r1 =
-            EntityResolutionRules(lazyEntityTypes: [User], mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          lazyEntityTypes: [User],
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(eagerEntityTypes: [User]);
 
         expect(r1.merge(r2).lazyEntityTypes, isNull);
@@ -1334,10 +1554,14 @@ void main() {
         expect(r2.merge(r1).eagerEntityTypes, equals([User]));
       }
       {
-        var r1 =
-            EntityResolutionRules(lazyEntityTypes: [User], mergeTolerant: true);
+        var r1 = EntityResolutionRules(
+          lazyEntityTypes: [User],
+          mergeTolerant: true,
+        );
         var r2 = EntityResolutionRules(
-            eagerEntityTypes: [User], mergeTolerant: true);
+          eagerEntityTypes: [User],
+          mergeTolerant: true,
+        );
 
         expect(r1.merge(r2).lazyEntityTypes, isNull);
         expect(r1.merge(r2).eagerEntityTypes, isNull);

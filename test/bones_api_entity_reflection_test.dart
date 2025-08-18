@@ -9,8 +9,9 @@ void main() {
 
   group('EntityReference', () {
     test('toEntityReference', () {
-      var t = TypeInfo<EntityReference<UserInfo>>.fromType(
-          EntityReference, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+      var t = TypeInfo<EntityReference<UserInfo>>.fromType(EntityReference, [
+        TypeInfo<UserInfo>.fromType(UserInfo),
+      ]);
       expect(t.isFuture, isFalse);
       expect(t.isFutureOr, isFalse);
       expect(t.type, equals(EntityReference));
@@ -44,7 +45,8 @@ void main() {
 
     test('from', () {
       var ref = EntityReference.fromEntity(
-          Address('NY', 'New York', 'Street 1', 123, id: 101));
+        Address('NY', 'New York', 'Street 1', 123, id: 101),
+      );
 
       expect(ref.id, equals(101));
       expect(ref.entity, isNotNull);
@@ -69,8 +71,13 @@ void main() {
     test('fromJson', () {
       {
         var address = Address('NY', 'New York', 'Street 1', 123);
-        var user =
-            User('joe@mail.com', '123', address, [], userInfo: UserInfo('ABC'));
+        var user = User(
+          'joe@mail.com',
+          '123',
+          address,
+          [],
+          userInfo: UserInfo('ABC'),
+        );
 
         var json = user.toJson();
 
@@ -81,8 +88,13 @@ void main() {
 
       {
         var address = Address('NY', 'New York', 'Street 1', 123);
-        var user = User('joe@mail.com', '123', address, [],
-            userInfo: UserInfo('ABC').reflection.toEntityReference());
+        var user = User(
+          'joe@mail.com',
+          '123',
+          address,
+          [],
+          userInfo: UserInfo('ABC').reflection.toEntityReference(),
+        );
 
         var json = user.toJson();
 
@@ -154,9 +166,13 @@ void main() {
 
         var json = account.toJson();
 
-        var account2 = Account$reflection.staticInstance
-            .createInstanceWithConstructorByName('entityReference', json,
-                fieldValueResolver: fieldValueResolver)!;
+        var account2 =
+            Account$reflection.staticInstance
+                .createInstanceWithConstructorByName(
+                  'entityReference',
+                  json,
+                  fieldValueResolver: fieldValueResolver,
+                )!;
 
         expect(account2.userInfo.isNull, isFalse);
         expect(account2.toJson(), equals(json));
@@ -169,9 +185,13 @@ void main() {
 
         var json = account.toJson();
 
-        var account2 = Account$reflection.staticInstance
-            .createInstanceWithConstructorByName('entityReference', json,
-                fieldValueResolver: fieldValueResolver)!;
+        var account2 =
+            Account$reflection.staticInstance
+                .createInstanceWithConstructorByName(
+                  'entityReference',
+                  json,
+                  fieldValueResolver: fieldValueResolver,
+                )!;
 
         expect(account2.userInfo.isNull, isTrue);
         expect(account2.toJson(), equals(json));
@@ -182,7 +202,9 @@ void main() {
   group('EntityReferenceList', () {
     test('toEntityReferenceList', () {
       var t = TypeInfo<EntityReferenceList<UserInfo>>.fromType(
-          EntityReferenceList, [TypeInfo<UserInfo>.fromType(UserInfo)]);
+        EntityReferenceList,
+        [TypeInfo<UserInfo>.fromType(UserInfo)],
+      );
       expect(t.isFuture, isFalse);
       expect(t.isFutureOr, isFalse);
       expect(t.type, equals(EntityReferenceList));
@@ -190,8 +212,9 @@ void main() {
       expect(t.isEntityReferenceBaseType, isTrue);
       expect(t.isEntityReferenceListType, isTrue);
 
-      var ref1 =
-          t.arguments0!.toEntityReferenceList(UserInfo('info 1', id: 11));
+      var ref1 = t.arguments0!.toEntityReferenceList(
+        UserInfo('info 1', id: 11),
+      );
       expect(ref1.isNull, isFalse);
       expect(ref1.ids, equals([11]));
       expect(ref1.idsNotNull, equals([11]));
@@ -199,12 +222,16 @@ void main() {
       expect(ref1.idsNotNullAs<int>(), equals([11]));
       expect(ref1.entities, equals([UserInfo('info 1', id: 11)]));
 
-      var ref2 = t.arguments0!.toEntityReferenceList(
-          [UserInfo('info 1', id: 11), UserInfo('info 2', id: 12)]);
+      var ref2 = t.arguments0!.toEntityReferenceList([
+        UserInfo('info 1', id: 11),
+        UserInfo('info 2', id: 12),
+      ]);
       expect(ref2.isNull, isFalse);
       expect(ref2.ids, equals([11, 12]));
-      expect(ref2.entities,
-          equals([UserInfo('info 1', id: 11), UserInfo('info 2', id: 12)]));
+      expect(
+        ref2.entities,
+        equals([UserInfo('info 1', id: 11), UserInfo('info 2', id: 12)]),
+      );
 
       var ref3 = t.arguments0!.toEntityReferenceList(null);
       expect(ref3.isNull, isTrue);
@@ -221,20 +248,24 @@ void main() {
       expect(ref5.ids, equals([11, 12]));
       expect(ref5.entities, isNull);
 
-      var ref6 =
-          t.arguments0!.toEntityReferenceList({'info': 'info 2', 'id': 12});
+      var ref6 = t.arguments0!.toEntityReferenceList({
+        'info': 'info 2',
+        'id': 12,
+      });
       expect(ref6.isNull, isFalse);
       expect(ref6.ids, equals([12]));
       expect(ref6.entities, equals([UserInfo('info 2', id: 12)]));
 
       var ref7 = t.arguments0!.toEntityReferenceList([
         {'info': 'info 2', 'id': 12},
-        {'info': 'info 3', 'id': 13}
+        {'info': 'info 3', 'id': 13},
       ]);
       expect(ref7.isNull, isFalse);
       expect(ref7.ids, equals([12, 13]));
-      expect(ref7.entities,
-          equals([UserInfo('info 2', id: 12), UserInfo('info 3', id: 13)]));
+      expect(
+        ref7.entities,
+        equals([UserInfo('info 2', id: 12), UserInfo('info 3', id: 13)]),
+      );
     });
   });
 }

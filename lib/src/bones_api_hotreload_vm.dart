@@ -29,18 +29,21 @@ class APIHotReloadVM extends APIHotReload {
     if (_hotReloader == null && autoCreate) {
       logging.hierarchicalLoggingEnabled = true;
       HotReloader.logLevel = logging.Level.CONFIG;
-      _hotReloader = await HotReloader.create(onBeforeReload: (ctx) {
-        var isolateId = ctx.isolate.id;
-        var isolateName = ctx.isolate.name ?? '?';
-        var ignore = isIgnoredIsolate(isolateId);
-        if (ignore) {
-          _log.info(
-              'Hot-reload ignored for Isolate[$isolateName]: `$isolateId`');
-        } else {
-          _log.info('Hot-reloading Isolate[$isolateName]: `$isolateId`');
-        }
-        return !ignore;
-      });
+      _hotReloader = await HotReloader.create(
+        onBeforeReload: (ctx) {
+          var isolateId = ctx.isolate.id;
+          var isolateName = ctx.isolate.name ?? '?';
+          var ignore = isIgnoredIsolate(isolateId);
+          if (ignore) {
+            _log.info(
+              'Hot-reload ignored for Isolate[$isolateName]: `$isolateId`',
+            );
+          } else {
+            _log.info('Hot-reloading Isolate[$isolateName]: `$isolateId`');
+          }
+          return !ignore;
+        },
+      );
       _log.info('Created HotReloader');
     }
     return _hotReloader;
@@ -92,7 +95,8 @@ class APIHotReloadVM extends APIHotReload {
 
     if (!allowed) {
       _log.warning(
-          'Hot Reloaded not allowed. Dart VM not running with: --enable-vm-service');
+        'Hot Reloaded not allowed. Dart VM not running with: --enable-vm-service',
+      );
       return false;
     }
 
@@ -144,7 +148,8 @@ class APIHotReloadVM extends APIHotReload {
     if (reloader != null) {
       var result = await reloader.reloadCode(force: force);
 
-      var ok = result == HotReloadResult.Succeeded ||
+      var ok =
+          result == HotReloadResult.Succeeded ||
           result == HotReloadResult.PartiallySucceeded;
       return ok;
     }

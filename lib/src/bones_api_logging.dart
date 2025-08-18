@@ -32,15 +32,17 @@ LoggerHandler _resolveLoggerHandler([LoggerHandler? loggerHandler]) {
   return loggerHandler ?? LoggerHandler.root;
 }
 
-void logAllTo(
-    {MessageLogger? messageLogger,
-    Object? logDestiny,
-    bool includeDBLogs = false}) {
+void logAllTo({
+  MessageLogger? messageLogger,
+  Object? logDestiny,
+  bool includeDBLogs = false,
+}) {
   var loggerHandler = _resolveLoggerHandler();
   loggerHandler.logAllTo(
-      messageLogger: messageLogger,
-      logDestiny: logDestiny,
-      includeDBLogs: includeDBLogs);
+    messageLogger: messageLogger,
+    logDestiny: logDestiny,
+    includeDBLogs: includeDBLogs,
+  );
 }
 
 void logToConsole({bool enabled = true}) {
@@ -48,19 +50,23 @@ void logToConsole({bool enabled = true}) {
   loggerHandler.logToConsole(enabled: enabled);
 }
 
-void logErrorTo(
-    {MessageLogger? messageLogger,
-    Object? logDestiny,
-    LoggerHandler? loggerHandler}) {
+void logErrorTo({
+  MessageLogger? messageLogger,
+  Object? logDestiny,
+  LoggerHandler? loggerHandler,
+}) {
   loggerHandler = _resolveLoggerHandler(loggerHandler);
   loggerHandler.logErrorTo(
-      messageLogger: messageLogger, logDestiny: logDestiny);
+    messageLogger: messageLogger,
+    logDestiny: logDestiny,
+  );
 }
 
-void logDbTo(
-    {MessageLogger? messageLogger,
-    Object? logDestiny,
-    LoggerHandler? loggerHandler}) {
+void logDbTo({
+  MessageLogger? messageLogger,
+  Object? logDestiny,
+  LoggerHandler? loggerHandler,
+}) {
   loggerHandler = _resolveLoggerHandler(loggerHandler);
   loggerHandler.logDbTo(messageLogger: messageLogger, logDestiny: logDestiny);
 }
@@ -75,9 +81,9 @@ extension LoggerExntesion on logging.Logger {
     return handler;
   }
 
-  FutureOr<bool> flushMessages(
-          {Duration? delay = const Duration(milliseconds: 20)}) =>
-      handler.flushMessages(delay: delay);
+  FutureOr<bool> flushMessages({
+    Duration? delay = const Duration(milliseconds: 20),
+  }) => handler.flushMessages(delay: delay);
 
   static final Set<logging.Logger> _dbLoggers = {};
 
@@ -121,8 +127,13 @@ extension LoggerExntesion on logging.Logger {
     await subscription?.cancel();
   }
 
-  void logDB(logging.Level logLevel, Object? message,
-      [Object? error, StackTrace? stackTrace, Zone? zone]) {
+  void logDB(
+    logging.Level logLevel,
+    Object? message, [
+    Object? error,
+    StackTrace? stackTrace,
+    Zone? zone,
+  ]) {
     if (handler.isLoggingDB) {
       log(logLevel, DBLog(message));
     }
@@ -147,8 +158,8 @@ class DBLog {
 }
 
 typedef MessageLogger = void Function(logging.Level level, String message);
-typedef MessagesBlockLogger = Future<void> Function(
-    logging.Level level, List<String> messages);
+typedef MessagesBlockLogger =
+    Future<void> Function(logging.Level level, List<String> messages);
 
 abstract class LoggerHandler {
   static LoggerHandler create(logging.Logger logger) =>
@@ -306,7 +317,8 @@ abstract class LoggerHandler {
     var message = msg.message;
 
     var logMsg = StringBuffer(
-        '$time $levelName $debugName $loggerName $apiRequestIDStr> $message\n');
+      '$time $levelName $debugName $loggerName $apiRequestIDStr> $message\n',
+    );
 
     if (msg.error != null) {
       logMsg.write('[ERROR] ');
@@ -350,8 +362,9 @@ abstract class LoggerHandler {
 
   /// Flushes the messages in the queue (if the implementation has one).
   /// See [useLogQueue].
-  FutureOr<bool> flushMessages(
-      {Duration? delay = const Duration(milliseconds: 20)});
+  FutureOr<bool> flushMessages({
+    Duration? delay = const Duration(milliseconds: 20),
+  });
 
   void logAll() {
     logging.hierarchicalLoggingEnabled = true;
@@ -363,10 +376,11 @@ abstract class LoggerHandler {
 
   static MessageLogger? getLogAllTo() => _allMessageLogger;
 
-  void logAllTo(
-      {MessageLogger? messageLogger,
-      Object? logDestiny,
-      bool includeDBLogs = false}) {
+  void logAllTo({
+    MessageLogger? messageLogger,
+    Object? logDestiny,
+    bool includeDBLogs = false,
+  }) {
     messageLogger ??= resolveLogDestiny(logDestiny);
 
     _allMessageLogger = messageLogger;
@@ -490,8 +504,12 @@ abstract class LoggerHandler {
 
   static final Expando<Future<void>> _bufferedCalls = Expando();
 
-  void logBuffered(Object identifier, MessagesBlockLogger messagesBlockLogger,
-      logging.Level level, String message) {
+  void logBuffered(
+    Object identifier,
+    MessagesBlockLogger messagesBlockLogger,
+    logging.Level level,
+    String message,
+  ) {
     final buffer = _buffers[identifier] ??= [];
 
     if (buffer.isEmpty) {
@@ -507,40 +525,45 @@ abstract class LoggerHandler {
 
     Future<void>? call;
 
-    call = _bufferedCalls[identifier] ??=
-        Future.delayed(Duration(milliseconds: 100), () async {
-      for (var levelBlock in buffer) {
-        var level = levelBlock.$1;
-        var messages = levelBlock.$2;
-        messagesBlockLogger(level, messages);
-      }
+    call =
+        _bufferedCalls[identifier] ??= Future.delayed(
+          Duration(milliseconds: 100),
+          () async {
+            for (var levelBlock in buffer) {
+              var level = levelBlock.$1;
+              var messages = levelBlock.$2;
+              messagesBlockLogger(level, messages);
+            }
 
-      buffer.clear();
+            buffer.clear();
 
-      var prevCall = _bufferedCalls[identifier];
-      if (identical(prevCall, call)) {
-        _bufferedCalls[identifier] = null;
-      }
-    });
+            var prevCall = _bufferedCalls[identifier];
+            if (identical(prevCall, call)) {
+              _bufferedCalls[identifier] = null;
+            }
+          },
+        );
   }
 
   void _logToHttpClient(
-          HttpClient client, logging.Level level, String message) =>
-      logBuffered(
-        client,
-        (l, ms) async => _callHttpClientLog(client, l, ms),
-        level,
-        message,
-      );
+    HttpClient client,
+    logging.Level level,
+    String message,
+  ) => logBuffered(
+    client,
+    (l, ms) async => _callHttpClientLog(client, l, ms),
+    level,
+    message,
+  );
 
   Future<void> _callHttpClientLog(
-      HttpClient client, logging.Level level, List<String> messages) async {
+    HttpClient client,
+    logging.Level level,
+    List<String> messages,
+  ) async {
     await client.post(
       'log',
-      body: {
-        'level': level.name,
-        'messages': messages,
-      },
+      body: {'level': level.name, 'messages': messages},
       contentType: 'json',
     );
   }

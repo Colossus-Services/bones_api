@@ -27,8 +27,11 @@ class AboutModule extends APIModule {
 bool _blockUserEmailCondition(EntityAccessRulesContext? c) =>
     c?.objectAs<User>()?.email.contains('secret') ?? false;
 
-@APIEntityAccessRules(EntityAccessRules.blockFields(User, ['email'],
-    condition: _blockUserEmailCondition))
+@APIEntityAccessRules(
+  EntityAccessRules.blockFields(User, [
+    'email',
+  ], condition: _blockUserEmailCondition),
+)
 @APIEntityResolutionRules(EntityResolutionRules.fetchEager([User]))
 @EnableReflection()
 class UserModule extends APIModule {
@@ -43,48 +46,63 @@ class UserModule extends APIModule {
 
   Future<String> notARouteAsync(int n) async => 'foo';
 
-  APIResponse<User> getUser(int id) => APIResponse.ok(User(
-      'joe@email.com', 'pass123', Address('SC', 'NY', '', 123), [],
-      creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14)));
+  APIResponse<User> getUser(int id) => APIResponse.ok(
+    User(
+      'joe@email.com',
+      'pass123',
+      Address('SC', 'NY', '', 123),
+      [],
+      creationTime: DateTime.utc(2021, 10, 11, 12, 13, 14),
+    ),
+  );
 
   APIResponse<User> echoUser(User user) =>
       APIResponse.ok(user..email += '.echo');
 
   APIResponse<List<User>> echoListUser(List<User> users) => APIResponse.ok(
-      users.mapIndexed((i, e) => e..email += '.echo[$i]').toList());
+    users.mapIndexed((i, e) => e..email += '.echo[$i]').toList(),
+  );
 
   APIResponse<List<User>> echoListUser2(String msg, List<User> users) =>
       APIResponse.ok(
-          users.mapIndexed((i, e) => e..email += '.echo[$i]{$msg}').toList());
+        users.mapIndexed((i, e) => e..email += '.echo[$i]{$msg}').toList(),
+      );
 
   APIResponse getDynamic(int id) => APIResponse.ok(
-      User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+    User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []),
+  );
 
   Future<APIResponse<User>> getUserAsync(int id) async => APIResponse.ok(
-      User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+    User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []),
+  );
 
   Future<APIResponse> geDynamicAsync(int id) async => APIResponse.ok(
-      User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+    User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []),
+  );
 
   Future<dynamic> geDynamicAsync2(int id) async => APIResponse.ok(
-      User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []));
+    User('joe@email.com', 'pass123', Address('SC', 'NY', '', 123), []),
+  );
 
   Future<APIResponse<Map>> getContextEntityResolutionRules() async {
     var contextProvider = EntityRulesResolver.cotextProviders.first;
     var resolutionRules = contextProvider.getContextEntityResolutionRules();
-    return APIResponse.ok(
-        {'context.resolutionRules': resolutionRules?.toJson()});
+    return APIResponse.ok({
+      'context.resolutionRules': resolutionRules?.toJson(),
+    });
   }
 
   Future<APIResponse<Map>> getRequestEntityResolutionRules(
-      APIRequest request) async {
+    APIRequest request,
+  ) async {
     var routeHandler = request.routeHandler;
     var resolutionRules = routeHandler?.entityResolutionRules;
     return APIResponse.ok({'resolutionRules': resolutionRules?.toJson()});
   }
 
   Future<APIResponse<Map>> getRequestEntityAccessRules(
-      APIRequest request) async {
+    APIRequest request,
+  ) async {
     var routeHandler = request.routeHandler;
     var accessRules = routeHandler?.entityAccessRules;
     return APIResponse.ok({'accessRules': accessRules?.toJson()});

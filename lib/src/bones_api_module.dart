@@ -54,7 +54,7 @@ abstract class APIModule with Initializable {
   late final APIRouteBuilder _routeBuilder;
 
   APIModule(this.apiRoot, String name, {this.version})
-      : name = name.trim().toLowerCase() {
+    : name = name.trim().toLowerCase() {
     BonesAPI.boot();
     _routeBuilder = APIRouteBuilder(this);
   }
@@ -105,14 +105,14 @@ abstract class APIModule with Initializable {
 
   /// Returns all the routes names.
   Set<String> get allRoutesNames => {
-        ..._routesHandlers.keys,
-        ..._routesHandlersGET.keys,
-        ..._routesHandlersPOST.keys,
-        ..._routesHandlersPUT.keys,
-        ..._routesHandlersDELETE.keys,
-        ..._routesHandlersPATH.keys,
-        ..._routesHandlersHEAD.keys,
-      };
+    ..._routesHandlers.keys,
+    ..._routesHandlersGET.keys,
+    ..._routesHandlersPOST.keys,
+    ..._routesHandlersPUT.keys,
+    ..._routesHandlersDELETE.keys,
+    ..._routesHandlersPATH.keys,
+    ..._routesHandlersHEAD.keys,
+  };
 
   /// Returns the routes names for [method].
   Iterable<String> getRoutesHandlersNames({APIRequestMethod? method}) {
@@ -148,14 +148,24 @@ abstract class APIModule with Initializable {
   /// [method] The route method. If `null` accepts any method.
   /// [function] The route handler, to process calls.
   APIModule addRoute(
-      APIRequestMethod? method, String name, APIRouteFunction function,
-      {Map<String, TypeInfo>? parameters,
-      Iterable<APIRouteRule>? rules,
-      APIRouteConfig? config}) {
+    APIRequestMethod? method,
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
+  }) {
     _checkMethodNotOPTIONS(method);
 
     var routeHandler = APIRouteHandlerFunction(
-        this, method, name, function, parameters, rules, config);
+      this,
+      method,
+      name,
+      function,
+      parameters,
+      rules,
+      config,
+    );
 
     var routesHandlers = _getRoutesHandlers(method);
     routesHandlers[name] = routeHandler;
@@ -176,8 +186,10 @@ abstract class APIModule with Initializable {
 
   void _checkMethodNotOPTIONS(APIRequestMethod? method) {
     if (method == APIRequestMethod.OPTIONS) {
-      throw ArgumentError("Can't add a route with method `OPTIONS`."
-          "Requests with method `OPTIONS` are reserved for CORS or other informational requests.");
+      throw ArgumentError(
+        "Can't add a route with method `OPTIONS`."
+        "Requests with method `OPTIONS` are reserved for CORS or other informational requests.",
+      );
     }
   }
 
@@ -185,8 +197,10 @@ abstract class APIModule with Initializable {
   APIRouteBuilder get routes => _routeBuilder;
 
   /// Returns a route handler for [name].
-  APIRouteHandler<T>? getRouteHandler<T>(String name,
-      [APIRequestMethod? method]) {
+  APIRouteHandler<T>? getRouteHandler<T>(
+    String name, [
+    APIRequestMethod? method,
+  ]) {
     var handler = _getRouteHandlerImpl<T>(name, method);
 
     if (handler == null) {
@@ -200,7 +214,9 @@ abstract class APIModule with Initializable {
   }
 
   APIRouteHandler<T>? _getRouteHandlerImpl<T>(
-      String name, APIRequestMethod? method) {
+    String name,
+    APIRequestMethod? method,
+  ) {
     ensureConfigured();
 
     var routesHandlers = _getRoutesHandlers(method);
@@ -216,8 +232,10 @@ abstract class APIModule with Initializable {
   /// Returns a route handler for [request].
   ///
   /// Calls [resolveRoute] to determine the route name of the [request].
-  APIRouteHandler<T>? getRouteHandlerByRequest<T>(APIRequest request,
-      [String? routeName]) {
+  APIRouteHandler<T>? getRouteHandlerByRequest<T>(
+    APIRequest request, [
+    String? routeName,
+  ]) {
     ensureConfigured();
 
     routeName ??= resolveRoute(request);
@@ -254,7 +272,9 @@ abstract class APIModule with Initializable {
   static final MimeType _mimeTypeJson = MimeType.parse(MimeType.json)!;
 
   FutureOr<APIResponse<T>> _callImpl<T>(
-      APIRequest apiRequest, String routeName) {
+    APIRequest apiRequest,
+    String routeName,
+  ) {
     if (routeName == 'API-INFO') {
       var info = apiInfo(apiRequest);
       return APIResponse.ok(info as T, mimeType: _mimeTypeJson);
@@ -271,9 +291,10 @@ abstract class APIModule with Initializable {
       return response;
     } catch (e, s) {
       _log.severe(
-          'Error calling route `$routeName` of module `$name`! APIModule: `$runtimeType` ; APIRequest: ${apiRequest.toString(withHeaders: false, withPayload: false)}',
-          e,
-          s);
+        'Error calling route `$routeName` of module `$name`! APIModule: `$runtimeType` ; APIRequest: ${apiRequest.toString(withHeaders: false, withPayload: false)}',
+        e,
+        s,
+      );
       var error = 'ERROR: $e\n$s';
       return APIResponse.error(error: error, stackTrace: s);
     }
@@ -329,8 +350,9 @@ class APIModuleInfo {
   final APIRequest? apiRequest;
 
   APIModuleInfo(this.module, [this.apiRequest])
-      : moduleClassReflection =
-            ReflectionFactory().getRegisterClassReflection(module.runtimeType);
+    : moduleClassReflection = ReflectionFactory().getRegisterClassReflection(
+        module.runtimeType,
+      );
 
   /// Returns the name of the [module].
   String get name => module.name;
@@ -368,54 +390,113 @@ class APIRouteBuilder<M extends APIModule> {
   APIRouteBuilder(this.module);
 
   /// Adds a route of [name] with [handler] for ANY request method.
-  APIModule any(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(null, name, function, parameters: parameters, rules: rules);
+  APIModule any(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(null, name, function, parameters: parameters, rules: rules);
 
   /// Adds a route of [name] with [handler] for `GET` request method.
-  APIModule get(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.GET, name, function,
-          parameters: parameters, rules: rules);
+  APIModule get(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.GET,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for `POST` request method.
-  APIModule post(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.POST, name, function,
-          parameters: parameters, rules: rules);
+  APIModule post(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.POST,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for `PUT` request method.
-  APIModule put(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.PUT, name, function,
-          parameters: parameters, rules: rules);
+  APIModule put(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.PUT,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for `DELETE` request method.
-  APIModule delete(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.DELETE, name, function,
-          parameters: parameters, rules: rules);
+  APIModule delete(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.DELETE,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for `PATCH` request method.
-  APIModule patch(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.PATCH, name, function,
-          parameters: parameters, rules: rules);
+  APIModule patch(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.PATCH,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for `HEAD` request method.
-  APIModule head(String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters, Iterable<APIRouteRule>? rules}) =>
-      add(APIRequestMethod.HEAD, name, function,
-          parameters: parameters, rules: rules);
+  APIModule head(
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+  }) => add(
+    APIRequestMethod.HEAD,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+  );
 
   /// Adds a route of [name] with [handler] for the request [method].
   APIModule add(
-          APIRequestMethod? method, String name, APIRouteFunction function,
-          {Map<String, TypeInfo>? parameters,
-          Iterable<APIRouteRule>? rules,
-          APIRouteConfig? config}) =>
-      module.addRoute(method, name, function,
-          parameters: parameters, rules: rules, config: config);
+    APIRequestMethod? method,
+    String name,
+    APIRouteFunction function, {
+    Map<String, TypeInfo>? parameters,
+    Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
+  }) => module.addRoute(
+    method,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+    config: config,
+  );
 
   /// Adds a [routeHandler] of [name] with [handler] for the request [method].
   APIModule addRouteHandler(APIRouteHandler routeHandler) =>
@@ -474,15 +555,19 @@ class APIRouteBuilder<M extends APIModule> {
   /// See [ClassReflectionExtension.apiMethods].
   ///
   /// - [requestMethod] the route request method.
-  bool apiReflection(ClassReflection reflection,
-      [APIRequestMethod? requestMethod]) {
+  bool apiReflection(
+    ClassReflection reflection, [
+    APIRequestMethod? requestMethod,
+  ]) {
     var methods = reflection.apiMethods();
     return apiMethods(methods, requestMethod);
   }
 
   /// Adds the routes from [apiMethods]. See [apiMethod].
-  bool apiMethods(Iterable<MethodReflection> apiMethods,
-      [APIRequestMethod? requestMethod]) {
+  bool apiMethods(
+    Iterable<MethodReflection> apiMethods, [
+    APIRequestMethod? requestMethod,
+  ]) {
     var addedAny = false;
     for (var m in apiMethods) {
       var added = apiMethod(m, requestMethod);
@@ -495,8 +580,10 @@ class APIRouteBuilder<M extends APIModule> {
   /// See [MethodReflectionExtension.isAPIMethod].
   ///
   /// - [requestMethod] the route request method.
-  bool apiMethod(MethodReflection apiMethod,
-      [APIRequestMethod? requestMethod]) {
+  bool apiMethod(
+    MethodReflection apiMethod, [
+    APIRequestMethod? requestMethod,
+  ]) {
     var classReflection = apiMethod.classReflection;
 
     if (classReflection.supperTypes.contains(APIModule) &&
@@ -517,12 +604,10 @@ class APIRouteBuilder<M extends APIModule> {
     } else {
       var noGlobalRules = methodRules.any((r) => r.noGlobalRules);
 
-      rules = noGlobalRules
-          ? methodRules
-          : [
-              ...methodRules,
-              ...classRules.where((r) => r.globalRules),
-            ];
+      rules =
+          noGlobalRules
+              ? methodRules
+              : [...methodRules, ...classRules.where((r) => r.globalRules)];
     }
 
     var config = apiMethod.annotations.whereType<APIRouteConfig>().firstOrNull;
@@ -534,8 +619,10 @@ class APIRouteBuilder<M extends APIModule> {
         returnTypeInfo = returnTypeInfo.arguments0!;
       }
 
-      assert(returnTypeInfo.isOf(APIResponse),
-          "Not an `APIResponse`: $returnTypeInfo -> $apiMethod");
+      assert(
+        returnTypeInfo.isOf(APIResponse),
+        "Not an `APIResponse`: $returnTypeInfo -> $apiMethod",
+      );
 
       APIRouteHandler routeHandler;
 
@@ -543,9 +630,20 @@ class APIRouteBuilder<M extends APIModule> {
         var paramName = apiMethod.normalParametersNames.first;
         var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
-        routeHandler = returnTypeInfo.hasArguments
-            ? returnTypeInfo.callCastedArgumentA(
-                <T>() => _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>(
+        routeHandler =
+            returnTypeInfo.hasArguments
+                ? returnTypeInfo.callCastedArgumentA(
+                  <T>() => _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>(
+                    module,
+                    requestMethod,
+                    apiMethod.name,
+                    apiMethod,
+                    parameters,
+                    rules,
+                    config,
+                  ),
+                )
+                : _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
                   module,
                   requestMethod,
                   apiMethod.name,
@@ -553,25 +651,28 @@ class APIRouteBuilder<M extends APIModule> {
                   parameters,
                   rules,
                   config,
-                ),
-              )
-            : _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
-                module,
-                requestMethod,
-                apiMethod.name,
-                apiMethod,
-                parameters,
-                rules,
-                config,
-              );
+                );
       } else {
-        var parameters = Map<String, TypeInfo>.fromEntries(apiMethod
-            .allParameters
-            .map((p) => MapEntry(p.name, TypeInfo.from(p))));
+        var parameters = Map<String, TypeInfo>.fromEntries(
+          apiMethod.allParameters.map(
+            (p) => MapEntry(p.name, TypeInfo.from(p)),
+          ),
+        );
 
-        routeHandler = returnTypeInfo.hasArguments
-            ? returnTypeInfo.callCastedArgumentA(
-                <T>() => _APIRouteHandlerAPIMethodReflection<T>(
+        routeHandler =
+            returnTypeInfo.hasArguments
+                ? returnTypeInfo.callCastedArgumentA(
+                  <T>() => _APIRouteHandlerAPIMethodReflection<T>(
+                    module,
+                    requestMethod,
+                    apiMethod.name,
+                    apiMethod,
+                    parameters,
+                    rules,
+                    config,
+                  ),
+                )
+                : _APIRouteHandlerAPIMethodReflection(
                   module,
                   requestMethod,
                   apiMethod.name,
@@ -579,17 +680,7 @@ class APIRouteBuilder<M extends APIModule> {
                   parameters,
                   rules,
                   config,
-                ),
-              )
-            : _APIRouteHandlerAPIMethodReflection(
-                module,
-                requestMethod,
-                apiMethod.name,
-                apiMethod,
-                parameters,
-                rules,
-                config,
-              );
+                );
       }
 
       addRouteHandler(routeHandler);
@@ -619,13 +710,18 @@ class APIRouteBuilder<M extends APIModule> {
 
   static final TypeInfo _typeInfoDecimal = TypeInfo.fromType(Decimal);
   static final TypeInfo _typeInfoDynamicInt = TypeInfo.fromType(DynamicInt);
-  static final TypeInfo _typeInfoDynamicNumber =
-      TypeInfo.fromType(DynamicNumber);
+  static final TypeInfo _typeInfoDynamicNumber = TypeInfo.fromType(
+    DynamicNumber,
+  );
 
   static final TypeInfo _typeInfoTime = TypeInfo.fromType(Time);
 
-  static Object? resolveValueByType(TypeInfo typeInfo, Object? value,
-      {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
+  static Object? resolveValueByType(
+    TypeInfo typeInfo,
+    Object? value, {
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  }) {
     if (value == null) {
       return null;
     } else if (typeInfo.type == value.runtimeType && !typeInfo.hasArguments) {
@@ -668,7 +764,11 @@ class APIRouteBuilder<M extends APIModule> {
       if (value is! Set) {
         if (arg0 != null) {
           var s = _resolveValueSetTypeAsListType(
-              arg0, value, entityCache, resolutionRules);
+            arg0,
+            value,
+            entityCache,
+            resolutionRules,
+          );
           if (s != null) return s;
         } else {
           value = TypeParser.parseSet(value) ?? value;
@@ -684,7 +784,11 @@ class APIRouteBuilder<M extends APIModule> {
         return typeInfo.castSet(value);
       } else if (arg0 != null) {
         var s = _resolveValueSetTypeAsListType(
-            arg0, value, entityCache, resolutionRules);
+          arg0,
+          value,
+          entityCache,
+          resolutionRules,
+        );
         if (s != null) return s;
       }
     } else if (typeInfo.isMap) {
@@ -722,8 +826,12 @@ class APIRouteBuilder<M extends APIModule> {
     }
 
     if (!typeInfo.isPrimitiveType) {
-      var o = _resolveValueAsEntity(typeInfo, value,
-          entityCache: entityCache, resolutionRules: resolutionRules);
+      var o = _resolveValueAsEntity(
+        typeInfo,
+        value,
+        entityCache: entityCache,
+        resolutionRules: resolutionRules,
+      );
       if (o != null) return o;
     }
 
@@ -731,12 +839,20 @@ class APIRouteBuilder<M extends APIModule> {
     return parsed ?? value;
   }
 
-  static Set? _resolveValueSetTypeAsListType(TypeInfo listType, Object value,
-      EntityCache? entityCache, EntityResolutionRules? resolutionRules) {
+  static Set? _resolveValueSetTypeAsListType(
+    TypeInfo listType,
+    Object value,
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  ) {
     var setTypeAsList = TypeInfo.fromListType(listType);
 
-    var l = resolveValueByType(setTypeAsList, value,
-        entityCache: entityCache, resolutionRules: resolutionRules);
+    var l = resolveValueByType(
+      setTypeAsList,
+      value,
+      entityCache: entityCache,
+      resolutionRules: resolutionRules,
+    );
 
     if (l is List) {
       return l.toSet();
@@ -794,8 +910,11 @@ class APIRouteBuilder<M extends APIModule> {
   }
 
   static Object? _resolveValueAsEntity(
-      TypeInfo parameterTypeInfo, Object? value,
-      {EntityCache? entityCache, EntityResolutionRules? resolutionRules}) {
+    TypeInfo parameterTypeInfo,
+    Object? value, {
+    EntityCache? entityCache,
+    EntityResolutionRules? resolutionRules,
+  }) {
     if (value == null) return null;
 
     entityCache ??= JsonEntityCacheSimple();
@@ -811,16 +930,30 @@ class APIRouteBuilder<M extends APIModule> {
       var listEntityType = parameterTypeInfo.listEntityType!;
 
       if (value is Iterable) {
-        var list = value
-            .map((e) => _resolveValueAsEntity(listEntityType, e,
-                entityCache: entityCache, resolutionRules: resolutionRules))
-            .toList();
+        var list =
+            value
+                .map(
+                  (e) => _resolveValueAsEntity(
+                    listEntityType,
+                    e,
+                    entityCache: entityCache,
+                    resolutionRules: resolutionRules,
+                  ),
+                )
+                .toList();
 
         return _castList(list, listEntityType);
       } else {
-        var list = TypeParser.parseList(value,
-            elementParser: (e) => _resolveValueAsEntity(listEntityType, e,
-                entityCache: entityCache, resolutionRules: resolutionRules));
+        var list = TypeParser.parseList(
+          value,
+          elementParser:
+              (e) => _resolveValueAsEntity(
+                listEntityType,
+                e,
+                entityCache: entityCache,
+                resolutionRules: resolutionRules,
+              ),
+        );
 
         if (list != null) {
           return _castList(list, listEntityType);
@@ -828,22 +961,28 @@ class APIRouteBuilder<M extends APIModule> {
       }
     } else if (!parameterTypeInfo.isBasicType) {
       if (value is Map) {
-        var classReflection = reflectionFactory
-            .getRegisterClassReflection(parameterTypeInfo.type);
+        var classReflection = reflectionFactory.getRegisterClassReflection(
+          parameterTypeInfo.type,
+        );
 
         if (classReflection != null) {
-          var map = value is Map<String, Object?>
-              ? value
-              : value.map((k, v) => MapEntry(k.toString(), v));
-          var o = classReflection.createFromMapSync(map,
-              entityCache: entityCache, resolutionRules: resolutionRules);
+          var map =
+              value is Map<String, Object?>
+                  ? value
+                  : value.map((k, v) => MapEntry(k.toString(), v));
+          var o = classReflection.createFromMapSync(
+            map,
+            entityCache: entityCache,
+            resolutionRules: resolutionRules,
+          );
           if (o != null) {
             return o;
           }
         }
       } else if (value is String) {
-        var enumReflection =
-            reflectionFactory.getRegisterEnumReflection(parameterTypeInfo.type);
+        var enumReflection = reflectionFactory.getRegisterEnumReflection(
+          parameterTypeInfo.type,
+        );
 
         if (enumReflection != null) {
           var o = enumReflection.from(value);
@@ -860,17 +999,22 @@ class APIRouteBuilder<M extends APIModule> {
   static List _castList(List<Object?> list, TypeInfo typeInfo) {
     var reflectionFactory = ReflectionFactory();
 
-    var classReflection =
-        reflectionFactory.getRegisterClassReflection(typeInfo.type);
+    var classReflection = reflectionFactory.getRegisterClassReflection(
+      typeInfo.type,
+    );
     if (classReflection != null) {
       var nullable = list.any((e) => e == null);
-      return classReflection.castList(list, typeInfo.type,
-              nullable: nullable) ??
+      return classReflection.castList(
+            list,
+            typeInfo.type,
+            nullable: nullable,
+          ) ??
           list;
     }
 
-    var enumReflection =
-        reflectionFactory.getRegisterEnumReflection(typeInfo.type);
+    var enumReflection = reflectionFactory.getRegisterEnumReflection(
+      typeInfo.type,
+    );
     if (enumReflection != null) {
       var nullable = list.any((e) => e == null);
       return enumReflection.castList(list, typeInfo.type, nullable: nullable) ??
@@ -881,14 +1025,15 @@ class APIRouteBuilder<M extends APIModule> {
   }
 
   List<APIRouteInfo> apiInfo([APIRequest? apiRequest]) {
-    var routesHandlers = <APIRouteHandler>[
-      ...module._routesHandlers.values,
-      ...module._routesHandlersGET.values,
-      ...module._routesHandlersPOST.values,
-      ...module._routesHandlersPATH.values,
-      ...module._routesHandlersPUT.values,
-      ...module._routesHandlersDELETE.values,
-    ].toDistinctList();
+    var routesHandlers =
+        <APIRouteHandler>[
+          ...module._routesHandlers.values,
+          ...module._routesHandlersGET.values,
+          ...module._routesHandlersPOST.values,
+          ...module._routesHandlersPATH.values,
+          ...module._routesHandlersPUT.values,
+          ...module._routesHandlersDELETE.values,
+        ].toDistinctList();
 
     var info = routesHandlers.map((e) => e.apiInfo(apiRequest)).toList();
     return info;
@@ -904,25 +1049,25 @@ class APIModuleProxy extends ClassProxy {
     super.libraryPath,
     Set<String> ignoreMethods = const <String>{},
   }) : super(
-            ignoreMethods: APIModule.interfaceMethodsNames,
-            ignoreMethods2: ignoreMethods,
-            alwaysReturnFuture: true,
-            traverseReturnTypes: const {
-              APIResponse
-            },
-            ignoreParametersTypes: const {
-              APIRequest,
-              APICredential,
-              APIAuthentication,
-            });
+         ignoreMethods: APIModule.interfaceMethodsNames,
+         ignoreMethods2: ignoreMethods,
+         alwaysReturnFuture: true,
+         traverseReturnTypes: const {APIResponse},
+         ignoreParametersTypes: const {
+           APIRequest,
+           APICredential,
+           APIAuthentication,
+         },
+       );
 }
 
-typedef APIModuleProxyTargetResolver = ClassProxyListener<T>? Function<T>(
-  Object target,
-  String? moduleName,
-  bool? responsesAsJson,
-  APIModuleProxyResponseErrorHandler? errorHandler,
-);
+typedef APIModuleProxyTargetResolver =
+    ClassProxyListener<T>? Function<T>(
+      Object target,
+      String? moduleName,
+      bool? responsesAsJson,
+      APIModuleProxyResponseErrorHandler? errorHandler,
+    );
 
 /// A [APIModuleProxy] caller for a specific module ([moduleName]).
 ///
@@ -933,24 +1078,30 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   /// Registers a target resolver.
   /// See [registerTargetResolver] and [resolveTarget].
   static bool registerTargetResolver(
-          APIModuleProxyTargetResolver targetResolver) =>
-      _targetResolvers.add(targetResolver);
+    APIModuleProxyTargetResolver targetResolver,
+  ) => _targetResolvers.add(targetResolver);
 
   /// Unregisters a target resolver.
   /// See [registerTargetResolver] and [resolveTarget].
   static bool unregisterTargetResolver(
-          APIModuleProxyTargetResolver targetResolver) =>
-      _targetResolvers.remove(targetResolver);
+    APIModuleProxyTargetResolver targetResolver,
+  ) => _targetResolvers.remove(targetResolver);
 
   /// Resolves [target] to a [ClassProxyListener].
   /// See [registerTargetResolver].
-  static ClassProxyListener<T> resolveTarget<T>(Object target,
-      {String? moduleName,
-      bool? responsesAsJson,
-      APIModuleProxyResponseErrorHandler? errorHandler}) {
+  static ClassProxyListener<T> resolveTarget<T>(
+    Object target, {
+    String? moduleName,
+    bool? responsesAsJson,
+    APIModuleProxyResponseErrorHandler? errorHandler,
+  }) {
     for (var resolver in _targetResolvers) {
-      var targetResolved =
-          resolver<T>(target, moduleName, responsesAsJson, errorHandler);
+      var targetResolved = resolver<T>(
+        target,
+        moduleName,
+        responsesAsJson,
+        errorHandler,
+      );
       if (targetResolved != null) return targetResolved;
     }
 
@@ -958,11 +1109,12 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
 
     if (target is HttpClient) {
       return APIModuleProxyHttpCaller(
-        target,
-        moduleRoute: moduleName,
-        responsesAsJson: responsesAsJson,
-        errorHandler: errorHandler,
-      ) as ClassProxyListener<T>;
+            target,
+            moduleRoute: moduleName,
+            responsesAsJson: responsesAsJson,
+            errorHandler: errorHandler,
+          )
+          as ClassProxyListener<T>;
     }
 
     throw StateError("Can't resolve `APIModuleProxyListener` target: $target");
@@ -971,14 +1123,19 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
   /// The [APIModule] name.
   final String moduleName;
 
-  APIModuleProxyCaller(Object target,
-      {required this.moduleName,
-      bool? responsesAsJson,
-      APIModuleProxyResponseErrorHandler? errorHandler})
-      : super(resolveTarget(target,
-            moduleName: moduleName,
-            responsesAsJson: responsesAsJson,
-            errorHandler: errorHandler));
+  APIModuleProxyCaller(
+    Object target, {
+    required this.moduleName,
+    bool? responsesAsJson,
+    APIModuleProxyResponseErrorHandler? errorHandler,
+  }) : super(
+         resolveTarget(
+           target,
+           moduleName: moduleName,
+           responsesAsJson: responsesAsJson,
+           errorHandler: errorHandler,
+         ),
+       );
 }
 
 abstract class APIModuleProxyCallerError extends Error
@@ -1008,15 +1165,17 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
   final String? methodName;
   final Map<String, Object?>? parameters;
 
-  APIModuleProxyCallerResponseError(super.message,
-      {this.request,
-      this.response,
-      this.responseStatus,
-      this.responseError,
-      this.responseStackTrace,
-      this.module,
-      this.methodName,
-      this.parameters});
+  APIModuleProxyCallerResponseError(
+    super.message, {
+    this.request,
+    this.response,
+    this.responseStatus,
+    this.responseError,
+    this.responseStackTrace,
+    this.module,
+    this.methodName,
+    this.parameters,
+  });
 
   APIResponse? get apiResponse {
     var response = this.response;
@@ -1079,7 +1238,8 @@ abstract class APIModuleProxyCallerListener<T>
     // print(Json.dumpRuntimeTypes(json));
 
     var jsonDecoder = Json.decoder(
-        entityHandlerProvider: EntityHandlerProvider.globalProvider);
+      entityHandlerProvider: EntityHandlerProvider.globalProvider,
+    );
 
     return mainType.fromJson(json, jsonDecoder: jsonDecoder);
   }
@@ -1101,20 +1261,30 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
   /// The default response error handler. See [errorHandler].
   static APIModuleProxyResponseErrorHandler? defaultErrorHandler;
 
-  APIModuleProxyDirectCaller(this.api,
-      {required this.moduleName,
-      this.credential,
-      bool? responsesAsJson,
-      this.errorHandler})
-      : responsesAsJson = responsesAsJson ?? true;
+  APIModuleProxyDirectCaller(
+    this.api, {
+    required this.moduleName,
+    this.credential,
+    bool? responsesAsJson,
+    this.errorHandler,
+  }) : responsesAsJson = responsesAsJson ?? true;
 
   APICredential? credential;
 
   @override
-  FutureOr onCall(T instance, String methodName,
-      Map<String, dynamic> parameters, TypeReflection? returnType) async {
-    var response = api.call(APIRequest.get('$moduleName/$methodName',
-        parameters: parameters, credential: credential));
+  FutureOr onCall(
+    T instance,
+    String methodName,
+    Map<String, dynamic> parameters,
+    TypeReflection? returnType,
+  ) async {
+    var response = api.call(
+      APIRequest.get(
+        '$moduleName/$methodName',
+        parameters: parameters,
+        credential: credential,
+      ),
+    );
 
     return response.resolveMapped((response) {
       if (response.isError) {
@@ -1129,7 +1299,8 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
           parameters: parameters,
         );
 
-        var errorHandler = this.errorHandler ??
+        var errorHandler =
+            this.errorHandler ??
             defaultErrorHandler ??
             APIModuleProxyCallerListener.defaultErrorHandler;
 
@@ -1166,9 +1337,15 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
           var accessRules = routeHandler.entityAccessRules;
 
           if (!accessRules.isInnocuous) {
-            return Json.toJson(payload,
-                toEncodableProvider: (o) => accessRules.toJsonEncodable(
-                    apiRequest, Json.defaultToEncodableJsonProvider(), o));
+            return Json.toJson(
+              payload,
+              toEncodableProvider:
+                  (o) => accessRules.toJsonEncodable(
+                    apiRequest,
+                    Json.defaultToEncodableJsonProvider(),
+                    o,
+                  ),
+            );
           }
         }
       }
@@ -1178,13 +1355,15 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
   }
 }
 
-typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
-    APIModuleProxyHttpCaller proxy,
-    String methodName,
-    Map<String, Object?> parameters);
+typedef APIModuleHttpProxyRequestHandler =
+    FutureOr<dynamic>? Function(
+      APIModuleProxyHttpCaller proxy,
+      String methodName,
+      Map<String, Object?> parameters,
+    );
 
-typedef APIModuleProxyResponseErrorHandler = void Function(
-    APIModuleProxyCallerResponseError responseError);
+typedef APIModuleProxyResponseErrorHandler =
+    void Function(APIModuleProxyCallerResponseError responseError);
 
 /// An [APIModuleProxy] caller that performs HTTP requests.
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].
@@ -1205,10 +1384,13 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   /// If `false` will treat as response only of `Content-Type` is JSON or JavaScript ([HttpResponse.isBodyTypeJSON]).
   final bool responsesAsJson;
 
-  APIModuleProxyHttpCaller(this.httpClient,
-      {String? moduleRoute, bool? responsesAsJson, this.errorHandler})
-      : modulePath = _normalizeModulePath(moduleRoute),
-        responsesAsJson = responsesAsJson ?? true {
+  APIModuleProxyHttpCaller(
+    this.httpClient, {
+    String? moduleRoute,
+    bool? responsesAsJson,
+    this.errorHandler,
+  }) : modulePath = _normalizeModulePath(moduleRoute),
+       responsesAsJson = responsesAsJson ?? true {
     BonesAPI.boot();
   }
 
@@ -1229,8 +1411,11 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
 
   APIModuleHttpProxyRequestHandler? requestHandler;
 
-  Future<dynamic> doRequest(String methodName, Map<String, Object?> parameters,
-      TypeReflection? returnType) async {
+  Future<dynamic> doRequest(
+    String methodName,
+    Map<String, Object?> parameters,
+    TypeReflection? returnType,
+  ) async {
     var requestHandler = this.requestHandler;
 
     if (requestHandler != null) {
@@ -1260,7 +1445,8 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
 
     if (returnType != null) {
       var type = returnType.type;
-      returnsBytes = type == Uint8List ||
+      returnsBytes =
+          type == Uint8List ||
           ((type == Future || type == FutureOr) &&
               returnType.arguments0?.type == Uint8List);
     }
@@ -1324,7 +1510,8 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
         parameters: parameters,
       );
 
-      final errorHandler = this.errorHandler ??
+      final errorHandler =
+          this.errorHandler ??
           defaultErrorHandler ??
           APIModuleProxyCallerListener.defaultErrorHandler;
 
@@ -1458,8 +1645,12 @@ class APIModuleProxyHttpCaller<T> extends APIModuleProxyCallerListener<T> {
   }
 
   @override
-  Future onCall(dynamic instance, String methodName,
-      Map<String, Object?> parameters, TypeReflection? returnType) async {
+  Future onCall(
+    dynamic instance,
+    String methodName,
+    Map<String, Object?> parameters,
+    TypeReflection? returnType,
+  ) async {
     var json = await doRequest(methodName, parameters, returnType);
     return resolveResponse(returnType, json);
   }
@@ -1469,14 +1660,14 @@ class _APIRouteHandlerAPIMethodAPIRequest extends APIRouteHandler {
   final MethodReflection apiMethod;
 
   _APIRouteHandlerAPIMethodAPIRequest(
-      super.module,
-      super.requestMethod,
-      super.routeName,
-      this.apiMethod,
-      super.parameters,
-      super.rules,
-      super.config)
-      : super();
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    this.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
 
   @override
   FutureOr<APIResponse> callImpl(APIRequest request) {
@@ -1498,14 +1689,14 @@ abstract class _APIRouteHandlerAPIMethodAPIResponse<T>
   final MethodReflection apiMethod;
 
   _APIRouteHandlerAPIMethodAPIResponse(
-      super.module,
-      super.requestMethod,
-      super.routeName,
-      this.apiMethod,
-      super.parameters,
-      super.rules,
-      super.config)
-      : super();
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    this.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
 
   FutureOr<APIResponse<T?>> castAPIResponse(Object? ret) {
     if (ret is Future) {
@@ -1525,24 +1716,28 @@ abstract class _APIRouteHandlerAPIMethodAPIResponse<T>
     }
   }
 
-  APIResponse<T?> _castErrorAPIResponse(Object? r, Object e, StackTrace s) =>
-      APIResponse.error(
-          error:
-              "Call didn't returned an `APIResponse<$T?>`. Returned type: ${r.runtimeType} > $apiMethod\n$e",
-          stackTrace: s);
+  APIResponse<T?> _castErrorAPIResponse(
+    Object? r,
+    Object e,
+    StackTrace s,
+  ) => APIResponse.error(
+    error:
+        "Call didn't returned an `APIResponse<$T?>`. Returned type: ${r.runtimeType} > $apiMethod\n$e",
+    stackTrace: s,
+  );
 }
 
 class _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>
     extends _APIRouteHandlerAPIMethodAPIResponse<T> {
   _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
-      super.module,
-      super.requestMethod,
-      super.routeName,
-      super.apiMethod,
-      super.parameters,
-      super.rules,
-      super.config)
-      : super();
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    super.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
 
   @override
   FutureOr<APIResponse<T?>> callImpl(APIRequest request) {
@@ -1558,14 +1753,14 @@ class _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>
 class _APIRouteHandlerAPIMethodReflection<T>
     extends _APIRouteHandlerAPIMethodAPIResponse<T> {
   _APIRouteHandlerAPIMethodReflection(
-      super.module,
-      super.requestMethod,
-      super.routeName,
-      super.apiMethod,
-      super.parameters,
-      super.rules,
-      super.config)
-      : super();
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    super.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
 
   @override
   FutureOr<APIResponse<T?>> callImpl(APIRequest request) {
@@ -1575,11 +1770,14 @@ class _APIRouteHandlerAPIMethodReflection<T>
   }
 
   MethodInvocation _resolveMethodInvocation(
-      MethodReflection method, APIRequest request) {
+    MethodReflection method,
+    APIRequest request,
+  ) {
     final payloadIsParametersMap = _isPayloadParametersMap(method, request);
 
-    var methodInvocation = method.methodInvocation((p, i) =>
-        _resolveRequestParameter(request, p, i, payloadIsParametersMap));
+    var methodInvocation = method.methodInvocation(
+      (p, i) => _resolveRequestParameter(request, p, i, payloadIsParametersMap),
+    );
 
     return methodInvocation;
   }
@@ -1592,18 +1790,20 @@ class _APIRouteHandlerAPIMethodReflection<T>
 
     if (payload.isEmpty && allParametersNames.isNotEmpty) return false;
 
-    var hasNonParameterKey =
-        payload.keys.any((k) => !allParametersNames.containsIgnoreCase(k));
+    var hasNonParameterKey = payload.keys.any(
+      (k) => !allParametersNames.containsIgnoreCase(k),
+    );
 
     return !hasNonParameterKey;
   }
 
   static Object? _resolveRequestParameter(
-      APIRequest request,
-      ParameterReflection parameter,
-      int? parameterIndex,
-      bool payloadIsParametersMap,
-      {EntityResolutionRules? resolutionRules}) {
+    APIRequest request,
+    ParameterReflection parameter,
+    int? parameterIndex,
+    bool payloadIsParametersMap, {
+    EntityResolutionRules? resolutionRules,
+  }) {
     var parameterTypeInfo = parameter.type.typeInfo;
 
     if (parameterTypeInfo.isOf(APIRequest)) {
@@ -1634,15 +1834,20 @@ class _APIRouteHandlerAPIMethodReflection<T>
           } else if (payload is Map &&
               EntityHandler.isValidEntityType(parameterTypeInfo.type)) {
             return APIRouteBuilder._resolveValueAsEntity(
-                parameterTypeInfo, payload,
-                resolutionRules: resolutionRules);
+              parameterTypeInfo,
+              payload,
+              resolutionRules: resolutionRules,
+            );
           } else if (payload is List &&
               parameterTypeInfo.isListEntity &&
               EntityHandler.isValidEntityType(
-                  parameterTypeInfo.listEntityType!.type)) {
+                parameterTypeInfo.listEntityType!.type,
+              )) {
             return APIRouteBuilder._resolveValueAsEntity(
-                parameterTypeInfo, payload,
-                resolutionRules: resolutionRules);
+              parameterTypeInfo,
+              payload,
+              resolutionRules: resolutionRules,
+            );
           }
         }
       }

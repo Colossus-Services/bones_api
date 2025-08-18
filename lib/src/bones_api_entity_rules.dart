@@ -56,15 +56,17 @@ class MergeEntityRulesError<R extends EntityRules<R>> extends Error {
 enum EntityAccessRuleType { allow, block, mask }
 
 /// An [EntityAccessRules.condition].
-typedef EntityAccessRulesCondition = bool Function(
-    EntityAccessRulesContext? context);
+typedef EntityAccessRulesCondition =
+    bool Function(EntityAccessRulesContext? context);
 
 /// An [EntityAccessRules.masker].
-typedef EntityAccessRulesMasker = Object? Function(
-    EntityAccessRulesContext? context,
-    Object object,
-    String field,
-    Object? value);
+typedef EntityAccessRulesMasker =
+    Object? Function(
+      EntityAccessRulesContext? context,
+      Object object,
+      String field,
+      Object? value,
+    );
 
 /// An [EntityAccessRules] context passed to rules with a condition ([EntityAccessRulesCondition]).
 class EntityAccessRulesContext {
@@ -105,84 +107,97 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
   final bool _simplified;
 
-  const EntityAccessRules(
-      {this.ruleType,
-      this.entityType,
-      this.entityFields,
-      this.rules,
-      this.condition,
-      this.masker})
-      : _simplified = false,
-        super(ruleType == null &&
-            entityType == null &&
-            entityFields == null &&
-            rules == null);
+  const EntityAccessRules({
+    this.ruleType,
+    this.entityType,
+    this.entityFields,
+    this.rules,
+    this.condition,
+    this.masker,
+  }) : _simplified = false,
+       super(
+         ruleType == null &&
+             entityType == null &&
+             entityFields == null &&
+             rules == null,
+       );
 
-  const EntityAccessRules._simplified(this.ruleType, this.entityType,
-      this.entityFields, this.rules, this.condition, this.masker)
-      : _simplified = true,
-        super(false);
+  const EntityAccessRules._simplified(
+    this.ruleType,
+    this.entityType,
+    this.entityFields,
+    this.rules,
+    this.condition,
+    this.masker,
+  ) : _simplified = true,
+      super(false);
 
   const EntityAccessRules.group(List<EntityAccessRules> rules)
-      :
-        // ignore: prefer_initializing_formals
-        rules = rules,
-        ruleType = null,
-        entityType = null,
-        entityFields = null,
-        condition = null,
-        masker = null,
-        _simplified = false,
-        super(false);
+    : rules = rules, // ignore: prefer_initializing_formals
+      ruleType = null,
+      entityType = null,
+      entityFields = null,
+      condition = null,
+      masker = null,
+      _simplified = false,
+      super(false);
 
-  const EntityAccessRules.block(Type entityType,
-      {this.entityFields, this.condition})
-      :
-        // ignore: prefer_initializing_formals
-        entityType = entityType,
-        ruleType = EntityAccessRuleType.block,
-        rules = null,
-        masker = null,
-        _simplified = false,
-        super(false);
+  const EntityAccessRules.block(
+    Type entityType, {
+    this.entityFields,
+    this.condition,
+  }) : entityType = entityType, // ignore: prefer_initializing_formals
+       ruleType = EntityAccessRuleType.block,
+       rules = null,
+       masker = null,
+       _simplified = false,
+       super(false);
 
   const EntityAccessRules.blockFields(
-      Type entityType, List<String> entityFields,
-      {EntityAccessRulesCondition? condition})
-      : this.block(entityType,
-            entityFields: entityFields, condition: condition);
+    Type entityType,
+    List<String> entityFields, {
+    EntityAccessRulesCondition? condition,
+  }) : this.block(entityType, entityFields: entityFields, condition: condition);
 
-  const EntityAccessRules.allow(Type entityType,
-      {this.entityFields, this.condition})
-      :
-        // ignore: prefer_initializing_formals
-        entityType = entityType,
-        ruleType = EntityAccessRuleType.allow,
-        rules = null,
-        masker = null,
-        _simplified = false,
-        super(false);
+  const EntityAccessRules.allow(
+    Type entityType, {
+    this.entityFields,
+    this.condition,
+  }) : entityType = entityType, // ignore: prefer_initializing_formals
+       ruleType = EntityAccessRuleType.allow,
+       rules = null,
+       masker = null,
+       _simplified = false,
+       super(false);
 
   const EntityAccessRules.allowFields(
-      Type entityType, List<String> entityFields,
-      {EntityAccessRulesCondition? condition})
-      : this.allow(entityType,
-            entityFields: entityFields, condition: condition);
+    Type entityType,
+    List<String> entityFields, {
+    EntityAccessRulesCondition? condition,
+  }) : this.allow(entityType, entityFields: entityFields, condition: condition);
 
-  const EntityAccessRules.mask(Type entityType,
-      {this.entityFields, this.condition, this.masker})
-      :
-        // ignore: prefer_initializing_formals
-        entityType = entityType,
-        ruleType = EntityAccessRuleType.mask,
-        rules = null,
-        _simplified = false,
-        super(false);
+  const EntityAccessRules.mask(
+    Type entityType, {
+    this.entityFields,
+    this.condition,
+    this.masker,
+  }) : entityType = entityType, // ignore: prefer_initializing_formals
+       ruleType = EntityAccessRuleType.mask,
+       rules = null,
+       _simplified = false,
+       super(false);
 
-  const EntityAccessRules.maskFields(Type entityType, List<String> entityFields,
-      {EntityAccessRulesCondition? condition, EntityAccessRulesMasker? masker})
-      : this.mask(entityType,
-            entityFields: entityFields, condition: condition, masker: masker);
+  const EntityAccessRules.maskFields(
+    Type entityType,
+    List<String> entityFields, {
+    EntityAccessRulesCondition? condition,
+    EntityAccessRulesMasker? masker,
+  }) : this.mask(
+         entityType,
+         entityFields: entityFields,
+         condition: condition,
+         masker: masker,
+       );
 
   /// Returns the total number of applicable rules, including nested rules when present.
   int totalRules() {
@@ -310,8 +325,11 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     return rules != null && rules.any((r) => r.hasRuleForEntityTypeField(type));
   }
 
-  bool? isAllowedEntityTypeField(Type type, String field,
-      {EntityAccessRulesContext? context}) {
+  bool? isAllowedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+  }) {
     if (isInnocuous) return null;
 
     final entityFields = this.entityFields;
@@ -361,8 +379,12 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     return null;
   }
 
-  bool? isMaskedEntityTypeField(Type type, String field,
-      {EntityAccessRulesContext? context, bool direct = false}) {
+  bool? isMaskedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+    bool direct = false,
+  }) {
     if (isInnocuous) return null;
 
     final entityFields = this.entityFields;
@@ -391,13 +413,22 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     return null;
   }
 
-  V applyMask<O extends Object, V>(O object, String field, V value,
-      {EntityAccessRulesContext? context, Type? type}) {
+  V applyMask<O extends Object, V>(
+    O object,
+    String field,
+    V value, {
+    EntityAccessRulesContext? context,
+    Type? type,
+  }) {
     type ??= object.runtimeType;
 
     if (ruleType == EntityAccessRuleType.mask) {
-      var m =
-          isMaskedEntityTypeField(type, field, context: context, direct: true);
+      var m = isMaskedEntityTypeField(
+        type,
+        field,
+        context: context,
+        direct: true,
+      );
       if (m != null && m) {
         return _applyMask(context, object, field, value);
       }
@@ -409,8 +440,12 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     var hasSubGroupRule = false;
     for (var rule in rules) {
       if (rule.ruleType == EntityAccessRuleType.mask) {
-        var m = rule.isMaskedEntityTypeField(type, field,
-            context: context, direct: true);
+        var m = rule.isMaskedEntityTypeField(
+          type,
+          field,
+          context: context,
+          direct: true,
+        );
         if (m != null && m) {
           return rule._applyMask(context, object, field, value);
         }
@@ -424,8 +459,13 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
         if (rule.ruleType == null) {
           var m = rule.isMaskedEntityTypeField(type, field, context: context);
           if (m != null && m) {
-            return rule.applyMask(object, field, value,
-                context: context, type: type);
+            return rule.applyMask(
+              object,
+              field,
+              value,
+              context: context,
+              type: type,
+            );
           }
         }
       }
@@ -435,7 +475,11 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
   }
 
   V _applyMask<O extends Object, V>(
-      EntityAccessRulesContext? context, O object, String field, V value) {
+    EntityAccessRulesContext? context,
+    O object,
+    String field,
+    V value,
+  ) {
     var masker = this.masker;
 
     if (masker != null) {
@@ -446,7 +490,11 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
   }
 
   static V defaultMask<O extends Object, V>(
-      EntityAccessRulesContext? context, O object, String field, V value) {
+    EntityAccessRulesContext? context,
+    O object,
+    String field,
+    V value,
+  ) {
     if (value == null) return null as V;
 
     if (value is String) return '' as V;
@@ -509,23 +557,31 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
     return s._isInnocuousImpl()
         ? EntityAccessRules.innocuous
-        : EntityAccessRules._simplified(s.ruleType, s.entityType,
-            s.entityFields, s.rules, s.condition, s.masker);
+        : EntityAccessRules._simplified(
+          s.ruleType,
+          s.entityType,
+          s.entityFields,
+          s.rules,
+          s.condition,
+          s.masker,
+        );
   }
 
   EntityAccessRules _simplifiedImpl() {
     var rules = this.rules;
     if (rules == null || rules.isEmpty) return this;
 
-    final rulesSimple =
-        rules.where((r) => !r.isInnocuous).map((r) => r.simplified());
+    final rulesSimple = rules
+        .where((r) => !r.isInnocuous)
+        .map((r) => r.simplified());
 
-    var rulesSimpleFlat = rulesSimple.expand((r) {
-      var rules = r.rules;
-      return rules != null && rules.isNotEmpty && r.entityType == null
-          ? rules
-          : [r];
-    }).toList();
+    var rulesSimpleFlat =
+        rulesSimple.expand((r) {
+          var rules = r.rules;
+          return rules != null && rules.isNotEmpty && r.entityType == null
+              ? rules
+              : [r];
+        }).toList();
 
     if (entityType != null) {
       var r1 = copyWith(rules: []);
@@ -558,13 +614,15 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     var rulesA = a.rules;
     var rulesB = b.rules;
 
-    var listA = rulesA != null && rulesA.isNotEmpty && a.entityType == null
-        ? rulesA
-        : [a];
+    var listA =
+        rulesA != null && rulesA.isNotEmpty && a.entityType == null
+            ? rulesA
+            : [a];
 
-    var listB = rulesB != null && rulesB.isNotEmpty && b.entityType == null
-        ? rulesB
-        : [b];
+    var listB =
+        rulesB != null && rulesB.isNotEmpty && b.entityType == null
+            ? rulesB
+            : [b];
 
     var allRules = [...listA, ...listB];
 
@@ -613,27 +671,32 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
     var propsStr = props.isNotEmpty ? '{${props.join(', ')}}' : '';
 
     final rules = this.rules;
-    var rulesStr = rules != null && rules.isNotEmpty
-        ? '<\n  ${rules.join('\n  ')}\n>'
-        : '';
+    var rulesStr =
+        rules != null && rules.isNotEmpty
+            ? '<\n  ${rules.join('\n  ')}\n>'
+            : '';
 
     return 'EntityAccessRules$ruleTypeStr$propsStr$rulesStr';
   }
 
   @override
-  Map<String, Object?> toJson() => isInnocuous
-      ? <String, Object?>{}
-      : <String, Object?>{
-          if (ruleType != null) 'ruleType': ruleType?.name,
-          if (entityType != null) 'entityType': '$entityType',
-          if (entityFields != null && entityFields!.isNotEmpty)
-            'entityFields': entityFields,
-          if (rules != null && rules!.isNotEmpty)
-            'rules': rules!.map((e) => e.toJson()).toList(),
-        };
+  Map<String, Object?> toJson() =>
+      isInnocuous
+          ? <String, Object?>{}
+          : <String, Object?>{
+            if (ruleType != null) 'ruleType': ruleType?.name,
+            if (entityType != null) 'entityType': '$entityType',
+            if (entityFields != null && entityFields!.isNotEmpty)
+              'entityFields': entityFields,
+            if (rules != null && rules!.isNotEmpty)
+              'rules': rules!.map((e) => e.toJson()).toList(),
+          };
 
-  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
-      ToEncodableJsonProvider encodableJsonProvider, Object o) {
+  ToEncodableJson? toJsonEncodable(
+    APIRequest apiRequest,
+    ToEncodableJsonProvider encodableJsonProvider,
+    Object o,
+  ) {
     if (o is EntityReferenceList ||
         o is DateTime ||
         o is Time ||
@@ -666,8 +729,9 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
       Object? map;
       if (enc == null) {
-        var classReflection =
-            ReflectionFactory().getRegisterClassReflection(o.runtimeType);
+        var classReflection = ReflectionFactory().getRegisterClassReflection(
+          o.runtimeType,
+        );
 
         if (classReflection != null) {
           map = classReflection.toMapFromFields(o);
@@ -684,8 +748,10 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
       var c = EntityAccessRulesContext(this, o, context: apiRequest);
 
-      if (hasRuleType(
-          const [EntityAccessRuleType.allow, EntityAccessRuleType.block])) {
+      if (hasRuleType(const [
+        EntityAccessRuleType.allow,
+        EntityAccessRuleType.block,
+      ])) {
         map.removeWhere((key, _) {
           var allowed = isAllowedEntityTypeField(t, key, context: c);
           return allowed != null && !allowed;
@@ -764,7 +830,9 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   @override
   bool hasRuleForEntityType(Type type) => _hasRuleForEntityType.putIfAbsent(
-      type, () => accessRules.hasRuleForEntityType(type));
+    type,
+    () => accessRules.hasRuleForEntityType(type),
+  );
 
   final Map<_CacheKey, bool> _hasRuleType = <_CacheKey, bool>{};
 
@@ -772,7 +840,9 @@ class EntityAccessRulesCached implements EntityAccessRules {
   bool hasRuleType(List<EntityAccessRuleType> ruleTypes) {
     final cacheKey = _CacheKey(ruleTypes);
     return _hasRuleType.putIfAbsent(
-        cacheKey, () => accessRules.hasRuleType(ruleTypes));
+      cacheKey,
+      () => accessRules.hasRuleType(ruleTypes),
+    );
   }
 
   final Map<Type, bool> _hasRuleForEntityTypeField = <Type, bool>{};
@@ -785,26 +855,47 @@ class EntityAccessRulesCached implements EntityAccessRules {
   bool? isAllowedEntityType(Type type) => accessRules.isAllowedEntityType(type);
 
   @override
-  bool? isAllowedEntityTypeField(Type type, String field,
-          {EntityAccessRulesContext? context}) =>
-      accessRules.isAllowedEntityTypeField(type, field, context: context);
+  bool? isAllowedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+  }) => accessRules.isAllowedEntityTypeField(type, field, context: context);
 
   @override
-  bool? isMaskedEntityTypeField(Type type, String field,
-          {EntityAccessRulesContext? context, bool direct = false}) =>
-      accessRules.isMaskedEntityTypeField(type, field,
-          context: context, direct: direct);
+  bool? isMaskedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+    bool direct = false,
+  }) => accessRules.isMaskedEntityTypeField(
+    type,
+    field,
+    context: context,
+    direct: direct,
+  );
 
   @override
-  V applyMask<O extends Object, V>(O object, String field, V value,
-          {EntityAccessRulesContext? context, Type? type}) =>
-      accessRules.applyMask<O, V>(object, field, value,
-          context: context, type: type);
+  V applyMask<O extends Object, V>(
+    O object,
+    String field,
+    V value, {
+    EntityAccessRulesContext? context,
+    Type? type,
+  }) => accessRules.applyMask<O, V>(
+    object,
+    field,
+    value,
+    context: context,
+    type: type,
+  );
 
   @override
   V _applyMask<O extends Object, V>(
-          EntityAccessRulesContext? context, O object, String field, V value) =>
-      accessRules._applyMask<O, V>(context, object, field, value);
+    EntityAccessRulesContext? context,
+    O object,
+    String field,
+    V value,
+  ) => accessRules._applyMask<O, V>(context, object, field, value);
 
   @override
   EntityAccessRules copyWith({
@@ -813,14 +904,13 @@ class EntityAccessRulesCached implements EntityAccessRules {
     List<String>? entityFields,
     List<EntityAccessRules>? rules,
     EntityAccessRulesCondition? condition,
-  }) =>
-      accessRules.copyWith(
-        ruleType: ruleType,
-        entityType: entityType,
-        entityFields: entityFields,
-        rules: rules,
-        condition: condition,
-      );
+  }) => accessRules.copyWith(
+    ruleType: ruleType,
+    entityType: entityType,
+    entityFields: entityFields,
+    rules: rules,
+    condition: condition,
+  );
 
   @override
   EntityAccessRules merge(EntityAccessRules? other) => accessRules.merge(other);
@@ -850,9 +940,11 @@ class EntityAccessRulesCached implements EntityAccessRules {
   Map<String, Object?> toJson() => accessRules.toJson();
 
   @override
-  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
-          ToEncodableJsonProvider encodableJsonProvider, Object o) =>
-      accessRules.toJsonEncodable(apiRequest, encodableJsonProvider, o);
+  ToEncodableJson? toJsonEncodable(
+    APIRequest apiRequest,
+    ToEncodableJsonProvider encodableJsonProvider,
+    Object o,
+  ) => accessRules.toJsonEncodable(apiRequest, encodableJsonProvider, o);
 }
 
 class _CacheKey<T> {
@@ -896,14 +988,13 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
     List<String>? entityFields,
     List<EntityAccessRules>? rules,
     EntityAccessRulesCondition? condition,
-  }) =>
-      EntityAccessRules(
-        ruleType: ruleType,
-        entityType: entityType,
-        entityFields: entityFields,
-        rules: rules,
-        condition: condition,
-      );
+  }) => EntityAccessRules(
+    ruleType: ruleType,
+    entityType: entityType,
+    entityFields: entityFields,
+    rules: rules,
+    condition: condition,
+  );
 
   @override
   bool get isInnocuous => true;
@@ -951,24 +1042,36 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
   bool? isAllowedEntityType(Type type) => null;
 
   @override
-  bool? isAllowedEntityTypeField(Type type, String field,
-          {EntityAccessRulesContext? context}) =>
-      null;
+  bool? isAllowedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+  }) => null;
 
   @override
-  bool? isMaskedEntityTypeField(Type type, String field,
-          {EntityAccessRulesContext? context, bool direct = false}) =>
-      null;
+  bool? isMaskedEntityTypeField(
+    Type type,
+    String field, {
+    EntityAccessRulesContext? context,
+    bool direct = false,
+  }) => null;
 
   @override
-  V applyMask<O extends Object, V>(O object, String field, V value,
-          {EntityAccessRulesContext? context, Type? type}) =>
-      value;
+  V applyMask<O extends Object, V>(
+    O object,
+    String field,
+    V value, {
+    EntityAccessRulesContext? context,
+    Type? type,
+  }) => value;
 
   @override
   V _applyMask<O extends Object, V>(
-          EntityAccessRulesContext? context, O object, String field, V value) =>
-      value;
+    EntityAccessRulesContext? context,
+    O object,
+    String field,
+    V value,
+  ) => value;
 
   @override
   EntityAccessRules simplified() => this;
@@ -995,9 +1098,11 @@ class _EntityAccessRulesInnocuous implements EntityAccessRules {
   String toString() => 'EntityAccessRules{innocuous}';
 
   @override
-  ToEncodableJson? toJsonEncodable(APIRequest apiRequest,
-          ToEncodableJsonProvider encodableJsonProvider, Object o) =>
-      null;
+  ToEncodableJson? toJsonEncodable(
+    APIRequest apiRequest,
+    ToEncodableJsonProvider encodableJsonProvider,
+    Object o,
+  ) => null;
 }
 
 /// Rules to resolve entities.
@@ -1037,86 +1142,93 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
   /// If `true` it will be ignored on a conflicting merge.
   final bool mergeTolerant;
 
-  const EntityResolutionRules(
-      {bool? allowEntityFetch,
-      this.allowReadFile = false,
-      this.lazyEntityTypes,
-      this.eagerEntityTypes,
-      this.allLazy,
-      this.allEager,
-      this.mergeTolerant = false})
-      : _allowEntityFetch = allowEntityFetch,
-        super((allowEntityFetch != null ||
-                allEager != null ||
-                allLazy != null ||
-                allowReadFile ||
-                mergeTolerant)
-            ? false
-            : (lazyEntityTypes == null && eagerEntityTypes == null)
-                ? true
-                : null);
+  const EntityResolutionRules({
+    bool? allowEntityFetch,
+    this.allowReadFile = false,
+    this.lazyEntityTypes,
+    this.eagerEntityTypes,
+    this.allLazy,
+    this.allEager,
+    this.mergeTolerant = false,
+  }) : _allowEntityFetch = allowEntityFetch,
+       super(
+         (allowEntityFetch != null ||
+                 allEager != null ||
+                 allLazy != null ||
+                 allowReadFile ||
+                 mergeTolerant)
+             ? false
+             : (lazyEntityTypes == null && eagerEntityTypes == null)
+             ? true
+             : null,
+       );
 
-  const EntityResolutionRules.fetch(
-      {this.lazyEntityTypes,
-      this.eagerEntityTypes,
-      this.allLazy,
-      this.allEager,
-      this.mergeTolerant = false})
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        super(false);
+  const EntityResolutionRules.fetch({
+    this.lazyEntityTypes,
+    this.eagerEntityTypes,
+    this.allLazy,
+    this.allEager,
+    this.mergeTolerant = false,
+  }) : _allowEntityFetch = true,
+       allowReadFile = false,
+       super(false);
 
-  const EntityResolutionRules.fetchEager(this.eagerEntityTypes,
-      {this.mergeTolerant = false})
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        lazyEntityTypes = null,
-        allLazy = null,
-        allEager = null,
-        super(false);
+  const EntityResolutionRules.fetchEager(
+    this.eagerEntityTypes, {
+    this.mergeTolerant = false,
+  }) : _allowEntityFetch = true,
+       allowReadFile = false,
+       lazyEntityTypes = null,
+       allLazy = null,
+       allEager = null,
+       super(false);
 
-  const EntityResolutionRules.fetchLazy(this.lazyEntityTypes,
-      {this.mergeTolerant = false})
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        allLazy = null,
-        allEager = null,
-        super(false);
+  const EntityResolutionRules.fetchLazy(
+    this.lazyEntityTypes, {
+    this.mergeTolerant = false,
+  }) : _allowEntityFetch = true,
+       allowReadFile = false,
+       eagerEntityTypes = null,
+       allLazy = null,
+       allEager = null,
+       super(false);
 
   const EntityResolutionRules.fetchEagerAll({this.mergeTolerant = false})
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        lazyEntityTypes = null,
-        allLazy = null,
-        allEager = true,
-        super(false);
+    : _allowEntityFetch = true,
+      allowReadFile = false,
+      eagerEntityTypes = null,
+      lazyEntityTypes = null,
+      allLazy = null,
+      allEager = true,
+      super(false);
 
   const EntityResolutionRules.fetchLazyAll({this.mergeTolerant = false})
-      : _allowEntityFetch = true,
-        allowReadFile = false,
-        eagerEntityTypes = null,
-        lazyEntityTypes = null,
-        allLazy = true,
-        allEager = false,
-        super(false);
+    : _allowEntityFetch = true,
+      allowReadFile = false,
+      eagerEntityTypes = null,
+      lazyEntityTypes = null,
+      allLazy = true,
+      allEager = false,
+      super(false);
 
-  factory EntityResolutionRules.fetchTypes(
-      {bool? allEager,
-      bool? allLazy,
-      Map<Object, bool?>? eagerTypes,
-      Map<Object, bool?>? lazyTypes,
-      bool mergeTolerant = false}) {
-    var eagerTypesNotNull = eagerTypes?.entries.map((e) {
-      var eager = e.value;
-      return eager != null ? MapEntry(e.key, eager) : null;
-    }).nonNulls;
+  factory EntityResolutionRules.fetchTypes({
+    bool? allEager,
+    bool? allLazy,
+    Map<Object, bool?>? eagerTypes,
+    Map<Object, bool?>? lazyTypes,
+    bool mergeTolerant = false,
+  }) {
+    var eagerTypesNotNull =
+        eagerTypes?.entries.map((e) {
+          var eager = e.value;
+          return eager != null ? MapEntry(e.key, eager) : null;
+        }).nonNulls;
 
-    var lazyTypesNotNull = lazyTypes?.entries.map((e) {
-      var lazy = e.value;
-      return lazy != null ? MapEntry(e.key, lazy) : null;
-    }).nonNulls;
+    var lazyTypesNotNull =
+        lazyTypes?.entries.map((e) {
+          var lazy = e.value;
+          return lazy != null ? MapEntry(e.key, lazy) : null;
+        }).nonNulls;
 
     var fetchEager = eagerTypesNotNull?.map((e) {
       var t = e.key;
@@ -1142,44 +1254,34 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
       return !lazy ? t : null;
     });
 
-    var eagerEntityTypes = [
-      ...?fetchEager,
-      ...?fetchNotLazy,
-    ]
-        .nonNulls
-        .expand((e) => e is Iterable ? e : [e])
-        .whereType<Type>()
-        .toList();
+    var eagerEntityTypes =
+        [...?fetchEager, ...?fetchNotLazy].nonNulls
+            .expand((e) => e is Iterable ? e : [e])
+            .whereType<Type>()
+            .toList();
 
-    var lazyEntityTypes = [
-      ...?fetchLazy,
-      ...?fetchNotEager,
-    ]
-        .nonNulls
-        .expand((e) => e is Iterable ? e : [e])
-        .whereType<Type>()
-        .toList();
+    var lazyEntityTypes =
+        [...?fetchLazy, ...?fetchNotEager].nonNulls
+            .expand((e) => e is Iterable ? e : [e])
+            .whereType<Type>()
+            .toList();
 
     if (allEager != null && allEager) {
       return lazyEntityTypes.isNotEmpty
           ? EntityResolutionRules(
-              allEager: true,
-              lazyEntityTypes: lazyEntityTypes,
-              mergeTolerant: mergeTolerant,
-            )
-          : EntityResolutionRules.fetchEagerAll(
-              mergeTolerant: mergeTolerant,
-            );
+            allEager: true,
+            lazyEntityTypes: lazyEntityTypes,
+            mergeTolerant: mergeTolerant,
+          )
+          : EntityResolutionRules.fetchEagerAll(mergeTolerant: mergeTolerant);
     } else if (allLazy != null && allLazy) {
       return eagerEntityTypes.isNotEmpty
           ? EntityResolutionRules(
-              allLazy: true,
-              eagerEntityTypes: eagerEntityTypes,
-              mergeTolerant: mergeTolerant,
-            )
-          : EntityResolutionRules.fetchLazyAll(
-              mergeTolerant: mergeTolerant,
-            );
+            allLazy: true,
+            eagerEntityTypes: eagerEntityTypes,
+            mergeTolerant: mergeTolerant,
+          )
+          : EntityResolutionRules.fetchLazyAll(mergeTolerant: mergeTolerant);
     }
 
     return EntityResolutionRules(
@@ -1433,13 +1535,11 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
           List<Type>? eagerEntityTypes;
 
           if (mergeTolerant) {
-            lazyEntityTypes = this
-                .lazyEntityTypes
+            lazyEntityTypes = this.lazyEntityTypes
                 .without(conflict)
                 .merge(other.lazyEntityTypes);
 
-            eagerEntityTypes = this
-                .eagerEntityTypes
+            eagerEntityTypes = this.eagerEntityTypes
                 .without(conflict)
                 .merge(other.eagerEntityTypes);
           } else if (other.mergeTolerant) {
@@ -1501,48 +1601,44 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
 
     return isInnocuous
         ? 'EntityResolutionRules{innocuous}'
-        : 'EntityResolutionRules{${[
-            if (allLazy != null) 'allLazy: $allLazy',
-            if (allEager != null) 'allEager: $allEager',
-            if (allowEntityFetch) 'allowEntityFetch',
-            if (allowReadFile) 'allowReadFile',
-            if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty)
-              'lazyEntityTypes: $lazyEntityTypes',
-            if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty)
-              'eagerEntityTypes: $eagerEntityTypes',
-          ].join(', ')}'
+        : 'EntityResolutionRules{${[if (allLazy != null) 'allLazy: $allLazy', if (allEager != null) 'allEager: $allEager', if (allowEntityFetch) 'allowEntityFetch', if (allowReadFile) 'allowReadFile', if (lazyEntityTypes != null && lazyEntityTypes.isNotEmpty) 'lazyEntityTypes: $lazyEntityTypes', if (eagerEntityTypes != null && eagerEntityTypes.isNotEmpty) 'eagerEntityTypes: $eagerEntityTypes'].join(', ')}'
             '}';
   }
 
   @override
-  Map<String, Object?> toJson() => isInnocuous
-      ? <String, Object?>{}
-      : <String, Object?>{
-          if (allLazy != null) 'allLazy': allLazy,
-          if (allEager != null) 'allEager': allEager,
-          if (allowEntityFetch) 'allowEntityFetch': true,
-          if (allowReadFile) 'allowReadFile': true,
-          if (lazyEntityTypes != null && lazyEntityTypes!.isNotEmpty)
-            'lazyEntityTypes':
-                lazyEntityTypes!.map((e) => e.toString()).toList(),
-          if (eagerEntityTypes != null && eagerEntityTypes!.isNotEmpty)
-            'eagerEntityTypes':
-                eagerEntityTypes!.map((e) => e.toString()).toList(),
-        };
+  Map<String, Object?> toJson() =>
+      isInnocuous
+          ? <String, Object?>{}
+          : <String, Object?>{
+            if (allLazy != null) 'allLazy': allLazy,
+            if (allEager != null) 'allEager': allEager,
+            if (allowEntityFetch) 'allowEntityFetch': true,
+            if (allowReadFile) 'allowReadFile': true,
+            if (lazyEntityTypes != null && lazyEntityTypes!.isNotEmpty)
+              'lazyEntityTypes':
+                  lazyEntityTypes!.map((e) => e.toString()).toList(),
+            if (eagerEntityTypes != null && eagerEntityTypes!.isNotEmpty)
+              'eagerEntityTypes':
+                  eagerEntityTypes!.map((e) => e.toString()).toList(),
+          };
 }
 
 class EntityResolutionRulesResolved implements EntityResolutionRules {
   static const _innocuousResolved = EntityResolutionRulesResolved(
-      EntityResolutionRules.innocuous,
-      contextRules: null,
-      rules: EntityResolutionRules.innocuous);
+    EntityResolutionRules.innocuous,
+    contextRules: null,
+    rules: EntityResolutionRules.innocuous,
+  );
 
   final EntityResolutionRules resolved;
   final EntityResolutionRules? contextRules;
   final EntityResolutionRules? rules;
 
-  const EntityResolutionRulesResolved(this.resolved,
-      {required this.contextRules, required this.rules});
+  const EntityResolutionRulesResolved(
+    this.resolved, {
+    required this.contextRules,
+    required this.rules,
+  });
 
   @override
   bool get isInnocuous => resolved.isInnocuous;
@@ -1620,24 +1716,25 @@ class EntityResolutionRulesResolved implements EntityResolutionRules {
       resolved.isAnyLazyEntityTypeInfo(types);
 
   @override
-  EntityResolutionRules copyWith(
-          {bool? allowEntityFetch,
-          bool? allowReadFile,
-          List<Type>? lazyEntityTypes,
-          List<Type>? eagerEntityTypes,
-          bool? allLazy,
-          bool? allEager,
-          bool? mergeTolerant,
-          List<Type>? conflictingEntityTypes}) =>
-      resolved.copyWith(
-          allowEntityFetch: allowEntityFetch,
-          allowReadFile: allowReadFile,
-          lazyEntityTypes: lazyEntityTypes,
-          eagerEntityTypes: eagerEntityTypes,
-          allLazy: allLazy,
-          allEager: allEager,
-          mergeTolerant: mergeTolerant,
-          conflictingEntityTypes: conflictingEntityTypes);
+  EntityResolutionRules copyWith({
+    bool? allowEntityFetch,
+    bool? allowReadFile,
+    List<Type>? lazyEntityTypes,
+    List<Type>? eagerEntityTypes,
+    bool? allLazy,
+    bool? allEager,
+    bool? mergeTolerant,
+    List<Type>? conflictingEntityTypes,
+  }) => resolved.copyWith(
+    allowEntityFetch: allowEntityFetch,
+    allowReadFile: allowReadFile,
+    lazyEntityTypes: lazyEntityTypes,
+    eagerEntityTypes: eagerEntityTypes,
+    allLazy: allLazy,
+    allEager: allEager,
+    mergeTolerant: mergeTolerant,
+    conflictingEntityTypes: conflictingEntityTypes,
+  );
 
   @override
   EntityResolutionRules merge(EntityResolutionRules? other) =>
@@ -1722,15 +1819,16 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
   bool isAnyLazyEntityTypeInfo(Iterable<TypeInfo> types) => false;
 
   @override
-  EntityResolutionRules copyWith(
-      {bool? allowEntityFetch,
-      bool? allowReadFile,
-      List<Type>? lazyEntityTypes,
-      List<Type>? eagerEntityTypes,
-      bool? allLazy,
-      bool? allEager,
-      bool? mergeTolerant,
-      List<Type>? conflictingEntityTypes}) {
+  EntityResolutionRules copyWith({
+    bool? allowEntityFetch,
+    bool? allowReadFile,
+    List<Type>? lazyEntityTypes,
+    List<Type>? eagerEntityTypes,
+    bool? allLazy,
+    bool? allEager,
+    bool? mergeTolerant,
+    List<Type>? conflictingEntityTypes,
+  }) {
     if (conflictingEntityTypes != null && conflictingEntityTypes.isNotEmpty) {
       lazyEntityTypes = lazyEntityTypes.without(conflictingEntityTypes);
       eagerEntityTypes = eagerEntityTypes.without(conflictingEntityTypes);
@@ -1769,8 +1867,10 @@ class _EntityResolutionRulesInnocuous implements EntityResolutionRules {
 /// An entity rules context provider.
 abstract class EntityRulesContextProvider {
   /// Returns the [EntityResolutionRules] for the current context.
-  EntityResolutionRules? getContextEntityResolutionRules(
-      {Zone? contextZone, Object? contextIdentifier});
+  EntityResolutionRules? getContextEntityResolutionRules({
+    Zone? contextZone,
+    Object? contextIdentifier,
+  });
 }
 
 /// Mixin to resolve the [EntityResolutionRules] to apply.
@@ -1780,8 +1880,9 @@ mixin EntityRulesResolver {
 
   static EntityRulesContextProvider? _singleContextProvider;
 
-  static void _updateSingleContextProvider() => _singleContextProvider =
-      _cotextProviders.length == 1 ? _cotextProviders.first : null;
+  static void _updateSingleContextProvider() =>
+      _singleContextProvider =
+          _cotextProviders.length == 1 ? _cotextProviders.first : null;
 
   /// Returns the current [EntityRulesContextProvider]s.
   static List<EntityRulesContextProvider> get cotextProviders =>
@@ -1789,7 +1890,8 @@ mixin EntityRulesResolver {
 
   /// Register an [EntityRulesContextProvider].
   static bool registerContextProvider(
-      EntityRulesContextProvider contextProvider) {
+    EntityRulesContextProvider contextProvider,
+  ) {
     var added = _cotextProviders.add(contextProvider);
     _updateSingleContextProvider();
     return added;
@@ -1797,7 +1899,8 @@ mixin EntityRulesResolver {
 
   /// Unregister an [EntityRulesContextProvider].
   static bool unregisterContextProvider(
-      EntityRulesContextProvider contextProvider) {
+    EntityRulesContextProvider contextProvider,
+  ) {
     var removed = _cotextProviders.remove(contextProvider);
     _updateSingleContextProvider();
     return removed;
@@ -1820,8 +1923,9 @@ mixin EntityRulesResolver {
     EntityResolutionRules? contextRule;
 
     for (var c in _cotextProviders) {
-      var resolutionRules =
-          c.getContextEntityResolutionRules(contextZone: zone);
+      var resolutionRules = c.getContextEntityResolutionRules(
+        contextZone: zone,
+      );
       if (resolutionRules != null) {
         if (contextRule != null) {
           contextRule = contextRule.merge(resolutionRules);
@@ -1839,7 +1943,8 @@ mixin EntityRulesResolver {
   ///
   /// See [getContextEntityResolutionRules] and [EntityResolutionRules.merge].
   EntityResolutionRulesResolved resolveEntityResolutionRules(
-      EntityResolutionRules? resolutionRules) {
+    EntityResolutionRules? resolutionRules,
+  ) {
     var context = getContextEntityResolutionRules();
 
     if (context == null || context.isInnocuous) {
@@ -1870,30 +1975,45 @@ mixin EntityRulesResolver {
   }
 
   EntityResolutionRulesResolved _resolveEntityResolutionRulesNoContext(
-      EntityResolutionRules? rules) {
+    EntityResolutionRules? rules,
+  ) {
     if (rules == null || rules.isInnocuous) {
       return EntityResolutionRulesResolved._innocuousResolved;
     } else {
-      return EntityResolutionRulesResolved(rules,
-          contextRules: null, rules: rules);
+      return EntityResolutionRulesResolved(
+        rules,
+        contextRules: null,
+        rules: rules,
+      );
     }
   }
 
   EntityResolutionRulesResolved _resolveEntityResolutionRulesWithContext(
-      EntityResolutionRules context, EntityResolutionRules? rules) {
+    EntityResolutionRules context,
+    EntityResolutionRules? rules,
+  ) {
     if (rules == null) {
-      return EntityResolutionRulesResolved(context,
-          contextRules: context, rules: null);
+      return EntityResolutionRulesResolved(
+        context,
+        contextRules: context,
+        rules: null,
+      );
     } else if (rules.isInnocuous) {
-      return EntityResolutionRulesResolved(context,
-          contextRules: context, rules: EntityResolutionRules.innocuous);
+      return EntityResolutionRulesResolved(
+        context,
+        contextRules: context,
+        rules: EntityResolutionRules.innocuous,
+      );
     } else {
       var merge = rules.merge(context);
 
       return identical(merge, EntityResolutionRules.innocuous)
           ? EntityResolutionRulesResolved._innocuousResolved
-          : EntityResolutionRulesResolved(merge,
-              contextRules: context, rules: rules);
+          : EntityResolutionRulesResolved(
+            merge,
+            contextRules: context,
+            rules: rules,
+          );
     }
   }
 }

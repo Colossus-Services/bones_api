@@ -124,8 +124,11 @@ class APIPlatformVM extends APIPlatform {
   }
 
   @override
-  String? getProperty(String? key,
-      {String? defaultValue, bool caseSensitive = false}) {
+  String? getProperty(
+    String? key, {
+    String? defaultValue,
+    bool caseSensitive = false,
+  }) {
     if (key == null) return defaultValue;
 
     var prev = _properties[key];

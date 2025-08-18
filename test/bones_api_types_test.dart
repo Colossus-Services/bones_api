@@ -86,8 +86,12 @@ void main() {
 
       _testTime(Time(20, 11, 31), '20:11:31');
       _testTime(Time(20, 11, 31), '20:11:31.000', withMillisecond: true);
-      _testTime(Time(20, 11, 31), '20:11:31.000000',
-          withMillisecond: true, withMicrosecond: true);
+      _testTime(
+        Time(20, 11, 31),
+        '20:11:31.000000',
+        withMillisecond: true,
+        withMicrosecond: true,
+      );
       _testTime(Time(20, 11, 31), '20:11', withSeconds: false);
 
       _testTime(Time(20, 11, 31, 123), '20:11:31.123');
@@ -98,61 +102,91 @@ void main() {
       _testTime(Time(20, 11, 31, 123, 456), '20:11:31.123456');
       _testTime(Time(20, 11, 31, 12, 456), '20:11:31.012456');
 
-      expect(Time(20, 11, 31).toDateTime(2020, 1, 2, false),
-          equals(DateTime(2020, 1, 2, 20, 11, 31)));
-      expect(Time(20, 11, 31).toDateTime(2020, 1, 2, true),
-          equals(DateTime.utc(2020, 1, 2, 20, 11, 31)));
+      expect(
+        Time(20, 11, 31).toDateTime(2020, 1, 2, false),
+        equals(DateTime(2020, 1, 2, 20, 11, 31)),
+      );
+      expect(
+        Time(20, 11, 31).toDateTime(2020, 1, 2, true),
+        equals(DateTime.utc(2020, 1, 2, 20, 11, 31)),
+      );
 
       expect(Time.fromMinutes(120), equals(Time(2)));
       expect(Time.fromMinutes(120 + 30), equals(Time(2, 30)));
 
       expect(Time.fromSeconds((60 * 60) * 3), equals(Time(3)));
-      expect(Time.fromSeconds((60 * 60) * 3 + (60 * 15) + (31)),
-          equals(Time(3, 15, 31)));
+      expect(
+        Time.fromSeconds((60 * 60) * 3 + (60 * 15) + (31)),
+        equals(Time(3, 15, 31)),
+      );
 
       expect(Time.fromMilliseconds((1000 * 60 * 60) * 5), equals(Time(5)));
       expect(
-          Time.fromMilliseconds(
-              (1000 * 60 * 60) * 5 + (1000 * 60 * 11) + (1000 * 20) + 123),
-          equals(Time(5, 11, 20, 123)));
+        Time.fromMilliseconds(
+          (1000 * 60 * 60) * 5 + (1000 * 60 * 11) + (1000 * 20) + 123,
+        ),
+        equals(Time(5, 11, 20, 123)),
+      );
 
       expect(
-          Time.fromMicroseconds((1000 * 1000 * 60 * 60) * 7), equals(Time(7)));
+        Time.fromMicroseconds((1000 * 1000 * 60 * 60) * 7),
+        equals(Time(7)),
+      );
       expect(
-          Time.fromMicroseconds((1000 * 1000 * 60 * 60) * 7 +
+        Time.fromMicroseconds(
+          (1000 * 1000 * 60 * 60) * 7 +
               (1000 * 1000 * 60 * 12) +
               (1000 * 1000 * 13) +
               (1000 * 321) +
-              654),
-          equals(Time(7, 12, 13, 321, 654)));
+              654,
+        ),
+        equals(Time(7, 12, 13, 321, 654)),
+      );
 
-      expect(Time(20, 11, 31).asDuration,
-          equals(Duration(hours: 20, minutes: 11, seconds: 31)));
       expect(
-          Time(20, 11, 31, 123, 456).asDuration,
-          equals(Duration(
-              hours: 20,
-              minutes: 11,
-              seconds: 31,
-              milliseconds: 123,
-              microseconds: 456)));
+        Time(20, 11, 31).asDuration,
+        equals(Duration(hours: 20, minutes: 11, seconds: 31)),
+      );
+      expect(
+        Time(20, 11, 31, 123, 456).asDuration,
+        equals(
+          Duration(
+            hours: 20,
+            minutes: 11,
+            seconds: 31,
+            milliseconds: 123,
+            microseconds: 456,
+          ),
+        ),
+      );
 
-      expect(Time(20, 11, 31).totalSeconds,
-          equals(Duration(hours: 20, minutes: 11, seconds: 31).inSeconds));
       expect(
-          Time(20, 11, 31, 123).totalMilliseconds,
-          equals(
-              Duration(hours: 20, minutes: 11, seconds: 31, milliseconds: 123)
-                  .inMilliseconds));
+        Time(20, 11, 31).totalSeconds,
+        equals(Duration(hours: 20, minutes: 11, seconds: 31).inSeconds),
+      );
       expect(
-          Time(20, 11, 31, 123, 456).totalMicrosecond,
-          equals(Duration(
-                  hours: 20,
-                  minutes: 11,
-                  seconds: 31,
-                  milliseconds: 123,
-                  microseconds: 456)
-              .inMicroseconds));
+        Time(20, 11, 31, 123).totalMilliseconds,
+        equals(
+          Duration(
+            hours: 20,
+            minutes: 11,
+            seconds: 31,
+            milliseconds: 123,
+          ).inMilliseconds,
+        ),
+      );
+      expect(
+        Time(20, 11, 31, 123, 456).totalMicrosecond,
+        equals(
+          Duration(
+            hours: 20,
+            minutes: 11,
+            seconds: 31,
+            milliseconds: 123,
+            microseconds: 456,
+          ).inMicroseconds,
+        ),
+      );
 
       expect(Time(8, 10) + Time(0, 10), equals(Time(8, 20)));
       expect(Time(8, 50) + Time(0, 20), equals(Time(9, 10)));
@@ -162,48 +196,75 @@ void main() {
       expect(Time(8, 10) - Time(0, 20), equals(Time(7, 50)));
       expect(Time(0, 10) - Time(0, 20), equals(Time(23, 50)));
 
-      expect(Time(8, 10) + Duration(hours: 0, minutes: 10, seconds: 40),
-          equals(Time(8, 20, 40)));
-      expect(Time(8, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
-          equals(Time(10, 10, 40)));
-      expect(Time(23, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
-          equals(Time(1, 10, 40)));
+      expect(
+        Time(8, 10) + Duration(hours: 0, minutes: 10, seconds: 40),
+        equals(Time(8, 20, 40)),
+      );
+      expect(
+        Time(8, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
+        equals(Time(10, 10, 40)),
+      );
+      expect(
+        Time(23, 50) + Duration(hours: 1, minutes: 20, seconds: 40),
+        equals(Time(1, 10, 40)),
+      );
 
-      expect(Time(8, 10) - Duration(hours: 0, minutes: 10, seconds: 40),
-          equals(Time(7, 59, 20)));
-      expect(Time(8, 50) - Duration(hours: 1, minutes: 20, seconds: 40),
-          equals(Time(7, 29, 20)));
-      expect(Time(0, 10) - Duration(hours: 1, minutes: 20, seconds: 40),
-          equals(Time(22, 49, 20)));
+      expect(
+        Time(8, 10) - Duration(hours: 0, minutes: 10, seconds: 40),
+        equals(Time(7, 59, 20)),
+      );
+      expect(
+        Time(8, 50) - Duration(hours: 1, minutes: 20, seconds: 40),
+        equals(Time(7, 29, 20)),
+      );
+      expect(
+        Time(0, 10) - Duration(hours: 1, minutes: 20, seconds: 40),
+        equals(Time(22, 49, 20)),
+      );
 
       _testTimeLessThan(Time(20, 11, 31), Time(21, 11, 31), false);
       _testTimeLessThan(Time(21, 10, 31), Time(21, 11, 31), false);
       _testTimeLessThan(Time(21, 11, 30), Time(21, 11, 31), false);
       _testTimeLessThan(Time(21, 11, 31, 90), Time(21, 11, 31, 100), false);
       _testTimeLessThan(
-          Time(21, 11, 31, 100, 90), Time(21, 11, 31, 100, 100), false);
+        Time(21, 11, 31, 100, 90),
+        Time(21, 11, 31, 100, 100),
+        false,
+      );
 
       _testTimeLessThan(Time(20, 11, 31), Time(20, 11, 31), true);
 
       var times = [Time(20, 11, 31), Time(14, 11, 31), Time(12, 11, 31)];
       times.sort();
-      expect(times.map((t) => '$t').join(' '),
-          equals('12:11:31 14:11:31 20:11:31'));
+      expect(
+        times.map((t) => '$t').join(' '),
+        equals('12:11:31 14:11:31 20:11:31'),
+      );
 
-      expect(Time.fromBytes(Time(21, 11, 31, 100, 90).toBytes64()),
-          equals(Time(21, 11, 31, 100, 90)));
+      expect(
+        Time.fromBytes(Time(21, 11, 31, 100, 90).toBytes64()),
+        equals(Time(21, 11, 31, 100, 90)),
+      );
 
-      expect(Time.fromBytes(Time(23, 59, 59, 999).toBytes64()),
-          equals(Time(23, 59, 59, 999)));
+      expect(
+        Time.fromBytes(Time(23, 59, 59, 999).toBytes64()),
+        equals(Time(23, 59, 59, 999)),
+      );
 
-      expect(Time.fromBytes(Time(21, 11, 31, 100).toBytes32()),
-          equals(Time(21, 11, 31, 100)));
+      expect(
+        Time.fromBytes(Time(21, 11, 31, 100).toBytes32()),
+        equals(Time(21, 11, 31, 100)),
+      );
 
-      expect(Time.fromBytes(Time(23, 59, 59, 999).toBytes32()),
-          equals(Time(23, 59, 59, 999)));
+      expect(
+        Time.fromBytes(Time(23, 59, 59, 999).toBytes32()),
+        equals(Time(23, 59, 59, 999)),
+      );
 
-      expect(Time.fromBytes([0, 0, 0, 15, 115, 100, 98]),
-          equals(Time(18, 26, 00, 467, 968)));
+      expect(
+        Time.fromBytes([0, 0, 0, 15, 115, 100, 98]),
+        equals(Time(18, 26, 00, 467, 968)),
+      );
     });
 
     test('(all combinations 32-bits)', () async {
@@ -211,8 +272,10 @@ void main() {
         for (var m = 0; m <= 59; ++m) {
           for (var s = 0; s <= 59; ++s) {
             for (var ms = 0; ms <= 999; ++ms) {
-              expect(Time.fromBytes(Time(h, m, s, ms).toBytes32()),
-                  equals(Time(h, m, s, ms)));
+              expect(
+                Time.fromBytes(Time(h, m, s, ms).toBytes32()),
+                equals(Time(h, m, s, ms)),
+              );
             }
           }
         }
@@ -224,8 +287,10 @@ void main() {
         for (var m = 0; m <= 59; ++m) {
           for (var s = 0; s <= 59; ++s) {
             for (var ms = 0; ms <= 999; ++ms) {
-              expect(Time.fromBytes(Time(h, m, s, ms).toBytes64()),
-                  equals(Time(h, m, s, ms)));
+              expect(
+                Time.fromBytes(Time(h, m, s, ms).toBytes64()),
+                equals(Time(h, m, s, ms)),
+              );
             }
           }
         }
@@ -247,19 +312,28 @@ void _testTimeLessThan(Time t1, Time t2, bool expectEquals) {
   }
 }
 
-void _testTime(Time t, String ts,
-    {bool withSeconds = true, bool? withMillisecond, bool? withMicrosecond}) {
+void _testTime(
+  Time t,
+  String ts, {
+  bool withSeconds = true,
+  bool? withMillisecond,
+  bool? withMicrosecond,
+}) {
   expect(
-      t.toString(
-          withSeconds: withSeconds,
-          withMillisecond: withMillisecond,
-          withMicrosecond: withMicrosecond),
-      equals(ts));
+    t.toString(
+      withSeconds: withSeconds,
+      withMillisecond: withMillisecond,
+      withMicrosecond: withMicrosecond,
+    ),
+    equals(ts),
+  );
   if (withSeconds) {
     expect(Time.parse(ts), equals(t));
   } else {
-    expect(Time.parse(ts),
-        equals(t.copyWith(second: 0, millisecond: 0, microsecond: 0)));
+    expect(
+      Time.parse(ts),
+      equals(t.copyWith(second: 0, millisecond: 0, microsecond: 0)),
+    );
   }
 }
 

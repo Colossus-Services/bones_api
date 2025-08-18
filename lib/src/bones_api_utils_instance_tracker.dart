@@ -13,7 +13,7 @@ class InstanceTracker<O extends Object, I extends Object> {
   final Expando<I> _instancesInfo;
 
   InstanceTracker(this.name, this.instanceInfoExtractor)
-      : _instancesInfo = Expando(name);
+    : _instancesInfo = Expando(name);
 
   /// Extract the info of instance [o].
   I extractInfo(O o) => instanceInfoExtractor(o);

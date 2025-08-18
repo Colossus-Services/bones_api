@@ -11,8 +11,10 @@ final _log = logging.Logger('ConditionSQLEncoder');
 class ConditionSQLEncoder extends ConditionEncoder {
   final String sqlElementQuote;
 
-  ConditionSQLEncoder(SchemeProvider super.schemeProvider,
-      {required this.sqlElementQuote});
+  ConditionSQLEncoder(
+    SchemeProvider super.schemeProvider, {
+    required this.sqlElementQuote,
+  });
 
   @override
   String get groupOpener => '(';
@@ -31,7 +33,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
   @override
   FutureOr<EncodingContext> encodeIDCondition(
-      ConditionID c, EncodingContext context) {
+    ConditionID c,
+    EncodingContext context,
+  ) {
     var tableName = context.tableNameOrEntityName;
     var tableAlias = context.resolveEntityAlias(tableName);
 
@@ -42,7 +46,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
       return encodeConditionValuesWithOperator(
-          context, int, idKey, tableKey, '=', c.idValue, false);
+        context,
+        int,
+        idKey,
+        tableKey,
+        '=',
+        c.idValue,
+        false,
+      );
     } else {
       var tableSchemeRet = schemeProvider.getTableScheme(tableName);
 
@@ -62,14 +73,23 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
         return encodeConditionValuesWithOperator(
-            context, idType, idKey, tableKey, '=', c.idValue, false);
+          context,
+          idType,
+          idKey,
+          tableKey,
+          '=',
+          c.idValue,
+          false,
+        );
       });
     }
   }
 
   @override
   FutureOr<EncodingContext> encodeIDConditionIN(
-      ConditionIdIN c, EncodingContext context) {
+    ConditionIdIN c,
+    EncodingContext context,
+  ) {
     var tableName = context.tableNameOrEntityName;
     var tableAlias = context.resolveEntityAlias(tableName);
 
@@ -80,7 +100,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
       return encodeConditionValuesWithOperator(
-          context, int, idKey, tableKey, 'IN', c.idsValues, true);
+        context,
+        int,
+        idKey,
+        tableKey,
+        'IN',
+        c.idsValues,
+        true,
+      );
     } else {
       var tableSchemeRet = schemeProvider.getTableScheme(tableName);
 
@@ -100,62 +127,88 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var tableKey = '$q$tableAlias$q.$q$idKey$q';
 
         return encodeConditionValuesWithOperator(
-            context, idType, idFieldName, tableKey, 'IN', c.idsValues, true);
+          context,
+          idType,
+          idFieldName,
+          tableKey,
+          'IN',
+          c.idsValues,
+          true,
+        );
       });
     }
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionEQ(
-      KeyConditionEQ c, EncodingContext context) {
+    KeyConditionEQ c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '=');
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionNotEQ(
-      KeyConditionNotEQ c, EncodingContext context) {
+    KeyConditionNotEQ c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '!=');
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionIN(
-      KeyConditionIN c, EncodingContext context) {
+    KeyConditionIN c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, 'IN', valueAsList: true);
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionNotIN(
-      KeyConditionNotIN c, EncodingContext context) {
+    KeyConditionNotIN c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, 'NOT IN', valueAsList: true);
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
-      KeyConditionGreaterThan c, EncodingContext context) {
+    KeyConditionGreaterThan c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '>');
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionGreaterThanOrEqual(
-      KeyConditionGreaterThanOrEqual c, EncodingContext context) {
+    KeyConditionGreaterThanOrEqual c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '>=');
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionLessThan(
-      KeyConditionLessThan c, EncodingContext context) {
+    KeyConditionLessThan c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '<');
   }
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionLessThanOrEqual(
-      KeyConditionLessThanOrEqual c, EncodingContext context) {
+    KeyConditionLessThanOrEqual c,
+    EncodingContext context,
+  ) {
     return encodeKeyConditionOperator(c, context, '<=');
   }
 
   FutureOr<EncodingContext> encodeKeyConditionOperator(
-      KeyCondition c, EncodingContext context, String operator,
-      {bool valueAsList = false}) {
+    KeyCondition c,
+    EncodingContext context,
+    String operator, {
+    bool valueAsList = false,
+  }) {
     var retKeySQL = keyToSQL(c, context);
 
     return retKeySQL.resolveMapped((keySQL) {
@@ -163,7 +216,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var tableKey = keySQL.value;
 
       return encodeConditionValuesWithOperator(
-          context, keyType, null, tableKey, operator, c.value, valueAsList);
+        context,
+        keyType,
+        null,
+        tableKey,
+        operator,
+        c.value,
+        valueAsList,
+      );
     });
   }
 
@@ -172,28 +232,34 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var schemeProvider = this.schemeProvider;
     if (schemeProvider == null) return fieldName;
 
-    return schemeProvider
-        .getTableScheme(tableName)
-        .resolveMapped((tableScheme) {
+    return schemeProvider.getTableScheme(tableName).resolveMapped((
+      tableScheme,
+    ) {
       if (tableScheme == null) return fieldName;
       return tableScheme.resolveTableFieldName(fieldName) ?? fieldName;
     });
   }
 
   FutureOr<EncodingContext> encodeConditionValuesWithOperator(
-      EncodingContext context,
-      Type keyType,
-      String? fieldKey,
-      String tableKey,
-      String operator,
-      dynamic values,
-      bool valueAsList) {
+    EncodingContext context,
+    Type keyType,
+    String? fieldKey,
+    String tableKey,
+    String operator,
+    dynamic values,
+    bool valueAsList,
+  ) {
     context.write(' ');
     context.write(tableKey);
     context.write(' ');
 
-    var valueSQLRet = valueToSQL(context, values,
-        fieldKey: fieldKey, fieldType: keyType, valueAsList: valueAsList);
+    var valueSQLRet = valueToSQL(
+      context,
+      values,
+      fieldKey: fieldKey,
+      fieldType: keyType,
+      valueAsList: valueAsList,
+    );
 
     return valueSQLRet.resolveMapped((valueSQL) {
       if (valueSQL == 'null') {
@@ -222,7 +288,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
   }
 
   FutureOr<MapEntry<Type, String>> keyToSQL(
-      KeyCondition<dynamic, dynamic> c, EncodingContext context) {
+    KeyCondition<dynamic, dynamic> c,
+    EncodingContext context,
+  ) {
     var keys = c.keys;
 
     if (keys.first is! ConditionKeyField) {
@@ -249,7 +317,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     if (schemeProvider == null) {
       throw ConditionEncodingError(
-          'No SchemeProvider> tableName: $tableName > $this');
+        'No SchemeProvider> tableName: $tableName > $this',
+      );
     }
 
     var keys = c.keys;
@@ -268,21 +337,26 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       var fieldName = key0.name;
       var tableFieldName = tableScheme.resolveTableFieldName(fieldName);
-      var tableFieldType = tableFieldName != null
-          ? tableScheme.fieldsTypes[tableFieldName]
-          : null;
+      var tableFieldType =
+          tableFieldName != null
+              ? tableScheme.fieldsTypes[tableFieldName]
+              : null;
 
       if (tableFieldType != null) {
         return MapEntry(tableFieldType, '$q$tableAlias$q.$q$tableFieldName$q');
       }
 
-      var retFieldType = schemeProvider.getFieldType(fieldName,
-          entityName: context.entityName, tableName: context.tableName);
+      var retFieldType = schemeProvider.getFieldType(
+        fieldName,
+        entityName: context.entityName,
+        tableName: context.tableName,
+      );
 
       return retFieldType.resolveMapped((refFieldType) {
         if (refFieldType == null) {
           throw ConditionEncodingError(
-              'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme');
+            'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme',
+          );
         }
 
         var retTableNameRef = schemeProvider.getTableForType(refFieldType);
@@ -290,23 +364,27 @@ class ConditionSQLEncoder extends ConditionEncoder {
         return retTableNameRef.resolveMapped((tableNameRef) {
           if (tableNameRef == null) {
             throw ConditionEncodingError(
-                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
+              'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
+            );
           }
 
           var relationship = tableScheme.getTableRelationshipReference(
-              sourceTable: tableName,
-              sourceField: fieldName,
-              targetTable: tableNameRef);
+            sourceTable: tableName,
+            sourceField: fieldName,
+            targetTable: tableNameRef,
+          );
 
           if (relationship == null) {
             throw ConditionEncodingError(
-                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
+              'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
+            );
           }
 
           context.addRelationshipTable(tableNameRef, relationship, c);
 
-          var relationshipAlias =
-              context.resolveEntityAlias(relationship.relationshipTable);
+          var relationshipAlias = context.resolveEntityAlias(
+            relationship.relationshipTable,
+          );
 
           String relationshipTargetField;
           Type relationshipTargetFieldType;
@@ -318,8 +396,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
             relationshipTargetFieldType = relationship.sourceFieldType;
           }
 
-          return MapEntry(relationshipTargetFieldType,
-              '$q$relationshipAlias$q.$q$relationshipTargetField$q');
+          return MapEntry(
+            relationshipTargetFieldType,
+            '$q$relationshipAlias$q.$q$relationshipTargetField$q',
+          );
         });
       });
     });
@@ -334,7 +414,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     if (schemeProvider == null) {
       throw ConditionEncodingError(
-          'No SchemeProvider> tableName: $tableName > $this');
+        'No SchemeProvider> tableName: $tableName > $this',
+      );
     }
 
     var keys = c.keys;
@@ -360,8 +441,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var key1 = keys[1];
 
         if (key1 is ConditionKeyField) {
-          var targetTableSchemeRet =
-              schemeProvider.getTableScheme(fieldRef.targetTable);
+          var targetTableSchemeRet = schemeProvider.getTableScheme(
+            fieldRef.targetTable,
+          );
 
           return targetTableSchemeRet.resolveMapped((targetTableScheme) {
             if (targetTableScheme == null) {
@@ -372,25 +454,32 @@ class ConditionSQLEncoder extends ConditionEncoder {
             }
 
             var q = sqlElementQuote;
-            var targetFieldName =
-                targetTableScheme.resolveTableFieldName(key1.name);
+            var targetFieldName = targetTableScheme.resolveTableFieldName(
+              key1.name,
+            );
             var targetFieldType =
                 targetTableScheme.fieldsTypes[targetFieldName]!;
             return MapEntry(
-                targetFieldType, '$q$entityAlias$q.$q$targetFieldName$q');
+              targetFieldType,
+              '$q$entityAlias$q.$q$targetFieldName$q',
+            );
           });
         } else {
           throw ConditionEncodingError('Key: $c');
         }
       }
 
-      var retFieldType = schemeProvider.getFieldType(fieldName,
-          entityName: context.entityName, tableName: context.tableName);
+      var retFieldType = schemeProvider.getFieldType(
+        fieldName,
+        entityName: context.entityName,
+        tableName: context.tableName,
+      );
 
       return retFieldType.resolveMapped((refFieldType) {
         if (refFieldType == null) {
           throw ConditionEncodingError(
-              'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme');
+            'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme',
+          );
         }
 
         var retTableNameRef = schemeProvider.getTableForType(refFieldType);
@@ -398,29 +487,34 @@ class ConditionSQLEncoder extends ConditionEncoder {
         return retTableNameRef.resolveMapped((tableNameRef) {
           if (tableNameRef == null) {
             throw ConditionEncodingError(
-                'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
+              'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
+            );
           }
 
           var relationship = tableScheme.getTableRelationshipReference(
-              sourceTable: tableName,
-              sourceField: fieldName,
-              targetTable: tableNameRef);
+            sourceTable: tableName,
+            sourceField: fieldName,
+            targetTable: tableNameRef,
+          );
 
           if (relationship == null) {
             throw ConditionEncodingError(
-                'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme');
+              'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
+            );
           }
 
           context.addRelationshipTable(tableNameRef, relationship, c);
 
-          var targetAlias =
-              context.resolveEntityAlias(relationship.targetTable);
+          var targetAlias = context.resolveEntityAlias(
+            relationship.targetTable,
+          );
 
           var key1 = keys[1];
 
           if (key1 is ConditionKeyField) {
-            var targetTableSchemeRet =
-                schemeProvider.getTableScheme(relationship.targetTable);
+            var targetTableSchemeRet = schemeProvider.getTableScheme(
+              relationship.targetTable,
+            );
 
             return targetTableSchemeRet.resolveMapped((targetTableScheme) {
               if (targetTableScheme == null) {
@@ -431,8 +525,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
               }
 
               var q = sqlElementQuote;
-              var targetFieldName =
-                  targetTableScheme.resolveTableFieldName(key1.name);
+              var targetFieldName = targetTableScheme.resolveTableFieldName(
+                key1.name,
+              );
 
               if (targetFieldName == null) {
                 var errorMsg =
@@ -444,7 +539,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
               var targetFieldType =
                   targetTableScheme.fieldsTypes[targetFieldName]!;
               return MapEntry(
-                  targetFieldType, '$q$targetAlias$q.$q$targetFieldName$q');
+                targetFieldType,
+                '$q$targetAlias$q.$q$targetFieldName$q',
+              );
             });
           } else {
             throw ConditionEncodingError('Key: $c');
@@ -481,20 +578,34 @@ class ConditionSQLEncoder extends ConditionEncoder {
     }
   }
 
-  FutureOr<String> valueToSQL(EncodingContext context, dynamic value,
-          {String? fieldKey, Type? fieldType, bool valueAsList = false}) =>
-      valueToParameterValue(context, value,
-              fieldKey: fieldKey,
-              fieldType: fieldType,
-              valueAsList: valueAsList)
-          .resolveMapped((val) => val.encode);
+  FutureOr<String> valueToSQL(
+    EncodingContext context,
+    dynamic value, {
+    String? fieldKey,
+    Type? fieldType,
+    bool valueAsList = false,
+  }) => valueToParameterValue(
+    context,
+    value,
+    fieldKey: fieldKey,
+    fieldType: fieldType,
+    valueAsList: valueAsList,
+  ).resolveMapped((val) => val.encode);
 
   FutureOr<EncodingValue<String, Object?>> valueToParameterValue(
-      EncodingContext context, dynamic value,
-      {String? fieldKey, Type? fieldType, bool valueAsList = false}) {
+    EncodingContext context,
+    dynamic value, {
+    String? fieldKey,
+    Type? fieldType,
+    bool valueAsList = false,
+  }) {
     if (value == null || value == Null) {
-      return _valueToParameterValueImpl(value, fieldType,
-          key: fieldKey, valueAsList: valueAsList);
+      return _valueToParameterValueImpl(
+        value,
+        fieldType,
+        key: fieldKey,
+        valueAsList: valueAsList,
+      );
     }
 
     if (value is Iterable) {
@@ -502,7 +613,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       if (values.isEmpty) {
         return EncodingValueNull(
-            fieldKey ?? '?', fieldType, encodeEncodingValueNull);
+          fieldKey ?? '?',
+          fieldType,
+          encodeEncodingValueNull,
+        );
       } else if (values.length == 1) {
         var v = value.first;
         value = v;
@@ -511,35 +625,64 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     if (value is ConditionParameter) {
       return conditionParameterToParameterValue(
-          value, context, fieldKey, fieldType,
-          valueAsList: valueAsList);
+        value,
+        context,
+        fieldKey,
+        fieldType,
+        valueAsList: valueAsList,
+      );
     } else if (value is List &&
         value.whereType<ConditionParameter>().isNotEmpty) {
-      var parametersValues = value.map((v) {
-        if (v is ConditionParameter) {
-          return conditionParameterToParameterValue(
-              value, context, fieldKey, fieldType,
-              valueAsList: valueAsList);
-        } else {
-          return _valueToParameterValueImpl(value, fieldType,
-              key: fieldKey, valueAsList: valueAsList);
-        }
-      }).resolveAll();
+      var parametersValues =
+          value.map((v) {
+            if (v is ConditionParameter) {
+              return conditionParameterToParameterValue(
+                value,
+                context,
+                fieldKey,
+                fieldType,
+                valueAsList: valueAsList,
+              );
+            } else {
+              return _valueToParameterValueImpl(
+                value,
+                fieldType,
+                key: fieldKey,
+                valueAsList: valueAsList,
+              );
+            }
+          }).resolveAll();
 
-      return parametersValues.resolveMapped((values) => EncodingValueList(
-          fieldKey ?? '?', fieldType, values, encodeEncodingValueList));
+      return parametersValues.resolveMapped(
+        (values) => EncodingValueList(
+          fieldKey ?? '?',
+          fieldType,
+          values,
+          encodeEncodingValueList,
+        ),
+      );
     } else {
-      return _valueToParameterValueImpl(value, fieldType,
-          key: fieldKey, valueAsList: valueAsList);
+      return _valueToParameterValueImpl(
+        value,
+        fieldType,
+        key: fieldKey,
+        valueAsList: valueAsList,
+      );
     }
   }
 
   FutureOr<EncodingValue<String, Object?>> _valueToParameterValueImpl(
-      Object? value, Type? type,
-      {String? key, bool valueAsList = false}) {
+    Object? value,
+    Type? type, {
+    String? key,
+    bool valueAsList = false,
+  }) {
     if (type != null) {
-      return resolveValueToType(value, type, valueAsList: valueAsList)
-          .resolveMapped((resolvedVal) {
+      return resolveValueToType(
+        value,
+        type,
+        valueAsList: valueAsList,
+      ).resolveMapped((resolvedVal) {
         if (valueAsList) {
           return valueToParameterValueList(resolvedVal, type, key: key);
         } else {
@@ -555,55 +698,84 @@ class ConditionSQLEncoder extends ConditionEncoder {
     }
   }
 
-  EncodingValue<String, Object?> valueToSQLPlain(Object? value, Type? type,
-      {String? key}) {
+  EncodingValue<String, Object?> valueToSQLPlain(
+    Object? value,
+    Type? type, {
+    String? key,
+  }) {
     key ??= '?';
 
     if (value == null || value == Null) {
       return EncodingValueNull(key, type, encodeEncodingValueNull);
     } else if (value is num || value is bool) {
       return EncodingValuePrimitive(
-          key, type, value, encodeEncodingValuePrimitive);
+        key,
+        type,
+        value,
+        encodeEncodingValuePrimitive,
+      );
     } else if (value is Decimal) {
       return EncodingValuePrimitive(
-          key, type, value.toDouble(), encodeEncodingValuePrimitive);
+        key,
+        type,
+        value.toDouble(),
+        encodeEncodingValuePrimitive,
+      );
     } else if (value is DynamicInt) {
       return EncodingValuePrimitive(
-          key, type, value.toBigInt(), encodeEncodingValuePrimitive);
+        key,
+        type,
+        value.toBigInt(),
+        encodeEncodingValuePrimitive,
+      );
     } else {
       return EncodingValueText(
-          key, type, value.toString(), encodeEncodingValueText);
+        key,
+        type,
+        value.toString(),
+        encodeEncodingValueText,
+      );
     }
   }
 
-  EncodingValueList<String> valueToParameterValueList(Object? value, Type? type,
-      {String? key}) {
+  EncodingValueList<String> valueToParameterValueList(
+    Object? value,
+    Type? type, {
+    String? key,
+  }) {
     key ??= '?';
 
-    var list = value is Iterable
-        ? value.map((v) => valueToSQLPlain(v, type, key: key)).toList()
-        : [valueToSQLPlain(value, type, key: key)];
+    var list =
+        value is Iterable
+            ? value.map((v) => valueToSQLPlain(v, type, key: key)).toList()
+            : [valueToSQLPlain(value, type, key: key)];
 
     return EncodingValueList(key, type, list, encodeEncodingValueList);
   }
 
   FutureOr<EncodingValue<String, Object?>> conditionParameterToParameterValue(
-      ConditionParameter parameter,
-      EncodingContext context,
-      String? fieldKey,
-      Type? fieldType,
-      {bool valueAsList = false}) {
+    ConditionParameter parameter,
+    EncodingContext context,
+    String? fieldKey,
+    Type? fieldType, {
+    bool valueAsList = false,
+  }) {
     var parameterKey =
         (parameter.hasKey ? parameter.key : parameter.contextKey) ?? fieldKey;
 
     if (parameterKey == null) {
       throw ConditionEncodingError(
-          'Field key not in context: $parameter > $this');
+        'Field key not in context: $parameter > $this',
+      );
     }
 
     var parameterValue = resolveParameterValue(
-        parameterKey, parameter, context, fieldType,
-        valueAsList: valueAsList);
+      parameterKey,
+      parameter,
+      context,
+      fieldType,
+      valueAsList: valueAsList,
+    );
 
     return parameterValue;
   }

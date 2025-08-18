@@ -18,8 +18,14 @@ final _logSchemeProvider = logging.Logger('SchemeProvider')
 
 /// A field that is a reference to another table field.
 class TableFieldReference {
-  static final TableFieldReference _dummy =
-      TableFieldReference('dummy', 'dummy', int, 'dummy', 'dummy', int);
+  static final TableFieldReference _dummy = TableFieldReference(
+    'dummy',
+    'dummy',
+    int,
+    'dummy',
+    'dummy',
+    int,
+  );
 
   /// The source table name.
   final String sourceTable;
@@ -39,8 +45,14 @@ class TableFieldReference {
   /// The target table field type.
   final Type targetFieldType;
 
-  TableFieldReference(this.sourceTable, this.sourceField, this.sourceFieldType,
-      this.targetTable, this.targetField, this.targetFieldType);
+  TableFieldReference(
+    this.sourceTable,
+    this.sourceField,
+    this.sourceFieldType,
+    this.targetTable,
+    this.targetField,
+    this.targetFieldType,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -98,16 +110,17 @@ class TableRelationshipReference {
   final String? relationshipField;
 
   TableRelationshipReference(
-      this.relationshipTable,
-      this.sourceTable,
-      this.sourceField,
-      this.sourceFieldType,
-      this.sourceRelationshipField,
-      this.targetTable,
-      this.targetField,
-      this.targetFieldType,
-      this.targetRelationshipField,
-      {this.relationshipField});
+    this.relationshipTable,
+    this.sourceTable,
+    this.sourceField,
+    this.sourceFieldType,
+    this.sourceRelationshipField,
+    this.targetTable,
+    this.targetField,
+    this.targetFieldType,
+    this.targetRelationshipField, {
+    this.relationshipField,
+  });
 
   @override
   bool operator ==(Object other) =>
@@ -187,8 +200,7 @@ class TableScheme with FieldsFromMap {
   late final List<String> _fieldsNamesSimple;
 
   final Map<String, List<TableRelationshipReference>>
-      _tableRelationshipReference =
-      <String, List<TableRelationshipReference>>{};
+  _tableRelationshipReference = <String, List<TableRelationshipReference>>{};
 
   TableScheme(
     this.name, {
@@ -199,13 +211,15 @@ class TableScheme with FieldsFromMap {
     Iterable<TableRelationshipReference>? relationshipTables,
     Iterable<TableConstraint>? constraints,
     this.relationship = false,
-  })  : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
-        fieldsTypes = Map.unmodifiable(fieldsTypes),
-        constraints = ((constraints?.toList() ?? [])..sort()).toSet(),
-        _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
-            fieldsReferencedTables),
-        _relationshipTables = Set<TableRelationshipReference>.unmodifiable(
-            relationshipTables ?? <TableRelationshipReference>[]) {
+  }) : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
+       fieldsTypes = Map.unmodifiable(fieldsTypes),
+       constraints = ((constraints?.toList() ?? [])..sort()).toSet(),
+       _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
+         fieldsReferencedTables,
+       ),
+       _relationshipTables = Set<TableRelationshipReference>.unmodifiable(
+         relationshipTables ?? <TableRelationshipReference>[],
+       ) {
     _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
     _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
     _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
@@ -213,13 +227,16 @@ class TableScheme with FieldsFromMap {
     for (var t in _relationshipTables) {
       if (t.sourceTable == name) {
         var l = _tableRelationshipReference.putIfAbsent(
-            t.targetTable, () => <TableRelationshipReference>[]);
+          t.targetTable,
+          () => <TableRelationshipReference>[],
+        );
         l.add(t);
       }
     }
 
-    _tableRelationshipReference.updateAll((key, value) =>
-        UnmodifiableListView<TableRelationshipReference>(value));
+    _tableRelationshipReference.updateAll(
+      (key, value) => UnmodifiableListView<TableRelationshipReference>(value),
+    );
   }
 
   /// Returns [_relationshipTables] length.
@@ -243,75 +260,102 @@ class TableScheme with FieldsFromMap {
 
   /// Returns [_tableRelationshipReference].
   Map<String, List<TableRelationshipReference>>
-      get tableRelationshipReference =>
-          UnmodifiableMapView<String, List<TableRelationshipReference>>(
-              _tableRelationshipReference);
+  get tableRelationshipReference =>
+      UnmodifiableMapView<String, List<TableRelationshipReference>>(
+        _tableRelationshipReference,
+      );
 
   /// Returns a [Map] with the table fields values populated from the provided [map].
   ///
   /// The field name resolution is case insensitive. See [getFieldValue].
-  Map<String, Object?> getFieldsValues(Map<String, Object?> map,
-      {Iterable<String>? fields}) {
+  Map<String, Object?> getFieldsValues(
+    Map<String, Object?> map, {
+    Iterable<String>? fields,
+  }) {
     var fieldsNames = this.fieldsNames;
 
     if (fields != null) {
       var fieldsSimple = fields.map(fieldToSimpleKey).toList();
 
-      fieldsNames = fieldsNames
-          .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
-          .where((e) => fieldsSimple.contains(e.value))
-          .map((e) => e.key)
-          .toList();
+      fieldsNames =
+          fieldsNames
+              .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
+              .where((e) => fieldsSimple.contains(e.value))
+              .map((e) => e.key)
+              .toList();
     }
 
-    return getFieldsValuesFromMap(fieldsNames, map,
-        fieldsNamesIndexes: _fieldsNamesIndexes,
-        fieldsNamesLC: _fieldsNamesLC,
-        fieldsNamesSimple: _fieldsNamesSimple,
-        includeAbsentFields: true);
+    return getFieldsValuesFromMap(
+      fieldsNames,
+      map,
+      fieldsNamesIndexes: _fieldsNamesIndexes,
+      fieldsNamesLC: _fieldsNamesLC,
+      fieldsNamesSimple: _fieldsNamesSimple,
+      includeAbsentFields: true,
+    );
   }
 
   final Map<_TableRelationshipKey, TableRelationshipReference?>
-      _tableRelationshipReferenceResolved =
+  _tableRelationshipReferenceResolved =
       <_TableRelationshipKey, TableRelationshipReference?>{};
 
   /// Returns the [TableRelationshipReference] with the [targetTable].
-  TableRelationshipReference? getTableRelationshipReference(
-      {String? sourceTable, String? sourceField, String? targetTable}) {
+  TableRelationshipReference? getTableRelationshipReference({
+    String? sourceTable,
+    String? sourceField,
+    String? targetTable,
+  }) {
     var key = _TableRelationshipKey(sourceTable, sourceField, targetTable);
     if (!key.isValid) {
       throw ArgumentError(
-          "Parameter `sourceTable` or `targetTable` should be provided.");
+        "Parameter `sourceTable` or `targetTable` should be provided.",
+      );
     }
 
     return _tableRelationshipReferenceResolved.putIfAbsent(
-        key,
-        () => _getTableRelationshipReferenceImpl(
-            sourceTable, sourceField, targetTable));
+      key,
+      () => _getTableRelationshipReferenceImpl(
+        sourceTable,
+        sourceField,
+        targetTable,
+      ),
+    );
   }
 
   TableRelationshipReference? _getTableRelationshipReferenceImpl(
-      String? sourceTable, String? sourceField, String? targetTable) {
+    String? sourceTable,
+    String? sourceField,
+    String? targetTable,
+  ) {
     var byTarget = _tableRelationshipReference[targetTable];
 
     var rel = _resolveTableRelationshipReference(
-        byTarget, sourceTable, sourceField, targetTable);
+      byTarget,
+      sourceTable,
+      sourceField,
+      targetTable,
+    );
     if (rel != null) return rel;
 
     var bySource = _tableRelationshipReference[sourceTable];
 
     rel = _resolveTableRelationshipReference(
-        bySource, sourceTable, sourceField, targetTable);
+      bySource,
+      sourceTable,
+      sourceField,
+      targetTable,
+    );
     if (rel != null) return rel;
 
     return null;
   }
 
   TableRelationshipReference? _resolveTableRelationshipReference(
-      List<TableRelationshipReference>? l,
-      String? sourceTable,
-      String? sourceField,
-      String? targetTable) {
+    List<TableRelationshipReference>? l,
+    String? sourceTable,
+    String? sourceField,
+    String? targetTable,
+  ) {
     if (l == null || l.isEmpty) return null;
     if (l.isEmpty) return null;
     if (l.length == 1) return l.first;
@@ -323,14 +367,18 @@ class TableScheme with FieldsFromMap {
       if (rels.length == 1) return rels.first;
 
       if (rels.isEmpty) {
-        var sourceTableSimple =
-            StringUtils.toLowerCaseSimpleCached(sourceTable);
+        var sourceTableSimple = StringUtils.toLowerCaseSimpleCached(
+          sourceTable,
+        );
 
-        rels = l
-            .where((rel) =>
-                StringUtils.toLowerCaseSimpleCached(rel.sourceTable) ==
-                sourceTableSimple)
-            .toList();
+        rels =
+            l
+                .where(
+                  (rel) =>
+                      StringUtils.toLowerCaseSimpleCached(rel.sourceTable) ==
+                      sourceTableSimple,
+                )
+                .toList();
 
         if (rels.length == 1) return rels.first;
       }
@@ -341,53 +389,69 @@ class TableScheme with FieldsFromMap {
       var sourceFieldSimpleUnderscored =
           StringUtils.toLowerCaseSimpleUnderscored(sourceField);
 
-      var rels1 = rels
-          .where((rel) =>
-              StringUtils.toLowerCaseSimpleUnderscored(rel.relationshipTable)
-                  .contains(sourceFieldSimpleUnderscored))
-          .toList();
+      var rels1 =
+          rels
+              .where(
+                (rel) => StringUtils.toLowerCaseSimpleUnderscored(
+                  rel.relationshipTable,
+                ).contains(sourceFieldSimpleUnderscored),
+              )
+              .toList();
 
       if (rels1.length == 1) return rels1.first;
 
-      var sourceFieldSimple =
-          StringUtils.toLowerCaseSimpleUnderscored(sourceField);
+      var sourceFieldSimple = StringUtils.toLowerCaseSimpleUnderscored(
+        sourceField,
+      );
 
       if (rels1.isEmpty) {
-        rels1 = rels
-            .where((rel) =>
-                StringUtils.toLowerCaseSimpleCached(rel.relationshipTable)
-                    .contains(sourceFieldSimple))
-            .toList();
+        rels1 =
+            rels
+                .where(
+                  (rel) => StringUtils.toLowerCaseSimpleCached(
+                    rel.relationshipTable,
+                  ).contains(sourceFieldSimple),
+                )
+                .toList();
       }
 
       var relsNames = StringUtils.trimEqualitiesMap(
         rels1.map((e) => e.relationshipTable).toList(),
         delimiter: '_',
         normalizer: (s) => StringUtils.toLowerCaseSimpleUnderscored(s),
-        validator: (s) =>
-            !StringUtils.toLowerCaseSimpleCached(s).contains(sourceFieldSimple),
+        validator:
+            (s) =>
+                !StringUtils.toLowerCaseSimpleCached(
+                  s,
+                ).contains(sourceFieldSimple),
       );
 
-      var relsNamesSimple = relsNames.map((key, value) =>
-          MapEntry(key, StringUtils.toLowerCaseSimpleCached(value)));
+      var relsNamesSimple = relsNames.map(
+        (key, value) =>
+            MapEntry(key, StringUtils.toLowerCaseSimpleCached(value)),
+      );
 
-      var rels2 = rels1.where((rel) {
-        var f = relsNamesSimple[rel.relationshipTable]!;
-        return f.contains(sourceFieldSimple);
-      }).toList();
+      var rels2 =
+          rels1.where((rel) {
+            var f = relsNamesSimple[rel.relationshipTable]!;
+            return f.contains(sourceFieldSimple);
+          }).toList();
 
       if (rels2.length == 1) return rels2.first;
 
-      var rels3 = rels1.where((rel) {
-        var f = relsNamesSimple[rel.relationshipTable]!;
-        return f == sourceFieldSimple;
-      }).toList();
+      var rels3 =
+          rels1.where((rel) {
+            var f = relsNamesSimple[rel.relationshipTable]!;
+            return f == sourceFieldSimple;
+          }).toList();
 
       if (rels3.length == 1) return rels3.first;
 
       if (rels1.length > 1) {
-        rels1.sort((a, b) =>
-            a.relationshipTable.length.compareTo(b.relationshipTable.length));
+        rels1.sort(
+          (a, b) =>
+              a.relationshipTable.length.compareTo(b.relationshipTable.length),
+        );
         var short = rels.first;
         return short;
       }
@@ -398,8 +462,9 @@ class TableScheme with FieldsFromMap {
     }
 
     throw StateError(
-        "Ambiguous relationship tables for ${sourceTable ?? '?'}.${sourceField ?? '?'} -> ${targetTable ?? '?'}:\n"
-        "${rels.map((r) => ' -- $r\n').join('\n')}\n");
+      "Ambiguous relationship tables for ${sourceTable ?? '?'}.${sourceField ?? '?'} -> ${targetTable ?? '?'}:\n"
+      "${rels.map((r) => ' -- $r\n').join('\n')}\n",
+    );
   }
 
   static final TableFieldReference _tableFieldReferenceDummy =
@@ -542,7 +607,7 @@ class TableEnumConstraint extends TableConstraint {
   final Set<String> values;
 
   TableEnumConstraint(super.field, Iterable<String> values)
-      : values = values.toSet();
+    : values = values.toSet();
 
   @override
   int get priority => 2;
@@ -578,8 +643,11 @@ abstract class SchemeProvider {
   /// - [contextID] should be [Expando] compatible. It informs that other
   ///   calls to [getTableScheme] are in the same context and could have
   ///   shared internal caches for the same [contextID] instance.
-  FutureOr<TableScheme?> getTableScheme(String table,
-      {TableRelationshipReference? relationship, Object? contextID}) {
+  FutureOr<TableScheme?> getTableScheme(
+    String table, {
+    TableRelationshipReference? relationship,
+    Object? contextID,
+  }) {
     var tablesScheme = _tablesSchemes[table];
     if (tablesScheme != null) return tablesScheme;
 
@@ -610,8 +678,10 @@ abstract class SchemeProvider {
   ///   calls to [getTableSchemeImpl] are in the same context and could have
   ///   shared internal caches for the same [contextID] instance.
   FutureOr<TableScheme?> getTableSchemeImpl(
-      String table, TableRelationshipReference? relationship,
-      {Object? contextID});
+    String table,
+    TableRelationshipReference? relationship, {
+    Object? contextID,
+  });
 
   /// Selects the `ID` field name from [primaryKeyCandidates] candidates:
   String selectIDFieldName(String table, List<String> primaryKeyCandidates) {
@@ -626,21 +696,25 @@ abstract class SchemeProvider {
     var idField = _selectIDFieldNameFromMultiple(table, primaryKeyCandidates);
 
     _logSchemeProvider.info(
-        "Multiple PRIMARY KEY candidates for ID field at table `$table`> picked `$idField` from $primaryKeyCandidates");
+      "Multiple PRIMARY KEY candidates for ID field at table `$table`> picked `$idField` from $primaryKeyCandidates",
+    );
 
     return idField;
   }
 
   String _selectIDFieldNameFromMultiple(
-      String table, List<String> primaryFieldsCandidates) {
+    String table,
+    List<String> primaryFieldsCandidates,
+  ) {
     for (var pk in primaryFieldsCandidates) {
       if (equalsIgnoreAsciiCase(pk, 'id')) {
         return pk;
       }
     }
 
-    var pk = primaryFieldsCandidates
-        .firstWhereOrNull((k) => k.toLowerCase().endsWith('_id'));
+    var pk = primaryFieldsCandidates.firstWhereOrNull(
+      (k) => k.toLowerCase().endsWith('_id'),
+    );
     if (pk != null) return pk;
 
     var possibleIDFields = ['code', 'serial'];
@@ -682,9 +756,13 @@ abstract class SchemeProvider {
   FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table);
 
   Map<String, Type> notifyTableFieldTypes(
-      String table, Map<String, Type> fieldsTypes) {
+    String table,
+    Map<String, Type> fieldsTypes,
+  ) {
     return _tablesFieldsTypes.putIfAbsent(
-        table, () => Map<String, Type>.unmodifiable(fieldsTypes));
+      table,
+      () => Map<String, Type>.unmodifiable(fieldsTypes),
+    );
   }
 
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
@@ -702,8 +780,9 @@ abstract class SchemeProvider {
 
   /// Returns a [TableScheme] for [entityRepository].
   FutureOr<TableScheme?> getTableSchemeForEntityRepository(
-      EntityRepository entityRepository,
-      {Object? contextID}) {
+    EntityRepository entityRepository, {
+    Object? contextID,
+  }) {
     var table = getTableForEntityRepository(entityRepository);
     return getTableScheme(table, contextID: contextID);
   }
@@ -720,15 +799,20 @@ abstract class SchemeProvider {
   }
 
   /// Returns the [type] for the [field] at [tableName] or by [entityName].
-  FutureOr<TypeInfo?> getFieldType(String field,
-      {String? entityName, String? tableName});
+  FutureOr<TypeInfo?> getFieldType(
+    String field, {
+    String? entityName,
+    String? tableName,
+  });
 
   /// Returns the [entity] ID for [entityName], [tableName] or [entityType].
-  Object? getEntityID(Object entity,
-      {String? entityName,
-      String? tableName,
-      Type? entityType,
-      EntityHandler? entityHandler});
+  Object? getEntityID(
+    Object entity, {
+    String? entityName,
+    String? tableName,
+    Type? entityType,
+    EntityHandler? entityHandler,
+  });
 }
 
 /// An encoding context for [ConditionEncoder].
@@ -750,13 +834,15 @@ class EncodingContext {
 
   String? tableFieldID;
 
-  EncodingContext(this.entityName,
-      {this.parameters,
-      this.positionalParameters,
-      this.namedParameters,
-      this.transaction,
-      this.tableName,
-      this.tableFieldID});
+  EncodingContext(
+    this.entityName, {
+    this.parameters,
+    this.positionalParameters,
+    this.namedParameters,
+    this.transaction,
+    this.tableName,
+    this.tableFieldID,
+  });
 
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
@@ -800,10 +886,13 @@ class EncodingContext {
 
   /// The [Condition]s of each used [TableRelationshipReference].
   final Map<TableRelationshipReference, List<Condition>>
-      _relationshipsConditions = {};
+  _relationshipsConditions = {};
 
   void addRelationshipTable(
-      String tableName, TableRelationshipReference relationship, Condition? c) {
+    String tableName,
+    TableRelationshipReference relationship,
+    Condition? c,
+  ) {
     _relationshipTables[tableName] ??= relationship;
 
     if (c != null) {
@@ -885,8 +974,12 @@ class EncodingContext {
   }
 
   String _resolveEntityAliasDefault(String entityName, Set<String> allAliases) {
-    var alias =
-        _resolveEntityAliasByPrefix(entityName, allAliases, 'alias', 1000);
+    var alias = _resolveEntityAliasByPrefix(
+      entityName,
+      allAliases,
+      'alias',
+      1000,
+    );
     if (alias == null) {
       throw StateError("Can't resolve entity alias: $entityName");
     }
@@ -894,7 +987,11 @@ class EncodingContext {
   }
 
   String? _resolveEntityAliasByPrefix(
-      String entityName, Set<String> allAliases, String prefix, int limit) {
+    String entityName,
+    Set<String> allAliases,
+    String prefix,
+    int limit,
+  ) {
     if (prefix.isEmpty) return null;
 
     for (var i = 1; i <= limit; ++i) {
@@ -941,8 +1038,11 @@ class EncodingContext {
         alias == 'empty';
   }
 
-  String addEncodingParameter(String suggestedKey, Object? value,
-      {String parameterPrefix = 'param_'}) {
+  String addEncodingParameter(
+    String suggestedKey,
+    Object? value, {
+    String parameterPrefix = 'param_',
+  }) {
     var encodingParameters = (this.encodingParameters ??= <String, Object?>{});
 
     var namedParameters = this.namedParameters;
@@ -952,9 +1052,10 @@ class EncodingContext {
     }
 
     for (var i = 0; i < 1000; ++i) {
-      var k = i == 0
-          ? '$parameterPrefix$suggestedKey'
-          : '$parameterPrefix$suggestedKey$i';
+      var k =
+          i == 0
+              ? '$parameterPrefix$suggestedKey'
+              : '$parameterPrefix$suggestedKey$i';
 
       if (!namedParameters.containsKey(k)) {
         encodingParameters[k] = value;
@@ -972,20 +1073,25 @@ abstract class ConditionEncoder {
 
   ConditionEncoder([this.schemeProvider]);
 
-  FutureOr<EncodingContext> encode(Condition condition, String entityName,
-      {Object? parameters,
-      List? positionalParameters,
-      Map<String, Object?>? namedParameters,
-      Transaction? transaction,
-      String? tableName,
-      String? tableFieldID}) {
-    var context = EncodingContext(entityName,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        transaction: transaction,
-        tableName: tableName,
-        tableFieldID: tableFieldID);
+  FutureOr<EncodingContext> encode(
+    Condition condition,
+    String entityName, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Transaction? transaction,
+    String? tableName,
+    String? tableFieldID,
+  }) {
+    var context = EncodingContext(
+      entityName,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      transaction: transaction,
+      tableName: tableName,
+      tableFieldID: tableFieldID,
+    );
 
     if (condition is ConditionANY) {
       return context;
@@ -1019,7 +1125,9 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<EncodingContext> encodeCondition(
-      Condition c, EncodingContext context) {
+    Condition c,
+    EncodingContext context,
+  ) {
     if (c is KeyCondition) {
       return encodeKeyCondition(c, context);
     } else if (c is GroupCondition) {
@@ -1036,13 +1144,19 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<EncodingContext> encodeIDCondition(
-      ConditionID c, EncodingContext context);
+    ConditionID c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeIDConditionIN(
-      ConditionIdIN c, EncodingContext context);
+    ConditionIdIN c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeGroupCondition(
-      GroupCondition c, EncodingContext context) {
+    GroupCondition c,
+    EncodingContext context,
+  ) {
     if (c is GroupConditionAND) {
       return encodeGroupConditionAND(c, context);
     } else if (c is GroupConditionOR) {
@@ -1061,15 +1175,20 @@ abstract class ConditionEncoder {
   String get groupOperatorOR;
 
   FutureOr<EncodingContext> encodeGroupConditionAND(
-          GroupConditionAND c, EncodingContext context) =>
-      encodeGroupConditionOperator(c, context, groupOperatorAND);
+    GroupConditionAND c,
+    EncodingContext context,
+  ) => encodeGroupConditionOperator(c, context, groupOperatorAND);
 
   FutureOr<EncodingContext> encodeGroupConditionOR(
-          GroupConditionOR c, EncodingContext context) =>
-      encodeGroupConditionOperator(c, context, groupOperatorOR);
+    GroupConditionOR c,
+    EncodingContext context,
+  ) => encodeGroupConditionOperator(c, context, groupOperatorOR);
 
   FutureOr<EncodingContext> encodeGroupConditionOperator(
-      GroupCondition c, EncodingContext context, String operator) {
+    GroupCondition c,
+    EncodingContext context,
+    String operator,
+  ) {
     var conditions = c.conditions;
     var length = conditions.length;
 
@@ -1088,14 +1207,17 @@ abstract class ConditionEncoder {
     var c1Ret = encodeCondition(c1, context);
 
     return c1Ret.resolveMapped((s) {
-      var rets = conditions.skip(1).map((c2) {
-        s.write(operator);
-        return encodeCondition(c2, context);
-      }).toList(growable: false);
+      var rets = conditions
+          .skip(1)
+          .map((c2) {
+            s.write(operator);
+            return encodeCondition(c2, context);
+          })
+          .toList(growable: false);
 
-      return rets
-          .resolveAllReduced((value, element) => element)
-          .resolveMapped((s) {
+      return rets.resolveAllReduced((value, element) => element).resolveMapped((
+        s,
+      ) {
         s.write(groupCloser);
         return s;
       });
@@ -1103,7 +1225,9 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<EncodingContext> encodeKeyCondition(
-      KeyCondition c, EncodingContext context) {
+    KeyCondition c,
+    EncodingContext context,
+  ) {
     if (c is KeyConditionEQ) {
       return encodeKeyConditionEQ(c, context);
     } else if (c is KeyConditionNotEQ) {
@@ -1126,100 +1250,160 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<EncodingContext> encodeKeyConditionEQ(
-      KeyConditionEQ c, EncodingContext context);
+    KeyConditionEQ c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionNotEQ(
-      KeyConditionNotEQ c, EncodingContext context);
+    KeyConditionNotEQ c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionIN(
-      KeyConditionIN c, EncodingContext context);
+    KeyConditionIN c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionNotIN(
-      KeyConditionNotIN c, EncodingContext context);
+    KeyConditionNotIN c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionGreaterThan(
-      KeyConditionGreaterThan c, EncodingContext context);
+    KeyConditionGreaterThan c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionGreaterThanOrEqual(
-      KeyConditionGreaterThanOrEqual c, EncodingContext context);
+    KeyConditionGreaterThanOrEqual c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionLessThan(
-      KeyConditionLessThan c, EncodingContext context);
+    KeyConditionLessThan c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingContext> encodeKeyConditionLessThanOrEqual(
-      KeyConditionLessThanOrEqual c, EncodingContext context);
+    KeyConditionLessThanOrEqual c,
+    EncodingContext context,
+  );
 
   FutureOr<EncodingValue<String, Object?>> resolveParameterValue(
-      String valueKey,
-      ConditionParameter value,
-      EncodingContext context,
-      Type? valueType,
-      {bool valueAsList = false}) {
+    String valueKey,
+    ConditionParameter value,
+    EncodingContext context,
+    Type? valueType, {
+    bool valueAsList = false,
+  }) {
     if (valueAsList) {
-      return _resolveParameterValueImpl(value, context, valueType, true)
-          .resolveMapped((values) {
-        var list = values is List
-            ? values
-            : (values is Iterable ? values.toList(growable: false) : [values]);
+      return _resolveParameterValueImpl(
+        value,
+        context,
+        valueType,
+        true,
+      ).resolveMapped((values) {
+        var list =
+            values is List
+                ? values
+                : (values is Iterable
+                    ? values.toList(growable: false)
+                    : [values]);
 
-        var placeHolders = list.mapIndexed((i, v) {
-          var k = parameterPlaceholderIndexKey(valueKey, i);
-          context.parametersPlaceholders[k] ??= v;
-          var placeholder = parameterPlaceholder(k);
-          return EncodingPlaceholderIndex(valueKey, valueType, placeholder, i,
-              encodeEncodingPlaceholderIndex);
-        }).toList();
+        var placeHolders =
+            list.mapIndexed((i, v) {
+              var k = parameterPlaceholderIndexKey(valueKey, i);
+              context.parametersPlaceholders[k] ??= v;
+              var placeholder = parameterPlaceholder(k);
+              return EncodingPlaceholderIndex(
+                valueKey,
+                valueType,
+                placeholder,
+                i,
+                encodeEncodingPlaceholderIndex,
+              );
+            }).toList();
 
         return EncodingValueList(
-            valueKey, valueType, placeHolders, encodeEncodingValueList);
+          valueKey,
+          valueType,
+          placeHolders,
+          encodeEncodingValueList,
+        );
       });
     } else {
       var placeholder = parameterPlaceholder(valueKey);
 
       if (!context.parametersPlaceholders.containsKey(valueKey)) {
-        return _resolveParameterValueImpl(value, context, valueType, false)
-            .resolveMapped((val) {
+        return _resolveParameterValueImpl(
+          value,
+          context,
+          valueType,
+          false,
+        ).resolveMapped((val) {
           context.parametersPlaceholders[valueKey] ??= val;
           return EncodingPlaceholder(
-              valueKey, valueType, placeholder, encodeEncodingPlaceholder);
+            valueKey,
+            valueType,
+            placeholder,
+            encodeEncodingPlaceholder,
+          );
         });
       } else {
         return EncodingPlaceholder(
-            valueKey, valueType, placeholder, encodeEncodingPlaceholder);
+          valueKey,
+          valueType,
+          placeholder,
+          encodeEncodingPlaceholder,
+        );
       }
     }
   }
 
-  FutureOr<Object?> _resolveParameterValueImpl(ConditionParameter value,
-      EncodingContext context, Type? valueType, bool valueAsList) {
+  FutureOr<Object?> _resolveParameterValueImpl(
+    ConditionParameter value,
+    EncodingContext context,
+    Type? valueType,
+    bool valueAsList,
+  ) {
     var paramValue = value.getValue(
-        parameters: context.parameters,
-        positionalParameters: context.positionalParameters,
-        namedParameters: context.namedParameters,
-        encodingParameters: context.encodingParameters);
+      parameters: context.parameters,
+      positionalParameters: context.positionalParameters,
+      namedParameters: context.namedParameters,
+      encodingParameters: context.encodingParameters,
+    );
 
     if (valueType != null) {
-      return resolveValueToType(paramValue, valueType,
-          valueAsList: valueAsList);
+      return resolveValueToType(
+        paramValue,
+        valueType,
+        valueAsList: valueAsList,
+      );
     } else {
       return paramValue;
     }
   }
 
-  FutureOr<Object?> resolveValueToType(Object? value, Type valueType,
-      {bool valueAsList = false}) {
+  FutureOr<Object?> resolveValueToType(
+    Object? value,
+    Type valueType, {
+    bool valueAsList = false,
+  }) {
     if (valueAsList) {
       if (value == null) {
         return [];
       } else if (value is Iterable) {
-        var list = value
-            .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))
-            .toList(growable: false)
-            .resolveAll();
+        var list =
+            value
+                .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))
+                .toList(growable: false)
+                .resolveAll();
         return list;
       } else {
-        var list = _resolveValueToTypeCompatibleImpl(value, valueType)
-            .resolveMapped((val) => [val]);
+        var list = _resolveValueToTypeCompatibleImpl(
+          value,
+          valueType,
+        ).resolveMapped((val) => [val]);
         return list;
       }
     } else {
@@ -1228,7 +1412,9 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<Object?> _resolveValueToTypeCompatibleImpl(
-      Object? value, Type valueType) {
+    Object? value,
+    Type valueType,
+  ) {
     value = _resolveValueToTypeImpl(value, valueType);
     value = resolveValueToCompatibleType(value);
     return value;
@@ -1273,7 +1459,8 @@ abstract class ConditionEncoder {
           value == list.first;
         } else {
           throw ArgumentError(
-              "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value");
+            "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value",
+          );
         }
       }
 
@@ -1290,8 +1477,10 @@ abstract class ConditionEncoder {
         var entityID = schemeProvider.getEntityID(value, entityType: valueType);
         return entityID;
       } else {
-        var entityID =
-            schemeProvider.getEntityID(value, entityType: value.runtimeType);
+        var entityID = schemeProvider.getEntityID(
+          value,
+          entityType: value.runtimeType,
+        );
         return entityID;
       }
     } else {
@@ -1302,8 +1491,8 @@ abstract class ConditionEncoder {
   String encodeEncodingValueNull(EncodingValueNull<String> p) => 'null';
 
   String encodeEncodingValuePrimitive(
-          EncodingValuePrimitive<String, Object?> p) =>
-      p.resolvedValue.toString();
+    EncodingValuePrimitive<String, Object?> p,
+  ) => p.resolvedValue.toString();
 
   String encodeEncodingValueText(EncodingValueText<String> p) {
     var valueStr = p.resolvedValue.toString();
@@ -1338,8 +1527,8 @@ abstract class ConditionEncoder {
       '${parameterKey}__$index';
 }
 
-typedef ValueEncoder<E, P extends EncodingValue<E, P>> = E Function(
-    P parameterValue);
+typedef ValueEncoder<E, P extends EncodingValue<E, P>> =
+    E Function(P parameterValue);
 
 abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
   final String key;
@@ -1349,8 +1538,9 @@ abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
 
   E get encode;
 
-  List<EncodingValue<E, Object?>> get asList =>
-      <EncodingValue<E, Object?>>[this];
+  List<EncodingValue<E, Object?>> get asList => <EncodingValue<E, Object?>>[
+    this,
+  ];
 
   @override
   String toString() => encode.toString();
@@ -1384,7 +1574,11 @@ class EncodingValuePrimitive<E, T>
   final T resolvedValue;
 
   EncodingValuePrimitive(
-      super.key, super.type, this.resolvedValue, this.valueEncoder);
+    super.key,
+    super.type,
+    this.resolvedValue,
+    this.valueEncoder,
+  );
 
   @override
   E get encode => valueEncoder(this);
@@ -1398,7 +1592,11 @@ class EncodingValueText<E>
   final String resolvedValue;
 
   EncodingValueText(
-      super.key, super.type, this.resolvedValue, this.valueEncoder);
+    super.key,
+    super.type,
+    this.resolvedValue,
+    this.valueEncoder,
+  );
 
   @override
   E get encode => valueEncoder(this);
@@ -1410,7 +1608,11 @@ class EncodingPlaceholder<E> extends EncodingValue<E, EncodingPlaceholder<E>> {
   final String placeholder;
 
   EncodingPlaceholder(
-      super.key, super.type, this.placeholder, this.valueEncoder);
+    super.key,
+    super.type,
+    this.placeholder,
+    this.valueEncoder,
+  );
 
   @override
   E get encode => valueEncoder(this);
@@ -1424,7 +1626,12 @@ class EncodingPlaceholderIndex<E>
   final int index;
 
   EncodingPlaceholderIndex(
-      super.key, super.type, this.placeholder, this.index, this.valueEncoder);
+    super.key,
+    super.type,
+    this.placeholder,
+    this.index,
+    this.valueEncoder,
+  );
 
   @override
   E get encode => valueEncoder(this);

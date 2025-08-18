@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.5.3
+// BUILDER: reflection_factory/2.6.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.5.3');
+  static final Version _version = Version.parse('2.6.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -132,7 +132,7 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   Account$reflection withObject([Account? obj]) =>
@@ -175,7 +175,7 @@ class Account$reflection extends ClassReflection<Account>
   static const List<String> _constructorsNames = const <String>[
     '',
     'empty',
-    'entityReference'
+    'entityReference',
   ];
 
   @override
@@ -199,36 +199,48 @@ class Account$reflection extends ClassReflection<Account>
     switch (lc) {
       case 'entityreference':
         return ConstructorReflection<Account>(
-            this,
-            Account,
-            'entityReference',
-            () => Account.entityReference,
-            const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
-            null,
-            const <String, __PR>{
-              'userInfo': __PR(
-                  __TR<EntityReference<UserInfo>>(
-                      EntityReference, <__TR>[__TR<UserInfo>(UserInfo)]),
-                  'userInfo',
-                  false,
-                  true)
-            },
-            null);
+          this,
+          Account,
+          'entityReference',
+          () => Account.entityReference,
+          const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
+          null,
+          const <String, __PR>{
+            'userInfo': __PR(
+              __TR<EntityReference<UserInfo>>(EntityReference, <__TR>[
+                __TR<UserInfo>(UserInfo),
+              ]),
+              'userInfo',
+              false,
+              true,
+            ),
+          },
+          null,
+        );
       case '':
         return ConstructorReflection<Account>(
-            this,
-            Account,
-            '',
-            () => Account.new,
-            const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
-            null,
-            const <String, __PR>{
-              'userInfo': __PR(__TR.tObject, 'userInfo', true, false)
-            },
-            null);
+          this,
+          Account,
+          '',
+          () => Account.new,
+          const <__PR>[__PR(__TR<User>(User), 'user', false, true)],
+          null,
+          const <String, __PR>{
+            'userInfo': __PR(__TR.tObject, 'userInfo', true, false),
+          },
+          null,
+        );
       case 'empty':
-        return ConstructorReflection<Account>(this, Account, 'empty',
-            () => Account.empty, null, null, null, null);
+        return ConstructorReflection<Account>(
+          this,
+          Account,
+          'empty',
+          () => Account.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -259,7 +271,7 @@ class Account$reflection extends ClassReflection<Account>
     'id',
     'idFieldName',
     'user',
-    'userInfo'
+    'userInfo',
   ];
 
   @override
@@ -308,7 +320,9 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   FieldReflection<Account, dynamic>? _fieldImpl(
-      String fieldName, Account? obj) {
+    String fieldName,
+    Account? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -342,8 +356,9 @@ class Account$reflection extends ClassReflection<Account>
         return FieldReflection<Account, EntityReference<UserInfo>>(
           this,
           Account,
-          const __TR<EntityReference<UserInfo>>(
-              EntityReference, <__TR>[__TR<UserInfo>(UserInfo)]),
+          const __TR<EntityReference<UserInfo>>(EntityReference, <__TR>[
+            __TR<UserInfo>(UserInfo),
+          ]),
           'userInfo',
           false,
           (o) => () => o!.userInfo,
@@ -396,8 +411,10 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(Account? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    Account? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -410,8 +427,10 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(Account? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    Account? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -438,14 +457,14 @@ class Account$reflection extends ClassReflection<Account>
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Account, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<Account, dynamic>> _methodsObject = {};
 
@@ -487,7 +506,9 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   MethodReflection<Account, dynamic>? _methodImpl(
-      String methodName, Account? obj) {
+    String methodName,
+    Account? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -495,102 +516,121 @@ class Account$reflection extends ClassReflection<Account>
     switch (lc) {
       case 'getfield':
         return MethodReflection<Account, dynamic>(
-            this,
-            Account,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Account,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<Account, TypeInfo<dynamic>?>(
-            this,
-            Account,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Account,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<Account, void>(
-            this,
-            Account,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          Account,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<Account, Map<String, dynamic>>(
-            this,
-            Account,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Account,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<Account, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<Account, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<Account, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getfieldentityannotations':
         return MethodReflection<Account, List<EntityAnnotation>?>(
-            this,
-            Entity,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<Account, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -628,7 +668,7 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   Address$reflection withObject([Address? obj]) =>
@@ -671,7 +711,7 @@ class Address$reflection extends ClassReflection<Address>
   static const List<String> _constructorsNames = const <String>[
     '',
     'empty',
-    'fromMap'
+    'fromMap',
   ];
 
   @override
@@ -695,42 +735,53 @@ class Address$reflection extends ClassReflection<Address>
     switch (lc) {
       case '':
         return ConstructorReflection<Address>(
-            this,
-            Address,
-            '',
-            () => Address.new,
-            const <__PR>[
-              __PR(__TR.tString, 'state', false, true),
-              __PR(__TR.tString, 'city', false, true),
-              __PR(__TR.tString, 'street', false, true),
-              __PR(__TR.tInt, 'number', false, true)
-            ],
-            null,
-            const <String, __PR>{
-              'closedStores': __PR(__TR.tObject, 'closedStores', true, false),
-              'id': __PR(__TR.tInt, 'id', true, false),
-              'latitude': __PR(__TR.tObject, 'latitude', true, false),
-              'longitude': __PR(__TR.tObject, 'longitude', true, false),
-              'stores': __PR(
-                  __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
-                  'stores',
-                  true,
-                  false)
-            },
-            null);
+          this,
+          Address,
+          '',
+          () => Address.new,
+          const <__PR>[
+            __PR(__TR.tString, 'state', false, true),
+            __PR(__TR.tString, 'city', false, true),
+            __PR(__TR.tString, 'street', false, true),
+            __PR(__TR.tInt, 'number', false, true),
+          ],
+          null,
+          const <String, __PR>{
+            'closedStores': __PR(__TR.tObject, 'closedStores', true, false),
+            'id': __PR(__TR.tInt, 'id', true, false),
+            'latitude': __PR(__TR.tObject, 'latitude', true, false),
+            'longitude': __PR(__TR.tObject, 'longitude', true, false),
+            'stores': __PR(
+              __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
+              'stores',
+              true,
+              false,
+            ),
+          },
+          null,
+        );
       case 'empty':
-        return ConstructorReflection<Address>(this, Address, 'empty',
-            () => Address.empty, null, null, null, null);
+        return ConstructorReflection<Address>(
+          this,
+          Address,
+          'empty',
+          () => Address.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'frommap':
         return ConstructorReflection<Address>(
-            this,
-            Address,
-            'fromMap',
-            () => Address.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Address,
+          'fromMap',
+          () => Address.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -767,7 +818,7 @@ class Address$reflection extends ClassReflection<Address>
     'number',
     'state',
     'stores',
-    'street'
+    'street',
   ];
 
   @override
@@ -816,7 +867,9 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   FieldReflection<Address, dynamic>? _fieldImpl(
-      String fieldName, Address? obj) {
+    String fieldName,
+    Address? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -925,8 +978,9 @@ class Address$reflection extends ClassReflection<Address>
         return FieldReflection<Address, EntityReferenceList<Store>>(
           this,
           Address,
-          const __TR<EntityReferenceList<Store>>(
-              EntityReferenceList, <__TR>[__TR<Store>(Store)]),
+          const __TR<EntityReferenceList<Store>>(EntityReferenceList, <__TR>[
+            __TR<Store>(Store),
+          ]),
           'closedStores',
           false,
           (o) => () => o!.closedStores,
@@ -979,8 +1033,10 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(Address? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    Address? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -999,8 +1055,10 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(Address? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    Address? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -1033,14 +1091,14 @@ class Address$reflection extends ClassReflection<Address>
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<Address, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<Address, dynamic>> _methodsObject = {};
 
@@ -1082,7 +1140,9 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   MethodReflection<Address, dynamic>? _methodImpl(
-      String methodName, Address? obj) {
+    String methodName,
+    Address? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -1090,102 +1150,121 @@ class Address$reflection extends ClassReflection<Address>
     switch (lc) {
       case 'getfield':
         return MethodReflection<Address, dynamic>(
-            this,
-            Address,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Address,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<Address, TypeInfo<dynamic>?>(
-            this,
-            Address,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Address,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldentityannotations':
         return MethodReflection<Address, List<EntityAnnotation>?>(
-            this,
-            Address,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Address,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<Address, void>(
-            this,
-            Address,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          Address,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<Address, Map<String, dynamic>>(
-            this,
-            Address,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Address,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<Address, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<Address, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<Address, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<Address, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -1222,7 +1301,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   Photo$reflection withObject([Photo? obj]) =>
@@ -1266,7 +1345,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     'empty',
     'from',
     'fromData',
-    'fromID'
+    'fromID',
   ];
 
   @override
@@ -1290,37 +1369,48 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     switch (lc) {
       case 'fromid':
         return ConstructorReflection<Photo>(
-            this,
-            Photo,
-            'fromID',
-            () => Photo.fromID,
-            const <__PR>[__PR(__TR.tString, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Photo,
+          'fromID',
+          () => Photo.fromID,
+          const <__PR>[__PR(__TR.tString, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'fromdata':
         return ConstructorReflection<Photo>(
-            this,
-            Photo,
-            'fromData',
-            () => Photo.fromData,
-            const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'data', false, true)],
-            null,
-            const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
-            null);
+          this,
+          Photo,
+          'fromData',
+          () => Photo.fromData,
+          const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'data', false, true)],
+          null,
+          const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
+          null,
+        );
       case 'from':
         return ConstructorReflection<Photo>(
-            this,
-            Photo,
-            'from',
-            () => Photo.from,
-            const <__PR>[__PR(__TR.tObject, 'o', false, true)],
-            null,
-            const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
-            null);
+          this,
+          Photo,
+          'from',
+          () => Photo.from,
+          const <__PR>[__PR(__TR.tObject, 'o', false, true)],
+          null,
+          const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
+          null,
+        );
       case 'empty':
         return ConstructorReflection<Photo>(
-            this, Photo, 'empty', () => Photo.empty, null, null, null, null);
+          this,
+          Photo,
+          'empty',
+          () => Photo.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -1351,7 +1441,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     'fieldsNames',
     'hashCode',
     'id',
-    'idFieldName'
+    'idFieldName',
   ];
 
   @override
@@ -1486,8 +1576,10 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(Photo? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    Photo? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -1500,8 +1592,10 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(Photo? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    Photo? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -1529,7 +1623,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     'setID',
     'toJson',
     'toJsonEncoded',
-    'toString'
+    'toString',
   ];
 
   @override
@@ -1585,115 +1679,135 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     switch (lc) {
       case 'getfield':
         return MethodReflection<Photo, dynamic>(
-            this,
-            Photo,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Photo,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<Photo, TypeInfo<dynamic>?>(
-            this,
-            Photo,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Photo,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<Photo, void>(
-            this,
-            Photo,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          Photo,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<Photo, Map<String, dynamic>>(
-            this,
-            Photo,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Photo,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'tostring':
         return MethodReflection<Photo, String>(
-            this,
-            Photo,
-            'toString',
-            __TR.tString,
-            false,
-            (o) => o!.toString,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Photo,
+          'toString',
+          __TR.tString,
+          false,
+          (o) => o!.toString,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<Photo, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<Photo, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<Photo, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getfieldentityannotations':
         return MethodReflection<Photo, List<EntityAnnotation>?>(
-            this,
-            Entity,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<Photo, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -1701,14 +1815,14 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
 
   static const List<String> _staticMethodsNames = const <String>[
     'computeID',
-    'fromMap'
+    'fromMap',
   ];
 
   @override
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, StaticMethodReflection<Photo, dynamic>>
-      _staticMethods = {};
+  _staticMethods = {};
 
   @override
   StaticMethodReflection<Photo, R>? staticMethod<R>(String methodName) {
@@ -1728,28 +1842,30 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
     switch (lc) {
       case 'computeid':
         return StaticMethodReflection<Photo, String>(
-            this,
-            Photo,
-            'computeID',
-            __TR.tString,
-            false,
-            () => Photo.computeID,
-            const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'data', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Photo,
+          'computeID',
+          __TR.tString,
+          false,
+          () => Photo.computeID,
+          const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'data', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'frommap':
         return StaticMethodReflection<Photo, Photo>(
-            this,
-            Photo,
-            'fromMap',
-            const __TR<Photo>(Photo),
-            false,
-            () => Photo.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Photo,
+          'fromMap',
+          const __TR<Photo>(Photo),
+          false,
+          () => Photo.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -1777,7 +1893,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   Role$reflection withObject([Role? obj]) =>
@@ -1820,7 +1936,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   static const List<String> _constructorsNames = const <String>[
     '',
     'empty',
-    'fromMap'
+    'fromMap',
   ];
 
   @override
@@ -1844,31 +1960,41 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     switch (lc) {
       case '':
         return ConstructorReflection<Role>(
-            this,
-            Role,
-            '',
-            () => Role.new,
-            const <__PR>[__PR(__TR<RoleType>(RoleType), 'type', false, true)],
-            null,
-            const <String, __PR>{
-              'enabled': __PR(__TR.tBool, 'enabled', false, false, true),
-              'id': __PR(__TR.tInt, 'id', true, false),
-              'value': __PR(__TR<Decimal>(Decimal), 'value', true, false)
-            },
-            null);
+          this,
+          Role,
+          '',
+          () => Role.new,
+          const <__PR>[__PR(__TR<RoleType>(RoleType), 'type', false, true)],
+          null,
+          const <String, __PR>{
+            'enabled': __PR(__TR.tBool, 'enabled', false, false, true),
+            'id': __PR(__TR.tInt, 'id', true, false),
+            'value': __PR(__TR<Decimal>(Decimal), 'value', true, false),
+          },
+          null,
+        );
       case 'empty':
         return ConstructorReflection<Role>(
-            this, Role, 'empty', () => Role.empty, null, null, null, null);
+          this,
+          Role,
+          'empty',
+          () => Role.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'frommap':
         return ConstructorReflection<Role>(
-            this,
-            Role,
-            'fromMap',
-            () => Role.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Role,
+          'fromMap',
+          () => Role.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -1900,7 +2026,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     'id',
     'idFieldName',
     'type',
-    'value'
+    'value',
   ];
 
   @override
@@ -2060,8 +2186,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(Role? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    Role? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -2090,7 +2218,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     'setID',
     'toJson',
     'toJsonEncoded',
-    'toString'
+    'toString',
   ];
 
   @override
@@ -2146,115 +2274,135 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
     switch (lc) {
       case 'getfield':
         return MethodReflection<Role, dynamic>(
-            this,
-            Role,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Role,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<Role, TypeInfo<dynamic>?>(
-            this,
-            Role,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Role,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<Role, void>(
-            this,
-            Role,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          Role,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<Role, Map<String, dynamic>>(
-            this,
-            Role,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Role,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'tostring':
         return MethodReflection<Role, String>(
-            this,
-            Role,
-            'toString',
-            __TR.tString,
-            false,
-            (o) => o!.toString,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Role,
+          'toString',
+          __TR.tString,
+          false,
+          (o) => o!.toString,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<Role, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<Role, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<Role, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'getfieldentityannotations':
         return MethodReflection<Role, List<EntityAnnotation>?>(
-            this,
-            Entity,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<Role, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -2279,7 +2427,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   }
 
   RoleType$reflection._([RoleType? object])
-      : super(RoleType, r'RoleType', object);
+    : super(RoleType, r'RoleType', object);
 
   static bool _registered = false;
   @override
@@ -2292,7 +2440,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -2325,7 +2473,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   static const List<String> _staticFieldsNames = const <String>[
     'admin',
     'guest',
-    'unknown'
+    'unknown',
   ];
 
   @override
@@ -2369,7 +2517,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   Store$reflection withObject([Store? obj]) =>
@@ -2432,23 +2580,32 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     switch (lc) {
       case '':
         return ConstructorReflection<Store>(
-            this,
-            Store,
-            '',
-            () => Store.new,
-            const <__PR>[
-              __PR(__TR.tString, 'name', false, true),
-              __PR(__TR.tInt, 'number', true, true)
-            ],
-            null,
-            const <String, __PR>{
-              'id': __PR(__TR.tInt, 'id', true, false),
-              'owner': __PR(__TR<User>(User), 'owner', true, false)
-            },
-            null);
+          this,
+          Store,
+          '',
+          () => Store.new,
+          const <__PR>[
+            __PR(__TR.tString, 'name', false, true),
+            __PR(__TR.tInt, 'number', true, true),
+          ],
+          null,
+          const <String, __PR>{
+            'id': __PR(__TR.tInt, 'id', true, false),
+            'owner': __PR(__TR<User>(User), 'owner', true, false),
+          },
+          null,
+        );
       case 'empty':
         return ConstructorReflection<Store>(
-            this, Store, 'empty', () => Store.empty, null, null, null, null);
+          this,
+          Store,
+          'empty',
+          () => Store.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -2480,7 +2637,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     'idFieldName',
     'name',
     'number',
-    'owner'
+    'owner',
   ];
 
   @override
@@ -2628,8 +2785,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(Store? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    Store? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -2643,8 +2802,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(Store? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    Store? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -2672,7 +2833,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     'setField',
     'setID',
     'toJson',
-    'toJsonEncoded'
+    'toJsonEncoded',
   ];
 
   @override
@@ -2728,102 +2889,121 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     switch (lc) {
       case 'getfield':
         return MethodReflection<Store, dynamic>(
-            this,
-            Store,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Store,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<Store, TypeInfo<dynamic>?>(
-            this,
-            Store,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Store,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldentityannotations':
         return MethodReflection<Store, List<EntityAnnotation>?>(
-            this,
-            Store,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          Store,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<Store, void>(
-            this,
-            Store,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          Store,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<Store, Map<String, dynamic>>(
-            this,
-            Store,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          Store,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<Store, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<Store, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<Store, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<Store, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -2835,7 +3015,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, StaticMethodReflection<Store, dynamic>>
-      _staticMethods = {};
+  _staticMethods = {};
 
   @override
   StaticMethodReflection<Store, R>? staticMethod<R>(String methodName) {
@@ -2855,16 +3035,17 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
     switch (lc) {
       case 'frommap':
         return StaticMethodReflection<Store, FutureOr<Store>>(
-            this,
-            Store,
-            'fromMap',
-            const __TR<FutureOr<Store>>(FutureOr, <__TR>[__TR<Store>(Store)]),
-            false,
-            () => Store.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Store,
+          'fromMap',
+          const __TR<FutureOr<Store>>(FutureOr, <__TR>[__TR<Store>(Store)]),
+          false,
+          () => Store.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -2892,7 +3073,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   User$reflection withObject([User? obj]) =>
@@ -2955,31 +3136,48 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     switch (lc) {
       case '':
         return ConstructorReflection<User>(
-            this,
-            User,
-            '',
-            () => User.new,
-            const <__PR>[
-              __PR(__TR.tString, 'email', false, true),
-              __PR(__TR.tString, 'password', false, true),
-              __PR(__TR<Address>(Address), 'address', false, true),
-              __PR(__TR<List<Role>>(List, <__TR>[__TR<Role>(Role)]), 'roles',
-                  false, true)
-            ],
-            null,
-            const <String, __PR>{
-              'creationTime':
-                  __PR(__TR<DateTime>(DateTime), 'creationTime', true, false),
-              'id': __PR(__TR.tInt, 'id', true, false),
-              'level': __PR(__TR.tInt, 'level', true, false),
-              'photo': __PR(__TR.tObject, 'photo', true, false),
-              'userInfo': __PR(__TR.tObject, 'userInfo', true, false),
-              'wakeUpTime': __PR(__TR<Time>(Time), 'wakeUpTime', true, false)
-            },
-            null);
+          this,
+          User,
+          '',
+          () => User.new,
+          const <__PR>[
+            __PR(__TR.tString, 'email', false, true),
+            __PR(__TR.tString, 'password', false, true),
+            __PR(__TR<Address>(Address), 'address', false, true),
+            __PR(
+              __TR<List<Role>>(List, <__TR>[__TR<Role>(Role)]),
+              'roles',
+              false,
+              true,
+            ),
+          ],
+          null,
+          const <String, __PR>{
+            'creationTime': __PR(
+              __TR<DateTime>(DateTime),
+              'creationTime',
+              true,
+              false,
+            ),
+            'id': __PR(__TR.tInt, 'id', true, false),
+            'level': __PR(__TR.tInt, 'level', true, false),
+            'photo': __PR(__TR.tObject, 'photo', true, false),
+            'userInfo': __PR(__TR.tObject, 'userInfo', true, false),
+            'wakeUpTime': __PR(__TR<Time>(Time), 'wakeUpTime', true, false),
+          },
+          null,
+        );
       case 'empty':
         return ConstructorReflection<User>(
-            this, User, 'empty', () => User.empty, null, null, null, null);
+          this,
+          User,
+          'empty',
+          () => User.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -3017,7 +3215,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     'photo',
     'roles',
     'userInfo',
-    'wakeUpTime'
+    'wakeUpTime',
   ];
 
   @override
@@ -3096,7 +3294,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const [
             EntityField.unique(),
             EntityField.maximum(100),
-            EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*')
+            EntityField.regexp(r'[\w-.]+@\w+(?:\.\w+)*'),
           ],
         );
       case 'password':
@@ -3163,8 +3361,9 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
         return FieldReflection<User, EntityReference<UserInfo>>(
           this,
           User,
-          const __TR<EntityReference<UserInfo>>(
-              EntityReference, <__TR>[__TR<UserInfo>(UserInfo)]),
+          const __TR<EntityReference<UserInfo>>(EntityReference, <__TR>[
+            __TR<UserInfo>(UserInfo),
+          ]),
           'userInfo',
           false,
           (o) => () => o!.userInfo,
@@ -3261,8 +3460,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(User? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    User? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -3297,7 +3498,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     'setID',
     'toJson',
     'toJsonEncoded',
-    'toString'
+    'toString',
   ];
 
   @override
@@ -3353,115 +3554,135 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     switch (lc) {
       case 'getfield':
         return MethodReflection<User, dynamic>(
-            this,
-            User,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<User, TypeInfo<dynamic>?>(
-            this,
-            User,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldentityannotations':
         return MethodReflection<User, List<EntityAnnotation>?>(
-            this,
-            User,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<User, void>(
-            this,
-            User,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<User, Map<String, dynamic>>(
-            this,
-            User,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'tostring':
         return MethodReflection<User, String>(
-            this,
-            User,
-            'toString',
-            __TR.tString,
-            false,
-            (o) => o!.toString,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          User,
+          'toString',
+          __TR.tString,
+          false,
+          (o) => o!.toString,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<User, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<User, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<User, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<User, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -3473,7 +3694,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, StaticMethodReflection<User, dynamic>>
-      _staticMethods = {};
+  _staticMethods = {};
 
   @override
   StaticMethodReflection<User, R>? staticMethod<R>(String methodName) {
@@ -3493,16 +3714,17 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     switch (lc) {
       case 'frommap':
         return StaticMethodReflection<User, FutureOr<User>>(
-            this,
-            User,
-            'fromMap',
-            const __TR<FutureOr<User>>(FutureOr, <__TR>[__TR<User>(User)]),
-            false,
-            () => User.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          User,
+          'fromMap',
+          const __TR<FutureOr<User>>(FutureOr, <__TR>[__TR<User>(User)]),
+          false,
+          () => User.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -3519,7 +3741,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   UserInfo$reflection._([UserInfo? object])
-      : super(UserInfo, r'UserInfo', object);
+    : super(UserInfo, r'UserInfo', object);
 
   static bool _registered = false;
   @override
@@ -3532,7 +3754,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.6.0');
+  Version get languageVersion => Version.parse('3.7.0');
 
   @override
   UserInfo$reflection withObject([UserInfo? obj]) =>
@@ -3595,17 +3817,26 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     switch (lc) {
       case '':
         return ConstructorReflection<UserInfo>(
-            this,
-            UserInfo,
-            '',
-            () => UserInfo.new,
-            const <__PR>[__PR(__TR.tString, 'info', false, true)],
-            null,
-            const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
-            null);
+          this,
+          UserInfo,
+          '',
+          () => UserInfo.new,
+          const <__PR>[__PR(__TR.tString, 'info', false, true)],
+          null,
+          const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
+          null,
+        );
       case 'empty':
-        return ConstructorReflection<UserInfo>(this, UserInfo, 'empty',
-            () => UserInfo.empty, null, null, null, null);
+        return ConstructorReflection<UserInfo>(
+          this,
+          UserInfo,
+          'empty',
+          () => UserInfo.empty,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -3635,7 +3866,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     'hashCode',
     'id',
     'idFieldName',
-    'info'
+    'info',
   ];
 
   @override
@@ -3684,7 +3915,9 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   FieldReflection<UserInfo, dynamic>? _fieldImpl(
-      String fieldName, UserInfo? obj) {
+    String fieldName,
+    UserInfo? obj,
+  ) {
     obj ??= object;
 
     var lc = fieldName.trim().toLowerCase();
@@ -3760,8 +3993,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   @override
-  Map<String, dynamic> getFieldsValues(UserInfo? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getFieldsValues(
+    UserInfo? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -3773,8 +4008,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   @override
-  Map<String, dynamic> getJsonFieldsVisibleValues(UserInfo? obj,
-      {bool withHashCode = false}) {
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    UserInfo? obj, {
+    bool withHashCode = false,
+  }) {
     obj ??= object;
     return <String, dynamic>{
       'id': obj?.id,
@@ -3801,14 +4038,14 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     'setID',
     'toJson',
     'toJsonEncoded',
-    'toString'
+    'toString',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
   static final Map<String, MethodReflection<UserInfo, dynamic>>
-      _methodsNoObject = {};
+  _methodsNoObject = {};
 
   final Map<String, MethodReflection<UserInfo, dynamic>> _methodsObject = {};
 
@@ -3850,7 +4087,9 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   MethodReflection<UserInfo, dynamic>? _methodImpl(
-      String methodName, UserInfo? obj) {
+    String methodName,
+    UserInfo? obj,
+  ) {
     obj ??= object;
 
     var lc = methodName.trim().toLowerCase();
@@ -3858,115 +4097,135 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
     switch (lc) {
       case 'tostring':
         return MethodReflection<UserInfo, String>(
-            this,
-            UserInfo,
-            'toString',
-            __TR.tString,
-            false,
-            (o) => o!.toString,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'toString',
+          __TR.tString,
+          false,
+          (o) => o!.toString,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getfield':
         return MethodReflection<UserInfo, dynamic>(
-            this,
-            UserInfo,
-            'getField',
-            __TR.tDynamic,
-            true,
-            (o) => o!.getField,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldtype':
         return MethodReflection<UserInfo, TypeInfo<dynamic>?>(
-            this,
-            UserInfo,
-            'getFieldType',
-            const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
-            true,
-            (o) => o!.getFieldType,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'getfieldentityannotations':
         return MethodReflection<UserInfo, List<EntityAnnotation>?>(
-            this,
-            UserInfo,
-            'getFieldEntityAnnotations',
-            const __TR<List<EntityAnnotation>>(
-                List, <__TR>[__TR<EntityAnnotation>(EntityAnnotation)]),
-            true,
-            (o) => o!.getFieldEntityAnnotations,
-            obj,
-            const <__PR>[__PR(__TR.tString, 'key', false, true)],
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
       case 'setfield':
         return MethodReflection<UserInfo, void>(
-            this,
-            UserInfo,
-            'setField',
-            __TR.tVoid,
-            false,
-            (o) => o!.setField,
-            obj,
-            const <__PR>[
-              __PR(__TR.tString, 'key', false, true),
-              __PR(__TR.tDynamic, 'value', true, true)
-            ],
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
       case 'tojson':
         return MethodReflection<UserInfo, Map<String, dynamic>>(
-            this,
-            UserInfo,
-            'toJson',
-            __TR.tMapStringDynamic,
-            false,
-            (o) => o!.toJson,
-            obj,
-            null,
-            null,
-            null,
-            const [override]);
+          this,
+          UserInfo,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
       case 'getid':
-        return MethodReflection<UserInfo, dynamic>(this, Entity, 'getID',
-            __TR.tDynamic, true, (o) => o!.getID, obj, null, null, null, null);
+        return MethodReflection<UserInfo, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       case 'setid':
         return MethodReflection<UserInfo, void>(
-            this,
-            Entity,
-            'setID',
-            __TR.tVoid,
-            false,
-            (o) => o!.setID,
-            obj,
-            const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
       case 'tojsonencoded':
         return MethodReflection<UserInfo, String>(
-            this,
-            Entity,
-            'toJsonEncoded',
-            __TR.tString,
-            false,
-            (o) => o!.toJsonEncoded,
-            obj,
-            null,
-            null,
-            null,
-            null);
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -3978,7 +4237,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   static final Map<String, StaticMethodReflection<UserInfo, dynamic>>
-      _staticMethods = {};
+  _staticMethods = {};
 
   @override
   StaticMethodReflection<UserInfo, R>? staticMethod<R>(String methodName) {
@@ -3993,23 +4252,26 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   StaticMethodReflection<UserInfo, dynamic>? _staticMethodImpl(
-      String methodName) {
+    String methodName,
+  ) {
     var lc = methodName.trim().toLowerCase();
 
     switch (lc) {
       case 'frommap':
         return StaticMethodReflection<UserInfo, FutureOr<UserInfo>>(
-            this,
-            UserInfo,
-            'fromMap',
-            const __TR<FutureOr<UserInfo>>(
-                FutureOr, <__TR>[__TR<UserInfo>(UserInfo)]),
-            false,
-            () => UserInfo.fromMap,
-            const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-            null,
-            null,
-            null);
+          this,
+          UserInfo,
+          'fromMap',
+          const __TR<FutureOr<UserInfo>>(FutureOr, <__TR>[
+            __TR<UserInfo>(UserInfo),
+          ]),
+          false,
+          () => UserInfo.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
       default:
         return null;
     }
@@ -4126,19 +4388,21 @@ extension UserInfo$reflectionExtension on UserInfo {
 }
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
-      Account$reflection(),
-      Address$reflection(),
-      Photo$reflection(),
-      Role$reflection(),
-      RoleType$reflection(),
-      Store$reflection(),
-      User$reflection(),
-      UserInfo$reflection(),
-    ];
+  Account$reflection(),
+  Address$reflection(),
+  Photo$reflection(),
+  Role$reflection(),
+  RoleType$reflection(),
+  Store$reflection(),
+  User$reflection(),
+  UserInfo$reflection(),
+];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
-    List<Reflection>.unmodifiable(_listSiblingsReflection());
+List<Reflection> _siblingsReflection() =>
+    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
+      _listSiblingsReflection(),
+    );
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

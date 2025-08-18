@@ -27,20 +27,29 @@ class APICredential {
   /// The refresh-token of this credential.
   final String? refreshToken;
 
-  APICredential(this.username,
-      {this.token,
-      this.refreshToken,
-      String? passwordHash,
-      APIPasswordHashAlgorithm? hashAlgorithm})
-      : password = passwordHash != null
-            ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
-            : null;
+  APICredential(
+    this.username, {
+    this.token,
+    this.refreshToken,
+    String? passwordHash,
+    APIPasswordHashAlgorithm? hashAlgorithm,
+  }) : password =
+           passwordHash != null
+               ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
+               : null;
 
-  APICredential._(this.username, this.usernameEntity, this.password, this.token,
-      this.refreshToken);
+  APICredential._(
+    this.username,
+    this.usernameEntity,
+    this.password,
+    this.token,
+    this.refreshToken,
+  );
 
-  static APICredential? fromMap(Map<String, dynamic>? map,
-      {bool requiresUsernameAndPassword = false}) {
+  static APICredential? fromMap(
+    Map<String, dynamic>? map, {
+    bool requiresUsernameAndPassword = false,
+  }) {
     if (map == null) {
       if (!requiresUsernameAndPassword) {
         return null;
@@ -49,10 +58,12 @@ class APICredential {
       map = {};
     }
 
-    var username = map.getAsString('username', ignoreCase: true) ??
+    var username =
+        map.getAsString('username', ignoreCase: true) ??
         map.getAsString('user', ignoreCase: true)?.trim();
 
-    var password = map.getAsString('password', ignoreCase: true) ??
+    var password =
+        map.getAsString('password', ignoreCase: true) ??
         map.getAsString('pass', ignoreCase: true)?.trim();
 
     if (requiresUsernameAndPassword) {
@@ -71,17 +82,18 @@ class APICredential {
   }
 
   /// Returns a copy of this [APICredential].
-  APICredential copy(
-          {bool withUsernameEntity = true,
-          bool withPassword = true,
-          bool withToken = true,
-          bool withRefreshToken = true}) =>
-      APICredential._(
-          username,
-          withUsernameEntity ? usernameEntity : null,
-          withPassword ? password : null,
-          withToken ? token : null,
-          withRefreshToken ? refreshToken : null);
+  APICredential copy({
+    bool withUsernameEntity = true,
+    bool withPassword = true,
+    bool withToken = true,
+    bool withRefreshToken = true,
+  }) => APICredential._(
+    username,
+    withUsernameEntity ? usernameEntity : null,
+    withPassword ? password : null,
+    withToken ? token : null,
+    withRefreshToken ? refreshToken : null,
+  );
 
   /// Returns a copy of this [APICredential] with [username].
   APICredential withUsername(String username) =>
@@ -136,9 +148,10 @@ class APIPassword {
   late String passwordHash;
 
   APIPassword(String passwordOrHash, {APIPasswordHashAlgorithm? hashAlgorithm})
-      : hashAlgorithm = hashAlgorithm ??
-            APIPasswordHashAlgorithm.detect(passwordOrHash) ??
-            APIPasswordSHA256() {
+    : hashAlgorithm =
+          hashAlgorithm ??
+          APIPasswordHashAlgorithm.detect(passwordOrHash) ??
+          APIPasswordSHA256() {
     passwordHash = this.hashAlgorithm.ensureHashedPassword(passwordOrHash);
   }
 
@@ -262,14 +275,16 @@ class APIAuthentication {
 
   APICredential? _credential;
 
-  APIAuthentication(this.token,
-      {List<APIPermission>? permissions,
-      this.resumed = false,
-      this.data,
-      APICredential? credential})
-      : permissions =
-            List<APIPermission>.unmodifiable(permissions ?? <APIPermission>[]),
-        _credential = credential;
+  APIAuthentication(
+    this.token, {
+    List<APIPermission>? permissions,
+    this.resumed = false,
+    this.data,
+    APICredential? credential,
+  }) : permissions = List<APIPermission>.unmodifiable(
+         permissions ?? <APIPermission>[],
+       ),
+       _credential = credential;
 
   String get username => token.username;
 
@@ -286,8 +301,9 @@ class APIAuthentication {
   }
 
   List<APIPermission> enabledPermissionsWhere(
-      bool Function(APIPermission permission) test,
-      {DateTime? now}) {
+    bool Function(APIPermission permission) test, {
+    DateTime? now,
+  }) {
     return enabledPermissions(now: now).where(test).toList();
   }
 
@@ -298,8 +314,10 @@ class APIAuthentication {
         .toList();
   }
 
-  List<APIPermission> enabledPermissionsOfTypes(Iterable<String> types,
-      {DateTime? now}) {
+  List<APIPermission> enabledPermissionsOfTypes(
+    Iterable<String> types, {
+    DateTime? now,
+  }) {
     now ??= DateTime.now();
     return permissions
         .where((p) => types.contains(p.type) && p.isEnabled(now: now))
@@ -313,13 +331,13 @@ class APIAuthentication {
       enabledPermissionsOfType(type).firstOrNull;
 
   Map<String, dynamic> toJson() => {
-        'token': token.toJson(),
-        if (permissions.isNotEmpty)
-          'permissions': permissions.map((e) => e.toJson()).toList(),
-        if (resumed) 'resumed': resumed,
-        if (data != null)
-          'data': Json.toJson(data, maskField: Json.standardJsonMaskField),
-      };
+    'token': token.toJson(),
+    if (permissions.isNotEmpty)
+      'permissions': permissions.map((e) => e.toJson()).toList(),
+    if (resumed) 'resumed': resumed,
+    if (data != null)
+      'data': Json.toJson(data, maskField: Json.standardJsonMaskField),
+  };
 
   factory APIAuthentication.fromJson(Map json) {
     var token = APIToken.fromJson(json['token']);
@@ -395,15 +413,20 @@ class APIToken implements Comparable<APIToken> {
   ];
 
   static List<String> tokenDefaultAlphabetPairsRandom = List.unmodifiable(
-      tokenDefaultAlphabet
-          .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
-          .toList()
-        ..shuffle());
+    tokenDefaultAlphabet
+        .expand((a) => tokenDefaultAlphabet.map((b) => '$a$b'))
+        .toList()
+      ..shuffle(),
+  );
 
   static final SecureRandom _advanceRandom = SecureRandom();
 
-  static String generateToken(int length,
-      {int variableLength = 0, String prefix = '', Random? random}) {
+  static String generateToken(
+    int length, {
+    int variableLength = 0,
+    String prefix = '',
+    Random? random,
+  }) {
     random ??= SecureRandom();
 
     random.advance(maxSteps: 11, random: _advanceRandom);
@@ -447,18 +470,20 @@ class APIToken implements Comparable<APIToken> {
 
   final String? refreshToken;
 
-  APIToken(this.username,
-      {String? token,
-      DateTime? issueTime,
-      Duration? duration,
-      String? refreshToken,
-      bool withRefreshToken = false})
-      : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
-        issueTime = issueTime ?? DateTime.now(),
-        duration = duration ?? Duration(hours: 3),
-        refreshToken = refreshToken == null && withRefreshToken
-            ? generateToken(640, variableLength: 64, prefix: 'RTK')
-            : refreshToken;
+  APIToken(
+    this.username, {
+    String? token,
+    DateTime? issueTime,
+    Duration? duration,
+    String? refreshToken,
+    bool withRefreshToken = false,
+  }) : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
+       issueTime = issueTime ?? DateTime.now(),
+       duration = duration ?? Duration(hours: 3),
+       refreshToken =
+           refreshToken == null && withRefreshToken
+               ? generateToken(640, variableLength: 64, prefix: 'RTK')
+               : refreshToken;
 
   DateTime get accessTime => _accessTime;
 
@@ -491,31 +516,33 @@ class APIToken implements Comparable<APIToken> {
   }
 
   Map<String, dynamic> toJson() => {
-        'username': username,
-        'token': token,
-        'issueTime': issueTime,
-        'duration': duration.inSeconds,
-        'expireTime': expireTime,
-        if (refreshToken != null) 'refreshToken': refreshToken,
-      };
+    'username': username,
+    'token': token,
+    'issueTime': issueTime,
+    'duration': duration.inSeconds,
+    'expireTime': expireTime,
+    if (refreshToken != null) 'refreshToken': refreshToken,
+  };
 
   factory APIToken.fromJson(Map json) => APIToken(
-        json['username'],
-        token: json['token'],
-        issueTime: TypeParser.parseDateTime(json['issueTime']),
-        duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
-        refreshToken: json['refreshToken'],
-      );
+    json['username'],
+    token: json['token'],
+    issueTime: TypeParser.parseDateTime(json['issueTime']),
+    duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
+    refreshToken: json['refreshToken'],
+  );
 
-  factory APIToken.fromCredential(APICredential credential,
-          {Duration? duration}) =>
-      APIToken(
-        credential.username,
-        token: credential.token ??
-            (throw ArgumentError("`credential` without `token`")),
-        duration: duration,
-        refreshToken: credential.refreshToken,
-      );
+  factory APIToken.fromCredential(
+    APICredential credential, {
+    Duration? duration,
+  }) => APIToken(
+    credential.username,
+    token:
+        credential.token ??
+        (throw ArgumentError("`credential` without `token`")),
+    duration: duration,
+    refreshToken: credential.refreshToken,
+  );
 }
 
 extension APITokenExtension on List<APIToken> {
@@ -562,29 +589,34 @@ class APIPermission {
 
   final Map<String, Object> properties;
 
-  APIPermission(String type,
-      {this.enabled = true,
-      this.initTime,
-      this.endTime,
-      Map<String, Object>? properties})
-      : type = normalizeType(type),
-        properties =
-            Map<String, Object>.unmodifiable(properties ?? <String, Object>{}) {
+  APIPermission(
+    String type, {
+    this.enabled = true,
+    this.initTime,
+    this.endTime,
+    Map<String, Object>? properties,
+  }) : type = normalizeType(type),
+       properties = Map<String, Object>.unmodifiable(
+         properties ?? <String, Object>{},
+       ) {
     if (!validateType(type)) {
       throw ArgumentError('Invalid type: $type');
     }
   }
 
-  APIPermission copy(
-      {bool? enabled,
-      DateTime? initTime,
-      DateTime? endTime,
-      Map<String, Object>? properties}) {
-    return APIPermission(type,
-        enabled: enabled ?? this.enabled,
-        initTime: initTime ?? this.initTime,
-        endTime: endTime ?? this.endTime,
-        properties: properties ?? this.properties);
+  APIPermission copy({
+    bool? enabled,
+    DateTime? initTime,
+    DateTime? endTime,
+    Map<String, Object>? properties,
+  }) {
+    return APIPermission(
+      type,
+      enabled: enabled ?? this.enabled,
+      initTime: initTime ?? this.initTime,
+      endTime: endTime ?? this.endTime,
+      properties: properties ?? this.properties,
+    );
   }
 
   bool isEnabled({DateTime? now}) {
@@ -617,18 +649,18 @@ class APIPermission {
   }
 
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'enabled': enabled,
-        if (initTime != null) 'initTime': initTime,
-        if (endTime != null) 'endTime': endTime,
-        if (properties.isNotEmpty) 'properties': properties,
-      };
+    'type': type,
+    'enabled': enabled,
+    if (initTime != null) 'initTime': initTime,
+    if (endTime != null) 'endTime': endTime,
+    if (properties.isNotEmpty) 'properties': properties,
+  };
 
   factory APIPermission.fromJson(Map json) => APIPermission(
-        json['type'],
-        enabled: TypeParser.parseBool(json['enabled'], false)!,
-        initTime: TypeParser.parseDateTime(json['initTime']),
-        endTime: TypeParser.parseDateTime(json['endTime']),
-        properties: TypeParser.parseMap(json['properties']),
-      );
+    json['type'],
+    enabled: TypeParser.parseBool(json['enabled'], false)!,
+    initTime: TypeParser.parseDateTime(json['initTime']),
+    endTime: TypeParser.parseDateTime(json['endTime']),
+    properties: TypeParser.parseMap(json['properties']),
+  );
 }

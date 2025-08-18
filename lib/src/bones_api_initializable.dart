@@ -125,26 +125,42 @@ class InitializationResult {
   /// The thrown error [StackTrace], if any.
   final StackTrace? stackTrace;
 
-  InitializationResult(this.initializable, this.ok,
-      {Iterable<Initializable>? dependencies, this.error, this.stackTrace})
-      : dependencies = dependencies?.toList() ?? <Initializable>[];
+  InitializationResult(
+    this.initializable,
+    this.ok, {
+    Iterable<Initializable>? dependencies,
+    this.error,
+    this.stackTrace,
+  }) : dependencies = dependencies?.toList() ?? <Initializable>[];
 
-  factory InitializationResult.ok(Initializable initializable,
-      {Iterable<Initializable>? dependencies}) {
-    return InitializationResult(initializable, true,
-        dependencies: dependencies);
+  factory InitializationResult.ok(
+    Initializable initializable, {
+    Iterable<Initializable>? dependencies,
+  }) {
+    return InitializationResult(
+      initializable,
+      true,
+      dependencies: dependencies,
+    );
   }
 
-  factory InitializationResult.error(Initializable initializable,
-          [Object? error, StackTrace? stackTrace]) =>
-      InitializationResult(initializable, false,
-          error: error, stackTrace: stackTrace);
+  factory InitializationResult.error(
+    Initializable initializable, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) => InitializationResult(
+    initializable,
+    false,
+    error: error,
+    stackTrace: stackTrace,
+  );
 
   @override
   String toString() {
-    var depsStr = dependencies.isNotEmpty
-        ? '->${dependencies.length <= 3 ? dependencies.toInitializationStatus() : dependencies.length}'
-        : '';
+    var depsStr =
+        dependencies.isNotEmpty
+            ? '->${dependencies.length <= 3 ? dependencies.toInitializationStatus() : dependencies.length}'
+            : '';
 
     if (ok) {
       return '[OK]@${initializable.initializationStatus}$depsStr';
@@ -164,9 +180,9 @@ extension IterableInitializationResultExtension
   List<InitializationResult> whereNotOk() => where((e) => !e.ok).toList();
 
   String allToString() => map((e) {
-        var s = e.toString().replaceAll('\n', '\n     ').trim();
-        return '  -- $s';
-      }).join('\n');
+    var s = e.toString().replaceAll('\n', '\n     ').trim();
+    return '  -- $s';
+  }).join('\n');
 
   String errorsToString() => whereNotOk().allToString();
 }
@@ -313,16 +329,19 @@ class _InitializationChain {
   void _checkDependency(Initializable dependency) {
     var dependencies = _dependencies;
     if (dependencies == null || !dependencies.containsIdentical(dependency)) {
-      throw InitializationError(initializable,
-          "Dependency not in chain: $dependency\nInitializable: $initializable");
+      throw InitializationError(
+        initializable,
+        "Dependency not in chain: $dependency\nInitializable: $initializable",
+      );
     }
   }
 
   ({
     List<Initializable> valids,
     List<Initializable> circular,
-    List<Initializable> finalizing
-  }) _filterValidDependencies(Iterable<Initializable> dependencies) {
+    List<Initializable> finalizing,
+  })
+  _filterValidDependencies(Iterable<Initializable> dependencies) {
     var valids = <Initializable>[];
     var circular = <Initializable>[];
     var finalizing = <Initializable>[];
@@ -360,8 +379,9 @@ class _InitializationChain {
     }
   }
 
-  List<Initializable> _allInitializedDependenciesDeeply(
-      [List<Initializable>? allDeep]) {
+  List<Initializable> _allInitializedDependenciesDeeply([
+    List<Initializable>? allDeep,
+  ]) {
     allDeep ??= <Initializable>[];
 
     var deps = _initializedDependencies;
@@ -378,10 +398,12 @@ class _InitializationChain {
   }
 
   Map<Initializable, Completer<InitializationResult>>?
-      _initializedDependenciesCompleters;
+  _initializedDependenciesCompleters;
 
   void _setInitializedDependencyCompleter(
-      Initializable dependency, Completer<InitializationResult> completer) {
+    Initializable dependency,
+    Completer<InitializationResult> completer,
+  ) {
     _checkDependency(dependency);
 
     var initializedDependenciesCompleters =
@@ -390,23 +412,27 @@ class _InitializationChain {
 
     var prev = initializedDependenciesCompleters[dependency];
     if (prev != null && !identical(prev, completer)) {
-      throw InitializationError(initializable,
-          "Dependency completer already set!\nInitializable: $initializable");
+      throw InitializationError(
+        initializable,
+        "Dependency completer already set!\nInitializable: $initializable",
+      );
     }
 
     initializedDependenciesCompleters[dependency] = completer;
   }
 
   void _setInitializedDependenciesCompleters(
-      Iterable<MapEntry<Initializable, Completer<InitializationResult>>>
-          entries) {
+    Iterable<MapEntry<Initializable, Completer<InitializationResult>>> entries,
+  ) {
     for (var e in entries) {
       _setInitializedDependencyCompleter(e.key, e.value);
     }
   }
 
   bool _completeCircularDependency(
-      Initializable dependency, List<Initializable> callChain) {
+    Initializable dependency,
+    List<Initializable> callChain,
+  ) {
     if (identical(initializable, dependency)) return false;
 
     if (callChain.containsIdentical(initializable)) return false;
@@ -420,8 +446,9 @@ class _InitializationChain {
 
       if (completer != null && !completer.isCompleted) {
         _log.warning(
-            '[$runtimeTypeNameUnsafe] Not waiting self reference `${dependency.initializationStatus}` '
-            'in async initialization graph of `${initializable.initializationStatus}`.');
+          '[$runtimeTypeNameUnsafe] Not waiting self reference `${dependency.initializationStatus}` '
+          'in async initialization graph of `${initializable.initializationStatus}`.',
+        );
 
         completer.complete(dependency._resultOk());
         completed = true;
@@ -434,8 +461,9 @@ class _InitializationChain {
 
           if (!completer.isCompleted) {
             _log.warning(
-                '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
-                'in async initialization graph of `${initializable.initializationStatus}`.');
+              '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
+              'in async initialization graph of `${initializable.initializationStatus}`.',
+            );
 
             completer.complete(dependency._resultOk());
             completed = true;
@@ -499,15 +527,17 @@ class _InitializationChain {
 
       if (completed) {
         _log.warning(
-            '[${initializable.runtimeTypeNameUnsafe}] Found self reference in async initialization graph: ${initializable.initializationStatus} -> '
-            '${depsInitializingAsync.length <= 3 ? '${depsInitializingAsync.toInitializationStatus()}' : '${depsInitializingAsync.length}'} ->> '
-            '${subDepsInitializing.length <= 3 ? '${subDepsInitializing.toInitializationStatus()}' : '${subDepsInitializing.length}'}');
+          '[${initializable.runtimeTypeNameUnsafe}] Found self reference in async initialization graph: ${initializable.initializationStatus} -> '
+          '${depsInitializingAsync.length <= 3 ? '${depsInitializingAsync.toInitializationStatus()}' : '${depsInitializingAsync.length}'} ->> '
+          '${subDepsInitializing.length <= 3 ? '${subDepsInitializing.toInitializationStatus()}' : '${subDepsInitializing.length}'}',
+        );
       }
     }
   }
 
   @override
-  String toString() => '_InitializationChain{'
+  String toString() =>
+      '_InitializationChain{'
       '_parents: ${_parents?.length ?? ''}, '
       '_dependencies: ${_dependencies?.length ?? ''}, '
       '_initializedDependencies: ${_initializedDependencies?.length ?? ''}, '
@@ -542,11 +572,13 @@ mixin Initializable {
   /// Ensures that this instance is initialized. If is not
   /// initialized yet it will force an asynchronous initialization
   /// and return a [Future].
-  FutureOr<InitializationResult> ensureInitializedAsync(
-      {Initializable? parent}) {
+  FutureOr<InitializationResult> ensureInitializedAsync({
+    Initializable? parent,
+  }) {
     if (_status.initialized) return _resultOk();
     return Future<InitializationResult>.microtask(
-        () => _doInitializationImpl(parent));
+      () => _doInitializationImpl(parent),
+    );
   }
 
   /// Initialize this instance if is not initialized yet.
@@ -565,8 +597,9 @@ mixin Initializable {
   Future<InitializationResult>? _initializeDependenciesAsync;
   Future<InitializationResult>? _initializeAsync;
 
-  FutureOr<InitializationResult> _doInitializationImpl(
-      [Initializable? parent]) {
+  FutureOr<InitializationResult> _doInitializationImpl([
+    Initializable? parent,
+  ]) {
     if (_status.initialized) return _resultOk();
 
     final chain = _chain;
@@ -591,48 +624,59 @@ mixin Initializable {
 
         var parentsLength1 = chain.parents.length;
 
-        return initCircular.timeout(Duration(milliseconds: 1000),
-            onTimeout: () async {
-          var parentsLength2 = chain.parents.length;
+        return initCircular.timeout(
+          Duration(milliseconds: 1000),
+          onTimeout: () async {
+            var parentsLength2 = chain.parents.length;
 
-          // Extra timeout if a new parent is added:
-          if (parentsLength2 > parentsLength1) {
-            _log.warning(
-                "Circular initialization with extra parents... ($this)");
+            // Extra timeout if a new parent is added:
+            if (parentsLength2 > parentsLength1) {
+              _log.warning(
+                "Circular initialization with extra parents... ($this)",
+              );
 
-            const circularTimeoutError = "!!CIRCULAR TIMEOUT!!";
+              const circularTimeoutError = "!!CIRCULAR TIMEOUT!!";
 
-            var r = await initCircular.timeout(Duration(milliseconds: 1000),
-                onTimeout: () =>
-                    InitializationResult.error(this, circularTimeoutError));
-            if (r.ok) {
-              return r;
-            } else if (r.error != circularTimeoutError) {
-              return r;
-            } else {
-              var parentsLength3 = chain.parents.length;
+              var r = await initCircular.timeout(
+                Duration(milliseconds: 1000),
+                onTimeout:
+                    () =>
+                        InitializationResult.error(this, circularTimeoutError),
+              );
+              if (r.ok) {
+                return r;
+              } else if (r.error != circularTimeoutError) {
+                return r;
+              } else {
+                var parentsLength3 = chain.parents.length;
 
-              if (parentsLength3 > parentsLength2) {
-                var r2 = await initCircular.timeout(
+                if (parentsLength3 > parentsLength2) {
+                  var r2 = await initCircular.timeout(
                     Duration(milliseconds: 1000),
-                    onTimeout: () =>
-                        InitializationResult.error(this, circularTimeoutError));
+                    onTimeout:
+                        () => InitializationResult.error(
+                          this,
+                          circularTimeoutError,
+                        ),
+                  );
 
-                if (r2.ok) {
-                  return r;
-                } else if (r2.error != circularTimeoutError) {
-                  return r;
+                  if (r2.ok) {
+                    return r;
+                  } else if (r2.error != circularTimeoutError) {
+                    return r;
+                  }
                 }
               }
             }
-          }
 
-          final circularTime = DateTime.now().difference(circularInitTime);
+            final circularTime = DateTime.now().difference(circularInitTime);
 
-          _log.warning(
-              "Circular initialization timeout (${circularTime.inMilliseconds} ms): $this");
-          return _resultOk();
-        });
+            _log.warning(
+              "Circular initialization timeout (${circularTime.inMilliseconds} ms): $this",
+            );
+            return _resultOk();
+          },
+        );
       }
     }
 
@@ -662,7 +706,8 @@ mixin Initializable {
     status._setInitializing();
 
     _log.info(
-        '[$runtimeTypeNameUnsafe#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...');
+      '[$runtimeTypeNameUnsafe#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...',
+    );
 
     var initDeps = initializeDependencies();
 
@@ -670,27 +715,19 @@ mixin Initializable {
       status._markAsynchronous(true);
 
       return _initializeDependenciesAsync = initDeps.then((initDeps) async {
-        return _doDependenciesInitialization.tryCallThen(
-          initDeps,
-          (depsInit) {
-            _checkAllDependenciesOk(depsInit.results);
-            return _callInitialize();
-          },
-          onError: (e, s) => _onInitializationError(e, s),
-        );
+        return _doDependenciesInitialization.tryCallThen(initDeps, (depsInit) {
+          _checkAllDependenciesOk(depsInit.results);
+          return _callInitialize();
+        }, onError: (e, s) => _onInitializationError(e, s));
       }, onError: (e, s) => _onInitializationError(e, s));
     } else {
       var hasAsyncDep = initDeps.any((dep) => dep.isAsyncInitialization);
       status._markAsynchronous(hasAsyncDep);
 
-      return _doDependenciesInitialization.tryCallThen(
-        initDeps,
-        (depsInit) {
-          _checkAllDependenciesOk(depsInit.results);
-          return _callInitialize();
-        },
-        onError: (e, s) => _onInitializationError(e, s),
-      );
+      return _doDependenciesInitialization.tryCallThen(initDeps, (depsInit) {
+        _checkAllDependenciesOk(depsInit.results);
+        return _callInitialize();
+      }, onError: (e, s) => _onInitializationError(e, s));
     }
   }
 
@@ -702,7 +739,9 @@ mixin Initializable {
     if (depsWithError.isNotEmpty) {
       var errors = depsWithError.allToString();
       throw InitializationError(
-          this, "Error initializing dependencies: $this\n$errors");
+        this,
+        "Error initializing dependencies: $this\n$errors",
+      );
     }
   }
 
@@ -710,11 +749,14 @@ mixin Initializable {
       InitializationResult.ok(this, dependencies: _chain._dependencies);
 
   FutureOr<_DependenciesInitialization> _doDependenciesInitialization(
-      List<Initializable> dependencies,
-      {bool forceCircular = false}) {
+    List<Initializable> dependencies, {
+    bool forceCircular = false,
+  }) {
     if (dependencies.isEmpty) {
-      return _DependenciesInitialization(<InitializationResult>[],
-          dependencies: null);
+      return _DependenciesInitialization(
+        <InitializationResult>[],
+        dependencies: null,
+      );
     }
 
     final chain = _chain;
@@ -726,19 +768,23 @@ mixin Initializable {
     var initValids1 = _doDependenciesInitializationImpl(depsStep1.valids);
 
     if (depsStep1.circular.isEmpty && depsStep1.finalizing.isEmpty) {
-      return _DependenciesInitialization.async(initValids1,
-          dependencies: dependencies);
+      return _DependenciesInitialization.async(
+        initValids1,
+        dependencies: dependencies,
+      );
     }
 
     if (forceCircular) {
       return initValids1.resolveMapped((initValids1) {
-        var initCirculars1 =
-            _doDependenciesInitializationImpl(depsStep1.circular);
+        var initCirculars1 = _doDependenciesInitializationImpl(
+          depsStep1.circular,
+        );
 
         return initCirculars1.resolveMapped((initCirculars1) {
-          return _DependenciesInitialization(
-              [...initValids1, ...initCirculars1],
-              dependencies: dependencies);
+          return _DependenciesInitialization([
+            ...initValids1,
+            ...initCirculars1,
+          ], dependencies: dependencies);
         });
       });
     }
@@ -750,8 +796,10 @@ mixin Initializable {
         var initValids2 = _doDependenciesInitializationImpl(depsStep2.valids);
 
         return initValids2.resolveMapped((initValids2) {
-          return _DependenciesInitialization(initValids2,
-              dependencies: dependencies);
+          return _DependenciesInitialization(
+            initValids2,
+            dependencies: dependencies,
+          );
         });
       });
     }
@@ -762,8 +810,10 @@ mixin Initializable {
 
       if (depsStep2.circular.isEmpty) {
         return initValids2.resolveMapped((initValids2) {
-          return _DependenciesInitialization([...initValids1, ...initValids2],
-              dependencies: dependencies);
+          return _DependenciesInitialization([
+            ...initValids1,
+            ...initValids2,
+          ], dependencies: dependencies);
         });
       }
 
@@ -773,9 +823,11 @@ mixin Initializable {
           var initValids3 = _doDependenciesInitializationImpl(depsStep3.valids);
 
           return initValids3.resolveMapped((initValids3) {
-            return _DependenciesInitialization(
-                [...initValids1, ...initValids2, ...initValids3],
-                dependencies: dependencies);
+            return _DependenciesInitialization([
+              ...initValids1,
+              ...initValids2,
+              ...initValids3,
+            ], dependencies: dependencies);
           });
         });
       });
@@ -783,7 +835,8 @@ mixin Initializable {
   }
 
   FutureOr<List<InitializationResult>> _doDependenciesInitializationImpl(
-      List<Initializable> dependencies) {
+    List<Initializable> dependencies,
+  ) {
     if (dependencies.isEmpty) {
       return <InitializationResult>[];
     }
@@ -792,18 +845,23 @@ mixin Initializable {
 
     chain._markInitializedDependencies(dependencies);
 
-    var depsInits = dependencies
-        .map((e) => MapEntry(e, e._doInitializationImpl(this)))
-        .toList();
+    var depsInits =
+        dependencies
+            .map((e) => MapEntry(e, e._doInitializationImpl(this)))
+            .toList();
 
-    var depsInitsAsync = depsInits
-        .where((e) => e.value is Future<InitializationResult>)
-        .map((e) => MapEntry(e.key, e.value as Future<InitializationResult>))
-        .toList();
+    var depsInitsAsync =
+        depsInits
+            .where((e) => e.value is Future<InitializationResult>)
+            .map(
+              (e) => MapEntry(e.key, e.value as Future<InitializationResult>),
+            )
+            .toList();
 
-    var depsCompleters = depsInitsAsync
-        .map((e) => MapEntry(e.key, e.value.toCompleter()))
-        .toList();
+    var depsCompleters =
+        depsInitsAsync
+            .map((e) => MapEntry(e.key, e.value.toCompleter()))
+            .toList();
 
     chain._setInitializedDependenciesCompleters(depsCompleters);
 
@@ -811,7 +869,8 @@ mixin Initializable {
 
     var depsInitsResolved =
         Map<Initializable, FutureOr<InitializationResult>>.fromEntries(
-            depsInits);
+          depsInits,
+        );
 
     for (var e in depsCompleters) {
       depsInitsResolved[e.key] = e.value.future;
@@ -839,10 +898,12 @@ mixin Initializable {
   }
 
   FutureOr<InitializationResult> _finalizeInitialization(
-      InitializationResult result) {
+    InitializationResult result,
+  ) {
     if (!result.ok) {
       _log.info(
-          '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR');
+        '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR',
+      );
       throw InitializationError(this, "Error initializing (async): $this");
     }
 
@@ -851,8 +912,11 @@ mixin Initializable {
     var dependencies = result.dependencies.uniqueEntries();
 
     if (!identical(this, result.initializable)) {
-      dependencies = <Initializable>[result.initializable, ...dependencies]
-          .uniqueEntries();
+      dependencies =
+          <Initializable>[
+            result.initializable,
+            ...dependencies,
+          ].uniqueEntries();
       result = InitializationResult.ok(this, dependencies: dependencies);
     }
 
@@ -865,44 +929,49 @@ mixin Initializable {
       return result;
     }
 
-    return _doDependenciesInitialization.tryCallThen(
-      dependencies,
-      (depsResults) {
-        if (depsResults.hasSkipped) {
-          var skipped = depsResults.skipped
-              ?.notInitialized(ignoreFinalizing: true)
-              .toList();
+    return _doDependenciesInitialization.tryCallThen(dependencies, (
+      depsResults,
+    ) {
+      if (depsResults.hasSkipped) {
+        var skipped =
+            depsResults.skipped
+                ?.notInitialized(ignoreFinalizing: true)
+                .toList();
 
-          if (skipped?.isNotEmpty ?? false) {
-            return (() => _doDependenciesInitialization(dependencies,
-                forceCircular: true)).tryCallThen(
-              (depsResults2) {
-                var allDepsResults =
-                    depsResults.merge(depsResults2, dependencies: dependencies);
+        if (skipped?.isNotEmpty ?? false) {
+          return (() => _doDependenciesInitialization(
+                dependencies,
+                forceCircular: true,
+              ))
+              .tryCallThen((depsResults2) {
+                var allDepsResults = depsResults.merge(
+                  depsResults2,
+                  dependencies: dependencies,
+                );
                 return _finalizeInitializationWithDeps(allDepsResults, result);
-              },
-              onError: (e, s) => _onInitializationError(e, s),
-            );
-          }
+              }, onError: (e, s) => _onInitializationError(e, s));
         }
+      }
 
-        return _finalizeInitializationWithDeps(depsResults, result);
-      },
-      onError: (e, s) => _onInitializationError(e, s),
-    );
+      return _finalizeInitializationWithDeps(depsResults, result);
+    }, onError: (e, s) => _onInitializationError(e, s));
   }
 
   FutureOr<InitializationResult> _finalizeInitializationWithDeps(
-      _DependenciesInitialization depsResults, InitializationResult result) {
+    _DependenciesInitialization depsResults,
+    InitializationResult result,
+  ) {
     var dependenciesDeep = _chain.dependenciesDeep;
 
-    var depsInitializing = dependenciesDeep
-        .where((e) => e.initializationStatus.initializing)
-        .toList();
+    var depsInitializing =
+        dependenciesDeep
+            .where((e) => e.initializationStatus.initializing)
+            .toList();
 
     if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
       _log.info(
-          '[$initializationStatus] Waiting Still initializing dependencies: ${depsInitializing.length} ...');
+        '[$initializationStatus] Waiting Still initializing dependencies: ${depsInitializing.length} ...',
+      );
 
       var waitInitializingDeps = depsInitializing
           .map((e) => e.ensureInitialized())
@@ -910,23 +979,25 @@ mixin Initializable {
           .resolveAll()
           .asFuture
           .timeout(
-        Duration(minutes: 2),
-        onTimeout: () {
-          _log.warning(
-              '[$initializationStatus] Timeout waiting still initializing dependencies:');
-          for (var dep in depsInitializing) {
-            _log.warning('-- $dep (${dep.initializationStatus})');
-          }
-          return depsInitializing.map((e) => e._resultOk()).toList();
-        },
-      );
+            Duration(minutes: 2),
+            onTimeout: () {
+              _log.warning(
+                '[$initializationStatus] Timeout waiting still initializing dependencies:',
+              );
+              for (var dep in depsInitializing) {
+                _log.warning('-- $dep (${dep.initializationStatus})');
+              }
+              return depsInitializing.map((e) => e._resultOk()).toList();
+            },
+          );
 
       return waitInitializingDeps.then((depsInitializingResults) {
         for (var result in depsInitializingResults) {
           var initializable = result.initializable;
           if (initializable.initializationStatus.initializing) {
             _log.warning(
-                '[$initializationStatus] Still initializing: $initializable (${initializable.initializationStatus})');
+              '[$initializationStatus] Still initializing: $initializable (${initializable.initializationStatus})',
+            );
           }
         }
 
@@ -938,14 +1009,17 @@ mixin Initializable {
   }
 
   FutureOr<InitializationResult> _finalizeInitializationWithDeps2(
-      _DependenciesInitialization depsResults, InitializationResult result) {
+    _DependenciesInitialization depsResults,
+    InitializationResult result,
+  ) {
     if (depsResults.hasSkipped) {
       var skipped =
           depsResults.skipped?.notInitialized(ignoreFinalizing: true).toList();
 
       if (skipped?.isNotEmpty ?? false) {
         _log.warning(
-            '[$initializationStatus] Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}');
+          '[$initializationStatus] Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}',
+        );
       }
     }
 
@@ -953,13 +1027,15 @@ mixin Initializable {
 
     var dependenciesDeep = _chain.dependenciesDeep;
 
-    var depsInitializing = dependenciesDeep
-        .where((e) => e.initializationStatus.initializing)
-        .toList();
+    var depsInitializing =
+        dependenciesDeep
+            .where((e) => e.initializationStatus.initializing)
+            .toList();
 
     if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
       _log.warning(
-          '[$initializationStatus] Still initializing dependencies: ${depsInitializing.length}');
+        '[$initializationStatus] Still initializing dependencies: ${depsInitializing.length}',
+      );
 
       for (var dep in depsInitializing) {
         _log.warning('-- $dep (${dep.initializationStatus})');
@@ -972,7 +1048,8 @@ mixin Initializable {
     var initializationTime = _status.initializationTime;
 
     _log.info(
-        '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (${initializationTime != null ? '${initializationTime.toStringUnit()} ; ' : ''}result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})');
+      '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (${initializationTime != null ? '${initializationTime.toStringUnit()} ; ' : ''}result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})',
+    );
 
     return result;
   }
@@ -1003,14 +1080,18 @@ mixin Initializable {
       var ret = _doInitializationImpl();
       if (ret is Future<InitializationResult>) {
         throw InitializationError(
-            this, "Not initialized yet! Async initialization for: $this");
+          this,
+          "Not initialized yet! Async initialization for: $this",
+        );
       }
     }
   }
 
   /// Executes the [callback] ensuring that this instances was fully initialized.
-  FutureOr<R> executeInitialized<R>(ExecuteInitializedCallback<R> callback,
-      {Initializable? parent}) {
+  FutureOr<R> executeInitialized<R>(
+    ExecuteInitializedCallback<R> callback, {
+    Initializable? parent,
+  }) {
     if (isInitialized) {
       return callback();
     }
@@ -1039,13 +1120,16 @@ class _DependenciesInitialization {
 
   late final List<Initializable>? skipped;
 
-  _DependenciesInitialization(this.results,
-      {required List<Initializable>? dependencies}) {
+  _DependenciesInitialization(
+    this.results, {
+    required List<Initializable>? dependencies,
+  }) {
     List<Initializable>? skipped;
 
     if (dependencies != null) {
-      var resultsDeps =
-          results.map((e) => e.initializable).toList(growable: false);
+      var resultsDeps = results
+          .map((e) => e.initializable)
+          .toList(growable: false);
       skipped = dependencies.where((e) => !resultsDeps.contains(e)).toList();
 
       if (skipped.isNotEmpty) {
@@ -1054,8 +1138,9 @@ class _DependenciesInitialization {
         if (skippedFinished.isNotEmpty) {
           skipped.removeAll(skippedFinished);
 
-          var skippedFinishedResults =
-              skippedFinished.map((e) => e._resultOk());
+          var skippedFinishedResults = skippedFinished.map(
+            (e) => e._resultOk(),
+          );
           results.addAll(skippedFinishedResults);
         }
       }
@@ -1069,23 +1154,29 @@ class _DependenciesInitialization {
   }
 
   static FutureOr<_DependenciesInitialization> async(
-      FutureOr<List<InitializationResult>> results,
-      {required List<Initializable>? dependencies}) {
-    return results.resolveMapped((results) =>
-        _DependenciesInitialization(results, dependencies: dependencies));
+    FutureOr<List<InitializationResult>> results, {
+    required List<Initializable>? dependencies,
+  }) {
+    return results.resolveMapped(
+      (results) =>
+          _DependenciesInitialization(results, dependencies: dependencies),
+    );
   }
 
   bool get hasSkipped => skipped?.isNotEmpty ?? false;
 
   int get resultsLength => results.length;
 
-  _DependenciesInitialization merge(_DependenciesInitialization other,
-      {required List<Initializable>? dependencies}) {
-    var allResults = [...results, ...other.results]
-        .groupBy((dep) => dep.initializable)
-        .map((dep, res) => MapEntry(dep, res.first))
-        .values
-        .toList();
+  _DependenciesInitialization merge(
+    _DependenciesInitialization other, {
+    required List<Initializable>? dependencies,
+  }) {
+    var allResults =
+        [...results, ...other.results]
+            .groupBy((dep) => dep.initializable)
+            .map((dep, res) => MapEntry(dep, res.first))
+            .values
+            .toList();
 
     return _DependenciesInitialization(allResults, dependencies: dependencies);
   }
@@ -1131,9 +1222,12 @@ extension InitializableListExtension<T extends Initializable> on List<T> {
   List<T> get idle =>
       where((e) => !e._status.initialized && !e._status.initializing).toList();
 
-  List<T> notInitialized({bool ignoreFinalizing = false}) => where((e) =>
-      !e._status.initialized &&
-      (!ignoreFinalizing || !e._status.finalizing)).toList();
+  List<T> notInitialized({bool ignoreFinalizing = false}) =>
+      where(
+        (e) =>
+            !e._status.initialized &&
+            (!ignoreFinalizing || !e._status.finalizing),
+      ).toList();
 }
 
 extension _ListExtension<T> on List<T> {
