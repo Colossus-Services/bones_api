@@ -1,3 +1,16 @@
+## 1.9.8
+
+- sdk: '>=3.7.0 <4.0.0'
+
+- reflection_factory: ^2.6.0
+- collection: ^1.19.1
+- mime: ^2.0.0
+- http: ^1.5.0
+
+- build_runner: ^2.7.0
+
+- Comment: `dependency_validator: ^4.1.3`.
+
 ## 1.9.7
 
 - `EntityAccessRules`: added `totalRules`.

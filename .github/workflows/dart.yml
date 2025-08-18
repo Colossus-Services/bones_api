@@ -24,8 +24,10 @@ jobs:
         run: dart format -o none --set-exit-if-changed .
       - name: dart analyze
         run: dart analyze --fatal-infos --fatal-warnings .
+      - name: activate dependency_validator
+        run: dart pub global activate dependency_validator
       - name: dependency_validator
-        run: dart run dependency_validator
+        run: dart pub global run dependency_validator
       - name: dart pub publish --dry-run
         run: dart pub publish --dry-run
 
