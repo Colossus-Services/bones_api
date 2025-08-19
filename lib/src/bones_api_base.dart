@@ -1936,12 +1936,16 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// Returns the last [pathParts]. Sames as [pathPartReversed] for index `0`.
   String get lastPathPart => _lastPathPart ??= pathPartReversed(0);
 
-  /// Returns from [parameters] a value for [name1] or [name1] .. [name9].
+  /// Returns from [parameters] a value for [name1]. Defaults to [def] if defined.
   V? getParameter<V>(String name1, [V? def]) {
     var val = parameters[name1];
     return val ?? def;
   }
 
+  /// Returns from [parameters] a value for the first defined name among
+  /// [name1], [name2], [name3], [name4], [name5], or [name6].
+  ///
+  /// Returns `null` if none are found.
   V? getParameterFirstOf<V>(
     String name1, [
     String? name2,
@@ -1981,7 +1985,7 @@ class APIRequest extends APIMetricSet with APIPayload {
     return null;
   }
 
-  /// Returns from [parameters] a value for [name] or [name1] .. [name9] ignoring case.
+  /// Returns from [parameters] a value for [name] ignoring case. Defaults to [def] if defined.
   /// See [getParameter].
   V? getParameterIgnoreCase<V>(String name, [V? def]) {
     var val = parameters[name];
@@ -2030,6 +2034,31 @@ class APIRequest extends APIMetricSet with APIPayload {
     }
 
     return null;
+  }
+
+  /// Returns from [payload] (as [Map]) a value for [name1].  Defaults to [def] if defined.
+  V? getPayloadParameter<V>(String name1, [V? def]) {
+    var payload = this.payload;
+    if (payload is! Map) return def;
+
+    var val = payload[name1];
+    return val ?? def;
+  }
+
+  /// Returns from [parameters] a value for [name] ignoring case. Defaults to [def] if defined.
+  /// See [getPayloadParameter].
+  V? getPayloadParameterIgnoreCase<V>(String name, [V? def]) {
+    var payload = this.payload;
+    if (payload is! Map) return def;
+
+    var val = payload[name];
+    if (val != null) return val;
+
+    for (var k in payload.keys) {
+      if (equalsIgnoreAsciiCase(k, name)) return payload[k];
+    }
+
+    return def;
   }
 
   String? getHeader(String key, {String? def}) {

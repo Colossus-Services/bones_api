@@ -6,6 +6,9 @@
 - `APITokenStore`:
   - Added `removeTokenPermissions`, `removeTokenDataAndPermissions`.
 
+- `APIRequest`:
+  - Add `APIRequest` and `getPayloadParameterIgnoreCase`.
+
 ## 1.9.8
 
 - sdk: '>=3.7.0 <4.0.0'
