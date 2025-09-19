@@ -1312,6 +1312,11 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
           }
         }
 
+        var responseStackTrace = response.stackTrace;
+        if (responseStackTrace != null) {
+          Error.throwWithStackTrace(responseError, responseStackTrace);
+        }
+
         throw responseError;
       }
 
