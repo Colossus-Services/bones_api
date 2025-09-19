@@ -1532,6 +1532,14 @@ void main() {
       );
 
       expect(
+        userRepository.selectIDsByQuery(
+          'address.state == ?',
+          parameters: ['NY'],
+        ),
+        equals([user1.id]),
+      );
+
+      expect(
         userRepository.selectByQuery(
           'address.state == ?#0',
           parameters: ['NY'],
