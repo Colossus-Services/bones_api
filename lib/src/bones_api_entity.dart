@@ -733,6 +733,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           v2 = v2.resolveMapped(
             (val) => entityType.toEntityReference(
               val,
+              // If the value can't be resolved, at least set the ID of the `EntityReference`:
+              id: val == null && v.isEntityIDType ? v : null,
               type: entityType.type,
               entityProvider: entityProvider,
               entityHandlerProvider: entityHandlerProvider,
@@ -857,6 +859,14 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return value as T?;
     }
 
+    if (value == null) {
+      if (type.isEntityReferenceBaseType) {
+        return type.parseEntity<T>(value);
+      }
+
+      return null;
+    }
+
     if (type.isPrimitiveType) {
       return type.parse(value) as T?;
     } else if (type.equalsType(_typeInfoTime)) {
@@ -869,13 +879,14 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return DynamicInt.from(value) as T?;
     }
 
-    var tType = TypeInfo.from(T);
-    var valueType = value != null ? TypeInfo.from(value) : null;
-
-    if (type.equalsTypeOrEntityType(valueType) &&
-        value is T &&
-        (!tType.isAnyType && type.equalsType(tType) && !type.hasArguments)) {
-      return value;
+    {
+      var valueType = TypeInfo.from(value);
+      if (type.equalsTypeOrEntityType(valueType) && value is T) {
+        var tType = TypeInfo.fromType(T);
+        if (!tType.isAnyType && type.equalsType(tType) && !type.hasArguments) {
+          return value as T;
+        }
+      }
     }
 
     final resolutionRulesResolved = resolveEntityResolutionRules(

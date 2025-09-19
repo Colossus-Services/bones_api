@@ -1,3 +1,9 @@
+## 1.9.11
+
+- `EntityHandler`:
+  - `resolveFieldsValues`: when resolving an `EntityReference` and the value can't be resolved, pass the ID to the EntityReference.
+  - `resolveValueByType`: optimize for null `value`.
+
 ## 1.9.10
 
 - `DBEntityRepository`:

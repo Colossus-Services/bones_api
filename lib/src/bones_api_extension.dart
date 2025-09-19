@@ -800,6 +800,7 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
   EntityReference<T> toEntityReference(
     Object? o, {
+    Object? id,
     Type? type,
     String? typeName,
     EntityHandler<T>? entityHandler,
@@ -827,6 +828,7 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
       return _toEntityReferenceImpl<E>(
         o,
+        id,
         type,
         typeName,
         oEntityHandler,
@@ -842,6 +844,7 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
   EntityReference<E> _toEntityReferenceImpl<E>(
     Object? o,
+    Object? id,
     Type? type,
     String? typeName,
     EntityHandler<E>? entityHandler,
@@ -853,6 +856,19 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     type ??= this.type;
 
     if (o == null) {
+      if (id != null) {
+        return EntityReference<E>.fromID(
+          id,
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entityFetcher: entityFetcher,
+          entityCache: entityCache,
+        );
+      }
+
       return EntityReference<E>.asNull(
         type: type,
         typeName: typeName,
