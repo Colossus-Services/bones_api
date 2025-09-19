@@ -1,3 +1,10 @@
+## 1.9.10
+
+- `DBEntityRepository`:
+  - Optimize `resolveEntities`.
+
+- build_runner: ^2.7.1
+
 ## 1.9.9
 
 - `APISecurity`:
