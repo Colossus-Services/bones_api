@@ -4,6 +4,12 @@
   - `resolveFieldsValues`: when resolving an `EntityReference` and the value can't be resolved, pass the ID to the EntityReference.
   - `resolveValueByType`: optimize for null `value`.
 
+- `LoggerHandler`:
+  - `_buildMsg`: handle long debugName starting with  `test_suite:`.
+
+- `ClassProxyListener`:
+  - `onCall`: On response error, throw an exception using `response.stackTrace` when available.
+
 ## 1.9.10
 
 - `DBEntityRepository`:
