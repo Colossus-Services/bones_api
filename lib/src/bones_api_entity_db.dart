@@ -1914,11 +1914,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       resolutionRules,
     );
 
-    Iterable<Map<String, dynamic>> entries;
+    List<Map<String, dynamic>> entries;
     if (results is! Iterable<Map<String, dynamic>>) {
-      entries = results.nonNulls;
+      entries = results.nonNulls.toList();
     } else {
-      entries = results;
+      entries =
+          results is List<Map<String, dynamic>> ? results : results.toList();
     }
 
     var fieldsListEntity = _fieldsListEntity;
@@ -1935,8 +1936,6 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
             retRelationshipFields,
             (tableScheme, relationshipFields) {
               if (relationshipFields.isNotEmpty) {
-                entries = entries is List ? entries : entries.toList();
-
                 var resolveRelationshipsFields = _resolveRelationshipFields(
                   transaction,
                   tableScheme,
@@ -2018,7 +2017,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<List<O>> _resolveEntitiesSubEntities(
     Transaction transaction,
     EntityResolutionRulesResolved resolutionRulesResolved,
-    Iterable<Map<String, dynamic>> results,
+    List<Map<String, dynamic>> results,
   ) {
     if (_fieldsEntity.isEmpty) {
       return _resolveEntitiesSimple(
@@ -2028,14 +2027,11 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       );
     }
 
-    var resultsList =
-        results is List<Map<String, dynamic>> ? results : results.toList();
-
-    if (resultsList.length == 1) {
+    if (results.length == 1) {
       return _resolveEntitiesSimple(
         transaction,
         resolutionRulesResolved,
-        resultsList,
+        results,
       );
     }
 
@@ -2061,7 +2057,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
             var tableColumn = fieldsColumns[field]!;
 
-            var ids = resultsList.map((e) => e[tableColumn]).toList();
+            var ids = results.map((e) => e[tableColumn]).toList();
             var idsUniques = ids.nonNulls.toSet().toList();
 
             var entities = repo
@@ -2087,20 +2083,22 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         var field = e.key;
         var fieldEntities = Map.fromEntries(e.value);
 
-        var length = resultsList.length;
+        var length = results.length;
 
         for (var i = 0; i < length; ++i) {
-          var result = resultsList[i];
+          var result = results[i];
           var entityId = result[field];
           var entity = fieldEntities[entityId];
-          result[field] = entity;
+          if (entity != null) {
+            result[field] = entity;
+          }
         }
       }
 
       return _resolveEntitiesSimple(
         transaction,
         resolutionRulesResolved,
-        resultsList,
+        results,
       );
     });
   }
@@ -2184,7 +2182,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<List<bool>> _resolveRelationshipFields(
     Transaction transaction,
     TableScheme tableScheme,
-    Iterable<Map<String, dynamic>> results,
+    List<Map<String, dynamic>> results,
     Map<String, TableRelationshipReference> relationshipFields,
     Map<String, TypeInfo> fieldsListEntity,
     EntityResolutionRulesResolved resolutionRulesResolved,
