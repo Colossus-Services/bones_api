@@ -291,6 +291,9 @@ abstract class LoggerHandler {
 
     var debugName = isolateDebugName;
     if (debugName.isNotEmpty) {
+      if (debugName.startsWith('test_suite:')) {
+        debugName = 'test_suite';
+      }
       var max = _maxKey('debugName', debugName, 10);
       debugName = truncateString(debugName, max);
       debugName = '($debugName)'.padRight(max + 2);
