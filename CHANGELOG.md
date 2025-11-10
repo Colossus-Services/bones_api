@@ -1,3 +1,12 @@
+## 1.9.12
+
+- reflection_factory: ^2.7.2
+- postgres: ^3.5.9
+- crypto: ^3.0.7
+- http: ^1.6.0
+
+- build_runner: ^2.10.1
+
 ## 1.9.11
 
 - `EntityHandler`:
