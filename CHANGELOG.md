@@ -1,5 +1,11 @@
 ## 1.9.12
 
+- `DBObjectGCSAdapter`:
+  - Added properties: `cacheFilesLimit`, `cacheCheckMaxSkips` and `cacheCheckTimeout`.
+  - `_checkCacheDirectoryLimit`:
+    - Optimize and also use `cacheFilesLimit`.
+    - Log check time.
+
 - reflection_factory: ^2.7.2
 - postgres: ^3.5.9
 - crypto: ^3.0.7
