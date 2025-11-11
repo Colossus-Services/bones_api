@@ -832,7 +832,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     if (cacheFile != null) {
       _checkCacheDirectoryLimit();
 
-      assert(await _checkCacheFileParent(cacheFile));
+      assert(cacheFile.parent.existsSync());
       await cacheFile.writeAsBytes(jsonBytes);
 
       _checkCacheDirectoryLimitUntrackedTotal += jsonBytes.length;
