@@ -78,10 +78,12 @@ class DBObjectDirectoryAdapter
     }
   }
 
+  final bool development;
   final Directory directory;
 
   DBObjectDirectoryAdapter(
     this.directory, {
+    bool? development,
     super.generateTables,
     super.populateTables,
     super.populateSource,
@@ -89,7 +91,8 @@ class DBObjectDirectoryAdapter
     super.parentRepositoryProvider,
     super.workingPath,
     super.log,
-  }) : super(
+  }) : development = development ?? false,
+       super(
          'object.directory',
          1,
          3,
@@ -104,7 +107,21 @@ class DBObjectDirectoryAdapter
        ) {
     boot();
 
-    if (!directory.existsSync()) {
+    var directoryExists = directory.existsSync();
+
+    if (!directoryExists &&
+        this.development &&
+        directory.path.contains('/tmp/')) {
+      directory.createSync();
+      directoryExists = directory.existsSync();
+      if (directoryExists) {
+        _log.warning(
+          "[development] Auto-created `directory`: ${directory.path}",
+        );
+      }
+    }
+
+    if (!directoryExists) {
       throw ArgumentError(
         "[DBObjectDirectoryAdapter]: Directory doesn't exists: $directory",
       );
@@ -133,6 +150,8 @@ class DBObjectDirectoryAdapter
       throw ArgumentError("Config without `path` entry!");
     }
 
+    var development = config?.getAsBool('development') ?? false;
+
     var populate = config?['populate'];
 
     var generateTables = false;
@@ -156,6 +175,7 @@ class DBObjectDirectoryAdapter
 
     var adapter = DBObjectDirectoryAdapter(
       directory,
+      development: development,
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,

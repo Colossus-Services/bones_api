@@ -955,6 +955,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         cacheDirectory.path.contains('/tmp/')) {
       cacheDirectory.createSync();
       cacheDirectoryExists = cacheDirectory.existsSync();
+      if (cacheDirectoryExists) {
+        _log.warning(
+          "[cacheDevelopment] Auto-created `cacheDirectory`: ${cacheDirectory.path}",
+        );
+      }
     }
 
     if (!cacheDirectoryExists) {

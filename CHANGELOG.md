@@ -2,9 +2,14 @@
 
 - `DBObjectGCSAdapter`:
   - Added properties: `cacheDevelopment`, `cacheFilesLimit`, `cacheCheckMaxSkips` and `cacheCheckTimeout`.
+  - Auto-created `cacheDirectory` on `cacheDevelopment`.
   - `_checkCacheDirectoryLimit`:
     - Optimize and also use `cacheFilesLimit`.
     - Log check time.
+
+- `DBObjectDirectoryAdapter`:
+  - Added property `development`.
+  - Auto-created `directory` on `development`.
 
 - reflection_factory: ^2.7.2
 - postgres: ^3.5.9
