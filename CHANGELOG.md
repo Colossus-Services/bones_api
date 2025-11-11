@@ -10,6 +10,7 @@
 - postgres: ^3.5.9
 - crypto: ^3.0.7
 - http: ^1.6.0
+- _discoveryapis_commons: ^1.0.7
 
 - build_runner: ^2.10.1
 

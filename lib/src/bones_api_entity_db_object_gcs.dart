@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:_discoveryapis_commons/_discoveryapis_commons.dart'
+    show DetailedApiRequestError;
 import 'package:async_extension/async_extension.dart';
 import 'package:crclib/catalog.dart';
 import 'package:crclib/crclib.dart';
@@ -759,7 +761,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     try {
       var info = await bucket.info(file);
       return info;
-    } catch (_) {
+    } catch (e, s) {
+      var notFound = e is DetailedApiRequestError && e.status == 404;
+      if (!notFound) {
+        _log.severe(
+          "Error getting info for bucket[$bucketName] file: `$file`",
+          e,
+          s,
+        );
+      }
       return null;
     }
   }
@@ -836,7 +846,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         bytes = await bucket
             .read(file)
             .reduce((previous, element) => previous + element);
-      } catch (e) {
+      } catch (e, s) {
+        _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
         return null;
       }
 

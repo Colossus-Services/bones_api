@@ -48,6 +48,7 @@ dependencies:
   stream_channel: ^2.1.4
   http: ^1.6.0
   googleapis_auth: ^2.0.0
+  _discoveryapis_commons: ^1.0.7
   crclib: ^3.0.0
   web: ^1.1.1
 
