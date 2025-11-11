@@ -833,7 +833,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     // Cache enabled:
     if (cacheFile != null) {
       // If `cacheFile` does not exist yet, check its parent directory:
-      if (cacheFileExists == false) {
+      if (cacheFileExists != true) {
         await _checkCacheFileParent(cacheFile);
       }
 
