@@ -1025,13 +1025,26 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     final delNeededFiles =
         cacheFilesLimit <= 0
             ? 0
-            : ((totalFiles * 0.80) - cacheFilesLimit).toInt();
+            :
+            // Del extra files + 20%:
+            (totalFiles - (cacheFilesLimit * 0.80)).toInt();
 
     final delNeededSize =
-        cacheLimit <= 0 ? 0 : ((totalSize * 0.80) - cacheLimit).toInt();
+        cacheLimit <= 0
+            ? 0
+            :
+            // Del extra bytes + 20%:
+            (totalSize - (cacheLimit * 0.80)).toInt();
+
+    var releaseInfo = [
+      if (delNeededFiles > 0) '$delNeededFiles files',
+      if (delNeededSize > 0) '$delNeededSize bytes',
+    ].join(' and ');
 
     _log.info(
-      '[CACHE] Limit Check[${checkTime.inMilliseconds} ms] reached limit: $totalSize${cacheLimit > 0 ? ' / $cacheLimit' : ''} bytes (${entries.length}${cacheFilesLimit > 0 ? ' / $cacheFilesLimit' : ''} files)! Releasing $delNeededSize bytes...',
+      '[CACHE] Limit Check[${checkTime.inMilliseconds} ms] reached limit: $totalSize${cacheLimit > 0 ? ' / $cacheLimit' : ''} bytes '
+      '(${entries.length}${cacheFilesLimit > 0 ? ' / $cacheFilesLimit' : ''} files)! '
+      'Releasing $releaseInfo...',
     );
 
     var del = <File>[];

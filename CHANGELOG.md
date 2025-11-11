@@ -1,5 +1,10 @@
 ## 1.9.13
 
+- `DBObjectGCSAdapter`:
+  - `_checkCacheDirectoryLimit`:
+    - Improve logging.
+    - Fix calculation of needed deleting and extra 20%.
+
 ## 1.9.12
 
 - `DBObjectGCSAdapter`:
