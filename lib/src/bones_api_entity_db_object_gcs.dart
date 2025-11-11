@@ -523,19 +523,22 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     );
   }
 
-  FutureOr<List<I>> _doExistIDsImpl<I extends Object>(
+  Future<List<I>> _doExistIDsImpl<I extends Object>(
     TransactionOperation op,
     String table,
     List<I> ids,
-  ) {
-    return ids
-        .forEachAsync((id) async {
-          var objFile = _resolveObjectFilePath(table, id);
+  ) async {
+    var existsIDs = <I>[];
 
-          var objInfo = await _getObjectInfo(objFile);
-          return objInfo != null && objInfo.length > 0 ? id : null;
-        })
-        .resolveMapped((ids) => ids.nonNulls.toList());
+    for (var id in ids) {
+      var objFile = _resolveObjectFilePath(table, id);
+      var objInfo = await _getObjectInfo(objFile);
+      if (objInfo != null && objInfo.length > 0) {
+        existsIDs.add(id);
+      }
+    }
+
+    return existsIDs;
   }
 
   @override
@@ -772,7 +775,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var jsonBytes = _jsonEncoder.convert(obj);
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
+    var cacheFile = await _resolveCacheObjectFile(table, id);
     if (cacheFile != null && await cacheFile.exists()) {
       var info = await _getObjectInfo(file);
 
@@ -784,7 +787,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         if (crc32JsonOk) {
           var cacheBytes = await cacheFile.readAsBytes();
           if (!cacheBytes.equalsElements(jsonBytes)) {
-            cacheFile.writeAsBytesSync(jsonBytes);
+            await cacheFile.writeAsBytes(jsonBytes);
           }
           return true;
         }
@@ -799,7 +802,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var ok = objInfo.length == jsonBytes.length;
 
-    cacheFile = _resolveCacheObjectFile(
+    cacheFile = await _resolveCacheObjectFile(
       table,
       id,
       autoCreateDir: true, // Ensure that the file's parent directory is created
@@ -808,8 +811,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     if (cacheFile != null) {
       _checkCacheDirectoryLimit();
 
-      assert(_checkCacheFileParent(cacheFile));
-      cacheFile.writeAsBytesSync(jsonBytes);
+      assert(await _checkCacheFileParent(cacheFile));
+      await cacheFile.writeAsBytes(jsonBytes);
 
       _checkCacheDirectoryLimitUntrackedTotal += jsonBytes.length;
       _checkCacheDirectoryFilesLimitUntrackedTotal++;
@@ -821,11 +824,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
     if (!_isValidId(id)) return null;
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
+    var cacheFile = await _resolveCacheObjectFile(table, id);
 
     List<int> bytes;
 
-    if (cacheFile != null && (await cacheFile.exists())) {
+    if (cacheFile != null && await cacheFile.exists()) {
       bytes = await cacheFile.readAsBytes();
     } else {
       var file = _resolveObjectFilePath(table, id);
@@ -836,15 +839,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       } catch (e) {
         return null;
       }
-    }
 
-    if (cacheFile != null) {
-      _checkCacheFileParent(cacheFile);
-      cacheFile.writeAsBytesSync(bytes);
-    }
+      if (cacheFile != null) {
+        await _checkCacheFileParent(cacheFile);
+        await cacheFile.writeAsBytes(bytes);
+      }
 
-    _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
-    _checkCacheDirectoryFilesLimitUntrackedTotal++;
+      _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
+      _checkCacheDirectoryFilesLimitUntrackedTotal++;
+    }
 
     var json = _utf8Decoder.convert(bytes);
 
@@ -852,10 +855,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return obj;
   }
 
-  bool _checkCacheFileParent(File cacheFile) {
+  Future<bool> _checkCacheFileParent(File cacheFile) async {
     var parent = cacheFile.parent;
-    if (!parent.existsSync()) {
-      parent.createSync(recursive: true);
+    var parentExists = await parent.exists();
+    if (!parentExists) {
+      await parent.create(recursive: true);
     }
     return true;
   }
@@ -867,8 +871,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var objFile = _resolveObjectFilePath(table, id);
     await bucket.delete(objFile);
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
-    cacheFile?.deleteSync();
+    var cacheFile = await _resolveCacheObjectFile(table, id);
+    await cacheFile?.delete();
 
     return entry;
   }
@@ -917,7 +921,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
     }
 
-    var list = cacheDirectory?.listSync(recursive: true);
+    var list = await cacheDirectory?.list(recursive: true).toList();
     if (list == null || list.isEmpty) return false;
 
     final checkInitTime = DateTime.now();
@@ -1017,23 +1021,23 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return tableStr;
   }
 
-  File? _resolveCacheObjectFile(
+  FutureOr<File?> _resolveCacheObjectFile(
     String table,
     Object? id, {
     bool autoCreateDir = false,
   }) {
-    var tableDir = _resolveCacheTableDirectory(
+    return _resolveCacheTableDirectory(
       table,
       autoCreateDir: autoCreateDir,
-    );
-    if (tableDir == null) return null;
-
-    var idStr = _normalizeID(id);
-    var file = File(pack_path.join(tableDir.path, '$idStr.json'));
-    return file;
+    ).resolveMapped((tableDir) {
+      if (tableDir == null) return null;
+      var idStr = _normalizeID(id);
+      var file = File(pack_path.join(tableDir.path, '$idStr.json'));
+      return file;
+    });
   }
 
-  Directory? _resolveCacheTableDirectory(
+  FutureOr<Directory?> _resolveCacheTableDirectory(
     String table, {
     bool autoCreateDir = false,
   }) {
@@ -1043,10 +1047,20 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var tableStr = _normalizeTableName(table);
     var tableDir = Directory(pack_path.join(cacheDirectory.path, tableStr));
 
-    if (autoCreateDir && !tableDir.existsSync()) {
-      tableDir.createSync();
+    if (autoCreateDir) {
+      return _resolveCacheTableDirectoryAutoCreate(tableDir);
+    } else {
+      return tableDir;
     }
+  }
 
+  Future<Directory> _resolveCacheTableDirectoryAutoCreate(
+    Directory tableDir,
+  ) async {
+    var tableDirExists = await tableDir.exists();
+    if (!tableDirExists) {
+      await tableDir.create(recursive: true);
+    }
     return tableDir;
   }
 
