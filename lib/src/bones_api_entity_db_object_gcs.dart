@@ -87,6 +87,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   final String projectName;
   final String bucketName;
 
+  final bool cacheDevelopment;
   final Directory? cacheDirectory;
   final int? cacheLimit;
   final int? cacheFilesLimit;
@@ -101,6 +102,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     http.Client client,
     this.projectName,
     this.bucketName, {
+    bool? cacheDevelopment,
     this.cacheDirectory,
     this.cacheLimit,
     this.cacheFilesLimit,
@@ -113,7 +115,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     super.parentRepositoryProvider,
     super.workingPath,
     super.log,
-  }) : super(
+  }) : cacheDevelopment = cacheDevelopment ?? false,
+       super(
          'object.gcs',
          1,
          3,
@@ -162,11 +165,14 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var cacheConfig = config?.getAsMap('cache', ignoreCase: true);
 
+    bool cacheDevelopment = false;
     Directory? cacheDir;
     int? cacheLimit;
     int? cacheFilesLimit;
 
     if (cacheConfig != null) {
+      cacheDevelopment = cacheConfig.getAsBool('development') ?? false;
+
       var path = cacheConfig.getAsString('path', ignoreCase: true)?.trim();
       if (path != null && path.isNotEmpty) {
         cacheDir = Directory(path);
@@ -245,6 +251,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       client,
       project,
       bucket,
+      cacheDevelopment: cacheDevelopment,
       cacheDirectory: cacheDir,
       cacheLimit: cacheLimit,
       cacheFilesLimit: cacheFilesLimit,
@@ -787,19 +794,23 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var cacheFile = await _resolveCacheObjectFile(table, id);
     if (cacheFile != null && await cacheFile.exists()) {
-      var info = await _getObjectInfo(file);
+      var cacheFileLength = await cacheFile.length();
 
-      if (info != null && info.length == jsonBytes.length) {
-        var crc32GCS = info.crc32CChecksumBytes;
-        var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
+      if (cacheFileLength == jsonBytes.length) {
+        var info = await _getObjectInfo(file);
 
-        var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
-        if (crc32JsonOk) {
-          var cacheBytes = await cacheFile.readAsBytes();
-          if (!cacheBytes.equalsElements(jsonBytes)) {
-            await cacheFile.writeAsBytes(jsonBytes);
+        if (info != null && info.length == jsonBytes.length) {
+          var crc32GCS = info.crc32CChecksumBytes;
+          var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
+
+          var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
+          if (crc32JsonOk) {
+            var cacheBytes = await cacheFile.readAsBytes();
+            if (!cacheBytes.equalsElements(jsonBytes)) {
+              await cacheFile.writeAsBytes(jsonBytes);
+            }
+            return true;
           }
-          return true;
         }
       }
     }
@@ -932,8 +943,30 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       }
     }
 
-    var list = await cacheDirectory?.list(recursive: true).toList();
-    if (list == null || list.isEmpty) return false;
+    final cacheDirectory = this.cacheDirectory;
+    if (cacheDirectory == null) {
+      return false;
+    }
+
+    var cacheDirectoryExists = await cacheDirectory.exists();
+
+    if (!cacheDirectoryExists &&
+        cacheDevelopment &&
+        cacheDirectory.path.contains('/tmp/')) {
+      cacheDirectory.createSync();
+      cacheDirectoryExists = cacheDirectory.existsSync();
+    }
+
+    if (!cacheDirectoryExists) {
+      final errorMsg =
+          "Invalid `cacheDirectory` — Directory does not exist: "
+          "${cacheDirectory.path}";
+      _log.severe(errorMsg);
+      throw StateError(errorMsg);
+    }
+
+    var list = await cacheDirectory.list(recursive: true).toList();
+    if (list.isEmpty) return false;
 
     final checkInitTime = DateTime.now();
     _checkCacheDirectoryLimitLastTime = checkInitTime;

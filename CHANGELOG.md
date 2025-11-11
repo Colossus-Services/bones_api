@@ -1,7 +1,7 @@
 ## 1.9.12
 
 - `DBObjectGCSAdapter`:
-  - Added properties: `cacheFilesLimit`, `cacheCheckMaxSkips` and `cacheCheckTimeout`.
+  - Added properties: `cacheDevelopment`, `cacheFilesLimit`, `cacheCheckMaxSkips` and `cacheCheckTimeout`.
   - `_checkCacheDirectoryLimit`:
     - Optimize and also use `cacheFilesLimit`.
     - Log check time.
