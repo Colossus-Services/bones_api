@@ -1,7 +1,10 @@
 import 'dart:convert' as dart_convert;
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:_discoveryapis_commons/_discoveryapis_commons.dart'
+    show DetailedApiRequestError;
 import 'package:async_extension/async_extension.dart';
 import 'package:crclib/catalog.dart';
 import 'package:crclib/crclib.dart';
@@ -86,6 +89,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   final Directory? cacheDirectory;
   final int? cacheLimit;
+  final int? cacheFilesLimit;
+
+  final int? cacheCheckMaxSkips;
+  final Duration? cacheCheckTimeout;
 
   late final gcs.Storage storage;
   late final gcs.Bucket bucket;
@@ -96,6 +103,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     this.bucketName, {
     this.cacheDirectory,
     this.cacheLimit,
+    this.cacheFilesLimit,
+    this.cacheCheckMaxSkips,
+    this.cacheCheckTimeout,
     super.generateTables,
     super.populateTables,
     super.populateSource,
@@ -154,6 +164,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     Directory? cacheDir;
     int? cacheLimit;
+    int? cacheFilesLimit;
 
     if (cacheConfig != null) {
       var path = cacheConfig.getAsString('path', ignoreCase: true)?.trim();
@@ -194,6 +205,19 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
           }
         }
       }
+
+      var filesLimitStr =
+          (cacheConfig.getAsString('filesLimit', ignoreCase: true) ??
+                  cacheConfig.getAsString('files-limit', ignoreCase: true))
+              ?.trim();
+
+      if (filesLimitStr != null && filesLimitStr.isNotEmpty) {
+        filesLimitStr = filesLimitStr.trim();
+        cacheFilesLimit = int.tryParse(filesLimitStr);
+        if (cacheFilesLimit != null && cacheFilesLimit <= 0) {
+          cacheFilesLimit = null;
+        }
+      }
     }
 
     var populate = config?['populate'];
@@ -223,6 +247,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       bucket,
       cacheDirectory: cacheDir,
       cacheLimit: cacheLimit,
+      cacheFilesLimit: cacheFilesLimit,
       parentRepositoryProvider: parentRepositoryProvider,
       generateTables: generateTables,
       populateTables: populateTables,
@@ -500,19 +525,22 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     );
   }
 
-  FutureOr<List<I>> _doExistIDsImpl<I extends Object>(
+  Future<List<I>> _doExistIDsImpl<I extends Object>(
     TransactionOperation op,
     String table,
     List<I> ids,
-  ) {
-    return ids
-        .forEachAsync((id) async {
-          var objFile = _resolveObjectFilePath(table, id);
+  ) async {
+    var existsIDs = <I>[];
 
-          var objInfo = await _getObjectInfo(objFile);
-          return objInfo != null && objInfo.length > 0 ? id : null;
-        })
-        .resolveMapped((ids) => ids.nonNulls.toList());
+    for (var id in ids) {
+      var objFile = _resolveObjectFilePath(table, id);
+      var objInfo = await _getObjectInfo(objFile);
+      if (objInfo != null && objInfo.length > 0) {
+        existsIDs.add(id);
+      }
+    }
+
+    return existsIDs;
   }
 
   @override
@@ -733,7 +761,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     try {
       var info = await bucket.info(file);
       return info;
-    } catch (_) {
+    } catch (e, s) {
+      var notFound = e is DetailedApiRequestError && e.status == 404;
+      if (!notFound) {
+        _log.severe(
+          "Error getting info for bucket[$bucketName] file: `$file`",
+          e,
+          s,
+        );
+      }
       return null;
     }
   }
@@ -749,8 +785,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var jsonBytes = _jsonEncoder.convert(obj);
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
-    if (cacheFile != null && cacheFile.existsSync()) {
+    var cacheFile = await _resolveCacheObjectFile(table, id);
+    if (cacheFile != null && await cacheFile.exists()) {
       var info = await _getObjectInfo(file);
 
       if (info != null && info.length == jsonBytes.length) {
@@ -758,14 +794,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
 
         var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
-
         if (crc32JsonOk) {
-          var cacheBytes = cacheFile.readAsBytesSync();
-
+          var cacheBytes = await cacheFile.readAsBytes();
           if (!cacheBytes.equalsElements(jsonBytes)) {
-            cacheFile.writeAsBytesSync(jsonBytes);
+            await cacheFile.writeAsBytes(jsonBytes);
           }
-
           return true;
         }
       }
@@ -776,15 +809,23 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       jsonBytes,
       contentType: _objectContentType,
     );
+
     var ok = objInfo.length == jsonBytes.length;
 
-    cacheFile = _resolveCacheObjectFile(table, id, autoCreateDir: true);
+    cacheFile = await _resolveCacheObjectFile(
+      table,
+      id,
+      autoCreateDir: true, // Ensure that the file's parent directory is created
+    );
 
     if (cacheFile != null) {
       _checkCacheDirectoryLimit();
-      _checkCacheFileParent(cacheFile);
-      cacheFile.writeAsBytesSync(jsonBytes);
+
+      assert(await _checkCacheFileParent(cacheFile));
+      await cacheFile.writeAsBytes(jsonBytes);
+
       _checkCacheDirectoryLimitUntrackedTotal += jsonBytes.length;
+      _checkCacheDirectoryFilesLimitUntrackedTotal++;
     }
 
     return ok;
@@ -793,30 +834,31 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
     if (!_isValidId(id)) return null;
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
+    var cacheFile = await _resolveCacheObjectFile(table, id);
 
     List<int> bytes;
 
-    if (cacheFile != null && cacheFile.existsSync()) {
-      bytes = cacheFile.readAsBytesSync();
+    if (cacheFile != null && await cacheFile.exists()) {
+      bytes = await cacheFile.readAsBytes();
     } else {
       var file = _resolveObjectFilePath(table, id);
-
       try {
         bytes = await bucket
             .read(file)
             .reduce((previous, element) => previous + element);
-      } catch (e) {
+      } catch (e, s) {
+        _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
         return null;
       }
-    }
 
-    if (cacheFile != null) {
-      _checkCacheFileParent(cacheFile);
-      cacheFile.writeAsBytesSync(bytes);
-    }
+      if (cacheFile != null) {
+        await _checkCacheFileParent(cacheFile);
+        await cacheFile.writeAsBytes(bytes);
+      }
 
-    _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
+      _checkCacheDirectoryLimitUntrackedTotal += bytes.length;
+      _checkCacheDirectoryFilesLimitUntrackedTotal++;
+    }
 
     var json = _utf8Decoder.convert(bytes);
 
@@ -824,11 +866,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return obj;
   }
 
-  void _checkCacheFileParent(File cacheFile) {
+  Future<bool> _checkCacheFileParent(File cacheFile) async {
     var parent = cacheFile.parent;
-    if (!parent.existsSync()) {
-      parent.createSync(recursive: true);
+    var parentExists = await parent.exists();
+    if (!parentExists) {
+      await parent.create(recursive: true);
     }
+    return true;
   }
 
   Future<Map<String, dynamic>?> _deleteObject(String table, Object? id) async {
@@ -838,46 +882,67 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var objFile = _resolveObjectFilePath(table, id);
     await bucket.delete(objFile);
 
-    var cacheFile = _resolveCacheObjectFile(table, id);
-    cacheFile?.deleteSync();
+    var cacheFile = await _resolveCacheObjectFile(table, id);
+    await cacheFile?.delete();
 
     return entry;
   }
 
   DateTime _checkCacheDirectoryLimitLastTime = DateTime.utc(2020);
   int _checkCacheDirectoryLimitSkips = 0;
-  int _checkCacheDirectoryLimitLastTotal = 0;
+  int _checkCacheDirectoryLimitLastTotalSize = 0;
+  int _checkCacheDirectoryLimitLastTotalFiles = 0;
   int _checkCacheDirectoryLimitUntrackedTotal = 0;
+  int _checkCacheDirectoryFilesLimitUntrackedTotal = 0;
 
-  void _checkCacheDirectoryLimit({bool force = false}) async {
+  Future<bool> _checkCacheDirectoryLimit({bool force = false}) async {
     var cacheLimit = this.cacheLimit ?? 0;
-    if (cacheLimit <= 0) return;
+    var cacheFilesLimit = this.cacheFilesLimit ?? 0;
+    if (cacheLimit <= 0 && cacheFilesLimit <= 0) return false;
+
+    var cacheCheckMaxSkips = math.max(10, this.cacheCheckMaxSkips ?? 200);
+
+    var cacheCheckTimeout = this.cacheCheckTimeout ?? Duration(minutes: 10);
+    if (cacheCheckTimeout.inSeconds < 10) {
+      cacheCheckTimeout = Duration(seconds: 10);
+    }
 
     if (!force) {
-      var estimatedTotal =
-          _checkCacheDirectoryLimitLastTotal +
+      var estimatedTotalSize =
+          _checkCacheDirectoryLimitLastTotalSize +
           _checkCacheDirectoryLimitUntrackedTotal;
 
-      var inLimit = estimatedTotal <= cacheLimit;
-      var lowSkips = _checkCacheDirectoryLimitSkips < 100;
+      var estimatedTotalFiles =
+          _checkCacheDirectoryLimitLastTotalFiles +
+          _checkCacheDirectoryFilesLimitUntrackedTotal;
+
+      var inLimitSize = cacheLimit == 0 || estimatedTotalSize <= cacheLimit;
+      var inLimitFiles =
+          cacheFilesLimit == 0 || estimatedTotalFiles <= cacheFilesLimit;
+
+      var lowSkips = _checkCacheDirectoryLimitSkips < cacheCheckMaxSkips;
+
       var notExpired =
-          _checkCacheDirectoryLimitLastTime.elapsedTime < Duration(minutes: 5);
+          _checkCacheDirectoryLimitLastTime.elapsedTime < cacheCheckTimeout;
 
       // Skip check:
-      if (inLimit && lowSkips && notExpired) {
+      if (inLimitSize && inLimitFiles && lowSkips && notExpired) {
         ++_checkCacheDirectoryLimitSkips;
-        return;
+        return false;
       }
     }
 
-    var list = cacheDirectory?.listSync(recursive: true);
-    if (list == null || list.isEmpty) return;
+    var list = await cacheDirectory?.list(recursive: true).toList();
+    if (list == null || list.isEmpty) return false;
 
-    _checkCacheDirectoryLimitLastTime = DateTime.now();
+    final checkInitTime = DateTime.now();
+    _checkCacheDirectoryLimitLastTime = checkInitTime;
     _checkCacheDirectoryLimitSkips = 0;
 
     var files =
         list.whereType<File>().where((f) => f.path.endsWith(".json")).toList();
+
+    var totalFiles = files.length;
 
     var filesStats =
         await files
@@ -887,24 +952,38 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var totalSize = filesStats.values.map((s) => s.size).sum;
 
-    _checkCacheDirectoryLimitLastTotal = totalSize;
+    _checkCacheDirectoryLimitLastTotalSize = totalSize;
+    _checkCacheDirectoryLimitLastTotalFiles = totalFiles;
     _checkCacheDirectoryLimitUntrackedTotal = 0;
+    _checkCacheDirectoryFilesLimitUntrackedTotal = 0;
 
-    if (totalSize <= cacheLimit) {
+    final checkTime = DateTime.now().difference(checkInitTime);
+
+    final cacheLimitOk = cacheLimit == 0 || totalSize <= cacheLimit;
+    final cacheFilesLimitOk =
+        cacheFilesLimit == 0 || totalFiles <= cacheFilesLimit;
+
+    if (cacheLimitOk && cacheFilesLimitOk) {
       var r = (totalSize / cacheLimit) * 100;
       _log.info(
-        '[CACHE] Limit check: OK ($totalSize / $cacheLimit bytes ${r.toStringAsFixed(2)}%)  (${filesStats.length} files)',
+        '[CACHE] Limit check[${checkTime.inMilliseconds} ms]: OK ($totalSize${cacheLimit > 0 ? ' / $cacheLimit' : ''} bytes ${r.toStringAsFixed(2)}%)  ($totalFiles${cacheFilesLimit > 0 ? ' / $cacheFilesLimit' : ''} files)',
       );
-      return;
+      return false;
     }
 
     var entries = filesStats.entries.toList();
     entries.sort((a, b) => a.value.modified.compareTo(b.value.modified));
 
-    final delNeededSize = ((totalSize * 0.80) - cacheLimit).toInt();
+    final delNeededFiles =
+        cacheFilesLimit <= 0
+            ? 0
+            : ((totalFiles * 0.80) - cacheFilesLimit).toInt();
+
+    final delNeededSize =
+        cacheLimit <= 0 ? 0 : ((totalSize * 0.80) - cacheLimit).toInt();
 
     _log.info(
-      '[CACHE] Reached limit: $totalSize / $cacheLimit bytes (${entries.length} files)! Releasing $delNeededSize bytes...',
+      '[CACHE] Limit Check[${checkTime.inMilliseconds} ms] reached limit: $totalSize${cacheLimit > 0 ? ' / $cacheLimit' : ''} bytes (${entries.length}${cacheFilesLimit > 0 ? ' / $cacheFilesLimit' : ''} files)! Releasing $delNeededSize bytes...',
     );
 
     var del = <File>[];
@@ -915,16 +994,24 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       var s = e.value;
 
       del.add(f);
-
       delSize += s.size;
-      if (delSize >= delNeededSize) break;
+
+      if (delSize >= delNeededSize && del.length >= delNeededFiles) break;
     }
 
-    _log.info('[CACHE] Removing ${del.length} files...');
+    _log.info('[CACHE] Removing ${del.length} files... ($delSize bytes)');
 
-    var delResuls = await del.map((f) => f.delete()).toList().resolveAll();
+    final removeInitTime = DateTime.now();
 
-    _log.info('[CACHE] Removed files: ${delResuls.length} ($delSize bytes)');
+    var delResults = await del.map((f) => f.delete()).toList().resolveAll();
+
+    final removeTime = DateTime.now().difference(removeInitTime);
+
+    _log.info(
+      '[CACHE] Removed files[${removeTime.inMilliseconds} ms]: ${delResults.length} ($delSize bytes)',
+    );
+
+    return true;
   }
 
   bool _isValidId(Object? id) {
@@ -945,34 +1032,46 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return tableStr;
   }
 
-  File? _resolveCacheObjectFile(
+  FutureOr<File?> _resolveCacheObjectFile(
     String table,
     Object? id, {
     bool autoCreateDir = false,
   }) {
-    var tableDir = _resolveCacheTableDirectory(
+    return _resolveCacheTableDirectory(
       table,
       autoCreateDir: autoCreateDir,
-    );
-    if (tableDir == null) return null;
-    var idStr = _normalizeID(id);
-    var file = File(pack_path.join(tableDir.path, '$idStr.json'));
-    return file;
+    ).resolveMapped((tableDir) {
+      if (tableDir == null) return null;
+      var idStr = _normalizeID(id);
+      var file = File(pack_path.join(tableDir.path, '$idStr.json'));
+      return file;
+    });
   }
 
-  Directory? _resolveCacheTableDirectory(
+  FutureOr<Directory?> _resolveCacheTableDirectory(
     String table, {
     bool autoCreateDir = false,
   }) {
     var cacheDirectory = this.cacheDirectory;
     if (cacheDirectory == null) return null;
+
     var tableStr = _normalizeTableName(table);
     var tableDir = Directory(pack_path.join(cacheDirectory.path, tableStr));
 
-    if (autoCreateDir && !tableDir.existsSync()) {
-      tableDir.createSync();
+    if (autoCreateDir) {
+      return _resolveCacheTableDirectoryAutoCreate(tableDir);
+    } else {
+      return tableDir;
     }
+  }
 
+  Future<Directory> _resolveCacheTableDirectoryAutoCreate(
+    Directory tableDir,
+  ) async {
+    var tableDirExists = await tableDir.exists();
+    if (!tableDirExists) {
+      await tableDir.create(recursive: true);
+    }
     return tableDir;
   }
 
