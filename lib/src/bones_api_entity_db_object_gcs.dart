@@ -865,7 +865,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
             .read(file)
             .reduce((previous, element) => previous + element);
       } catch (e, s) {
-        _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
+        var notFound = e is DetailedApiRequestError && e.status == 404;
+        if (!notFound) {
+          _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
+        }
         return null;
       }
 
