@@ -793,23 +793,30 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var jsonBytes = _jsonEncoder.convert(obj);
 
     var cacheFile = await _resolveCacheObjectFile(table, id);
-    if (cacheFile != null && await cacheFile.exists()) {
-      var cacheFileLength = await cacheFile.length();
+    bool? cacheFileExists;
 
-      if (cacheFileLength == jsonBytes.length) {
-        var info = await _getObjectInfo(file);
+    // Cache enabled:
+    if (cacheFile != null) {
+      cacheFileExists = await cacheFile.exists();
 
-        if (info != null && info.length == jsonBytes.length) {
-          var crc32GCS = info.crc32CChecksumBytes;
-          var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
+      if (cacheFileExists) {
+        var cacheFileLength = await cacheFile.length();
 
-          var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
-          if (crc32JsonOk) {
-            var cacheBytes = await cacheFile.readAsBytes();
-            if (!cacheBytes.equalsElements(jsonBytes)) {
-              await cacheFile.writeAsBytes(jsonBytes);
+        if (cacheFileLength == jsonBytes.length) {
+          var info = await _getObjectInfo(file);
+
+          if (info != null && info.length == jsonBytes.length) {
+            var crc32GCS = info.crc32CChecksumBytes;
+            var crc32Json = Crc32C().convert(jsonBytes).crc32CChecksumBytes;
+
+            var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
+            if (crc32JsonOk) {
+              var cacheBytes = await cacheFile.readAsBytes();
+              if (!cacheBytes.equalsElements(jsonBytes)) {
+                await cacheFile.writeAsBytes(jsonBytes);
+              }
+              return true;
             }
-            return true;
           }
         }
       }
@@ -823,13 +830,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var ok = objInfo.length == jsonBytes.length;
 
-    cacheFile = await _resolveCacheObjectFile(
-      table,
-      id,
-      autoCreateDir: true, // Ensure that the file's parent directory is created
-    );
-
+    // Cache enabled:
     if (cacheFile != null) {
+      // If `cacheFile` does not exist yet, check its parent directory:
+      if (cacheFileExists == false) {
+        await _checkCacheFileParent(cacheFile);
+      }
+
       _checkCacheDirectoryLimit();
 
       assert(cacheFile.parent.existsSync());
@@ -1070,6 +1077,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return tableStr;
   }
 
+  /// Returns the cache [File] for [table]/[id].
+  /// Returns null if the cache is not enabled.
   FutureOr<File?> _resolveCacheObjectFile(
     String table,
     Object? id, {
@@ -1086,6 +1095,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     });
   }
 
+  /// Returns the cache [Directory] for [table].
+  /// Returns null if the cache is not enabled.
   FutureOr<Directory?> _resolveCacheTableDirectory(
     String table, {
     bool autoCreateDir = false,
