@@ -1,3 +1,7 @@
+- `FileLimitExtension`:
+    - Added `readAsBytesLimited()` and `writeAsBytesLimited()` methods to
+      safely limit concurrent file I/O operations and prevent `Too many open files` errors.
+
 ## 1.9.13
 
 - `DBObjectGCSAdapter`:
