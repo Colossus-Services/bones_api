@@ -1,3 +1,5 @@
+## 1.9.14
+
 - `FileLimitExtension`:
     - Added `readAsBytesLimited()` and `writeAsBytesLimited()` methods to
       safely limit concurrent file I/O operations and prevent `Too many open files` errors.
@@ -6,6 +8,11 @@
     - Replaced direct file reads with the new
       `FileLimitExtension.readAsBytesLimited()` to control concurrent I/O and prevent
       `Too many open files` errors during cache access.
+
+- async_locks: ^4.0.2
+
+- build_runner: ^2.10.2
+- test: ^1.27.0
 
 ## 1.9.13
 
