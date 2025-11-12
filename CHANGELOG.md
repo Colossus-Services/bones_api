@@ -2,6 +2,11 @@
     - Added `readAsBytesLimited()` and `writeAsBytesLimited()` methods to
       safely limit concurrent file I/O operations and prevent `Too many open files` errors.
 
+- `DBObjectGCSAdapter`:
+    - Replaced direct file reads with the new
+      `FileLimitExtension.readAsBytesLimited()` to control concurrent I/O and prevent
+      `Too many open files` errors during cache access.
+
 ## 1.9.13
 
 - `DBObjectGCSAdapter`:

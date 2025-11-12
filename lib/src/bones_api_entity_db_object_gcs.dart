@@ -24,6 +24,7 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_extension_io.dart';
 import 'bones_api_logging.dart';
 
 final _log = logging.Logger('DBObjectGCSAdapter')..registerAsDbLogger();
@@ -811,7 +812,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
             var crc32JsonOk = crc32GCS.equalsElements(crc32Json);
             if (crc32JsonOk) {
-              var cacheBytes = await cacheFile.readAsBytes();
+              var cacheBytes = await cacheFile.readAsBytesLimited();
               if (!cacheBytes.equalsElements(jsonBytes)) {
                 await cacheFile.writeAsBytes(jsonBytes);
               }
@@ -857,7 +858,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     List<int> bytes;
 
     if (cacheFile != null && await cacheFile.exists()) {
-      bytes = await cacheFile.readAsBytes();
+      bytes = await cacheFile.readAsBytesLimited();
     } else {
       var file = _resolveObjectFilePath(table, id);
       try {
