@@ -1,5 +1,13 @@
+## 1.9.15
+
 - `FileLimitExtension`:
   - Added `statLimited`, `deleteLimited`.
+
+- `DBObjectGCSAdapter`:
+    - Replaced direct file operations with the new limited I/O methods:
+        - `deleteLimited()` instead of `delete()`
+        - `statLimited()` instead of `stat()`
+    - Improves concurrency control and prevents `Too many open files` errors during cache cleanup and maintenance...
 
 ## 1.9.14
 

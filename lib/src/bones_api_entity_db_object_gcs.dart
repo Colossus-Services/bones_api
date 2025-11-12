@@ -905,7 +905,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     await bucket.delete(objFile);
 
     var cacheFile = await _resolveCacheObjectFile(table, id);
-    await cacheFile?.delete();
+    await cacheFile?.deleteLimited();
 
     return entry;
   }
@@ -995,7 +995,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     var filesStats =
         await files
-            .map((f) => MapEntry(f, f.stat()))
+            .map((f) => MapEntry(f, f.statLimited()))
             .toMapFromEntries()
             .resolveAllValues();
 
@@ -1065,7 +1065,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     final removeInitTime = DateTime.now();
 
-    var delResults = await del.map((f) => f.delete()).toList().resolveAll();
+    var delResults =
+        await del.map((f) => f.deleteLimited()).toList().resolveAll();
 
     final removeTime = DateTime.now().difference(removeInitTime);
 
