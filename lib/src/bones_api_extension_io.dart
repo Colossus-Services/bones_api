@@ -68,4 +68,32 @@ extension FileLimitExtension on File {
       _semaphore.release();
     }
   }
+
+  /// Similar to [File.stat], but limits concurrency to the current
+  /// semaphore limit to reduce excessive parallel I/O operations.
+  ///
+  /// Helps prevent `Too many open files` errors and mitigates disk
+  /// contention when multiple files are accessed simultaneously.
+  Future<FileStat> statLimited() async {
+    await _semaphore.acquire();
+    try {
+      return await stat();
+    } finally {
+      _semaphore.release();
+    }
+  }
+
+  /// Similar to [File.delete], but limits concurrency to the current
+  /// semaphore limit to avoid excessive parallel I/O operations.
+  ///
+  /// Helps prevent `Too many open files` errors and reduces disk
+  /// contention when deleting multiple files concurrently.
+  Future<void> deleteLimited({bool recursive = false}) async {
+    await _semaphore.acquire();
+    try {
+      await delete(recursive: recursive);
+    } finally {
+      _semaphore.release();
+    }
+  }
 }

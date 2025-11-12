@@ -1,3 +1,6 @@
+- `FileLimitExtension`:
+  - Added `statLimited`, `deleteLimited`.
+
 ## 1.9.14
 
 - `FileLimitExtension`:
