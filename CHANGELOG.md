@@ -1,4 +1,4 @@
-## 1.9.12
+## 1.9.16
 
 - shelf_letsencrypt: ^2.0.2
 - reflection_factory: ^2.7.2
@@ -8,6 +8,61 @@
 
 - build_runner: ^2.10.4
 - test: ^1.28.0
+
+## 1.9.15
+
+- `FileLimitExtension`:
+  - Added `statLimited`, `deleteLimited`.
+
+- `DBObjectGCSAdapter`:
+    - Replaced direct file operations with the new limited I/O methods:
+        - `deleteLimited()` instead of `delete()`
+        - `statLimited()` instead of `stat()`
+    - Improves concurrency control and prevents `Too many open files` errors during cache cleanup and maintenance...
+
+## 1.9.14
+
+- `FileLimitExtension`:
+    - Added `readAsBytesLimited()` and `writeAsBytesLimited()` methods to
+      safely limit concurrent file I/O operations and prevent `Too many open files` errors.
+
+- `DBObjectGCSAdapter`:
+    - Replaced direct file reads with the new
+      `FileLimitExtension.readAsBytesLimited()` to control concurrent I/O and prevent
+      `Too many open files` errors during cache access.
+
+- async_locks: ^4.0.2
+
+- build_runner: ^2.10.2
+- test: ^1.27.0
+
+## 1.9.13
+
+- `DBObjectGCSAdapter`:
+  - `_checkCacheDirectoryLimit`:
+    - Improve logging.
+    - Fix calculation of needed deleting and extra 20%.
+
+## 1.9.12
+
+- `DBObjectGCSAdapter`:
+  - Added properties: `cacheDevelopment`, `cacheFilesLimit`, `cacheCheckMaxSkips` and `cacheCheckTimeout`.
+  - Auto-created `cacheDirectory` on `cacheDevelopment`.
+  - `_checkCacheDirectoryLimit`:
+    - Optimize and also use `cacheFilesLimit`.
+    - Log check time.
+
+- `DBObjectDirectoryAdapter`:
+  - Added property `development`.
+  - Auto-created `directory` on `development`.
+
+- reflection_factory: ^2.7.2
+- postgres: ^3.5.9
+- crypto: ^3.0.7
+- http: ^1.6.0
+- _discoveryapis_commons: ^1.0.7
+
+- build_runner: ^2.10.1
 
 ## 1.9.11
 
