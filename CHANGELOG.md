@@ -1,3 +1,18 @@
+## 1.9.16
+
+- New `FileLimited`: expose `Fili` limit handling.
+
+- `FileLimitExtension`: use `FileLimited.global`.
+
+- `APIServerResponseCache`:
+  - Use a local `_fileLimited` for file operations.
+  - Optimize `File` operations to prioritize async and limited operations.
+
+- shelf_letsencrypt: ^2.0.3
+
+- build_runner: ^2.10.4
+- test: ^1.28.0
+
 ## 1.9.15
 
 - `FileLimitExtension`:

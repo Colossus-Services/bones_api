@@ -13,10 +13,14 @@ import 'package:shelf/src/body.dart';
 import 'package:shelf/src/message.dart';
 import 'package:shelf_gzip/shelf_gzip.dart';
 
+import 'bones_api_extension_io.dart';
+
 final _log = logging.Logger('APIServerResponseCache');
 
 const _headerServerTime = 'server-timing';
 const _headerAPIServerCache = 'X-API-Server-Cache';
+
+final FileLimited _fileLimited = FileLimited(name: 'APIServerResponseCache');
 
 /// An [APIServer] in-memory [Response] cache.
 class APIServerResponseCache {
@@ -113,16 +117,23 @@ class APIServerResponseCache {
     DateTime requestInit,
   ) {
     return Future.sync(() => innerHandler(request)).then((response) {
-      _log.info(
-        () =>
-            "UN-CACHED File Response in ms ${requestInit.elapsedTime.toMillisecondsFormatted()} [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})",
-      );
-
       var cachedResponse = cacheResponse(request, response);
-      if (cachedResponse != null) {
-        return cachedResponse;
+
+      if (cachedResponse == null) {
+        _log.info(
+          () =>
+              "UN-CACHED File Response in ${requestInit.elapsedTime.toMillisecondsFormatted()} [${response.statusCode}]> /${request.url.path} (${response.contentLengthHeader})",
+        );
+        return response;
       }
-      return response;
+
+      return cachedResponse.then((cachedResponse) {
+        _log.info(
+          () =>
+              "UN-CACHED File Response (now cached) in ${requestInit.elapsedTime.toMillisecondsFormatted()} [${cachedResponse.statusCode}]> /${request.url.path} (${cachedResponse.contentLengthHeader})",
+        );
+        return cachedResponse;
+      });
     });
   }
 
@@ -407,9 +418,12 @@ class APIServerResponseCache {
 
     var file = response.context['file'];
 
+    var fileStat = await _FileStat.fromAsync(file);
+
     var cachedResponse = _CachedResponse200(
       path: path,
       file: file,
+      fileStat: fileStat,
       headers: headers,
       content: content,
       contentEncoding: contentEncoding,
@@ -437,28 +451,40 @@ class APIServerResponseCache {
     }
 
     var requestIfModifiableSince = request.ifModifiedSinceHeader;
-
     if (requestIfModifiableSince == null) return null;
 
+    return _cacheResponse304Impl(response, request, requestIfModifiableSince);
+  }
+
+  Future<Response>? _cacheResponse304Impl(
+    Response response,
+    Request request,
+    String requestIfModifiableSince,
+  ) {
     var cacheControl = response.headers[HttpHeaders.cacheControlHeader];
     var server = response.headers[HttpHeaders.serverHeader];
 
     var file = response.context['file'];
 
-    var cachedResponse = _CachedResponse304(
-      path: request.url.path,
-      file: file,
-      requestIfModifiableSince: requestIfModifiableSince,
-      cacheControl: cacheControl,
-      server: server,
-    );
+    var fileStat = _FileStat.fromAsync(file);
 
-    var key = cachedResponse.key;
+    fileStat.then((fileStat) {
+      var cachedResponse = _CachedResponse304(
+        path: request.url.path,
+        file: file,
+        fileStat: fileStat,
+        requestIfModifiableSince: requestIfModifiableSince,
+        cacheControl: cacheControl,
+        server: server,
+      );
 
-    assert(cachedResponse.statusCode == 304);
-    assert(key.statusCode == 304);
+      var key = cachedResponse.key;
 
-    _put(cachedResponse);
+      assert(cachedResponse.statusCode == 304);
+      assert(key.statusCode == 304);
+
+      _put(cachedResponse);
+    });
 
     return null;
   }
@@ -604,8 +630,21 @@ class _FileStat implements WithMemorySize {
   late final int fileLength;
   late final DateTime fileLastModified;
 
-  _FileStat._(this.file) {
-    var stat = this.stat();
+  _FileStat._notFound(this.file) {
+    fileExists = false;
+    fileLength = -1;
+    fileLastModified = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+
+  static _FileStat? notFoundFrom(Object? file) {
+    if (file == null) return null;
+    if (file is File) return _FileStat._notFound(file);
+    return null;
+  }
+
+  _FileStat._(this.file, {FileStat? stat}) {
+    stat ??= file.statSync();
+    _setStat(stat);
 
     fileExists = stat.type != FileSystemEntityType.notFound;
     fileLength = stat.size;
@@ -615,18 +654,46 @@ class _FileStat implements WithMemorySize {
   static _FileStat? from(Object? file) {
     var fileResolved = _resolveFile(file);
     if (fileResolved == null) return null;
-    return _FileStat._(fileResolved);
+    return _FileStat._(fileResolved.$1, stat: fileResolved.$2);
   }
 
-  static File? _resolveFile(Object? file) {
+  static (File, FileStat)? _resolveFile(Object? file) {
     if (file == null) return null;
-    if (file is File) return file;
+
+    if (file is File) {
+      return (file, file.statSync());
+    }
 
     if (file is String && file.isNotEmpty) {
       var f = File(file).absolute;
       if (f.existsSync()) {
-        return f;
+        return (f, f.statSync());
       }
+    }
+
+    return null;
+  }
+
+  static FutureOr<_FileStat?> fromAsync(Object? file) {
+    return _resolveFileAsync(file).resolveMapped((fileResolved) {
+      if (fileResolved == null) return null;
+      return _FileStat._(fileResolved.$1, stat: fileResolved.$2);
+    });
+  }
+
+  static FutureOr<(File, FileStat)?> _resolveFileAsync(Object? file) {
+    if (file == null) return null;
+
+    if (file is File) {
+      return _fileLimited.stat(file).then((stat) => (file, stat));
+    }
+
+    if (file is String && file.isNotEmpty) {
+      var f = File(file).absolute;
+      return _fileLimited.exists(f).then((exists) {
+        if (!exists) return null;
+        return _fileLimited.stat(f).then((stat) => (f, stat));
+      });
     }
 
     return null;
@@ -642,9 +709,7 @@ class _FileStat implements WithMemorySize {
     var stat = _stat;
 
     if (stat == null) {
-      // ignore: discarded_futures
-      _updateStat(sync: true);
-      stat = _stat!;
+      var stat = _updateStatSync();
       return stat;
     } else if (isStatExpired(timeout: timeout)) {
       // ignore: discarded_futures
@@ -674,14 +739,14 @@ class _FileStat implements WithMemorySize {
     return statElapsedTime > timeout;
   }
 
+  FileStat _updateStatSync() {
+    _log.info("Updating File.stat (sync): ${file.path}");
+    return _setStat(file.statSync());
+  }
+
   Future<FileStat>? _updating;
 
-  FutureOr<FileStat> _updateStat({bool sync = false}) {
-    if (sync) {
-      _log.info("Updating File.stat (sync): ${file.path}");
-      return _setStart(file.statSync());
-    }
-
+  FutureOr<FileStat> _updateStat() {
     final updating = _updating;
     if (updating != null) {
       return updating;
@@ -689,14 +754,14 @@ class _FileStat implements WithMemorySize {
 
     _log.info("Updating File.stat: ${file.path}");
 
-    return _updating = file.stat().then((stat) {
-      _setStart(stat);
+    return _updating = _fileLimited.stat(file).then((stat) {
+      _setStat(stat);
       _updating = null;
       return stat;
     });
   }
 
-  FileStat _setStart(FileStat stat) {
+  FileStat _setStat(FileStat stat) {
     _stat = stat;
     _statTime = DateTime.now();
     return stat;
@@ -1180,7 +1245,7 @@ class _CachedResponse404 extends _CachedResponseWithBody {
     super.contentEncoding,
     super.encoding,
     this.server,
-  }) : super(statusCode: 404, fileStat: null);
+  }) : super(statusCode: 404, fileStat: _FileStat.notFoundFrom(file));
 
   @override
   bool validate(Request request) {
