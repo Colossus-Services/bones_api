@@ -1,5 +1,9 @@
 ## 1.9.16
 
+- New `FileLimited`: expose `Fili` limit handling.
+
+- `FileLimitExtension`: use `FileLimited.global`.
+
 - shelf_letsencrypt: ^2.0.2
 
 - build_runner: ^2.10.4
