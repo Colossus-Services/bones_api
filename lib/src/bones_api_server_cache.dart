@@ -754,7 +754,7 @@ class _FileStat implements WithMemorySize {
 
     _log.info("Updating File.stat: ${file.path}");
 
-    return _updating = file.statLimited().then((stat) {
+    return _updating = _fileLimited.stat(file).then((stat) {
       _setStat(stat);
       _updating = null;
       return stat;
