@@ -681,6 +681,7 @@ class _FileStat implements WithMemorySize {
       _log.info("Updating File.stat (sync): ${file.path}");
       return _setStart(file.statSync());
     }
+    return _setStat(file.statSync());
 
     final updating = _updating;
     if (updating != null) {
@@ -691,12 +692,13 @@ class _FileStat implements WithMemorySize {
 
     return _updating = file.stat().then((stat) {
       _setStart(stat);
+      _setStat(stat);
       _updating = null;
       return stat;
     });
   }
 
-  FileStat _setStart(FileStat stat) {
+  FileStat _setStat(FileStat stat) {
     _stat = stat;
     _statTime = DateTime.now();
     return stat;
