@@ -101,16 +101,19 @@ class FileLimited {
   /// consistently under a unified semaphore.
   ///
   /// Intended for shared usage rather than per-component instantiation.
-  static final global = FileLimited();
+  static final global = FileLimited(name: '[GLOBAL]');
 
   /// Default semaphore limit across all operations.
   static const int defaultSemaphoreLimit = 50;
+
+  /// Instance identifier used for debugging or logging purposes.
+  final String? name;
 
   /// Global semaphore enforcing the concurrency limit.
   Semaphore _semaphore;
   int _semaphoreLimit;
 
-  FileLimited({int semaphoreLimit = defaultSemaphoreLimit})
+  FileLimited({this.name, int semaphoreLimit = defaultSemaphoreLimit})
     : _semaphore = Semaphore(semaphoreLimit),
       _semaphoreLimit = semaphoreLimit;
 
@@ -201,4 +204,8 @@ class FileLimited {
       _semaphore.release();
     }
   }
+
+  @override
+  String toString() =>
+      'FileLimited{name: $name, semaphoreLimit: $_semaphoreLimit}';
 }
