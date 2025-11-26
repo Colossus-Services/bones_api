@@ -8,7 +8,7 @@
   - Use a local `_fileLimited` for file operations.
   - Optimize `File` operations to prioritize async and limited operations.
 
-- shelf_letsencrypt: ^2.0.2
+- shelf_letsencrypt: ^2.0.3
 
 - build_runner: ^2.10.4
 - test: ^1.28.0

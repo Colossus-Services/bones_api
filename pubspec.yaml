@@ -27,7 +27,7 @@ dependencies:
   resource_portable: ^3.1.2
   docker_commander: ^2.1.7
   args_simple: ^1.1.0
-  shelf_letsencrypt: ^2.0.2
+  shelf_letsencrypt: ^2.0.3
   shelf: ^1.4.2
   shelf_gzip: ^4.1.0
   shelf_static: ^1.1.3
