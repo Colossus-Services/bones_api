@@ -4,6 +4,10 @@
 
 - `FileLimitExtension`: use `FileLimited.global`.
 
+- `APIServerResponseCache`:
+  - Use a local `_fileLimited` for file operations.
+  - Optimize `File` operations to prioritize async and limited operations.
+
 - shelf_letsencrypt: ^2.0.2
 
 - build_runner: ^2.10.4
