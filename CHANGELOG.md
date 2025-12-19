@@ -1,3 +1,7 @@
+## 1.9.17
+
+- statistics: ^1.2.1
+
 ## 1.9.16
 
 - New `FileLimited`: expose `Fili` limit handling.
