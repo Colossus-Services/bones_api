@@ -1590,7 +1590,18 @@ class APIServer extends _APIServerBase {
 
     Object payload = s;
     if (mimeType.isJSON) {
-      payload = json.decode(s);
+      s = s.trim();
+      if (s.isEmpty) return null;
+      try {
+        payload = json.decode(s);
+      } catch (e, s) {
+        _log.severe(
+          "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
+          e,
+          s,
+        );
+        return null;
+      }
     } else if (mimeType.isFormURLEncoded) {
       payload = decodeQueryStringParameters(s, charset: mimeType.charset);
     }

@@ -1,5 +1,11 @@
 ## 1.9.17
 
+- `APIServer`:
+  - `_resolvePayloadFromString`: Improved JSON payload parsing:
+    - Trim input before decoding.
+    - Return `null` for empty bodies.
+    - Catch decode errors and log them without throwing.
+
 - statistics: ^1.2.1
 
 ## 1.9.16
