@@ -1,3 +1,8 @@
+## 1.9.19
+
+- Dependency updates:
+  - Updated `reflection_factory` dependency from `^2.7.2` to `^2.7.3`.
+
 ## 1.9.18
 
 - `DBAdapter`:
