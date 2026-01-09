@@ -1,3 +1,12 @@
+## 1.9.18
+
+- `DBAdapter`:
+  - Improved error messages in instantiation methods to include a list of instantiator function keys.
+
+- Dependencies:
+  - Updated `async_extension` from ^1.2.15 to ^1.2.17.
+  - Updated `test` from ^1.28.0 to ^1.29.0.
+
 ## 1.9.17
 
 - `APIServer`:
