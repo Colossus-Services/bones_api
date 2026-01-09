@@ -295,19 +295,28 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
     }
 
+    List<DBAdapterInstantiator> functions() =>
+        instantiators.map((e) => e.key).toList();
+
     if (asyncInstantiators.isNotEmpty) {
       return asyncInstantiators.resolveAll().then((l) {
         for (var e in l) {
           return e;
         }
 
+        var fs = functions();
+
         throw StateError(
-          "Can't async instantiate an `$A` for `config`: $config",
+          "Can't async instantiate an `$A` for `config`: $config\nInstantiators:\n-- ${fs.join('\n-- ')}",
         );
       });
     }
 
-    throw StateError("Can't instantiate an `$A` for `config`: $config");
+    var fs = functions();
+
+    throw StateError(
+      "Can't instantiate an `$A` for `config`: $config\nInstantiators:\n-- ${fs.join('\n-- ')}",
+    );
   }
 
   @override
