@@ -1,3 +1,23 @@
+## 1.9.20
+
+- `ConditionSQLEncoder`:
+  - `keyToSQL`: added check to throw `ConditionEncodingError` if `keys` is empty.
+  - Refactored `keyFieldReferenceToSQL` to recursively resolve multi-level key references by walking keys and resolving intermediate tables and relationships.
+  - Added helper methods `_resolveReferenceField` and `_resolveFinalField` to modularize reference resolution logic.
+
+- `DBSQLAdapter`:
+  - Introduced `_JoinEntry` typedef to represent SQL JOIN fragments with explicit alias dependencies (`defs` and `refs`).
+  - Added local extension methods on `List<_JoinEntry>` to perform dependency-aware sorting of JOINs ensuring referenced aliases are resolved before use.
+  - Refactored JOIN construction logic in SQL query building to:
+    - Collect JOINs as `_JoinEntry` with defined and referenced aliases.
+    - Sort JOINs by alias dependencies before concatenation.
+    - Log a warning if not all JOIN references could be resolved.
+  - This improves correctness and ordering of JOIN clauses in generated SQL.
+
+- Dependencies:
+  - Updated `async_extension` from ^1.2.17 to ^1.2.18.
+  - Updated `build_runner` from ^2.10.4 to ^2.10.5.
+
 ## 1.9.19
 
 - Dependency updates:

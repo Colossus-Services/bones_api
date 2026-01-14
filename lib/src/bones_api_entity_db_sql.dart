@@ -27,6 +27,78 @@ export 'bones_api_entity_db.dart' show DBAdapterCapabilityConnectivity;
 
 final _log = logging.Logger('SQLAdapter')..registerAsDbLogger();
 
+/// Represents a SQL JOIN fragment with explicit alias dependencies.
+///
+/// - [defs]: Aliases **defined** (introduced) by this JOIN.
+/// - [refs]: Aliases **referenced** by this JOIN (typically in the ON clause).
+/// - [join]: The rendered JOIN SQL snippet.
+typedef _JoinEntry = ({List<String> defs, List<String> refs, String join});
+
+extension on _JoinEntry {
+  bool refsResolved(Set<String> resolved) => refs.every(resolved.contains);
+}
+
+extension on List<_JoinEntry> {
+  /// Sorts JOIN entries so that alias dependency order is respected.
+  ///
+  /// Ensures that every JOIN appears **after** all aliases it references
+  /// are already available, producing a valid SQL JOIN sequence whenever
+  /// possible.
+  ///
+  /// - [initialAliases] are aliases already defined by the FROM clause.
+  ///
+  /// This performs a dependency-aware (topological) sort:
+  /// - Iteratively selects JOINs whose [refs] are fully resolved
+  /// - Appends them in a valid order
+  /// - Accumulates newly defined aliases from [defs]
+  ///
+  /// If unresolved or circular dependencies are detected, the remaining
+  /// JOINs are appended in their original order and the method returns
+  /// `false`.
+  ///
+  /// Returns `true` if all JOIN dependencies were fully resolved and
+  /// ordered correctly, or `false` if a best-effort fallback order was used.
+  bool sortJoins(Set<String> initialAliases) {
+    final List<_JoinEntry> joins = this;
+    // No ordering needed for zero or one JOIN.
+    if (joins.length <= 1) {
+      var resolved = joins.first.refsResolved(initialAliases);
+      return resolved;
+    }
+
+    // Aliases currently available for reference.
+    final resolved = <String>{...initialAliases};
+    // JOINs not yet placed in the final order.
+    final pending = List<_JoinEntry>.from(joins);
+
+    // Clear and rebuild the list in dependency-safe order.
+    joins.clear();
+
+    while (pending.isNotEmpty) {
+      // Find a JOIN whose referenced aliases are all resolved.
+      final index = pending.indexWhere((j) => j.refsResolved(resolved));
+
+      // No JOIN can be resolved → missing alias or circular dependency.
+      if (index == -1) {
+        // Append remaining JOINs as-is, preserving input order.
+        joins.addAll(pending);
+        // Not fully resolved; fallback ordering was applied.
+        return false;
+      }
+
+      // Move the resolvable JOIN to the final list.
+      final resolvedJoin = pending.removeAt(index);
+      joins.add(resolvedJoin);
+
+      // Register aliases defined by this JOIN.
+      resolved.addAll(resolvedJoin.defs);
+    }
+
+    // Fully resolved dependency order.
+    return true;
+  }
+}
+
 /// [SQL] wrapper interface.
 abstract class SQLWrapper {
   /// The amount of [SQL]s.
@@ -2511,7 +2583,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           limit: limit,
         );
       } else {
-        var join = StringBuffer();
+        var joins = <_JoinEntry>[];
 
         for (var e in encodedSQL.referencedTablesFields.entries) {
           var refTable = e.key;
@@ -2521,6 +2593,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             (ref) => encodedSQL.isInnerFieldReference(ref),
           );
 
+          var join = StringBuffer();
+
           if (innerRef) {
             join.write('INNER JOIN ');
           } else {
@@ -2528,6 +2602,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           }
 
           join.write('$q$refTable$q as $q$refTableAlias$q ON ');
+
+          var defAliases = <String>[refTableAlias];
+          var refAliases = <String>[];
 
           for (var fieldRef in e.value) {
             var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
@@ -2538,6 +2615,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               encodedSQL,
               fieldRef.targetTable,
             );
+
+            refAliases.add(sourceTableAlias);
+            refAliases.add(targetTableAlias);
 
             join.write(q);
             join.write(sourceTableAlias);
@@ -2556,7 +2636,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             join.write(q);
             join.write(fieldRef.targetField);
             join.write(q);
+            join.write(' ');
           }
+
+          refAliases.removeAll(defAliases);
+
+          joins.add((
+            defs: defAliases,
+            refs: refAliases,
+            join: join.toString(),
+          ));
         }
 
         for (var e in encodedSQL.relationshipTables.entries) {
@@ -2578,6 +2667,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           }
 
           var innerRel = encodedSQL.isInnerRelationshipTable(relationship);
+
+          var join = StringBuffer();
 
           if (innerRel) {
             join.write('INNER JOIN ');
@@ -2650,10 +2741,30 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           join.write(q);
 
           join.write(') ');
+
+          joins.add((
+            defs: [relTableAlias, targetTableAlias],
+            refs: [tableAlias],
+            join: join.toString(),
+          ));
         }
+
+        var allJoinRefsResolved = joins.sortJoins({tableAlias});
+
+        var join = joins.map((e) => e.join).join(' ');
 
         var from =
             'FROM $q$table$q as $q$tableAlias$q $join WHERE $conditionSQL';
+
+        if (!allJoinRefsResolved) {
+          _log.warning(
+            "Not all JOIN references where resolved while building SQL>\n"
+            "$from\n"
+            "$joins\n"
+            "$matcher",
+          );
+        }
+
         var sqlQuery = sqlBuilder(from, encodedSQL);
 
         return SQL(

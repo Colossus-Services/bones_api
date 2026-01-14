@@ -292,6 +292,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
     EncodingContext context,
   ) {
     var keys = c.keys;
+    if (keys.isEmpty) {
+      throw ConditionEncodingError('keys empty: $c');
+    }
 
     if (keys.first is! ConditionKeyField) {
       throw ConditionEncodingError('Root Key should be a field key: $c');
@@ -299,10 +302,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
     if (keys.length == 1) {
       return keyFieldToSQL(c, context);
-    } else if (keys.length == 2) {
+    }
+    // keys.length >= 2
+    else {
       return keyFieldReferenceToSQL(c, context);
-    } else {
-      throw ConditionEncodingError('keys > 2: $c');
     }
   }
 
@@ -405,150 +408,133 @@ class ConditionSQLEncoder extends ConditionEncoder {
     });
   }
 
+  FutureOr<String> _resolveReferenceField({
+    required SchemeProvider schemeProvider,
+    required EncodingContext context,
+    required KeyCondition c,
+    required TableScheme sourceScheme,
+    required String sourceTable,
+    required ConditionKeyField key,
+  }) {
+    final fieldRef = sourceScheme.getFieldReferencedTable(key.name);
+
+    // Normal reference field, pointing to another entity table:
+    if (fieldRef != null) {
+      context.addFieldReference(fieldRef, c);
+      context.resolveEntityAlias(fieldRef.targetTable);
+      return fieldRef.targetTable;
+    }
+
+    return schemeProvider
+        .getFieldType(key.name, tableName: sourceTable)
+        .resolveMapped((fieldType) {
+          if (fieldType == null) {
+            throw ConditionEncodingError('No field type for ${key.name}');
+          }
+
+          return schemeProvider.getTableForType(fieldType).resolveMapped((
+            targetTable,
+          ) {
+            if (targetTable == null) {
+              throw ConditionEncodingError('No table for type $fieldType');
+            }
+
+            final rel = sourceScheme.getTableRelationshipReference(
+              sourceTable: sourceTable,
+              sourceField: key.name,
+              targetTable: targetTable,
+            );
+
+            if (rel == null) {
+              throw ConditionEncodingError(
+                'No relationship table for: `$sourceTable` -> `$targetTable`',
+              );
+            }
+
+            context.addRelationshipTable(targetTable, rel, c);
+            context.resolveEntityAlias(rel.targetTable);
+
+            return rel.targetTable;
+          });
+        });
+  }
+
+  FutureOr<MapEntry<Type, String>> _resolveFinalField({
+    required SchemeProvider schemeProvider,
+    required EncodingContext context,
+    required String targetTable,
+    required ConditionKeyField key,
+  }) {
+    return schemeProvider.getTableScheme(targetTable).resolveMapped((scheme) {
+      if (scheme == null) {
+        throw StateError("Can't find TableScheme for $targetTable");
+      }
+
+      final fieldName = scheme.resolveTableFieldName(key.name);
+      if (fieldName == null) {
+        throw StateError(
+          "Can't find field `${key.name}` on table `${scheme.name}`",
+        );
+      }
+
+      final alias = context.resolveEntityAlias(targetTable);
+      final type = scheme.fieldsTypes[fieldName]!;
+      final q = sqlElementQuote;
+
+      return MapEntry(type, '$q$alias$q.$q$fieldName$q');
+    });
+  }
+
   FutureOr<MapEntry<Type, String>> keyFieldReferenceToSQL(
     KeyCondition<dynamic, dynamic> c,
     EncodingContext context,
   ) {
-    var schemeProvider = this.schemeProvider;
-    var tableName = context.tableNameOrEntityName;
+    final rootTable = context.tableNameOrEntityName;
 
+    final schemeProvider = this.schemeProvider;
     if (schemeProvider == null) {
       throw ConditionEncodingError(
-        'No SchemeProvider> tableName: $tableName > $this',
+        'No SchemeProvider> tableName: $rootTable > $this',
       );
     }
 
-    var keys = c.keys;
-    var key0 = keys.first as ConditionKeyField;
+    final keys = c.keys.cast<ConditionKeyField>();
+    if (keys.isEmpty) {
+      throw ConditionEncodingError('Empty key path: $c');
+    }
 
-    var tableSchemeRet = schemeProvider.getTableScheme(tableName);
-
-    return tableSchemeRet.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
+    FutureOr<MapEntry<Type, String>> walkKeys({
+      required int index,
+      required String sourceTable,
+    }) {
+      if (index == keys.length - 1) {
+        return _resolveFinalField(
+          schemeProvider: schemeProvider,
+          context: context,
+          targetTable: sourceTable,
+          key: keys[index],
+        );
       }
 
-      var fieldName = key0.name;
-      var fieldRef = tableScheme.getFieldReferencedTable(fieldName);
-
-      if (fieldRef != null) {
-        context.addFieldReference(fieldRef, c);
-
-        var entityAlias = context.resolveEntityAlias(fieldRef.targetTable);
-
-        var key1 = keys[1];
-
-        if (key1 is ConditionKeyField) {
-          var targetTableSchemeRet = schemeProvider.getTableScheme(
-            fieldRef.targetTable,
-          );
-
-          return targetTableSchemeRet.resolveMapped((targetTableScheme) {
-            if (targetTableScheme == null) {
-              var errorMsg =
-                  "Can't find `TableScheme` for target table: $fieldRef";
-              _log.severe(errorMsg);
-              throw StateError(errorMsg);
-            }
-
-            var q = sqlElementQuote;
-            var targetFieldName = targetTableScheme.resolveTableFieldName(
-              key1.name,
-            );
-            var targetFieldType =
-                targetTableScheme.fieldsTypes[targetFieldName]!;
-            return MapEntry(
-              targetFieldType,
-              '$q$entityAlias$q.$q$targetFieldName$q',
-            );
-          });
-        } else {
-          throw ConditionEncodingError('Key: $c');
-        }
-      }
-
-      var retFieldType = schemeProvider.getFieldType(
-        fieldName,
-        entityName: context.entityName,
-        tableName: context.tableName,
-      );
-
-      return retFieldType.resolveMapped((refFieldType) {
-        if (refFieldType == null) {
-          throw ConditionEncodingError(
-            'No field type for key[0]> keys: $key0 $keys ; entityName: ${context.entityName} ; tableName: ${context.tableName} > $this ; tableScheme: $tableScheme',
-          );
+      return schemeProvider.getTableScheme(sourceTable).resolveMapped((scheme) {
+        if (scheme == null) {
+          throw StateError("Can't find `TableScheme` for table: $sourceTable");
         }
 
-        var retTableNameRef = schemeProvider.getTableForType(refFieldType);
-
-        return retTableNameRef.resolveMapped((tableNameRef) {
-          if (tableNameRef == null) {
-            throw ConditionEncodingError(
-              'No referenced table or relationship table for key[0]> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
-            );
-          }
-
-          var relationship = tableScheme.getTableRelationshipReference(
-            sourceTable: tableName,
-            sourceField: fieldName,
-            targetTable: tableNameRef,
-          );
-
-          if (relationship == null) {
-            throw ConditionEncodingError(
-              'No relationship table with target table $tableNameRef> keys: $key0 $keys ; tableName: $tableName ; fieldType: $refFieldType> $this ; tableScheme: $tableScheme',
-            );
-          }
-
-          context.addRelationshipTable(tableNameRef, relationship, c);
-
-          var targetAlias = context.resolveEntityAlias(
-            relationship.targetTable,
-          );
-
-          var key1 = keys[1];
-
-          if (key1 is ConditionKeyField) {
-            var targetTableSchemeRet = schemeProvider.getTableScheme(
-              relationship.targetTable,
-            );
-
-            return targetTableSchemeRet.resolveMapped((targetTableScheme) {
-              if (targetTableScheme == null) {
-                var errorMsg =
-                    "Can't find `TableScheme` for target table: $fieldRef";
-                _log.severe(errorMsg);
-                throw StateError(errorMsg);
-              }
-
-              var q = sqlElementQuote;
-              var targetFieldName = targetTableScheme.resolveTableFieldName(
-                key1.name,
-              );
-
-              if (targetFieldName == null) {
-                var errorMsg =
-                    "Can't find field `${key1.name}` for target `${targetTableScheme.name}`. relationship: $relationship";
-                _log.severe(errorMsg);
-                throw StateError(errorMsg);
-              }
-
-              var targetFieldType =
-                  targetTableScheme.fieldsTypes[targetFieldName]!;
-              return MapEntry(
-                targetFieldType,
-                '$q$targetAlias$q.$q$targetFieldName$q',
-              );
-            });
-          } else {
-            throw ConditionEncodingError('Key: $c');
-          }
-        });
+        return _resolveReferenceField(
+          schemeProvider: schemeProvider,
+          context: context,
+          c: c,
+          sourceScheme: scheme,
+          sourceTable: sourceTable,
+          key: keys[index],
+        ).resolveMapped(
+          (nextTable) => walkKeys(index: index + 1, sourceTable: nextTable),
+        );
       });
-    });
+    }
+
+    return walkKeys(index: 0, sourceTable: rootTable);
   }
 
   static List<T> _valueToList<T>(Object value) {
