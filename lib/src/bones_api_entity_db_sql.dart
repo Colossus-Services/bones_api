@@ -60,8 +60,12 @@ extension on List<_JoinEntry> {
   /// ordered correctly, or `false` if a best-effort fallback order was used.
   bool sortJoins(Set<String> initialAliases) {
     final List<_JoinEntry> joins = this;
-    // No ordering needed for zero or one JOIN.
-    if (joins.length <= 1) {
+    // No ordering needed for zero JOINs:
+    if (joins.isEmpty) {
+      return true;
+    }
+    // No ordering needed for a single JOIN; only check if it is resolved:
+    else if (joins.length == 1) {
       var resolved = joins.first.refsResolved(initialAliases);
       return resolved;
     }
