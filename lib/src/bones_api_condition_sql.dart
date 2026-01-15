@@ -498,9 +498,19 @@ class ConditionSQLEncoder extends ConditionEncoder {
       );
     }
 
-    final keys = c.keys.cast<ConditionKeyField>();
+    final keys = c.keys;
     if (keys.isEmpty) {
       throw ConditionEncodingError('Empty key path: $c');
+    }
+
+    ConditionKeyField getKey(int index) {
+      var k = keys[index];
+      if (k is! ConditionKeyField) {
+        throw ConditionEncodingError(
+          "key[$index] is not a `ConditionKeyField`: $k",
+        );
+      }
+      return k;
     }
 
     FutureOr<MapEntry<Type, String>> walkKeys({
@@ -512,7 +522,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
           schemeProvider: schemeProvider,
           context: context,
           targetTable: sourceTable,
-          key: keys[index],
+          key: getKey(index),
         );
       }
 
@@ -527,7 +537,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
           c: c,
           sourceScheme: scheme,
           sourceTable: sourceTable,
-          key: keys[index],
+          key: getKey(index),
         ).resolveMapped(
           (nextTable) => walkKeys(index: index + 1, sourceTable: nextTable),
         );
