@@ -37,10 +37,14 @@ Symbol? _getSymbol(String? key) {
       return const Symbol(r"bonus");
     case r"campaign":
       return const Symbol(r"campaign");
+    case r"config":
+      return const Symbol(r"config");
     case r"id":
       return const Symbol(r"id");
     case r"items":
       return const Symbol(r"items");
+    case r"open":
+      return const Symbol(r"open");
     default:
       return null;
   }
@@ -58,6 +62,12 @@ Campaign Campaign$fromJson(Map<String, Object?> map) =>
 // ignore: non_constant_identifier_names
 Campaign Campaign$fromJsonEncoded(String jsonEncoded) =>
     Campaign$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
+CampaignConfig CampaignConfig$fromJson(Map<String, Object?> map) =>
+    CampaignConfig$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+CampaignConfig CampaignConfig$fromJsonEncoded(String jsonEncoded) =>
+    CampaignConfig$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 // ignore: non_constant_identifier_names
 Item Item$fromJson(Map<String, Object?> map) =>
     Item$reflection.staticInstance.fromJson(map);
@@ -673,7 +683,10 @@ class Campaign$reflection extends ClassReflection<Campaign>
           () => Campaign.new,
           const <__PR>[__PR(__TR.tString, 'name', false, true)],
           null,
-          const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
+          const <String, __PR>{
+            'config': __PR(__TR.tObject, 'config', true, false),
+            'id': __PR(__TR.tInt, 'id', true, false),
+          },
           null,
         );
       case 'empty':
@@ -712,6 +725,7 @@ class Campaign$reflection extends ClassReflection<Campaign>
   }
 
   static const List<String> _fieldsNames = const <String>[
+    'config',
     'fieldsNames',
     'id',
     'idFieldName',
@@ -796,6 +810,20 @@ class Campaign$reflection extends ClassReflection<Campaign>
           obj,
           false,
         );
+      case 'config':
+        return FieldReflection<Campaign, EntityReference<CampaignConfig>>(
+          this,
+          Campaign,
+          const __TR<EntityReference<CampaignConfig>>(EntityReference, <__TR>[
+            __TR<CampaignConfig>(CampaignConfig),
+          ]),
+          'config',
+          false,
+          (o) => () => o!.config,
+          (o) => (v) => o!.config = v,
+          obj,
+          false,
+        );
       case 'idfieldname':
         return FieldReflection<Campaign, String>(
           this,
@@ -836,6 +864,7 @@ class Campaign$reflection extends ClassReflection<Campaign>
     return <String, dynamic>{
       'id': obj?.id,
       'name': obj?.name,
+      'config': obj?.config,
       'idFieldName': obj?.idFieldName,
       'fieldsNames': obj?.fieldsNames,
       if (withHashCode) 'hashCode': obj?.hashCode,
@@ -851,6 +880,7 @@ class Campaign$reflection extends ClassReflection<Campaign>
     return <String, dynamic>{
       'id': obj?.id,
       'name': obj?.name,
+      'config': obj?.config,
       'idFieldName': obj?.idFieldName,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
@@ -1087,6 +1117,545 @@ class Campaign$reflection extends ClassReflection<Campaign>
           ]),
           false,
           () => Campaign.fromMap,
+          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
+          null,
+          null,
+          null,
+        );
+      default:
+        return null;
+    }
+  }
+}
+
+class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
+    with __ReflectionMixin {
+  static final Expando<CampaignConfig$reflection> _objectReflections =
+      Expando();
+
+  factory CampaignConfig$reflection([CampaignConfig? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= CampaignConfig$reflection._(object);
+  }
+
+  CampaignConfig$reflection._([CampaignConfig? object])
+    : super(CampaignConfig, r'CampaignConfig', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.7.0');
+
+  @override
+  CampaignConfig$reflection withObject([CampaignConfig? obj]) =>
+      CampaignConfig$reflection(obj)..setupInternalsWith(this);
+
+  static CampaignConfig$reflection? _withoutObjectInstance;
+  @override
+  CampaignConfig$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static CampaignConfig$reflection get staticInstance =>
+      _withoutObjectInstance ??= CampaignConfig$reflection._();
+
+  @override
+  CampaignConfig$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    CampaignConfig$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => true;
+  @override
+  CampaignConfig? createInstanceWithDefaultConstructor() => CampaignConfig();
+
+  @override
+  bool get hasEmptyConstructor => true;
+  @override
+  CampaignConfig? createInstanceWithEmptyConstructor() =>
+      CampaignConfig.empty();
+  @override
+  bool get hasNoRequiredArgsConstructor => true;
+  @override
+  CampaignConfig? createInstanceWithNoRequiredArgsConstructor() =>
+      CampaignConfig.empty();
+
+  static const List<String> _constructorsNames = const <String>['', 'empty'];
+
+  @override
+  List<String> get constructorsNames => _constructorsNames;
+
+  static final Map<String, ConstructorReflection<CampaignConfig>>
+  _constructors = {};
+
+  @override
+  ConstructorReflection<CampaignConfig>? constructor(String constructorName) {
+    var c = _constructors[constructorName];
+    if (c != null) return c;
+    c = _constructorImpl(constructorName);
+    if (c == null) return null;
+    _constructors[constructorName] = c;
+    return c;
+  }
+
+  ConstructorReflection<CampaignConfig>? _constructorImpl(
+    String constructorName,
+  ) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case '':
+        return ConstructorReflection<CampaignConfig>(
+          this,
+          CampaignConfig,
+          '',
+          () => CampaignConfig.new,
+          null,
+          null,
+          const <String, __PR>{
+            'id': __PR(__TR.tInt, 'id', true, false),
+            'open': __PR(__TR.tBool, 'open', false, false, false),
+          },
+          null,
+        );
+      case 'empty':
+        return ConstructorReflection<CampaignConfig>(
+          this,
+          CampaignConfig,
+          'empty',
+          () => CampaignConfig.empty,
+          null,
+          null,
+          null,
+          null,
+        );
+      default:
+        return null;
+    }
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[Entity];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
+
+  @override
+  bool get hasMethodToJson => true;
+
+  @override
+  Object? callMethodToJson([CampaignConfig? obj]) {
+    obj ??= object;
+    return obj?.toJson();
+  }
+
+  static const List<String> _fieldsNames = const <String>[
+    'fieldsNames',
+    'id',
+    'idFieldName',
+    'open',
+  ];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+
+  static final Map<String, FieldReflection<CampaignConfig, dynamic>>
+  _fieldsNoObject = {};
+
+  final Map<String, FieldReflection<CampaignConfig, dynamic>> _fieldsObject =
+      {};
+
+  @override
+  FieldReflection<CampaignConfig, T>? field<T>(
+    String fieldName, [
+    CampaignConfig? obj,
+  ]) {
+    if (obj == null) {
+      if (object != null) {
+        return _fieldObjectImpl<T>(fieldName);
+      } else {
+        return _fieldNoObjectImpl<T>(fieldName);
+      }
+    } else if (identical(obj, object)) {
+      return _fieldObjectImpl<T>(fieldName);
+    }
+    return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
+  }
+
+  FieldReflection<CampaignConfig, T>? _fieldNoObjectImpl<T>(String fieldName) {
+    final f = _fieldsNoObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<CampaignConfig, T>;
+    }
+    final f2 = _fieldImpl(fieldName, null);
+    if (f2 == null) return null;
+    _fieldsNoObject[fieldName] = f2;
+    return f2 as FieldReflection<CampaignConfig, T>;
+  }
+
+  FieldReflection<CampaignConfig, T>? _fieldObjectImpl<T>(String fieldName) {
+    final f = _fieldsObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<CampaignConfig, T>;
+    }
+    var f2 = _fieldNoObjectImpl<T>(fieldName);
+    if (f2 == null) return null;
+    f2 = f2.withObject(object!);
+    _fieldsObject[fieldName] = f2;
+    return f2;
+  }
+
+  FieldReflection<CampaignConfig, dynamic>? _fieldImpl(
+    String fieldName,
+    CampaignConfig? obj,
+  ) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'id':
+        return FieldReflection<CampaignConfig, int?>(
+          this,
+          CampaignConfig,
+          __TR.tInt,
+          'id',
+          true,
+          (o) => () => o!.id,
+          (o) => (v) => o!.id = v,
+          obj,
+          false,
+        );
+      case 'open':
+        return FieldReflection<CampaignConfig, bool>(
+          this,
+          CampaignConfig,
+          __TR.tBool,
+          'open',
+          false,
+          (o) => () => o!.open,
+          (o) => (v) => o!.open = v,
+          obj,
+          false,
+        );
+      case 'idfieldname':
+        return FieldReflection<CampaignConfig, String>(
+          this,
+          CampaignConfig,
+          __TR.tString,
+          'idFieldName',
+          false,
+          (o) => () => o!.idFieldName,
+          null,
+          obj,
+          false,
+          const [override],
+        );
+      case 'fieldsnames':
+        return FieldReflection<CampaignConfig, List<String>>(
+          this,
+          CampaignConfig,
+          __TR.tListString,
+          'fieldsNames',
+          false,
+          (o) => () => o!.fieldsNames,
+          null,
+          obj,
+          false,
+          const [JsonField.hidden(), override],
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(
+    CampaignConfig? obj, {
+    bool withHashCode = false,
+  }) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'open': obj?.open,
+      'idFieldName': obj?.idFieldName,
+      'fieldsNames': obj?.fieldsNames,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getJsonFieldsVisibleValues(
+    CampaignConfig? obj, {
+    bool withHashCode = false,
+  }) {
+    obj ??= object;
+    return <String, dynamic>{
+      'id': obj?.id,
+      'open': obj?.open,
+      'idFieldName': obj?.idFieldName,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  static const List<String> _staticFieldsNames = const <String>[];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  @override
+  StaticFieldReflection<CampaignConfig, T>? staticField<T>(String fieldName) =>
+      null;
+
+  static const List<String> _methodsNames = const <String>[
+    'getField',
+    'getFieldEntityAnnotations',
+    'getFieldType',
+    'getID',
+    'setField',
+    'setID',
+    'toJson',
+    'toJsonEncoded',
+  ];
+
+  @override
+  List<String> get methodsNames => _methodsNames;
+
+  static final Map<String, MethodReflection<CampaignConfig, dynamic>>
+  _methodsNoObject = {};
+
+  final Map<String, MethodReflection<CampaignConfig, dynamic>> _methodsObject =
+      {};
+
+  @override
+  MethodReflection<CampaignConfig, R>? method<R>(
+    String methodName, [
+    CampaignConfig? obj,
+  ]) {
+    if (obj == null) {
+      if (object != null) {
+        return _methodObjectImpl<R>(methodName);
+      } else {
+        return _methodNoObjectImpl<R>(methodName);
+      }
+    } else if (identical(obj, object)) {
+      return _methodObjectImpl<R>(methodName);
+    }
+    return _methodNoObjectImpl<R>(methodName)?.withObject(obj);
+  }
+
+  MethodReflection<CampaignConfig, R>? _methodNoObjectImpl<R>(
+    String methodName,
+  ) {
+    final m = _methodsNoObject[methodName];
+    if (m != null) {
+      return m as MethodReflection<CampaignConfig, R>;
+    }
+    final m2 = _methodImpl(methodName, null);
+    if (m2 == null) return null;
+    _methodsNoObject[methodName] = m2;
+    return m2 as MethodReflection<CampaignConfig, R>;
+  }
+
+  MethodReflection<CampaignConfig, R>? _methodObjectImpl<R>(String methodName) {
+    final m = _methodsObject[methodName];
+    if (m != null) {
+      return m as MethodReflection<CampaignConfig, R>;
+    }
+    var m2 = _methodNoObjectImpl<R>(methodName);
+    if (m2 == null) return null;
+    m2 = m2.withObject(object!);
+    _methodsObject[methodName] = m2;
+    return m2;
+  }
+
+  MethodReflection<CampaignConfig, dynamic>? _methodImpl(
+    String methodName,
+    CampaignConfig? obj,
+  ) {
+    obj ??= object;
+
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'getfield':
+        return MethodReflection<CampaignConfig, dynamic>(
+          this,
+          CampaignConfig,
+          'getField',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getField,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
+      case 'getfieldtype':
+        return MethodReflection<CampaignConfig, TypeInfo<dynamic>?>(
+          this,
+          CampaignConfig,
+          'getFieldType',
+          const __TR<TypeInfo<dynamic>>(TypeInfo, <__TR>[__TR.tDynamic]),
+          true,
+          (o) => o!.getFieldType,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          const [override],
+        );
+      case 'setfield':
+        return MethodReflection<CampaignConfig, void>(
+          this,
+          CampaignConfig,
+          'setField',
+          __TR.tVoid,
+          false,
+          (o) => o!.setField,
+          obj,
+          const <__PR>[
+            __PR(__TR.tString, 'key', false, true),
+            __PR(__TR.tDynamic, 'value', true, true),
+          ],
+          null,
+          null,
+          const [override],
+        );
+      case 'tojson':
+        return MethodReflection<CampaignConfig, Map<String, dynamic>>(
+          this,
+          CampaignConfig,
+          'toJson',
+          __TR.tMapStringDynamic,
+          false,
+          (o) => o!.toJson,
+          obj,
+          null,
+          null,
+          null,
+          const [override],
+        );
+      case 'getid':
+        return MethodReflection<CampaignConfig, dynamic>(
+          this,
+          Entity,
+          'getID',
+          __TR.tDynamic,
+          true,
+          (o) => o!.getID,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
+      case 'setid':
+        return MethodReflection<CampaignConfig, void>(
+          this,
+          Entity,
+          'setID',
+          __TR.tVoid,
+          false,
+          (o) => o!.setID,
+          obj,
+          const <__PR>[__PR(__TR.tDynamic, 'id', false, true)],
+          null,
+          null,
+          null,
+        );
+      case 'getfieldentityannotations':
+        return MethodReflection<CampaignConfig, List<EntityAnnotation>?>(
+          this,
+          Entity,
+          'getFieldEntityAnnotations',
+          const __TR<List<EntityAnnotation>>(List, <__TR>[
+            __TR<EntityAnnotation>(EntityAnnotation),
+          ]),
+          true,
+          (o) => o!.getFieldEntityAnnotations,
+          obj,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          null,
+          null,
+        );
+      case 'tojsonencoded':
+        return MethodReflection<CampaignConfig, String>(
+          this,
+          Entity,
+          'toJsonEncoded',
+          __TR.tString,
+          false,
+          (o) => o!.toJsonEncoded,
+          obj,
+          null,
+          null,
+          null,
+          null,
+        );
+      default:
+        return null;
+    }
+  }
+
+  static const List<String> _staticMethodsNames = const <String>['fromMap'];
+
+  @override
+  List<String> get staticMethodsNames => _staticMethodsNames;
+
+  static final Map<String, StaticMethodReflection<CampaignConfig, dynamic>>
+  _staticMethods = {};
+
+  @override
+  StaticMethodReflection<CampaignConfig, R>? staticMethod<R>(
+    String methodName,
+  ) {
+    var m = _staticMethods[methodName];
+    if (m != null) {
+      return m as StaticMethodReflection<CampaignConfig, R>;
+    }
+    m = _staticMethodImpl(methodName);
+    if (m == null) return null;
+    _staticMethods[methodName] = m;
+    return m as StaticMethodReflection<CampaignConfig, R>;
+  }
+
+  StaticMethodReflection<CampaignConfig, dynamic>? _staticMethodImpl(
+    String methodName,
+  ) {
+    var lc = methodName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'frommap':
+        return StaticMethodReflection<CampaignConfig, FutureOr<CampaignConfig>>(
+          this,
+          CampaignConfig,
+          'fromMap',
+          const __TR<FutureOr<CampaignConfig>>(FutureOr, <__TR>[
+            __TR<CampaignConfig>(CampaignConfig),
+          ]),
+          false,
+          () => CampaignConfig.fromMap,
           const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
           null,
           null,
@@ -2173,6 +2742,20 @@ extension Campaign$reflectionExtension on Campaign {
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
+extension CampaignConfig$reflectionExtension on CampaignConfig {
+  /// Returns a [ClassReflection] for type [CampaignConfig]. (Generated by [ReflectionFactory])
+  ClassReflection<CampaignConfig> get reflection =>
+      CampaignConfig$reflection(this);
+
+  /// Returns a JSON [Map] for type [CampaignConfig]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns a JSON for type [CampaignConfig] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
 extension Item$reflectionExtension on Item {
   /// Returns a [ClassReflection] for type [Item]. (Generated by [ReflectionFactory])
   ClassReflection<Item> get reflection => Item$reflection(this);
@@ -2202,6 +2785,7 @@ extension Order$reflectionExtension on Order {
 List<Reflection> _listSiblingsReflection() => <Reflection>[
   Bonus$reflection(),
   Campaign$reflection(),
+  CampaignConfig$reflection(),
   Item$reflection(),
   Order$reflection(),
 ];

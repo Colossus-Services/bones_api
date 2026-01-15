@@ -31,6 +31,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final EntityHandler<UserInfo> userInfoEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
+  final EntityHandler<CampaignConfig> campaignConfigEntityHandler;
   final EntityHandler<Campaign> campaignEntityHandler;
   final EntityHandler<Bonus> bonusEntityHandler;
   final EntityHandler<Item> itemEntityHandler;
@@ -42,6 +43,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   late final UserInfoAPIRepository userInfoAPIRepository;
   late final UserAPIRepository userAPIRepository;
 
+  late final CampaignConfigAPIRepository campaignConfigAPIRepository;
   late final CampaignAPIRepository campaignAPIRepository;
   late final BonusAPIRepository bonusAPIRepository;
   late final ItemAPIRepository itemAPIRepository;
@@ -53,6 +55,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     this.roleEntityHandler,
     this.userInfoEntityHandler,
     this.userEntityHandler,
+    this.campaignConfigEntityHandler,
     this.campaignEntityHandler,
     this.bonusEntityHandler,
     this.itemEntityHandler,
@@ -91,6 +94,11 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
           ),
           DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler),
           // Order-related tables
+          DBSQLEntityRepository<CampaignConfig>(
+            adapter,
+            'campaign_config',
+            campaignConfigEntityHandler,
+          ),
           DBSQLEntityRepository<Campaign>(
             adapter,
             'campaign',
@@ -110,6 +118,7 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     userInfoAPIRepository = UserInfoAPIRepository(this),
     userAPIRepository = UserAPIRepository(this),
     // Order related repositories
+    campaignConfigAPIRepository = CampaignConfigAPIRepository(this),
     campaignAPIRepository = CampaignAPIRepository(this),
     bonusAPIRepository = BonusAPIRepository(this),
     itemAPIRepository = ItemAPIRepository(this),
@@ -171,6 +180,7 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           Role$reflection().entityHandler,
           UserInfo$reflection().entityHandler,
           User$reflection().entityHandler,
+          CampaignConfig$reflection().entityHandler,
           Campaign$reflection().entityHandler,
           Bonus$reflection().entityHandler,
           Item$reflection().entityHandler,
@@ -185,6 +195,7 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           roleEntityHandler..inspectObject(Role.empty()),
           userInfoEntityHandler..inspectObject(UserInfo.empty()),
           userEntityHandler..inspectObject(User.empty()),
+          campaignConfigEntityHandler..inspectObject(CampaignConfig.empty()),
           campaignEntityHandler..inspectObject(Campaign.empty()),
           bonusEntityHandler..inspectObject(Bonus.empty()),
           itemEntityHandler..inspectObject(Item.empty()),
@@ -2243,6 +2254,70 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test(
+        'Multi-level Query: Order.items.bonus.campaign.config.open == true',
+        () async {
+          {
+            final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+            final campaignConfigRepo =
+                entityRepositoryProvider.campaignConfigAPIRepository;
+            final bonusRepo = entityRepositoryProvider.bonusAPIRepository;
+            final itemRepo = entityRepositoryProvider.itemAPIRepository;
+            final orderRepo = entityRepositoryProvider.orderAPIRepository;
+
+            // Create two campaign configs
+            var cfgOpen = CampaignConfig(open: true);
+            var cfgClosed = CampaignConfig(open: false);
+            var cfgOpenId = await campaignConfigRepo.store(cfgOpen);
+            var cfgClosedId = await campaignConfigRepo.store(cfgClosed);
+            expect(cfgOpenId, isNotNull);
+            expect(cfgClosedId, isNotNull);
+
+            // Create campaigns referencing configs
+            var campaignOpen = Campaign('Promo Open', config: cfgOpenId);
+            var campaignClosed = Campaign('Promo Closed', config: cfgClosedId);
+            var campaignOpenId = await campaignRepo.store(campaignOpen);
+            var campaignClosedId = await campaignRepo.store(campaignClosed);
+            expect(campaignOpenId, isNotNull);
+            expect(campaignClosedId, isNotNull);
+
+            // Create bonuses referencing campaigns
+            var bonusOpen = Bonus(campaign: campaignOpenId);
+            var bonusClosed = Bonus(campaign: campaignClosedId);
+            var bonusOpenId = await bonusRepo.store(bonusOpen);
+            var bonusClosedId = await bonusRepo.store(bonusClosed);
+            expect(bonusOpenId, isNotNull);
+            expect(bonusClosedId, isNotNull);
+
+            // Create items referencing bonuses
+            var itemOpen = Item('WidgetA', bonus: bonusOpenId);
+            var itemClosed = Item('WidgetB', bonus: bonusClosedId);
+            var itemOpenId = await itemRepo.store(itemOpen);
+            var itemClosedId = await itemRepo.store(itemClosed);
+            expect(itemOpenId, isNotNull);
+            expect(itemClosedId, isNotNull);
+
+            // Create orders
+            var orderOpen = Order('ORD-CONFIG-001', items: [itemOpen]);
+            var orderClosed = Order('ORD-CONFIG-002', items: [itemClosed]);
+            var orderOpenId = await orderRepo.store(orderOpen);
+            var orderClosedId = await orderRepo.store(orderClosed);
+            expect(orderOpenId, isNotNull);
+            expect(orderClosedId, isNotNull);
+
+            // Query orders where items.bonus.campaign.config.open == true
+            var results =
+                (await orderRepo.selectByQuery(
+                  ' items.bonus.campaign.config.open == ? ',
+                  parameters: [true],
+                )).toList();
+
+            var numbers = results.map((o) => o.orderNumber).toList();
+            expect(numbers, contains('ORD-CONFIG-001'));
+            expect(numbers, isNot(contains('ORD-CONFIG-002')));
+          }
+        },
+      );
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [

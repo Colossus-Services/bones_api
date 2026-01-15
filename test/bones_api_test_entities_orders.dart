@@ -9,6 +9,13 @@ final campaignEntityHandler = GenericEntityHandler<Campaign>(
   typeName: 'Campaign',
 );
 
+final campaignConfigEntityHandler = GenericEntityHandler<CampaignConfig>(
+  instantiatorDefault: CampaignConfig.empty,
+  instantiatorFromMap: CampaignConfig.fromMap,
+  type: CampaignConfig,
+  typeName: 'CampaignConfig',
+);
+
 final bonusEntityHandler = GenericEntityHandler<Bonus>(
   instantiatorDefault: Bonus.empty,
   instantiatorFromMap: Bonus.fromMap,
@@ -29,6 +36,11 @@ final orderEntityHandler = GenericEntityHandler<Order>(
   type: Order,
   typeName: 'Order',
 );
+
+class CampaignConfigAPIRepository extends APIRepository<CampaignConfig> {
+  CampaignConfigAPIRepository(EntityRepositoryProvider provider)
+    : super(provider: provider);
+}
 
 class CampaignAPIRepository extends APIRepository<Campaign> {
   CampaignAPIRepository(EntityRepositoryProvider provider)
@@ -59,22 +71,85 @@ class OrderAPIRepository extends APIRepository<Order> {
 }
 
 @EnableReflection()
-class Campaign extends Entity {
+class CampaignConfig extends Entity {
   int? id;
-  String name;
+  bool open;
 
-  Campaign(this.name, {this.id});
-  Campaign.empty() : this('');
+  CampaignConfig({this.open = false, this.id});
+  CampaignConfig.empty() : this(open: false);
 
-  static FutureOr<Campaign> fromMap(Map<String, dynamic> map) =>
-      Campaign(map.getAsString('name')!, id: map['id']);
+  static FutureOr<CampaignConfig> fromMap(Map<String, dynamic> map) =>
+      CampaignConfig(open: map['open'] == true, id: map['id']);
 
   @override
   String get idFieldName => 'id';
 
   @JsonField.hidden()
   @override
-  List<String> get fieldsNames => const ['id', 'name'];
+  List<String> get fieldsNames => const ['id', 'open'];
+
+  @override
+  V? getField<V>(String key) {
+    switch (key) {
+      case 'id':
+        return id as V?;
+      case 'open':
+        return open as V?;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  TypeInfo? getFieldType(String key) {
+    switch (key) {
+      case 'id':
+        return TypeInfo.tInt;
+      case 'open':
+        return TypeInfo.tBool;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        id = value as int?;
+        break;
+      case 'open':
+        open = value as bool;
+        break;
+      default:
+        return;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {if (id != null) 'id': id, 'open': open};
+}
+
+@EnableReflection()
+class Campaign extends Entity {
+  int? id;
+  String name;
+  EntityReference<CampaignConfig> config;
+
+  Campaign(this.name, {Object? config, this.id})
+    : config = EntityReference<CampaignConfig>.from(config);
+
+  Campaign.empty() : this('', config: null);
+
+  static FutureOr<Campaign> fromMap(Map<String, dynamic> map) =>
+      Campaign(map.getAsString('name')!, config: map['config'], id: map['id']);
+
+  @override
+  String get idFieldName => 'id';
+
+  @JsonField.hidden()
+  @override
+  List<String> get fieldsNames => const ['id', 'name', 'config'];
 
   @override
   V? getField<V>(String key) {
@@ -83,6 +158,8 @@ class Campaign extends Entity {
         return id as V?;
       case 'name':
         return name as V?;
+      case 'config':
+        return config as V?;
       default:
         return null;
     }
@@ -95,6 +172,11 @@ class Campaign extends Entity {
         return TypeInfo.tInt;
       case 'name':
         return TypeInfo.tString;
+      case 'config':
+        return TypeInfo<EntityReference<CampaignConfig>>.fromType(
+          EntityReference,
+          [TypeInfo<CampaignConfig>.fromType(CampaignConfig)],
+        );
       default:
         return null;
     }
@@ -109,13 +191,20 @@ class Campaign extends Entity {
       case 'name':
         name = value as String;
         break;
+      case 'config':
+        config = EntityReference<CampaignConfig>.from(value);
+        break;
       default:
         return;
     }
   }
 
   @override
-  Map<String, dynamic> toJson() => {if (id != null) 'id': id, 'name': name};
+  Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    'name': name,
+    'config': config.toJson(),
+  };
 }
 
 @EnableReflection()
