@@ -9,6 +9,7 @@ import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
+import 'bones_api_test_entities_orders.dart';
 
 final _log = logging.Logger('bones_api_test_adapter');
 
@@ -30,11 +31,21 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final EntityHandler<UserInfo> userInfoEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
+  final EntityHandler<Campaign> campaignEntityHandler;
+  final EntityHandler<Bonus> bonusEntityHandler;
+  final EntityHandler<Item> itemEntityHandler;
+  final EntityHandler<Order> orderEntityHandler;
+
   late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
   late final RoleAPIRepository roleAPIRepository;
   late final UserInfoAPIRepository userInfoAPIRepository;
   late final UserAPIRepository userAPIRepository;
+
+  late final CampaignAPIRepository campaignAPIRepository;
+  late final BonusAPIRepository bonusAPIRepository;
+  late final ItemAPIRepository itemAPIRepository;
+  late final OrderAPIRepository orderAPIRepository;
 
   TestEntityRepositoryProvider(
     this.storeEntityHandler,
@@ -42,6 +53,10 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     this.roleEntityHandler,
     this.userInfoEntityHandler,
     this.userEntityHandler,
+    this.campaignEntityHandler,
+    this.bonusEntityHandler,
+    this.itemEntityHandler,
+    this.orderEntityHandler,
     this.sqlAdapterCreator,
     this.dbPort,
     this.dbConfig,
@@ -75,6 +90,15 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
             userInfoEntityHandler,
           ),
           DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler),
+          // Order-related tables
+          DBSQLEntityRepository<Campaign>(
+            adapter,
+            'campaign',
+            campaignEntityHandler,
+          ),
+          DBSQLEntityRepository<Bonus>(adapter, 'bonus', bonusEntityHandler),
+          DBSQLEntityRepository<Item>(adapter, 'item', itemEntityHandler),
+          DBSQLEntityRepository<Order>(adapter, 'order', orderEntityHandler),
         ].asUnmodifiableListView();
   }
 
@@ -85,6 +109,11 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     roleAPIRepository = RoleAPIRepository(this),
     userInfoAPIRepository = UserInfoAPIRepository(this),
     userAPIRepository = UserAPIRepository(this),
+    // Order related repositories
+    campaignAPIRepository = CampaignAPIRepository(this),
+    bonusAPIRepository = BonusAPIRepository(this),
+    itemAPIRepository = ItemAPIRepository(this),
+    orderAPIRepository = OrderAPIRepository(this),
   ];
 }
 
@@ -142,6 +171,10 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           Role$reflection().entityHandler,
           UserInfo$reflection().entityHandler,
           User$reflection().entityHandler,
+          Campaign$reflection().entityHandler,
+          Bonus$reflection().entityHandler,
+          Item$reflection().entityHandler,
+          Order$reflection().entityHandler,
           sqlAdapterCreator,
           dbPort,
           dbConfig,
@@ -152,6 +185,10 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           roleEntityHandler..inspectObject(Role.empty()),
           userInfoEntityHandler..inspectObject(UserInfo.empty()),
           userEntityHandler..inspectObject(User.empty()),
+          campaignEntityHandler..inspectObject(Campaign.empty()),
+          bonusEntityHandler..inspectObject(Bonus.empty()),
+          itemEntityHandler..inspectObject(Item.empty()),
+          orderEntityHandler..inspectObject(Order.empty()),
           sqlAdapterCreator,
           dbPort,
           dbConfig,
@@ -2160,6 +2197,49 @@ Future<bool> runAdapterTests(
             () async => await userAPIRepository.store(user3),
             throwsA(isA<RecursiveRelationshipLoopError>()),
           );
+        }
+      });
+
+      test('Multi-level Query: Order.items.bonus.campaign query', () async {
+        //////////
+
+        {
+          final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+          final bonusRepo = entityRepositoryProvider.bonusAPIRepository;
+          final itemRepo = entityRepositoryProvider.itemAPIRepository;
+          final orderRepo = entityRepositoryProvider.orderAPIRepository;
+
+          // Create campaign
+          var campaign = Campaign('Summer Promo');
+          var campaignId = await campaignRepo.store(campaign);
+          expect(campaignId, isNotNull);
+
+          // Create bonus referencing the campaign (by id)
+          var bonus = Bonus(campaign: campaignId);
+          var bonusId = await bonusRepo.store(bonus);
+          expect(bonusId, isNotNull);
+
+          // Create item referencing the bonus (by id)
+          var item = Item('Widget', bonus: bonusId);
+          var itemId = await itemRepo.store(item);
+          expect(itemId, isNotNull);
+
+          // Create order containing the item
+          var order = Order('ORD-CHAIN-001', items: [item]);
+          var orderId = await orderRepo.store(order);
+          expect(orderId, isNotNull);
+
+          // Negative case: order without the referenced campaign
+          var otherOrder = Order('ORD-CHAIN-002', items: []);
+          await orderRepo.store(otherOrder);
+
+          // Query orders by campaign id using multi-level chain
+          var results =
+              (await orderRepo.selectByCampaignId(campaignId)).toList();
+          var numbers = results.map((o) => o.orderNumber).toList();
+
+          expect(numbers, contains('ORD-CHAIN-001'));
+          expect(numbers, isNot(contains('ORD-CHAIN-002')));
         }
       });
 
