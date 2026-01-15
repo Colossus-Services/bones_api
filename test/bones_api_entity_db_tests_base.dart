@@ -2211,7 +2211,7 @@ Future<bool> runAdapterTests(
         }
       });
 
-      test('Multi-level Query: Order.items.bonus.campaign query', () async {
+      test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 
         {
