@@ -9,6 +9,7 @@ import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
+import 'bones_api_test_entities_orders.dart';
 
 final _log = logging.Logger('bones_api_test_adapter');
 
@@ -30,11 +31,23 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final EntityHandler<UserInfo> userInfoEntityHandler;
   final EntityHandler<User> userEntityHandler;
 
+  final EntityHandler<CampaignConfig> campaignConfigEntityHandler;
+  final EntityHandler<Campaign> campaignEntityHandler;
+  final EntityHandler<Bonus> bonusEntityHandler;
+  final EntityHandler<Item> itemEntityHandler;
+  final EntityHandler<Order> orderEntityHandler;
+
   late final StoreAPIRepository storeAPIRepository;
   late final AddressAPIRepository addressAPIRepository;
   late final RoleAPIRepository roleAPIRepository;
   late final UserInfoAPIRepository userInfoAPIRepository;
   late final UserAPIRepository userAPIRepository;
+
+  late final CampaignConfigAPIRepository campaignConfigAPIRepository;
+  late final CampaignAPIRepository campaignAPIRepository;
+  late final BonusAPIRepository bonusAPIRepository;
+  late final ItemAPIRepository itemAPIRepository;
+  late final OrderAPIRepository orderAPIRepository;
 
   TestEntityRepositoryProvider(
     this.storeEntityHandler,
@@ -42,6 +55,11 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     this.roleEntityHandler,
     this.userInfoEntityHandler,
     this.userEntityHandler,
+    this.campaignConfigEntityHandler,
+    this.campaignEntityHandler,
+    this.bonusEntityHandler,
+    this.itemEntityHandler,
+    this.orderEntityHandler,
     this.sqlAdapterCreator,
     this.dbPort,
     this.dbConfig,
@@ -75,6 +93,20 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
             userInfoEntityHandler,
           ),
           DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler),
+          // Order-related tables
+          DBSQLEntityRepository<CampaignConfig>(
+            adapter,
+            'campaign_config',
+            campaignConfigEntityHandler,
+          ),
+          DBSQLEntityRepository<Campaign>(
+            adapter,
+            'campaign',
+            campaignEntityHandler,
+          ),
+          DBSQLEntityRepository<Bonus>(adapter, 'bonus', bonusEntityHandler),
+          DBSQLEntityRepository<Item>(adapter, 'item', itemEntityHandler),
+          DBSQLEntityRepository<Order>(adapter, 'order', orderEntityHandler),
         ].asUnmodifiableListView();
   }
 
@@ -85,6 +117,12 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
     roleAPIRepository = RoleAPIRepository(this),
     userInfoAPIRepository = UserInfoAPIRepository(this),
     userAPIRepository = UserAPIRepository(this),
+    // Order related repositories
+    campaignConfigAPIRepository = CampaignConfigAPIRepository(this),
+    campaignAPIRepository = CampaignAPIRepository(this),
+    bonusAPIRepository = BonusAPIRepository(this),
+    itemAPIRepository = ItemAPIRepository(this),
+    orderAPIRepository = OrderAPIRepository(this),
   ];
 }
 
@@ -142,6 +180,11 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           Role$reflection().entityHandler,
           UserInfo$reflection().entityHandler,
           User$reflection().entityHandler,
+          CampaignConfig$reflection().entityHandler,
+          Campaign$reflection().entityHandler,
+          Bonus$reflection().entityHandler,
+          Item$reflection().entityHandler,
+          Order$reflection().entityHandler,
           sqlAdapterCreator,
           dbPort,
           dbConfig,
@@ -152,6 +195,11 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
           roleEntityHandler..inspectObject(Role.empty()),
           userInfoEntityHandler..inspectObject(UserInfo.empty()),
           userEntityHandler..inspectObject(User.empty()),
+          campaignConfigEntityHandler..inspectObject(CampaignConfig.empty()),
+          campaignEntityHandler..inspectObject(Campaign.empty()),
+          bonusEntityHandler..inspectObject(Bonus.empty()),
+          itemEntityHandler..inspectObject(Item.empty()),
+          orderEntityHandler..inspectObject(Order.empty()),
           sqlAdapterCreator,
           dbPort,
           dbConfig,
@@ -2163,6 +2211,113 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
+        //////////
+
+        {
+          final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+          final bonusRepo = entityRepositoryProvider.bonusAPIRepository;
+          final itemRepo = entityRepositoryProvider.itemAPIRepository;
+          final orderRepo = entityRepositoryProvider.orderAPIRepository;
+
+          // Create campaign
+          var campaign = Campaign('Summer Promo');
+          var campaignId = await campaignRepo.store(campaign);
+          expect(campaignId, isNotNull);
+
+          // Create bonus referencing the campaign (by id)
+          var bonus = Bonus(campaign: campaignId);
+          var bonusId = await bonusRepo.store(bonus);
+          expect(bonusId, isNotNull);
+
+          // Create item referencing the bonus (by id)
+          var item = Item('Widget', bonus: bonusId);
+          var itemId = await itemRepo.store(item);
+          expect(itemId, isNotNull);
+
+          // Create order containing the item
+          var order = Order('ORD-CHAIN-001', items: [item]);
+          var orderId = await orderRepo.store(order);
+          expect(orderId, isNotNull);
+
+          // Negative case: order without the referenced campaign
+          var otherOrder = Order('ORD-CHAIN-002', items: []);
+          await orderRepo.store(otherOrder);
+
+          // Query orders by campaign id using multi-level chain
+          var results =
+              (await orderRepo.selectByCampaignId(campaignId)).toList();
+          var numbers = results.map((o) => o.orderNumber).toList();
+
+          expect(numbers, contains('ORD-CHAIN-001'));
+          expect(numbers, isNot(contains('ORD-CHAIN-002')));
+        }
+      });
+
+      test(
+        'Multi-level Query: Order.items.bonus.campaign.config.open == true',
+        () async {
+          {
+            final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+            final campaignConfigRepo =
+                entityRepositoryProvider.campaignConfigAPIRepository;
+            final bonusRepo = entityRepositoryProvider.bonusAPIRepository;
+            final itemRepo = entityRepositoryProvider.itemAPIRepository;
+            final orderRepo = entityRepositoryProvider.orderAPIRepository;
+
+            // Create two campaign configs
+            var cfgOpen = CampaignConfig(open: true);
+            var cfgClosed = CampaignConfig(open: false);
+            var cfgOpenId = await campaignConfigRepo.store(cfgOpen);
+            var cfgClosedId = await campaignConfigRepo.store(cfgClosed);
+            expect(cfgOpenId, isNotNull);
+            expect(cfgClosedId, isNotNull);
+
+            // Create campaigns referencing configs
+            var campaignOpen = Campaign('Promo Open', config: cfgOpenId);
+            var campaignClosed = Campaign('Promo Closed', config: cfgClosedId);
+            var campaignOpenId = await campaignRepo.store(campaignOpen);
+            var campaignClosedId = await campaignRepo.store(campaignClosed);
+            expect(campaignOpenId, isNotNull);
+            expect(campaignClosedId, isNotNull);
+
+            // Create bonuses referencing campaigns
+            var bonusOpen = Bonus(campaign: campaignOpenId);
+            var bonusClosed = Bonus(campaign: campaignClosedId);
+            var bonusOpenId = await bonusRepo.store(bonusOpen);
+            var bonusClosedId = await bonusRepo.store(bonusClosed);
+            expect(bonusOpenId, isNotNull);
+            expect(bonusClosedId, isNotNull);
+
+            // Create items referencing bonuses
+            var itemOpen = Item('WidgetA', bonus: bonusOpenId);
+            var itemClosed = Item('WidgetB', bonus: bonusClosedId);
+            var itemOpenId = await itemRepo.store(itemOpen);
+            var itemClosedId = await itemRepo.store(itemClosed);
+            expect(itemOpenId, isNotNull);
+            expect(itemClosedId, isNotNull);
+
+            // Create orders
+            var orderOpen = Order('ORD-CONFIG-001', items: [itemOpen]);
+            var orderClosed = Order('ORD-CONFIG-002', items: [itemClosed]);
+            var orderOpenId = await orderRepo.store(orderOpen);
+            var orderClosedId = await orderRepo.store(orderClosed);
+            expect(orderOpenId, isNotNull);
+            expect(orderClosedId, isNotNull);
+
+            // Query orders where items.bonus.campaign.config.open == true
+            var results =
+                (await orderRepo.selectByQuery(
+                  ' items.bonus.campaign.config.open == ? ',
+                  parameters: [true],
+                )).toList();
+
+            var numbers = results.map((o) => o.orderNumber).toList();
+            expect(numbers, contains('ORD-CONFIG-001'));
+            expect(numbers, isNot(contains('ORD-CONFIG-002')));
+          }
+        },
+      );
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [
