@@ -612,7 +612,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, TypeInfo>? _fieldsWithEntityReference;
 
   Map<String, TypeInfo> fieldsWithEntityReference([O? o]) =>
-      _fieldsWithEntityReference ??= Map.unmodifiable(
+      _fieldsWithEntityReference ??= Map<String, TypeInfo>.unmodifiable(
         fieldsWithTypeEntityOrReference(o).entries
             .where((e) => e.value.isEntityReferenceType)
             .toMapFromEntries(),
@@ -649,7 +649,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, TypeInfo>? _fieldsWithEntityReferenceList;
 
   Map<String, TypeInfo> fieldsWithEntityReferenceList([O? o]) =>
-      _fieldsWithEntityReferenceList ??= Map.unmodifiable(
+      _fieldsWithEntityReferenceList ??= Map<String, TypeInfo>.unmodifiable(
         fieldsWithTypeListEntityOrReference(o).entries
             .where((e) => e.value.isEntityReferenceListType)
             .toMapFromEntries(),
@@ -658,17 +658,18 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotations;
 
   Map<String, List<EntityAnnotation>> fieldsEntityAnnotations() =>
-      _fieldsEntityAnnotations ??= Map.unmodifiable(
-        (getAllFieldsEntityAnnotations() ?? {})
-            .map<String, List<EntityAnnotation>>(
-              (k, v) => MapEntry(k, List<EntityAnnotation>.unmodifiable(v)),
-            ),
-      );
+      _fieldsEntityAnnotations ??=
+          Map<String, List<EntityAnnotation>>.unmodifiable(
+            (getAllFieldsEntityAnnotations() ?? {})
+                .map<String, List<EntityAnnotation>>(
+                  (k, v) => MapEntry(k, List<EntityAnnotation>.unmodifiable(v)),
+                ),
+          );
 
   Map<String, TypeInfo> fieldsWithType(
     bool Function(String fieldName, TypeInfo fieldType) typeFilter, [
     O? o,
-  ]) => Map.unmodifiable(
+  ]) => Map<String, TypeInfo>.unmodifiable(
     fieldsTypes(
       o,
     ).entries.where((e) => typeFilter(e.key, e.value)).toMapFromEntries(),
@@ -1561,7 +1562,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, TypeInfo>? _fieldsTypes;
 
   Map<String, TypeInfo> getFieldsTypes([O? o]) {
-    return _fieldsTypes ??= Map.unmodifiable(
+    return _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
       Map<String, TypeInfo>.fromEntries(
         fieldsNames(o).map(
           (key) => MapEntry<String, TypeInfo>(
@@ -1590,7 +1591,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             )
             .toMapFromEntries();
 
-    return _fieldsEnumTypes = Map.unmodifiable(mapEnumFields);
+    return _fieldsEnumTypes = Map<String, TypeInfo>.unmodifiable(mapEnumFields);
   }
 
   Map<String, TypeInfo>? _fieldsEntityTypes;
@@ -1619,7 +1620,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
             .nonNulls
             .toMapFromEntries();
 
-    return _fieldsEntityTypes = Map.unmodifiable(mapEntityFields);
+    return _fieldsEntityTypes = Map<String, TypeInfo>.unmodifiable(
+      mapEntityFields,
+    );
   }
 
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
@@ -3166,14 +3169,17 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   Map<String, Map<String, TypeInfo>>? constructors([O? o]) {
-    return _constructors ??= Map.unmodifiable(
+    return _constructors ??= Map<String, Map<String, TypeInfo>>.unmodifiable(
       reflectionWithObject(o).allConstructors().map((c) {
         var name = c.name;
         var args =
             c.allParameters
-                .map((p) => MapEntry(p.jsonName, p.type.typeInfo))
+                .map(
+                  (p) =>
+                      MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo),
+                )
                 .toMapFromEntries();
-        return MapEntry(name, Map.unmodifiable(args));
+        return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
       }).toMapFromEntries(),
     );
   }

@@ -1,3 +1,13 @@
+## 1.9.21
+
+- `EntityHandler`:
+  - Updated all `Map.unmodifiable` usages to explicitly specify type arguments, e.g. `Map<String, TypeInfo>.unmodifiable`.
+  - Updated methods including `fieldsWithEntityReference`, `fieldsWithEntityReferenceList`, `fieldsEntityAnnotations`, `fieldsWithType`, `getFieldsTypes`, `getFieldsEnumTypes`, `getFieldsEntityTypes`, and `constructors` to use typed unmodifiable maps.
+  - Improved type safety in map constructions by adding explicit generic parameters.
+
+- Dependency updates:
+  - `meta`: ^1.18.0
+
 ## 1.9.20
 
 - `ConditionSQLEncoder`:
