@@ -85,6 +85,8 @@ extension LoggerExntesion on logging.Logger {
     Duration? delay = const Duration(milliseconds: 20),
   }) => handler.flushMessages(delay: delay);
 
+  bool forceFlushMessages() => handler.forceFlushMessages();
+
   static final Set<logging.Logger> _dbLoggers = {};
 
   List<logging.Logger> get dbLoggers => _dbLoggers.toList();
@@ -368,6 +370,9 @@ abstract class LoggerHandler {
   FutureOr<bool> flushMessages({
     Duration? delay = const Duration(milliseconds: 20),
   });
+
+  /// Forces immediate flushing of messages.
+  bool forceFlushMessages();
 
   void logAll() {
     logging.hierarchicalLoggingEnabled = true;

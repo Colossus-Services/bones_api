@@ -90,6 +90,12 @@ class LoggerHandlerIO extends LoggerHandler {
   }
 
   @override
+  bool forceFlushMessages() {
+    if (_printMessageQueue.isEmpty) return false;
+    return _flushPrintMessageQueue();
+  }
+
+  @override
   void printMessage(logging.Level level, String message) {
     if (!LoggerHandler.useLogQueue) {
       if (_printMessageQueueLevel != null) {

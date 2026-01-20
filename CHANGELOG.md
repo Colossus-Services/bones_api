@@ -1,3 +1,26 @@
+## 1.9.22
+
+- `Initializable` mixin:
+  - Added calls to `_forceLogFlushMessages()` before throwing `InitializationError` in:
+    - `_checkDependency`
+    - `_setInitializedDependenciesCompleters`
+    - `_onInitializationError`
+    - `_checkAllDependenciesOk`
+    - `_finalizeInitialization`
+    - `checkInitialized`
+    - `executeInitialized`
+
+- Logging:
+  - Added `_forceLogFlushMessages()` function to call `logging.Logger.root.forceFlushMessages()`.
+  - `Logger` extension:
+    - Added `forceFlushMessages()` method to invoke `LoggerHandler.forceFlushMessages()`.
+  - `LoggerHandler` abstract class:
+    - Added `forceFlushMessages()` method.
+  - `LoggerHandlerGeneric` implementation:
+    - Implemented `forceFlushMessages()` returning `false`.
+  - `LoggerHandlerIO` implementation:
+    - Implemented `forceFlushMessages()` to flush the print message queue immediately if not empty.
+
 ## 1.9.21
 
 - `EntityHandler`:

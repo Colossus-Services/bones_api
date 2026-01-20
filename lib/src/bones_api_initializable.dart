@@ -2,6 +2,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:statistics/statistics.dart';
 
+import 'bones_api_logging.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('Initializable');
@@ -329,6 +330,7 @@ class _InitializationChain {
   void _checkDependency(Initializable dependency) {
     var dependencies = _dependencies;
     if (dependencies == null || !dependencies.containsIdentical(dependency)) {
+      _forceLogFlushMessages();
       throw InitializationError(
         initializable,
         "Dependency not in chain: $dependency\nInitializable: $initializable",
@@ -412,6 +414,7 @@ class _InitializationChain {
 
     var prev = initializedDependenciesCompleters[dependency];
     if (prev != null && !identical(prev, completer)) {
+      _forceLogFlushMessages();
       throw InitializationError(
         initializable,
         "Dependency completer already set!\nInitializable: $initializable",
@@ -731,13 +734,16 @@ mixin Initializable {
     }
   }
 
-  InitializationResult _onInitializationError(e, s) =>
-      InitializationResult.error(this, e, s);
+  InitializationResult _onInitializationError(e, s) {
+    _forceLogFlushMessages();
+    return InitializationResult.error(this, e, s);
+  }
 
   void _checkAllDependenciesOk(List<InitializationResult> depsInit) {
     var depsWithError = depsInit.where((res) => !res.ok).toList();
     if (depsWithError.isNotEmpty) {
       var errors = depsWithError.allToString();
+      _forceLogFlushMessages();
       throw InitializationError(
         this,
         "Error initializing dependencies: $this\n$errors",
@@ -904,6 +910,7 @@ mixin Initializable {
       _log.info(
         '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR',
       );
+      _forceLogFlushMessages();
       throw InitializationError(this, "Error initializing (async): $this");
     }
 
@@ -1079,6 +1086,7 @@ mixin Initializable {
       // ignore: discarded_futures
       var ret = _doInitializationImpl();
       if (ret is Future<InitializationResult>) {
+        _forceLogFlushMessages();
         throw InitializationError(
           this,
           "Not initialized yet! Async initialization for: $this",
@@ -1101,12 +1109,14 @@ mixin Initializable {
     if (ret is Future<InitializationResult>) {
       return ret.then((result) {
         if (!result.ok) {
+          _forceLogFlushMessages();
           throw InitializationError(this, "Error initializing (async): $this");
         }
         return callback();
       });
     } else {
       if (!ret.ok) {
+        _forceLogFlushMessages();
         throw InitializationError(this, "Error initializing: $this");
       }
 
@@ -1281,4 +1291,8 @@ extension _FutureExtension<T> on Future<T> {
     });
     return completer;
   }
+}
+
+void _forceLogFlushMessages() {
+  logging.Logger.root.forceFlushMessages();
 }
