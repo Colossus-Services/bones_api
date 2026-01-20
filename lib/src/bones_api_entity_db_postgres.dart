@@ -770,11 +770,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       case 'int2':
       case 'int4':
       case 'int8':
+      case 'smallint':
       case 'bigint':
       case 'serial':
       case 'serial2':
       case 'serial4':
       case 'serial8':
+      case 'smallserial':
       case 'bigserial':
         return int;
       case 'decimal':

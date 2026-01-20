@@ -1,3 +1,8 @@
+## 1.9.23
+
+- `DBPostgreSQLAdapter`:
+  - `mapDataTypeToDartType`: added support for PostgreSQL types `smallint` and `smallserial` mapping to `int`.
+
 ## 1.9.22
 
 - `Initializable` mixin:
