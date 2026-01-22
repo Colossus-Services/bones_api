@@ -108,6 +108,20 @@ class GZipSink extends ByteConversionSinkBuffered {
   }
 
   @override
+  void addSlice(List<int> chunk, int start, int end, bool isLast) {
+    final chunkLength = chunk.length;
+    if (start != 0 || end != chunkLength) {
+      var length = end - start;
+      _inputLength += length;
+      _gzipSink.addSlice(chunk, start, end, isLast);
+    } else {
+      _inputLength += chunkLength;
+      _gzipSink.add(chunk);
+      if (isLast) _gzipSink.close();
+    }
+  }
+
+  @override
   void close() => _gzipSink.close();
 
   @override
@@ -135,10 +149,8 @@ class BytesSink extends BytesBuffer implements ByteConversionSinkBuffered {
 
   @override
   void addSlice(List<int> chunk, int start, int end, bool isLast) {
-    if (start != 0 || end != chunk.length) {
-      chunk = chunk.sublist(start, end);
-    }
-    add(chunk);
+    var length = end - start;
+    addPart(chunk, start, length);
     if (isLast) close();
   }
 }
@@ -146,7 +158,9 @@ class BytesSink extends BytesBuffer implements ByteConversionSinkBuffered {
 /// Base class for sinks with tracking and reset support.
 abstract class ByteConversionSinkBuffered extends ByteConversionSink {
   int get length;
+
   int get capacity;
+
   int get inputLength;
 
   Uint8List toBytes({bool copy = false});
@@ -175,13 +189,16 @@ class BytesBuffer {
 
   /// Adds [bytes] to buffer, resizing if needed.
   void add(List<int> bytes) {
-    final chunkLength = bytes.length;
-    final requiredLength = _length + chunkLength;
+    addPart(bytes, 0, bytes.length);
+  }
+
+  void addPart(List<int> bytes, int offset, int length) {
+    final requiredLength = _length + length;
     if (requiredLength > _buffer.length) {
       _increaseCapacity(requiredLength);
     }
-    _buffer.setRange(_length, _length + chunkLength, bytes);
-    _length += chunkLength;
+    _buffer.setRange(_length, _length + length, bytes, offset);
+    _length += length;
   }
 
   void _increaseCapacity(int requiredLength) {
