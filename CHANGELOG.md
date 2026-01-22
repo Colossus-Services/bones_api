@@ -1,3 +1,17 @@
+## 1.9.24
+
+- `GZipSink`:
+  - Added override for `addSlice` to handle partial chunk addition and update `_inputLength` accordingly.
+  - Optimized `addSlice` to call `_gzipSink.close()` when `isLast` is true and full chunk is added.
+
+- `BytesSink`:
+  - Updated `addSlice` to use new `addPart` method for partial chunk addition.
+
+- `BytesBuffer`:
+  - Added `addPart` method to add a slice of bytes from a given offset and length, resizing buffer if needed.
+  - Refactored `add` method to delegate to `addPart`.
+  - Improved buffer range setting to support offset and length parameters in `addPart`.
+
 ## 1.9.23
 
 - `DBPostgreSQLAdapter`:
