@@ -12,6 +12,8 @@
   - Refactored `add` method to delegate to `addPart`.
   - Improved buffer range setting to support offset and length parameters in `addPart`.
 
+- async_extension: ^1.2.18 -> ^1.2.19
+
 ## 1.9.23
 
 - `DBPostgreSQLAdapter`:
