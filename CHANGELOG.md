@@ -16,6 +16,10 @@
 
 - `SQLDialect`:
   - Added `foreignKeyCreatesImplicitIndex` boolean flag with default `true`.
+  - Added field `createIndexIfNotExists` to indicate support for `IF NOT EXISTS` in `CREATE INDEX` (default `true`).
+
+- `CreateIndexSQL`:
+  - Updated `buildSQL` method to conditionally include `IF NOT EXISTS` only if dialect supports it.
 
 - `DBPostgreSQLAdapter`:
   - Added `foreignKeyCreatesImplicitIndex` flag to PostgreSQL dialect set to `false`.

@@ -108,6 +108,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              elementQuote: '`',
              acceptsTemporaryTableForReturning: true,
              acceptsInsertIgnore: true,
+             createIndexIfNotExists: false,
            ),
            transactions: true,
            transactionAbort: true,

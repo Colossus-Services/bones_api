@@ -108,6 +108,9 @@ class SQLDialect extends DBDialect {
   /// If `true`, foreign keys implicitly create an index on the referencing columns.
   final bool foreignKeyCreatesImplicitIndex;
 
+  /// Whether the SQL dialect supports `IF NOT EXISTS` on `CREATE INDEX`.
+  final bool createIndexIfNotExists;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -119,6 +122,7 @@ class SQLDialect extends DBDialect {
     this.acceptsInsertOnConflict = false,
     this.acceptsVarcharWithoutMaximumSize = false,
     this.foreignKeyCreatesImplicitIndex = true,
+    this.createIndexIfNotExists = true,
   });
 
   @override
@@ -142,7 +146,8 @@ class SQLDialect extends DBDialect {
         'acceptsInsertDefaultValues: $acceptsInsertDefaultValues, '
         'acceptsInsertIgnore: $acceptsInsertIgnore, '
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
-        'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex'
+        'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
+        'createIndexIfNotExists: $createIndexIfNotExists'
         '}';
   }
 }
@@ -222,7 +227,7 @@ class CreateIndexSQL extends SQLBuilder {
 
     sql.write('CREATE INDEX ');
 
-    if (ifNotExists) {
+    if (ifNotExists && dialect.createIndexIfNotExists) {
       sql.write('IF NOT EXISTS ');
     }
 
