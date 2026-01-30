@@ -25,6 +25,7 @@
 
 - `DBSQLAdapter`:
   - `parseConfigDBGenerateTablesAndCheckTables`: changed return type from `List<bool>` to a record with named fields `(generateTables, checkTables)`.
+  - `extractTableSQLs`: updated regex to also match `CREATE INDEX` statements in addition to `CREATE` and `ALTER TABLE`.
   - Added detection of missing foreign key indexes when dialect does not create implicit indexes.
   - Added detection of missing relationship reference indexes for collection reference fields.
   - Updated error reporting and logging to include missing reference indexes and relationship reference indexes.

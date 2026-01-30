@@ -1342,7 +1342,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   static List<String> extractTableSQLs(String sqls) => extractSQLs(
     sqls,
-    RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true),
+    RegExp(
+      r'(?:(?:CREATE|ALTER)\s+TABLE|CREATE\s+INDEX)',
+      caseSensitive: false,
+      dotAll: true,
+    ),
   );
 
   static List<String> extractSQLs(String sqls, RegExp commandPrefixPattern) {
