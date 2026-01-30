@@ -456,9 +456,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return null;
   }
 
-  static List<bool> parseConfigDBGenerateTablesAndCheckTables(
-    Map<String, dynamic>? config,
-  ) {
+  static ({bool generateTables, bool checkTables})
+  parseConfigDBGenerateTablesAndCheckTables(Map<String, dynamic>? config) {
     bool? checkTables;
     bool? generateTables;
 
@@ -496,7 +495,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     generateTables ??= false;
     checkTables ??= true;
 
-    return [generateTables, checkTables];
+    return (generateTables: generateTables, checkTables: checkTables);
   }
 
   /// The [DBSQLAdapter] capability.
