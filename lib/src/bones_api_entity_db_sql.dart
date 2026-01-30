@@ -1399,6 +1399,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return _populateTablesFromSQLsImpl(list);
   }
 
+  static final RegExp _regExpCreateIndex = RegExp(
+    r'CREATE\s+INDEX',
+    caseSensitive: false,
+  );
+
   Future<List<String>> _populateTablesFromSQLsImpl(List<String> list) async {
     var tables = <String>[];
 
@@ -1407,6 +1412,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var ok = await executeTableSQL(sql);
       if (!ok) {
+        if (!dialect.createIndexIfNotExists) {
+          if (_regExpCreateIndex.hasMatch(sql)) {
+            _log.warning(
+              "Ignoring CREATE INDEX error: the SQL dialect does NOT support `IF NOT EXISTS`. SQL> $sql",
+            );
+            continue;
+          }
+        }
         throw StateError("Error creating table SQL: $sql");
       }
 
