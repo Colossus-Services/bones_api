@@ -27,6 +27,9 @@
   - Populated `indexName` in `TableFieldReference` instances from query result.
   - Updated relationship references to include `sourceRelationshipFieldIndex` and `targetRelationshipFieldIndex` from `indexName`.
 
+- `DBMySQLAdapter`:
+  - Set `createIndexIfNotExists` to `false` in MySQL dialect capabilities.
+
 - `DBSQLAdapter`:
   - `parseConfigDBGenerateTablesAndCheckTables`: changed return type from `List<bool>` to a record with named fields `(generateTables, checkTables)`.
   - `extractTableSQLs`: updated regex to also match `CREATE INDEX` statements in addition to `CREATE` and `ALTER TABLE`.
