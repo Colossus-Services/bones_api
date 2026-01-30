@@ -343,6 +343,8 @@ Future<bool> runAdapterTests(
         var sqlAdapter = await entityRepositoryProvider.adapter;
         expect(sqlAdapter, isNotNull);
 
+        var dialect = sqlAdapter.dialect;
+
         expect(sqlAdapter.isInitialized, isTrue);
         expect(sqlAdapter.generatedTables, generateTables);
         expect(sqlAdapter.checkedTables, checkTables);
@@ -394,8 +396,12 @@ Future<bool> runAdapterTests(
         );
 
         var indexAddressRegexp = RegExp(
-          'CREATE INDEX IF NOT EXISTS ${q}address__state__idx$q ON '
-          '${q}address$q \\(${q}state$q\\)',
+          [
+            'CREATE INDEX',
+            if (dialect.createIndexIfNotExists) 'IF NOT EXISTS',
+            '${q}address__state__idx$q ON',
+            '${q}address$q \\(${q}state$q\\)',
+          ].join(' '),
         );
 
         expect(

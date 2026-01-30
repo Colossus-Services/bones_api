@@ -105,6 +105,12 @@ class SQLDialect extends DBDialect {
   /// If `true` indicates that the `VARCHAR` can be defined without a maximum size.
   final bool acceptsVarcharWithoutMaximumSize;
 
+  /// If `true`, foreign keys implicitly create an index on the referencing columns.
+  final bool foreignKeyCreatesImplicitIndex;
+
+  /// Whether the SQL dialect supports `IF NOT EXISTS` on `CREATE INDEX`.
+  final bool createIndexIfNotExists;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -115,6 +121,8 @@ class SQLDialect extends DBDialect {
     this.acceptsInsertIgnore = false,
     this.acceptsInsertOnConflict = false,
     this.acceptsVarcharWithoutMaximumSize = false,
+    this.foreignKeyCreatesImplicitIndex = true,
+    this.createIndexIfNotExists = true,
   });
 
   @override
@@ -129,7 +137,18 @@ class SQLDialect extends DBDialect {
 
   @override
   String toString() {
-    return 'SQLDialect{name: $name, elementQuote: $elementQuote, acceptsOutputSyntax: $acceptsOutputSyntax, acceptsReturningSyntax: $acceptsReturningSyntax, acceptsTemporaryTableForReturning: $acceptsTemporaryTableForReturning, acceptsInsertDefaultValues: $acceptsInsertDefaultValues, acceptsInsertIgnore: $acceptsInsertIgnore, acceptsInsertOnConflict: $acceptsInsertOnConflict}';
+    return 'SQLDialect{'
+        'name: $name,'
+        'elementQuote: $elementQuote, '
+        'acceptsOutputSyntax: $acceptsOutputSyntax, '
+        'acceptsReturningSyntax: $acceptsReturningSyntax, '
+        'acceptsTemporaryTableForReturning: $acceptsTemporaryTableForReturning, '
+        'acceptsInsertDefaultValues: $acceptsInsertDefaultValues, '
+        'acceptsInsertIgnore: $acceptsInsertIgnore, '
+        'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
+        'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
+        'createIndexIfNotExists: $createIndexIfNotExists'
+        '}';
   }
 }
 
@@ -208,7 +227,7 @@ class CreateIndexSQL extends SQLBuilder {
 
     sql.write('CREATE INDEX ');
 
-    if (ifNotExists) {
+    if (ifNotExists && dialect.createIndexIfNotExists) {
       sql.write('IF NOT EXISTS ');
     }
 
@@ -1610,6 +1629,15 @@ abstract mixin class SQLGenerator {
       );
 
       constraints.add(AlterTableSQL(dialect, table, [constraintEntry]));
+
+      if (!dialect.foreignKeyCreatesImplicitIndex) {
+        var indexName = '${table}__${columnName}__idx';
+
+        indexes ??= [];
+        indexes.add(
+          CreateIndexSQL(dialect, table, columnName, indexName, q: q),
+        );
+      }
     }
 
     var alterTableSQL = AlterTableSQL(
@@ -1920,6 +1948,13 @@ abstract mixin class SQLGenerator {
           ],
         ),
       );
+
+      if (!dialect.foreignKeyCreatesImplicitIndex) {
+        var indexName = '${table}__${columnName}__idx';
+        indexSQLs.add(
+          CreateIndexSQL(dialect, table, columnName, indexName, q: q),
+        );
+      }
     }
 
     sqlEntries.sort((a, b) {
@@ -2049,12 +2084,25 @@ abstract mixin class SQLGenerator {
         ),
       ];
 
+      var relIndexes = <CreateIndexSQL>[];
+
+      if (!dialect.foreignKeyCreatesImplicitIndex) {
+        var indexName1 = '${relName}__${srcFieldName}__idx';
+        var indexName2 = '${relName}__${dstFieldName}__idx';
+
+        relIndexes.addAll([
+          CreateIndexSQL(dialect, relName, srcFieldName, indexName1, q: q),
+          CreateIndexSQL(dialect, relName, dstFieldName, indexName2, q: q),
+        ]);
+      }
+
       var relSQL = CreateTableSQL(
         dialect,
         relName,
         sqlRelEntries,
         q: q,
         parentTable: table,
+        indexes: relIndexes,
       );
       relationshipSQLs.add(relSQL);
     }

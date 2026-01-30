@@ -456,9 +456,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return null;
   }
 
-  static List<bool> parseConfigDBGenerateTablesAndCheckTables(
-    Map<String, dynamic>? config,
-  ) {
+  static ({bool generateTables, bool checkTables})
+  parseConfigDBGenerateTablesAndCheckTables(Map<String, dynamic>? config) {
     bool? checkTables;
     bool? generateTables;
 
@@ -496,7 +495,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     generateTables ??= false;
     checkTables ??= true;
 
-    return [generateTables, checkTables];
+    return (generateTables: generateTables, checkTables: checkTables);
   }
 
   /// The [DBSQLAdapter] capability.
@@ -644,6 +643,29 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               )
               .toList();
 
+      var missingReferenceIndexesSQLs =
+          repositoriesChecksErrors
+              .where((e) => e.missingReferenceIndexes?.isNotEmpty ?? false)
+              .expand((e) => e.generateMissingReferenceIndexesSQLs(this))
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
+
+      var missingRelationshipReferenceIndexesSQLs =
+          repositoriesChecksErrors
+              .where(
+                (e) =>
+                    e.missingRelationshipReferenceIndexes?.isNotEmpty ?? false,
+              )
+              .expand(
+                (e) => e.generateMissingRelationshipReferenceIndexesSQLs(this),
+              )
+              .expand(
+                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
+              )
+              .toList();
+
       var missingUniqueConstraintsSQLs =
           repositoriesChecksErrors
               .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
@@ -677,6 +699,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ...missingReferenceColumnsSQLs,
         '',
         ...missingReferenceConstraintsSQLs,
+        '',
+        ...missingReferenceIndexesSQLs,
+        '',
+        ...missingRelationshipReferenceIndexesSQLs,
         '',
         ...missingUniqueConstraintsSQLs,
         '',
@@ -849,6 +875,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .toList();
 
     var missingFieldReferenceConstraints = <String>{};
+    var missingFieldReferenceIndexes = <String>{};
+    var missingRelationshipFieldReferenceIndexes =
+        <(String, String, TypeInfo)>{};
 
     var missingUniqueConstraints = <String>{};
 
@@ -903,6 +932,67 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             fieldEntityTypes.keys
                 .where((f) => !fieldsReferences.containsKey(f))
                 .toSet();
+
+        if (!dialect.foreignKeyCreatesImplicitIndex) {
+          missingFieldReferenceIndexes =
+              fieldsReferencedTables.entries
+                  .where((e) => e.value.indexName == null)
+                  .map((e) => e.key)
+                  .toSet();
+        }
+      }
+
+      // RELATIONSHIP CONSTRAINTS //
+
+      var fieldListEntityTypes =
+          entityHandler
+              .getFieldsListEntityTypes()
+              .entries
+              .map((e) {
+                var entityType = e.value.entityType;
+                if (entityType == null) return null;
+
+                var refRepository = repository.provider
+                    .getEntityRepositoryByType(entityType);
+
+                if (refRepository == null ||
+                    !refRepository.isSameEntityManager(repository)) {
+                  return null;
+                }
+
+                return MapEntry(e.key, entityType);
+              })
+              .nonNulls
+              .toMapFromEntries();
+
+      if (fieldListEntityTypes.isNotEmpty) {
+        if (!dialect.foreignKeyCreatesImplicitIndex) {
+          missingRelationshipFieldReferenceIndexes =
+              collectionReferenceFields.entries
+                  .expand((e) {
+                    var relFieldRef = e.value;
+                    if (relFieldRef == null) {
+                      return <(String, String, TypeInfo)>[];
+                    }
+
+                    return [
+                      if (relFieldRef.sourceRelationshipFieldIndex == null)
+                        (
+                          relFieldRef.relationshipTable,
+                          relFieldRef.sourceRelationshipField,
+                          relFieldRef.sourceFieldEntityType,
+                        ),
+                      if (relFieldRef.targetRelationshipFieldIndex == null)
+                        (
+                          relFieldRef.relationshipTable,
+                          relFieldRef.targetRelationshipField,
+                          relFieldRef.targetFieldEntityType,
+                        ),
+                    ];
+                  })
+                  .nonNulls
+                  .toSet();
+        }
       }
 
       // UNIQUE CONSTRAINTS //
@@ -982,6 +1072,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         missingReferenceColumns.isNotEmpty ||
         missingCollectionReferenceColumns.isNotEmpty ||
         missingFieldReferenceConstraints.isNotEmpty ||
+        missingFieldReferenceIndexes.isNotEmpty ||
+        missingRelationshipFieldReferenceIndexes.isNotEmpty ||
         missingUniqueConstraints.isNotEmpty ||
         missingEnumConstraints.isNotEmpty ||
         missingEnumValues.isNotEmpty) {
@@ -991,6 +1083,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
         "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
         "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
+        "${missingFieldReferenceIndexes.isNotEmpty ? '-- missingFieldReferenceIndexes: $missingFieldReferenceIndexes\n' : ''}"
+        "${missingRelationshipFieldReferenceIndexes.isNotEmpty ? '-- missingRelationshipFieldReferenceIndexes: $missingRelationshipFieldReferenceIndexes\n' : ''}"
         "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
         "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
         "${missingEnumValues.isNotEmpty ? '-- missingEnumValues: $missingEnumValues\n' : ''}",
@@ -1010,6 +1104,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             .toList(),
         missingFieldReferenceConstraints
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingFieldReferenceIndexes
+            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+            .toList(),
+        missingRelationshipFieldReferenceIndexes
+            .map((f) => _DBRelationshipTableColumn(f.$1, f.$2, f.$3, []))
             .toList(),
         missingUniqueConstraints
             .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
@@ -1033,7 +1133,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return _DBTableCheck.ok();
   }
 
-  MapEntry<String, TableRelationshipReference?>?
+  MapEntry<String, TableRelationshipReferenceEntityTyped?>?
   _checkDBTableSchemeReferenceField(
     EntityHandler<Object> entityHandler,
     TableScheme scheme,
@@ -1058,13 +1158,18 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var targetTable = getTableForType(entityType);
     if (targetTable == null) return null;
 
-    TableRelationshipReference? tableRef;
+    TableRelationshipReferenceEntityTyped? tableRefEntityTyped;
 
     try {
-      tableRef = scheme.getTableRelationshipReference(
+      var tableRef = scheme.getTableRelationshipReference(
         sourceTable: table,
         sourceField: fieldName,
         targetTable: targetTable,
+      );
+
+      tableRefEntityTyped = tableRef?.copyWithEntityTypes(
+        entityHandler.typeInfo,
+        entityType,
       );
     } catch (e) {
       _log.warning(
@@ -1073,7 +1178,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       );
     }
 
-    return MapEntry(fieldName, tableRef);
+    return MapEntry(fieldName, tableRefEntityTyped);
   }
 
   bool checkDBTableField(
@@ -1237,7 +1342,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   static List<String> extractTableSQLs(String sqls) => extractSQLs(
     sqls,
-    RegExp(r'(?:CREATE|ALTER)\s+TABLE', caseSensitive: false, dotAll: true),
+    RegExp(
+      r'(?:(?:CREATE|ALTER)\s+TABLE|CREATE\s+INDEX)',
+      caseSensitive: false,
+      dotAll: true,
+    ),
   );
 
   static List<String> extractSQLs(String sqls, RegExp commandPrefixPattern) {
@@ -1290,6 +1399,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return _populateTablesFromSQLsImpl(list);
   }
 
+  static final RegExp _regExpCreateIndex = RegExp(
+    r'CREATE\s+INDEX',
+    caseSensitive: false,
+  );
+
   Future<List<String>> _populateTablesFromSQLsImpl(List<String> list) async {
     var tables = <String>[];
 
@@ -1298,6 +1412,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var ok = await executeTableSQL(sql);
       if (!ok) {
+        if (!dialect.createIndexIfNotExists) {
+          if (_regExpCreateIndex.hasMatch(sql)) {
+            _log.warning(
+              "Ignoring CREATE INDEX error: the SQL dialect does NOT support `IF NOT EXISTS`. SQL> $sql",
+            );
+            continue;
+          }
+        }
         throw StateError("Error creating table SQL: $sql");
       }
 
@@ -3311,6 +3433,10 @@ class _DBTableCheck {
 
   List<_DBTableColumn>? missingReferenceConstraints;
 
+  List<_DBTableColumn>? missingReferenceIndexes;
+
+  List<_DBRelationshipTableColumn>? missingRelationshipReferenceIndexes;
+
   List<_DBTableColumn>? missingUniqueConstraints;
 
   List<_DBTableColumn>? missingEnumConstraints;
@@ -3323,6 +3449,8 @@ class _DBTableCheck {
     this.missingReferenceColumns,
     this.missingCollectionReferenceColumns,
     this.missingReferenceConstraints,
+    this.missingReferenceIndexes,
+    this.missingRelationshipReferenceIndexes,
     this.missingUniqueConstraints,
     this.missingEnumConstraints,
     this.missingEnumValues,
@@ -3340,6 +3468,8 @@ class _DBTableCheck {
       (missingReferenceColumns?.isEmpty ?? true) &&
       (missingCollectionReferenceColumns?.isEmpty ?? true) &&
       (missingReferenceConstraints?.isEmpty ?? true) &&
+      (missingReferenceIndexes?.isEmpty ?? true) &&
+      (missingRelationshipReferenceIndexes?.isEmpty ?? true) &&
       (missingUniqueConstraints?.isEmpty ?? true) &&
       (missingEnumConstraints?.isEmpty ?? true) &&
       (missingEnumValues?.isEmpty ?? true);
@@ -3347,16 +3477,16 @@ class _DBTableCheck {
   bool get isError => !isOK;
 
   List<AlterTableSQL> generateMissingColumnsSQLs(SQLGenerator sqlGenerator) =>
-      _generateMissingSQLs(missingColumns, sqlGenerator);
+      _generateMissingColumnSQLs(missingColumns, sqlGenerator);
 
   List<AlterTableSQL> generateMissingReferenceColumnsSQLs(
     SQLGenerator sqlGenerator,
-  ) => _generateMissingSQLs(missingReferenceColumns, sqlGenerator);
+  ) => _generateMissingColumnSQLs(missingReferenceColumns, sqlGenerator);
 
   List<AlterTableSQL> generateMissingReferenceConstraintsSQLs(
     SQLGenerator sqlGenerator,
   ) {
-    var columnsSQLs = _generateMissingSQLs(
+    var columnsSQLs = _generateMissingColumnSQLs(
       missingReferenceConstraints,
       sqlGenerator,
     );
@@ -3365,6 +3495,34 @@ class _DBTableCheck {
         columnsSQLs.expand((e) => e.constraints ?? <AlterTableSQL>[]).toList();
 
     return constraints;
+  }
+
+  List<CreateIndexSQL> generateMissingReferenceIndexesSQLs(
+    SQLGenerator sqlGenerator,
+  ) {
+    var columnsSQLs = _generateMissingColumnSQLs(
+      missingReferenceIndexes,
+      sqlGenerator,
+    );
+
+    var indexes =
+        columnsSQLs.expand((e) => e.indexes ?? <CreateIndexSQL>[]).toList();
+
+    return indexes;
+  }
+
+  List<CreateIndexSQL> generateMissingRelationshipReferenceIndexesSQLs(
+    SQLGenerator sqlGenerator,
+  ) {
+    var columnsSQLs = _generateMissingColumnSQLs(
+      missingRelationshipReferenceIndexes,
+      sqlGenerator,
+    );
+
+    var indexes =
+        columnsSQLs.expand((e) => e.indexes ?? <CreateIndexSQL>[]).toList();
+
+    return indexes;
   }
 
   List<AlterTableSQL> generateMissingUniqueConstraintsSQLs(
@@ -3386,7 +3544,7 @@ class _DBTableCheck {
     sqlGenerator,
   );
 
-  List<AlterTableSQL> _generateMissingSQLs(
+  List<AlterTableSQL> _generateMissingColumnSQLs(
     List<_DBTableColumn>? missing,
     SQLGenerator sqlGenerator,
   ) {
@@ -3396,16 +3554,18 @@ class _DBTableCheck {
     }
 
     var sqls =
-        missing
-            .map(
-              (f) => sqlGenerator.generateAddColumnAlterTableSQL(
-                scheme.name,
-                f.name,
-                f.type,
-                entityFieldAnnotations: f.annotations,
-              ),
-            )
-            .toList();
+        missing.map((f) {
+          var schemeName =
+              f is _DBRelationshipTableColumn
+                  ? f.relationshipTable
+                  : scheme.name;
+          return sqlGenerator.generateAddColumnAlterTableSQL(
+            schemeName,
+            f.name,
+            f.type,
+            entityFieldAnnotations: f.annotations,
+          );
+        }).toList();
 
     return sqls;
   }
@@ -3461,9 +3621,17 @@ class _DBTableCheck {
     var missingCollectionReferenceColumns =
         this.missingCollectionReferenceColumns ?? [];
 
+    var missingReferenceConstraints = this.missingReferenceConstraints ?? [];
+    var missingReferenceIndexes = this.missingReferenceIndexes ?? [];
+    var missingRelationshipReferenceIndexes =
+        this.missingRelationshipReferenceIndexes ?? [];
+
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
-        missingCollectionReferenceColumns.isNotEmpty) {
+        missingCollectionReferenceColumns.isNotEmpty ||
+        missingReferenceConstraints.isNotEmpty ||
+        missingReferenceIndexes.isNotEmpty ||
+        missingRelationshipReferenceIndexes.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
 
@@ -3474,6 +3642,19 @@ class _DBTableCheck {
       var missingReferenceColumnsStr = missingReferenceColumns
           .map((e) => '${e.type.toString(withT: false)} ${e.name}')
           .join(' , ');
+
+      var missingReferenceConstraintsStr = missingReferenceConstraints
+          .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+          .join(' , ');
+
+      var missingReferenceIndexesStr = missingReferenceIndexes
+          .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+          .join(' , ');
+
+      var missingRelationshipReferenceIndexesStr =
+          missingRelationshipReferenceIndexes
+              .map((e) => '${e.type.toString(withT: false)} ${e.name}')
+              .join(' , ');
 
       var missingCollectionReferenceColumnsStr =
           missingCollectionReferenceColumns
@@ -3487,6 +3668,12 @@ class _DBTableCheck {
           "  -- missingColumns: [$missingColumnsStr]",
         if (missingReferenceColumns.isNotEmpty)
           "  -- missingReferenceColumns: [$missingReferenceColumnsStr]",
+        if (missingReferenceConstraints.isNotEmpty)
+          "  -- missingReferenceConstraints: [$missingReferenceConstraintsStr]",
+        if (missingReferenceIndexes.isNotEmpty)
+          "  -- missingReferenceIndexes: [$missingReferenceIndexesStr]",
+        if (missingRelationshipReferenceIndexes.isNotEmpty)
+          "  -- missingRelationshipReferenceIndexes: [$missingRelationshipReferenceIndexesStr]",
         if (missingCollectionReferenceColumns.isNotEmpty)
           "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
       ].join('\n');
@@ -3496,6 +3683,20 @@ class _DBTableCheck {
 
     return error?.toString() ?? '';
   }
+}
+
+class _DBRelationshipTableColumn extends _DBTableColumn {
+  final String relationshipTable;
+
+  _DBRelationshipTableColumn(
+    this.relationshipTable,
+    super.name,
+    super.type,
+    super.annotations,
+  );
+
+  @override
+  String toString() => '{$relationshipTable.$name: $type}';
 }
 
 class _DBTableColumn {

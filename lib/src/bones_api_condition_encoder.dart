@@ -45,14 +45,18 @@ class TableFieldReference {
   /// The target table field type.
   final Type targetFieldType;
 
+  /// The name of the index, if one exists.
+  final String? indexName;
+
   TableFieldReference(
     this.sourceTable,
     this.sourceField,
     this.sourceFieldType,
     this.targetTable,
     this.targetField,
-    this.targetFieldType,
-  );
+    this.targetFieldType, {
+    String? indexName,
+  }) : indexName = indexName != null && indexName.isNotEmpty ? indexName : null;
 
   @override
   bool operator ==(Object other) =>
@@ -73,7 +77,48 @@ class TableFieldReference {
 
   @override
   String toString() {
-    return 'TableFieldReference{"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)}';
+    return 'TableFieldReference{'
+        '"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)'
+        '}${indexName != null ? '@$indexName' : ''}';
+  }
+}
+
+/// A [TableRelationshipReference] that explicitly defines the entity types
+/// of its relationship fields.
+///
+/// - [sourceFieldEntityType] represents the entity type of the [sourceField].
+/// - [targetFieldEntityType] represents the entity type of the [targetField].
+class TableRelationshipReferenceEntityTyped extends TableRelationshipReference {
+  /// The entity type of the [sourceField].
+  TypeInfo sourceFieldEntityType;
+
+  /// The entity type of the [targetField].
+  TypeInfo targetFieldEntityType;
+
+  TableRelationshipReferenceEntityTyped(
+    super.relationshipTable,
+    super.sourceTable,
+    super.sourceField,
+    super.sourceFieldType,
+    this.sourceFieldEntityType,
+    super.sourceRelationshipField,
+    super.targetTable,
+    super.targetField,
+    super.targetFieldType,
+    this.targetFieldEntityType,
+    super.targetRelationshipField, {
+    super.relationshipField,
+    super.sourceRelationshipFieldIndex,
+    super.targetRelationshipFieldIndex,
+  });
+
+  @override
+  String toString() {
+    return 'TableRelationshipReferenceEntityTyped[$relationshipTable]{'
+        '"$sourceTable"."$sourceField"($sourceFieldType @ $sourceFieldEntityType) -> "$targetTable"."$targetField"($targetFieldType @ $targetFieldEntityType)'
+        '}'
+        '${sourceRelationshipFieldIndex != null ? '$sourceField@$sourceRelationshipFieldIndex' : ''}'
+        '${targetRelationshipFieldIndex != null ? '$targetField@$targetRelationshipFieldIndex' : ''}';
   }
 }
 
@@ -109,6 +154,12 @@ class TableRelationshipReference {
   /// The virtual/entity relationship field name.
   final String? relationshipField;
 
+  /// The index of the [sourceRelationshipField]
+  final String? sourceRelationshipFieldIndex;
+
+  /// The index of the [targetRelationshipField]
+  final String? targetRelationshipFieldIndex;
+
   TableRelationshipReference(
     this.relationshipTable,
     this.sourceTable,
@@ -120,13 +171,45 @@ class TableRelationshipReference {
     this.targetFieldType,
     this.targetRelationshipField, {
     this.relationshipField,
-  });
+    String? sourceRelationshipFieldIndex,
+    String? targetRelationshipFieldIndex,
+  }) : sourceRelationshipFieldIndex =
+           sourceRelationshipFieldIndex != null &&
+                   sourceRelationshipFieldIndex.isNotEmpty
+               ? sourceRelationshipFieldIndex
+               : null,
+       targetRelationshipFieldIndex =
+           targetRelationshipFieldIndex != null &&
+                   targetRelationshipFieldIndex.isNotEmpty
+               ? targetRelationshipFieldIndex
+               : null;
+
+  /// Returns a copy as [TableRelationshipReference],
+  /// with entity types [sourceFieldEntityType] and [targetFieldEntityType].
+  TableRelationshipReferenceEntityTyped copyWithEntityTypes(
+    TypeInfo sourceFieldEntityType,
+    TypeInfo targetFieldEntityType,
+  ) => TableRelationshipReferenceEntityTyped(
+    relationshipTable,
+    sourceTable,
+    sourceField,
+    sourceFieldType,
+    sourceFieldEntityType,
+    sourceRelationshipField,
+    targetTable,
+    targetField,
+    targetFieldType,
+    targetFieldEntityType,
+    targetRelationshipField,
+    relationshipField: relationshipField,
+    sourceRelationshipFieldIndex: sourceRelationshipFieldIndex,
+    targetRelationshipFieldIndex: targetRelationshipFieldIndex,
+  );
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is TableRelationshipReference &&
-          runtimeType == other.runtimeType &&
           relationshipTable == other.relationshipTable &&
           sourceTable == other.sourceTable &&
           sourceField == other.sourceField &&
@@ -143,7 +226,11 @@ class TableRelationshipReference {
 
   @override
   String toString() {
-    return 'TableRelationshipReference[$relationshipTable]{"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)}';
+    return 'TableRelationshipReference[$relationshipTable]{'
+        '"$sourceTable"."$sourceField"($sourceFieldType) -> "$targetTable"."$targetField"($targetFieldType)'
+        '}'
+        '${sourceRelationshipFieldIndex != null ? '$sourceField@$sourceRelationshipFieldIndex' : ''}'
+        '${targetRelationshipFieldIndex != null ? '$targetField@$targetRelationshipFieldIndex' : ''}';
   }
 }
 

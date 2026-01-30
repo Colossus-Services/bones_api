@@ -108,6 +108,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              elementQuote: '`',
              acceptsTemporaryTableForReturning: true,
              acceptsInsertIgnore: true,
+             createIndexIfNotExists: false,
            ),
            transactions: true,
            transactionAbort: true,
@@ -161,11 +162,10 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     minConnections ??= 1;
     maxConnections ??= 3;
 
-    var retCheckTablesAndGenerateTables =
-        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
-
-    var generateTables = retCheckTablesAndGenerateTables[0];
-    var checkTables = retCheckTablesAndGenerateTables[1];
+    var (
+      generateTables: generateTables,
+      checkTables: checkTables,
+    ) = DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
     var populate = config?['populate'];
     Object? populateTables;
