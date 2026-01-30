@@ -1625,6 +1625,37 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     );
   }
 
+  Map<String, TypeInfo>? _fieldsListEntityTypes;
+
+  Map<String, TypeInfo> getFieldsListEntityTypes([O? o]) {
+    var listEntityFields = _fieldsListEntityTypes;
+    if (listEntityFields != null) return listEntityFields;
+
+    var enumFields = getFieldsEnumTypes(o);
+
+    var mapListEntityFields =
+        getFieldsTypes().entries
+            .map((e) {
+              var field = e.key;
+              var typeInfo = e.value;
+
+              if (enumFields.containsKey(field)) return null;
+
+              if (!typeInfo.isListEntityOrReference) return null;
+
+              var entityType = typeInfo.entityType;
+              if (entityType == null) return null;
+
+              return MapEntry(field, typeInfo);
+            })
+            .nonNulls
+            .toMapFromEntries();
+
+    return _fieldsListEntityTypes = Map<String, TypeInfo>.unmodifiable(
+      mapListEntityFields,
+    );
+  }
+
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
 
   Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations([O? o]) {

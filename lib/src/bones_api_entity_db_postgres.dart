@@ -118,6 +118,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              acceptsInsertDefaultValues: true,
              acceptsInsertOnConflict: true,
              acceptsVarcharWithoutMaximumSize: true,
+             foreignKeyCreatesImplicitIndex: false,
            ),
            transactions: true,
            transactionAbort: true,
@@ -838,7 +839,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               var refToTable = refToTables.single;
               var otherRef = otherRefs.single;
 
-              return TableRelationshipReference(
+              var tableRelationshipReference = TableRelationshipReference(
                 refToTable.sourceTable,
                 refToTable.targetTable,
                 refToTable.targetField,
@@ -848,7 +849,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
                 otherRef.targetField,
                 otherRef.targetFieldType,
                 otherRef.sourceField,
+                sourceRelationshipFieldIndex: refToTable.indexName,
+                targetRelationshipFieldIndex: otherRef.indexName,
               );
+
+              return tableRelationshipReference;
             })
             .nonNulls
             .toList();
@@ -953,36 +958,85 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       f.relname AS target_table,
       targ_attr.attname AS target_column,
-      targ_inf.data_type AS target_column_type
-      
+      targ_inf.data_type AS target_column_type,
+    
+      idx.relname AS fk_index_name
+
     FROM
-      pg_constraint o 
+      pg_constraint o
       LEFT JOIN pg_class f ON f.oid = o.confrelid 
       LEFT JOIN pg_class m ON m.oid = o.conrelid
-	  INNER JOIN pg_attribute stc_attr ON stc_attr.attrelid = m.oid AND stc_attr.attnum = o.conkey[1] AND stc_attr.attisdropped = false
-	  INNER JOIN information_schema.columns src_inf ON src_inf.table_name = m.relname and src_inf.column_name = stc_attr.attname
-	  INNER JOIN pg_attribute targ_attr ON targ_attr.attrelid = f.oid AND targ_attr.attnum = o.confkey[1] AND targ_attr.attisdropped = false
-	  INNER JOIN information_schema.columns targ_inf ON targ_inf.table_name = f.relname and targ_inf.column_name = targ_attr.attname
+    
+    INNER JOIN pg_attribute stc_attr
+      ON stc_attr.attrelid = m.oid
+      AND stc_attr.attnum = o.conkey[1]
+      AND stc_attr.attisdropped = false
+    
+    INNER JOIN information_schema.columns src_inf
+      ON src_inf.table_name = m.relname
+      AND src_inf.column_name = stc_attr.attname
+    
+    INNER JOIN pg_attribute targ_attr
+      ON targ_attr.attrelid = f.oid
+      AND targ_attr.attnum = o.confkey[1]
+      AND targ_attr.attisdropped = false
+    
+    INNER JOIN information_schema.columns targ_inf
+      ON targ_inf.table_name = f.relname
+      AND targ_inf.column_name = targ_attr.attname
+    
+  	LEFT JOIN LATERAL (
+      SELECT
+        i.indexrelid
+      FROM pg_index i
+      WHERE i.indrelid = m.oid
+        -- FK column must be the *first* column of the index. (i.indkey is 0-based)
+        AND i.indkey[0] = o.conkey[1]
+      ORDER BY
+        array_length(i.indkey, 1) ASC,  -- single-column first
+        i.indisunique DESC               -- prefer unique
+      LIMIT 1
+    ) idx_def ON true
+    
+    LEFT JOIN pg_class idx
+      ON idx.oid = idx_def.indexrelid
+    
     WHERE
-      o.contype = 'f' AND m.relname = '$table' AND o.conrelid IN (SELECT oid FROM pg_class c WHERE c.relkind = 'r') 
+      o.contype = 'f'
+      AND m.relname = '$table'
+      AND o.conrelid IN (
+        SELECT oid FROM pg_class c WHERE c.relkind = 'r'
+      );
     ''';
 
     var referenceFields = await connection.mappedResultsQuery(sql);
 
     var map = Map<String, TableFieldReference>.fromEntries(
       referenceFields.map((e) {
-        var sourceTable = e['source_table'];
-        var sourceField = e['source_column'];
-        var sourceFieldDataType = e['source_column_type'];
-        var targetTable = e['target_table'];
-        var targetField = e['target_column'];
-        var targetFieldDataType = e['target_column_type'];
-        if (targetTable == null || targetField == null) return null;
+        var sourceTable = e['source_table'] as String?;
+        var sourceField = e['source_column'] as String?;
+        var sourceFieldDataType = e['source_column_type'] as String?;
+        var targetTable = e['target_table'] as String?;
+        var targetField = e['target_column'] as String?;
+        var targetFieldDataType = e['target_column_type'] as String?;
+        var fkIndexName = e['fk_index_name'] as String?;
+
+        if (sourceTable == null ||
+            sourceField == null ||
+            targetTable == null ||
+            targetField == null) {
+          return null;
+        }
+
+        if (fkIndexName != null && fkIndexName.isEmpty) {
+          fkIndexName = null;
+        }
 
         var sourceFieldType =
             sourceFieldDataType != null
                 ? _toFieldType(sourceFieldDataType)
                 : String;
+
         var targetFieldType =
             targetFieldDataType != null
                 ? _toFieldType(targetFieldDataType)
@@ -995,7 +1049,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           targetTable,
           targetField,
           targetFieldType,
+          indexName: fkIndexName,
         );
+
         return MapEntry<String, TableFieldReference>(sourceField, reference);
       }).nonNulls,
     );

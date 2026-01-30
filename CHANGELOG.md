@@ -1,3 +1,46 @@
+## 1.9.25
+
+- `TableFieldReference`:
+  - Added nullable field `indexName` to represent the name of the index if one exists.
+
+- Added new class `TableRelationshipReferenceEntityTyped` extending `TableRelationshipReference`:
+  - Adds `sourceFieldEntityType` and `targetFieldEntityType` fields of type `TypeInfo`.
+  - Provides `copyWithEntityTypes` method to create typed copies.
+
+- `TableRelationshipReference`:
+  - Added nullable fields `sourceRelationshipFieldIndex` and `targetRelationshipFieldIndex`.
+  - Added `copyWithEntityTypes` method returning `TableRelationshipReferenceEntityTyped`.
+
+- `EntityHandler`:
+  - Added `getFieldsListEntityTypes` method to return a map of fields that are list entities or references with their `TypeInfo`.
+
+- `SQLDialect`:
+  - Added `foreignKeyCreatesImplicitIndex` boolean flag with default `true`.
+
+- `DBPostgreSQLAdapter`:
+  - Added `foreignKeyCreatesImplicitIndex` flag to PostgreSQL dialect set to `false`.
+  - Updated `_findAllTableFieldsReferences` query to include foreign key index name (`fk_index_name`) by joining with `pg_index` and `pg_class`.
+  - Populated `indexName` in `TableFieldReference` instances from query result.
+  - Updated relationship references to include `sourceRelationshipFieldIndex` and `targetRelationshipFieldIndex` from `indexName`.
+
+- `DBSQLAdapter`:
+  - Added detection of missing foreign key indexes when dialect does not create implicit indexes.
+  - Added detection of missing relationship reference indexes for collection reference fields.
+  - Updated error reporting and logging to include missing reference indexes and relationship reference indexes.
+  - Updated `_checkDBTableSchemeReferenceField` to return `TableRelationshipReferenceEntityTyped` with entity types.
+  - Added generation of missing reference indexes and missing relationship reference indexes SQL statements.
+  - Updated `_DBTableCheck` class:
+    - Added fields `missingReferenceIndexes` and `missingRelationshipReferenceIndexes`.
+    - Added methods to generate missing reference indexes and relationship reference indexes SQL.
+  - Added `_DBRelationshipTableColumn` subclass of `_DBTableColumn` to represent relationship table columns with relationship table name.
+  - Updated SQL generation to create indexes for foreign keys if dialect does not create implicit indexes:
+    - Added index creation after foreign key constraints in `generateAddColumnAlterTableSQL`.
+    - Added index creation for relationship table foreign keys in relationship table creation SQL.
+
+- Dependency updates:
+  - `async_extension`: ^1.2.19 → ^1.2.20
+  - `meta`: ^1.18.0 → ^1.18.1
+
 ## 1.9.24
 
 - `GZipSink`:
