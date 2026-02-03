@@ -1009,7 +1009,7 @@ mixin Initializable {
         }
 
         return _finalizeInitializationWithDeps2(depsResults, result);
-      });
+      }, onError: (e, s) => _onInitializationError(e, s));
     } else {
       return _finalizeInitializationWithDeps2(depsResults, result);
     }
@@ -1107,13 +1107,21 @@ mixin Initializable {
     var ret = ensureInitialized(parent: parent);
 
     if (ret is Future<InitializationResult>) {
-      return ret.then((result) {
-        if (!result.ok) {
-          _forceLogFlushMessages();
+      return ret.then(
+        (result) {
+          if (!result.ok) {
+            _forceLogFlushMessages();
+            throw InitializationError(
+              this,
+              "Error initializing (async): $this",
+            );
+          }
+          return callback();
+        },
+        onError: (e, s) {
           throw InitializationError(this, "Error initializing (async): $this");
-        }
-        return callback();
-      });
+        },
+      );
     } else {
       if (!ret.ok) {
         _forceLogFlushMessages();
@@ -1284,11 +1292,18 @@ extension _FutureExtension<T> on Future<T> {
   Completer<T> toCompleter() {
     var completer = Completer<T>();
     // ignore: discarded_futures
-    then((val) {
-      if (!completer.isCompleted) {
-        completer.complete(val);
-      }
-    });
+    then(
+      (val) {
+        if (!completer.isCompleted) {
+          completer.complete(val);
+        }
+      },
+      onError: (e, s) {
+        if (!completer.isCompleted) {
+          completer.completeError(e, s);
+        }
+      },
+    );
     return completer;
   }
 }
