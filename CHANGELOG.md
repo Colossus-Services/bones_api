@@ -1,3 +1,12 @@
+## 1.9.26
+
+- `Initializable` mixin:
+  - `ensureInitialized`: added `onError` handler to `then` call to route errors to `_onInitializationError`.
+  - `executeInitializedCallback`:
+    - Added `onError` handler to `then` call on async initialization result to throw `InitializationError` with stack trace.
+  - `_FutureExtension`:
+    - `toCompleter`: added `onError` handler to `then` to complete completer with error and stack trace if not completed.
+
 ## 1.9.25
 
 - `TableFieldReference`:
