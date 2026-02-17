@@ -344,6 +344,7 @@ export 'src/bones_api_utils.dart';
 export 'src/bones_api_utils_arguments.dart';
 export 'src/bones_api_utils_call.dart';
 export 'src/bones_api_utils_collections.dart';
+export 'src/bones_api_utils_fast_checksum.dart';
 export 'src/bones_api_utils_httpclient.dart';
 export 'src/bones_api_utils_instance_tracker.dart';
 export 'src/bones_api_utils_json.dart';

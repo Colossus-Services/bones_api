@@ -2,7 +2,6 @@ import 'dart:collection';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart' show Adler32, Crc32;
 import 'package:async_events/async_events.dart';
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
@@ -25,6 +24,7 @@ import 'bones_api_module.dart';
 import 'bones_api_security.dart';
 import 'bones_api_utils_arguments.dart';
 import 'bones_api_utils_call.dart';
+import 'bones_api_utils_fast_checksum.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIRoot');
@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.9.26';
+  static const String VERSION = '1.9.27';
 
   static bool _boot = false;
 
@@ -2522,7 +2522,7 @@ class WeakEtag extends Etag {
 
     return WeakEtag(<String>[
       bytes.length.toString(),
-      Adler32().convert(bytes).toString(),
+      getAdler32Hex(bytes),
       _computeFragments(bytes),
     ]);
   }
@@ -2532,7 +2532,7 @@ class WeakEtag extends Etag {
 
     return WeakEtag(<String>[
       bytes.length.toString(),
-      Crc32().convert(bytes).toString(),
+      getCrc32Hex(bytes),
       _computeFragments(bytes),
     ]);
   }

@@ -1,3 +1,22 @@
+## 1.9.27
+
+- Added `bones_api_utils_fast_checksum.dart`:
+  - Provides functions `getAdler32Uint8List`, `getAdler32Hex`, `getCrc32Uint8List`, and `getCrc32Hex` for Adler-32 and CRC-32 checksums as byte arrays and hex strings.
+  - Implements internal helpers for big-endian byte conversion and hex encoding.
+  - Exports `getAdler32` and `getCrc32` from `archive` package for checksum calculation.
+
+- `WeakEtag` class (`bones_api_base.dart`):
+  - Updated `WeakEtag.adler32` and `WeakEtag.crc32` factories to use `getAdler32Hex` and `getCrc32Hex` from `bones_api_utils_fast_checksum.dart` instead of deprecated `Adler32` and `Crc32` classes.
+
+- `bones_api.dart`:
+  - Exported new `bones_api_utils_fast_checksum.dart` utility.
+
+- Dependencies:
+  - Updated `async_extension` from ^1.2.20 to ^1.2.21.
+  - Updated `swiss_knife` from ^3.3.3 to ^3.3.5.
+  - Updated `archive` from ^4.0.7 to ^4.0.9.
+  - Updated `build_runner` from ^2.10.5 to ^2.11.1.
+
 ## 1.9.26
 
 - `Initializable` mixin:
