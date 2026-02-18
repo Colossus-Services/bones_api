@@ -16,6 +16,7 @@
   - Updated `swiss_knife` from ^3.3.3 to ^3.3.5.
   - Updated `archive` from ^4.0.7 to ^4.0.9.
   - Updated `build_runner` from ^2.10.5 to ^2.11.1.
+  - docker_commander: ^2.1.8
 
 ## 1.9.26
 
