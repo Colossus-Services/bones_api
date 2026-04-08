@@ -1588,8 +1588,8 @@ abstract mixin class SQLGenerator {
             SQLColumn(
               table,
               columnName,
-              referenceTable: refTable!,
-              referenceColumn: refColumn!,
+              referenceTable: refTable,
+              referenceColumn: refColumn,
             ),
           ],
         );
@@ -1660,7 +1660,7 @@ abstract mixin class SQLGenerator {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
 
-    var constraintName = '${table}_${fieldName}_unique';
+    var constraintName = '${table}_${columnName}__unique';
 
     var comment = '${fieldType.toString(withT: false)} $fieldName UNIQUE';
 
@@ -1684,7 +1684,7 @@ abstract mixin class SQLGenerator {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
 
-    var constraintName = '${table}_${fieldName}_check';
+    var constraintName = '${table}_${columnName}__check';
 
     var fieldSQLType = typeToSQLType(
       fieldType,

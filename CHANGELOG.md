@@ -1,3 +1,19 @@
+## 1.9.28
+
+- `SQLGenerator`:
+  - Fixed `referenceTable` and `referenceColumn` assignment in unique constraint SQL entries to allow nullable references.
+  - Updated unique and enum constraint names in `generateAddUniqueConstraintAlterTableSQL` and `generateAddEnumConstraintAlterTableSQL` to use normalized column names with double underscores for consistency.
+
+- Dependency updates:
+  - `async_extension`: ^1.2.22
+  - `reflection_factory`: ^2.7.5
+  - `swiss_knife`: ^3.3.14
+  - `meta`: ^1.18.2
+  - `hotreloader`: ^4.4.0
+  - `googleapis_auth`: ^2.3.0
+  - `build_runner`: ^2.13.1
+  - `test`: ^1.31.0
+
 ## 1.9.27
 
 - Added `bones_api_utils_fast_checksum.dart`:
