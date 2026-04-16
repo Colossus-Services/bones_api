@@ -1014,6 +1014,20 @@ class ConditionID<O> extends Condition<O> {
 
   ConditionID([this.idValue]) : super._();
 
+  dynamic resolveIDValue({Object? parameters}) {
+    var id = idValue;
+
+    if (id == null && parameters is O) {
+      id = getID(parameters);
+    }
+
+    if (id is ConditionParameter) {
+      id = id.getValue(parameters: parameters);
+    }
+
+    return id;
+  }
+
   @override
   bool get isIDCondition => true;
 

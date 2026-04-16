@@ -371,7 +371,7 @@ class DBObjectDirectoryAdapter
         op,
         table,
         matcher,
-        parameters,
+        parameters ?? namedParameters,
       ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
     );
   }
@@ -387,7 +387,7 @@ class DBObjectDirectoryAdapter
 
     if (matcher != null) {
       if (matcher is ConditionID) {
-        var id = matcher.idValue ?? matcher.getID(parameters);
+        var id = matcher.resolveIDValue(parameters: parameters);
 
         var objFile = _resolveObjectFile(table, id);
         return objFile.existsSync() ? 1 : 0;
@@ -558,7 +558,7 @@ class DBObjectDirectoryAdapter
       op,
       table,
       matcher,
-      parameters,
+      parameters ?? namedParameters,
     ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
   );
 
@@ -572,7 +572,7 @@ class DBObjectDirectoryAdapter
     if (!tableDir.existsSync()) return [];
 
     if (matcher is ConditionID) {
-      var id = matcher.idValue ?? matcher.getID(parameters);
+      var id = matcher.resolveIDValue(parameters: parameters);
 
       var objFile = _resolveObjectFile(table, id);
       if (!objFile.existsSync()) return [];

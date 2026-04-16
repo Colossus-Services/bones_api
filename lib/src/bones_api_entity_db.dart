@@ -1671,6 +1671,30 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       return _selectAll(transaction, matcher, resolutionRules);
     }
 
+    if (matcher is KeyConditionEQ) {
+      var keys = matcher.keys;
+      if (keys.length == 1) {
+        var conditionKey = matcher.keys.first;
+
+        if (conditionKey is ConditionKeyField) {
+          var key = conditionKey.name;
+          var idFieldName = entityHandler.idFieldName();
+
+          if (idFieldName == key) {
+            var idValue = matcher.value;
+            var matcherID = ConditionID(idValue);
+
+            return _selectByID(
+              transaction,
+              matcherID,
+              parameters ?? namedParameters,
+              resolutionRules,
+            ).resolveMapped((res) => res != null ? <O>[res] : <O>[]);
+          }
+        }
+      }
+    }
+
     throw UnsupportedError(
       "Relationship select not supported for: (${matcher.runtimeTypeNameUnsafe}) $matcher @ $tableName ($this)",
     );
@@ -1686,7 +1710,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     int? limit,
   }) {
     if (matcher is ConditionID) {
-      var id = matcher.idValue;
+      var id = matcher.resolveIDValue(
+        parameters: parameters ?? namedParameters,
+      );
       return existsID(
         id,
         transaction: transaction,
@@ -1709,7 +1735,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Object? parameters,
     EntityResolutionRules? resolutionRules,
   ) {
-    var id = matcher.idValue ?? matcher.getID(parameters);
+    var id = matcher.resolveIDValue(parameters: parameters);
 
     if (id == null && parameters != null) {
       id = matcher.getID(parameters);

@@ -791,6 +791,24 @@ Future<bool> runAdapterTests(
 
           expect((await photoAPIRepository.existsID(png1PixelSha256)), isTrue);
 
+          expect(
+            (await photoAPIRepository.selectByID(png1PixelSha256)),
+            equals(photo),
+          );
+
+          expect(
+            (await photoAPIRepository.selectByIDs([png1PixelSha256, "nope"])),
+            equals([photo, null]),
+          );
+
+          expect(
+            (await photoAPIRepository.selectByQuery(
+              'id == ?',
+              parameters: {'id': photo.id},
+            )),
+            equals([photo]),
+          );
+
           {
             var address1 = await addressAPIRepository.selectByID(address.id);
             expect(address1, isNotNull);

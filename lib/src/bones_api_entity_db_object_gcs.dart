@@ -479,7 +479,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         op,
         table,
         matcher,
-        parameters,
+        parameters ?? namedParameters,
       ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
     );
   }
@@ -492,7 +492,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   ) async {
     if (matcher != null) {
       if (matcher is ConditionID) {
-        var id = matcher.idValue ?? matcher.getID(parameters);
+        var id = matcher.resolveIDValue(parameters: parameters);
 
         var objFile = _resolveObjectFilePath(table, id);
 
@@ -646,7 +646,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       op,
       table,
       matcher,
-      parameters,
+      parameters ?? namedParameters,
     ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
   );
 
@@ -657,7 +657,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Object? parameters,
   ) async {
     if (matcher is ConditionID) {
-      var id = matcher.idValue ?? matcher.getID(parameters);
+      var id = matcher.resolveIDValue(parameters: parameters);
 
       var entry = await _deleteObject(table, id);
 
