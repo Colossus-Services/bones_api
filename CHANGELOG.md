@@ -1,3 +1,13 @@
+## 1.9.29
+
+- `DBEntityRepository`:
+  - `select`:
+    - Added optimization for `KeyConditionEQ` matcher with a single key matching the entity ID field.
+    - When matched, uses `_selectByID` to fetch the entity by ID and returns a single-element list or empty list accordingly.
+
+- Dependency updates:
+  - `vm_service`: ^15.0.2 → ^15.1.0
+
 ## 1.9.28
 
 - `SQLGenerator`:
