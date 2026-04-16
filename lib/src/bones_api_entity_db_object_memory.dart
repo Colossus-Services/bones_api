@@ -438,7 +438,7 @@ class DBObjectMemoryAdapter
         op,
         table,
         matcher,
-        parameters,
+        parameters ?? namedParameters,
       ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
     );
   }
@@ -454,7 +454,7 @@ class DBObjectMemoryAdapter
 
     if (matcher != null) {
       if (matcher is ConditionID) {
-        var id = matcher.idValue ?? matcher.getID(parameters);
+        var id = matcher.resolveIDValue(parameters: parameters);
         return map.containsKey(id) ? 1 : 0;
       }
 
@@ -609,7 +609,7 @@ class DBObjectMemoryAdapter
       op,
       table,
       matcher,
-      parameters,
+      parameters ?? namedParameters,
     ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
   );
 
@@ -623,7 +623,7 @@ class DBObjectMemoryAdapter
     if (map == null) return [];
 
     if (matcher is ConditionID) {
-      var id = matcher.idValue ?? matcher.getID(parameters);
+      var id = matcher.resolveIDValue(parameters: parameters);
       var entry = map.remove(id);
       return entry != null ? [entry] : [];
     }

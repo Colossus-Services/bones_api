@@ -1,9 +1,25 @@
 ## 1.9.29
 
+- `ConditionID`:
+  - Added method `resolveIDValue` to resolve the ID value from parameters or `ConditionParameter`.
+
 - `DBEntityRepository`:
+  - Updated `selectIDsBy` and `_selectByID` to use `ConditionID.resolveIDValue` for ID resolution.
   - `select`:
     - Added optimization for `KeyConditionEQ` matcher with a single key matching the entity ID field.
     - When matched, uses `_selectByID` to fetch the entity by ID and returns a single-element list or empty list accordingly.
+
+- `DBObjectDirectoryAdapter`:
+  - Updated `_doCountImpl` and `_doDeleteImpl` to use `ConditionID.resolveIDValue` for ID resolution.
+  - Updated public methods to pass combined parameters (`parameters ?? namedParameters`) to internal implementations.
+
+- `DBObjectGCSAdapter`:
+  - Updated `_doCountImpl` and `_doDeleteImpl` to use `ConditionID.resolveIDValue` for ID resolution.
+  - Updated public methods to pass combined parameters (`parameters ?? namedParameters`) to internal implementations.
+
+- `DBObjectMemoryAdapter`:
+  - Updated `_doCountImpl` and `_doDeleteImpl` to use `ConditionID.resolveIDValue` for ID resolution.
+  - Updated public methods to pass combined parameters (`parameters ?? namedParameters`) to internal implementations.
 
 - Dependency updates:
   - `vm_service`: ^15.0.2 → ^15.1.0
