@@ -149,6 +149,18 @@ class APIRootStarter<A extends APIRoot> {
         return apiRoot.ensureInitialized().resolveMapped((initResult) {
           _started = true;
           _starting = null;
+
+          if (!initResult.ok) {
+            var error = initResult.error;
+            if (error != null) {
+              _log.severe(
+                "Can't initialize `APIRoot`: $apiRoot",
+                error,
+                initResult.stackTrace,
+              );
+            }
+          }
+
           return initResult.ok;
         });
       });

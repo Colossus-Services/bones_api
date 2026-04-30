@@ -23,4 +23,4 @@ fi
 
 dart pub global activate project_template
 
-dart run project_template prepare -d "$TEMPLATE_DIR" -o "$TEMPLATE_TAR_GZ" -r "^\.git" -r "\.DS_Store$"
+dart run project_template prepare -d "$TEMPLATE_DIR" -o "$TEMPLATE_TAR_GZ" -r "^\.git" -r "\.DS_Store$" -r "^\w+\.iml$"

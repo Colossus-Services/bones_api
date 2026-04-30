@@ -1,3 +1,18 @@
+## 1.9.30
+
+- `APIRootStarter`:
+  - `start`:
+    - Added logging of severe errors when `apiRoot.ensureInitialized()` returns a failure with an error.
+ 
+- Project template:
+  - `update_project_template.sh`:
+    - Updated `project_template prepare` command to exclude IDE module files matching `^\w+\.iml$` from the template archive.
+
+- Dependencies:
+  - Updated `build_runner` to ^2.15.0.
+  - Updated `test` to ^1.31.1.
+  - Updated `vm_service` to ^15.2.0.
+
 ## 1.9.29
 
 - `ConditionID`:
