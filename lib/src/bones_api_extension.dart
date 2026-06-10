@@ -248,7 +248,9 @@ extension MapGetterExtension<K, V> on Map<K, V> {
     var keyStr = key.toString();
 
     for (var k in keys) {
-      if (equalsIgnoreAsciiCase(keyStr, k.toString())) {}
+      if (equalsIgnoreAsciiCase(keyStr, k.toString())) {
+        return k;
+      }
     }
 
     return null;

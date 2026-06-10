@@ -497,6 +497,48 @@ void main() {
           TableFieldReference('account', 'address', int, 'address', 'id', int),
         });
       }
+
+      {
+        // An `IN` list mixing a `ConditionParameter` and a literal value.
+        // Each element must be encoded individually (not the whole list).
+        var cond = KeyConditionIN(
+          [ConditionKeyField('id')],
+          [ConditionParameter.key('a'), 99],
+        );
+
+        var sql = await sqlEncoder.encode(
+          cond,
+          'account',
+          parameters: {'a': 7},
+        );
+
+        expect(
+          sql.outputString,
+          equals('( "ac"."id" IN ( ( @a__0 ) , ( 99 ) ) )'),
+        );
+        expect(sql.parametersPlaceholders, equals({'a__0': 7}));
+      }
+    });
+
+    test('resolveValueToType single-element list', () async {
+      var enc = ConditionSQLEncoder(
+        _TestSchemeProvider(),
+        sqlElementQuote: '"',
+      );
+
+      // A single-element `Iterable` must be resolved to its element when the
+      // target type is a primitive:
+      expect(await enc.resolveValueToType([42], int), equals(42));
+      expect(await enc.resolveValueToType(['abc'], String), equals('abc'));
+
+      // An empty `Iterable` resolves to `null`:
+      expect(await enc.resolveValueToType([], int), isNull);
+
+      // A plain value is resolved as-is:
+      expect(await enc.resolveValueToType(7, int), equals(7));
+
+      // A multi-element list can't be resolved to a primitive:
+      expect(() => enc.resolveValueToType([1, 2], int), throwsArgumentError);
     });
   });
 

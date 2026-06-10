@@ -633,7 +633,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
           value.map((v) {
             if (v is ConditionParameter) {
               return conditionParameterToParameterValue(
-                value,
+                v,
                 context,
                 fieldKey,
                 fieldType,
@@ -641,7 +641,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
               );
             } else {
               return _valueToParameterValueImpl(
-                value,
+                v,
                 fieldType,
                 key: fieldKey,
                 valueAsList: valueAsList,

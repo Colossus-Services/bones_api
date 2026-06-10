@@ -1543,13 +1543,15 @@ abstract class ConditionEncoder {
         if (listLength == 0) {
           return null;
         } else if (listLength == 1) {
-          value == list.first;
+          value = list.first;
         } else {
           throw ArgumentError(
             "Can't resolve a `List` with mutiple values to a primitive type: $valueTypeInfo >> $value",
           );
         }
       }
+
+      if (value == null) return null;
 
       var parsedValue = valueParser(value);
       if (parsedValue != null) {

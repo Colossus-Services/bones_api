@@ -99,6 +99,8 @@ class WeakList<E extends Object> extends ListBase<E?> {
       _entries[index] = WeakReference(value);
     }
 
+    ++_modCount;
+
     return prevWeakRef.target;
   }
 
