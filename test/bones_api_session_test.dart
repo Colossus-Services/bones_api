@@ -7,6 +7,30 @@ import 'package:shared_map/shared_map.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('APISession', () {
+    test('isExpired uses provided `now`', () async {
+      var session = APISession('s1');
+
+      var lastAccess = session.lastAccessTime;
+      var timeout = Duration(seconds: 10);
+
+      // Within the timeout window:
+      expect(
+        session.isExpired(timeout, now: lastAccess.add(Duration(seconds: 5))),
+        isFalse,
+      );
+      // Exactly at the timeout (elapsed == timeout is NOT expired):
+      expect(session.isExpired(timeout, now: lastAccess.add(timeout)), isFalse);
+      // Past the timeout window:
+      expect(
+        session.isExpired(timeout, now: lastAccess.add(Duration(seconds: 11))),
+        isTrue,
+      );
+      // A `now` before/at the last access is never expired:
+      expect(session.isExpired(timeout, now: lastAccess), isFalse);
+    });
+  });
+
   group('APISessionSet', () {
     final sharedStoreRef = SharedStore("t1").sharedReference();
 

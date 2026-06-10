@@ -43,7 +43,7 @@ class Time implements Comparable<Time> {
       throw ArgumentError.value(second, 'second', 'Not in range: 0..59');
     }
 
-    if (millisecond < 0 || millisecond > 1000) {
+    if (millisecond < 0 || millisecond > 999) {
       throw ArgumentError.value(
         millisecond,
         'millisecond',
@@ -51,7 +51,7 @@ class Time implements Comparable<Time> {
       );
     }
 
-    if (microsecond < 0 || microsecond > 1000) {
+    if (microsecond < 0 || microsecond > 999) {
       throw ArgumentError.value(
         microsecond,
         'microsecond',
@@ -122,7 +122,7 @@ class Time implements Comparable<Time> {
     if (value.isEmpty) return false;
 
     if (!_isDigitByte(value[0])) return false;
-    if (value.length < 2 && !_isDigitByte(value[1])) return false;
+    if (value.length >= 2 && !_isDigitByte(value[1])) return false;
 
     if (value.length == 8 &&
         value[2] == _charColon &&

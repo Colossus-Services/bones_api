@@ -1,3 +1,18 @@
+## 1.9.31
+
+- Bug fixes:
+  - `ConditionSQLEncoder.valueToParameterValue`: fixed encoding of a `List` of values containing `ConditionParameter`s; each element is now resolved individually instead of passing the whole list to every element.
+  - `ConditionEncoder.resolveValueToType`: fixed resolution of a single-element `Iterable` to a primitive type (was a no-op comparison instead of an assignment, leaving the value as a `List`).
+  - `MapGetterExtension.matchKeyIgnoreCase`: fixed case-insensitive key matching that always returned `null` (empty loop body); now returns the matching key. Also fixes `setMultiValue(..., ignoreCase: true)`.
+  - `Time`: `millisecond`/`microsecond` range validation now correctly rejects `1000` (valid range is `0..999`).
+  - `Time._bytesInStringFormat`: fixed the second-byte digit check that was effectively disabled (`length < 2` instead of `length >= 2`).
+  - `APISession.isExpired`: now honors the provided `now` argument instead of always using `DateTime.now()`.
+  - `APIServerResponseCache` cached entry: `replaceFileStat` no longer compares a variable to itself (`identical(myFileStat, myFileStat)`), so the file stat is correctly replaced.
+  - `WeakList.set`: now increments the internal modification counter, consistent with the other mutating methods.
+
+- Tests:
+  - Added tests covering the bug fixes above (`Time` range/string parsing, `matchKeyIgnoreCase`/`getIgnoreCase`/`setMultiValue`, `APISession.isExpired`, and `ConditionSQLEncoder`/`ConditionEncoder` value resolution).
+
 ## 1.9.30
 
 - `APIRootStarter`:

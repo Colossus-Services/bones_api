@@ -766,6 +766,41 @@ void main() {
       );
     });
   });
+
+  group('MapGetterExtension', () {
+    test('matchKeyIgnoreCase', () async {
+      var map = {'Foo': 1, 'BAR': 2};
+
+      // Exact match:
+      expect(map.matchKeyIgnoreCase('Foo'), equals('Foo'));
+      // Case-insensitive match should return the ORIGINAL key:
+      expect(map.matchKeyIgnoreCase('foo'), equals('Foo'));
+      expect(map.matchKeyIgnoreCase('FOO'), equals('Foo'));
+      expect(map.matchKeyIgnoreCase('bar'), equals('BAR'));
+      expect(map.matchKeyIgnoreCase('Bar'), equals('BAR'));
+      // No match:
+      expect(map.matchKeyIgnoreCase('baz'), isNull);
+    });
+
+    test('getIgnoreCase', () async {
+      var map = {'Foo': 1, 'BAR': 2};
+
+      expect(map.getIgnoreCase('foo'), equals(1));
+      expect(map.getIgnoreCase('bar'), equals(2));
+      expect(map.getIgnoreCase('baz'), isNull);
+      expect(map.getIgnoreCase('baz', defaultValue: -1), equals(-1));
+    });
+
+    test('setMultiValue ignoreCase', () async {
+      var map = <String, Object>{'Foo': 'a'};
+
+      map.setMultiValue('foo', 'b', ignoreCase: true);
+
+      // Should accumulate into the existing (original-case) key, not create a new one:
+      expect(map.keys.toList(), equals(['Foo']));
+      expect(map['Foo'], equals(['a', 'b']));
+    });
+  });
 }
 
 Future<T> _asyncValue<T>(T value) =>

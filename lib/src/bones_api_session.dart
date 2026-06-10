@@ -66,7 +66,7 @@ class APISession {
   bool isExpired(Duration timeout, {DateTime? now}) {
     now ??= DateTime.now();
 
-    var elapsedTime = lastAccessElapsedTime;
+    var elapsedTime = now.difference(lastAccessTime);
     return elapsedTime.compareTo(timeout) > 0;
   }
 

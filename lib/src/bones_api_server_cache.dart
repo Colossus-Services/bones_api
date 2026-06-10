@@ -834,7 +834,7 @@ abstract class _CachedResponse
     if (fileStat == null) return;
 
     var myFileStat = _fileStat;
-    if (identical(myFileStat, myFileStat)) return;
+    if (identical(myFileStat, fileStat)) return;
 
     if (myFileStat == null || myFileStat.file == fileStat.file) {
       fileStat.updateFrom(myFileStat);
