@@ -20,10 +20,7 @@ void main() {
         isFalse,
       );
       // Exactly at the timeout (elapsed == timeout is NOT expired):
-      expect(
-        session.isExpired(timeout, now: lastAccess.add(timeout)),
-        isFalse,
-      );
+      expect(session.isExpired(timeout, now: lastAccess.add(timeout)), isFalse);
       // Past the timeout window:
       expect(
         session.isExpired(timeout, now: lastAccess.add(Duration(seconds: 11))),

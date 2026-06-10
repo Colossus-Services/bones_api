@@ -91,7 +91,10 @@ void main() {
       var argsInsensitive = Arguments.parseLine('-Address host');
       expect(argsInsensitive.parameters, equals({'address': 'host'}));
 
-      var argsSensitive = Arguments.parseLine('-Address host', caseSensitive: true);
+      var argsSensitive = Arguments.parseLine(
+        '-Address host',
+        caseSensitive: true,
+      );
       expect(argsSensitive.parameters, equals({'Address': 'host'}));
     });
 
@@ -103,10 +106,7 @@ void main() {
     });
 
     test('trailing double-dash parameter with no value throws', () async {
-      expect(
-        () => Arguments.parseLine('x --foo'),
-        throwsA(isA<StateError>()),
-      );
+      expect(() => Arguments.parseLine('x --foo'), throwsA(isA<StateError>()));
     });
 
     test('keysAbbreviations inverts abbreviations', () async {
@@ -114,10 +114,7 @@ void main() {
         '-a host',
         abbreviations: {'a': 'address', 'v': 'verbose'},
       );
-      expect(
-        args.keysAbbreviations,
-        equals({'address': 'a', 'verbose': 'v'}),
-      );
+      expect(args.keysAbbreviations, equals({'address': 'a', 'verbose': 'v'}));
     });
 
     test('toArgumentsList', () async {

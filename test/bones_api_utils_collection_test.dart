@@ -193,10 +193,7 @@ void main() {
 
       expect(isEqualsDeep('ABC', 'abc'), isFalse);
       expect(isEqualsDeep('ABC', 'abc', valueEquality: ciEquals), isTrue);
-      expect(
-        isEqualsDeep(['ABC'], ['abc'], valueEquality: ciEquals),
-        isTrue,
-      );
+      expect(isEqualsDeep(['ABC'], ['abc'], valueEquality: ciEquals), isTrue);
     });
   });
 
@@ -434,10 +431,15 @@ void main() {
       caches.populateMultiCache('k1', ('a', true), () => <String, int>{}, 100);
 
       var computerCalled = false;
-      var v = caches.getMultiCached('k1', ('a', false), () => <String, int>{}, () {
-        computerCalled = true;
-        return 999;
-      });
+      var v = caches.getMultiCached(
+        'k1',
+        ('a', false),
+        () => <String, int>{},
+        () {
+          computerCalled = true;
+          return 999;
+        },
+      );
 
       expect(v, equals(100));
       expect(computerCalled, isFalse);
@@ -446,11 +448,21 @@ void main() {
     test('getMultiCached computes and caches on miss', () {
       var caches = <(String, bool), Map<String, int>>{};
 
-      var v = caches.getMultiCached('k', ('a', false), () => <String, int>{}, () => 42);
+      var v = caches.getMultiCached(
+        'k',
+        ('a', false),
+        () => <String, int>{},
+        () => 42,
+      );
       expect(v, equals(42));
 
       // Now cached in its own context.
-      var v2 = caches.getMultiCached('k', ('a', false), () => <String, int>{}, () => 0);
+      var v2 = caches.getMultiCached(
+        'k',
+        ('a', false),
+        () => <String, int>{},
+        () => 0,
+      );
       expect(v2, equals(42));
     });
 

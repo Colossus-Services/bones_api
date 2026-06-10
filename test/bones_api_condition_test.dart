@@ -538,10 +538,7 @@ void main() {
       expect(await enc.resolveValueToType(7, int), equals(7));
 
       // A multi-element list can't be resolved to a primitive:
-      expect(
-        () => enc.resolveValueToType([1, 2], int),
-        throwsArgumentError,
-      );
+      expect(() => enc.resolveValueToType([1, 2], int), throwsArgumentError);
     });
   });
 

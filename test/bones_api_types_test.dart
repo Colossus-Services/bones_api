@@ -270,10 +270,7 @@ void main() {
     test('range validation', () async {
       // Valid boundaries:
       expect(Time(0, 0, 0, 0, 0).toString(), equals('00:00:00'));
-      expect(
-        Time(23, 59, 59, 999, 999).toString(),
-        equals('23:59:59.999999'),
-      );
+      expect(Time(23, 59, 59, 999, 999).toString(), equals('23:59:59.999999'));
 
       // millisecond/microsecond must be in range 0..999 (1000 is invalid):
       expect(() => Time(0, 0, 0, 1000), throwsArgumentError);
@@ -288,10 +285,7 @@ void main() {
     test('fromBytes string format', () async {
       // 8-byte ASCII string "20:11:31" must be parsed as a string, not as
       // binary-encoded microseconds:
-      expect(
-        Time.fromBytes('20:11:31'.codeUnits),
-        equals(Time(20, 11, 31)),
-      );
+      expect(Time.fromBytes('20:11:31'.codeUnits), equals(Time(20, 11, 31)));
 
       expect(
         Time.fromBytes('20:11:31.123'.codeUnits),
