@@ -86,5 +86,40 @@ void main() {
         equals('-v --address host --port 80 --list 1 --list 2 --list 3'),
       );
     });
+
+    test('caseSensitive keys', () async {
+      var argsInsensitive = Arguments.parseLine('-Address host');
+      expect(argsInsensitive.parameters, equals({'address': 'host'}));
+
+      var argsSensitive = Arguments.parseLine(
+        '-Address host',
+        caseSensitive: true,
+      );
+      expect(argsSensitive.parameters, equals({'Address': 'host'}));
+    });
+
+    test('trailing single-dash key becomes a flag', () async {
+      var args = Arguments.parseLine('x -v');
+      expect(args.flags, equals({'v'}));
+      expect(args.parameters, isEmpty);
+      expect(args.args, equals(['x']));
+    });
+
+    test('trailing double-dash parameter with no value throws', () async {
+      expect(() => Arguments.parseLine('x --foo'), throwsA(isA<StateError>()));
+    });
+
+    test('keysAbbreviations inverts abbreviations', () async {
+      var args = Arguments.parseLine(
+        '-a host',
+        abbreviations: {'a': 'address', 'v': 'verbose'},
+      );
+      expect(args.keysAbbreviations, equals({'address': 'a', 'verbose': 'v'}));
+    });
+
+    test('toArgumentsList', () async {
+      var args = Arguments.parseLine('x -a 1 -f');
+      expect(args.toArgumentsList(), equals(['-f', '--a', '1']));
+    });
   });
 }
