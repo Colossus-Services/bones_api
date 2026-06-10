@@ -1,3 +1,15 @@
+## 1.9.32
+
+- Tests:
+  - Expanded coverage of `bones_api_utils_collections`:
+    - `isEqualsDeep` / `isEqualsListDeep` / `isEqualsIterableDeep` / `isEqualsSetDeep` / `isEqualsMapDeep` (including nested structures, `null`/identity edge cases and custom `valueEquality`).
+    - `intersectsIterableDeep`.
+    - `deepCopy` / `deepCopyList` / `deepCopySet` / `deepCopyMap` (typed fast paths, `Uint8List`/`Int8List`, and copy independence).
+    - `MapAsCacheExtension` (`getCached`, `getCachedNullable`, `getCachedAsync`, `getCachedAsyncNullable`, `getIfCached`, `checkCacheLimit`).
+    - `MapOfCachesExtension` (`getMultiCached*`, `isEquivalentContext` wildcard semantics, `equivalentCaches`).
+    - `RecordExtension.positionalParametersLength`.
+  - Expanded coverage of `Arguments`: case-sensitive keys, trailing single-dash flags, the trailing double-dash error path, `keysAbbreviations` and `toArgumentsList`.
+
 ## 1.9.31
 
 - Bug fixes:
