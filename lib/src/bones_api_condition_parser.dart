@@ -25,7 +25,7 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       return source.toParser(message: 'Expected ${name ?? source}').trim();
     } else if (source is Parser) {
       ArgumentError.checkNotNull(name, 'name');
-      return source.flatten('Expected $name').trim();
+      return source.flatten(message: 'Expected $name').trim();
     } else {
       throw ArgumentError('Unknown token type: $source.');
     }
