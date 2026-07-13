@@ -1,6 +1,0 @@
-# Local development: resolve the updated chain from sibling repos until published.
-dependency_overrides:
-  docker_commander:
-    path: ../docker_commander
-  apollovm:
-    path: ../apollovm_dart

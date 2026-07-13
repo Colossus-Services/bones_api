@@ -13,3 +13,6 @@ coverage/
 pubspec.lock
 
 .DS_Store
+
+# Local dependency overrides (developer-specific).
+pubspec_overrides.yaml
