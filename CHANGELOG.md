@@ -1,3 +1,19 @@
+## 1.10.0
+
+- `docker_commander`: `^2.1.8` → `^3.0.0`.
+  - Removes `wasm_run` and `flutter_rust_bridge` 1.x from the dependency graph
+    (they came in via `docker_commander` → `apollovm`, and were only ever needed
+    to *execute* Wasm — which nothing here does).
+  - Those packages pinned `shelf_web_socket ^1.0.2` and
+    `web_socket_channel ^2.2.0`, so **every** `bones_api` application was locked
+    out of a modern shelf/WebSocket stack. That constraint is now gone.
+  - `docker_commander`'s own API is unchanged, so this is a minor release: the
+    `DockerHost` types exposed by the test utils keep the same shape.
+
+- `petitparser`: `^6.1.0` → `^7.0.2` (required by `apollovm` 2.0.0).
+  - `JsonGrammarLexer.token`: `flatten()` takes its message as a named
+    parameter in petitparser 7. Same behaviour, new call shape.
+
 ## 1.9.32
 
 - Tests:
