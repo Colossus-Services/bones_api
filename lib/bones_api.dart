@@ -325,6 +325,7 @@ export 'src/bones_api_entity_db_memory.dart';
 export 'src/bones_api_entity_db_object_memory.dart';
 export 'src/bones_api_entity_db_relational.dart';
 export 'src/bones_api_entity_db_sql.dart';
+export 'src/bones_api_entity_pagination.dart';
 export 'src/bones_api_entity_reference.dart';
 export 'src/bones_api_entity_rules.dart';
 export 'src/bones_api_entity_sql.dart';
