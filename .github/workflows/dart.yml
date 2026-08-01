@@ -10,8 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1.7.2
       - name: Dart version
         run: |
           dart --version
@@ -34,8 +34,8 @@ jobs:
   test_vm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1.7.2
       - name: Dart version
         run: |
           dart --version
@@ -51,10 +51,11 @@ jobs:
           dart pub global activate coverage
           dart pub global run coverage:format_coverage --packages=.dart_tool/package_config.json --report-on=lib --lcov -o ./coverage/lcov.info -i ./coverage
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v7
         with:
+          # `codecov-action` v4+ takes the token as an input
+          # (it was an env var in v3):
+          token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./coverage/
           flags: unittests
           env_vars: OS,DART
@@ -65,8 +66,8 @@ jobs:
   test_chrome:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1.7.2
       - name: Dart version
         run: |
           dart --version
