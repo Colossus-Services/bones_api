@@ -502,10 +502,13 @@ class DBRelationalEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
     checkNotClosed();
+
+    offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
 
     var op = TransactionOperationSelect(
       name,
@@ -549,11 +552,14 @@ class DBRelationalEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     checkNotClosed();
+
+    offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
 
     final resolutionRulesResolved = resolveEntityResolutionRules(
       resolutionRules,
@@ -606,6 +612,7 @@ class DBRelationalEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -615,6 +622,7 @@ class DBRelationalEntityRepository<O extends Object>
     ConditionANY(),
     limit: limit,
     offset: offset,
+    page: page,
     orderByID: orderByID,
     orderDirection: orderDirection,
     resolutionRules: resolutionRules,

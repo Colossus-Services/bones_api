@@ -282,6 +282,7 @@ void main() {
       Object? parameters,
       int? limit,
       int? offset,
+      int? page,
       bool? orderByID,
       OrderDirection? orderDirection,
     }) async {
@@ -290,6 +291,7 @@ void main() {
         parameters: parameters ?? [ids.first],
         limit: limit,
         offset: offset,
+        page: page,
         orderByID: orderByID,
         orderDirection: orderDirection,
       );
@@ -439,6 +441,112 @@ void main() {
         offset: 1,
       );
       expect(sel.map((e) => e.id).toList(), equals(ids.skip(1).take(2)));
+    });
+
+    test('page: 1-based, computes the offset from the limit', () async {
+      expect(await selectIDs(limit: 2, page: 1), equals(ids.take(2)));
+      expect(await selectIDs(limit: 2, page: 2), equals(ids.skip(2).take(2)));
+      expect(await selectIDs(limit: 2, page: 3), equals(ids.skip(4).take(2)));
+
+      // Past the end:
+      expect(await selectIDs(limit: 2, page: 4), isEmpty);
+
+      // `page` is equivalent to the offset it computes:
+      expect(
+        await selectIDs(limit: 2, page: 2),
+        equals(await selectIDs(limit: 2, offset: 2)),
+      );
+    });
+
+    test('page implies the ordering, even on page 1', () async {
+      // Resolves to `offset: 0`, which still activates `orderByID`:
+      expect(await selectIDs(limit: 5, page: 1), equals(ids));
+
+      expect(
+        await selectIDs(
+          limit: 2,
+          page: 1,
+          orderDirection: OrderDirection.descending,
+        ),
+        equals(ids.reversed.take(2)),
+      );
+    });
+
+    test('page: descending', () async {
+      expect(
+        await selectIDs(
+          limit: 2,
+          page: 2,
+          orderDirection: OrderDirection.descending,
+        ),
+        equals(ids.reversed.skip(2).take(2)),
+      );
+    });
+
+    test('paging by page reassembles the full set exactly once', () async {
+      var pages = <List<Object?>>[];
+      for (var page = 1; page <= 3; ++page) {
+        pages.add(await selectIDs(limit: 2, page: page));
+      }
+
+      expect(pages.map((p) => p.length), equals([2, 2, 1]));
+      expect(pages.expand((p) => p).toList(), equals(ids));
+    });
+
+    test('page is rejected without a positive limit', () async {
+      expect(() => selectIDs(page: 2), throwsArgumentError);
+      expect(() => selectIDs(page: 2, limit: 0), throwsArgumentError);
+    });
+
+    test('page and offset are mutually exclusive', () async {
+      expect(
+        () => selectIDs(limit: 2, page: 2, offset: 2),
+        throwsArgumentError,
+      );
+    });
+
+    test('page must be >= 1', () async {
+      expect(() => selectIDs(limit: 2, page: 0), throwsArgumentError);
+      expect(() => selectIDs(limit: 2, page: -1), throwsArgumentError);
+    });
+
+    test('page on the other select methods', () async {
+      expect(
+        (await roleRepository.selectIDsByQuery<int>(
+          ' id >= ? ',
+          parameters: [ids.first],
+          limit: 2,
+          page: 2,
+        )).toList(),
+        equals(ids.skip(2).take(2)),
+      );
+
+      expect(
+        (await roleRepository.selectAll(
+          limit: 2,
+          page: 2,
+        )).map((e) => e.id).toList(),
+        equals(ids.skip(2).take(2)),
+      );
+
+      expect(
+        (await roleRepository.select(
+          ConditionANY(),
+          limit: 2,
+          page: 3,
+        )).map((e) => e.id).toList(),
+        equals(ids.skip(4).take(2)),
+      );
+
+      // `selectFirstByQuery` forces `limit: 1`, so `page: n` is the Nth entity:
+      expect(
+        (await roleRepository.selectFirstByQuery(
+          ' id >= ? ',
+          parameters: [ids.first],
+          page: 3,
+        ))?.id,
+        equals(ids[2]),
+      );
     });
 
     test('count is not affected by the ordering', () async {

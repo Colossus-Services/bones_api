@@ -1686,10 +1686,13 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
+    offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
+
     if (matcher is ConditionID) {
       // A single row: only a positive `offset` can change the result.
       return _selectByID(
@@ -1763,9 +1766,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
+    offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
+
     if (matcher is ConditionID) {
       var id = matcher.resolveIDValue(
         parameters: parameters ?? namedParameters,
@@ -1955,6 +1961,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -1964,6 +1971,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     ConditionANY(),
     limit: limit,
     offset: offset,
+    page: page,
     orderByID: orderByID,
     orderDirection: orderDirection,
     resolutionRules: resolutionRules,

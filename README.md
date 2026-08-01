@@ -417,15 +417,16 @@ class AccountAPIRepository extends APIRepository<Account> {
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
 
-  /// Selects a page of [Account]s by field `state`:
+  /// Selects a page of [Account]s by field `state` (`page` starts at 1):
   FutureOr<Iterable<Account>> selectAccountsPage(String state, int page) {
-    // `offset` implies `orderByID`, so the pagination is stable
-    // (translated to: ORDER BY <id> ASC LIMIT 20 OFFSET <page * 20>).
+    // `page` computes the offset from the page size, and implies `orderByID`,
+    // so the pagination is stable
+    // (translated to: ORDER BY <id> ASC LIMIT 20 OFFSET <(page - 1) * 20>).
     return selectByQuery(
       ' address.state == ? ',
       parameters: [state],
       limit: 20,
-      offset: page * 20,
+      page: page,
     );
   }
 
@@ -443,7 +444,7 @@ class AccountAPIRepository extends APIRepository<Account> {
 
 ### Ordering and pagination
 
-The `select*` methods accept `limit`, `offset`, `orderByID` and
+The `select*` methods accept `limit`, `offset`, `page`, `orderByID` and
 `orderDirection`:
 
 - `orderByID` orders by the table's ID column, resolved automatically from the
@@ -453,6 +454,10 @@ The `select*` methods accept `limit`, `offset`, `orderByID` and
   `orderByID: false` to opt out.
 - `orderDirection` is `OrderDirection.ascending` by default, and is ignored
   while the ordering is not active.
+- `page` is the 1-based ergonomic form of `offset`, using `limit` as the page
+  size: `page: 3, limit: 20` is `offset: 40`. It throws an `ArgumentError` if
+  combined with an `offset`, if there is no positive `limit` to page by, or if
+  it is below 1.
 
 The config file used above:
 

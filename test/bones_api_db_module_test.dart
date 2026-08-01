@@ -134,6 +134,51 @@ void main() {
       );
     });
 
+    test('PAGE', () async {
+      expect(await selectIDs('LIMIT=2&PAGE=1'), equals([1, 2]));
+      expect(await selectIDs('LIMIT=2&PAGE=2'), equals([3, 4]));
+      expect(await selectIDs('LIMIT=2&PAGE=3'), equals([5]));
+      expect(await selectIDs('LIMIT=2&PAGE=4'), isEmpty);
+
+      expect(await selectIDs('PAGE=2&LIMIT=2&ORDER=desc'), equals([3, 2]));
+
+      // `PAGE` is equivalent to the `OFFSET` it computes:
+      expect(
+        await selectIDs('LIMIT=2&PAGE=2'),
+        equals(await selectIDs('LIMIT=2&OFFSET=2')),
+      );
+    });
+
+    test('an invalid PAGE is an error response, not a crash', () async {
+      FutureOr<APIResponse> call(String query) => apiRoot.call(
+        APIRequest(
+          APIRequestMethod.GET,
+          '/db/select/role/json',
+          requestedUri: Uri.parse(
+            'http://localhost/db/select/role/json?$query',
+          ),
+        ),
+      );
+
+      // `PAGE` without a `LIMIT`:
+      var noLimit = await call('PAGE=2');
+      expect(noLimit.isOK, isFalse);
+      expect(noLimit.toString(), contains('Invalid pagination'));
+
+      // `PAGE` together with an `OFFSET`:
+      var withOffset = await call('LIMIT=2&PAGE=2&OFFSET=2');
+      expect(withOffset.isOK, isFalse);
+      expect(withOffset.toString(), contains('Invalid pagination'));
+
+      // `PAGE` below 1:
+      var zero = await call('LIMIT=2&PAGE=0');
+      expect(zero.isOK, isFalse);
+      expect(zero.toString(), contains('Invalid pagination'));
+
+      // An unparsable `PAGE` is ignored, like the other directives:
+      expect(await selectIDs('LIMIT=2&PAGE=abc'), equals([1, 2]));
+    });
+
     test('paging through reassembles the full set exactly once', () async {
       var pages = <List<Object?>>[];
       for (var offset = 0; offset < ids.length; offset += 2) {
@@ -180,7 +225,7 @@ void main() {
     test('selectQueryDirectives', () {
       expect(
         APIDBModule.selectQueryDirectives,
-        equals(['EAGER', 'LIMIT', 'OFFSET', 'ORDER']),
+        equals(['EAGER', 'LIMIT', 'OFFSET', 'PAGE', 'ORDER']),
       );
     });
   });

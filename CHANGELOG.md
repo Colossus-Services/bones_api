@@ -1,8 +1,10 @@
 ## 1.11.0
 
-- `selectByQuery` and its siblings gained 3 optional parameters, for pagination
+- `selectByQuery` and its siblings gained 4 optional parameters, for pagination
   and ordering:
   - `offset`: the return offset.
+  - `page`: the 1-based page to return, an ergonomic alternative to `offset`
+    that computes it from the page size: `(page - 1) * limit`.
   - `orderByID`: orders the result by the table's ID column, resolved
     automatically from the existing scheme machinery (`TableScheme.idFieldName`
     → `EncodingContext.tableFieldID`, or `EntityHandler.idFieldName`).
@@ -15,7 +17,13 @@
     pagination needs a stable order to be correct. Pass `orderByID: false` to
     opt out and get a bare `OFFSET`.
   - `orderDirection` is **ignored** while the ordering is not active.
-  - All 3 are optional and default to the previous behavior: with them unset the
+  - `page` is a public convenience resolved to an `offset` at the repository
+    layer (see `resolveSelectOffset`); the adapter contract keeps taking only
+    `offset`. It throws an `ArgumentError` when combined with an `offset` (two
+    spellings of one thing), when there is no positive `limit` to use as the
+    page size, or when it is `< 1`. `page: 1` resolves to `offset: 0`, which
+    still activates the ordering, so even the first page is stable.
+  - All 4 are optional and default to the previous behavior: with them unset the
     generated SQL is character-identical to 1.10.0.
 
   Added to `EntitySource`/`EntityRepository` (`selectByQuery`,
@@ -35,6 +43,9 @@
   (`bones_api_entity.dart`): the shared Dart-side "order by ID → skip → take"
   used by every adapter that can't delegate the ordering to a DB engine.
 
+- New `resolveSelectOffset` (`bones_api_entity.dart`): resolves `page` to an
+  `offset`, and states the `page`/`offset`/`limit` validation rules once.
+
 - `SQLDialect`:
   - New `orderBySQL` and `limitOffsetSQL` clause builders, so all the
     dialect-specific `SELECT` tail syntax lives in one place.
@@ -47,12 +58,14 @@
 - `SQL`: new `offset`, `orderByID` and `orderDirection` fields (carried by
   `copy()`), read by `DBSQLMemoryAdapter` to apply the same semantics in Dart.
 
-- `APIDBModule.select` (`/db/select/<table>`): new `LIMIT=<n>`, `OFFSET=<n>` and
-  `ORDER=asc|desc` query directives (see `APIDBModule.selectQueryDirectives`),
+- `APIDBModule.select` (`/db/select/<table>`): new `LIMIT=<n>`, `OFFSET=<n>`,
+  `PAGE=<n>` and `ORDER=asc|desc` query directives
+  (see `APIDBModule.selectQueryDirectives`),
   parsed from the query `String` alongside the pre-existing `EAGER=true` and
   stripped before the remainder is parsed as the entity condition query. The
   endpoint no longer selects the whole table and sorts it in Dart — the ordering
-  is now resolved by the DB. Its output order is unchanged.
+  is now resolved by the DB. Its output order is unchanged. An invalid `PAGE`
+  becomes an error response rather than an uncaught `ArgumentError`.
 
 - **Behavior change**: `limit` is now honored on the paths that previously
   accepted and silently ignored it — `DBEntityRepository.select`'s

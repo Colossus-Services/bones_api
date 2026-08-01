@@ -3332,6 +3332,46 @@ int compareEntityIDs(Object? id1, Object? id2) {
   return 0;
 }
 
+/// Resolves the effective `offset` of a `select*` operation from a 1-based
+/// [page], where [limit] is the page size.
+///
+/// Returns [offset] unchanged when [page] is `null`, otherwise
+/// `(page - 1) * limit`. A [page] of `1` resolves to an `offset` of `0`, which
+/// still activates the ordering (see [OrderDirection.resolveOrderByID]), so a
+/// paginated select is stable by default.
+///
+/// Throws an [ArgumentError] when:
+/// - [page] and [offset] are both defined: they are two spellings of the same
+///   thing, so passing both is a bug rather than a precedence question;
+/// - [page] is defined without a positive [limit]: a page has no meaning
+///   without a page size, and a `limit` of `0` means "no limit";
+/// - [page] is `< 1`: pages are numbered from `1`.
+int? resolveSelectOffset({int? page, int? offset, int? limit}) {
+  if (page == null) return offset;
+
+  if (offset != null) {
+    throw ArgumentError.value(
+      page,
+      'page',
+      "`page` and `offset` are mutually exclusive (offset: $offset)",
+    );
+  }
+
+  if (limit == null || limit <= 0) {
+    throw ArgumentError.value(
+      page,
+      'page',
+      '`page` requires a positive `limit` (the page size), got: $limit',
+    );
+  }
+
+  if (page < 1) {
+    throw ArgumentError.value(page, 'page', '`page` is 1-based, must be >= 1');
+  }
+
+  return (page - 1) * limit;
+}
+
 /// Applies the ordering and the pagination of a `select*` operation to [itr].
 ///
 /// Orders the elements by ID (resolved through [idGetter]) when
@@ -3454,8 +3494,13 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
 
   /// {@template bones_api.select_pagination}
   /// Ordering and pagination:
-  /// - [limit]: the maximum number of returned entities.
+  /// - [limit]: the maximum number of returned entities. Also the page size
+  ///   of [page].
   /// - [offset]: the return offset, for pagination.
+  /// - [page]: the 1-based page to return, an ergonomic alternative to
+  ///   [offset]: it resolves to `(page - 1) * limit`. Requires a positive
+  ///   [limit], and can't be combined with [offset].
+  ///   See [resolveSelectOffset].
   /// - [orderByID]: if `true` the result is ordered by the table ID column,
   ///   automatically resolved from the table scheme
   ///   ([TableScheme.idFieldName]) or from [EntityHandler.idFieldName].
@@ -3476,6 +3521,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) => selectByQuery(
@@ -3484,7 +3530,8 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,
-    offset: offset,
+    // The page size of a "first" select is 1, so `page: n` is the Nth entity:
+    offset: resolveSelectOffset(page: page, offset: offset, limit: 1),
     orderByID: orderByID,
     orderDirection: orderDirection,
   ).resolveMapped((result) => result.firstOrNull);
@@ -3498,6 +3545,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
@@ -3510,7 +3558,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
@@ -3525,6 +3573,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -3539,6 +3588,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
@@ -3551,7 +3601,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
@@ -3566,6 +3616,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   });
@@ -3575,6 +3626,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -5592,6 +5644,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -5601,7 +5654,8 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,
-    offset: offset,
+    // The page size of a "first" select is 1, so `page: n` is the Nth entity:
+    offset: resolveSelectOffset(page: page, offset: offset, limit: 1),
     orderByID: orderByID,
     orderDirection: orderDirection,
     resolutionRules: resolutionRules,
@@ -5617,6 +5671,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -5632,7 +5687,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
       resolutionRules: resolutionRules,
@@ -5649,6 +5704,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
@@ -5663,7 +5719,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
@@ -7569,6 +7625,7 @@ abstract class IterableEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -7581,7 +7638,7 @@ abstract class IterableEntityRepository<O extends Object>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
@@ -7598,6 +7655,7 @@ abstract class IterableEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
@@ -7609,7 +7667,7 @@ abstract class IterableEntityRepository<O extends Object>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
@@ -7624,6 +7682,7 @@ abstract class IterableEntityRepository<O extends Object>
     Transaction? transaction,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
@@ -7632,7 +7691,7 @@ abstract class IterableEntityRepository<O extends Object>
 
     var os = all(
       limit: limit,
-      offset: offset,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
       orderByID: orderByID,
       orderDirection: orderDirection,
     );

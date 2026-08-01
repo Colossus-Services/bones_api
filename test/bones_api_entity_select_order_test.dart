@@ -128,6 +128,94 @@ void main() {
     });
   });
 
+  group('resolveSelectOffset', () {
+    test('no page returns the offset unchanged', () {
+      expect(resolveSelectOffset(), isNull);
+      expect(resolveSelectOffset(offset: 40), equals(40));
+      expect(resolveSelectOffset(offset: 40, limit: 20), equals(40));
+      expect(resolveSelectOffset(offset: 0), equals(0));
+    });
+
+    test('page is 1-based', () {
+      expect(resolveSelectOffset(page: 1, limit: 20), equals(0));
+      expect(resolveSelectOffset(page: 2, limit: 20), equals(20));
+      expect(resolveSelectOffset(page: 3, limit: 20), equals(40));
+      expect(resolveSelectOffset(page: 10, limit: 3), equals(27));
+      expect(resolveSelectOffset(page: 2, limit: 1), equals(1));
+    });
+
+    test('page 1 resolves to offset 0, which activates the ordering', () {
+      var offset = resolveSelectOffset(page: 1, limit: 20);
+      expect(offset, equals(0));
+      // A paginated select must be stable even on the first page:
+      expect(OrderDirection.resolveOrderByID(null, offset), isTrue);
+    });
+
+    test('page requires a positive limit', () {
+      expect(
+        () => resolveSelectOffset(page: 3),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('requires a positive `limit`'),
+          ),
+        ),
+      );
+
+      // No special case for page 1: the rule stays predictable.
+      expect(() => resolveSelectOffset(page: 1), throwsArgumentError);
+
+      // A `limit` of 0 means "no limit", so it is not a page size:
+      expect(() => resolveSelectOffset(page: 2, limit: 0), throwsArgumentError);
+      expect(
+        () => resolveSelectOffset(page: 2, limit: -1),
+        throwsArgumentError,
+      );
+    });
+
+    test('page and offset are mutually exclusive', () {
+      expect(
+        () => resolveSelectOffset(page: 3, offset: 100, limit: 20),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('mutually exclusive'),
+          ),
+        ),
+      );
+
+      // Even when they would agree, and even for an offset of 0:
+      expect(
+        () => resolveSelectOffset(page: 3, offset: 40, limit: 20),
+        throwsArgumentError,
+      );
+      expect(
+        () => resolveSelectOffset(page: 1, offset: 0, limit: 20),
+        throwsArgumentError,
+      );
+    });
+
+    test('page must be >= 1', () {
+      expect(
+        () => resolveSelectOffset(page: 0, limit: 20),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('1-based'),
+          ),
+        ),
+      );
+
+      expect(
+        () => resolveSelectOffset(page: -1, limit: 20),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('applySelectOrderAndPagination', () {
     // Deliberately unsorted, so an ordered result can't pass by accident:
     final ids = <Object?>[3, 1, 5, 2, 4];

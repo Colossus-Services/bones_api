@@ -2447,6 +2447,7 @@ Future<bool> runAdapterTests(
         Future<List<Object?>> selectIDs({
           int? limit,
           int? offset,
+          int? page,
           bool? orderByID,
           OrderDirection? orderDirection,
         }) async {
@@ -2455,6 +2456,7 @@ Future<bool> runAdapterTests(
             parameters: [firstId],
             limit: limit,
             offset: offset,
+            page: page,
             orderByID: orderByID,
             orderDirection: orderDirection,
           );
@@ -2539,6 +2541,47 @@ Future<bool> runAdapterTests(
           (await campaignRepo.selectAll(limit: 2, orderByID: true)).length,
           equals(2),
         );
+
+        // `page` is 1-based and computes the offset from the `limit`:
+        expect(
+          await selectIDs(limit: 2, page: 1),
+          equals(ids.take(2).toList()),
+        );
+        expect(
+          await selectIDs(limit: 2, page: 2),
+          equals(ids.skip(2).take(2).toList()),
+        );
+        expect(
+          await selectIDs(limit: 2, page: 3),
+          equals(ids.skip(4).take(2).toList()),
+        );
+        expect(await selectIDs(limit: 2, page: 4), isEmpty);
+
+        expect(
+          await selectIDs(
+            limit: 2,
+            page: 2,
+            orderDirection: OrderDirection.descending,
+          ),
+          equals(ids.reversed.skip(2).take(2).toList()),
+        );
+
+        // Paging by `page` reassembles the full set exactly once:
+        var byPage = <List<Object?>>[];
+        for (var page = 1; page <= 3; ++page) {
+          byPage.add(await selectIDs(limit: 2, page: page));
+        }
+        expect(byPage.expand((p) => p).toList(), equals(ids));
+
+        // `page` is rejected without a positive `limit`, alongside an
+        // `offset`, or below 1:
+        expect(() => selectIDs(page: 2), throwsArgumentError);
+        expect(() => selectIDs(page: 2, limit: 0), throwsArgumentError);
+        expect(
+          () => selectIDs(page: 2, limit: 2, offset: 2),
+          throwsArgumentError,
+        );
+        expect(() => selectIDs(page: 0, limit: 2), throwsArgumentError);
       });
 
       test('Pagination [objectAdapter]: orderByID / offset / limit', () async {

@@ -269,15 +269,19 @@ class APIDBModule extends APIModule {
   /// the entity condition query.
   ///
   /// - `EAGER=true`: resolves the referenced entities.
-  /// - `LIMIT=<n>`: the maximum number of returned entities.
+  /// - `LIMIT=<n>`: the maximum number of returned entities, and the page size
+  ///   of `PAGE`.
   /// - `OFFSET=<n>`: the return offset, for pagination.
+  /// - `PAGE=<n>`: the 1-based page to return; requires `LIMIT` and can't be
+  ///   combined with `OFFSET`. See [resolveSelectOffset].
   /// - `ORDER=asc|desc`: the [OrderDirection] of the ordering.
   ///
-  /// Example: `/db/select/user/json?email == "a@b.c"&LIMIT=10&OFFSET=20`
+  /// Example: `/db/select/user/json?email == "a@b.c"&LIMIT=10&PAGE=3`
   static const List<String> selectQueryDirectives = [
     'EAGER',
     'LIMIT',
     'OFFSET',
+    'PAGE',
     'ORDER',
   ];
 
@@ -319,6 +323,7 @@ class APIDBModule extends APIModule {
     bool json = false,
     int? limit,
     int? offset,
+    int? page,
     bool? orderByID,
     OrderDirection? orderDirection,
   }) async {
@@ -361,9 +366,23 @@ class APIDBModule extends APIModule {
     }
 
     {
+      var extracted = _extractQueryDirective(query, 'PAGE');
+      query = extracted.query;
+      page ??= int.tryParse(extracted.value?.trim() ?? '');
+    }
+
+    {
       var extracted = _extractQueryDirective(query, 'ORDER');
       query = extracted.query;
       orderDirection ??= OrderDirection.parse(extracted.value);
+    }
+
+    // Resolved here (and not by the repository) so an invalid `PAGE` becomes an
+    // error response instead of an uncaught `ArgumentError`:
+    try {
+      offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
+    } on ArgumentError catch (e) {
+      return APIResponse.error(error: "Invalid pagination: ${e.message}");
     }
 
     eager ??= false;
@@ -381,6 +400,7 @@ class APIDBModule extends APIModule {
       "orderDirection: ${OrderDirection.resolve(orderDirection).name}"
       "${limit != null ? ' ; limit: $limit' : ''}"
       "${offset != null ? ' ; offset: $offset' : ''}"
+      "${page != null ? ' ; page: $page' : ''}"
       "${query.isNotEmpty ? ' ; QUERY> $query' : ''}",
     );
 
