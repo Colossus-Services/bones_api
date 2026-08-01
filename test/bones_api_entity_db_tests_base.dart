@@ -2584,6 +2584,103 @@ Future<bool> runAdapterTests(
         expect(() => selectIDs(page: 0, limit: 2), throwsArgumentError);
       });
 
+      test('Pagination: JOIN, eager resolution and stability', () async {
+        final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+        final campaignConfigRepo =
+            entityRepositoryProvider.campaignConfigAPIRepository;
+
+        var cfgId = await campaignConfigRepo.store(CampaignConfig(open: true));
+        expect(cfgId, isNotNull);
+
+        var ids = <int>[];
+        for (var i = 1; i <= 5; ++i) {
+          var id = await campaignRepo.store(
+            Campaign('JOIN-0$i', config: cfgId),
+          );
+          ids.add(id as int);
+        }
+        expect(ids, orderedEquals([...ids]..sort()));
+
+        // A condition over a referenced entity generates a `JOIN`. The
+        // `ORDER BY` must target the MAIN table's alias (`campaign`), not the
+        // joined one, otherwise the paging below would be ordered by the
+        // config's ID -- which is the same row for all 5 campaigns.
+        Future<List<Object?>> selectJoined({
+          int? limit,
+          int? offset,
+          bool? orderByID,
+          OrderDirection? orderDirection,
+          EntityResolutionRules? resolutionRules,
+        }) async {
+          var sel = await campaignRepo.selectByQuery(
+            ' config.open == ? && id >= ? ',
+            parameters: [true, ids.first],
+            limit: limit,
+            offset: offset,
+            orderByID: orderByID,
+            orderDirection: orderDirection,
+            resolutionRules: resolutionRules,
+          );
+          return sel.map((e) => e.id).toList();
+        }
+
+        expect(await selectJoined(orderByID: true), equals(ids));
+
+        expect(
+          await selectJoined(
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          ),
+          equals(ids.reversed.toList()),
+        );
+
+        expect(
+          await selectJoined(limit: 2, offset: 2),
+          equals(ids.skip(2).take(2).toList()),
+        );
+
+        // Paging a JOIN query must still reassemble the full set:
+        var joinPages = <List<Object?>>[];
+        for (var offset = 0; offset < ids.length; offset += 2) {
+          joinPages.add(await selectJoined(limit: 2, offset: offset));
+        }
+        expect(joinPages.expand((p) => p).toList(), equals(ids));
+
+        // The ordering must survive the eager entity resolution, which
+        // re-reads the referenced entities after the select:
+        var eager = await selectJoined(
+          limit: 3,
+          offset: 1,
+          resolutionRules: EntityResolutionRules(allEager: true),
+        );
+        expect(eager, equals(ids.skip(1).take(3).toList()));
+
+        // Stability: the whole point of `offset` implying `orderByID` is that
+        // the same page is the same rows every time.
+        for (var i = 0; i < 3; ++i) {
+          expect(
+            await selectJoined(limit: 2, offset: 2),
+            equals(ids.skip(2).take(2).toList()),
+            reason: 'Unstable page on repetition #$i',
+          );
+        }
+
+        // A query matching nothing stays empty under every option:
+        Future<List<Object?>> selectNone({int? offset, int? limit}) async {
+          var sel = await campaignRepo.selectByQuery(
+            ' name == ? ',
+            parameters: ['JOIN-NO-SUCH-CAMPAIGN'],
+            limit: limit,
+            offset: offset,
+          );
+          return sel.map((e) => e.id).toList();
+        }
+
+        expect(await selectNone(), isEmpty);
+        expect(await selectNone(offset: 0), isEmpty);
+        expect(await selectNone(offset: 5, limit: 2), isEmpty);
+      });
+
       test('Pagination [objectAdapter]: orderByID / offset / limit', () async {
         final photoRepo = entityRepositoryProvider2.photoAPIRepository;
 

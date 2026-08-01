@@ -27,6 +27,15 @@ class _SelectTestProvider extends EntityRepositoryProvider {
             'value': Decimal,
           },
         ),
+        // A table whose ID column is NOT named `id`. Every entity of
+        // `bones_api_test_entities.dart` uses `id`, so without this the
+        // `orderByID` assertions would pass even if the column name were
+        // hardcoded instead of resolved from the `TableScheme`.
+        TableScheme(
+          'legacy_item',
+          idFieldName: 'item_code',
+          fieldsTypes: {'item_code': String, 'name': String},
+        ),
       ]);
 
     roleRepository = DBSQLEntityRepository<Role>(
@@ -183,6 +192,64 @@ void main() {
         equals(
           'SELECT ro.* FROM role as ro WHERE ( ro.enabled = @enabled )'
           ' ORDER BY ro.id ASC LIMIT 2 OFFSET 1',
+        ),
+      );
+    });
+
+    test('ORDER BY uses the resolved ID column, not a hardcoded `id`', () async {
+      // `legacy_item` declares `idFieldName: 'item_code'`. The ORDER BY column
+      // must come from the `TableScheme` (through
+      // `EncodingContext.tableFieldID`), which is the machinery this feature
+      // reuses. If it ever falls back to a literal `id`, this fails.
+      var sql = await sqlAdapter.generateSelectSQL(
+        Transaction(),
+        'LegacyItem',
+        'legacy_item',
+        ConditionANY(),
+        orderByID: true,
+      );
+
+      expect(
+        sql.sql,
+        equals(
+          'SELECT le.* FROM legacy_item as le'
+          ' ORDER BY le.item_code ASC',
+        ),
+      );
+      expect(sql.sql, isNot(contains('.id')));
+
+      var desc = await sqlAdapter.generateSelectSQL(
+        Transaction(),
+        'LegacyItem',
+        'legacy_item',
+        ConditionANY(),
+        limit: 2,
+        offset: 4,
+        orderDirection: OrderDirection.descending,
+      );
+
+      expect(
+        desc.sql,
+        equals(
+          'SELECT le.* FROM legacy_item as le'
+          ' ORDER BY le.item_code DESC LIMIT 2 OFFSET 4',
+        ),
+      );
+
+      // The IDs projection must also use it, for both the column and ORDER BY:
+      var ids = await sqlAdapter.generateSelectIDsSQL(
+        Transaction(),
+        'LegacyItem',
+        'legacy_item',
+        ConditionANY(),
+        orderByID: true,
+      );
+
+      expect(
+        ids.sql,
+        equals(
+          'SELECT le.item_code as id FROM legacy_item as le'
+          ' ORDER BY le.item_code ASC',
         ),
       );
     });
