@@ -111,6 +111,18 @@ class SQLDialect extends DBDialect {
   /// Whether the SQL dialect supports `IF NOT EXISTS` on `CREATE INDEX`.
   final bool createIndexIfNotExists;
 
+  /// If `true` this dialect can't parse an `OFFSET` clause that is not preceded
+  /// by a `LIMIT` clause (MySQL). See [offsetMaxLimitValue].
+  final bool offsetRequiresLimit;
+
+  /// The maximum row count accepted by a `LIMIT` clause of this dialect,
+  /// used as the `LIMIT` value when only an `offset` was requested and
+  /// [offsetRequiresLimit] is `true`.
+  ///
+  /// Declared as a [String] and not an [int] because MySQL's documented value
+  /// (`18446744073709551615`, 2^64-1) is out of range of a Dart [int].
+  final String offsetMaxLimitValue;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -123,7 +135,47 @@ class SQLDialect extends DBDialect {
     this.acceptsVarcharWithoutMaximumSize = false,
     this.foreignKeyCreatesImplicitIndex = true,
     this.createIndexIfNotExists = true,
+    this.offsetRequiresLimit = false,
+    this.offsetMaxLimitValue = '18446744073709551615',
   });
+
+  /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause
+  /// of this dialect.
+  String orderBySQL(
+    String tableAlias,
+    String column, {
+    OrderDirection? direction,
+  }) {
+    var q = elementQuote;
+    var keyword = OrderDirection.resolve(direction).sqlKeyword;
+    return ' ORDER BY $q$tableAlias$q.$q$column$q $keyword';
+  }
+
+  /// Builds the ` LIMIT <limit> OFFSET <offset>` clause of this dialect.
+  /// Returns an empty `String` when neither [limit] nor [offset] applies.
+  ///
+  /// Only positive values are emitted (`limit > 0` and `offset > 0`),
+  /// preserving the pre-existing `LIMIT` behavior.
+  ///
+  /// When only an [offset] applies and [offsetRequiresLimit] is `true`, emits
+  /// `LIMIT <offsetMaxLimitValue> OFFSET <offset>`, since such a dialect can't
+  /// parse a standalone `OFFSET`.
+  String limitOffsetSQL({int? limit, int? offset}) {
+    var hasLimit = limit != null && limit > 0;
+    var hasOffset = offset != null && offset > 0;
+
+    if (!hasOffset) {
+      return hasLimit ? ' LIMIT $limit' : '';
+    }
+
+    if (hasLimit) {
+      return ' LIMIT $limit OFFSET $offset';
+    }
+
+    return offsetRequiresLimit
+        ? ' LIMIT $offsetMaxLimitValue OFFSET $offset'
+        : ' OFFSET $offset';
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -147,7 +199,9 @@ class SQLDialect extends DBDialect {
         'acceptsInsertIgnore: $acceptsInsertIgnore, '
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
-        'createIndexIfNotExists: $createIndexIfNotExists'
+        'createIndexIfNotExists: $createIndexIfNotExists, '
+        'offsetRequiresLimit: $offsetRequiresLimit, '
+        'offsetMaxLimitValue: $offsetMaxLimitValue'
         '}';
   }
 }

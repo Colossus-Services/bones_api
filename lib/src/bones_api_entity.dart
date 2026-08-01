@@ -3307,6 +3307,77 @@ mixin EntityFieldAccessor<O> {
 
 class EntityFieldAccessorGeneric<O> with EntityFieldAccessor<O> {}
 
+/// Compares 2 entity IDs, implementing the `orderByID` ordering of the
+/// `select*` methods.
+///
+/// - `null` IDs are ordered last (in [OrderDirection.ascending] order).
+/// - [num]s are compared numerically and [String]s lexicographically.
+/// - Any other pair of [Comparable]s of the same type is compared
+///   with [Comparable.compareTo]; otherwise returns `0` (undefined order).
+int compareEntityIDs(Object? id1, Object? id2) {
+  if (identical(id1, id2)) return 0;
+
+  if (id1 == null) return id2 == null ? 0 : 1;
+  if (id2 == null) return -1;
+
+  if (id1 is num && id2 is num) return id1.compareTo(id2);
+  if (id1 is String && id2 is String) return id1.compareTo(id2);
+
+  if (id1 is Comparable && id2 is Comparable) {
+    if (id1.runtimeType == id2.runtimeType) {
+      return id1.compareTo(id2);
+    }
+  }
+
+  return 0;
+}
+
+/// Applies the ordering and the pagination of a `select*` operation to [itr].
+///
+/// Orders the elements by ID (resolved through [idGetter]) when
+/// [OrderDirection.resolveOrderByID] resolves to `true`, then skips [offset]
+/// elements and takes [limit] of them — in that order, matching SQL semantics
+/// (`ORDER BY` → `OFFSET` → `LIMIT`).
+///
+/// Used by the [DBAdapter]s that can't delegate the ordering and the
+/// pagination to a DB engine, and by [IterableEntityRepository].
+///
+/// [zeroLimitIsUnlimited] selects how a `limit` of `0` is interpreted, since
+/// the pre-existing call sites disagree: the generated SQL treats it as "no
+/// `LIMIT` clause" (`true`), while the in-memory selects treat it as an empty
+/// result (`false`, the default). Only relevant for a [limit] of exactly `0`.
+Iterable<T> applySelectOrderAndPagination<T>(
+  Iterable<T> itr,
+  Object? Function(T o) idGetter, {
+  int? limit,
+  int? offset,
+  bool? orderByID,
+  OrderDirection? orderDirection,
+  bool zeroLimitIsUnlimited = false,
+}) {
+  if (OrderDirection.resolveOrderByID(orderByID, offset)) {
+    var descending = OrderDirection.resolve(orderDirection).isDescending;
+
+    var sorted = itr.toList();
+    sorted.sort(
+      descending
+          ? (a, b) => compareEntityIDs(idGetter(b), idGetter(a))
+          : (a, b) => compareEntityIDs(idGetter(a), idGetter(b)),
+    );
+    itr = sorted;
+  }
+
+  if (offset != null && offset > 0) {
+    itr = itr.skip(offset);
+  }
+
+  if (limit != null && (zeroLimitIsUnlimited ? limit > 0 : limit >= 0)) {
+    itr = itr.take(limit);
+  }
+
+  return itr;
+}
+
 abstract class EntityAccessor<O extends Object> {
   static String simplifiedName(String name) {
     name = name.trim().toLowerCase().replaceAll(RegExp(r'[\W_]+'), '').trim();

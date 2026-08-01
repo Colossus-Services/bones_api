@@ -167,6 +167,17 @@ class SQL implements SQLWrapper {
 
   final int? limit;
 
+  /// The return offset of this select (`OFFSET`), or `null` for no offset.
+  final int? offset;
+
+  /// If this select is ordered by the table ID column. `null` means unset,
+  /// resolved by [OrderDirection.resolveOrderByID] as `offset != null`.
+  final bool? orderByID;
+
+  /// The [OrderDirection] of the ordering.
+  /// Only applies while the ordering is active. See [orderByID].
+  final OrderDirection? orderDirection;
+
   final Map<String, String>? returnColumnsAliases;
 
   final String? mainTable;
@@ -216,6 +227,9 @@ class SQL implements SQLWrapper {
     this.returnColumns,
     this.returnColumnsAliases,
     this.limit,
+    this.offset,
+    this.orderByID,
+    this.orderDirection,
     required this.mainTable,
     this.relationship,
     this.tablesAliases,
@@ -240,6 +254,9 @@ class SQL implements SQLWrapper {
     returnColumns: returnColumns?.toSet(),
     returnColumnsAliases: returnColumnsAliases?.map((k, v) => MapEntry(k, v)),
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     mainTable: mainTable,
     relationship: relationship,
     tablesAliases: tablesAliases?.map((k, v) => MapEntry(k, v)),
