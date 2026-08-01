@@ -2342,6 +2342,205 @@ Future<bool> runAdapterTests(
           }
         },
       );
+
+      test('generateSelectSQL: ORDER BY / LIMIT / OFFSET', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        // NOTE: not `cmdQuote` (the DDL quote asserted by
+        // `generateFullCreateTableSQLs`): the `generic` dialect of
+        // `DBSQLMemoryAdapter` has an empty element quote.
+        var q = sqlAdapter.dialect.elementQuote;
+
+        FutureOr<SQL> selectSQL({
+          int? limit,
+          int? offset,
+          bool? orderByID,
+          OrderDirection? orderDirection,
+        }) => sqlAdapter.generateSelectSQL(
+          Transaction(),
+          'Campaign',
+          'campaign',
+          ConditionANY(),
+          limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
+        );
+
+        // The `ORDER BY` column is the table ID, resolved from the
+        // `TableScheme` of the DB:
+        final orderByIdAsc = ' ORDER BY ${q}ca$q.${q}id$q ASC';
+        final orderByIdDesc = ' ORDER BY ${q}ca$q.${q}id$q DESC';
+
+        // Baseline: the pre-existing SQL is unchanged.
+        expect((await selectSQL()).sql, isNot(contains('ORDER BY')));
+        expect((await selectSQL()).sql, isNot(contains('LIMIT')));
+        expect((await selectSQL()).sql, isNot(contains('OFFSET')));
+
+        expect((await selectSQL(limit: 2)).sql, endsWith(' LIMIT 2'));
+
+        // `orderDirection` alone is ignored:
+        expect(
+          (await selectSQL(orderDirection: OrderDirection.descending)).sql,
+          isNot(contains('ORDER BY')),
+        );
+
+        expect((await selectSQL(orderByID: true)).sql, endsWith(orderByIdAsc));
+
+        expect(
+          (await selectSQL(
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          )).sql,
+          endsWith(orderByIdDesc),
+        );
+
+        // An `offset` implies the ordering, so the pagination is stable:
+        expect(
+          (await selectSQL(limit: 2, offset: 3)).sql,
+          endsWith('$orderByIdAsc LIMIT 2 OFFSET 3'),
+        );
+
+        expect(
+          (await selectSQL(offset: 3, orderByID: false)).sql,
+          isNot(contains('ORDER BY')),
+        );
+
+        // An `offset` with no `limit` is the dialect-specific case: MySQL can't
+        // parse a standalone `OFFSET`, so it gets the maximum row count as the
+        // `LIMIT` instead.
+        var offsetOnly = (await selectSQL(offset: 3)).sql;
+        if (sqlAdapter.dialect.offsetRequiresLimit) {
+          expect(
+            offsetOnly,
+            endsWith(
+              '$orderByIdAsc'
+              ' LIMIT ${sqlAdapter.dialect.offsetMaxLimitValue} OFFSET 3',
+            ),
+          );
+        } else {
+          expect(offsetOnly, endsWith('$orderByIdAsc OFFSET 3'));
+        }
+      });
+
+      test('Pagination: orderByID / orderDirection / offset / limit', () async {
+        final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+
+        // Store 5 campaigns and keep their (ascending) IDs. Every query below
+        // is scoped with ` id >= ? ` so the campaigns stored by the previous
+        // tests of this group can't leak into the assertions.
+        var ids = <int>[];
+        for (var i = 1; i <= 5; ++i) {
+          var id = await campaignRepo.store(Campaign('PAGE-0$i'));
+          expect(id, isNotNull);
+          ids.add(id as int);
+        }
+
+        expect(ids.length, equals(5));
+        expect(
+          ids,
+          orderedEquals([...ids]..sort()),
+          reason: "The stored IDs must be ascending: $ids",
+        );
+
+        final firstId = ids.first;
+
+        Future<List<Object?>> selectIDs({
+          int? limit,
+          int? offset,
+          bool? orderByID,
+          OrderDirection? orderDirection,
+        }) async {
+          var sel = await campaignRepo.selectByQuery(
+            ' id >= ? ',
+            parameters: [firstId],
+            limit: limit,
+            offset: offset,
+            orderByID: orderByID,
+            orderDirection: orderDirection,
+          );
+          return sel.map((e) => e.id).toList();
+        }
+
+        // Ordering:
+        expect(await selectIDs(orderByID: true), equals(ids));
+
+        expect(
+          await selectIDs(
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          ),
+          equals(ids.reversed.toList()),
+        );
+
+        expect(
+          await selectIDs(orderByID: true, limit: 2),
+          equals(ids.take(2).toList()),
+        );
+
+        // `offset` implies `orderByID`:
+        expect(
+          await selectIDs(offset: 2, limit: 2),
+          equals(ids.skip(2).take(2).toList()),
+        );
+
+        // An `offset` with no `limit`: the MySQL
+        // `LIMIT <offsetMaxLimitValue> OFFSET n` path.
+        expect(await selectIDs(offset: 3), equals(ids.skip(3).toList()));
+
+        expect(
+          await selectIDs(
+            offset: 1,
+            limit: 2,
+            orderDirection: OrderDirection.descending,
+          ),
+          equals(ids.reversed.skip(1).take(2).toList()),
+        );
+
+        expect(await selectIDs(offset: ids.length), isEmpty);
+
+        // Paging through reassembles the full set exactly once:
+        var pages = <List<Object?>>[];
+        for (var offset = 0; offset < ids.length; offset += 2) {
+          pages.add(await selectIDs(limit: 2, offset: offset));
+        }
+        expect(pages.expand((p) => p).toList(), equals(ids));
+
+        // `orderDirection` alone is ignored (the order stays unspecified):
+        expect(
+          await selectIDs(orderDirection: OrderDirection.descending),
+          unorderedEquals(ids),
+        );
+
+        // `selectIDsByQuery`:
+        expect(
+          (await campaignRepo.selectIDsByQuery<int>(
+            ' id >= ? ',
+            parameters: [firstId],
+            offset: 2,
+            limit: 2,
+          )).toList(),
+          equals(ids.skip(2).take(2).toList()),
+        );
+
+        // `selectFirstByQuery`:
+        expect(
+          (await campaignRepo.selectFirstByQuery(
+            ' id >= ? ',
+            parameters: [firstId],
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          ))?.id,
+          equals(ids.last),
+        );
+
+        // `selectAll` can't assert exact IDs (the previous tests of this group
+        // also stored campaigns), only that the pagination is applied:
+        expect(
+          (await campaignRepo.selectAll(limit: 2, orderByID: true)).length,
+          equals(2),
+        );
+      });
+
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [

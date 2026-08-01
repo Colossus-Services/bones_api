@@ -2602,6 +2602,36 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  /// Builds the ` ORDER BY ... LIMIT ... OFFSET ...` tail of a `SELECT`,
+  /// shared by [generateSelectSQL] and [generateSelectIDsSQL].
+  ///
+  /// The `ORDER BY` column is the ID column of the main table, already
+  /// resolved by [_generateSQLFrom] (through [TableScheme.idFieldName]) and
+  /// exposed as [EncodingContext.tableFieldID].
+  String _generateSelectTailSQL(
+    EncodingContext context,
+    String tableAlias, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) {
+    var tail = '';
+
+    if (OrderDirection.resolveOrderByID(orderByID, offset)) {
+      var tableFieldID = context.tableFieldID ?? 'id';
+      tail += dialect.orderBySQL(
+        tableAlias,
+        tableFieldID,
+        direction: orderDirection,
+      );
+    }
+
+    tail += dialect.limitOffsetSQL(limit: limit, offset: offset);
+
+    return tail;
+  }
+
   FutureOr<SQL> generateSelectSQL(
     Transaction transaction,
     String entityName,
@@ -2611,6 +2641,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     return _generateSQLFrom(
       transaction,
@@ -2621,11 +2654,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
       sqlBuilder: (String from, EncodingContext context) {
         var tableAlias = context.resolveEntityAlias(table);
         var q = dialect.elementQuote;
-        var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
-        var sql = 'SELECT $q$tableAlias$q.* $from$limitStr';
+        var tail = _generateSelectTailSQL(
+          context,
+          tableAlias,
+          limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
+        );
+        var sql = 'SELECT $q$tableAlias$q.* $from$tail';
         return sql;
       },
     );
@@ -2640,6 +2683,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     return _generateSQLFrom(
       transaction,
@@ -2650,13 +2696,23 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
       sqlBuilder: (String from, EncodingContext context) {
         var tableAlias = context.resolveEntityAlias(table);
         var tableFieldID = context.tableFieldID ?? 'id';
         var q = dialect.elementQuote;
-        var limitStr = limit != null && limit > 0 ? ' LIMIT $limit' : '';
+        var tail = _generateSelectTailSQL(
+          context,
+          tableAlias,
+          limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
+        );
         var sql =
-            'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$limitStr';
+            'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$tail';
         return sql;
       },
     );
@@ -2671,6 +2727,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     required String Function(String from, EncodingContext context) sqlBuilder,
   }) {
     if (matcher is! Condition) {
@@ -2724,6 +2783,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           mainTable: table,
           tablesAliases: encodedSQL.tableAliases,
           limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
         );
       } else {
         var joins = <_JoinEntry>[];
@@ -2922,6 +2984,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           mainTable: table,
           tablesAliases: encodedSQL.tableAliases,
           limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
         );
       }
     });
@@ -3298,6 +3363,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
   }) {
     return generateSelectSQL(
@@ -3309,6 +3377,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((sql) {
       return selectSQL(
         op,
@@ -3329,6 +3400,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     return generateSelectIDsSQL(
       op.transaction,
@@ -3339,6 +3413,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((sql) {
       return selectSQL(op, entityName, table, sql).resolveMapped(
         (r) => _finishSQLOperation(sql, op, r, (results) {
@@ -3785,6 +3862,9 @@ class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) => databaseAdapter.generateSelectSQL(
     transaction,
     name,
@@ -3794,6 +3874,9 @@ class DBSQLRepositoryAdapter<O> extends DBRelationalRepositoryAdapter<O> {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
   );
 
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(

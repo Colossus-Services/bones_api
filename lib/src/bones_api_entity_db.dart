@@ -1639,6 +1639,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
+  // NOTE: the fast paths below don't apply `limit`/`offset`/`orderByID`/
+  // `orderDirection` yet (matching the pre-existing behavior of `limit`).
+  // Only reached by the object adapters, since
+  // `DBRelationalEntityRepository.select` fully overrides this method.
   @override
   FutureOr<Iterable<O>> select(
     EntityMatcher matcher, {
@@ -1647,6 +1651,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     if (matcher is ConditionID) {
@@ -1708,6 +1715,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     if (matcher is ConditionID) {
       var id = matcher.resolveIDValue(
@@ -1870,8 +1880,20 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<Iterable<O>> selectAll({
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
-  }) => select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
+    // NOTE: `transaction` is not forwarded, preserving the pre-existing
+    // behavior of this method.
+  }) => select(
+    ConditionANY(),
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    resolutionRules: resolutionRules,
+  );
 
   @override
   bool hasReferencedEntities([EntityResolutionRulesResolved? resolutionRules]) {

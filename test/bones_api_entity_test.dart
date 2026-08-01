@@ -1602,6 +1602,87 @@ void main() {
         expect(user, isNull);
       }
     });
+
+    test('SetEntityRepository: offset/orderByID/orderDirection', () async {
+      // A dedicated repository, so the group's shared ones are untouched:
+      var repository = SetEntityRepository<Role>('role', roleEntityHandler)
+        ..ensureInitialized();
+
+      addTearDown(repository.close);
+
+      var ids = <int>[];
+      for (var i = 1; i <= 5; ++i) {
+        var role = Role(i.isEven ? RoleType.admin : RoleType.guest);
+        ids.add((await repository.store(role)) as int);
+      }
+
+      expect(ids, equals([1, 2, 3, 4, 5]));
+
+      List<Object?> selectIDs({
+        int? limit,
+        int? offset,
+        bool? orderByID,
+        OrderDirection? orderDirection,
+      }) =>
+          repository
+              .select(
+                ConditionANY(),
+                limit: limit,
+                offset: offset,
+                orderByID: orderByID,
+                orderDirection: orderDirection,
+              )
+              .map((e) => e.id)
+              .toList();
+
+      // Baseline: unchanged, no ordering applied.
+      expect(selectIDs(), equals(ids));
+      expect(selectIDs(limit: 2), equals([1, 2]));
+
+      // `orderDirection` alone is ignored:
+      expect(selectIDs(orderDirection: OrderDirection.descending), equals(ids));
+
+      expect(selectIDs(orderByID: true), equals([1, 2, 3, 4, 5]));
+      expect(
+        selectIDs(orderByID: true, orderDirection: OrderDirection.descending),
+        equals([5, 4, 3, 2, 1]),
+      );
+
+      // `offset` implies the ordering:
+      expect(selectIDs(offset: 2), equals([3, 4, 5]));
+      expect(selectIDs(offset: 2, limit: 2), equals([3, 4]));
+      expect(
+        selectIDs(
+          offset: 1,
+          limit: 2,
+          orderDirection: OrderDirection.descending,
+        ),
+        equals([4, 3]),
+      );
+      expect(selectIDs(offset: 5), isEmpty);
+
+      // `selectIDsBy` and `selectAll` honor the same options:
+      expect(
+        repository.selectIDsBy<int>(ConditionANY(), offset: 2, limit: 2),
+        equals([3, 4]),
+      );
+
+      expect(
+        (await repository.selectAll(
+          orderByID: true,
+          orderDirection: OrderDirection.descending,
+        )).map((e) => e.id),
+        equals([5, 4, 3, 2, 1]),
+      );
+
+      expect(
+        (await repository.selectAll(offset: 3)).map((e) => e.id),
+        equals([4, 5]),
+      );
+
+      // A `limit` of 0 keeps meaning "no limit" for this repository:
+      expect(selectIDs(limit: 0), equals(ids));
+    });
   });
 
   group('SQLEntityRepository[memory]', () {

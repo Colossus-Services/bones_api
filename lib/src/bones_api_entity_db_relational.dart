@@ -13,6 +13,7 @@ import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_logging.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
 
 final _log = logging.Logger('DBRelationalAdapter')..registerAsDbLogger();
@@ -135,6 +136,9 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
   });
 
@@ -147,6 +151,9 @@ abstract class DBRelationalAdapter<C extends Object> extends DBAdapter<C> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   });
 
   FutureOr<bool> doInsertRelationship(
@@ -201,6 +208,9 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
   }) => databaseAdapter.doSelect<R>(
     op,
@@ -211,6 +221,9 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     preFinish: preFinish,
   );
 
@@ -221,6 +234,9 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) => databaseAdapter.doSelectIDsBy<I>(
     op,
     name,
@@ -230,6 +246,9 @@ class DBRelationalRepositoryAdapter<O> extends DBRepositoryAdapter<O> {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
   );
 
   FutureOr<bool> doInsertRelationship(
@@ -482,6 +501,9 @@ class DBRelationalEntityRepository<O extends Object>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     checkNotClosed();
 
@@ -501,6 +523,9 @@ class DBRelationalEntityRepository<O extends Object>
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
       );
     } catch (e, s) {
       var message =
@@ -523,6 +548,9 @@ class DBRelationalEntityRepository<O extends Object>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     checkNotClosed();
@@ -549,6 +577,9 @@ class DBRelationalEntityRepository<O extends Object>
         positionalParameters: positionalParameters,
         namedParameters: namedParameters,
         limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
         preFinish: (results) {
           return resolveEntities(
             op.transaction,
@@ -574,8 +605,20 @@ class DBRelationalEntityRepository<O extends Object>
   FutureOr<Iterable<O>> selectAll({
     Transaction? transaction,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
-  }) => select(ConditionANY(), limit: limit, resolutionRules: resolutionRules);
+    // NOTE: `transaction` is not forwarded, preserving the pre-existing
+    // behavior of this method.
+  }) => select(
+    ConditionANY(),
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    resolutionRules: resolutionRules,
+  );
 
   @override
   bool isStored(O o, {Transaction? transaction}) {

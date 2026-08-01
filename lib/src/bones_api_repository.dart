@@ -5,6 +5,7 @@ import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_initializable.dart';
+import 'bones_api_types.dart';
 
 /// A entity repository API.
 abstract class APIRepository<O extends Object> with Initializable {
@@ -123,23 +124,34 @@ abstract class APIRepository<O extends Object> with Initializable {
     resolutionRules: resolutionRules,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> selectAll({
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
   }) => entityRepository.selectAll(
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
   );
 
   FutureOr<int> length() => entityRepository.length();
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<O?> selectFirstByQuery(
     String query, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
   }) => entityRepository.selectFirstByQuery(
@@ -147,16 +159,23 @@ abstract class APIRepository<O extends Object> with Initializable {
     parameters: parameters,
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> selectByQuery(
     String query, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
   }) => entityRepository.selectByQuery(
@@ -165,16 +184,23 @@ abstract class APIRepository<O extends Object> with Initializable {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(
     String query, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
   }) => entityRepository.selectIDsByQuery<I>(
     query,
@@ -182,15 +208,22 @@ abstract class APIRepository<O extends Object> with Initializable {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<I>> selectIDsBy<I extends Object>(
     EntityMatcher<O> matcher, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
   }) => entityRepository.selectIDsBy(
     matcher,
@@ -198,15 +231,22 @@ abstract class APIRepository<O extends Object> with Initializable {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> select(
     EntityMatcher<O> matcher, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
   }) => entityRepository.select(
@@ -215,6 +255,9 @@ abstract class APIRepository<O extends Object> with Initializable {
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
   );
