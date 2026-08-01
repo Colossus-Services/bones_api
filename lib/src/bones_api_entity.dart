@@ -3307,6 +3307,117 @@ mixin EntityFieldAccessor<O> {
 
 class EntityFieldAccessorGeneric<O> with EntityFieldAccessor<O> {}
 
+/// Compares 2 entity IDs, implementing the `orderByID` ordering of the
+/// `select*` methods.
+///
+/// - `null` IDs are ordered last (in [OrderDirection.ascending] order).
+/// - [num]s are compared numerically and [String]s lexicographically.
+/// - Any other pair of [Comparable]s of the same type is compared
+///   with [Comparable.compareTo]; otherwise returns `0` (undefined order).
+int compareEntityIDs(Object? id1, Object? id2) {
+  if (identical(id1, id2)) return 0;
+
+  if (id1 == null) return id2 == null ? 0 : 1;
+  if (id2 == null) return -1;
+
+  if (id1 is num && id2 is num) return id1.compareTo(id2);
+  if (id1 is String && id2 is String) return id1.compareTo(id2);
+
+  if (id1 is Comparable && id2 is Comparable) {
+    if (id1.runtimeType == id2.runtimeType) {
+      return id1.compareTo(id2);
+    }
+  }
+
+  return 0;
+}
+
+/// Resolves the effective `offset` of a `select*` operation from a 1-based
+/// [page], where [limit] is the page size.
+///
+/// Returns [offset] unchanged when [page] is `null`, otherwise
+/// `(page - 1) * limit`. A [page] of `1` resolves to an `offset` of `0`, which
+/// still activates the ordering (see [OrderDirection.resolveOrderByID]), so a
+/// paginated select is stable by default.
+///
+/// Throws an [ArgumentError] when:
+/// - [page] and [offset] are both defined: they are two spellings of the same
+///   thing, so passing both is a bug rather than a precedence question;
+/// - [page] is defined without a positive [limit]: a page has no meaning
+///   without a page size, and a `limit` of `0` means "no limit";
+/// - [page] is `< 1`: pages are numbered from `1`.
+int? resolveSelectOffset({int? page, int? offset, int? limit}) {
+  if (page == null) return offset;
+
+  if (offset != null) {
+    throw ArgumentError.value(
+      page,
+      'page',
+      "`page` and `offset` are mutually exclusive (offset: $offset)",
+    );
+  }
+
+  if (limit == null || limit <= 0) {
+    throw ArgumentError.value(
+      page,
+      'page',
+      '`page` requires a positive `limit` (the page size), got: $limit',
+    );
+  }
+
+  if (page < 1) {
+    throw ArgumentError.value(page, 'page', '`page` is 1-based, must be >= 1');
+  }
+
+  return (page - 1) * limit;
+}
+
+/// Applies the ordering and the pagination of a `select*` operation to [itr].
+///
+/// Orders the elements by ID (resolved through [idGetter]) when
+/// [OrderDirection.resolveOrderByID] resolves to `true`, then skips [offset]
+/// elements and takes [limit] of them — in that order, matching SQL semantics
+/// (`ORDER BY` → `OFFSET` → `LIMIT`).
+///
+/// Used by the [DBAdapter]s that can't delegate the ordering and the
+/// pagination to a DB engine, and by [IterableEntityRepository].
+///
+/// [zeroLimitIsUnlimited] selects how a `limit` of `0` is interpreted, since
+/// the pre-existing call sites disagree: the generated SQL treats it as "no
+/// `LIMIT` clause" (`true`), while the in-memory selects treat it as an empty
+/// result (`false`, the default). Only relevant for a [limit] of exactly `0`.
+Iterable<T> applySelectOrderAndPagination<T>(
+  Iterable<T> itr,
+  Object? Function(T o) idGetter, {
+  int? limit,
+  int? offset,
+  bool? orderByID,
+  OrderDirection? orderDirection,
+  bool zeroLimitIsUnlimited = false,
+}) {
+  if (OrderDirection.resolveOrderByID(orderByID, offset)) {
+    var descending = OrderDirection.resolve(orderDirection).isDescending;
+
+    var sorted = itr.toList();
+    sorted.sort(
+      descending
+          ? (a, b) => compareEntityIDs(idGetter(b), idGetter(a))
+          : (a, b) => compareEntityIDs(idGetter(a), idGetter(b)),
+    );
+    itr = sorted;
+  }
+
+  if (offset != null && offset > 0) {
+    itr = itr.skip(offset);
+  }
+
+  if (limit != null && (zeroLimitIsUnlimited ? limit > 0 : limit >= 0)) {
+    itr = itr.take(limit);
+  }
+
+  return itr;
+}
+
 abstract class EntityAccessor<O extends Object> {
   static String simplifiedName(String name) {
     name = name.trim().toLowerCase().replaceAll(RegExp(r'[\W_]+'), '').trim();
@@ -3381,20 +3492,51 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
 
   final ConditionParseCache<O> _parseCache = ConditionParseCache.get<O>();
 
+  /// {@template bones_api.select_pagination}
+  /// Ordering and pagination:
+  /// - [limit]: the maximum number of returned entities. Also the page size
+  ///   of [page].
+  /// - [offset]: the return offset, for pagination.
+  /// - [page]: the 1-based page to return, an ergonomic alternative to
+  ///   [offset]: it resolves to `(page - 1) * limit`. Requires a positive
+  ///   [limit], and can't be combined with [offset].
+  ///   See [resolveSelectOffset].
+  /// - [orderByID]: if `true` the result is ordered by the table ID column,
+  ///   automatically resolved from the table scheme
+  ///   ([TableScheme.idFieldName]) or from [EntityHandler.idFieldName].
+  ///   Defaults to `true` when [offset] is defined, since a paginated select
+  ///   needs a stable order to be correct. Pass `false` to opt out.
+  /// - [orderDirection]: the [OrderDirection] of the ordering,
+  ///   [OrderDirection.ascending] by default.
+  ///   **Ignored while the ordering is not active** (see [orderByID]).
+  ///
+  /// Note that a query over a to-many relationship generates a `JOIN` without
+  /// a `DISTINCT`, so it can return the same entity more than once. Paginating
+  /// such a query is best-effort.
+  /// {@endtemplate}
   FutureOr<O?> selectFirstByQuery(
     String query, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) => selectByQuery(
     query,
     parameters: parameters,
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,
+    // The page size of a "first" select is 1, so `page: n` is the Nth entity:
+    offset: resolveSelectOffset(page: page, offset: offset, limit: 1),
+    orderByID: orderByID,
+    orderDirection: orderDirection,
   ).resolveMapped((result) => result.firstOrNull);
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> selectByQuery(
     String query, {
     Object? parameters,
@@ -3402,6 +3544,10 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     var condition = _parseCache.parseQuery(query);
 
@@ -3412,9 +3558,13 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     );
   }
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> select(
     EntityMatcher<O> matcher, {
     Object? parameters,
@@ -3422,9 +3572,14 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   });
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(
     String query, {
     Object? parameters,
@@ -3432,6 +3587,10 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     var condition = _parseCache.parseQuery(query);
 
@@ -3442,9 +3601,13 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     );
   }
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<I>> selectIDsBy<I extends Object>(
     EntityMatcher<O> matcher, {
     Object? parameters,
@@ -3452,11 +3615,20 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   });
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<Iterable<O>> selectAll({
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   });
 
@@ -5463,6 +5635,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     );
   }
 
+  /// {@macro bones_api.select_pagination}
   @override
   FutureOr<O?> selectFirstByQuery(
     String query, {
@@ -5470,6 +5643,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) => selectByQuery(
     query,
@@ -5477,9 +5654,14 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,
+    // The page size of a "first" select is 1, so `page: n` is the Nth entity:
+    offset: resolveSelectOffset(page: page, offset: offset, limit: 1),
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     resolutionRules: resolutionRules,
   ).resolveMapped((result) => result.firstOrNull);
 
+  /// {@macro bones_api.select_pagination}
   @override
   FutureOr<Iterable<O>> selectByQuery(
     String query, {
@@ -5488,6 +5670,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     checkNotClosed();
@@ -5501,10 +5687,14 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
       resolutionRules: resolutionRules,
     );
   }
 
+  /// {@macro bones_api.select_pagination}
   @override
   FutureOr<Iterable<I>> selectIDsByQuery<I extends Object>(
     String query, {
@@ -5513,6 +5703,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     checkNotClosed();
 
@@ -5525,6 +5719,9 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       namedParameters: namedParameters,
       transaction: transaction,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     );
   }
 
@@ -7427,6 +7624,10 @@ abstract class IterableEntityRepository<O extends Object>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     checkNotClosed();
@@ -7437,6 +7638,9 @@ abstract class IterableEntityRepository<O extends Object>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     );
 
     return trackEntities(os);
@@ -7450,6 +7654,10 @@ abstract class IterableEntityRepository<O extends Object>
     Map<String, Object?>? namedParameters,
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     checkNotClosed();
 
@@ -7459,6 +7667,9 @@ abstract class IterableEntityRepository<O extends Object>
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
       limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     );
 
     var ids = entityHandler.getIDs<I>(os);
@@ -7470,11 +7681,20 @@ abstract class IterableEntityRepository<O extends Object>
   FutureOr<Iterable<O>> selectAll({
     Transaction? transaction,
     int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     EntityResolutionRules? resolutionRules,
   }) {
     checkNotClosed();
 
-    var os = all(limit: limit);
+    var os = all(
+      limit: limit,
+      offset: resolveSelectOffset(page: page, offset: offset, limit: limit),
+      orderByID: orderByID,
+      orderDirection: orderDirection,
+    );
 
     return trackEntities(os);
   }
@@ -7871,12 +8091,16 @@ abstract class IterableEntityRepository<O extends Object>
     return del;
   }
 
+  /// {@macro bones_api.select_pagination}
   List<O> matches(
     EntityMatcher<dynamic> matcher, {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) {
     var itr = iterable().where((o) {
       return matcher.matchesEntity(
@@ -7888,22 +8112,47 @@ abstract class IterableEntityRepository<O extends Object>
       );
     });
 
-    if (limit != null && limit > 0) {
-      itr = itr.take(limit);
-    }
-
-    return itr.toList();
+    return _applyOrderAndPagination(
+      itr,
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
+    );
   }
 
-  List<O> all({int? limit}) {
-    var itr = iterable();
+  /// {@macro bones_api.select_pagination}
+  List<O> all({
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) => _applyOrderAndPagination(
+    iterable(),
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+  );
 
-    if (limit != null && limit > 0) {
-      itr = itr.take(limit);
-    }
-
-    return itr.toList();
-  }
+  List<O> _applyOrderAndPagination(
+    Iterable<O> itr, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) =>
+      applySelectOrderAndPagination(
+        itr,
+        (o) => getID(o, entityHandler: entityHandler),
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
+        // Preserves the pre-existing behavior of this repository,
+        // where a `limit` of 0 means "no limit":
+        zeroLimitIsUnlimited: true,
+      ).toList();
 
   @override
   Map<String, dynamic> information({bool extended = false}) {

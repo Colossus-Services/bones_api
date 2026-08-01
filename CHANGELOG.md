@@ -1,3 +1,102 @@
+## 1.11.0
+
+- `selectByQuery` and its siblings gained 4 optional parameters, for pagination
+  and ordering:
+  - `offset`: the return offset.
+  - `page`: the 1-based page to return, an ergonomic alternative to `offset`
+    that computes it from the page size: `(page - 1) * limit`.
+  - `orderByID`: orders the result by the table's ID column, resolved
+    automatically from the existing scheme machinery (`TableScheme.idFieldName`
+    → `EncodingContext.tableFieldID`, or `EntityHandler.idFieldName`).
+  - `orderDirection`: the new `OrderDirection` enum, `ascending` (default) or
+    `descending`.
+
+  Semantics:
+  - The effective ordering is `orderByID ?? (offset != null)`: a non-null
+    `offset` turns the ordering **on** by default, since an offset-based
+    pagination needs a stable order to be correct. Pass `orderByID: false` to
+    opt out and get a bare `OFFSET`.
+  - `orderDirection` is **ignored** while the ordering is not active.
+  - `page` is a public convenience resolved to an `offset` at the repository
+    layer (see `resolveSelectOffset`); the adapter contract keeps taking only
+    `offset`. It throws an `ArgumentError` when combined with an `offset` (two
+    spellings of one thing), when there is no positive `limit` to use as the
+    page size, or when it is `< 1`. `page: 1` resolves to `offset: 0`, which
+    still activates the ordering, so even the first page is stable.
+  - All 4 are optional and default to the previous behavior: with them unset the
+    generated SQL is character-identical to 1.10.0.
+
+  Added to `EntitySource`/`EntityRepository` (`selectByQuery`,
+  `selectFirstByQuery`, `select`, `selectIDsByQuery`, `selectIDsBy`,
+  `selectAll`), `APIRepository`, `IterableEntityRepository`
+  (`matches`/`all` included), `DBEntityRepository`, `DBRelationalAdapter`/
+  `DBRelationalRepositoryAdapter`/`DBRelationalEntityRepository`,
+  `DBAdapter.doSelectAll`/`doSelectByIDs`, `DBSQLAdapter.doSelect`/
+  `doSelectIDsBy`/`generateSelectSQL`/`generateSelectIDsSQL` and
+  `DBSQLRepositoryAdapter.generateSelectSQL`.
+
+- New `OrderDirection` enum (`bones_api_types.dart`), with `sqlKeyword`,
+  `parse` and the resolvers `resolve` and `resolveOrderByID` that state the
+  semantics above exactly once.
+
+- New `compareEntityIDs` and `applySelectOrderAndPagination`
+  (`bones_api_entity.dart`): the shared Dart-side "order by ID → skip → take"
+  used by every adapter that can't delegate the ordering to a DB engine.
+
+- New `resolveSelectOffset` (`bones_api_entity.dart`): resolves `page` to an
+  `offset`, and states the `page`/`offset`/`limit` validation rules once.
+
+- `SQLDialect`:
+  - New `orderBySQL` and `limitOffsetSQL` clause builders, so all the
+    dialect-specific `SELECT` tail syntax lives in one place.
+  - New `offsetRequiresLimit` and `offsetMaxLimitValue` capabilities. MySQL sets
+    `offsetRequiresLimit: true` since it can't parse an `OFFSET` that is not
+    preceded by a `LIMIT`; an offset-only select there emits
+    `LIMIT 18446744073709551615 OFFSET n`. PostgreSQL and the `generic`
+    (in-memory) dialect emit a bare `OFFSET n`.
+
+- `SQL`: new `offset`, `orderByID` and `orderDirection` fields (carried by
+  `copy()`), read by `DBSQLMemoryAdapter` to apply the same semantics in Dart.
+
+- `APIDBModule.select` (`/db/select/<table>`): new `LIMIT=<n>`, `OFFSET=<n>`,
+  `PAGE=<n>` and `ORDER=asc|desc` query directives
+  (see `APIDBModule.selectQueryDirectives`),
+  parsed from the query `String` alongside the pre-existing `EAGER=true` and
+  stripped before the remainder is parsed as the entity condition query. The
+  endpoint no longer selects the whole table and sorts it in Dart — the ordering
+  is now resolved by the DB. Its output order is unchanged. An invalid `PAGE`
+  becomes an error response rather than an uncaught `ArgumentError`.
+
+- **Behavior change**: `limit` is now honored on the paths that previously
+  accepted and silently ignored it — `DBEntityRepository.select`'s
+  `ConditionID`/`ConditionIdIN`/`ConditionANY`/`KeyConditionEQ` fast paths,
+  `DBAdapter.doSelectAll`/`doSelectByIDs`, and the `DBObjectMemoryAdapter`,
+  `DBObjectDirectoryAdapter` and `DBObjectGCSAdapter` adapters. For example,
+  `selectAll(limit: 2)` on an object adapter returned *every* row before this
+  release; it now returns 2.
+
+- **Source-breaking for external subclasses**: new named parameters were added
+  to abstract members (`EntitySource.select`/`selectIDsBy`/`selectAll`,
+  `DBAdapter.doSelectAll`/`doSelectByIDs`,
+  `DBRelationalAdapter.doSelect`/`doSelectIDsBy`). Dart requires an override to
+  accept every named parameter of the supertype, so third-party
+  `EntityRepository`/`DBAdapter` implementations must widen their overrides.
+
+- Known limitation: a query over a to-many relationship generates a `JOIN`
+  without a `DISTINCT`, so it can return the same entity more than once
+  (pre-existing). Paginating such a query is therefore best-effort.
+
+- Tests:
+  - New `bones_api_entity_select_order_test.dart` (`OrderDirection`,
+    `compareEntityIDs`, `applySelectOrderAndPagination`, `SQLDialect` clause
+    builders), `bones_api_entity_db_sql_select_test.dart` (exact generated SQL
+    per case + end-to-end paging over the in-memory SQL adapter) and
+    `bones_api_db_module_test.dart` (first coverage of `APIDBModule`).
+  - `bones_api_entity_db_tests_base.dart`: 3 new tests in the shared adapter
+    template, so the generated SQL and real page-by-page reads are asserted for
+    the in-memory, PostgreSQL, MySQL, object-memory and object-directory
+    adapters. Verified against real PostgreSQL and MySQL containers.
+
 ## 1.10.0
 
 - `docker_commander`: `^2.1.8` → `^3.0.0`.

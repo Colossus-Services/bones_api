@@ -877,10 +877,17 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       });
     }
 
-    final limit = sql.limit;
-
+    // The `ORDER BY` must be applied before the `OFFSET`/`LIMIT`,
+    // which is what makes an offset-based pagination stable:
     var sel =
-        limit != null && limit >= 0 ? itr.take(limit).toList() : itr.toList();
+        applySelectOrderAndPagination(
+          itr,
+          (e) => e[tableScheme?.idFieldName ?? 'id'],
+          limit: sql.limit,
+          offset: sql.offset,
+          orderByID: sql.orderByID,
+          orderDirection: sql.orderDirection,
+        ).toList();
 
     return sel;
   }

@@ -17,6 +17,7 @@ import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_logging.dart';
+import 'bones_api_types.dart';
 
 final _log = logging.Logger('DBObjectDirectoryAdapter')..registerAsDbLogger();
 
@@ -485,6 +486,10 @@ class DBObjectDirectoryAdapter
     String entityName,
     String table,
     List<Object> ids, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
   }) => executeTransactionOperation<List<R>>(
     op,
@@ -492,21 +497,36 @@ class DBObjectDirectoryAdapter
       table,
       ids,
       entityName,
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
     String table,
     List<Object> ids,
-    String entityName,
-  ) async {
+    String entityName, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) async {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
     var entries =
         await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
 
-    return entries;
+    return _applyOrderAndPagination(
+      table,
+      entries,
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
+    );
   }
 
   @override
@@ -514,19 +534,31 @@ class DBObjectDirectoryAdapter
     TransactionOperation op,
     String entityName,
     String table, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   }) => executeTransactionOperation<List<R>>(
     op,
     (conn) => _doSelectAllImpl<R>(
       table,
       entityName,
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
     String table,
-    String entityName,
-  ) {
+    String entityName, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
@@ -539,7 +571,36 @@ class DBObjectDirectoryAdapter
           return _readObject(table, id);
         }).resolveAllNotNull();
 
-    return entries;
+    return entries.resolveMapped(
+      (entries) => _applyOrderAndPagination(
+        table,
+        entries,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _applyOrderAndPagination(
+    String table,
+    Iterable<Map<String, dynamic>> entries, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) {
+    var idField = _getTableIDFieldName(table);
+
+    return applySelectOrderAndPagination(
+      entries,
+      (e) => e[idField],
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
+    ).toList();
   }
 
   @override

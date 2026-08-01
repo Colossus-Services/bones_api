@@ -15,6 +15,7 @@ import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_html_document.dart';
 import 'bones_api_module.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils_json.dart';
 
 final _log = logging.Logger('APIDBModule');
@@ -263,11 +264,68 @@ class APIDBModule extends APIModule {
     return APIResponse.ok(html, mimeType: 'html');
   }
 
+  /// The directives accepted by the query `String` of [select], as
+  /// `&`-joined `KEY=VALUE` tokens. Everything else in the query `String` is
+  /// the entity condition query.
+  ///
+  /// - `EAGER=true`: resolves the referenced entities.
+  /// - `LIMIT=<n>`: the maximum number of returned entities, and the page size
+  ///   of `PAGE`.
+  /// - `OFFSET=<n>`: the return offset, for pagination.
+  /// - `PAGE=<n>`: the 1-based page to return; requires `LIMIT` and can't be
+  ///   combined with `OFFSET`. See [resolveSelectOffset].
+  /// - `ORDER=asc|desc`: the [OrderDirection] of the ordering.
+  ///
+  /// Example: `/db/select/user/json?email == "a@b.c"&LIMIT=10&PAGE=3`
+  static const List<String> selectQueryDirectives = [
+    'EAGER',
+    'LIMIT',
+    'OFFSET',
+    'PAGE',
+    'ORDER',
+  ];
+
+  /// Extracts the `KEY=VALUE` directive [key] from the raw [query] `String`,
+  /// returning the value and the [query] without it.
+  ///
+  /// Follows the pre-existing `EAGER=true` convention: the directive can be
+  /// the whole [query] or one of its `&`-joined tokens.
+  static ({String query, String? value}) _extractQueryDirective(
+    String query,
+    String key,
+  ) {
+    if (query.isEmpty) return (query: query, value: null);
+
+    var prefix = '$key=';
+
+    var parts = query.split('&');
+
+    String? value;
+    var rest = <String>[];
+
+    for (var part in parts) {
+      if (value == null && part.startsWith(prefix)) {
+        value = part.substring(prefix.length);
+      } else {
+        rest.add(part);
+      }
+    }
+
+    if (value == null) return (query: query, value: null);
+
+    return (query: rest.join('&'), value: value);
+  }
+
   Future<APIResponse<dynamic>> select(
     String table,
     APIRequest apiRequest, {
     bool? eager,
     bool json = false,
+    int? limit,
+    int? offset,
+    int? page,
+    bool? orderByID,
+    OrderDirection? orderDirection,
   }) async {
     if (onlyOnDevelopment && !development) {
       return APIResponse.error(error: "Unsupported request!");
@@ -287,20 +345,62 @@ class APIDBModule extends APIModule {
 
     var query = Uri.decodeQueryComponent(requestedUri.query);
 
-    if (query == 'EAGER=true') {
-      query = '';
-      eager = true;
-    } else if (query.endsWith('&EAGER=true')) {
-      query = query.substring(0, query.length - 11);
-      eager = true;
+    // See [selectQueryDirectives]. The arguments passed to this method take
+    // precedence over the query `String` directives.
+    {
+      var extracted = _extractQueryDirective(query, 'EAGER');
+      query = extracted.query;
+      if (extracted.value == 'true') eager = true;
+    }
+
+    {
+      var extracted = _extractQueryDirective(query, 'LIMIT');
+      query = extracted.query;
+      limit ??= int.tryParse(extracted.value?.trim() ?? '');
+    }
+
+    {
+      var extracted = _extractQueryDirective(query, 'OFFSET');
+      query = extracted.query;
+      offset ??= int.tryParse(extracted.value?.trim() ?? '');
+    }
+
+    {
+      var extracted = _extractQueryDirective(query, 'PAGE');
+      query = extracted.query;
+      page ??= int.tryParse(extracted.value?.trim() ?? '');
+    }
+
+    {
+      var extracted = _extractQueryDirective(query, 'ORDER');
+      query = extracted.query;
+      orderDirection ??= OrderDirection.parse(extracted.value);
+    }
+
+    // Resolved here (and not by the repository) so an invalid `PAGE` becomes an
+    // error response instead of an uncaught `ArgumentError`:
+    try {
+      offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
+    } on ArgumentError catch (e) {
+      return APIResponse.error(error: "Invalid pagination: ${e.message}");
     }
 
     eager ??= false;
 
+    // This endpoint has always returned ID-sorted entities, so the ordering
+    // defaults to `true` here (and not to the `offset != null` rule).
+    // It is now resolved by the DB instead of being sorted in Dart.
+    orderByID ??= true;
+
     _log.info(
       "APIDBModule[REQUEST]> select> "
       "table: `$table` ; "
-      "eager: $eager"
+      "eager: $eager ; "
+      "orderByID: $orderByID ; "
+      "orderDirection: ${OrderDirection.resolve(orderDirection).name}"
+      "${limit != null ? ' ; limit: $limit' : ''}"
+      "${offset != null ? ' ; offset: $offset' : ''}"
+      "${page != null ? ' ; page: $page' : ''}"
       "${query.isNotEmpty ? ' ; QUERY> $query' : ''}",
     );
 
@@ -311,34 +411,23 @@ class APIDBModule extends APIModule {
     if (query.isEmpty) {
       var selectAll = await entityRepository.selectAll(
         resolutionRules: resolutionRules,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
       );
       list = selectAll.toList();
     } else {
       var selectByQuery = await entityRepository.selectByQuery(
         query,
         resolutionRules: resolutionRules,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
       );
       list = selectByQuery.toList();
     }
-
-    list.sort((a, b) {
-      var id1 = entityRepository.getEntityID(a);
-      var id2 = entityRepository.getEntityID(b);
-
-      if (id1 == null && id2 == null) {
-        return 0;
-      } else if (id1 == null) {
-        return 1;
-      } else if (id2 == null) {
-        return -1;
-      } else if (id1 is num && id2 is num) {
-        return id1.compareTo(id2);
-      } else if (id1 is String && id2 is String) {
-        return id1.compareTo(id2);
-      } else {
-        return 0;
-      }
-    });
 
     if (json) {
       var entitiesJson = _entitiesToJsonMap(list);

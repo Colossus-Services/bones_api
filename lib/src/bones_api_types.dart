@@ -6,6 +6,71 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_utils.dart';
 
+/// The direction of the "order by" clause of a select operation.
+///
+/// Used by the `orderDirection` parameter of the `select*` methods.
+/// Only has effect while the ordering is active (see the `orderByID`
+/// parameter and [resolveOrderByID]).
+enum OrderDirection {
+  /// Ascending order (SQL `ASC`). The [defaultDirection].
+  ascending,
+
+  /// Descending order (SQL `DESC`).
+  descending;
+
+  /// The direction used when none is defined: [ascending].
+  static const OrderDirection defaultDirection = ascending;
+
+  /// Returns `true` if this is [ascending].
+  bool get isAscending => this == ascending;
+
+  /// Returns `true` if this is [descending].
+  bool get isDescending => this == descending;
+
+  /// The SQL keyword of this direction: `ASC` or `DESC`.
+  String get sqlKeyword => isDescending ? 'DESC' : 'ASC';
+
+  /// Resolves a nullable [direction] to a non-null one,
+  /// defaulting to [defaultDirection].
+  static OrderDirection resolve(OrderDirection? direction) =>
+      direction ?? defaultDirection;
+
+  /// Resolves if a select operation should order by the table ID column.
+  ///
+  /// Returns [orderByID] when defined. Otherwise returns `true` if an [offset]
+  /// is defined, since a paginated select needs a stable order to be correct.
+  static bool resolveOrderByID(bool? orderByID, int? offset) =>
+      orderByID ?? (offset != null);
+
+  /// Parses [o] to an [OrderDirection], or returns `null` if it can't
+  /// be resolved.
+  ///
+  /// Accepts (case-insensitive and trimmed): `asc`, `ascending`, `up`, `+`,
+  /// `desc`, `descending`, `down`, `-`. Also accepts an [OrderDirection].
+  static OrderDirection? parse(Object? o) {
+    if (o == null) return null;
+    if (o is OrderDirection) return o;
+
+    var s = o.toString().trim().toLowerCase();
+    if (s.isEmpty) return null;
+
+    switch (s) {
+      case 'asc':
+      case 'ascending':
+      case 'up':
+      case '+':
+        return ascending;
+      case 'desc':
+      case 'descending':
+      case 'down':
+      case '-':
+        return descending;
+      default:
+        return null;
+    }
+  }
+}
+
 /// A [Time] represents the time of the day,
 /// independently of the day of the year, timezone or [DateTime].
 class Time implements Comparable<Time> {
