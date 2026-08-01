@@ -19,6 +19,7 @@ import 'package:swiss_knife/swiss_knife.dart' show EventStream, DataURLBase64;
 import 'bones_api_base.dart';
 import 'bones_api_condition.dart';
 import 'bones_api_entity_annotation.dart';
+import 'bones_api_entity_pagination.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
@@ -3632,6 +3633,88 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     EntityResolutionRules? resolutionRules,
   });
 
+  /// {@template bones_api.paginate}
+  /// Returns an [EntityPagination] over this select, loading nothing yet:
+  /// pages are fetched only when asked for. See [EntityPagination].
+  ///
+  /// - [limit]: the page size. Required, and must be `> 0`.
+  /// - [orderByID]: defaults to `true`. A paginated read is only meaningful
+  ///   over a stable order, so unlike the `select*` methods this is on by
+  ///   default instead of being implied by an offset.
+  /// - [orderDirection]: the [OrderDirection] of the ordering.
+  /// {@endtemplate}
+  EntityPagination<O> paginateByQuery(
+    String query, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: query,
+    pageLoader:
+        (page, limit) => selectByQuery(
+          query,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+        ).resolveMapped((os) => os.toList()),
+  );
+
+  /// {@macro bones_api.paginate}
+  EntityPagination<O> paginate(
+    EntityMatcher<O> matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: '$matcher',
+    pageLoader:
+        (page, limit) => select(
+          matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+        ).resolveMapped((os) => os.toList()),
+  );
+
+  /// {@macro bones_api.paginate}
+  EntityPagination<O> paginateAll({
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: 'ALL',
+    pageLoader:
+        (page, limit) => selectAll(
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+        ).resolveMapped((os) => os.toList()),
+  );
+
   FutureOr<Iterable<dynamic>> selectRelationship<E>(
     O? o,
     String field, {
@@ -5724,6 +5807,94 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       orderDirection: orderDirection,
     );
   }
+
+  /// {@macro bones_api.paginate}
+  ///
+  /// - [resolutionRules]: applied to every loaded page.
+  @override
+  EntityPagination<O> paginateByQuery(
+    String query, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: query,
+    pageLoader:
+        (page, limit) => selectByQuery(
+          query,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+          resolutionRules: resolutionRules,
+        ).resolveMapped((os) => os.toList()),
+  );
+
+  /// {@macro bones_api.paginate}
+  ///
+  /// - [resolutionRules]: applied to every loaded page.
+  @override
+  EntityPagination<O> paginate(
+    EntityMatcher<O> matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: '$matcher',
+    pageLoader:
+        (page, limit) => select(
+          matcher,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+          resolutionRules: resolutionRules,
+        ).resolveMapped((os) => os.toList()),
+  );
+
+  /// {@macro bones_api.paginate}
+  ///
+  /// - [resolutionRules]: applied to every loaded page.
+  @override
+  EntityPagination<O> paginateAll({
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => EntityPagination<O>(
+    limit: limit,
+    query: 'ALL',
+    pageLoader:
+        (page, limit) => selectAll(
+          transaction: transaction,
+          limit: limit,
+          page: page,
+          orderByID: orderByID ?? true,
+          orderDirection: orderDirection,
+          resolutionRules: resolutionRules,
+        ).resolveMapped((os) => os.toList()),
+  );
 
   @override
   FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>

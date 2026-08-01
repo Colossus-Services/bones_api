@@ -616,6 +616,95 @@ void main() {
       );
     });
 
+    test('paginateByQuery over the real select path', () async {
+      var p = roleRepository.paginateByQuery(
+        ' id >= ? ',
+        parameters: [ids.first],
+        limit: 2,
+      );
+
+      // Nothing is loaded until asked:
+      expect(p.loadedPages, isEmpty);
+      expect(p.totalLength, isNull);
+      expect(p[0], isNull);
+
+      expect((await p.loadNextPage())!.map((e) => e.id), equals(ids.take(2)));
+      expect(p[0]?.id, equals(ids[0]));
+      expect(p[1]?.id, equals(ids[1]));
+      expect(p.maxLoadedIndex, equals(1));
+      expect(p.maxKnownPage, equals(1));
+      expect(p.isFinalPageResolved, isFalse);
+
+      // Jump ahead, leaving page 2 as a gap:
+      expect((await p.getAt(4))?.id, equals(ids[4]));
+      expect(p.loadedPages, equals([1, 3]));
+      expect(p[2], isNull, reason: 'Page 2 is a gap');
+      expect(p.loadedEntitiesLength, equals(3));
+      expect(p.maxLoadedIndex, equals(4));
+
+      // Page 3 is short (5 roles, limit 2) -> the end is resolved:
+      expect(p.isFinalPageResolved, isTrue);
+      expect(p.finalPage, equals(3));
+      expect(p.totalLength, equals(5));
+
+      // Filling the gap gives the full ordered set:
+      await p.loadAll();
+      expect(p.loadedEntities.map((e) => e.id).toList(), equals(ids));
+    });
+
+    test('paginateByQuery: loadAll, stream and an empty query', () async {
+      var p = roleRepository.paginateByQuery(
+        ' id >= ? ',
+        parameters: [ids.first],
+        limit: 2,
+      );
+
+      expect(await p.loadAll(), equals(5));
+      expect(p.loadedEntities.map((e) => e.id).toList(), equals(ids));
+
+      var streamed =
+          await roleRepository
+              .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
+              .stream()
+              .toList();
+      expect(streamed.map((e) => e.id).toList(), equals(ids));
+
+      // A query matching nothing resolves as empty:
+      var none = roleRepository.paginateByQuery(
+        ' id > ? ',
+        parameters: [ids.last],
+        limit: 2,
+      );
+      expect(await none.loadAll(), equals(0));
+      expect(none.isKnownEmpty, isTrue);
+      expect(none.finalPage, equals(1));
+      expect(none[0], isNull);
+    });
+
+    test('paginateByQuery: descending, paginate() and paginateAll()', () async {
+      var desc = roleRepository.paginateByQuery(
+        ' id >= ? ',
+        parameters: [ids.first],
+        limit: 2,
+        orderDirection: OrderDirection.descending,
+      );
+      await desc.loadAll();
+      expect(
+        desc.loadedEntities.map((e) => e.id).toList(),
+        equals(ids.reversed.toList()),
+      );
+
+      var byMatcher = roleRepository.paginate(ConditionANY(), limit: 3);
+      expect(
+        (await byMatcher.getPage(1)).map((e) => e.id),
+        equals(ids.take(3)),
+      );
+
+      var all = roleRepository.paginateAll(limit: 4);
+      expect(await all.loadAll(), equals(5));
+      expect(all.loadedEntities.map((e) => e.id).toList(), equals(ids));
+    });
+
     test('count is not affected by the ordering', () async {
       expect(await roleRepository.length(), equals(ids.length));
       expect(

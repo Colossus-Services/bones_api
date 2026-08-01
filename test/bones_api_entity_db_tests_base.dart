@@ -2681,6 +2681,98 @@ Future<bool> runAdapterTests(
         expect(await selectNone(offset: 5, limit: 2), isEmpty);
       });
 
+      test('EntityPagination: lazy paged access', () async {
+        final campaignRepo = entityRepositoryProvider.campaignAPIRepository;
+
+        var ids = <int>[];
+        for (var i = 1; i <= 7; ++i) {
+          var id = await campaignRepo.store(Campaign('PAGINATION-0$i'));
+          ids.add(id as int);
+        }
+        expect(ids, orderedEquals([...ids]..sort()));
+
+        var p = campaignRepo.paginateByQuery(
+          ' id >= ? ',
+          parameters: [ids.first],
+          limit: 3,
+        );
+
+        // Nothing is fetched until asked:
+        expect(p.loadedPages, isEmpty);
+        expect(p.totalLength, isNull);
+        expect(p[0], isNull);
+
+        // Page 1:
+        var page1 = await p.loadNextPage();
+        expect(page1!.map((e) => e.id).toList(), equals(ids.take(3).toList()));
+        expect(p[0]?.id, equals(ids[0]));
+        expect(p[2]?.id, equals(ids[2]));
+        expect(p.maxLoadedIndex, equals(2));
+        expect(p.maxKnownPage, equals(1));
+        expect(
+          p.isFinalPageResolved,
+          isFalse,
+          reason: 'A full page does not resolve the end',
+        );
+        expect(p.totalLength, isNull);
+
+        // Jump to index 6 (page 3), leaving page 2 as a gap:
+        expect((await p.getAt(6))?.id, equals(ids[6]));
+        expect(p.loadedPages, equals([1, 3]));
+        expect(p[3], isNull, reason: 'Page 2 was never loaded');
+        expect(p.isIndexLoaded(3), isFalse);
+        expect(p.loadedEntitiesLength, equals(4));
+        expect(p.maxLoadedIndex, equals(6));
+
+        // Page 3 holds 1 of 3 entries -> it is the final page:
+        expect(p.isFinalPageResolved, isTrue);
+        expect(p.finalPage, equals(3));
+        expect(p.totalLength, equals(7));
+        expect(p.isIndexKnownOutOfRange(7), isTrue);
+        expect(await p.getAt(7), isNull);
+
+        // `loadAll` fills the gap left by the jump:
+        expect(await p.loadAll(), equals(7));
+        expect(p.loadedPages, equals([1, 2, 3]));
+        expect(p.loadedEntities.map((e) => e.id).toList(), equals(ids));
+
+        // `getRange` across the whole set:
+        var range = await p.getRange(2, 5);
+        expect(range.map((e) => e.id).toList(), equals(ids.sublist(2, 5)));
+
+        // Descending pagination:
+        var desc = campaignRepo.paginateByQuery(
+          ' id >= ? ',
+          parameters: [ids.first],
+          limit: 3,
+          orderDirection: OrderDirection.descending,
+        );
+        expect(await desc.loadAll(), equals(7));
+        expect(
+          desc.loadedEntities.map((e) => e.id).toList(),
+          equals(ids.reversed.toList()),
+        );
+
+        // Streaming walks every entry, in order:
+        var streamed =
+            await campaignRepo
+                .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
+                .stream()
+                .toList();
+        expect(streamed.map((e) => e.id).toList(), equals(ids));
+
+        // A query matching nothing resolves as empty:
+        var none = campaignRepo.paginateByQuery(
+          ' name == ? ',
+          parameters: ['PAGINATION-NO-SUCH-CAMPAIGN'],
+          limit: 3,
+        );
+        expect(await none.loadAll(), equals(0));
+        expect(none.isKnownEmpty, isTrue);
+        expect(none.finalPage, equals(1));
+        expect(none[0], isNull);
+      });
+
       test('Pagination [objectAdapter]: orderByID / offset / limit', () async {
         final photoRepo = entityRepositoryProvider2.photoAPIRepository;
 
