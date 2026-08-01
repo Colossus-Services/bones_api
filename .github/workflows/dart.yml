@@ -21,14 +21,7 @@ jobs:
       - name: Upgrade dependencies
         run: dart pub upgrade
       - name: dart format
-        # Generated code (`*.g.dart`) is excluded: it is already formatted by
-        # its generator (`reflection_factory`), whose bundled `dart_style` can
-        # differ from the `dart format` of the SDK. Checking it here would
-        # conflict with `ensure_build_test`, which requires the committed files
-        # to be byte-identical to what `build_runner` produces.
-        run: |
-          dart format -o none --set-exit-if-changed \
-            $(git ls-files '*.dart' | grep -v '\.g\.dart$')
+        run: dart format -o none --set-exit-if-changed .
       - name: dart analyze
         run: dart analyze --fatal-infos --fatal-warnings .
       - name: activate dependency_validator
