@@ -3314,6 +3314,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     String entityName,
     String table,
     List<Object> ids, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   }) {
     return generateSelectSQL(
@@ -3321,6 +3325,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       entityName,
       table,
       ConditionIdIN(ids),
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((sql) {
       return selectSQL(
         op,
@@ -3336,6 +3344,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     TransactionOperation op,
     String entityName,
     String table, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   }) {
     return generateSelectSQL(
@@ -3343,6 +3355,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       entityName,
       table,
       ConditionANY(),
+      limit: limit,
+      offset: offset,
+      orderByID: orderByID,
+      orderDirection: orderDirection,
     ).resolveMapped((sql) {
       return selectSQL(
         op,

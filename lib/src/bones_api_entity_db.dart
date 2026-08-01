@@ -603,18 +603,28 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
   });
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<List<R>> doSelectByIDs<R>(
     TransactionOperation op,
     String entityName,
     String table,
     List<Object> ids, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   });
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<List<R>> doSelectAll<R>(
     TransactionOperation op,
     String entityName,
     String table, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   });
 
@@ -1356,23 +1366,45 @@ class DBRepositoryAdapter<O> with Initializable {
     preFinish: preFinish,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<List<R>> doSelectByIDs<R>(
     TransactionOperation op,
     List<Object> ids, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
   }) => databaseAdapter.doSelectByIDs<R>(
     op,
     name,
     tableName,
     ids,
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
     preFinish: preFinish,
   );
 
+  /// {@macro bones_api.select_pagination}
   FutureOr<List<R>> doSelectAll<R>(
     TransactionOperation op, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
-  }) =>
-      databaseAdapter.doSelectAll<R>(op, name, tableName, preFinish: preFinish);
+  }) => databaseAdapter.doSelectAll<R>(
+    op,
+    name,
+    tableName,
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    preFinish: preFinish,
+  );
 
   FutureOr<dynamic> doInsert(
     TransactionOperation op,
@@ -1639,10 +1671,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     }
   }
 
-  // NOTE: the fast paths below don't apply `limit`/`offset`/`orderByID`/
-  // `orderDirection` yet (matching the pre-existing behavior of `limit`).
-  // Only reached by the object adapters, since
-  // `DBRelationalEntityRepository.select` fully overrides this method.
+  /// Resolves a single-row select against a requested [offset]: any positive
+  /// offset skips the only row there is.
+  List<O> _singleResult(O? res, int? offset) =>
+      res != null && (offset == null || offset <= 0) ? <O>[res] : <O>[];
+
+  /// {@macro bones_api.select_pagination}
   @override
   FutureOr<Iterable<O>> select(
     EntityMatcher matcher, {
@@ -1657,12 +1691,13 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     EntityResolutionRules? resolutionRules,
   }) {
     if (matcher is ConditionID) {
+      // A single row: only a positive `offset` can change the result.
       return _selectByID(
         transaction,
         matcher,
         parameters ?? namedParameters,
         resolutionRules,
-      ).resolveMapped((res) => res != null ? <O>[res] : <O>[]);
+      ).resolveMapped((res) => _singleResult(res, offset));
     }
 
     if (matcher is ConditionIdIN) {
@@ -1671,11 +1706,23 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         matcher,
         parameters ?? namedParameters,
         resolutionRules,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
       );
     }
 
     if (matcher is ConditionANY) {
-      return _selectAll(transaction, matcher, resolutionRules);
+      return _selectAll(
+        transaction,
+        matcher,
+        resolutionRules,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
+      );
     }
 
     if (matcher is KeyConditionEQ) {
@@ -1696,7 +1743,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
               matcherID,
               parameters ?? namedParameters,
               resolutionRules,
-            ).resolveMapped((res) => res != null ? <O>[res] : <O>[]);
+            ).resolveMapped((res) => _singleResult(res, offset));
           }
         }
       }
@@ -1723,15 +1770,26 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var id = matcher.resolveIDValue(
         parameters: parameters ?? namedParameters,
       );
-      return existsID(
-        id,
-        transaction: transaction,
-      ).resolveMapped((exists) => exists ? [id] : []);
+      // A single ID: only a positive `offset` can change the result.
+      return existsID(transaction: transaction, id).resolveMapped(
+        (exists) => exists && (offset == null || offset <= 0) ? [id] : [],
+      );
     }
 
     if (matcher is ConditionIdIN) {
       var ids = matcher.idsValues.whereType<I>().toList();
-      return existIDs(ids, transaction: transaction);
+      // `existIDs` has no ordering/pagination hook, so it is applied here:
+      return existIDs(ids, transaction: transaction).resolveMapped(
+        (existing) =>
+            applySelectOrderAndPagination(
+              existing,
+              (id) => id,
+              limit: limit,
+              offset: offset,
+              orderByID: orderByID,
+              orderDirection: orderDirection,
+            ).toList(),
+      );
     }
 
     throw UnsupportedError(
@@ -1794,8 +1852,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     Transaction? transaction,
     ConditionIdIN matcher,
     Object? parameters,
-    EntityResolutionRules? resolutionRules,
-  ) {
+    EntityResolutionRules? resolutionRules, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) {
     var ids = matcher.idsValues.nonNulls.toList();
     if (ids.isEmpty) return <O>[];
 
@@ -1817,6 +1879,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       return repositoryAdapter.doSelectByIDs<O>(
         op,
         ids,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
         preFinish: (results) {
           return resolveEntities(
             op.transaction,
@@ -1839,8 +1905,12 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   FutureOr<List<O>> _selectAll(
     Transaction? transaction,
     ConditionANY matcher,
-    EntityResolutionRules? resolutionRules,
-  ) {
+    EntityResolutionRules? resolutionRules, {
+    int? limit,
+    int? offset,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+  }) {
     final resolutionRulesResolved = resolveEntityResolutionRules(
       resolutionRules,
     );
@@ -1858,6 +1928,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     try {
       return repositoryAdapter.doSelectAll<O>(
         op,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
         preFinish: (results) {
           return resolveEntities(
             op.transaction,

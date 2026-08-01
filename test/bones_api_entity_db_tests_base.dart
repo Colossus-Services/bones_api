@@ -2541,6 +2541,80 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('Pagination [objectAdapter]: orderByID / offset / limit', () async {
+        final photoRepo = entityRepositoryProvider2.photoAPIRepository;
+
+        // `Photo` has a `String` ID, so this also covers the non-numeric
+        // branch of `compareEntityIDs`. Deliberately stored out of order:
+        var ids = ['PG-01', 'PG-02', 'PG-03', 'PG-04', 'PG-05'];
+        for (var id in [ids[2], ids[0], ids[4], ids[1], ids[3]]) {
+          var photo = Photo.fromData(base64.decode(png1PixelBase64), id: id);
+          expect(await photoRepo.store(photo), equals(id));
+        }
+
+        Future<List<String>> selectAllIDs({
+          int? limit,
+          int? offset,
+          bool? orderByID,
+          OrderDirection? orderDirection,
+        }) async {
+          var sel = await photoRepo.selectAll(
+            limit: limit,
+            offset: offset,
+            orderByID: orderByID,
+            orderDirection: orderDirection,
+          );
+          // The `setUpAll` of this group stores an extra photo (with a sha256
+          // ID), so only the ones created here are asserted:
+          return sel.map((e) => e.id).where(ids.contains).toList();
+        }
+
+        expect(await selectAllIDs(orderByID: true), equals(ids));
+
+        expect(
+          await selectAllIDs(
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          ),
+          equals(ids.reversed.toList()),
+        );
+
+        // REGRESSION: `limit` was previously accepted and silently ignored by
+        // the object adapters, so this returned every photo.
+        var limited = await photoRepo.selectAll(limit: 2, orderByID: true);
+        expect(limited.length, equals(2));
+
+        // `offset` implies the ordering:
+        expect(
+          await selectAllIDs(offset: 1, limit: 2),
+          equals(ids.skip(1).take(2).toList()),
+        );
+
+        // `selectByIDs` -> `ConditionIdIN`, which is one of the
+        // `DBEntityRepository.select` fast paths that used to drop `limit`:
+        var byIDs = await photoRepo.entityRepository.select(
+          ConditionIdIN(ids),
+          offset: 1,
+          limit: 2,
+        );
+        expect(byIDs.map((e) => e.id).toList(), equals(ids.skip(1).take(2)));
+
+        // A single-row select: any positive offset skips the only row.
+        expect(
+          (await photoRepo.entityRepository.select(
+            ConditionID(ids.first),
+          )).map((e) => e.id),
+          equals([ids.first]),
+        );
+        expect(
+          await photoRepo.entityRepository.select(
+            ConditionID(ids.first),
+            offset: 1,
+          ),
+          isEmpty,
+        );
+      });
+
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [
