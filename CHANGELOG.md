@@ -1,3 +1,60 @@
+## 1.12.0
+
+- New `EntityPagination<O>`: a lazily loaded, paginated view over a select,
+  for reading a result page by page without knowing its total length upfront.
+
+  ```dart
+  var p = userRepository.paginateByQuery(' state == ? ',
+      parameters: ['NY'], limit: 20);
+
+  await p.loadNextPage();   // page 1
+  p[0];                     // sync, already loaded
+  await p.getAt(45);        // loads page 3 on demand, leaving page 2 a gap
+  await p.loadAll();        // fills the gaps and resolves the total
+  ```
+
+  - Pages are **1-based** (matching the `page` parameter of the `select*`
+    methods); entry indexes are **0-based** (matching a Dart `List`). See
+    `indexOfPage` / `pageOfIndex`.
+  - Pages can be loaded out of order, leaving gaps: `getAt(45)` with a `limit`
+    of 20 loads only page 3.
+  - Synchronous access (`operator []`, `loadedEntities`) **never fetches**;
+    only the `FutureOr` methods (`getAt`, `getPage`, `getRange`,
+    `loadNextPage`, `loadPage`, `loadAll`, `stream`) do. `operator []` returns
+    `null` for a gap, an unloaded page or an out-of-range index alike; use
+    `isPageLoaded` / `isIndexKnownOutOfRange` to tell them apart.
+  - It is deliberately **not** a `List` or an `Iterable`: both require a
+    `length`, which is exactly what a paginated select can't answer until it
+    reaches the end. Use `loadAll` when a complete list is really needed.
+
+  What it knows: `loadedPages`, `loadedPagesLength`, `loadedEntities`,
+  `loadedEntitiesLength`, `maxLoadedPage`, `maxLoadedIndex`, `maxKnownPage`,
+  `isFinalPageResolved`, `finalPage`, `totalLength`, `isKnownEmpty`,
+  and `information()`.
+
+  Since every page except the last holds exactly `limit` entries, identifying
+  the final page yields the total even with gaps:
+  `totalLength == (finalPage - 1) * limit + entries(finalPage)`.
+  The end resolves when a page comes back short, when an empty page has a
+  loaded and full predecessor, or when page 1 comes back empty. An empty page
+  *without* a loaded predecessor does **not** resolve it — jumping to page 50
+  of a 3-page result only proves the end is somewhere before page 50 — but it
+  is still recorded, to avoid re-fetching that page or any page after it.
+
+  Concurrent requests for the same page share a single fetch, and a failed
+  load is evicted so a retry actually retries.
+
+- New `paginateByQuery`, `paginate` and `paginateAll` on `EntitySource`,
+  `EntityRepository` (with `resolutionRules`) and `APIRepository`. They return
+  immediately without loading anything. `orderByID` defaults to `true` there,
+  rather than following the `offset != null` rule of the `select*` methods:
+  a paginated read is only meaningful over a stable order.
+
+- Note: each page is an independent select, without a shared `Transaction`.
+  Entries inserted or deleted between two page loads shift the offsets, so a
+  page loaded later can repeat or skip entries. This is inherent to
+  offset-based pagination; ordering by ID makes it as stable as it can be.
+
 ## 1.11.0
 
 - `selectByQuery` and its siblings gained 4 optional parameters, for pagination

@@ -459,6 +459,42 @@ The `select*` methods accept `limit`, `offset`, `page`, `orderByID` and
   combined with an `offset`, if there is no positive `limit` to page by, or if
   it is below 1.
 
+### Paginated reads: `EntityPagination`
+
+For reading a result page by page, `paginateByQuery` (and `paginate` /
+`paginateAll`) returns an `EntityPagination`, which keeps the pages it has
+already loaded:
+
+```dart
+var page = accountRepository.paginateByQuery(
+  ' address.state == ? ',
+  parameters: ['NY'],
+  limit: 20,
+);
+
+await page.loadNextPage();   // loads page 1
+page[0];                     // synchronous: already loaded
+page[45];                    // null: not loaded (never fetches)
+
+await page.getAt(45);        // loads page 3 on demand
+page.loadedPages;            // [1, 3] — page 2 is a gap
+page.maxLoadedIndex;         // 59
+page.totalLength;            // null: the end is not known yet
+
+await page.loadAll();        // fills the gaps and resolves the end
+page.totalLength;            // 57
+page.finalPage;              // 3
+```
+
+Pages are 1-based and entry indexes 0-based. Synchronous access
+(`operator []`, `loadedEntities`) never fetches — only the `FutureOr` methods
+(`getAt`, `getPage`, `getRange`, `loadNextPage`, `loadAll`, `stream`) do.
+
+It is deliberately not a `List`: a paginated select does not know its length
+until it reaches the end, so `totalLength` is `null` until the final page is
+identified (`isFinalPageResolved`). Until then you still know
+`maxLoadedIndex`, `maxKnownPage` and which pages are loaded.
+
 The config file used above:
 
 File: `api-local.yaml`
