@@ -416,9 +416,43 @@ class AccountAPIRepository extends APIRepository<Account> {
     // This condition will be translated to a SQL with INNER JOIN (when using an SQLAdapter):
     return selectByQuery(' address.state == ? ', parameters: [state]);
   }
+
+  /// Selects a page of [Account]s by field `state`:
+  FutureOr<Iterable<Account>> selectAccountsPage(String state, int page) {
+    // `offset` implies `orderByID`, so the pagination is stable
+    // (translated to: ORDER BY <id> ASC LIMIT 20 OFFSET <page * 20>).
+    return selectByQuery(
+      ' address.state == ? ',
+      parameters: [state],
+      limit: 20,
+      offset: page * 20,
+    );
+  }
+
+  /// Selects the 10 newest [Account]s (highest IDs first):
+  FutureOr<Iterable<Account>> selectNewestAccounts() {
+    return selectAll(
+      limit: 10,
+      orderByID: true,
+      orderDirection: OrderDirection.descending,
+    );
+  }
 }
 
 ```
+
+### Ordering and pagination
+
+The `select*` methods accept `limit`, `offset`, `orderByID` and
+`orderDirection`:
+
+- `orderByID` orders by the table's ID column, resolved automatically from the
+  table scheme — no column name to spell out.
+- A non-null `offset` turns `orderByID` on by default, since an offset without
+  a stable order can return overlapping or missing rows across pages. Pass
+  `orderByID: false` to opt out.
+- `orderDirection` is `OrderDirection.ascending` by default, and is ignored
+  while the ordering is not active.
 
 The config file used above:
 
