@@ -333,20 +333,35 @@ class EntityPagination<O extends Object> {
     ).resolveMapped((entries) => entries.isEmpty ? null : entries);
   }
 
-  /// Loads pages, from the one after [maxLoadedPage], until the final page is
-  /// resolved or [maxPages] pages have been loaded.
+  /// Loads every page from page 1 until the end, so that afterwards
+  /// [loadedEntities] holds the complete result with no gap.
+  ///
+  /// Pages already loaded are skipped without re-fetching (and without
+  /// counting against [maxPages]), so this also fills the gaps left by a
+  /// sparse [getAt].
   ///
   /// Returns [totalLength], which is `null` if [maxPages] stopped it before
   /// the end was reached.
-  FutureOr<int?> loadAll({int? maxPages}) => _loadAllImpl(maxPages, 0);
+  FutureOr<int?> loadAll({int? maxPages}) => _loadAllImpl(maxPages, 0, 1);
 
-  FutureOr<int?> _loadAllImpl(int? maxPages, int loadedCount) {
-    if (isFinalPageResolved) return totalLength;
-    if (maxPages != null && loadedCount >= maxPages) return totalLength;
+  FutureOr<int?> _loadAllImpl(int? maxPages, int fetchCount, int page) {
+    // Skip what is already loaded: no fetch, no budget spent.
+    while (isPageLoaded(page)) {
+      var finalPage = _finalPage;
+      if (finalPage != null && page >= finalPage) return totalLength;
+      ++page;
+    }
 
-    return loadNextPage().resolveMapped((entries) {
-      if (entries == null) return totalLength;
-      return _loadAllImpl(maxPages, loadedCount + 1);
+    var finalPage = _finalPage;
+    if (finalPage != null && page > finalPage) return totalLength;
+
+    if (_isPageKnownEmpty(page)) return totalLength;
+
+    if (maxPages != null && fetchCount >= maxPages) return totalLength;
+
+    return loadPage(page).resolveMapped((entries) {
+      if (entries.isEmpty) return totalLength;
+      return _loadAllImpl(maxPages, fetchCount + 1, page + 1);
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_pagination.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_types.dart';
@@ -268,6 +269,67 @@ abstract class APIRepository<O extends Object> with Initializable {
     limit: limit,
     offset: offset,
     page: page,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    transaction: transaction,
+    resolutionRules: resolutionRules,
+  );
+
+  /// {@macro bones_api.paginate}
+  EntityPagination<O> paginateByQuery(
+    String query, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => entityRepository.paginateByQuery(
+    query,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    limit: limit,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    transaction: transaction,
+    resolutionRules: resolutionRules,
+  );
+
+  /// {@macro bones_api.paginate}
+  EntityPagination<O> paginate(
+    EntityMatcher<O> matcher, {
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => entityRepository.paginate(
+    matcher,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    limit: limit,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    transaction: transaction,
+    resolutionRules: resolutionRules,
+  );
+
+  /// {@macro bones_api.paginate}
+  EntityPagination<O> paginateAll({
+    required int limit,
+    bool? orderByID,
+    OrderDirection? orderDirection,
+    Transaction? transaction,
+    EntityResolutionRules? resolutionRules,
+  }) => entityRepository.paginateAll(
+    limit: limit,
     orderByID: orderByID,
     orderDirection: orderDirection,
     transaction: transaction,
