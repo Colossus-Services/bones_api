@@ -495,6 +495,37 @@ until it reaches the end, so `totalLength` is `null` until the final page is
 identified (`isFinalPageResolved`). Until then you still know
 `maxLoadedIndex`, `maxKnownPage` and which pages are loaded.
 
+The optional `onEvent` hook reports what is being fetched, for progress
+reporting and logging:
+
+```dart
+var page = accountRepository.paginateByQuery(
+  ' address.state == ? ',
+  parameters: ['NY'],
+  limit: 20,
+  onEvent: (event) {
+    switch (event) {
+      case EntityPaginationPageLoading(:var page):
+        print('fetching page $page...');
+      case EntityPaginationPageLoaded(:var page, :var entriesLength):
+        print('page $page: $entriesLength entries');
+      case EntityPaginationPageError(:var page, :var error):
+        print('page $page failed: $error');
+      case EntityPaginationPageSkipped(:var page, :var reason):
+        print('page $page not fetched: ${reason.name}');
+      case EntityPaginationEnd(:var totalLength):
+        print('done: $totalLength entries');
+      case EntityPaginationReset(:var discardedPages):
+        print('discarded ${discardedPages.length} pages');
+    }
+  },
+);
+```
+
+Events are delivered synchronously and in order, so the sequence is meaningful
+even for a synchronous page loader. To consume them as a `Stream` instead,
+forward them: `onEvent: myEventStream.add`.
+
 The config file used above:
 
 File: `api-local.yaml`

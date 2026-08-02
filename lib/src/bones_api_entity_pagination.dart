@@ -5,6 +5,218 @@ import 'package:async_extension/async_extension.dart';
 typedef EntityPageLoader<O extends Object> =
     FutureOr<List<O>> Function(int page, int limit);
 
+/// Notified of what an [EntityPagination] is fetching.
+/// See [EntityPagination.onEvent] and [EntityPaginationEvent].
+typedef EntityPaginationListener<O extends Object> =
+    void Function(EntityPaginationEvent<O> event);
+
+/// An event of an [EntityPagination]. See [EntityPagination.onEvent].
+///
+/// Delivered **synchronously**, at the point where it happens and in order, so
+/// it is also correct for a synchronous [EntityPageLoader]. To consume it as a
+/// `Stream` instead, forward it: `onEvent: myEventStream.add`.
+///
+/// Every event but [EntityPaginationReset] refers to a page, and is an
+/// [EntityPaginationPageEvent]. Switch over it exhaustively:
+///
+/// ```dart
+/// switch (event) {
+///   case EntityPaginationPageLoading(:var page):
+///     print('fetching page $page...');
+///   case EntityPaginationPageLoaded(:var page, :var entries):
+///     print('page $page: ${entries.length} entries');
+///   case EntityPaginationPageError(:var page, :var error):
+///     print('page $page failed: $error');
+///   case EntityPaginationPageSkipped(:var page, :var reason):
+///     print('page $page not fetched: ${reason.name}');
+///   case EntityPaginationEnd(:var totalLength):
+///     print('done: $totalLength entries');
+///   case EntityPaginationReset(:var discardedPages):
+///     print('discarded ${discardedPages.length} pages');
+/// }
+/// ```
+sealed class EntityPaginationEvent<O extends Object> {
+  /// The [EntityPagination] that emitted this event.
+  final EntityPagination<O> pagination;
+
+  EntityPaginationEvent(this.pagination);
+
+  /// The page size. Same as `pagination.limit`.
+  int get limit => pagination.limit;
+}
+
+/// An [EntityPaginationEvent] about a specific [page].
+///
+/// Everything but [EntityPaginationReset], which is about the whole
+/// pagination.
+sealed class EntityPaginationPageEvent<O extends Object>
+    extends EntityPaginationEvent<O> {
+  /// The page (1-based) this event refers to.
+  final int page;
+
+  EntityPaginationPageEvent(super.pagination, this.page);
+}
+
+/// A page fetch is about to start: [EntityPagination.pageLoader] is called
+/// immediately after this event.
+///
+/// Emitted once per *actual* fetch. A page that is already loaded, already
+/// in-flight, or known to be past the end emits an
+/// [EntityPaginationPageSkipped] instead.
+final class EntityPaginationPageLoading<O extends Object>
+    extends EntityPaginationPageEvent<O> {
+  EntityPaginationPageLoading(super.pagination, super.page);
+
+  @override
+  String toString() => 'EntityPaginationPageLoading{page: $page}';
+}
+
+/// A page fetch finished. Always preceded by an
+/// [EntityPaginationPageLoading] for the same [page].
+final class EntityPaginationPageLoaded<O extends Object>
+    extends EntityPaginationPageEvent<O> {
+  /// The loaded entries (unmodifiable).
+  final List<O> entries;
+
+  /// How long [EntityPagination.pageLoader] took.
+  final Duration elapsedTime;
+
+  EntityPaginationPageLoaded(
+    super.pagination,
+    super.page,
+    this.entries,
+    this.elapsedTime,
+  );
+
+  /// The number of loaded entries. A value below [limit] means this is the
+  /// last page.
+  int get entriesLength => entries.length;
+
+  /// Whether this page turned out to be the final one.
+  bool get isFinalPage => pagination.finalPage == page;
+
+  @override
+  String toString() =>
+      'EntityPaginationPageLoaded{page: $page, '
+      'entries: ${entries.length}, elapsedTime: $elapsedTime}';
+}
+
+/// A page fetch failed. The error is rethrown to the caller right after this
+/// event, and the failed page is evicted so a retry actually retries.
+final class EntityPaginationPageError<O extends Object>
+    extends EntityPaginationPageEvent<O> {
+  /// The error thrown by [EntityPagination.pageLoader].
+  final Object error;
+
+  /// The stack trace of [error].
+  final StackTrace stackTrace;
+
+  /// How long the failed fetch took.
+  final Duration elapsedTime;
+
+  EntityPaginationPageError(
+    super.pagination,
+    super.page,
+    this.error,
+    this.stackTrace,
+    this.elapsedTime,
+  );
+
+  @override
+  String toString() => 'EntityPaginationPageError{page: $page, error: $error}';
+}
+
+/// Why a page was served without calling [EntityPagination.pageLoader].
+/// See [EntityPaginationPageSkipped].
+enum EntityPaginationSkipReason {
+  /// The page was already loaded, and was served from [EntityPagination].
+  alreadyLoaded,
+
+  /// A fetch of the same page was already in-flight, and is shared with it.
+  inFlight,
+
+  /// The page is known to be past the end, so it can only be empty.
+  knownEmpty,
+}
+
+/// A page was served without a fetch. See [EntityPaginationSkipReason].
+///
+/// Not an error: it is what makes a repeated read, a concurrent read and a
+/// read past the end free. Ignore it to only observe real fetches.
+final class EntityPaginationPageSkipped<O extends Object>
+    extends EntityPaginationPageEvent<O> {
+  /// Why the page was not fetched.
+  final EntityPaginationSkipReason reason;
+
+  EntityPaginationPageSkipped(super.pagination, super.page, this.reason);
+
+  @override
+  String toString() =>
+      'EntityPaginationPageSkipped{page: $page, reason: ${reason.name}}';
+}
+
+/// The end of the result was resolved: [EntityPagination.finalPage] and
+/// [EntityPagination.totalLength] are now known.
+///
+/// Emitted once, immediately after the [EntityPaginationPageLoaded] that
+/// resolved it — which is not necessarily the final page itself, since an
+/// empty page can pin the end at its predecessor.
+/// See [EntityPagination.isFinalPageResolved].
+final class EntityPaginationEnd<O extends Object>
+    extends EntityPaginationPageEvent<O> {
+  /// The total number of entries.
+  final int totalLength;
+
+  /// The final page. Same as [page].
+  int get finalPage => page;
+
+  EntityPaginationEnd(super.pagination, super.page, this.totalLength);
+
+  /// Whether the select matched no entry at all.
+  bool get isEmpty => totalLength == 0;
+
+  @override
+  String toString() =>
+      'EntityPaginationEnd{finalPage: $page, totalLength: $totalLength}';
+}
+
+/// Every loaded page was discarded by [EntityPagination.reset] or
+/// [EntityPagination.refresh], and everything known about the end with them.
+///
+/// Emitted *after* the state is cleared, so the [pagination] already reads as
+/// empty. The discarded state is on the event itself.
+///
+/// The only event that is not an [EntityPaginationPageEvent]: it is about the
+/// whole pagination.
+final class EntityPaginationReset<O extends Object>
+    extends EntityPaginationEvent<O> {
+  /// The pages that were loaded before the reset, ascending.
+  final List<int> discardedPages;
+
+  /// The number of entries that were loaded before the reset.
+  final int discardedEntitiesLength;
+
+  /// Whether this is the reset of an [EntityPagination.refresh], which
+  /// re-fetches [discardedPages] right after — so a consumer can tell an
+  /// in-progress refresh from a pagination that was simply emptied.
+  final bool isRefresh;
+
+  EntityPaginationReset(
+    super.pagination,
+    this.discardedPages,
+    this.discardedEntitiesLength,
+    this.isRefresh,
+  );
+
+  /// Whether there was nothing to discard.
+  bool get isEmpty => discardedPages.isEmpty;
+
+  @override
+  String toString() =>
+      'EntityPaginationReset{discardedPages: ${discardedPages.length}, '
+      'discardedEntities: $discardedEntitiesLength, isRefresh: $isRefresh}';
+}
+
 /// A lazily loaded, paginated view over a select operation.
 ///
 /// It keeps the pages it has already loaded and never fetches implicitly:
@@ -59,13 +271,39 @@ class EntityPagination<O extends Object> {
   /// An optional description of the paginated query, for [toString].
   final String? query;
 
+  /// An optional hook notified of what is being fetched, or `null` (the
+  /// default) to notify nothing. See [EntityPaginationEvent].
+  ///
+  /// Called **synchronously** at the point where the event happens, so the
+  /// order is meaningful even for a synchronous [pageLoader]. Not `final`, so
+  /// it can also be attached to an already built [EntityPagination] — only
+  /// events emitted afterwards are seen.
+  ///
+  /// An exception thrown by the listener is reported to the current [Zone] and
+  /// does not break the fetch.
+  EntityPaginationListener<O>? onEvent;
+
   EntityPagination({
     required this.limit,
     required this.pageLoader,
     this.query,
+    this.onEvent,
   }) {
     if (limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'The page size must be > 0');
+    }
+  }
+
+  /// Notifies [onEvent], isolating it: a broken listener must not break a
+  /// fetch, but must not be silently swallowed either.
+  void _notify(EntityPaginationEvent<O> event) {
+    var onEvent = this.onEvent;
+    if (onEvent == null) return;
+
+    try {
+      onEvent(event);
+    } catch (e, s) {
+      Zone.current.handleUncaughtError(e, s);
     }
   }
 
@@ -282,34 +520,89 @@ class EntityPagination<O extends Object> {
     }
 
     var loaded = _pages[page];
-    if (loaded != null) return loaded;
+    if (loaded != null) {
+      _notifySkipped(page, EntityPaginationSkipReason.alreadyLoaded);
+      return loaded;
+    }
 
     // Already known to be past the end, no need to fetch:
-    if (_isPageKnownEmpty(page)) return <O>[];
+    if (_isPageKnownEmpty(page)) {
+      _notifySkipped(page, EntityPaginationSkipReason.knownEmpty);
+      return <O>[];
+    }
 
     var loading = _loadingPages[page];
-    if (loading != null) return loading;
+    if (loading != null) {
+      _notifySkipped(page, EntityPaginationSkipReason.inFlight);
+      return loading;
+    }
+
+    _notify(EntityPaginationPageLoading<O>(this, page));
+
+    // Only timed while there is a listener to receive it:
+    var stopwatch = onEvent != null ? (Stopwatch()..start()) : null;
 
     var ret = pageLoader(page, limit);
 
     if (ret is! Future<List<O>>) {
-      _setPage(page, ret);
-      return _pages[page]!;
+      var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
+      var resolvedEnd = _setPage(page, ret);
+      var entries = _pages[page]!;
+
+      _notifyLoaded(page, entries, elapsedTime, resolvedEnd);
+
+      return entries;
     }
 
     var future = ret
-        .then((entries) {
+        .then((pageEntries) {
+          var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
           _loadingPages.remove(page);
-          _setPage(page, entries);
-          return _pages[page]!;
+          var resolvedEnd = _setPage(page, pageEntries);
+          var entries = _pages[page]!;
+
+          _notifyLoaded(page, entries, elapsedTime, resolvedEnd);
+
+          return entries;
         })
         .onError<Object>((e, s) {
+          var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
           _loadingPages.remove(page);
+
+          _notify(EntityPaginationPageError<O>(this, page, e, s, elapsedTime));
+
           throw e;
         });
 
     _loadingPages[page] = future;
     return future;
+  }
+
+  void _notifySkipped(int page, EntityPaginationSkipReason reason) {
+    if (onEvent == null) return;
+    _notify(EntityPaginationPageSkipped<O>(this, page, reason));
+  }
+
+  /// Notifies the loaded page, then the end of the result when this page
+  /// resolved it (in that order).
+  void _notifyLoaded(
+    int page,
+    List<O> entries,
+    Duration elapsedTime,
+    bool resolvedEnd,
+  ) {
+    if (onEvent == null) return;
+
+    _notify(EntityPaginationPageLoaded<O>(this, page, entries, elapsedTime));
+
+    if (resolvedEnd) {
+      var finalPage = _finalPage;
+      var totalLength = this.totalLength;
+
+      if (finalPage != null && totalLength != null) {
+        _notify(EntityPaginationEnd<O>(this, finalPage, totalLength));
+      }
+    }
   }
 
   bool _isPageKnownEmpty(int page) {
@@ -388,10 +681,17 @@ class EntityPagination<O extends Object> {
   // Control:
   // ---------------------------------------------------------------------
 
-  void _setPage(int page, List<O> entries) {
+  /// Stores the entries of [page], and returns `true` if this call resolved
+  /// [finalPage] (so that [EntityPaginationEnd] is emitted exactly once, and
+  /// after the [EntityPaginationPageLoaded] that caused it).
+  bool _setPage(int page, List<O> entries) {
     var list = List<O>.unmodifiable(entries);
     _pages[page] = list;
+
+    var wasResolved = _finalPage != null;
     _resolveFinalPage(page, list);
+
+    return !wasResolved && _finalPage != null;
   }
 
   void _resolveFinalPage(int page, List<O> entries) {
@@ -426,18 +726,41 @@ class EntityPagination<O extends Object> {
 
   /// Discards every loaded page and everything known about the end,
   /// keeping the query.
-  void reset() {
+  ///
+  /// Notifies an [EntityPaginationReset].
+  void reset() => _resetImpl(isRefresh: false);
+
+  void _resetImpl({required bool isRefresh}) {
+    // Captured before clearing: the event reports what was discarded, while
+    // the pagination itself already reads as empty.
+    var discardedPages = onEvent != null ? loadedPages : const <int>[];
+    var discardedEntitiesLength = onEvent != null ? loadedEntitiesLength : 0;
+
     _pages.clear();
     _loadingPages.clear();
     _finalPage = null;
     _minEmptyPage = null;
+
+    if (onEvent != null) {
+      _notify(
+        EntityPaginationReset<O>(
+          this,
+          discardedPages,
+          discardedEntitiesLength,
+          isRefresh,
+        ),
+      );
+    }
   }
 
   /// Re-fetches the currently loaded pages, discarding what was known about
   /// the end (it may have moved).
+  ///
+  /// Notifies an [EntityPaginationReset] with `isRefresh: true`, then the
+  /// events of the re-fetched pages.
   FutureOr<void> refresh() {
     var pages = loadedPages;
-    reset();
+    _resetImpl(isRefresh: true);
 
     if (pages.isEmpty) return null;
 

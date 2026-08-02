@@ -286,6 +286,7 @@ abstract class APIRepository<O extends Object> with Initializable {
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => entityRepository.paginateByQuery(
     query,
     parameters: parameters,
@@ -296,6 +297,7 @@ abstract class APIRepository<O extends Object> with Initializable {
     orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
+    onEvent: onEvent,
   );
 
   /// {@macro bones_api.paginate}
@@ -309,6 +311,7 @@ abstract class APIRepository<O extends Object> with Initializable {
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => entityRepository.paginate(
     matcher,
     parameters: parameters,
@@ -319,6 +322,7 @@ abstract class APIRepository<O extends Object> with Initializable {
     orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
+    onEvent: onEvent,
   );
 
   /// {@macro bones_api.paginate}
@@ -328,12 +332,14 @@ abstract class APIRepository<O extends Object> with Initializable {
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => entityRepository.paginateAll(
     limit: limit,
     orderByID: orderByID,
     orderDirection: orderDirection,
     transaction: transaction,
     resolutionRules: resolutionRules,
+    onEvent: onEvent,
   );
 
   FutureOr<Iterable<O>> deleteByQuery(
