@@ -36,11 +36,43 @@ class _FakeSource {
     return async ? Future.value(entries) : entries;
   }
 
-  EntityPagination<_Item> pagination({int limit = 10}) =>
-      EntityPagination<_Item>(limit: limit, pageLoader: load, query: 'fake');
+  EntityPagination<_Item> pagination({
+    int limit = 10,
+    EntityPaginationListener<_Item>? onEvent,
+  }) => EntityPagination<_Item>(
+    limit: limit,
+    pageLoader: load,
+    query: 'fake',
+    onEvent: onEvent,
+  );
 }
 
 List<int> _ids(Iterable<_Item> items) => items.map((e) => e.id).toList();
+
+/// Records the [EntityPagination] events as compact `'<kind>:<page>'` strings,
+/// so a whole sequence can be asserted at once.
+class _EventLog {
+  final List<EntityPaginationEvent<_Item>> events = [];
+
+  void call(EntityPaginationEvent<_Item> event) => events.add(event);
+
+  List<String> get trace =>
+      events.map((e) {
+        return switch (e) {
+          EntityPaginationPageLoading(:var page) => 'loading:$page',
+          EntityPaginationPageLoaded(:var page, :var entriesLength) =>
+            'loaded:$page($entriesLength)',
+          EntityPaginationPageError(:var page) => 'error:$page',
+          EntityPaginationPageSkipped(:var page, :var reason) =>
+            'skipped:$page(${reason.name})',
+          EntityPaginationEnd(:var finalPage, :var totalLength) =>
+            'end:$finalPage($totalLength)',
+          EntityPaginationReset(:var discardedPages, :var isRefresh) =>
+            '${isRefresh ? 'refresh' : 'reset'}:'
+                '(${discardedPages.join(',')})',
+        };
+      }).toList();
+}
 
 void main() {
   group('EntityPagination: construction', () {
@@ -626,6 +658,290 @@ void main() {
 
       expect(p.isIndexKnownOutOfRange(24), isFalse);
       expect(p.isIndexKnownOutOfRange(25), isTrue);
+    });
+  });
+
+  group('EntityPagination: events', () {
+    test('nothing is notified without a listener', () async {
+      var p = _FakeSource(25).pagination(limit: 10);
+
+      // Just has to not throw:
+      await p.loadAll();
+
+      expect(p.onEvent, isNull);
+      expect(p.totalLength, equals(25));
+    });
+
+    test('a full read notifies each page, then the end', () async {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10, onEvent: log.call);
+
+      await p.loadAll();
+
+      expect(
+        log.trace,
+        equals([
+          'loading:1',
+          'loaded:1(10)',
+          'loading:2',
+          'loaded:2(10)',
+          'loading:3',
+          // A short page is the last one, so the end resolves right here:
+          'loaded:3(5)',
+          'end:3(25)',
+        ]),
+      );
+    });
+
+    test('the end is notified once, after the page that resolved it', () async {
+      var log = _EventLog();
+      // An exact multiple of the page size: the end is only pinned by the
+      // empty page 3, whose predecessor is loaded and full.
+      var p = _FakeSource(20).pagination(limit: 10, onEvent: log.call);
+
+      await p.loadAll();
+
+      expect(
+        log.trace,
+        equals([
+          'loading:1',
+          'loaded:1(10)',
+          'loading:2',
+          'loaded:2(10)',
+          'loading:3',
+          'loaded:3(0)',
+          'end:2(20)',
+        ]),
+      );
+
+      // Re-reading resolves nothing new:
+      log.events.clear();
+      await p.loadAll();
+      expect(log.trace.where((e) => e.startsWith('end:')), isEmpty);
+    });
+
+    test('an empty result notifies the end on page 1', () async {
+      var log = _EventLog();
+      var p = _FakeSource(0).pagination(limit: 10, onEvent: log.call);
+
+      await p.loadAll();
+
+      expect(log.trace, equals(['loading:1', 'loaded:1(0)', 'end:1(0)']));
+
+      var end = log.events.whereType<EntityPaginationEnd<_Item>>().single;
+      expect(end.isEmpty, isTrue);
+    });
+
+    test('a page served without a fetch notifies why', () async {
+      var log = _EventLog();
+      var source = _FakeSource(25);
+      var p = source.pagination(limit: 10, onEvent: log.call);
+
+      await p.loadPage(1);
+      log.events.clear();
+
+      // Already loaded:
+      await p.loadPage(1);
+
+      // In-flight: 2 concurrent requests for page 2 share one fetch.
+      await Future.wait([
+        Future.value(p.loadPage(2)),
+        Future.value(p.loadPage(2)),
+      ]);
+
+      expect(
+        log.trace,
+        equals([
+          'skipped:1(alreadyLoaded)',
+          'loading:2',
+          'skipped:2(inFlight)',
+          'loaded:2(10)',
+        ]),
+      );
+
+      // Past the resolved end:
+      await p.loadAll();
+      log.events.clear();
+      await p.loadPage(9);
+
+      expect(log.trace, equals(['skipped:9(knownEmpty)']));
+
+      expect(source.fetches, equals([1, 2, 3]));
+    });
+
+    test('a failed page notifies the error, then rethrows', () async {
+      var log = _EventLog();
+      var attempts = 0;
+
+      var p = EntityPagination<_Item>(
+        limit: 10,
+        onEvent: log.call,
+        pageLoader: (page, limit) async {
+          ++attempts;
+          if (attempts == 1) throw StateError('boom');
+          return [_Item(0)];
+        },
+      );
+
+      await expectLater(p.loadPage(1), throwsA(isA<StateError>()));
+
+      var error =
+          log.events.whereType<EntityPaginationPageError<_Item>>().single;
+      expect(error.page, equals(1));
+      expect(error.error, isA<StateError>());
+      expect(error.stackTrace, isNotNull);
+
+      // The retry is a normal load, with no leftover state:
+      log.events.clear();
+      await p.loadPage(1);
+
+      expect(log.trace, equals(['loading:1', 'loaded:1(1)', 'end:1(1)']));
+    });
+
+    test('a synchronous pageLoader notifies in order, synchronously', () {
+      var log = _EventLog();
+      var p = _FakeSource(
+        25,
+        async: false,
+      ).pagination(limit: 10, onEvent: log.call);
+
+      // Not awaited: a sync loader must have notified everything already.
+      p.loadPage(1);
+
+      expect(log.trace, equals(['loading:1', 'loaded:1(10)']));
+    });
+
+    test('the loaded entries and the elapsed time are reported', () async {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10, onEvent: log.call);
+
+      await p.loadPage(3);
+
+      var loaded =
+          log.events.whereType<EntityPaginationPageLoaded<_Item>>().single;
+
+      expect(_ids(loaded.entries), equals([20, 21, 22, 23, 24]));
+      expect(loaded.entriesLength, equals(5));
+      expect(loaded.isFinalPage, isTrue);
+      expect(loaded.limit, equals(10));
+      expect(loaded.pagination, same(p));
+      expect(loaded.elapsedTime, isA<Duration>());
+      expect(loaded.elapsedTime.isNegative, isFalse);
+
+      // The entries are the stored, unmodifiable list:
+      expect(() => loaded.entries.add(_Item(99)), throwsUnsupportedError);
+    });
+
+    test('a listener can be attached after construction', () async {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10);
+
+      await p.loadPage(1);
+      expect(log.events, isEmpty);
+
+      p.onEvent = log.call;
+      await p.loadPage(2);
+
+      expect(log.trace, equals(['loading:2', 'loaded:2(10)']));
+    });
+
+    test('a listener that throws does not break the fetch', () async {
+      var uncaught = <Object>[];
+
+      var entries = await runZonedGuarded(() async {
+        var p = _FakeSource(25).pagination(
+          limit: 10,
+          onEvent: (_) => throw StateError('broken listener'),
+        );
+
+        return await p.loadPage(1);
+      }, (e, s) => uncaught.add(e));
+
+      expect(_ids(entries!), equals([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+      expect(uncaught, isNotEmpty);
+      expect(uncaught.first, isA<StateError>());
+    });
+
+    test('reset notifies what it discarded', () async {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10, onEvent: log.call);
+
+      await p.loadAll();
+      log.events.clear();
+
+      p.reset();
+
+      expect(log.trace, equals(['reset:(1,2,3)']));
+
+      var reset = log.events.whereType<EntityPaginationReset<_Item>>().single;
+      expect(reset.discardedPages, equals([1, 2, 3]));
+      expect(reset.discardedEntitiesLength, equals(25));
+      expect(reset.isRefresh, isFalse);
+      expect(reset.isEmpty, isFalse);
+      expect(reset.pagination, same(p));
+
+      // Emitted *after* the state is cleared:
+      expect(p.loadedPages, isEmpty);
+      expect(p.totalLength, isNull);
+    });
+
+    test('resetting an empty pagination still notifies', () {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10, onEvent: log.call);
+
+      p.reset();
+
+      expect(log.trace, equals(['reset:()']));
+
+      var reset = log.events.whereType<EntityPaginationReset<_Item>>().single;
+      expect(reset.isEmpty, isTrue);
+      expect(reset.discardedEntitiesLength, equals(0));
+    });
+
+    test('refresh notifies a reset, then re-fetches the pages', () async {
+      var log = _EventLog();
+      var source = _FakeSource(25);
+      var p = source.pagination(limit: 10, onEvent: log.call);
+
+      await p.loadPage(1);
+      await p.loadPage(3);
+      log.events.clear();
+
+      await p.refresh();
+
+      expect(
+        log.trace,
+        equals([
+          // Marked as a refresh, so a consumer knows the pages come back:
+          'refresh:(1,3)',
+          'loading:1',
+          'loading:3',
+          'loaded:1(10)',
+          'loaded:3(5)',
+          'end:3(25)',
+        ]),
+      );
+
+      expect(source.fetches, equals([1, 3, 1, 3]));
+    });
+
+    test('stream and getRange notify their pages', () async {
+      var log = _EventLog();
+      var p = _FakeSource(25).pagination(limit: 10, onEvent: log.call);
+
+      await p.getRange(5, 15);
+
+      // `getRange` starts every spanned page at once, so both fetches are
+      // announced before either completes:
+      expect(
+        log.trace,
+        equals(['loading:1', 'loading:2', 'loaded:1(10)', 'loaded:2(10)']),
+      );
+
+      log.events.clear();
+      await p.stream(fromPage: 3).toList();
+
+      expect(log.trace, equals(['loading:3', 'loaded:3(5)', 'end:3(25)']));
     });
   });
 }

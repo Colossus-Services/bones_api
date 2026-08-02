@@ -3642,6 +3642,8 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   ///   over a stable order, so unlike the `select*` methods this is on by
   ///   default instead of being implied by an offset.
   /// - [orderDirection]: the [OrderDirection] of the ordering.
+  /// - [onEvent]: an optional hook notified of what is being fetched.
+  ///   See [EntityPaginationEvent].
   /// {@endtemplate}
   EntityPagination<O> paginateByQuery(
     String query, {
@@ -3652,9 +3654,11 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     bool? orderByID,
     OrderDirection? orderDirection,
     Transaction? transaction,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
     query: query,
+    onEvent: onEvent,
     pageLoader:
         (page, limit) => selectByQuery(
           query,
@@ -3679,9 +3683,11 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     bool? orderByID,
     OrderDirection? orderDirection,
     Transaction? transaction,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
     query: '$matcher',
+    onEvent: onEvent,
     pageLoader:
         (page, limit) => select(
           matcher,
@@ -3702,9 +3708,11 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     bool? orderByID,
     OrderDirection? orderDirection,
     Transaction? transaction,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
     query: 'ALL',
+    onEvent: onEvent,
     pageLoader:
         (page, limit) => selectAll(
           transaction: transaction,
@@ -5822,8 +5830,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
+    onEvent: onEvent,
     query: query,
     pageLoader:
         (page, limit) => selectByQuery(
@@ -5854,8 +5864,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
+    onEvent: onEvent,
     query: '$matcher',
     pageLoader:
         (page, limit) => select(
@@ -5882,8 +5894,10 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     OrderDirection? orderDirection,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
+    EntityPaginationListener<O>? onEvent,
   }) => EntityPagination<O>(
     limit: limit,
+    onEvent: onEvent,
     query: 'ALL',
     pageLoader:
         (page, limit) => selectAll(

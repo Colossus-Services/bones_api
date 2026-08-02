@@ -1,3 +1,80 @@
+## 1.13.0
+
+- New `EntityPagination.onEvent`: an optional hook notified of what is being
+  fetched, for progress reporting and logging.
+
+  ```dart
+  var p = userRepository.paginateByQuery(' state == ? ',
+      parameters: ['NY'], limit: 20, onEvent: (event) {
+    switch (event) {
+      case EntityPaginationPageLoading(:var page):
+        print('fetching page $page...');
+      case EntityPaginationPageLoaded(:var page, :var entriesLength):
+        print('page $page: $entriesLength entries');
+      case EntityPaginationPageError(:var page, :var error):
+        print('page $page failed: $error');
+      case EntityPaginationPageSkipped(:var page, :var reason):
+        print('page $page not fetched: ${reason.name}');
+      case EntityPaginationEnd(:var totalLength):
+        print('done: $totalLength entries');
+      case EntityPaginationReset(:var discardedPages):
+        print('discarded ${discardedPages.length} pages');
+    }
+  });
+  ```
+
+  - Delivered **synchronously**, at the point where it happens and in order, so
+    it is also correct for a synchronous `EntityPageLoader` (a `Stream` would
+    only deliver in a later microtask, after a sync read already finished).
+    To consume it as a stream, forward it: `onEvent: myEventStream.add`.
+  - `onEvent` is not `final`, so it can also be attached to an already built
+    `EntityPagination`. Only events emitted afterwards are seen.
+  - An exception thrown by the listener is reported to the current `Zone` and
+    does not break the fetch.
+  - Nothing is allocated (not even the fetch timer) while `onEvent` is `null`.
+
+- New `EntityPaginationEvent<O>`, a `sealed` hierarchy so a `switch` over it is
+  exhaustive, with `EntityPaginationListener<O>` as the callback type:
+  - `EntityPaginationPageLoading`: a fetch is about to start. Emitted once per
+    *actual* fetch.
+  - `EntityPaginationPageLoaded`: a fetch finished, with the `entries`, the
+    `entriesLength`, the `elapsedTime` of the `pageLoader` and `isFinalPage`.
+  - `EntityPaginationPageError`: a fetch failed, with the `error`, the
+    `stackTrace` and the `elapsedTime`. The error is rethrown to the caller
+    right after the event.
+  - `EntityPaginationPageSkipped`: a page was served *without* a fetch, with an
+    `EntityPaginationSkipReason`: `alreadyLoaded`, `inFlight` (a concurrent
+    request shares the fetch) or `knownEmpty` (past the resolved end). Not an
+    error — it is what makes a repeated, concurrent or past-the-end read free.
+  - `EntityPaginationEnd`: the end was resolved, with the `finalPage` and the
+    `totalLength`. Emitted once, immediately after the
+    `EntityPaginationPageLoaded` that resolved it — which is not necessarily
+    the final page itself, since an empty page can pin the end at its
+    predecessor.
+  - `EntityPaginationReset`: `reset()` or `refresh()` discarded the loaded
+    pages, with the `discardedPages`, the `discardedEntitiesLength` and
+    `isRefresh` — `true` while it is the reset of a `refresh()`, which
+    re-fetches those pages right after, so a consumer can tell an in-progress
+    refresh from a pagination that was simply emptied. Emitted *after* the
+    state is cleared, so the pagination already reads as empty and the
+    discarded state is on the event.
+
+  Every event but `EntityPaginationReset` is about a page, and is an
+  `EntityPaginationPageEvent` (also `sealed`) carrying the `page`.
+
+  Note that concurrent page loads interleave: `getRange` and `refresh` start
+  every page at once, so all the fetches are announced before any completes.
+
+- `paginateByQuery`, `paginate` and `paginateAll` gained the optional `onEvent`
+  parameter, on `EntitySource`, `EntityRepository` and `APIRepository`, so the
+  hook is reachable without building an `EntityPagination` by hand.
+
+- Tests: 15 new cases in `bones_api_entity_pagination_test.dart` (the event
+  sequence of a full read, of an exact multiple of the page size, of an empty
+  result and of a failure; the 3 skip reasons; the synchronous delivery; a
+  listener attached after construction; a throwing listener; and the
+  `reset`/`refresh` events).
+
 ## 1.12.0
 
 - New `EntityPagination<O>`: a lazily loaded, paginated view over a select,
