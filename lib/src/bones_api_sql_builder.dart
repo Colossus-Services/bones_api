@@ -93,6 +93,14 @@ class SQLDialect extends DBDialect {
   /// If `true` indicates that this adapter's SQL needs a temporary table to return rows for inserts/deletes.
   final bool acceptsTemporaryTableForReturning;
 
+  /// If `true` a `RETURNING` clause can select all the columns of a table
+  /// qualified by its alias (`RETURNING "alias".*`).
+  ///
+  /// SQLite only accepts the unqualified wildcard (`RETURNING *`), rejecting
+  /// the qualified form with *"RETURNING may not use TABLE.\* wildcards"*.
+  /// Only meaningful when [acceptsReturningSyntax] is `true`.
+  final bool returningAcceptsTableWildcard;
+
   /// If `true` indicates that this adapter's SQL can use the `DEFAULT VALUES` directive for inserts.
   final bool acceptsInsertDefaultValues;
 
@@ -129,6 +137,7 @@ class SQLDialect extends DBDialect {
     this.acceptsOutputSyntax = false,
     this.acceptsReturningSyntax = false,
     this.acceptsTemporaryTableForReturning = false,
+    this.returningAcceptsTableWildcard = true,
     this.acceptsInsertDefaultValues = false,
     this.acceptsInsertIgnore = false,
     this.acceptsInsertOnConflict = false,
@@ -195,6 +204,7 @@ class SQLDialect extends DBDialect {
         'acceptsOutputSyntax: $acceptsOutputSyntax, '
         'acceptsReturningSyntax: $acceptsReturningSyntax, '
         'acceptsTemporaryTableForReturning: $acceptsTemporaryTableForReturning, '
+        'returningAcceptsTableWildcard: $returningAcceptsTableWildcard, '
         'acceptsInsertDefaultValues: $acceptsInsertDefaultValues, '
         'acceptsInsertIgnore: $acceptsInsertIgnore, '
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
@@ -243,12 +253,9 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// Build all the `SQL`s, including the [extraSQLBuilders].
   List<String> buildAllSQLs({bool multiline = true, bool ifNotExists = true}) {
     var allSQLBuilders = this.allSQLBuilders;
-    var sqls =
-        allSQLBuilders
-            .map(
-              (e) => e.buildSQL(multiline: multiline, ifNotExists: ifNotExists),
-            )
-            .toList();
+    var sqls = allSQLBuilders
+        .map((e) => e.buildSQL(multiline: multiline, ifNotExists: ifNotExists))
+        .toList();
     return sqls;
   }
 }
@@ -383,29 +390,27 @@ class CreateTableSQL extends TableSQL {
   List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables =>
-      _referenceTables ??=
-          <String>{
-            ...entries.expand((e) => e.referenceTables ?? <String>[]),
-          }.toList();
+  List<String> get referenceTables => _referenceTables ??= <String>{
+    ...entries.expand((e) => e.referenceTables ?? <String>[]),
+  }.toList();
 
   List<String>? _relationshipsTables;
 
   /// Returns the tables of the [relationships].
-  List<String> get relationshipsTables =>
-      _relationshipsTables ??=
-          <String>{
-            ...?relationships?.expand(
-              (e) => e.referenceTables.where((t) => t != table),
-            ),
-          }.toList();
+  List<String> get relationshipsTables => _relationshipsTables ??= <String>{
+    ...?relationships?.expand(
+      (e) => e.referenceTables.where((t) => t != table),
+    ),
+  }.toList();
 
   List<String>? _referenceAndRelationshipTables;
 
   /// Returns the tables in [referenceTables] and [relationshipsTables].
   List<String> get referenceAndRelationshipTables =>
-      _referenceAndRelationshipTables ??=
-          <String>{...referenceTables, ...relationshipsTables}.toList();
+      _referenceAndRelationshipTables ??= <String>{
+        ...referenceTables,
+        ...relationshipsTables,
+      }.toList();
 
   @override
   List<String> get dependentTables => referenceAndRelationshipTables;
@@ -436,10 +441,9 @@ class CreateTableSQL extends TableSQL {
     var constraints = this.constraints;
 
     if (onlyDependents) {
-      constraints =
-          constraints
-              .where((c) => c.referenceTables?.any((t) => t != table) ?? false)
-              .toList();
+      constraints = constraints
+          .where((c) => c.referenceTables?.any((t) => t != table) ?? false)
+          .toList();
     }
 
     var alterTablesConstraint = <AlterTableSQL>[];
@@ -591,11 +595,9 @@ class AlterTableSQL extends TableSQL {
   List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables =>
-      _referenceTables ??=
-          <String>{
-            ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls,
-          }.toList();
+  List<String> get referenceTables => _referenceTables ??= <String>{
+    ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls,
+  }.toList();
 
   @override
   List<String> get dependentTables => referenceTables;
@@ -698,13 +700,12 @@ extension SQLBuilderIterableMapEntryExtension<K>
     var allSQLs = expand((e) => e.value.allSQLBuilders).toList();
     allSQLs.bestOrder();
 
-    var ordered =
-        sorted((a, b) {
-          var i1 = allSQLs.indexOf(a.value);
-          var i2 = allSQLs.indexOf(b.value);
-          var cmp = i1.compareTo(i2);
-          return cmp;
-        }).toList();
+    var ordered = sorted((a, b) {
+      var i1 = allSQLs.indexOf(a.value);
+      var i2 = allSQLs.indexOf(b.value);
+      var cmp = i1.compareTo(i2);
+      return cmp;
+    }).toList();
 
     return ordered;
   }
@@ -716,13 +717,12 @@ extension SQLBuilderIterableMapEntryExtension<K>
       (e) => e.value.allSQLBuilders,
     ).toList().toHierarchicalOrder(verbose: verbose);
 
-    var ordered =
-        sorted((a, b) {
-          var i1 = allSQLs.indexOf(a.value);
-          var i2 = allSQLs.indexOf(b.value);
-          var cmp = i1.compareTo(i2);
-          return cmp;
-        }).toList();
+    var ordered = sorted((a, b) {
+      var i1 = allSQLs.indexOf(a.value);
+      var i2 = allSQLs.indexOf(b.value);
+      var cmp = i1.compareTo(i2);
+      return cmp;
+    }).toList();
 
     return ordered;
   }
@@ -747,14 +747,14 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     for (var sql in this) {
       if (processed.add(sql)) {
         var dependentTables = sql.dependentTables;
-        var dependentSQLs =
-            dependentTables
-                ?.map((t) => createTables.getCreateTable(t))
-                .nonNulls
-                .toList();
+        var dependentSQLs = dependentTables
+            ?.map((t) => createTables.getCreateTable(t))
+            .nonNulls
+            .toList();
 
-        var unprocessedDependencies =
-            dependentSQLs?.where((s) => !processed.contains(s)).toList();
+        var unprocessedDependencies = dependentSQLs
+            ?.where((s) => !processed.contains(s))
+            .toList();
 
         if (unprocessedDependencies != null &&
             unprocessedDependencies.isNotEmpty) {
@@ -843,10 +843,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         : refTables.where((r) => _indexOfTable(r, 0) != null).toList();
   }
 
-  Map<SQLBuilder, List<String>> _entriesReferences() =>
-      map(
-        (e) => MapEntry(e, _referenceTablesInList(e.referenceTables)),
-      ).toMapFromEntries();
+  Map<SQLBuilder, List<String>> _entriesReferences() => map(
+    (e) => MapEntry(e, _referenceTablesInList(e.referenceTables)),
+  ).toMapFromEntries();
 
   Map<SQLBuilder, List<String>> _entriesRelationships() =>
       whereType<CreateTableSQL>()
@@ -883,21 +882,20 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     final entriesReferences = _entriesReferences();
     final entriesRelationships = _entriesRelationships();
 
-    var withParents =
-        whereType<TableSQL>().where((e) => e.parentTable != null).toList();
+    var withParents = whereType<TableSQL>()
+        .where((e) => e.parentTable != null)
+        .toList();
     removeAll(withParents);
 
-    var withRelationship =
-        whereType<CreateTableSQL>()
-            .where((e) => e.relationshipsTables.isNotEmpty)
-            .toList();
+    var withRelationship = whereType<CreateTableSQL>()
+        .where((e) => e.relationshipsTables.isNotEmpty)
+        .toList();
     removeAll(withRelationship);
 
-    var withReference =
-        where((e) {
-          var referenceTables = e.referenceTables;
-          return referenceTables != null && referenceTables.isNotEmpty;
-        }).toList();
+    var withReference = where((e) {
+      var referenceTables = e.referenceTables;
+      return referenceTables != null && referenceTables.isNotEmpty;
+    }).toList();
     removeAll(withReference);
 
     withParents._bestOrderLoop(
@@ -917,10 +915,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     _bestOrderLoop();
 
-    refsGetter(SQLBuilder e) =>
-        e is CreateTableSQL
-            ? e.referenceAndRelationshipTables
-            : e.referenceTables ?? [];
+    refsGetter(SQLBuilder e) => e is CreateTableSQL
+        ? e.referenceAndRelationshipTables
+        : e.referenceTables ?? [];
 
     _addByRefPos(withReference, addAtEnd: true);
     _addByRefPos(withRelationship, addAtEnd: true, refsGetter: refsGetter);
@@ -1254,11 +1251,10 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
     graph.populate(
       this,
       inputsProvider: (step, sql) => getCreateTables(sql.dependentTables),
-      outputsProvider:
-          (step, sql) => [
-            ...?sql.extraSQLBuilders,
-            //if (sql is CreateTableSQL) ...getCreateTables(sql.relationshipsTables)
-          ],
+      outputsProvider: (step, sql) => [
+        ...?sql.extraSQLBuilders,
+        //if (sql is CreateTableSQL) ...getCreateTables(sql.relationshipsTables)
+      ],
     );
 
     return graph;
@@ -1271,15 +1267,14 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
     var graph = toGraph();
 
-    var sqlBuildOrder =
-        graph
-            .walkOutputsOrderFrom(
-              graph.rootValues,
-              sortByInputDependency: true,
-              expandSideRoots: true,
-              maxExpansion: 1,
-            )
-            .toListOfValues();
+    var sqlBuildOrder = graph
+        .walkOutputsOrderFrom(
+          graph.rootValues,
+          sortByInputDependency: true,
+          expandSideRoots: true,
+          maxExpansion: 1,
+        )
+        .toListOfValues();
 
     var invalidSQLsOrders = sqlBuildOrder.invalidSQLsOrder();
 
@@ -1510,11 +1505,10 @@ abstract mixin class SQLGenerator {
 
     var idName = entityHandler.idFieldName();
     var idType = entityHandler.idType();
-    var idEntityAnnotations =
-        entityHandler
-            .getFieldEntityAnnotations(null, idName)
-            ?.whereType<EntityField>()
-            .toList();
+    var idEntityAnnotations = entityHandler
+        .getFieldEntityAnnotations(null, idName)
+        ?.whereType<EntityField>()
+        .toList();
 
     var sqlType = foreignKeyTypeToSQLType(
       TypeInfo.fromType(idType),
@@ -1821,11 +1815,10 @@ abstract mixin class SQLGenerator {
     var idType = entityHandler.idType();
 
     var idColumnName = normalizeColumnName(idFieldName);
-    var idAnnotations =
-        entityHandler
-            .getFieldEntityAnnotations(null, idFieldName)
-            ?.whereType<EntityField>()
-            .toList();
+    var idAnnotations = entityHandler
+        .getFieldEntityAnnotations(null, idFieldName)
+        ?.whereType<EntityField>()
+        .toList();
 
     var idTypeSQL = primaryKeyTypeToSQLType(
       idType,
@@ -1843,12 +1836,11 @@ abstract mixin class SQLGenerator {
 
     var indexSQLs = <CreateIndexSQL>[];
 
-    var fieldsEntries =
-        entityHandler
-            .fieldsTypes()
-            .entries
-            .where((e) => !e.value.isListEntityOrReference)
-            .toList();
+    var fieldsEntries = entityHandler
+        .fieldsTypes()
+        .entries
+        .where((e) => !e.value.isListEntityOrReference)
+        .toList();
 
     if (sortColumns) {
       fieldsEntries.sort((a, b) => a.key.compareTo(b.key));
@@ -1862,11 +1854,10 @@ abstract mixin class SQLGenerator {
       var fieldType = e.value;
       if (fieldName == idFieldName) continue;
 
-      var entityFieldAnnotations =
-          entityHandler
-              .getFieldEntityAnnotations(null, fieldName)
-              ?.whereType<EntityField>()
-              .toList();
+      var entityFieldAnnotations = entityHandler
+          .getFieldEntityAnnotations(null, fieldName)
+          ?.whereType<EntityField>()
+          .toList();
 
       if (entityFieldAnnotations != null && entityFieldAnnotations.hasHidden) {
         continue;
@@ -2033,22 +2024,20 @@ abstract mixin class SQLGenerator {
 
     var relationshipSQLs = <CreateTableSQL>[];
 
-    var relationshipEntries =
-        entityHandler
-            .fieldsTypes()
-            .entries
-            .where((e) => e.value.isListEntityOrReference)
-            .toList();
+    var relationshipEntries = entityHandler
+        .fieldsTypes()
+        .entries
+        .where((e) => e.value.isListEntityOrReference)
+        .toList();
 
     for (var e in relationshipEntries) {
       var fieldName = e.key;
       var fieldType = e.value.arguments0!;
 
-      var entityFieldAnnotations =
-          entityHandler
-              .getFieldEntityAnnotations(null, fieldName)
-              ?.whereType<EntityField>()
-              .toList();
+      var entityFieldAnnotations = entityHandler
+          .getFieldEntityAnnotations(null, fieldName)
+          ?.whereType<EntityField>()
+          .toList();
 
       var columnName = normalizeColumnName(fieldName);
 

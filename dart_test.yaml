@@ -17,6 +17,9 @@ tags:
   # Tests that uses `MySQL`.
   mysql:
     timeout: 180s
+  # Tests that uses `SQLite` (embedded: no container needed).
+  sqlite:
+    timeout: 180s
   # Slow tests.
   slow:
     timeout: 180s

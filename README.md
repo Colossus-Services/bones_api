@@ -539,15 +539,34 @@ postgres:
 
 To use a SQL database with your `EntityRepository` you need a `SQLAdapter`:
 
-- `PostgreSQLAdapter`: a [PostgreSQL][postgres] adapter.
-- `MySQLAdapter`: A [MySQL][mysql] adapter.
-- `MemorySQLAdapter`: a portable `SQLAdapter` that stores entities in memory.
+- `DBPostgreSQLAdapter`: a [PostgreSQL][postgres] adapter.
+  Import: `package:bones_api/bones_api_db_postgre.dart`
+- `DBMySQLAdapter`: a [MySQL][mysql] adapter.
+  Import: `package:bones_api/bones_api_db_mysql.dart`
+- `DBSQLiteAdapter`: an embedded [SQLite][sqlite] adapter, for a database file
+  or an in-memory database. Needs no server and no native library: the
+  [`sqlite3`][sqlite3_pkg] package bundles SQLite itself.
+  Import: `package:bones_api/bones_api_db_sqlite.dart`
+- `DBSQLMemoryAdapter`: a portable `SQLAdapter` that stores entities in memory.
 
 The `SQLAdapter` is responsible to connect to the database, manage the connection
 pool and also to adjust the generated SQLs to the correct dialect.
 
+Example of a SQLite configuration:
+
+```yaml
+db:
+  sqlite:
+    path: /var/lib/myapp/db.sqlite
+    generateTables: true
+```
+
+Use `memory: true` (or `path: ':memory:'`) for an in-memory database.
+
 [postgres]: https://www.postgresql.org/
 [mysql]: https://www.mysql.com/
+[sqlite]: https://www.sqlite.org/
+[sqlite3_pkg]: https://pub.dev/packages/sqlite3
 
 ## Bones_UI
 

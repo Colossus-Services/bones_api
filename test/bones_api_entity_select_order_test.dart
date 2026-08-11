@@ -356,6 +356,12 @@ void main() {
       expect(postgres.offsetRequiresLimit, isFalse);
       expect(mysql.offsetRequiresLimit, isTrue);
       expect(generic.offsetMaxLimitValue, equals('18446744073709551615'));
+
+      // `RETURNING "alias".*` is the pre-existing behavior and must stay the
+      // default: only SQLite opts out of the table-qualified wildcard.
+      for (var d in [generic, postgres, mysql]) {
+        expect(d.returningAcceptsTableWildcard, isTrue, reason: d.name);
+      }
     });
 
     test('limitOffsetSQL: no clause', () {
