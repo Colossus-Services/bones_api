@@ -44,6 +44,13 @@
   (*"RETURNING may not use TABLE.\* wildcards"*) and needs a bare
   `RETURNING *`.
 
+- Fixed `DBObjectDirectoryAdapter` losing objects written just before a read:
+  `_saveObject` was `async` and its `Future` was dropped by `doInsert`/
+  `doUpdate`, while every reader in the adapter inspects the filesystem
+  synchronously. A `store` could therefore return before its object was on
+  disk, and `selectAll` would *silently omit* it (a not-yet-written file reads
+  back as `null` and was discarded). The write is now synchronous.
+
 - **Breaking**: the minimum Dart SDK is now **3.10.0** (was 3.7.0), required by
   `sqlite3` and its build hooks.
 
