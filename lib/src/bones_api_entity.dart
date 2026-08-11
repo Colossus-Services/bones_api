@@ -458,8 +458,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       var id = resolveIDFromMap(value);
       return id != null ? <V>[id] : [];
     } else if (value is Iterable) {
-      var ids =
-          value.map((e) => resolveID<V>(e)).whereNotNullResolved().toList();
+      var ids = value
+          .map((e) => resolveID<V>(e))
+          .whereNotNullResolved()
+          .toList();
       return ids;
     } else if (value is EntityReference) {
       var id = value.id;
@@ -497,21 +499,20 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           <double>[];
       return ids as List<V>;
     } else if (idType.isString) {
-      var ids =
-          value
-              .toString()
-              .trim()
-              .split(RegExp(r'\s+'))
-              .map((s) => s.trim())
-              .map(
-                (s) =>
-                    (s.startsWith('"') && s.endsWith('"')) ||
-                            (s.startsWith("'") && s.endsWith("'"))
-                        ? s.substring(1, s.length - 1)
-                        : s,
-              )
-              .where((s) => s.isNotEmpty)
-              .toList();
+      var ids = value
+          .toString()
+          .trim()
+          .split(RegExp(r'\s+'))
+          .map((s) => s.trim())
+          .map(
+            (s) =>
+                (s.startsWith('"') && s.endsWith('"')) ||
+                    (s.startsWith("'") && s.endsWith("'"))
+                ? s.substring(1, s.length - 1)
+                : s,
+          )
+          .where((s) => s.isNotEmpty)
+          .toList();
       return ids as List<V>;
     }
 
@@ -567,9 +568,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   Type? _idType;
 
-  Type idType([O? o]) =>
-      _idType ??=
-          getFieldType(o, idFieldName(o), resolveFiledName: false)!.type;
+  Type idType([O? o]) => _idType ??= getFieldType(
+    o,
+    idFieldName(o),
+    resolveFiledName: false,
+  )!.type;
 
   String idFieldName([O? o]);
 
@@ -579,11 +582,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   Map<String, TypeInfo>? _fieldsWithTypeList;
 
-  Map<String, TypeInfo> fieldsWithTypeList([O? o]) =>
-      _fieldsWithTypeList ??= fieldsWithType(
-        (_, fieldType) => fieldType.isList,
-        o,
-      );
+  Map<String, TypeInfo> fieldsWithTypeList([O? o]) => _fieldsWithTypeList ??=
+      fieldsWithType((_, fieldType) => fieldType.isList, o);
 
   Map<String, TypeInfo>? _fieldsWithTypeEntity;
 
@@ -1041,15 +1041,14 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityCache: entityCache,
         );
       } else {
-        resolved =
-            valEntityHandler != null
-                ? valEntityHandler.createFromMap(
-                  value,
-                  entityProvider: entityProvider,
-                  entityCache: entityCache,
-                  resolutionRules: resolutionRulesResolved,
-                )
-                : value;
+        resolved = valEntityHandler != null
+            ? valEntityHandler.createFromMap(
+                value,
+                entityProvider: entityProvider,
+                entityCache: entityCache,
+                resolutionRules: resolutionRulesResolved,
+              )
+            : value;
       }
 
       return resolved as FutureOr<T?>;
@@ -1158,28 +1157,27 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       var totalEntitiesToResolve = 0;
       var totalResolvedEntities = 0;
 
-      value =
-          value.map((e) {
-            if (e.isEntityIDType) {
-              totalEntitiesToResolve++;
+      value = value.map((e) {
+        if (e.isEntityIDType) {
+          totalEntitiesToResolve++;
 
-              var id = valEntityHandler?.resolveID(e) ?? e;
+          var id = valEntityHandler?.resolveID(e) ?? e;
 
-              var entity = entityCache.getCachedEntityByID(
-                id,
-                type: elementType.type,
-              );
+          var entity = entityCache.getCachedEntityByID(
+            id,
+            type: elementType.type,
+          );
 
-              if (entity != null) {
-                totalResolvedEntities++;
-                return entity;
-              } else {
-                return e;
-              }
-            } else {
-              return e;
-            }
-          }).toList();
+          if (entity != null) {
+            totalResolvedEntities++;
+            return entity;
+          } else {
+            return e;
+          }
+        } else {
+          return e;
+        }
+      }).toList();
 
       if (totalResolvedEntities == totalEntitiesToResolve &&
           value.length == totalResolvedEntities) {
@@ -1194,14 +1192,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     if (valEntityHandler != null) {
       var listFutures = TypeParser.parseList(
         value,
-        elementParser:
-            (e) => valEntityHandler.resolveValueByType(
-              elementType,
-              e,
-              entityProvider: entityProvider,
-              entityCache: entityCache,
-              resolutionRules: resolutionRulesResolved,
-            ),
+        elementParser: (e) => valEntityHandler.resolveValueByType(
+          elementType,
+          e,
+          entityProvider: entityProvider,
+          entityCache: entityCache,
+          resolutionRules: resolutionRulesResolved,
+        ),
       );
 
       if (listFutures == null) return null;
@@ -1212,14 +1209,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     } else {
       var listFutures = TypeParser.parseList(
         value,
-        elementParser:
-            (e) => resolveValueByType(
-              elementType,
-              e,
-              entityProvider: entityProvider,
-              entityCache: entityCache,
-              resolutionRules: resolutionRulesResolved,
-            ),
+        elementParser: (e) => resolveValueByType(
+          elementType,
+          e,
+          entityProvider: entityProvider,
+          entityCache: entityCache,
+          resolutionRules: resolutionRulesResolved,
+        ),
       );
 
       if (listFutures == null) return null;
@@ -1583,14 +1579,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     final reflectionFactory = ReflectionFactory();
 
-    var mapEnumFields =
-        getFieldsTypes(o).entries
-            .where(
-              (e) =>
-                  reflectionFactory.getRegisterEnumReflection(e.value.type) !=
-                  null,
-            )
-            .toMapFromEntries();
+    var mapEnumFields = getFieldsTypes(o).entries
+        .where(
+          (e) =>
+              reflectionFactory.getRegisterEnumReflection(e.value.type) != null,
+        )
+        .toMapFromEntries();
 
     return _fieldsEnumTypes = Map<String, TypeInfo>.unmodifiable(mapEnumFields);
   }
@@ -1603,23 +1597,22 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var enumFields = getFieldsEnumTypes(o);
 
-    var mapEntityFields =
-        getFieldsTypes().entries
-            .map((e) {
-              var field = e.key;
-              var typeInfo = e.value;
+    var mapEntityFields = getFieldsTypes().entries
+        .map((e) {
+          var field = e.key;
+          var typeInfo = e.value;
 
-              if (enumFields.containsKey(field)) return null;
+          if (enumFields.containsKey(field)) return null;
 
-              if (typeInfo.isListEntityOrReference) return null;
+          if (typeInfo.isListEntityOrReference) return null;
 
-              var entityType = typeInfo.entityType;
-              if (entityType == null) return null;
+          var entityType = typeInfo.entityType;
+          if (entityType == null) return null;
 
-              return MapEntry(field, typeInfo);
-            })
-            .nonNulls
-            .toMapFromEntries();
+          return MapEntry(field, typeInfo);
+        })
+        .nonNulls
+        .toMapFromEntries();
 
     return _fieldsEntityTypes = Map<String, TypeInfo>.unmodifiable(
       mapEntityFields,
@@ -1634,23 +1627,22 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var enumFields = getFieldsEnumTypes(o);
 
-    var mapListEntityFields =
-        getFieldsTypes().entries
-            .map((e) {
-              var field = e.key;
-              var typeInfo = e.value;
+    var mapListEntityFields = getFieldsTypes().entries
+        .map((e) {
+          var field = e.key;
+          var typeInfo = e.value;
 
-              if (enumFields.containsKey(field)) return null;
+          if (enumFields.containsKey(field)) return null;
 
-              if (!typeInfo.isListEntityOrReference) return null;
+          if (!typeInfo.isListEntityOrReference) return null;
 
-              var entityType = typeInfo.entityType;
-              if (entityType == null) return null;
+          var entityType = typeInfo.entityType;
+          if (entityType == null) return null;
 
-              return MapEntry(field, typeInfo);
-            })
-            .nonNulls
-            .toMapFromEntries();
+          return MapEntry(field, typeInfo);
+        })
+        .nonNulls
+        .toMapFromEntries();
 
     return _fieldsListEntityTypes = Map<String, TypeInfo>.unmodifiable(
       mapListEntityFields,
@@ -1662,11 +1654,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations([O? o]) {
     var fieldsNames = this.fieldsNames(o);
 
-    var entries =
-        fieldsNames.map((f) {
-          var annotations = getFieldEntityAnnotations(o, f);
-          return annotations == null ? null : MapEntry(f, annotations);
-        }).nonNulls;
+    var entries = fieldsNames.map((f) {
+      var annotations = getFieldEntityAnnotations(o, f);
+      return annotations == null ? null : MapEntry(f, annotations);
+    }).nonNulls;
 
     var map = Map<String, List<EntityAnnotation>>.fromEntries(entries);
 
@@ -2088,8 +2079,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return DynamicInt.fromInt(value.millisecondsSinceEpoch);
     }
 
-    DynamicNumber? n =
-        value == null ? def : (Decimal.from(value.toString().trim()) ?? def);
+    DynamicNumber? n = value == null
+        ? def
+        : (Decimal.from(value.toString().trim()) ?? def);
 
     if (n == null) {
       throw ArgumentError(
@@ -2187,25 +2179,23 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var reflectionFactory = ReflectionFactory();
 
-    EntityHandler? entityHandler1 =
-        value1.isPrimitiveValue
-            ? null
-            : reflectionFactory
-                    .getRegisterClassReflection(value1.runtimeType)
-                    ?.entityHandler ??
-                EntityHandlerProvider.globalProvider.getEntityHandler(
-                  obj: value1,
-                );
+    EntityHandler? entityHandler1 = value1.isPrimitiveValue
+        ? null
+        : reflectionFactory
+                  .getRegisterClassReflection(value1.runtimeType)
+                  ?.entityHandler ??
+              EntityHandlerProvider.globalProvider.getEntityHandler(
+                obj: value1,
+              );
 
-    EntityHandler? entityHandler2 =
-        value2.isPrimitiveValue
-            ? null
-            : reflectionFactory
-                    .getRegisterClassReflection(value2.runtimeType)
-                    ?.entityHandler ??
-                EntityHandlerProvider.globalProvider.getEntityHandler(
-                  obj: value2,
-                );
+    EntityHandler? entityHandler2 = value2.isPrimitiveValue
+        ? null
+        : reflectionFactory
+                  .getRegisterClassReflection(value2.runtimeType)
+                  ?.entityHandler ??
+              EntityHandlerProvider.globalProvider.getEntityHandler(
+                obj: value2,
+              );
 
     if (entityHandler1 != null) {
       var id1 = entityHandler1.getID(value1);
@@ -2283,14 +2273,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   static bool? equalsValuesTime(Object value1, Object value2) {
     if (value1 is Time || value2 is Time) {
-      var t1 =
-          value1 is Time
-              ? value1.totalMilliseconds
-              : TypeParser.parseInt(value1);
-      var t2 =
-          value2 is Time
-              ? value2.totalMilliseconds
-              : TypeParser.parseInt(value2);
+      var t1 = value1 is Time
+          ? value1.totalMilliseconds
+          : TypeParser.parseInt(value1);
+      var t2 = value2 is Time
+          ? value2.totalMilliseconds
+          : TypeParser.parseInt(value2);
       return t1 == t2;
     }
 
@@ -2336,8 +2324,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return isEqualsDeep(
         value1,
         value2,
-        valueEquality:
-            (a, b) => equalsValuesBasic(a, b, entityHandler: entityHandler),
+        valueEquality: (a, b) =>
+            equalsValuesBasic(a, b, entityHandler: entityHandler),
       );
     }
 
@@ -2461,25 +2449,26 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
         var msgConstructors = '';
         if (constructors != null && constructors.isNotEmpty) {
-          var allParameters =
-              constructors.entries.expand((c) => c.value.keys).toSet();
+          var allParameters = constructors.entries
+              .expand((c) => c.value.keys)
+              .toSet();
 
-          var missingParameters =
-              allParameters.where((p) => !parameters.contains(p)).toList();
+          var missingParameters = allParameters
+              .where((p) => !parameters.contains(p))
+              .toList();
 
-          var list =
-              constructors.entries.map((e) {
-                var name = e.key;
-                var args = e.value.entries
-                    .map((e) {
-                      var argName = e.key;
-                      var argType = e.value.toString(withT: false);
-                      return '$argType $argName';
-                    })
-                    .join(', ');
+          var list = constructors.entries.map((e) {
+            var name = e.key;
+            var args = e.value.entries
+                .map((e) {
+                  var argName = e.key;
+                  var argType = e.value.toString(withT: false);
+                  return '$argType $argName';
+                })
+                .join(', ');
 
-                return '$type${name.isNotEmpty ? '.$name' : ''}($args)';
-              }).toList();
+            return '$type${name.isNotEmpty ? '.$name' : ''}($args)';
+          }).toList();
 
           msgConstructors =
               '\n  Missing parameters: $missingParameters'
@@ -2753,8 +2742,9 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     if (o != null && _idFieldsName == null) {
       _idFieldsName = o.idFieldName;
 
-      final fieldsNames =
-          _fieldsNames ??= List<String>.unmodifiable(o.fieldsNames);
+      final fieldsNames = _fieldsNames ??= List<String>.unmodifiable(
+        o.fieldsNames,
+      );
 
       _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
         Map<String, TypeInfo>.fromEntries(
@@ -2924,9 +2914,8 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   @override
   String get typeName => reflection.className;
 
-  ClassReflection<O> get reflection =>
-      _reflection ??=
-          ReflectionFactory().getRegisterClassReflection<O>(classType)!;
+  ClassReflection<O> get reflection => _reflection ??= ReflectionFactory()
+      .getRegisterClassReflection<O>(classType)!;
 
   ClassReflection<O> reflectionWithObject([O? o]) =>
       o == null ? reflection : reflection.withObject(o);
@@ -3204,13 +3193,9 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     return _constructors ??= Map<String, Map<String, TypeInfo>>.unmodifiable(
       reflectionWithObject(o).allConstructors().map((c) {
         var name = c.name;
-        var args =
-            c.allParameters
-                .map(
-                  (p) =>
-                      MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo),
-                )
-                .toMapFromEntries();
+        var args = c.allParameters
+            .map((p) => MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo))
+            .toMapFromEntries();
         return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
       }).toMapFromEntries(),
     );
@@ -3229,9 +3214,8 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     return reflection.createInstanceFromMap(
       fields,
       fieldNameResolver: Json.defaultFieldNameResolver,
-      fieldValueResolver:
-          (f, v, t) =>
-              Json.defaultFieldValueResolver(f, v, t, jsonDecoder!, provider),
+      fieldValueResolver: (f, v, t) =>
+          Json.defaultFieldValueResolver(f, v, t, jsonDecoder!, provider),
     );
   }
 
@@ -3659,18 +3643,17 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     limit: limit,
     query: query,
     onEvent: onEvent,
-    pageLoader:
-        (page, limit) => selectByQuery(
-          query,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => selectByQuery(
+      query,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+    ).resolveMapped((os) => os.toList()),
   );
 
   /// {@macro bones_api.paginate}
@@ -3688,18 +3671,17 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     limit: limit,
     query: '$matcher',
     onEvent: onEvent,
-    pageLoader:
-        (page, limit) => select(
-          matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => select(
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+    ).resolveMapped((os) => os.toList()),
   );
 
   /// {@macro bones_api.paginate}
@@ -3713,14 +3695,13 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
     limit: limit,
     query: 'ALL',
     onEvent: onEvent,
-    pageLoader:
-        (page, limit) => selectAll(
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => selectAll(
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+    ).resolveMapped((os) => os.toList()),
   );
 
   FutureOr<Iterable<dynamic>> selectRelationship<E>(
@@ -4296,12 +4277,9 @@ class EntityRepositoryProvider
       if (name != null) {
         var nameSimplified = EntityAccessor.simplifiedName(name);
 
-        entityRepository =
-            _entityRepositories.values
-                .where(
-                  (e) => e.name == name || e.nameSimplified == nameSimplified,
-                )
-                .firstOrNull;
+        entityRepository = _entityRepositories.values
+            .where((e) => e.name == name || e.nameSimplified == nameSimplified)
+            .firstOrNull;
 
         if (entityRepository != null && !entityRepository.isClosed) {
           return entityRepository as EntityRepository<O>;
@@ -4704,11 +4682,10 @@ extension _IterableEntityRepositoryProviderExtension
 
     var notClosed = _whereNotClosed(this, length, removeClosedProviders);
 
-    var entityRepositories =
-        notClosed
-            .map((e) => e.getEntityRepositoryByType<T>(type))
-            .nonNulls
-            .toList();
+    var entityRepositories = notClosed
+        .map((e) => e.getEntityRepositoryByType<T>(type))
+        .nonNulls
+        .toList();
 
     return _resolveEntityRepository<T>(
       entityRepositories,
@@ -4741,23 +4718,20 @@ extension _IterableEntityRepositoryProviderExtension
       }
 
       if (entityRepositoryProvider != null) {
-        var sameProvider =
-            entityRepositories
-                .where(
-                  (r) =>
-                      r.provider == entityRepositoryProvider &&
-                      (entityHandler == null ||
-                          r.entityHandler == entityHandler),
-                )
-                .toList();
+        var sameProvider = entityRepositories
+            .where(
+              (r) =>
+                  r.provider == entityRepositoryProvider &&
+                  (entityHandler == null || r.entityHandler == entityHandler),
+            )
+            .toList();
         if (sameProvider.length == 1) {
           return sameProvider.first;
         }
       } else if (entityHandler != null) {
-        var sameProvider =
-            entityRepositories
-                .where((r) => r.entityHandler == entityHandler)
-                .toList();
+        var sameProvider = entityRepositories
+            .where((r) => r.entityHandler == entityHandler)
+            .toList();
         if (sameProvider.length == 1) {
           return sameProvider.first;
         }
@@ -4843,34 +4817,35 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       growable: false,
     );
 
-    var entriesRepositoriesOrdered =
-        entries.entries
-            .map((e) {
-              var typeName = e.key;
-              var entities = e.value;
-              var entityRepository = getEntityRepository(name: typeName);
-              return MapEntry(typeName, (entities, entityRepository));
-            })
-            .sorted((a, b) {
-              var rep1 = a.value.$2;
-              var rep2 = b.value.$2;
+    var entriesRepositoriesOrdered = entries.entries
+        .map((e) {
+          var typeName = e.key;
+          var entities = e.value;
+          var entityRepository = getEntityRepository(name: typeName);
+          return MapEntry(typeName, (entities, entityRepository));
+        })
+        .sorted((a, b) {
+          var rep1 = a.value.$2;
+          var rep2 = b.value.$2;
 
-              var idx1 =
-                  rep1 != null ? allRepositoriesBuildOrder.indexOf(rep1) : -1;
-              var idx2 =
-                  rep2 != null ? allRepositoriesBuildOrder.indexOf(rep2) : -1;
+          var idx1 = rep1 != null
+              ? allRepositoriesBuildOrder.indexOf(rep1)
+              : -1;
+          var idx2 = rep2 != null
+              ? allRepositoriesBuildOrder.indexOf(rep2)
+              : -1;
 
-              if (idx1 < 0) {
-                idx1 = 9999999;
-              }
+          if (idx1 < 0) {
+            idx1 = 9999999;
+          }
 
-              if (idx2 < 0) {
-                idx2 = 9999999;
-              }
+          if (idx2 < 0) {
+            idx2 = 9999999;
+          }
 
-              return idx1.compareTo(idx2);
-            })
-            .toMapFromEntries();
+          return idx1.compareTo(idx2);
+        })
+        .toMapFromEntries();
 
     _log.info('Repositories build order:');
     for (var e in entriesRepositoriesOrdered.entries) {
@@ -5034,17 +5009,14 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       var key = k.toString();
       var values = v is Iterable ? v : [v];
 
-      var entities =
-          values
-              .map(
-                (e) => (e as Map).map(
-                  (key, value) => MapEntry<String, dynamic>(
-                    key.toString(),
-                    value as dynamic,
-                  ),
-                ),
-              )
-              .toList();
+      var entities = values
+          .map(
+            (e) => (e as Map).map(
+              (key, value) =>
+                  MapEntry<String, dynamic>(key.toString(), value as dynamic),
+            ),
+          )
+          .toList();
 
       return MapEntry(key, entities);
     });
@@ -5333,25 +5305,25 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     EntityResolutionRules? resolutionRules,
   ) => Transaction.executeBlock((transaction) {
     if (entitiesJson.length <= 100) {
-      var osAsync =
-          entitiesJson
-              .map(
-                (e) => createFromMap(
-                  e,
-                  entityCache: transaction,
-                  entityProvider: provider,
-                  resolutionRules: resolutionRules,
-                ),
-              )
-              .resolveAll();
+      var osAsync = entitiesJson
+          .map(
+            (e) => createFromMap(
+              e,
+              entityCache: transaction,
+              entityProvider: provider,
+              resolutionRules: resolutionRules,
+            ),
+          )
+          .resolveAll();
 
       return osAsync.resolveMapped((os) {
         return storeAll(os, transaction: transaction).resolveWithValue(os);
       });
     }
 
-    var entitiesJsonBlocks =
-        entitiesJson.splitBeforeIndexed((i, e) => i % 50 == 0).toList();
+    var entitiesJsonBlocks = entitiesJson
+        .splitBeforeIndexed((i, e) => i % 50 == 0)
+        .toList();
 
     final entitiesJsonLength = entitiesJson.length;
     int processCount = 0;
@@ -5367,29 +5339,26 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
           final elapsedTime = DateTime.now().difference(initTime);
 
           final estimatedTime = Duration(
-            milliseconds:
-                count == 0
-                    ? 0
-                    : ((elapsedTime.inMilliseconds / count) *
-                            entitiesJsonLength)
-                        .toInt(),
+            milliseconds: count == 0
+                ? 0
+                : ((elapsedTime.inMilliseconds / count) * entitiesJsonLength)
+                      .toInt(),
           );
 
           _log.info(
             'Populating `$name`...  $count / $entitiesJsonLength (${progress.toStringAsFixed(2)}%) -- ${elapsedTime.toHumanReadable()} / ${estimatedTime.toHumanReadable()}',
           );
 
-          var osAsync =
-              entitiesBlock
-                  .map(
-                    (e) => createFromMap(
-                      e,
-                      entityCache: transaction,
-                      entityProvider: provider,
-                      resolutionRules: resolutionRules,
-                    ),
-                  )
-                  .resolveAll();
+          var osAsync = entitiesBlock
+              .map(
+                (e) => createFromMap(
+                  e,
+                  entityCache: transaction,
+                  entityProvider: provider,
+                  resolutionRules: resolutionRules,
+                ),
+              )
+              .resolveAll();
 
           return osAsync.resolveMapped((os) {
             return storeAll(os, transaction: transaction).resolveWithValue(os);
@@ -5835,19 +5804,18 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     limit: limit,
     onEvent: onEvent,
     query: query,
-    pageLoader:
-        (page, limit) => selectByQuery(
-          query,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-          resolutionRules: resolutionRules,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => selectByQuery(
+      query,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+      resolutionRules: resolutionRules,
+    ).resolveMapped((os) => os.toList()),
   );
 
   /// {@macro bones_api.paginate}
@@ -5869,19 +5837,18 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     limit: limit,
     onEvent: onEvent,
     query: '$matcher',
-    pageLoader:
-        (page, limit) => select(
-          matcher,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-          resolutionRules: resolutionRules,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => select(
+      matcher,
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+      resolutionRules: resolutionRules,
+    ).resolveMapped((os) => os.toList()),
   );
 
   /// {@macro bones_api.paginate}
@@ -5899,15 +5866,14 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     limit: limit,
     onEvent: onEvent,
     query: 'ALL',
-    pageLoader:
-        (page, limit) => selectAll(
-          transaction: transaction,
-          limit: limit,
-          page: page,
-          orderByID: orderByID ?? true,
-          orderDirection: orderDirection,
-          resolutionRules: resolutionRules,
-        ).resolveMapped((os) => os.toList()),
+    pageLoader: (page, limit) => selectAll(
+      transaction: transaction,
+      limit: limit,
+      page: page,
+      orderByID: orderByID ?? true,
+      orderDirection: orderDirection,
+      resolutionRules: resolutionRules,
+    ).resolveMapped((os) => os.toList()),
   );
 
   @override
@@ -6464,8 +6430,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   Future<bool> _waitAllExecutedImpl() async {
     while (_executedOperations.length < _operations.length) {
-      var completer =
-          _waitingExecutedOperation ??= Completer<TransactionOperation>();
+      var completer = _waitingExecutedOperation ??=
+          Completer<TransactionOperation>();
       await completer.future;
     }
     return true;
@@ -6511,8 +6477,8 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         return false;
       }
 
-      var completer =
-          _waitingExecutedOperation ??= Completer<TransactionOperation?>();
+      var completer = _waitingExecutedOperation ??=
+          Completer<TransactionOperation?>();
 
       var executedOp = await completer.future.timeout(
         remainingTime,
@@ -6828,12 +6794,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     if (onError != null) {
       return zone.asyncTry<R>(
         block,
-        onError:
-            (e, s) => _executeCommit(
-              zone,
-              e,
-              s,
-            ).resolveMapped((val) => onError(this, e, s)),
+        onError: (e, s) => _executeCommit(
+          zone,
+          e,
+          s,
+        ).resolveMapped((val) => onError(this, e, s)),
         onFinally: () => _executeCommit(zone),
       );
     } else {
@@ -6952,16 +6917,15 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }) {
     final previousError = _error;
 
-    final errorResolved =
-        errorResolver != null
-            ? errorResolver(
-                  error,
-                  stackTrace,
-                  debugInfo != null ? [operation, debugInfo] : operation,
-                  previousError,
-                ) ??
-                error
-            : error;
+    final errorResolved = errorResolver != null
+        ? errorResolver(
+                error,
+                stackTrace,
+                debugInfo != null ? [operation, debugInfo] : operation,
+                previousError,
+              ) ??
+              error
+        : error;
 
     _errorsTransactions[errorResolved] = this;
 
@@ -7289,13 +7253,14 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
       'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationSelect<O> extends TransactionOperation {
@@ -7320,13 +7285,14 @@ class TransactionOperationSelect<O> extends TransactionOperation {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationCount<O> extends TransactionOperation {
@@ -7345,13 +7311,14 @@ class TransactionOperationCount<O> extends TransactionOperation {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
+  )!;
 }
 
 abstract class TransactionOperationWithEntity<O> extends TransactionOperation {
@@ -7402,13 +7369,14 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
@@ -7432,13 +7400,14 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationStoreRelationship<O, E>
@@ -7465,13 +7434,14 @@ class TransactionOperationStoreRelationship<O, E>
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationConstrainRelationship<O, E>
@@ -7498,13 +7468,14 @@ class TransactionOperationConstrainRelationship<O, E>
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationSelectRelationship<O>
@@ -7528,13 +7499,14 @@ class TransactionOperationSelectRelationship<O>
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
@@ -7560,13 +7532,14 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo',
+  )!;
 }
 
 class TransactionOperationDelete<O> extends TransactionOperation {
@@ -7591,13 +7564,14 @@ class TransactionOperationDelete<O> extends TransactionOperation {
       'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]$durationMsInfo';
 
   @override
-  String toString({Set<Object>? processedObjects}) =>
-      RecursiveToString.recursiveToString(
-        processedObjects,
-        this,
-        () =>
-            'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-      )!;
+  String toString({
+    Set<Object>? processedObjects,
+  }) => RecursiveToString.recursiveToString(
+    processedObjects,
+    this,
+    () =>
+        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
+  )!;
 }
 
 enum TransactionOperationType {
@@ -7726,8 +7700,8 @@ abstract class IterableEntityRepository<O extends Object>
     final fieldsEntity = entityHandler.fieldsWithTypeEntityOrReference();
     final fieldsEntityRef = entityHandler.fieldsWithEntityReference();
 
-    final fieldsListEntity =
-        entityHandler.fieldsWithTypeListEntityOrReference();
+    final fieldsListEntity = entityHandler
+        .fieldsWithTypeListEntityOrReference();
     final fieldsListEntityRef = entityHandler.fieldsWithEntityReferenceList();
 
     if (fieldsEntity.isEmpty && fieldsListEntity.isEmpty) return false;
@@ -7791,12 +7765,11 @@ abstract class IterableEntityRepository<O extends Object>
   }) {
     checkNotClosed();
 
-    var osIDs =
-        iterable().map((o) {
-          var oId = getID(o, entityHandler: entityHandler);
-          var matches = ids.contains(oId);
-          return matches ? oId as I : null;
-        }).nonNulls;
+    var osIDs = iterable().map((o) {
+      var oId = getID(o, entityHandler: entityHandler);
+      var matches = ids.contains(oId);
+      return matches ? oId as I : null;
+    }).nonNulls;
 
     return osIDs;
   }
@@ -7959,10 +7932,9 @@ abstract class IterableEntityRepository<O extends Object>
       o,
     );
 
-    var uniques =
-        fieldsEntityAnnotations?.entries
-            .where((e) => e.value.hasUnique)
-            .toList();
+    var uniques = fieldsEntityAnnotations?.entries
+        .where((e) => e.value.hasUnique)
+        .toList();
     if (uniques == null || uniques.isEmpty) return;
 
     for (var e in uniques) {
@@ -8087,26 +8059,24 @@ abstract class IterableEntityRepository<O extends Object>
     TypeInfo? fieldType,
     Transaction? transaction,
   }) {
-    oIds ??=
-        os!
-            .map((o) => getID(o, entityHandler: entityHandler)! as Object)
-            .toList();
+    oIds ??= os!
+        .map((o) => getID(o, entityHandler: entityHandler)! as Object)
+        .toList();
 
     if (oIds.isEmpty) {
       return <dynamic, Iterable<dynamic>>{};
     }
 
-    var entries =
-        oIds.map((oId) {
-          var objs = selectRelationship(
-            null,
-            field,
-            oId: oId,
-            fieldType: fieldType,
-            transaction: transaction,
-          );
-          return MapEntry(oId, objs);
-        }).toList();
+    var entries = oIds.map((oId) {
+      var objs = selectRelationship(
+        null,
+        field,
+        oId: oId,
+        fieldType: fieldType,
+        transaction: transaction,
+      );
+      return MapEntry(oId, objs);
+    }).toList();
 
     var results = Map<dynamic, FutureOr<Iterable<dynamic>>>.fromEntries(
       entries,
@@ -8182,8 +8152,11 @@ abstract class IterableEntityRepository<O extends Object>
       var value = entityHandler.getField(o, fieldName);
       if (value == null) return null;
 
-      var fieldType =
-          entityHandler.getFieldType(o, fieldName, resolveFiledName: false)!;
+      var fieldType = entityHandler.getFieldType(
+        o,
+        fieldName,
+        resolveFiledName: false,
+      )!;
 
       if (!EntityHandler.isValidEntityType(fieldType.type)) {
         return null;
@@ -8197,14 +8170,13 @@ abstract class IterableEntityRepository<O extends Object>
         );
         if (elementRepository == null) return null;
 
-        var futures =
-            value.map((e) {
-              return elementRepository.ensureStored(
-                e,
-                transaction: transaction,
-                operation: operation,
-              );
-            }).toList();
+        var futures = value.map((e) {
+          return elementRepository.ensureStored(
+            e,
+            transaction: transaction,
+            operation: operation,
+          );
+        }).toList();
 
         return futures.resolveAll();
       } else {
@@ -8326,18 +8298,17 @@ abstract class IterableEntityRepository<O extends Object>
     int? offset,
     bool? orderByID,
     OrderDirection? orderDirection,
-  }) =>
-      applySelectOrderAndPagination(
-        itr,
-        (o) => getID(o, entityHandler: entityHandler),
-        limit: limit,
-        offset: offset,
-        orderByID: orderByID,
-        orderDirection: orderDirection,
-        // Preserves the pre-existing behavior of this repository,
-        // where a `limit` of 0 means "no limit":
-        zeroLimitIsUnlimited: true,
-      ).toList();
+  }) => applySelectOrderAndPagination(
+    itr,
+    (o) => getID(o, entityHandler: entityHandler),
+    limit: limit,
+    offset: offset,
+    orderByID: orderByID,
+    orderDirection: orderDirection,
+    // Preserves the pre-existing behavior of this repository,
+    // where a `limit` of 0 means "no limit":
+    zeroLimitIsUnlimited: true,
+  ).toList();
 
   @override
   Map<String, dynamic> information({bool extended = false}) {

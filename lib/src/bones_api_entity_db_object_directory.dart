@@ -402,11 +402,10 @@ class DBObjectDirectoryAdapter
   }
 
   List<File> _listTableFiles(Directory tableDir) {
-    var list =
-        tableDir.listSync(recursive: false).whereType<File>().where((e) {
-          var path = e.path;
-          return path.endsWith('.json') && !path.startsWith('.');
-        }).toList();
+    var list = tableDir.listSync(recursive: false).whereType<File>().where((e) {
+      var path = e.path;
+      return path.endsWith('.json') && !path.startsWith('.');
+    }).toList();
     return list;
   }
 
@@ -443,11 +442,10 @@ class DBObjectDirectoryAdapter
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
-    var existIDs =
-        ids.where((id) {
-          var objFile = _resolveObjectFile(table, id);
-          return objFile.existsSync();
-        }).toList();
+    var existIDs = ids.where((id) {
+      var objFile = _resolveObjectFile(table, id);
+      return objFile.existsSync();
+    }).toList();
 
     return existIDs;
   }
@@ -516,8 +514,9 @@ class DBObjectDirectoryAdapter
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
-    var entries =
-        await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
+    var entries = await ids
+        .map((id) => _readObject(table, id))
+        .resolveAllNotNull();
 
     return _applyOrderAndPagination(
       table,
@@ -564,12 +563,11 @@ class DBObjectDirectoryAdapter
 
     var files = _listTableFiles(tableDir);
 
-    var entries =
-        files.map((f) {
-          var fileName = pack_path.split(f.path).last;
-          var id = pack_path.withoutExtension(fileName);
-          return _readObject(table, id);
-        }).resolveAllNotNull();
+    var entries = files.map((f) {
+      var fileName = pack_path.split(f.path).last;
+      var id = pack_path.withoutExtension(fileName);
+      return _readObject(table, id);
+    }).resolveAllNotNull();
 
     return entries.resolveMapped(
       (entries) => _applyOrderAndPagination(
@@ -881,15 +879,13 @@ class DBObjectDirectoryAdapter
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
@@ -904,15 +900,13 @@ class DBObjectDirectoryAdapter
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
@@ -968,14 +962,13 @@ class DBObjectDirectoryAdapter
     if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(
         f,
-        onError:
-            (e, s) => transaction.notifyExecutionError(
-              e,
-              s,
-              errorResolver: resolveError,
-              operation: op,
-              debugInfo: () => op.toString(),
-            ),
+        onError: (e, s) => transaction.notifyExecutionError(
+          e,
+          s,
+          errorResolver: resolveError,
+          operation: op,
+          debugInfo: () => op.toString(),
+        ),
       );
     }
 
@@ -993,9 +986,9 @@ class DBObjectDirectoryAdapter
         () => openTransaction(transaction),
         callCloseTransactionRequired
             ? () => closeTransaction(
-              transaction,
-              transaction.context as DBObjectDirectoryAdapterContext?,
-            )
+                transaction,
+                transaction.context as DBObjectDirectoryAdapterContext?,
+              )
             : null,
       );
     }

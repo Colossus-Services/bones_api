@@ -130,10 +130,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }) {
     boot();
 
-    var (
-      generateTables: generateTables,
-      checkTables: checkTables,
-    ) = DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
+    var (generateTables: generateTables, checkTables: checkTables) =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
     var populate = config?['populate'];
     Object? populateTables;
@@ -316,10 +314,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
         var tableMap = _getTableMap(ref.sourceTable, false);
 
-        var reference =
-            tableMap?.entries
-                .where((e) => e.value[sourceField] == id)
-                .firstOrNull;
+        var reference = tableMap?.entries
+            .where((e) => e.value[sourceField] == id)
+            .firstOrNull;
 
         if (reference != null) {
           var value = reference.value[sourceField];
@@ -396,10 +393,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       o,
     );
 
-    var uniques =
-        fieldsEntityAnnotations?.entries
-            .where((e) => e.value.hasUnique)
-            .toList();
+    var uniques = fieldsEntityAnnotations?.entries
+        .where((e) => e.value.hasUnique)
+        .toList();
     if (uniques == null || uniques.isEmpty) return;
 
     for (var e in uniques) {
@@ -541,8 +537,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       );
 
   Map<String, MapHistory<Object, Set<Object>>> _getTableIndexes(String table) {
-    var tableIndexes =
-        _tablesIndexes[table] ??= <String, MapHistory<Object, Set<Object>>>{};
+    var tableIndexes = _tablesIndexes[table] ??=
+        <String, MapHistory<Object, Set<Object>>>{};
 
     return tableIndexes;
   }
@@ -697,15 +693,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (!fieldType.isPrimitiveType &&
             EntityHandler.isValidEntityType(fieldType.type)) {
           var fieldEntityRepository = getEntityRepositoryByTypeInfo(fieldType);
@@ -879,15 +873,14 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     // The `ORDER BY` must be applied before the `OFFSET`/`LIMIT`,
     // which is what makes an offset-based pagination stable:
-    var sel =
-        applySelectOrderAndPagination(
-          itr,
-          (e) => e[tableScheme?.idFieldName ?? 'id'],
-          limit: sql.limit,
-          offset: sql.offset,
-          orderByID: sql.orderByID,
-          orderDirection: sql.orderDirection,
-        ).toList();
+    var sel = applySelectOrderAndPagination(
+      itr,
+      (e) => e[tableScheme?.idFieldName ?? 'id'],
+      limit: sql.limit,
+      offset: sql.offset,
+      orderByID: sql.orderByID,
+      orderDirection: sql.orderDirection,
+    ).toList();
 
     return sel;
   }
@@ -942,14 +935,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var entityHandler = getEntityHandler(tableName: table);
 
     if (tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0) {
-      var entries =
-          map.entries.where((e) {
-            return sql.condition!.matchesEntityMap(
-              e.value,
-              namedParameters: sql.parametersByPlaceholder,
-              entityHandler: entityHandler,
-            );
-          }).toList();
+      var entries = map.entries.where((e) {
+        return sql.condition!.matchesEntityMap(
+          e.value,
+          namedParameters: sql.parametersByPlaceholder,
+          entityHandler: entityHandler,
+        );
+      }).toList();
 
       _checkNotReferencedEntities(entries, table, sql);
 
@@ -1051,11 +1043,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       }),
     );
 
-    var relationshipsTables =
-        tableScheme.tableRelationshipReference.values
-            .expand((e) => e)
-            .where((e) => e.sourceTable == tableScheme.name)
-            .toList();
+    var relationshipsTables = tableScheme.tableRelationshipReference.values
+        .expand((e) => e)
+        .where((e) => e.sourceTable == tableScheme.name)
+        .toList();
 
     if (relationshipsTables.isNotEmpty) {
       if (entityHandler == null) {
@@ -1067,8 +1058,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       var fieldId = entityHandler.idFieldName();
       var id = obj2[fieldId];
 
-      var fieldsListEntity =
-          entityHandler.fieldsWithTypeListEntityOrReference();
+      var fieldsListEntity = entityHandler
+          .fieldsWithTypeListEntityOrReference();
 
       for (var e in fieldsListEntity.entries) {
         var fieldKey = e.key;
@@ -1164,33 +1155,32 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       return [];
     }
 
-    var targetIds =
-        relWithID
-            .map((relId) => relMap[relId]?[targetRelationshipField])
-            .nonNulls
-            .toList();
+    var targetIds = relWithID
+        .map((relId) => relMap[relId]?[targetRelationshipField])
+        .nonNulls
+        .toList();
 
     if (targetIds.isEmpty) {
       return [];
     }
 
-    var targetObjs =
-        targetIds.map((tId) => _getByID(targetTable, tId) ?? tId).toList();
+    var targetObjs = targetIds
+        .map((tId) => _getByID(targetTable, tId) ?? tId)
+        .toList();
 
     var tableScheme2 = getTableScheme(targetTable);
 
     if (tableScheme2 != null && tableScheme2.hasTableReferences) {
       var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
 
-      targetObjs =
-          targetObjs
-              .map((e) {
-                return e is! Map<String, Object?>
-                    ? null
-                    : _resolveEntityMap(e, entityHandler2, tableScheme2);
-              })
-              .nonNulls
-              .toList();
+      targetObjs = targetObjs
+          .map((e) {
+            return e is! Map<String, Object?>
+                ? null
+                : _resolveEntityMap(e, entityHandler2, tableScheme2);
+          })
+          .nonNulls
+          .toList();
     }
 
     return targetObjs;
@@ -1338,10 +1328,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       if (targetEntityHandler != null) {
         targetName = getEntityRepositoryByType(targetEntityHandler.type)?.name;
         targetIdField = targetEntityHandler.idFieldName();
-        targetIdType =
-            targetEntityHandler
-                .getFieldType(null, targetIdField, resolveFiledName: false)
-                ?.type;
+        targetIdType = targetEntityHandler
+            .getFieldType(null, targetIdField, resolveFiledName: false)
+            ?.type;
       }
 
       targetName ??= targetEntityType.type.toString().toLowerCase();
@@ -1368,8 +1357,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var entityType =
         fieldType.isListEntityOrReference || fieldType.isEntityReferenceType
-            ? fieldType.arguments0
-            : fieldType;
+        ? fieldType.arguments0
+        : fieldType;
 
     if (entityType == null ||
         !EntityHandler.isValidEntityType(entityType.type)) {
@@ -1408,44 +1397,43 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     allTablesReferences.removeWhere((repo, refs) => refs.isEmpty);
 
-    var relationships =
-        allTablesReferences.entries.expand((e) {
-          var repo = e.key;
-          var refs = e.value;
+    var relationships = allTablesReferences.entries.expand((e) {
+      var repo = e.key;
+      var refs = e.value;
 
-          return refs.values.map((ref) {
-            var sourceTable = ref.sourceTable;
-            var sourceField = ref.sourceField;
+      return refs.values.map((ref) {
+        var sourceTable = ref.sourceTable;
+        var sourceField = ref.sourceField;
 
-            var targetTable = ref.targetTable;
-            var targetField = ref.targetField;
+        var targetTable = ref.targetTable;
+        var targetField = ref.targetField;
 
-            var sourceEntityHandler = repo.entityHandler;
-            var sourceFieldId = sourceEntityHandler.idFieldName();
-            var sourceFieldIdType =
-                sourceEntityHandler
-                    .getFieldType(null, sourceFieldId, resolveFiledName: false)
-                    ?.type ??
-                int;
+        var sourceEntityHandler = repo.entityHandler;
+        var sourceFieldId = sourceEntityHandler.idFieldName();
+        var sourceFieldIdType =
+            sourceEntityHandler
+                .getFieldType(null, sourceFieldId, resolveFiledName: false)
+                ?.type ??
+            int;
 
-            var relTable = '${sourceTable}__${sourceField}__rel';
-            var relSourceField = '${sourceTable}__$sourceFieldId';
-            var relTargetField = '${targetTable}__$targetField';
+        var relTable = '${sourceTable}__${sourceField}__rel';
+        var relSourceField = '${sourceTable}__$sourceFieldId';
+        var relTargetField = '${targetTable}__$targetField';
 
-            return TableRelationshipReference(
-              relTable,
-              sourceTable,
-              sourceFieldId,
-              sourceFieldIdType,
-              relSourceField,
-              targetTable,
-              ref.targetField,
-              ref.targetFieldType,
-              relTargetField,
-              relationshipField: sourceField,
-            );
-          });
-        }).toList();
+        return TableRelationshipReference(
+          relTable,
+          sourceTable,
+          sourceFieldId,
+          sourceFieldIdType,
+          relSourceField,
+          targetTable,
+          ref.targetField,
+          ref.targetFieldType,
+          relTargetField,
+          relationshipField: sourceField,
+        );
+      });
+    }).toList();
 
     return relationships;
   }

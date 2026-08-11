@@ -43,7 +43,8 @@ class MyBTCModule extends APIModule {
     // The requested path:
     var path = request.path;
 
-    var body = '''
+    var body =
+        '''
     <h1>404</h1><br>
     <b>PATH:<b> $path
     <p>

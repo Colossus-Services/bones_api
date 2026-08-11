@@ -340,10 +340,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       var fieldName = key0.name;
       var tableFieldName = tableScheme.resolveTableFieldName(fieldName);
-      var tableFieldType =
-          tableFieldName != null
-              ? tableScheme.fieldsTypes[tableFieldName]
-              : null;
+      var tableFieldType = tableFieldName != null
+          ? tableScheme.fieldsTypes[tableFieldName]
+          : null;
 
       if (tableFieldType != null) {
         return MapEntry(tableFieldType, '$q$tableAlias$q.$q$tableFieldName$q');
@@ -629,25 +628,24 @@ class ConditionSQLEncoder extends ConditionEncoder {
       );
     } else if (value is List &&
         value.whereType<ConditionParameter>().isNotEmpty) {
-      var parametersValues =
-          value.map((v) {
-            if (v is ConditionParameter) {
-              return conditionParameterToParameterValue(
-                v,
-                context,
-                fieldKey,
-                fieldType,
-                valueAsList: valueAsList,
-              );
-            } else {
-              return _valueToParameterValueImpl(
-                v,
-                fieldType,
-                key: fieldKey,
-                valueAsList: valueAsList,
-              );
-            }
-          }).resolveAll();
+      var parametersValues = value.map((v) {
+        if (v is ConditionParameter) {
+          return conditionParameterToParameterValue(
+            v,
+            context,
+            fieldKey,
+            fieldType,
+            valueAsList: valueAsList,
+          );
+        } else {
+          return _valueToParameterValueImpl(
+            v,
+            fieldType,
+            key: fieldKey,
+            valueAsList: valueAsList,
+          );
+        }
+      }).resolveAll();
 
       return parametersValues.resolveMapped(
         (values) => EncodingValueList(
@@ -741,10 +739,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
   }) {
     key ??= '?';
 
-    var list =
-        value is Iterable
-            ? value.map((v) => valueToSQLPlain(v, type, key: key)).toList()
-            : [valueToSQLPlain(value, type, key: key)];
+    var list = value is Iterable
+        ? value.map((v) => valueToSQLPlain(v, type, key: key)).toList()
+        : [valueToSQLPlain(value, type, key: key)];
 
     return EncodingValueList(key, type, list, encodeEncodingValueList);
   }

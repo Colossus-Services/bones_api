@@ -78,15 +78,13 @@ class EntityInstantiatorHandler<T> extends EntityInstantiator<T> {
   }
 
   static Map<String, dynamic> resolveEntityMap(Object entity) {
-    var entityMap =
-        entity is Map
-            ? entity
-            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+    var entityMap = entity is Map
+        ? entity
+        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
 
-    var entityMapCast =
-        entityMap is Map<String, dynamic>
-            ? entityMap
-            : entityMap.map((key, value) => MapEntry('$key', value));
+    var entityMapCast = entityMap is Map<String, dynamic>
+        ? entityMap
+        : entityMap.map((key, value) => MapEntry('$key', value));
 
     return entityMapCast;
   }
@@ -747,15 +745,13 @@ class EntityReference<T> extends EntityReferenceBase<T> {
   }
 
   static Map<String, dynamic> _resolveEntityMap(Object entity) {
-    var entityMap =
-        entity is Map
-            ? entity
-            : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+    var entityMap = entity is Map
+        ? entity
+        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
 
-    var entityMapCast =
-        entityMap is Map<String, dynamic>
-            ? entityMap
-            : entityMap.map((key, value) => MapEntry('$key', value));
+    var entityMapCast = entityMap is Map<String, dynamic>
+        ? entityMap
+        : entityMap.map((key, value) => MapEntry('$key', value));
     return entityMapCast;
   }
 
@@ -1052,8 +1048,8 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
       if (entityProvider != null) {
         var entityByID =
-        // ignore: discarded_futures
-        entityProvider.getEntityByID<T>(id, type: type, sync: true);
+            // ignore: discarded_futures
+            entityProvider.getEntityByID<T>(id, type: type, sync: true);
         if (entityByID is Future) {
           throw StateError(
             "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider",
@@ -1394,14 +1390,10 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
     var entityFetcher = _entityFetcher;
     if (entityFetcher != null) {
-      fetcher =
-          (ids, type) =>
-              ids
-                  .map(
-                    (id) => entityFetcher(id, type),
-                  ) // ignore: discarded_futures
-                  .toList()
-                  .resolveAll(); // ignore: discarded_futures
+      fetcher = (ids, type) => ids
+          .map((id) => entityFetcher(id, type)) // ignore: discarded_futures
+          .toList()
+          .resolveAll(); // ignore: discarded_futures
     }
 
     return EntityReferenceList<T>._(
@@ -1624,17 +1616,16 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entities = json['entities'];
 
       if (entities != null && entities is List) {
-        var entitiesMaps =
-            entities is List<Map<String, dynamic>?>
-                ? entities
-                : entities
-                    .map((e) {
-                      var m = e is Map ? e : TypeParser.parseMap(e);
-                      return m is Map<String, dynamic>
-                          ? m
-                          : m?.map((key, value) => MapEntry('$key', value));
-                    })
-                    .toList(growable: false);
+        var entitiesMaps = entities is List<Map<String, dynamic>?>
+            ? entities
+            : entities
+                  .map((e) {
+                    var m = e is Map ? e : TypeParser.parseMap(e);
+                    return m is Map<String, dynamic>
+                        ? m
+                        : m?.map((key, value) => MapEntry('$key', value));
+                  })
+                  .toList(growable: false);
 
         return EntityReferenceList<T>.fromEntitiesMaps(
           entitiesMaps,
@@ -1819,26 +1810,20 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        _ids =
-            entitiesMaps
-                .map(
-                  (map) =>
-                      map == null ? null : entityHandler.resolveIDFromMap(map),
-                )
-                .toList();
+        _ids = entitiesMaps
+            .map(
+              (map) => map == null ? null : entityHandler.resolveIDFromMap(map),
+            )
+            .toList();
 
         entityCache ??= JsonEntityCacheSimple();
 
         List<FutureOr<T?>> lAsync = entitiesMaps
             .map(
-              (map) =>
-                  map == null
-                      ? null
-                      // ignore: discarded_futures
-                      : entityHandler.createFromMap(
-                        map,
-                        entityCache: entityCache,
-                      ),
+              (map) => map == null
+                  ? null
+                  // ignore: discarded_futures
+                  : entityHandler.createFromMap(map, entityCache: entityCache),
             )
             .toList(growable: false);
 
@@ -2092,18 +2077,17 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityProvider = this.entityProvider;
 
       if (ids != null && entityProvider != null) {
-        entities =
-            ids.map((id) {
-              var entityByID =
+        entities = ids.map((id) {
+          var entityByID =
               // ignore: discarded_futures
               entityProvider.getEntityByID<T>(id, type: type, sync: true);
-              if (entityByID is Future) {
-                throw StateError(
-                  "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider",
-                );
-              }
-              return entityByID;
-            }).toList();
+          if (entityByID is Future) {
+            throw StateError(
+              "Can't get entity (#$id@`$T`) from `entityProvider`, returned a `Future`: $entityProvider",
+            );
+          }
+          return entityByID;
+        }).toList();
 
         if (entities.every((e) => e == null)) {
           entities = null;
@@ -2175,30 +2159,26 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     if (entities == null) return null;
 
     if (jsonEncoder != null) {
-      var jsonList =
-          entities
-              .map(
-                (e) =>
-                    e == null
-                        ? null
-                        : (jsonEncoder.toJson(e) as Map<String, dynamic>?),
-              )
-              .toList();
+      var jsonList = entities
+          .map(
+            (e) => e == null
+                ? null
+                : (jsonEncoder.toJson(e) as Map<String, dynamic>?),
+          )
+          .toList();
       return jsonList;
     }
 
     var entityHandler = this.entityHandler;
 
     if (entityHandler != null) {
-      var jsonList =
-          entities
-              .map(
-                (e) =>
-                    e == null
-                        ? null
-                        : (entityHandler.toJson(e) as Map<String, dynamic>?),
-              )
-              .toList();
+      var jsonList = entities
+          .map(
+            (e) => e == null
+                ? null
+                : (entityHandler.toJson(e) as Map<String, dynamic>?),
+          )
+          .toList();
       return jsonList;
     }
 
@@ -2403,11 +2383,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
     if (entityProvider == null) return entities;
 
-    var l =
-        ids
-            .map((id) => entityProvider.getEntityByID<T>(id, type: type))
-            .toList()
-            .resolveAll();
+    var l = ids
+        .map((id) => entityProvider.getEntityByID<T>(id, type: type))
+        .toList()
+        .resolveAll();
 
     return l;
   }
@@ -2481,8 +2460,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       if (ids.length == 1) {
         _entities = <T?>[o];
       } else {
-        var entities =
-            _entities = List<T?>.filled(ids.length, null, growable: true);
+        var entities = _entities = List<T?>.filled(
+          ids.length,
+          null,
+          growable: true,
+        );
 
         entities[ids.lastIndex] = o;
       }
@@ -2643,10 +2625,9 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
       var entityHandler = this.entityHandler;
 
       if (entityHandler != null) {
-        var otherIDs =
-            otherEntities
-                .map((e) => _getEntityIDImpl(entityHandler, e as T))
-                .toList();
+        var otherIDs = otherEntities
+            .map((e) => _getEntityIDImpl(entityHandler, e as T))
+            .toList();
         return _idsEquality.equals(ids, otherIDs);
       }
 
@@ -2708,8 +2689,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
     final entitiesFetcher = _entitiesFetcher;
     if (entitiesFetcher != null) {
-      fetcher =
-          (id, type) =>
+      fetcher = (id, type) =>
           // ignore: discarded_futures
           entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }

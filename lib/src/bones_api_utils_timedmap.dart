@@ -90,11 +90,10 @@ class TimedMap<K, V> implements Map<K, V> {
 
   /// Returns the values of this instance checking [keyTimeout].
   /// See [checkAllEntries].
-  List<V> valuesChecked({DateTime? now, Duration? keyTimeout}) =>
-      keysChecked(
-        now: now,
-        keyTimeout: keyTimeout,
-      ).map((k) => _entries[k]!).toList();
+  List<V> valuesChecked({DateTime? now, Duration? keyTimeout}) => keysChecked(
+    now: now,
+    keyTimeout: keyTimeout,
+  ).map((k) => _entries[k]!).toList();
 
   /// Returns the entries of this instance checking [keyTimeout].
   /// See [checkAllEntries].

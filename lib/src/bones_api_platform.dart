@@ -167,23 +167,23 @@ class APIPlatformCapability {
            (int64
                ? int64Max.toInt()
                : (int53
-                   ? int53Max.toInt()
-                   : (int32
-                       ? int32Max.toInt()
-                       : throw StateError(
-                         'maxSafeInteger error: Platform `int` not defined!',
-                       )))),
+                     ? int53Max.toInt()
+                     : (int32
+                           ? int32Max.toInt()
+                           : throw StateError(
+                               'maxSafeInteger error: Platform `int` not defined!',
+                             )))),
        minSafeInteger =
            minSafeInteger ??
            (int64
                ? int64Min.toInt()
                : (int53
-                   ? int53Min.toInt()
-                   : (int32
-                       ? int32Min.toInt()
-                       : throw StateError(
-                         'minSafeInteger error: Platform `int` not defined!',
-                       ))));
+                     ? int53Min.toInt()
+                     : (int32
+                           ? int32Min.toInt()
+                           : throw StateError(
+                               'minSafeInteger error: Platform `int` not defined!',
+                             ))));
 
   APIPlatformCapability.bits64({required bool canReadFile})
     : this(canReadFile: canReadFile, int64: true, double64: true);

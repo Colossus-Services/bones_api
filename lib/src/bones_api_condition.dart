@@ -44,10 +44,9 @@ abstract class ConditionElement {
       List<ConditionParameter>.unmodifiable([]);
 
   void _setParameters(Iterable<ConditionParameter> parameters) {
-    _parameters =
-        parameters.isEmpty
-            ? _emptyParameters
-            : List<ConditionParameter>.unmodifiable(parameters);
+    _parameters = parameters.isEmpty
+        ? _emptyParameters
+        : List<ConditionParameter>.unmodifiable(parameters);
   }
 }
 
@@ -114,17 +113,15 @@ class ConditionParameter extends ConditionElement {
       }
 
       if (parameters is Map) {
-        namedParameters ??=
-            parameters is Map<String, Object?>
-                ? parameters
-                : parameters.map<String, Object?>(
-                  (key, value) => MapEntry<String, Object?>('$key', value),
-                );
+        namedParameters ??= parameters is Map<String, Object?>
+            ? parameters
+            : parameters.map<String, Object?>(
+                (key, value) => MapEntry<String, Object?>('$key', value),
+              );
       } else if (parameters is Iterable) {
-        positionalParameters ??=
-            parameters is List
-                ? parameters
-                : parameters.toList(growable: false);
+        positionalParameters ??= parameters is List
+            ? parameters
+            : parameters.toList(growable: false);
       }
     }
 
@@ -192,52 +189,48 @@ class ConditionParameter extends ConditionElement {
       namedParameters: namedParameters,
     );
 
-    var otherValue =
-        value is ConditionParameter
-            ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-            )
-            : value;
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
+        : value;
 
     if (myValue is Iterable) {
       if (otherValue is Iterable) {
         var equals = isEqualsIterableDeep(
           myValue,
           otherValue,
-          valueEquality:
-              (a, b) => EntityHandler.equalsValuesBasic(
-                a,
-                b,
-                entityHandler: entityHandler,
-              ),
+          valueEquality: (a, b) => EntityHandler.equalsValuesBasic(
+            a,
+            b,
+            entityHandler: entityHandler,
+          ),
         );
         return equals;
       } else {
-        var contains =
-            myValue
-                .where(
-                  (v) => EntityHandler.equalsValuesBasic(
-                    v,
-                    otherValue,
-                    entityHandler: entityHandler,
-                  ),
-                )
-                .isNotEmpty;
+        var contains = myValue
+            .where(
+              (v) => EntityHandler.equalsValuesBasic(
+                v,
+                otherValue,
+                entityHandler: entityHandler,
+              ),
+            )
+            .isNotEmpty;
         return contains;
       }
     } else if (otherValue is Iterable) {
-      var contains =
-          otherValue
-              .where(
-                (v) => EntityHandler.equalsValuesBasic(
-                  v,
-                  myValue,
-                  entityHandler: entityHandler,
-                ),
-              )
-              .isNotEmpty;
+      var contains = otherValue
+          .where(
+            (v) => EntityHandler.equalsValuesBasic(
+              v,
+              myValue,
+              entityHandler: entityHandler,
+            ),
+          )
+          .isNotEmpty;
       return contains;
     }
 
@@ -261,14 +254,13 @@ class ConditionParameter extends ConditionElement {
       namedParameters: namedParameters,
     );
 
-    var otherValue =
-        value is ConditionParameter
-            ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-            )
-            : value;
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
+        : value;
 
     return EntityHandler.graterThanValue(
       myValue,
@@ -290,14 +282,13 @@ class ConditionParameter extends ConditionElement {
       namedParameters: namedParameters,
     );
 
-    var otherValue =
-        value is ConditionParameter
-            ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-            )
-            : value;
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
+        : value;
 
     return EntityHandler.graterThanOrEqualValue(
       myValue,
@@ -319,14 +310,13 @@ class ConditionParameter extends ConditionElement {
       namedParameters: namedParameters,
     );
 
-    var otherValue =
-        value is ConditionParameter
-            ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-            )
-            : value;
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
+        : value;
 
     return EntityHandler.lessThanValue(
       myValue,
@@ -348,14 +338,13 @@ class ConditionParameter extends ConditionElement {
       namedParameters: namedParameters,
     );
 
-    var otherValue =
-        value is ConditionParameter
-            ? value.getValue(
-              parameters: parameters,
-              positionalParameters: positionalParameters,
-              namedParameters: namedParameters,
-            )
-            : value;
+    var otherValue = value is ConditionParameter
+        ? value.getValue(
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          )
+        : value;
 
     return EntityHandler.lessThanOrEqualValue(
       myValue,
@@ -380,14 +369,13 @@ class ConditionParameter extends ConditionElement {
     if (myValue is List) {
       for (var v1 in myValue) {
         for (var v2 in values) {
-          var otherValue =
-              v2 is ConditionParameter
-                  ? v2.getValue(
-                    parameters: parameters,
-                    positionalParameters: positionalParameters,
-                    namedParameters: namedParameters,
-                  )
-                  : v2;
+          var otherValue = v2 is ConditionParameter
+              ? v2.getValue(
+                  parameters: parameters,
+                  positionalParameters: positionalParameters,
+                  namedParameters: namedParameters,
+                )
+              : v2;
 
           var match = EntityHandler.equalsValuesBasic(
             v1,
@@ -401,14 +389,13 @@ class ConditionParameter extends ConditionElement {
       return false;
     } else {
       for (var v2 in values) {
-        var otherValue =
-            v2 is ConditionParameter
-                ? v2.getValue(
-                  parameters: parameters,
-                  positionalParameters: positionalParameters,
-                  namedParameters: namedParameters,
-                )
-                : v2;
+        var otherValue = v2 is ConditionParameter
+            ? v2.getValue(
+                parameters: parameters,
+                positionalParameters: positionalParameters,
+                namedParameters: namedParameters,
+              )
+            : v2;
 
         var match = EntityHandler.equalsValuesBasic(
           myValue,
@@ -792,8 +779,9 @@ abstract class GroupCondition<O> extends Condition<O> {
   final List<Condition> conditions;
 
   GroupCondition(Iterable<Condition> conditions)
-    : conditions =
-          conditions is List<Condition> ? conditions : conditions.toList(),
+    : conditions = conditions is List<Condition>
+          ? conditions
+          : conditions.toList(),
       super._() {
     for (var c in conditions) {
       c._parent = this;
@@ -1139,8 +1127,9 @@ class ConditionIdIN<O> extends Condition<O> {
 
     var idsValues = this.idsValues;
 
-    var params =
-        idsValues.map((e) => e is ConditionParameter ? e : null).nonNulls;
+    var params = idsValues
+        .map((e) => e is ConditionParameter ? e : null)
+        .nonNulls;
     _setParameters(params);
 
     _markResolved();
@@ -1193,11 +1182,11 @@ class ConditionIdIN<O> extends Condition<O> {
     return idsValues.any((p) {
       return p is ConditionParameter
           ? p.matches(
-            id,
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-          )
+              id,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            )
           : id == p;
     });
   }
@@ -1219,31 +1208,30 @@ abstract class ConditionKey {
       throw ArgumentError('Empty key');
     }
 
-    var list =
-        _keyRegExp.allMatches(keys).map((m) {
-          var s1 = m.group(1);
-          if (s1 != null) {
-            return ConditionKeyField(s1);
-          }
+    var list = _keyRegExp.allMatches(keys).map((m) {
+      var s1 = m.group(1);
+      if (s1 != null) {
+        return ConditionKeyField(s1);
+      }
 
-          var s2 = m.group(2);
-          if (s2 != null) {
-            return ConditionKeyField(s2);
-          }
+      var s2 = m.group(2);
+      if (s2 != null) {
+        return ConditionKeyField(s2);
+      }
 
-          var field = m.group(3);
-          if (field != null) {
-            return ConditionKeyField(field);
-          }
+      var field = m.group(3);
+      if (field != null) {
+        return ConditionKeyField(field);
+      }
 
-          var index = m.group(4);
-          if (index != null) {
-            var idx = int.parse(index);
-            return ConditionKeyIndex(idx);
-          }
+      var index = m.group(4);
+      if (index != null) {
+        var idx = int.parse(index);
+        return ConditionKeyIndex(idx);
+      }
 
-          throw StateError('Invalid match: $m');
-        }).toList();
+      throw StateError('Invalid match: $m');
+    }).toList();
 
     return list;
   }
@@ -1391,20 +1379,19 @@ abstract class KeyCondition<O, V> extends Condition<O> {
         if (value is Map) {
           keyValue = value[keyName];
         } else if (value is Iterable) {
-          keyValue =
-              value.map((e) {
-                if (e is Map) {
-                  return e[keyName];
-                } else {
-                  var handler = entityHandler?.getEntityHandler(obj: e);
-                  if (handler != null) {
-                    var v = handler.getField(e, keyName);
-                    return v;
-                  } else {
-                    return e;
-                  }
-                }
-              }).toList();
+          keyValue = value.map((e) {
+            if (e is Map) {
+              return e[keyName];
+            } else {
+              var handler = entityHandler?.getEntityHandler(obj: e);
+              if (handler != null) {
+                var v = handler.getField(e, keyName);
+                return v;
+              } else {
+                return e;
+              }
+            }
+          }).toList();
         } else {
           throw StateError(
             "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}",

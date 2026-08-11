@@ -142,10 +142,11 @@ class HTMLDocument {
   }
 
   String get bodyStyles {
-    var styles = (_bodyStyles != null && _bodyStyles.trim().isNotEmpty
-            ? _bodyStyles
-            : '')
-        .split(RegExp(r'\s*;\s*'));
+    var styles =
+        (_bodyStyles != null && _bodyStyles.trim().isNotEmpty
+                ? _bodyStyles
+                : '')
+            .split(RegExp(r'\s*;\s*'));
 
     final bodyColor = this.bodyColor;
     if (bodyColor != null && bodyColor.isNotEmpty) {
@@ -402,17 +403,16 @@ class HTMLInput {
 
         html.write('<option value=""></option>\n');
 
-        valStr =
-            value != null
-                ? (enumReflection.name(value) ??
-                    value.toString().split('.').last)
-                : '';
+        valStr = value != null
+            ? (enumReflection.name(value) ?? value.toString().split('.').last)
+            : '';
 
         for (var e in enumReflection.values) {
           var enumName = enumReflection.name(e) ?? '';
 
-          var selected =
-              equalsIgnoreAsciiCase(enumName, valStr) ? ' selected' : '';
+          var selected = equalsIgnoreAsciiCase(enumName, valStr)
+              ? ' selected'
+              : '';
 
           html.write('<option value="$enumName"$selected>$enumName</option>\n');
         }

@@ -185,10 +185,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       if (limitStr != null && limitStr.isNotEmpty) {
         limitStr = limitStr.replaceAll(RegExp(r'\s'), '').toLowerCase();
 
-        var nPart =
-            limitStr.length > 1
-                ? limitStr.substring(0, limitStr.length - 1)
-                : limitStr;
+        var nPart = limitStr.length > 1
+            ? limitStr.substring(0, limitStr.length - 1)
+            : limitStr;
 
         int unit;
         if (limitStr.endsWith('g')) {
@@ -607,8 +606,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     bool? orderByID,
     OrderDirection? orderDirection,
   }) async {
-    var entries =
-        await ids.map((id) => _readObject(table, id)).resolveAllNotNull();
+    var entries = await ids
+        .map((id) => _readObject(table, id))
+        .resolveAllNotNull();
 
     return _applyOrderAndPagination(
       table,
@@ -652,12 +652,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }) async {
     var files = await _listTableFiles(table);
 
-    var entries =
-        await files.map((f) {
-          var fileName = f.split('/').last;
-          var id = pack_path.withoutExtension(fileName);
-          return _readObject(table, id);
-        }).resolveAllNotNull();
+    var entries = await files.map((f) {
+      var fileName = f.split('/').last;
+      var id = pack_path.withoutExtension(fileName);
+      return _readObject(table, id);
+    }).resolveAllNotNull();
 
     return _applyOrderAndPagination(
       table,
@@ -1047,16 +1046,17 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     _checkCacheDirectoryLimitLastTime = checkInitTime;
     _checkCacheDirectoryLimitSkips = 0;
 
-    var files =
-        list.whereType<File>().where((f) => f.path.endsWith(".json")).toList();
+    var files = list
+        .whereType<File>()
+        .where((f) => f.path.endsWith(".json"))
+        .toList();
 
     var totalFiles = files.length;
 
-    var filesStats =
-        await files
-            .map((f) => MapEntry(f, f.statLimited()))
-            .toMapFromEntries()
-            .resolveAllValues();
+    var filesStats = await files
+        .map((f) => MapEntry(f, f.statLimited()))
+        .toMapFromEntries()
+        .resolveAllValues();
 
     var totalSize = filesStats.values.map((s) => s.size).sum;
 
@@ -1082,19 +1082,17 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     var entries = filesStats.entries.toList();
     entries.sort((a, b) => a.value.modified.compareTo(b.value.modified));
 
-    final delNeededFiles =
-        cacheFilesLimit <= 0
-            ? 0
-            :
-            // Del extra files + 20%:
-            (totalFiles - (cacheFilesLimit * 0.80)).toInt();
+    final delNeededFiles = cacheFilesLimit <= 0
+        ? 0
+        :
+          // Del extra files + 20%:
+          (totalFiles - (cacheFilesLimit * 0.80)).toInt();
 
-    final delNeededSize =
-        cacheLimit <= 0
-            ? 0
-            :
-            // Del extra bytes + 20%:
-            (totalSize - (cacheLimit * 0.80)).toInt();
+    final delNeededSize = cacheLimit <= 0
+        ? 0
+        :
+          // Del extra bytes + 20%:
+          (totalSize - (cacheLimit * 0.80)).toInt();
 
     var releaseInfo = [
       if (delNeededFiles > 0) '$delNeededFiles files',
@@ -1124,8 +1122,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     final removeInitTime = DateTime.now();
 
-    var delResults =
-        await del.map((f) => f.deleteLimited()).toList().resolveAll();
+    var delResults = await del
+        .map((f) => f.deleteLimited())
+        .toList()
+        .resolveAll();
 
     final removeTime = DateTime.now().difference(removeInitTime);
 
@@ -1298,15 +1298,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
@@ -1321,15 +1319,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
@@ -1385,14 +1381,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(
         f,
-        onError:
-            (e, s) => transaction.notifyExecutionError(
-              e,
-              s,
-              errorResolver: resolveError,
-              operation: op,
-              debugInfo: () => op.toString(),
-            ),
+        onError: (e, s) => transaction.notifyExecutionError(
+          e,
+          s,
+          errorResolver: resolveError,
+          operation: op,
+          debugInfo: () => op.toString(),
+        ),
       );
     }
 
@@ -1410,9 +1405,9 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         () => openTransaction(transaction),
         callCloseTransactionRequired
             ? () => closeTransaction(
-              transaction,
-              transaction.context as DBObjectGCSAdapterContext?,
-            )
+                transaction,
+                transaction.context as DBObjectGCSAdapterContext?,
+              )
             : null,
       );
     }

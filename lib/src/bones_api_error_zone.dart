@@ -26,8 +26,8 @@ Zone createErrorZone({
   var zoneId = ++_errorZoneIDCount;
 
   var zoneSpecification = ZoneSpecification(
-    handleUncaughtError:
-        (self, parent, zone, error, stackTrace) => _handleUncaughtError(
+    handleUncaughtError: (self, parent, zone, error, stackTrace) =>
+        _handleUncaughtError(
           uncaughtErrorTitle,
           printErrorToStderr,
           onUncaughtError,
@@ -213,9 +213,8 @@ class ZoneField<T extends Object> {
       }
 
       zoneSpecification = ZoneSpecification(
-        handleUncaughtError:
-            (self, parent, zone, error, stack) =>
-                handleUncaughtError(error, stack),
+        handleUncaughtError: (self, parent, zone, error, stack) =>
+            handleUncaughtError(error, stack),
       );
     }
 

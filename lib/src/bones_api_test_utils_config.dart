@@ -360,11 +360,10 @@ class APITestConfigDBSQLMemory extends APITestConfigDB with APITestConfigBase {
 
     var tables = allRepositories.map((e) => e.name).toList();
 
-    var tablesSchemes =
-        await tables
-            .map((t) => sqlAdapter.getTableScheme(t))
-            .toList()
-            .resolveAll();
+    var tablesSchemes = await tables
+        .map((t) => sqlAdapter.getTableScheme(t))
+        .toList()
+        .resolveAll();
 
     var relationshipTables = tablesSchemes.nonNulls.expand(
       (e) => e.tableRelationshipReference.values.expand((e) => e),

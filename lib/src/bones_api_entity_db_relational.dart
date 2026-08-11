@@ -384,21 +384,19 @@ class DBRelationalEntityRepository<O extends Object>
   Map<String, TypeInfo>? _nonPrimitiveFields;
 
   Map<String, TypeInfo> _getNonPrimitiveFields(O o) =>
-      _nonPrimitiveFields ??=
-          entityHandler
-              .fieldsNames(o)
-              .map((fieldName) {
-                var fieldType =
-                    entityHandler.getFieldType(
-                      o,
-                      fieldName,
-                      resolveFiledName: false,
-                    )!;
-                if (fieldType.isPrimitiveType) return null;
-                return MapEntry(fieldName, fieldType);
-              })
-              .nonNulls
-              .toMapFromEntries();
+      _nonPrimitiveFields ??= entityHandler
+          .fieldsNames(o)
+          .map((fieldName) {
+            var fieldType = entityHandler.getFieldType(
+              o,
+              fieldName,
+              resolveFiledName: false,
+            )!;
+            if (fieldType.isPrimitiveType) return null;
+            return MapEntry(fieldName, fieldType);
+          })
+          .nonNulls
+          .toMapFromEntries();
 
   @override
   FutureOr<bool> ensureReferencesStored(
@@ -441,15 +439,14 @@ class DBRelationalEntityRepository<O extends Object>
             );
             if (elementRepository == null) return null;
 
-            var futures =
-                value.map((e) {
-                  if (!elementRepository.isOfEntityType(e)) return e;
-                  return elementRepository.ensureStored(
-                    e,
-                    transaction: transaction,
-                    operation: operation,
-                  );
-                }).toList();
+            var futures = value.map((e) {
+              if (!elementRepository.isOfEntityType(e)) return e;
+              return elementRepository.ensureStored(
+                e,
+                transaction: transaction,
+                operation: operation,
+              );
+            }).toList();
 
             return futures.resolveAll().resolveMapped((ids) {
               if (fieldValue is EntityReferenceList) {
@@ -785,26 +782,25 @@ class DBRelationalEntityRepository<O extends Object>
       );
     }
 
-    var ret =
-        fieldsListEntity.entries.map((e) {
-          var field = e.key;
-          var fieldType = e.value;
-          var values = entityHandler.getField(o, field);
-          if (values is EntityReferenceList) {
-            values = values.entitiesOrIDs;
-          }
+    var ret = fieldsListEntity.entries.map((e) {
+      var field = e.key;
+      var fieldType = e.value;
+      var values = entityHandler.getField(o, field);
+      if (values is EntityReferenceList) {
+        values = values.entitiesOrIDs;
+      }
 
-          var list = values is Iterable ? values.asList : [values];
-          var listNotNull = list.nonNulls.toList();
+      var list = values is Iterable ? values.asList : [values];
+      var listNotNull = list.nonNulls.toList();
 
-          return setRelationship(
-            o,
-            field,
-            listNotNull as dynamic,
-            fieldType: fieldType,
-            transaction: transaction,
-          );
-        }).resolveAll();
+      return setRelationship(
+        o,
+        field,
+        listNotNull as dynamic,
+        fieldType: fieldType,
+        transaction: transaction,
+      );
+    }).resolveAll();
 
     return ret.resolveWithValue(true);
   }
@@ -833,15 +829,13 @@ class DBRelationalEntityRepository<O extends Object>
 
     var oId = entityHandler.getID(o);
 
-    var othersIds =
-        values
-            .map(
-              (e) =>
-                  valuesEntityHandler.isEntityInstance(e)
-                      ? valuesEntityHandler.getID(e)
-                      : e,
-            )
-            .toList();
+    var othersIds = values
+        .map(
+          (e) => valuesEntityHandler.isEntityInstance(e)
+              ? valuesEntityHandler.getID(e)
+              : e,
+        )
+        .toList();
 
     try {
       return repositoryAdapter.doInsertRelationship(
@@ -932,10 +926,9 @@ class DBRelationalEntityRepository<O extends Object>
 
       if (fieldValue != null) {
         var fieldEntityHandler = entityHandler.getEntityHandler(
-          type:
-              fieldType.isListEntityOrReference
-                  ? fieldType.listEntityOrReferenceType!.type
-                  : fieldType.type,
+          type: fieldType.isListEntityOrReference
+              ? fieldType.listEntityOrReferenceType!.type
+              : fieldType.type,
         );
 
         if (fieldValue is EntityReferenceBase) {
@@ -944,23 +937,18 @@ class DBRelationalEntityRepository<O extends Object>
 
         if (fieldEntityHandler != null) {
           if (fieldValue is Iterable) {
-            var fieldIds =
-                fieldValue
-                    .map(
-                      (Object? e) =>
-                          fieldEntityHandler.isEntityInstance(e)
-                              ? fieldEntityHandler.getID(e)
-                              : (e.isEntityIDType ? e : null),
-                    )
-                    .toList();
+            var fieldIds = fieldValue
+                .map(
+                  (Object? e) => fieldEntityHandler.isEntityInstance(e)
+                      ? fieldEntityHandler.getID(e)
+                      : (e.isEntityIDType ? e : null),
+                )
+                .toList();
             return fieldIds;
           } else {
-            var fieldId =
-                fieldEntityHandler.isEntityInstance(fieldValue)
-                    ? fieldEntityHandler.getID(fieldValue)
-                    : ((fieldValue as Object?).isEntityIDType
-                        ? fieldValue
-                        : null);
+            var fieldId = fieldEntityHandler.isEntityInstance(fieldValue)
+                ? fieldEntityHandler.getID(fieldValue)
+                : ((fieldValue as Object?).isEntityIDType ? fieldValue : null);
             return [fieldId];
           }
         }
@@ -986,44 +974,43 @@ class DBRelationalEntityRepository<O extends Object>
 
     if (cachedEntities != null && cachedEntities.isNotEmpty) {
       var fieldEntityHandler = entityHandler.getEntityHandler(
-        type:
-            fieldType.isListEntityOrReference
-                ? fieldType.arguments0!.type
-                : fieldType.type,
+        type: fieldType.isListEntityOrReference
+            ? fieldType.arguments0!.type
+            : fieldType.type,
       );
 
       if (fieldEntityHandler == null) return null;
 
-      var relationshipEntries =
-          cachedEntities.entries.map((e) {
-            var id = e.key;
-            var entity = e.value;
+      var relationshipEntries = cachedEntities.entries.map((e) {
+        var id = e.key;
+        var entity = e.value;
 
-            var fieldValue = entityHandler.getField(entity as dynamic, field);
+        var fieldValue = entityHandler.getField(entity as dynamic, field);
 
-            if (fieldValue != null) {
-              if (fieldValue is Iterable) {
-                var fieldIds =
-                    fieldValue.map((e) => fieldEntityHandler.getID(e)).toList();
-                return MapEntry(id, fieldIds);
-              } else if (fieldValue is EntityReferenceList) {
-                var fieldIds =
-                    fieldValue.entities
-                        ?.map((e) => fieldEntityHandler.getID(e))
-                        .toList() ??
-                    [];
-                return MapEntry(id, fieldIds);
-              } else if (fieldValue is EntityReference) {
-                var fieldId = fieldEntityHandler.getID(fieldValue.entity);
-                return MapEntry(id, [fieldId]);
-              } else {
-                var fieldId = fieldEntityHandler.getID(fieldValue);
-                return MapEntry(id, [fieldId]);
-              }
-            }
+        if (fieldValue != null) {
+          if (fieldValue is Iterable) {
+            var fieldIds = fieldValue
+                .map((e) => fieldEntityHandler.getID(e))
+                .toList();
+            return MapEntry(id, fieldIds);
+          } else if (fieldValue is EntityReferenceList) {
+            var fieldIds =
+                fieldValue.entities
+                    ?.map((e) => fieldEntityHandler.getID(e))
+                    .toList() ??
+                [];
+            return MapEntry(id, fieldIds);
+          } else if (fieldValue is EntityReference) {
+            var fieldId = fieldEntityHandler.getID(fieldValue.entity);
+            return MapEntry(id, [fieldId]);
+          } else {
+            var fieldId = fieldEntityHandler.getID(fieldValue);
+            return MapEntry(id, [fieldId]);
+          }
+        }
 
-            return null;
-          }).nonNulls;
+        return null;
+      }).nonNulls;
 
       var relationships = Map.fromEntries(relationshipEntries);
 
@@ -1043,13 +1030,15 @@ class DBRelationalEntityRepository<O extends Object>
     TypeInfo? fieldType,
     Transaction? transaction,
   }) {
-    oIds ??=
-        os!
-            .map((o) => getID(o, entityHandler: entityHandler)! as Object)
-            .toList();
+    oIds ??= os!
+        .map((o) => getID(o, entityHandler: entityHandler)! as Object)
+        .toList();
 
-    fieldType ??=
-        entityHandler.getFieldType(os?.first, field, resolveFiledName: true)!;
+    fieldType ??= entityHandler.getFieldType(
+      os?.first,
+      field,
+      resolveFiledName: true,
+    )!;
 
     if (oIds.isEmpty) {
       return <dynamic, Iterable<dynamic>>{};

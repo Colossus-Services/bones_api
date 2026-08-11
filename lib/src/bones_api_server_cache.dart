@@ -1312,9 +1312,9 @@ extension _MapMemorySize on Map<Object?, Object?>? {
     return self == null
         ? 0
         : 8 +
-            self.entries
-                .map((e) => 32 + e.key.memorySize + e.value.memorySize)
-                .sum;
+              self.entries
+                  .map((e) => 32 + e.key.memorySize + e.value.memorySize)
+                  .sum;
   }
 }
 
@@ -1324,9 +1324,9 @@ extension _MapStringObjectMemorySize on Map<String, Object?>? {
     return self == null
         ? 0
         : 8 +
-            self.entries
-                .map((e) => 32 + e.key.memorySize + e.value.memorySize)
-                .sum;
+              self.entries
+                  .map((e) => 32 + e.key.memorySize + e.value.memorySize)
+                  .sum;
   }
 }
 

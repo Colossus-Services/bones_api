@@ -662,11 +662,10 @@ void main() {
       expect(await p.loadAll(), equals(5));
       expect(p.loadedEntities.map((e) => e.id).toList(), equals(ids));
 
-      var streamed =
-          await roleRepository
-              .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
-              .stream()
-              .toList();
+      var streamed = await roleRepository
+          .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
+          .stream()
+          .toList();
       expect(streamed.map((e) => e.id).toList(), equals(ids));
 
       // A query matching nothing resolves as empty:

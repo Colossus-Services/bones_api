@@ -37,13 +37,12 @@ abstract class APIRepository<O extends Object> with Initializable {
     EntityRepository<O>? entityRepository,
     EntityRepositoryProvider? provider,
     Type? type,
-  }) : entityRepository =
-           resolveEntityRepository(
-             entityRepository: entityRepository,
-             provider: provider,
-             type: type ?? O,
-             required: true,
-           )! {
+  }) : entityRepository = resolveEntityRepository(
+         entityRepository: entityRepository,
+         provider: provider,
+         type: type ?? O,
+         required: true,
+       )! {
     // ignore: discarded_futures
     this.entityRepository.ensureInitialized(parent: this);
   }

@@ -416,28 +416,27 @@ class Time implements Comparable<Time> {
     int month = 1,
     int day = 1,
     bool utc = true,
-  ]) =>
-      utc
-          ? DateTime.utc(
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second,
-            millisecond,
-            microsecond,
-          )
-          : DateTime(
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second,
-            millisecond,
-            microsecond,
-          );
+  ]) => utc
+      ? DateTime.utc(
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second,
+          millisecond,
+          microsecond,
+        )
+      : DateTime(
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second,
+          millisecond,
+          microsecond,
+        );
 
   /// Returns the total minutes of this [Time] period.
   int get totalMinutes => (hour * 60) + minute;

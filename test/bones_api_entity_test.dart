@@ -24,109 +24,113 @@ class APIEntityRepositoryProvider extends EntityRepositoryProvider {
   late final UserAPIRepository userAPIRepository;
 
   APIEntityRepositoryProvider._() {
-    sqlAdapter = DBSQLMemoryAdapter(
-      parentRepositoryProvider: this,
-    )..addTableSchemes([
-      TableScheme(
-        'user_info',
-        idFieldName: 'id',
-        fieldsTypes: {'id': int, 'info': String},
-      ),
-      TableScheme(
-        'user',
-        idFieldName: 'id',
-        fieldsTypes: {
-          'id': int,
-          'email': String,
-          'password': String,
-          'address': int,
-          'level': int,
-          'wake_up_time': Time,
-          'creation_time': DateTime,
-        },
-        fieldsReferencedTables: {
-          'address': TableFieldReference(
-            'user',
-            'address',
-            int,
-            'address',
-            'id',
-            int,
-          ),
-          'user_info': TableFieldReference(
-            'user',
-            'user_info',
-            int,
-            'user_info',
-            'id',
-            int,
-          ),
-        },
-        relationshipTables: [
-          TableRelationshipReference(
-            'user__roles__rel',
-            'user',
-            'id',
-            int,
-            'user_id',
-            'role',
-            'id',
-            int,
-            'role_id',
-          ),
-        ],
-      ),
-      TableScheme(
-        'address',
-        idFieldName: 'id',
-        fieldsTypes: {
-          'id': int,
-          'state': String,
-          'city': String,
-          'street': String,
-          'number': int,
-        },
-        relationshipTables: [
-          TableRelationshipReference(
-            'address__stores__rel',
-            'address',
-            'id',
-            int,
-            'address_id',
-            'store',
-            'id',
-            int,
-            'store_id',
-          ),
-          TableRelationshipReference(
-            'address__closed_stores__rel',
-            'address',
-            'id',
-            int,
-            'address_id',
-            'store',
-            'id',
-            int,
-            'store_id',
-          ),
-        ],
-      ),
-      TableScheme(
-        'store',
-        idFieldName: 'id',
-        fieldsTypes: {'id': int, 'name': String, 'number': int, 'owner': User},
-      ),
-      TableScheme(
-        'role',
-        idFieldName: 'id',
-        fieldsTypes: {
-          'id': int,
-          'type': String,
-          'enabled': bool,
-          'value': Decimal,
-        },
-      ),
-    ]);
+    sqlAdapter = DBSQLMemoryAdapter(parentRepositoryProvider: this)
+      ..addTableSchemes([
+        TableScheme(
+          'user_info',
+          idFieldName: 'id',
+          fieldsTypes: {'id': int, 'info': String},
+        ),
+        TableScheme(
+          'user',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'email': String,
+            'password': String,
+            'address': int,
+            'level': int,
+            'wake_up_time': Time,
+            'creation_time': DateTime,
+          },
+          fieldsReferencedTables: {
+            'address': TableFieldReference(
+              'user',
+              'address',
+              int,
+              'address',
+              'id',
+              int,
+            ),
+            'user_info': TableFieldReference(
+              'user',
+              'user_info',
+              int,
+              'user_info',
+              'id',
+              int,
+            ),
+          },
+          relationshipTables: [
+            TableRelationshipReference(
+              'user__roles__rel',
+              'user',
+              'id',
+              int,
+              'user_id',
+              'role',
+              'id',
+              int,
+              'role_id',
+            ),
+          ],
+        ),
+        TableScheme(
+          'address',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'state': String,
+            'city': String,
+            'street': String,
+            'number': int,
+          },
+          relationshipTables: [
+            TableRelationshipReference(
+              'address__stores__rel',
+              'address',
+              'id',
+              int,
+              'address_id',
+              'store',
+              'id',
+              int,
+              'store_id',
+            ),
+            TableRelationshipReference(
+              'address__closed_stores__rel',
+              'address',
+              'id',
+              int,
+              'address_id',
+              'store',
+              'id',
+              int,
+              'store_id',
+            ),
+          ],
+        ),
+        TableScheme(
+          'store',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'name': String,
+            'number': int,
+            'owner': User,
+          },
+        ),
+        TableScheme(
+          'role',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'type': String,
+            'enabled': bool,
+            'value': Decimal,
+          },
+        ),
+      ]);
 
     storeSQLRepository = DBSQLEntityRepository<Store>(
       sqlAdapter,
@@ -1623,17 +1627,16 @@ void main() {
         int? offset,
         bool? orderByID,
         OrderDirection? orderDirection,
-      }) =>
-          repository
-              .select(
-                ConditionANY(),
-                limit: limit,
-                offset: offset,
-                orderByID: orderByID,
-                orderDirection: orderDirection,
-              )
-              .map((e) => e.id)
-              .toList();
+      }) => repository
+          .select(
+            ConditionANY(),
+            limit: limit,
+            offset: offset,
+            orderByID: orderByID,
+            orderDirection: orderDirection,
+          )
+          .map((e) => e.id)
+          .toList();
 
       // Baseline: unchanged, no ordering applied.
       expect(selectIDs(), equals(ids));

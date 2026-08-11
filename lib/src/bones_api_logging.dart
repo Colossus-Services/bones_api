@@ -533,24 +533,23 @@ abstract class LoggerHandler {
 
     Future<void>? call;
 
-    call =
-        _bufferedCalls[identifier] ??= Future.delayed(
-          Duration(milliseconds: 100),
-          () async {
-            for (var levelBlock in buffer) {
-              var level = levelBlock.$1;
-              var messages = levelBlock.$2;
-              messagesBlockLogger(level, messages);
-            }
+    call = _bufferedCalls[identifier] ??= Future.delayed(
+      Duration(milliseconds: 100),
+      () async {
+        for (var levelBlock in buffer) {
+          var level = levelBlock.$1;
+          var messages = levelBlock.$2;
+          messagesBlockLogger(level, messages);
+        }
 
-            buffer.clear();
+        buffer.clear();
 
-            var prevCall = _bufferedCalls[identifier];
-            if (identical(prevCall, call)) {
-              _bufferedCalls[identifier] = null;
-            }
-          },
-        );
+        var prevCall = _bufferedCalls[identifier];
+        if (identical(prevCall, call)) {
+          _bufferedCalls[identifier] = null;
+        }
+      },
+    );
   }
 
   void _logToHttpClient(

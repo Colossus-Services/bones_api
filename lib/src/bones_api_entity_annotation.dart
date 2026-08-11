@@ -346,8 +346,9 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
       entityStr = '($entityStr)';
     }
 
-    var fieldStr =
-        fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
+    var fieldStr = fieldName != null && fieldName!.isNotEmpty
+        ? '($fieldName)'
+        : '';
 
     var msg = 'reason: $reason';
 
@@ -367,8 +368,9 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
       entityStr = '($entityStr)';
     }
 
-    var fieldStr =
-        fieldName != null && fieldName!.isNotEmpty ? '($fieldName)' : '';
+    var fieldStr = fieldName != null && fieldName!.isNotEmpty
+        ? '($fieldName)'
+        : '';
 
     var operationStr = '';
     if (operation != null) {
@@ -381,10 +383,9 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
       operationStr = '\n  -- Operation>>\n$s';
     }
 
-    var parentStr =
-        parentError != null
-            ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
-            : '';
+    var parentStr = parentError != null
+        ? '\n  -- Parent ERROR>> [${parentError.runtimeTypeNameUnsafe}] $parentError'
+        : '';
 
     return 'Invalid entity$entityStr field$fieldStr> $message$operationStr$parentStr';
   }

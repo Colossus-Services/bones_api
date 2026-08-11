@@ -102,7 +102,7 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Bonus$reflection withObject([Bonus? obj]) =>
@@ -277,8 +277,10 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -291,8 +293,10 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
           ]),
           'campaign',
           false,
-          (o) => () => o!.campaign,
-          (o) => (v) => o!.campaign = v,
+          (o) =>
+              () => o!.campaign,
+          (o) =>
+              (v) => o!.campaign = v,
           obj,
           false,
         );
@@ -303,7 +307,8 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -316,7 +321,8 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -614,7 +620,7 @@ class Campaign$reflection extends ClassReflection<Campaign>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Campaign$reflection withObject([Campaign? obj]) =>
@@ -793,8 +799,10 @@ class Campaign$reflection extends ClassReflection<Campaign>
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -805,8 +813,10 @@ class Campaign$reflection extends ClassReflection<Campaign>
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
-          (o) => (v) => o!.name = v,
+          (o) =>
+              () => o!.name,
+          (o) =>
+              (v) => o!.name = v,
           obj,
           false,
         );
@@ -819,8 +829,10 @@ class Campaign$reflection extends ClassReflection<Campaign>
           ]),
           'config',
           false,
-          (o) => () => o!.config,
-          (o) => (v) => o!.config = v,
+          (o) =>
+              () => o!.config,
+          (o) =>
+              (v) => o!.config = v,
           obj,
           false,
         );
@@ -831,7 +843,8 @@ class Campaign$reflection extends ClassReflection<Campaign>
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -844,7 +857,8 @@ class Campaign$reflection extends ClassReflection<Campaign>
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -1152,7 +1166,7 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   CampaignConfig$reflection withObject([CampaignConfig? obj]) =>
@@ -1339,8 +1353,10 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -1351,8 +1367,10 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
           __TR.tBool,
           'open',
           false,
-          (o) => () => o!.open,
-          (o) => (v) => o!.open = v,
+          (o) =>
+              () => o!.open,
+          (o) =>
+              (v) => o!.open = v,
           obj,
           false,
         );
@@ -1363,7 +1381,8 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -1376,7 +1395,8 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -1688,7 +1708,7 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Item$reflection withObject([Item? obj]) =>
@@ -1863,8 +1883,10 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -1875,8 +1897,10 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
-          (o) => (v) => o!.name = v,
+          (o) =>
+              () => o!.name,
+          (o) =>
+              (v) => o!.name = v,
           obj,
           false,
         );
@@ -1889,8 +1913,10 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           ]),
           'bonus',
           false,
-          (o) => () => o!.bonus,
-          (o) => (v) => o!.bonus = v,
+          (o) =>
+              () => o!.bonus,
+          (o) =>
+              (v) => o!.bonus = v,
           obj,
           false,
         );
@@ -1901,7 +1927,8 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -1914,7 +1941,8 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -2209,7 +2237,7 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Order$reflection withObject([Order? obj]) =>
@@ -2390,8 +2418,10 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -2402,8 +2432,10 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           __TR.tString,
           'orderNumber',
           false,
-          (o) => () => o!.orderNumber,
-          (o) => (v) => o!.orderNumber = v,
+          (o) =>
+              () => o!.orderNumber,
+          (o) =>
+              (v) => o!.orderNumber = v,
           obj,
           false,
         );
@@ -2414,8 +2446,10 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           const __TR<List<Item>>(List, <__TR>[__TR<Item>(Item)]),
           'items',
           false,
-          (o) => () => o!.items,
-          (o) => (v) => o!.items = v,
+          (o) =>
+              () => o!.items,
+          (o) =>
+              (v) => o!.items = v,
           obj,
           false,
         );
@@ -2426,7 +2460,8 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -2439,7 +2474,8 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -2791,10 +2827,8 @@ List<Reflection> _listSiblingsReflection() => <Reflection>[
 ];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() =>
-    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
-      _listSiblingsReflection(),
-    );
+List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
+    List<Reflection>.unmodifiable(_listSiblingsReflection());
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

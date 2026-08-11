@@ -100,10 +100,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     super.logSQL,
   }) : host = host ?? 'localhost',
        port = port ?? 5432,
-       _password =
-           (password != null && password is! PasswordProvider
-               ? password.toString()
-               : null),
+       _password = (password != null && password is! PasswordProvider
+           ? password.toString()
+           : null),
        _passwordProvider =
            passwordProvider ?? (password is PasswordProvider ? password : null),
        super(
@@ -170,10 +169,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     minConnections ??= 1;
     maxConnections ??= 3;
 
-    var (
-      generateTables: generateTables,
-      checkTables: checkTables,
-    ) = DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
+    var (generateTables: generateTables, checkTables: checkTables) =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
     var populate = config?['populate'];
     Object? populateTables;
@@ -385,10 +382,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     } else if (connectivity == DBAdapterConnectivity.insecure) {
       (connection, secure) = await _connectNoSSLImpl(endpoint, timeout);
     } else {
-      (connection, secure) =
-          await (_lastConnectSSLSupported
-              ? _connectSSLImpl(endpoint, timeout)
-              : _connectNoSSLImpl(endpoint, timeout));
+      (connection, secure) = await (_lastConnectSSLSupported
+          ? _connectSSLImpl(endpoint, timeout)
+          : _connectNoSSLImpl(endpoint, timeout));
     }
 
     if (connection == null) return null;
@@ -640,7 +636,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     String table,
     Map<String, Type> fieldsTypes,
   ) async {
-    var sql = '''
+    var sql =
+        '''
     SELECT 
       pg_get_constraintdef(con.oid) AS constraint_definition
     FROM pg_constraint con
@@ -651,33 +648,34 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var columns = await connection.mappedResultsQuery(sql);
 
-    var constraintsDefinitions =
-        columns.map((m) => m['constraint_definition'].toString()).toList();
+    var constraintsDefinitions = columns
+        .map((m) => m['constraint_definition'].toString())
+        .toList();
 
-    var constraints =
-        constraintsDefinitions.map(_parseConstraint).nonNulls.toSet();
+    var constraints = constraintsDefinitions
+        .map(_parseConstraint)
+        .nonNulls
+        .toSet();
 
     return constraints;
   }
 
   TableConstraint? _parseConstraint(String definition) {
     if (definition.startsWith("PRIMARY KEY")) {
-      var field =
-          RegExp(r'\(([^()]+?)\)')
-              .firstMatch(definition)
-              ?.group(1)
-              ?.replaceAll("'", '')
-              .replaceAll('"', '')
-              .trim();
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(definition)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
       return field == null ? null : TablePrimaryKeyConstraint(field);
     } else if (definition.startsWith("UNIQUE")) {
-      var field =
-          RegExp(r'\(([^()]+?)\)')
-              .firstMatch(definition)
-              ?.group(1)
-              ?.replaceAll("'", '')
-              .replaceAll('"', '')
-              .trim();
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(definition)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
       return field == null ? null : TableUniqueConstraint(field);
     } else if (definition.startsWith("CHECK")) {
       var idx1 = definition.indexOf('(');
@@ -685,13 +683,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       var s = definition.substring(idx1 + 1, idx2);
 
-      var field =
-          RegExp(r'\(([^()]+?)\)')
-              .firstMatch(s)
-              ?.group(1)
-              ?.replaceAll("'", '')
-              .replaceAll('"', '')
-              .trim();
+      var field = RegExp(
+        r'\(([^()]+?)\)',
+      ).firstMatch(s)?.group(1)?.replaceAll("'", '').replaceAll('"', '').trim();
 
       if (field == null || field.isEmpty) return null;
 
@@ -700,13 +694,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       Set<String>? values;
 
       if (arrayDef != null && arrayDef.isNotEmpty) {
-        values =
-            RegExp(
-              r"'(.*?)'",
-            ).allMatches(arrayDef).map((m) => m.group(1)).nonNulls.toSet();
+        values = RegExp(
+          r"'(.*?)'",
+        ).allMatches(arrayDef).map((m) => m.group(1)).nonNulls.toSet();
       } else {
-        var singleValue =
-            RegExp(r"\s+=\s+'(.*?)'").firstMatch(s)?.group(1)?.trim();
+        var singleValue = RegExp(
+          r"\s+=\s+'(.*?)'",
+        ).firstMatch(s)?.group(1)?.trim();
 
         if (singleValue != null) {
           values = {singleValue};
@@ -726,7 +720,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     String table,
     List<Map<String, dynamic>> scheme,
   ) async {
-    var sql = '''
+    var sql =
+        '''
     SELECT
       c.column_name, c.data_type
     FROM
@@ -821,41 +816,40 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       contextID: contextID,
     );
 
-    var relationships =
-        tablesReferences
-            .map((e) {
-              var refToTables = e.values
-                  .where((r) => r.targetTable == table)
-                  .toList(growable: false);
-              var otherRefs = e.values
-                  .where((r) => r.targetTable != table)
-                  .toList(growable: false);
+    var relationships = tablesReferences
+        .map((e) {
+          var refToTables = e.values
+              .where((r) => r.targetTable == table)
+              .toList(growable: false);
+          var otherRefs = e.values
+              .where((r) => r.targetTable != table)
+              .toList(growable: false);
 
-              if (refToTables.length != 1 || otherRefs.length != 1) {
-                return null;
-              }
+          if (refToTables.length != 1 || otherRefs.length != 1) {
+            return null;
+          }
 
-              var refToTable = refToTables.single;
-              var otherRef = otherRefs.single;
+          var refToTable = refToTables.single;
+          var otherRef = otherRefs.single;
 
-              var tableRelationshipReference = TableRelationshipReference(
-                refToTable.sourceTable,
-                refToTable.targetTable,
-                refToTable.targetField,
-                refToTable.targetFieldType,
-                refToTable.sourceField,
-                otherRef.targetTable,
-                otherRef.targetField,
-                otherRef.targetFieldType,
-                otherRef.sourceField,
-                sourceRelationshipFieldIndex: refToTable.indexName,
-                targetRelationshipFieldIndex: otherRef.indexName,
-              );
+          var tableRelationshipReference = TableRelationshipReference(
+            refToTable.sourceTable,
+            refToTable.targetTable,
+            refToTable.targetField,
+            refToTable.targetFieldType,
+            refToTable.sourceField,
+            otherRef.targetTable,
+            otherRef.targetField,
+            otherRef.targetFieldType,
+            otherRef.sourceField,
+            sourceRelationshipFieldIndex: refToTable.indexName,
+            targetRelationshipFieldIndex: otherRef.indexName,
+          );
 
-              return tableRelationshipReference;
-            })
-            .nonNulls
-            .toList();
+          return tableRelationshipReference;
+        })
+        .nonNulls
+        .toList();
 
     return relationships;
   }
@@ -879,12 +873,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       tablesReferences.add(refs);
     }
 
-    tablesReferences =
-        tablesReferences.where((m) {
-          return m.length > 1 &&
-              m.values.where((r) => r.targetTable == table).isNotEmpty &&
-              m.values.where((r) => r.targetTable != table).isNotEmpty;
-        }).toList();
+    tablesReferences = tablesReferences.where((m) {
+      return m.length > 1 &&
+          m.values.where((r) => r.targetTable == table).isNotEmpty &&
+          m.values.where((r) => r.targetTable != table).isNotEmpty;
+    }).toList();
     return tablesReferences;
   }
 
@@ -927,14 +920,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }) {
     if (contextID != null) {
       var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      return cache[table] ??= _findFieldsReferencedTablesImpl(
-        connection,
-        table,
-      ).then((ret) {
-        cache[table] = ret;
-        _findFieldsReferencedTablesCache[table] = ret;
-        return ret;
-      });
+      return cache[table] ??= _findFieldsReferencedTablesImpl(connection, table)
+          .then((ret) {
+            cache[table] = ret;
+            _findFieldsReferencedTablesCache[table] = ret;
+            return ret;
+          });
     }
 
     return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
@@ -947,7 +938,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     PostgreSQLConnectionWrapper connection,
     String table,
   ) async {
-    var sql = '''
+    var sql =
+        '''
     SELECT
       o.conname AS constraint_name,
       
@@ -1031,15 +1023,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           fkIndexName = null;
         }
 
-        var sourceFieldType =
-            sourceFieldDataType != null
-                ? _toFieldType(sourceFieldDataType)
-                : String;
+        var sourceFieldType = sourceFieldDataType != null
+            ? _toFieldType(sourceFieldDataType)
+            : String;
 
-        var targetFieldType =
-            targetFieldDataType != null
-                ? _toFieldType(targetFieldDataType)
-                : String;
+        var targetFieldType = targetFieldDataType != null
+            ? _toFieldType(targetFieldDataType)
+            : String;
 
         var reference = TableFieldReference(
           sourceTable,
@@ -1162,16 +1152,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           substitutionValues: sql.parametersByPlaceholder,
         )
         .resolveMapped((results) {
-          var count =
-              results
-                  .map((row) {
-                    var count = row['count'] ?? 0;
-                    return count is int
-                        ? count
-                        : int.tryParse(count.toString().trim());
-                  })
-                  .whereType<int>()
-                  .first;
+          var count = results
+              .map((row) {
+                var count = row['count'] ?? 0;
+                return count is int
+                    ? count
+                    : int.tryParse(count.toString().trim());
+              })
+              .whereType<int>()
+              .first;
           return count;
         });
   }
@@ -1414,14 +1403,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         });
       },
       validator: (c) => !transaction.isAborted,
-      onError:
-          (e, s) => transaction.notifyExecutionError(
-            e,
-            s,
-            errorResolver: resolveError,
-            debugInfo:
-                () => transaction.toString(withExecutedOperations: false),
-          ),
+      onError: (e, s) => transaction.notifyExecutionError(
+        e,
+        s,
+        errorResolver: resolveError,
+        debugInfo: () => transaction.toString(withExecutedOperations: false),
+      ),
     );
 
     transaction.transactionResult = result;

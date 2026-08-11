@@ -33,10 +33,9 @@ class APICredential {
     this.refreshToken,
     String? passwordHash,
     APIPasswordHashAlgorithm? hashAlgorithm,
-  }) : password =
-           passwordHash != null
-               ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
-               : null;
+  }) : password = passwordHash != null
+           ? APIPassword(passwordHash, hashAlgorithm: hashAlgorithm)
+           : null;
 
   APICredential._(
     this.username,
@@ -201,8 +200,8 @@ abstract class APIPasswordHashAlgorithm {
   /// Ensures that [passwordOrHash] is hashed with this algorithm.
   String ensureHashedPassword(String passwordOrHash) =>
       isHashedPassword(passwordOrHash)
-          ? passwordOrHash
-          : hashPassword(passwordOrHash);
+      ? passwordOrHash
+      : hashPassword(passwordOrHash);
 
   @override
   String toString() {
@@ -480,10 +479,9 @@ class APIToken implements Comparable<APIToken> {
   }) : token = token ?? generateToken(512, variableLength: 32, prefix: 'TK'),
        issueTime = issueTime ?? DateTime.now(),
        duration = duration ?? Duration(hours: 3),
-       refreshToken =
-           refreshToken == null && withRefreshToken
-               ? generateToken(640, variableLength: 64, prefix: 'RTK')
-               : refreshToken;
+       refreshToken = refreshToken == null && withRefreshToken
+           ? generateToken(640, variableLength: 64, prefix: 'RTK')
+           : refreshToken;
 
   DateTime get accessTime => _accessTime;
 

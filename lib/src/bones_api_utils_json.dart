@@ -251,12 +251,11 @@ class Json {
       removeField: removeField,
       removeNullFields: removeNullFields,
       toEncodable: toEncodable == null ? null : (o, j) => toEncodable(o),
-      toEncodableProvider:
-          toEncodableProvider != null
-              ? (o) =>
-                  toEncodableProvider(o) ??
-                  _jsonEncodableProvider(o, entityHandlerProvider)
-              : (o) => _jsonEncodableProvider(o, entityHandlerProvider),
+      toEncodableProvider: toEncodableProvider != null
+          ? (o) =>
+                toEncodableProvider(o) ??
+                _jsonEncodableProvider(o, entityHandlerProvider)
+          : (o) => _jsonEncodableProvider(o, entityHandlerProvider),
       entityCache: entityCache,
       forceDuplicatedEntitiesAsID: true,
     );
@@ -264,7 +263,8 @@ class Json {
 
   static ToEncodableJsonProvider defaultToEncodableJsonProvider([
     EntityHandlerProvider? entityHandlerProvider,
-  ]) => (o) => _jsonEncodableProvider(o, entityHandlerProvider);
+  ]) =>
+      (o) => _jsonEncodableProvider(o, entityHandlerProvider);
 
   static ToEncodableJson? _jsonEncodableProvider(
     Object object,
@@ -571,8 +571,8 @@ class Json {
 
   static final JsonDecoder defaultDecoder = JsonDecoder(
     jsonValueDecoderProvider: _jsonValueDecoderProvider,
-    jsomMapDecoderAsyncProvider:
-        (t, m, j) => _jsomMapDecoderAsyncProvider(t, j, null, null),
+    jsomMapDecoderAsyncProvider: (t, m, j) =>
+        _jsomMapDecoderAsyncProvider(t, j, null, null),
     jsomMapDecoderProvider: (t, m, j) => _jsomMapDecoderProvider(t, j, null),
     entityCache: JsonEntityCacheSimple(),
     forceDuplicatedEntitiesAsID: true,
@@ -590,26 +590,24 @@ class Json {
     }
 
     return JsonDecoder(
-      jsonValueDecoderProvider:
-          (t, v, j) => _jsonValueDecoderProvider(
-            t,
-            v,
-            j,
-            entityHandlerProvider,
-            entityCache,
-          ),
+      jsonValueDecoderProvider: (t, v, j) => _jsonValueDecoderProvider(
+        t,
+        v,
+        j,
+        entityHandlerProvider,
+        entityCache,
+      ),
       jsomMapDecoder: jsomMapDecoder,
-      jsomMapDecoderAsyncProvider:
-          (t, m, j) => _jsomMapDecoderAsyncProvider(
-            t,
-            j,
-            entityHandlerProvider,
-            entityCache,
-          ),
-      jsomMapDecoderProvider:
-          (t, m, j) => _jsomMapDecoderProvider(t, j, entityHandlerProvider),
-      iterableCaster:
-          (v, t, j) => _iterableCaster(v, t, j, entityHandlerProvider),
+      jsomMapDecoderAsyncProvider: (t, m, j) => _jsomMapDecoderAsyncProvider(
+        t,
+        j,
+        entityHandlerProvider,
+        entityCache,
+      ),
+      jsomMapDecoderProvider: (t, m, j) =>
+          _jsomMapDecoderProvider(t, j, entityHandlerProvider),
+      iterableCaster: (v, t, j) =>
+          _iterableCaster(v, t, j, entityHandlerProvider),
       entityCache: entityCache,
       forceDuplicatedEntitiesAsID: true,
     );
@@ -692,9 +690,8 @@ class Json {
       return (m, j) => classReflection.createInstanceFromMap(
         m,
         fieldNameResolver: defaultFieldNameResolver,
-        fieldValueResolver:
-            (f, v, t) =>
-                defaultFieldValueResolver(f, v, t, j, entityHandlerProvider),
+        fieldValueResolver: (f, v, t) =>
+            defaultFieldValueResolver(f, v, t, j, entityHandlerProvider),
       );
     }
 
@@ -724,9 +721,8 @@ class Json {
       return (m, j) => classReflection.createInstanceFromMap(
         m,
         fieldNameResolver: defaultFieldNameResolver,
-        fieldValueResolver:
-            (f, v, t) =>
-                defaultFieldValueResolver(f, v, t, j, entityHandlerProvider),
+        fieldValueResolver: (f, v, t) =>
+            defaultFieldValueResolver(f, v, t, j, entityHandlerProvider),
       );
     }
 
@@ -814,8 +810,9 @@ class Json {
     JsonDecoder jsonDecoder,
     EntityHandlerProvider? entityHandlerProvider,
   ) {
-    final entityTypeReflection =
-        type.isListEntityOrReference ? type.arguments0! : type;
+    final entityTypeReflection = type.isListEntityOrReference
+        ? type.arguments0!
+        : type;
     final entityType = entityTypeReflection.type;
 
     EntityHandler? entityHandler;
@@ -841,43 +838,33 @@ class Json {
     if (classification.isAllObj) {
       list = value;
     } else if (classification.isAllMap) {
-      list =
-          value
-              .map(
-                (m) =>
-                    m is Map<String, dynamic>
-                        ? entityHandler!.createFromMapSync(
-                          m,
-                          entityCache: entityCache,
-                        )
-                        : null,
-              )
-              .toList();
+      list = value
+          .map(
+            (m) => m is Map<String, dynamic>
+                ? entityHandler!.createFromMapSync(m, entityCache: entityCache)
+                : null,
+          )
+          .toList();
     } else if (classification.isAllID) {
-      list =
-          value.map((id) {
-            if (id == null) return null;
-            var o = entityCache.getCachedEntityByID(id, type: entityType);
-            return o;
-          }).toList();
+      list = value.map((id) {
+        if (id == null) return null;
+        var o = entityCache.getCachedEntityByID(id, type: entityType);
+        return o;
+      }).toList();
     } else if (classification.isAllNullOrEmpty) {
       list = value;
     } else {
-      list =
-          value.map((e) {
-            if (e == null) {
-              return null;
-            } else if (e is Map<String, dynamic>) {
-              return entityHandler!.createFromMapSync(
-                e,
-                entityCache: entityCache,
-              );
-            } else if ((e as Object).isEntityIDPrimitiveType) {
-              return entityCache.getCachedEntityByID(e, type: entityType);
-            } else {
-              return e;
-            }
-          }).toList();
+      list = value.map((e) {
+        if (e == null) {
+          return null;
+        } else if (e is Map<String, dynamic>) {
+          return entityHandler!.createFromMapSync(e, entityCache: entityCache);
+        } else if ((e as Object).isEntityIDPrimitiveType) {
+          return entityCache.getCachedEntityByID(e, type: entityType);
+        } else {
+          return e;
+        }
+      }).toList();
     }
 
     return classification.hasNull

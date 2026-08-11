@@ -175,14 +175,14 @@ class TableRelationshipReference {
     String? targetRelationshipFieldIndex,
   }) : sourceRelationshipFieldIndex =
            sourceRelationshipFieldIndex != null &&
-                   sourceRelationshipFieldIndex.isNotEmpty
-               ? sourceRelationshipFieldIndex
-               : null,
+               sourceRelationshipFieldIndex.isNotEmpty
+           ? sourceRelationshipFieldIndex
+           : null,
        targetRelationshipFieldIndex =
            targetRelationshipFieldIndex != null &&
-                   targetRelationshipFieldIndex.isNotEmpty
-               ? targetRelationshipFieldIndex
-               : null;
+               targetRelationshipFieldIndex.isNotEmpty
+           ? targetRelationshipFieldIndex
+           : null;
 
   /// Returns a copy as [TableRelationshipReference],
   /// with entity types [sourceFieldEntityType] and [targetFieldEntityType].
@@ -364,12 +364,11 @@ class TableScheme with FieldsFromMap {
     if (fields != null) {
       var fieldsSimple = fields.map(fieldToSimpleKey).toList();
 
-      fieldsNames =
-          fieldsNames
-              .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
-              .where((e) => fieldsSimple.contains(e.value))
-              .map((e) => e.key)
-              .toList();
+      fieldsNames = fieldsNames
+          .mapIndexed((i, e) => MapEntry(e, _fieldsNamesSimple[i]))
+          .where((e) => fieldsSimple.contains(e.value))
+          .map((e) => e.key)
+          .toList();
     }
 
     return getFieldsValuesFromMap(
@@ -458,14 +457,13 @@ class TableScheme with FieldsFromMap {
           sourceTable,
         );
 
-        rels =
-            l
-                .where(
-                  (rel) =>
-                      StringUtils.toLowerCaseSimpleCached(rel.sourceTable) ==
-                      sourceTableSimple,
-                )
-                .toList();
+        rels = l
+            .where(
+              (rel) =>
+                  StringUtils.toLowerCaseSimpleCached(rel.sourceTable) ==
+                  sourceTableSimple,
+            )
+            .toList();
 
         if (rels.length == 1) return rels.first;
       }
@@ -476,14 +474,13 @@ class TableScheme with FieldsFromMap {
       var sourceFieldSimpleUnderscored =
           StringUtils.toLowerCaseSimpleUnderscored(sourceField);
 
-      var rels1 =
-          rels
-              .where(
-                (rel) => StringUtils.toLowerCaseSimpleUnderscored(
-                  rel.relationshipTable,
-                ).contains(sourceFieldSimpleUnderscored),
-              )
-              .toList();
+      var rels1 = rels
+          .where(
+            (rel) => StringUtils.toLowerCaseSimpleUnderscored(
+              rel.relationshipTable,
+            ).contains(sourceFieldSimpleUnderscored),
+          )
+          .toList();
 
       if (rels1.length == 1) return rels1.first;
 
@@ -492,25 +489,21 @@ class TableScheme with FieldsFromMap {
       );
 
       if (rels1.isEmpty) {
-        rels1 =
-            rels
-                .where(
-                  (rel) => StringUtils.toLowerCaseSimpleCached(
-                    rel.relationshipTable,
-                  ).contains(sourceFieldSimple),
-                )
-                .toList();
+        rels1 = rels
+            .where(
+              (rel) => StringUtils.toLowerCaseSimpleCached(
+                rel.relationshipTable,
+              ).contains(sourceFieldSimple),
+            )
+            .toList();
       }
 
       var relsNames = StringUtils.trimEqualitiesMap(
         rels1.map((e) => e.relationshipTable).toList(),
         delimiter: '_',
         normalizer: (s) => StringUtils.toLowerCaseSimpleUnderscored(s),
-        validator:
-            (s) =>
-                !StringUtils.toLowerCaseSimpleCached(
-                  s,
-                ).contains(sourceFieldSimple),
+        validator: (s) =>
+            !StringUtils.toLowerCaseSimpleCached(s).contains(sourceFieldSimple),
       );
 
       var relsNamesSimple = relsNames.map(
@@ -518,19 +511,17 @@ class TableScheme with FieldsFromMap {
             MapEntry(key, StringUtils.toLowerCaseSimpleCached(value)),
       );
 
-      var rels2 =
-          rels1.where((rel) {
-            var f = relsNamesSimple[rel.relationshipTable]!;
-            return f.contains(sourceFieldSimple);
-          }).toList();
+      var rels2 = rels1.where((rel) {
+        var f = relsNamesSimple[rel.relationshipTable]!;
+        return f.contains(sourceFieldSimple);
+      }).toList();
 
       if (rels2.length == 1) return rels2.first;
 
-      var rels3 =
-          rels1.where((rel) {
-            var f = relsNamesSimple[rel.relationshipTable]!;
-            return f == sourceFieldSimple;
-          }).toList();
+      var rels3 = rels1.where((rel) {
+        var f = relsNamesSimple[rel.relationshipTable]!;
+        return f == sourceFieldSimple;
+      }).toList();
 
       if (rels3.length == 1) return rels3.first;
 
@@ -615,8 +606,9 @@ class TableScheme with FieldsFromMap {
 
   @override
   String toString() {
-    var constraintNotPrimary =
-        constraints.where((e) => e is! TablePrimaryKeyConstraint).toList();
+    var constraintNotPrimary = constraints
+        .where((e) => e is! TablePrimaryKeyConstraint)
+        .toList();
 
     return 'TableScheme{name: $name, '
         'idFieldName: $idFieldName, '
@@ -1139,10 +1131,9 @@ class EncodingContext {
     }
 
     for (var i = 0; i < 1000; ++i) {
-      var k =
-          i == 0
-              ? '$parameterPrefix$suggestedKey'
-              : '$parameterPrefix$suggestedKey$i';
+      var k = i == 0
+          ? '$parameterPrefix$suggestedKey'
+          : '$parameterPrefix$suggestedKey$i';
 
       if (!namedParameters.containsKey(k)) {
         encodingParameters[k] = value;
@@ -1390,26 +1381,22 @@ abstract class ConditionEncoder {
         valueType,
         true,
       ).resolveMapped((values) {
-        var list =
-            values is List
-                ? values
-                : (values is Iterable
-                    ? values.toList(growable: false)
-                    : [values]);
+        var list = values is List
+            ? values
+            : (values is Iterable ? values.toList(growable: false) : [values]);
 
-        var placeHolders =
-            list.mapIndexed((i, v) {
-              var k = parameterPlaceholderIndexKey(valueKey, i);
-              context.parametersPlaceholders[k] ??= v;
-              var placeholder = parameterPlaceholder(k);
-              return EncodingPlaceholderIndex(
-                valueKey,
-                valueType,
-                placeholder,
-                i,
-                encodeEncodingPlaceholderIndex,
-              );
-            }).toList();
+        var placeHolders = list.mapIndexed((i, v) {
+          var k = parameterPlaceholderIndexKey(valueKey, i);
+          context.parametersPlaceholders[k] ??= v;
+          var placeholder = parameterPlaceholder(k);
+          return EncodingPlaceholderIndex(
+            valueKey,
+            valueType,
+            placeholder,
+            i,
+            encodeEncodingPlaceholderIndex,
+          );
+        }).toList();
 
         return EncodingValueList(
           valueKey,
@@ -1480,11 +1467,10 @@ abstract class ConditionEncoder {
       if (value == null) {
         return [];
       } else if (value is Iterable) {
-        var list =
-            value
-                .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))
-                .toList(growable: false)
-                .resolveAll();
+        var list = value
+            .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))
+            .toList(growable: false)
+            .resolveAll();
         return list;
       } else {
         var list = _resolveValueToTypeCompatibleImpl(

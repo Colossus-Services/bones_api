@@ -117,13 +117,14 @@ Future<bool> _runTest(bool useReflection, bool populateSource) {
         populateSourceVariables: populate?['variables'],
       );
     },
-    (provider, dbPort, dbConfig) => DBObjectDirectoryAdapter(
-        tempObjectDir,
-        parentRepositoryProvider: provider,
-      )
-      ..onClose.listen((_) {
-        tempObjectDir.deleteSync(recursive: true);
-      }),
+    (provider, dbPort, dbConfig) =>
+        DBObjectDirectoryAdapter(
+            tempObjectDir,
+            parentRepositoryProvider: provider,
+          )
+          ..onClose.listen((_) {
+            tempObjectDir.deleteSync(recursive: true);
+          }),
     '"',
     'int',
     entityByReflection: useReflection,

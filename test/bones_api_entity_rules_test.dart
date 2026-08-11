@@ -311,12 +311,11 @@ void main() {
       var j1 =
           Json.toJson(
                 user1,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 
@@ -327,12 +326,11 @@ void main() {
       var j2 =
           Json.toJson(
                 user2,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 
@@ -415,12 +413,11 @@ void main() {
       var j1 =
           Json.toJson(
                 user1,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 
@@ -431,12 +428,11 @@ void main() {
       var j2 =
           Json.toJson(
                 user2,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 
@@ -521,12 +517,11 @@ void main() {
       var j1 =
           Json.toJson(
                 user1,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 
@@ -537,12 +532,11 @@ void main() {
       var j2 =
           Json.toJson(
                 user2,
-                toEncodableProvider:
-                    (o) => r1.toJsonEncodable(
-                      apiRequest,
-                      Json.defaultToEncodableJsonProvider(),
-                      o,
-                    ),
+                toEncodableProvider: (o) => r1.toJsonEncodable(
+                  apiRequest,
+                  Json.defaultToEncodableJsonProvider(),
+                  o,
+                ),
               )
               as Map;
 

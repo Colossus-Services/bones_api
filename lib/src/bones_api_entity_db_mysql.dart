@@ -92,10 +92,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     super.logSQL,
   }) : host = host ?? 'localhost',
        port = port ?? 3306,
-       _password =
-           (password != null && password is! PasswordProvider
-               ? password.toString()
-               : null),
+       _password = (password != null && password is! PasswordProvider
+           ? password.toString()
+           : null),
        _passwordProvider =
            passwordProvider ?? (password is PasswordProvider ? password : null),
        super(
@@ -164,10 +163,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     minConnections ??= 1;
     maxConnections ??= 3;
 
-    var (
-      generateTables: generateTables,
-      checkTables: checkTables,
-    ) = DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
+    var (generateTables: generateTables, checkTables: checkTables) =
+        DBSQLAdapter.parseConfigDBGenerateTablesAndCheckTables(config);
 
     var populate = config?['populate'];
     Object? populateTables;
@@ -428,8 +425,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   ) {
     var primaryFields = scheme.where((f) => f['Key'] == 'PRI');
 
-    var primaryFieldsNames =
-        primaryFields.map((e) => e['Field'].toString()).toList();
+    var primaryFieldsNames = primaryFields
+        .map((e) => e['Field'].toString())
+        .toList();
 
     return selectIDFieldName(table, primaryFieldsNames);
   }
@@ -507,45 +505,43 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       tablesReferences.add(refs);
     }
 
-    tablesReferences =
-        tablesReferences.where((m) {
-          return m.length > 1 &&
-              m.values.where((r) => r.targetTable == table).isNotEmpty &&
-              m.values.where((r) => r.targetTable != table).isNotEmpty;
-        }).toList();
+    tablesReferences = tablesReferences.where((m) {
+      return m.length > 1 &&
+          m.values.where((r) => r.targetTable == table).isNotEmpty &&
+          m.values.where((r) => r.targetTable != table).isNotEmpty;
+    }).toList();
 
-    var relationships =
-        tablesReferences
-            .map((e) {
-              var refToTables = e.values
-                  .where((r) => r.targetTable == table)
-                  .toList(growable: false);
+    var relationships = tablesReferences
+        .map((e) {
+          var refToTables = e.values
+              .where((r) => r.targetTable == table)
+              .toList(growable: false);
 
-              var otherRefs = e.values
-                  .where((r) => r.targetTable != table)
-                  .toList(growable: false);
+          var otherRefs = e.values
+              .where((r) => r.targetTable != table)
+              .toList(growable: false);
 
-              if (refToTables.length != 1 || otherRefs.length != 1) {
-                return null;
-              }
+          if (refToTables.length != 1 || otherRefs.length != 1) {
+            return null;
+          }
 
-              var refToTable = refToTables.first;
-              var otherRef = otherRefs.first;
+          var refToTable = refToTables.first;
+          var otherRef = otherRefs.first;
 
-              return TableRelationshipReference(
-                refToTable.sourceTable,
-                refToTable.targetTable,
-                refToTable.targetField,
-                refToTable.targetFieldType,
-                refToTable.sourceField,
-                otherRef.targetTable,
-                otherRef.targetField,
-                otherRef.targetFieldType,
-                otherRef.sourceField,
-              );
-            })
-            .nonNulls
-            .toList();
+          return TableRelationshipReference(
+            refToTable.sourceTable,
+            refToTable.targetTable,
+            refToTable.targetField,
+            refToTable.targetFieldType,
+            refToTable.sourceField,
+            otherRef.targetTable,
+            otherRef.targetField,
+            otherRef.targetFieldType,
+            otherRef.sourceField,
+          );
+        })
+        .nonNulls
+        .toList();
 
     return relationships;
   }
@@ -589,14 +585,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }) {
     if (contextID != null) {
       var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      return cache[table] ??= _findFieldsReferencedTablesImpl(
-        connection,
-        table,
-      ).then((ret) {
-        cache[table] = ret;
-        _findFieldsReferencedTablesCache[table] = ret;
-        return ret;
-      });
+      return cache[table] ??= _findFieldsReferencedTablesImpl(connection, table)
+          .then((ret) {
+            cache[table] = ret;
+            _findFieldsReferencedTablesCache[table] = ret;
+            return ret;
+          });
     }
 
     return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
@@ -609,7 +603,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     DBMySqlConnectionWrapper connection,
     String table,
   ) async {
-    var sql = '''
+    var sql =
+        '''
     SELECT 
       CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
       REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
@@ -624,42 +619,41 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var referenceFields = results.map((r) => r.fields).toList(growable: false);
 
-    var mapEntriesRet =
-        referenceFields
-            .map((e) {
-              var sourceTable = e['TABLE_NAME'];
-              var sourceField = e['COLUMN_NAME'];
-              var targetTable = e['REFERENCED_TABLE_NAME'];
-              var targetField = e['REFERENCED_COLUMN_NAME'];
-              if (targetTable == null || targetField == null) return null;
+    var mapEntriesRet = referenceFields
+        .map((e) {
+          var sourceTable = e['TABLE_NAME'];
+          var sourceField = e['COLUMN_NAME'];
+          var targetTable = e['REFERENCED_TABLE_NAME'];
+          var targetField = e['REFERENCED_COLUMN_NAME'];
+          if (targetTable == null || targetField == null) return null;
 
-              var sourceFieldsTypesRet = getTableFieldsTypes(table);
-              var targetFieldsTypesRet = getTableFieldsTypes(targetTable);
+          var sourceFieldsTypesRet = getTableFieldsTypes(table);
+          var targetFieldsTypesRet = getTableFieldsTypes(targetTable);
 
-              return sourceFieldsTypesRet.resolveBoth(targetFieldsTypesRet, (
-                sourceFieldsTypes,
-                targetFieldsTypes,
-              ) {
-                var sourceFieldType = sourceFieldsTypes?[sourceField] ?? String;
-                var targetFieldType = targetFieldsTypes?[targetField] ?? String;
+          return sourceFieldsTypesRet.resolveBoth(targetFieldsTypesRet, (
+            sourceFieldsTypes,
+            targetFieldsTypes,
+          ) {
+            var sourceFieldType = sourceFieldsTypes?[sourceField] ?? String;
+            var targetFieldType = targetFieldsTypes?[targetField] ?? String;
 
-                var reference = TableFieldReference(
-                  sourceTable,
-                  sourceField,
-                  sourceFieldType,
-                  targetTable,
-                  targetField,
-                  targetFieldType,
-                );
+            var reference = TableFieldReference(
+              sourceTable,
+              sourceField,
+              sourceFieldType,
+              targetTable,
+              targetField,
+              targetFieldType,
+            );
 
-                return MapEntry<String, TableFieldReference>(
-                  sourceField,
-                  reference,
-                );
-              });
-            })
-            .nonNulls
-            .resolveAll();
+            return MapEntry<String, TableFieldReference>(
+              sourceField,
+              reference,
+            );
+          });
+        })
+        .nonNulls
+        .resolveAll();
 
     return mapEntriesRet.resolveMapped((mapEntries) {
       var map = Map<String, TableFieldReference>.fromEntries(mapEntries);
@@ -847,26 +841,20 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   FutureOr<List<Results>> _executeSQLs(
     List<SQL> sql,
     DBMySqlConnectionWrapper connection,
-  ) =>
-      sql
-          .map(
-            (e) =>
-                connection.query(e.sqlPositional, e.parametersValuesByPosition),
-          )
-          .resolveAll();
+  ) => sql
+      .map(
+        (e) => connection.query(e.sqlPositional, e.parametersValuesByPosition),
+      )
+      .resolveAll();
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteSQLImpl(
     String table,
     SQL sql,
     DBMySqlConnectionWrapper connection,
   ) {
-    FutureOr<Results?> sqlRet =
-        sql.isDummy
-            ? null
-            : connection.query(
-              sql.sqlPositional,
-              sql.parametersValuesByPosition,
-            );
+    FutureOr<Results?> sqlRet = sql.isDummy
+        ? null
+        : connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
 
     var posSQLs = sql.posSQL;
 
@@ -1053,14 +1041,12 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         });
       },
       validator: (c) => !transaction.isAborted,
-      onError:
-          (e, s) => transaction.notifyExecutionError(
-            e,
-            s,
-            errorResolver: resolveError,
-            debugInfo:
-                () => transaction.toString(withExecutedOperations: false),
-          ),
+      onError: (e, s) => transaction.notifyExecutionError(
+        e,
+        s,
+        errorResolver: resolveError,
+        debugInfo: () => transaction.toString(withExecutedOperations: false),
+      ),
     );
 
     transaction.transactionResult = result;

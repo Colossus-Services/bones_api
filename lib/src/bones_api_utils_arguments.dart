@@ -53,10 +53,9 @@ class Arguments {
   }) {
     var arguments = <String>[];
 
-    var keysAbbreviations =
-        abbreviateFlags || abbreviateParameters
-            ? this.keysAbbreviations
-            : abbreviations;
+    var keysAbbreviations = abbreviateFlags || abbreviateParameters
+        ? this.keysAbbreviations
+        : abbreviations;
 
     for (var f in flags) {
       if (abbreviateFlags) {
