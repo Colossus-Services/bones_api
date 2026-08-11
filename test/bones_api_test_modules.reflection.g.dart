@@ -84,7 +84,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   AboutModule$reflection withObject([AboutModule? obj]) =>
@@ -259,7 +259,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           const __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
-          (o) => () => o!.apiRoot,
+          (o) =>
+              () => o!.apiRoot,
           null,
           obj,
           true,
@@ -271,7 +272,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
+          (o) =>
+              () => o!.name,
           null,
           obj,
           true,
@@ -283,7 +285,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tString,
           'version',
           true,
-          (o) => () => o!.version,
+          (o) =>
+              () => o!.version,
           null,
           obj,
           true,
@@ -295,7 +298,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           const __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
-          (o) => () => o!.apiConfig,
+          (o) =>
+              () => o!.apiConfig,
           null,
           obj,
           false,
@@ -307,7 +311,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tString,
           'defaultRouteName',
           true,
-          (o) => () => o!.defaultRouteName,
+          (o) =>
+              () => o!.defaultRouteName,
           null,
           obj,
           false,
@@ -319,7 +324,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tSetString,
           'allRoutesNames',
           false,
-          (o) => () => o!.allRoutesNames,
+          (o) =>
+              () => o!.allRoutesNames,
           null,
           obj,
           false,
@@ -333,7 +339,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           ]),
           'routes',
           false,
-          (o) => () => o!.routes,
+          (o) =>
+              () => o!.routes,
           null,
           obj,
           false,
@@ -345,7 +352,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tString,
           'authenticationRoute',
           false,
-          (o) => () => o!.authenticationRoute,
+          (o) =>
+              () => o!.authenticationRoute,
           null,
           obj,
           false,
@@ -357,7 +365,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           const __TR<APISecurity>(APISecurity),
           'security',
           true,
-          (o) => () => o!.security,
+          (o) =>
+              () => o!.security,
           null,
           obj,
           false,
@@ -369,7 +378,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -382,7 +392,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           const __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
-          (o) => () => o!.initializationStatus,
+          (o) =>
+              () => o!.initializationStatus,
           null,
           obj,
           false,
@@ -394,7 +405,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tBool,
           'isInitialized',
           false,
-          (o) => () => o!.isInitialized,
+          (o) =>
+              () => o!.isInitialized,
           null,
           obj,
           false,
@@ -406,7 +418,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tBool,
           'isInitializing',
           false,
-          (o) => () => o!.isInitializing,
+          (o) =>
+              () => o!.isInitializing,
           null,
           obj,
           false,
@@ -418,7 +431,8 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           __TR.tBool,
           'isAsyncInitialization',
           false,
-          (o) => () => o!.isAsyncInitialization,
+          (o) =>
+              () => o!.isAsyncInitialization,
           null,
           obj,
           false,
@@ -973,7 +987,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   UserModule$reflection withObject([UserModule? obj]) =>
@@ -1155,7 +1169,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           const __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
-          (o) => () => o!.apiRoot,
+          (o) =>
+              () => o!.apiRoot,
           null,
           obj,
           true,
@@ -1167,7 +1182,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
+          (o) =>
+              () => o!.name,
           null,
           obj,
           true,
@@ -1179,7 +1195,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tString,
           'version',
           true,
-          (o) => () => o!.version,
+          (o) =>
+              () => o!.version,
           null,
           obj,
           true,
@@ -1191,7 +1208,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           const __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
-          (o) => () => o!.apiConfig,
+          (o) =>
+              () => o!.apiConfig,
           null,
           obj,
           false,
@@ -1203,7 +1221,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tString,
           'defaultRouteName',
           true,
-          (o) => () => o!.defaultRouteName,
+          (o) =>
+              () => o!.defaultRouteName,
           null,
           obj,
           false,
@@ -1215,7 +1234,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tSetString,
           'allRoutesNames',
           false,
-          (o) => () => o!.allRoutesNames,
+          (o) =>
+              () => o!.allRoutesNames,
           null,
           obj,
           false,
@@ -1229,7 +1249,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           ]),
           'routes',
           false,
-          (o) => () => o!.routes,
+          (o) =>
+              () => o!.routes,
           null,
           obj,
           false,
@@ -1241,7 +1262,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tString,
           'authenticationRoute',
           false,
-          (o) => () => o!.authenticationRoute,
+          (o) =>
+              () => o!.authenticationRoute,
           null,
           obj,
           false,
@@ -1253,7 +1275,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           const __TR<APISecurity>(APISecurity),
           'security',
           true,
-          (o) => () => o!.security,
+          (o) =>
+              () => o!.security,
           null,
           obj,
           false,
@@ -1265,7 +1288,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -1278,7 +1302,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           const __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
-          (o) => () => o!.initializationStatus,
+          (o) =>
+              () => o!.initializationStatus,
           null,
           obj,
           false,
@@ -1290,7 +1315,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tBool,
           'isInitialized',
           false,
-          (o) => () => o!.isInitialized,
+          (o) =>
+              () => o!.isInitialized,
           null,
           obj,
           false,
@@ -1302,7 +1328,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tBool,
           'isInitializing',
           false,
-          (o) => () => o!.isInitializing,
+          (o) =>
+              () => o!.isInitializing,
           null,
           obj,
           false,
@@ -1314,7 +1341,8 @@ class UserModule$reflection extends ClassReflection<UserModule>
           __TR.tBool,
           'isAsyncInitialization',
           false,
-          (o) => () => o!.isAsyncInitialization,
+          (o) =>
+              () => o!.isAsyncInitialization,
           null,
           obj,
           false,
@@ -2192,10 +2220,8 @@ List<Reflection> _listSiblingsReflection() => <Reflection>[
 ];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() =>
-    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
-      _listSiblingsReflection(),
-    );
+List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
+    List<Reflection>.unmodifiable(_listSiblingsReflection());
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

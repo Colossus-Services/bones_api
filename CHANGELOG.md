@@ -1,3 +1,57 @@
+## 1.14.0
+
+- New `DBSQLiteAdapter`: an embedded SQLite DB adapter, backed by the
+  [`sqlite3`][sqlite3_pkg] package.
+
+  ```dart
+  import 'package:bones_api/bones_api_db_sqlite.dart';
+
+  var adapter = DBSQLiteAdapter('/var/lib/myapp/db.sqlite',
+      generateTables: true);
+
+  // Or an in-memory database:
+  var memoryAdapter = DBSQLiteAdapter(':memory:', generateTables: true);
+  ```
+
+  - Registered as `sqlite`, `sqlite3`, `sql.sqlite` and `sql.sqlite3`, so a
+    config block `db: { sqlite: {...} }` resolves it.
+  - `fromConfig` accepts `path`/`file`/`database`/`db` for the database file,
+    and `memory: true` (or the path `:memory:`) for an in-memory database, plus
+    the usual `generateTables`/`checkTables`/`populate`/`log.sql` keys.
+    Irrelevant keys (`host`, `port`, `username`, `password`) are accepted and
+    ignored, so a config can be pointed at SQLite without being rewritten.
+  - **No server and no native library to install**: the `sqlite3` package
+    bundles SQLite (3.53.4) through Dart's build hooks.
+  - Runs the same entity test-suite as the PostgreSQL and MySQL adapters, and
+    needs no `Docker` container to do it. New `APITestConfigSQLite`, exported by
+    `package:bones_api/bones_api_test_sqlite.dart`.
+
+  - Notes on the SQLite dialect:
+    - An auto-assigning ID is declared `INTEGER PRIMARY KEY AUTOINCREMENT`:
+      SQLite has no `SERIAL`/`AUTO_INCREMENT`, only a column declared exactly
+      `INTEGER PRIMARY KEY` aliases the `rowid`, and without `AUTOINCREMENT`
+      SQLite reuses the ID of a deleted row.
+    - `ENUM` is emulated with a `VARCHAR CHECK (col IN (...))` constraint.
+    - Since `sqlite3` is a **synchronous** driver, and SQLite allows a single
+      writer, the adapter uses one native handle shared by every pooled
+      connection: a second handle blocking on a lock would stall the isolate
+      holding it, and offers nothing to gain when there is no I/O to overlap.
+      Nested transactions use `SAVEPOINT`.
+
+- New `SQLDialect.returningAcceptsTableWildcard` (default `true`, so the
+  PostgreSQL/MySQL/memory dialects are unchanged). SQLite rejects the
+  table-qualified wildcard that `DELETE ... RETURNING` emits
+  (*"RETURNING may not use TABLE.\* wildcards"*) and needs a bare
+  `RETURNING *`.
+
+- **Breaking**: the minimum Dart SDK is now **3.10.0** (was 3.7.0), required by
+  `sqlite3` and its build hooks.
+
+- Dependencies:
+  - Added `sqlite3: ^3.5.1`
+
+[sqlite3_pkg]: https://pub.dev/packages/sqlite3
+
 ## 1.13.0
 
 - New `EntityPagination.onEvent`: an optional hook notified of what is being

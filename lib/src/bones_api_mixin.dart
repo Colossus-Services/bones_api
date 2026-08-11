@@ -94,17 +94,16 @@ mixin Pool<O extends Object> {
   FutureOr<List<O>> filterPoolElements(FutureOr<bool> Function(O o) filter) {
     var hasFuture = false;
 
-    var elements =
-        _pool.map<FutureOr<O?>>((o) {
-          var valid = filter(o);
+    var elements = _pool.map<FutureOr<O?>>((o) {
+      var valid = filter(o);
 
-          if (valid is Future<bool>) {
-            hasFuture = true;
-            return valid.then((valid) => valid ? o : null);
-          }
+      if (valid is Future<bool>) {
+        hasFuture = true;
+        return valid.then((valid) => valid ? o : null);
+      }
 
-          return valid ? o : null;
-        }).toList();
+      return valid ? o : null;
+    }).toList();
 
     if (hasFuture) {
       return elements.resolveAllNotNull();
@@ -715,22 +714,21 @@ mixin FieldsFromMap {
     Map<String, String>? mapLC,
     Map<String, String>? mapSimple,
   }) {
-    var fieldsMap =
-        fields
-            .map(
-              (f) => MapEntry(
-                f,
-                getFieldKeyInMap(
-                  f,
-                  map,
-                  fieldLC: fieldLC,
-                  fieldSimple: fieldSimple,
-                  mapLC: mapLC,
-                  mapSimple: mapSimple,
-                ),
-              ),
-            )
-            .toMapFromEntries();
+    var fieldsMap = fields
+        .map(
+          (f) => MapEntry(
+            f,
+            getFieldKeyInMap(
+              f,
+              map,
+              fieldLC: fieldLC,
+              fieldSimple: fieldSimple,
+              mapLC: mapLC,
+              mapSimple: mapSimple,
+            ),
+          ),
+        )
+        .toMapFromEntries();
 
     return fieldsMap;
   }

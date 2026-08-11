@@ -56,22 +56,21 @@ class _EventLog {
 
   void call(EntityPaginationEvent<_Item> event) => events.add(event);
 
-  List<String> get trace =>
-      events.map((e) {
-        return switch (e) {
-          EntityPaginationPageLoading(:var page) => 'loading:$page',
-          EntityPaginationPageLoaded(:var page, :var entriesLength) =>
-            'loaded:$page($entriesLength)',
-          EntityPaginationPageError(:var page) => 'error:$page',
-          EntityPaginationPageSkipped(:var page, :var reason) =>
-            'skipped:$page(${reason.name})',
-          EntityPaginationEnd(:var finalPage, :var totalLength) =>
-            'end:$finalPage($totalLength)',
-          EntityPaginationReset(:var discardedPages, :var isRefresh) =>
-            '${isRefresh ? 'refresh' : 'reset'}:'
-                '(${discardedPages.join(',')})',
-        };
-      }).toList();
+  List<String> get trace => events.map((e) {
+    return switch (e) {
+      EntityPaginationPageLoading(:var page) => 'loading:$page',
+      EntityPaginationPageLoaded(:var page, :var entriesLength) =>
+        'loaded:$page($entriesLength)',
+      EntityPaginationPageError(:var page) => 'error:$page',
+      EntityPaginationPageSkipped(:var page, :var reason) =>
+        'skipped:$page(${reason.name})',
+      EntityPaginationEnd(:var finalPage, :var totalLength) =>
+        'end:$finalPage($totalLength)',
+      EntityPaginationReset(:var discardedPages, :var isRefresh) =>
+        '${isRefresh ? 'refresh' : 'reset'}:'
+            '(${discardedPages.join(',')})',
+    };
+  }).toList();
 }
 
 void main() {
@@ -785,8 +784,9 @@ void main() {
 
       await expectLater(p.loadPage(1), throwsA(isA<StateError>()));
 
-      var error =
-          log.events.whereType<EntityPaginationPageError<_Item>>().single;
+      var error = log.events
+          .whereType<EntityPaginationPageError<_Item>>()
+          .single;
       expect(error.page, equals(1));
       expect(error.error, isA<StateError>());
       expect(error.stackTrace, isNotNull);
@@ -817,8 +817,9 @@ void main() {
 
       await p.loadPage(3);
 
-      var loaded =
-          log.events.whereType<EntityPaginationPageLoaded<_Item>>().single;
+      var loaded = log.events
+          .whereType<EntityPaginationPageLoaded<_Item>>()
+          .single;
 
       expect(_ids(loaded.entries), equals([20, 21, 22, 23, 24]));
       expect(loaded.entriesLength, equals(5));

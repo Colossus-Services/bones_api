@@ -720,10 +720,12 @@ class _TestSchemeProvider extends SchemeProvider {
     String? entityName,
     String? tableName,
   }) {
-    var tableScheme =
-        tableName != null ? getTableScheme(tableName) as TableScheme? : null;
-    tableScheme ??=
-        entityName != null ? getTableScheme(entityName) as TableScheme? : null;
+    var tableScheme = tableName != null
+        ? getTableScheme(tableName) as TableScheme?
+        : null;
+    tableScheme ??= entityName != null
+        ? getTableScheme(entityName) as TableScheme?
+        : null;
 
     var fieldsType = tableScheme?.fieldsTypes[field];
     if (fieldsType != null) return TypeInfo.from(fieldsType);

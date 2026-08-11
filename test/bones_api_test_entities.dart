@@ -564,10 +564,9 @@ class Photo extends Entity {
     if (o is Uint8List) return Photo.fromData(o, id: id);
 
     if (o is Map) {
-      var map =
-          o is Map<String, Object?>
-              ? o
-              : o.map((key, value) => MapEntry('$key', value));
+      var map = o is Map<String, Object?>
+          ? o
+          : o.map((key, value) => MapEntry('$key', value));
       return Photo.fromMap(map);
     }
 

@@ -564,19 +564,18 @@ class DBObjectMemoryAdapter
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
-    var entries =
-        ids
-            .map((id) {
-              var entry = map[id];
+    var entries = ids
+        .map((id) {
+          var entry = map[id];
 
-              if (entry == null) {
-                return null;
-              }
+          if (entry == null) {
+            return null;
+          }
 
-              return entry;
-            })
-            .nonNulls
-            .toList();
+          return entry;
+        })
+        .nonNulls
+        .toList();
 
     return _applyOrderAndPagination(
       table,
@@ -859,15 +858,13 @@ class DBObjectMemoryAdapter
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
@@ -882,15 +879,13 @@ class DBObjectMemoryAdapter
 
           var valIter = value is Iterable ? value : [value];
 
-          value =
-              valIter
-                  .map(
-                    (v) =>
-                        fieldListEntityRepository.isOfEntityType(v)
-                            ? fieldListEntityRepository.getEntityID(v)
-                            : v,
-                  )
-                  .toList();
+          value = valIter
+              .map(
+                (v) => fieldListEntityRepository.isOfEntityType(v)
+                    ? fieldListEntityRepository.getEntityID(v)
+                    : v,
+              )
+              .toList();
         } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
           var entityType = fieldType.entityType!;
           var fieldEntityRepository = getEntityRepositoryByType(entityType);
@@ -946,14 +941,13 @@ class DBObjectMemoryAdapter
     if (isTransactionWithSingleOperation(op)) {
       return executeWithPool(
         f,
-        onError:
-            (e, s) => transaction.notifyExecutionError(
-              e,
-              s,
-              errorResolver: resolveError,
-              operation: op,
-              debugInfo: () => op.toString(),
-            ),
+        onError: (e, s) => transaction.notifyExecutionError(
+          e,
+          s,
+          errorResolver: resolveError,
+          operation: op,
+          debugInfo: () => op.toString(),
+        ),
       );
     }
 
@@ -971,9 +965,9 @@ class DBObjectMemoryAdapter
         () => openTransaction(transaction),
         callCloseTransactionRequired
             ? () => closeTransaction(
-              transaction,
-              transaction.context as DBObjectMemoryAdapterContext?,
-            )
+                transaction,
+                transaction.context as DBObjectMemoryAdapterContext?,
+              )
             : null,
       );
     }

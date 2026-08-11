@@ -595,8 +595,9 @@ class APIRouteBuilder<M extends APIModule> {
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
 
     var methodRules = apiMethod.annotations.whereType<APIRouteRule>().toList();
-    var classRules =
-        classReflection.classAnnotations.whereType<APIRouteRule>().toList();
+    var classRules = classReflection.classAnnotations
+        .whereType<APIRouteRule>()
+        .toList();
 
     List<APIRouteRule> rules;
     if (methodRules.isEmpty) {
@@ -604,10 +605,9 @@ class APIRouteBuilder<M extends APIModule> {
     } else {
       var noGlobalRules = methodRules.any((r) => r.noGlobalRules);
 
-      rules =
-          noGlobalRules
-              ? methodRules
-              : [...methodRules, ...classRules.where((r) => r.globalRules)];
+      rules = noGlobalRules
+          ? methodRules
+          : [...methodRules, ...classRules.where((r) => r.globalRules)];
     }
 
     var config = apiMethod.annotations.whereType<APIRouteConfig>().firstOrNull;
@@ -630,20 +630,9 @@ class APIRouteBuilder<M extends APIModule> {
         var paramName = apiMethod.normalParametersNames.first;
         var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
-        routeHandler =
-            returnTypeInfo.hasArguments
-                ? returnTypeInfo.callCastedArgumentA(
-                  <T>() => _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>(
-                    module,
-                    requestMethod,
-                    apiMethod.name,
-                    apiMethod,
-                    parameters,
-                    rules,
-                    config,
-                  ),
-                )
-                : _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
+        routeHandler = returnTypeInfo.hasArguments
+            ? returnTypeInfo.callCastedArgumentA(
+                <T>() => _APIRouteHandlerAPIMethodAPIRequestAPIResponse<T>(
                   module,
                   requestMethod,
                   apiMethod.name,
@@ -651,7 +640,17 @@ class APIRouteBuilder<M extends APIModule> {
                   parameters,
                   rules,
                   config,
-                );
+                ),
+              )
+            : _APIRouteHandlerAPIMethodAPIRequestAPIResponse(
+                module,
+                requestMethod,
+                apiMethod.name,
+                apiMethod,
+                parameters,
+                rules,
+                config,
+              );
       } else {
         var parameters = Map<String, TypeInfo>.fromEntries(
           apiMethod.allParameters.map(
@@ -659,20 +658,9 @@ class APIRouteBuilder<M extends APIModule> {
           ),
         );
 
-        routeHandler =
-            returnTypeInfo.hasArguments
-                ? returnTypeInfo.callCastedArgumentA(
-                  <T>() => _APIRouteHandlerAPIMethodReflection<T>(
-                    module,
-                    requestMethod,
-                    apiMethod.name,
-                    apiMethod,
-                    parameters,
-                    rules,
-                    config,
-                  ),
-                )
-                : _APIRouteHandlerAPIMethodReflection(
+        routeHandler = returnTypeInfo.hasArguments
+            ? returnTypeInfo.callCastedArgumentA(
+                <T>() => _APIRouteHandlerAPIMethodReflection<T>(
                   module,
                   requestMethod,
                   apiMethod.name,
@@ -680,7 +668,17 @@ class APIRouteBuilder<M extends APIModule> {
                   parameters,
                   rules,
                   config,
-                );
+                ),
+              )
+            : _APIRouteHandlerAPIMethodReflection(
+                module,
+                requestMethod,
+                apiMethod.name,
+                apiMethod,
+                parameters,
+                rules,
+                config,
+              );
       }
 
       addRouteHandler(routeHandler);
@@ -813,8 +811,9 @@ class APIRouteBuilder<M extends APIModule> {
             return TypeParser.parseMap<K, V>(
               value,
               keyParser: argParser0 is TypeElementParser<K> ? argParser0 : null,
-              valueParser:
-                  argParser1 is TypeElementParser<V> ? argParser1 : null,
+              valueParser: argParser1 is TypeElementParser<V>
+                  ? argParser1
+                  : null,
             );
           });
 
@@ -930,29 +929,27 @@ class APIRouteBuilder<M extends APIModule> {
       var listEntityType = parameterTypeInfo.listEntityType!;
 
       if (value is Iterable) {
-        var list =
-            value
-                .map(
-                  (e) => _resolveValueAsEntity(
-                    listEntityType,
-                    e,
-                    entityCache: entityCache,
-                    resolutionRules: resolutionRules,
-                  ),
-                )
-                .toList();
-
-        return _castList(list, listEntityType);
-      } else {
-        var list = TypeParser.parseList(
-          value,
-          elementParser:
+        var list = value
+            .map(
               (e) => _resolveValueAsEntity(
                 listEntityType,
                 e,
                 entityCache: entityCache,
                 resolutionRules: resolutionRules,
               ),
+            )
+            .toList();
+
+        return _castList(list, listEntityType);
+      } else {
+        var list = TypeParser.parseList(
+          value,
+          elementParser: (e) => _resolveValueAsEntity(
+            listEntityType,
+            e,
+            entityCache: entityCache,
+            resolutionRules: resolutionRules,
+          ),
         );
 
         if (list != null) {
@@ -966,10 +963,9 @@ class APIRouteBuilder<M extends APIModule> {
         );
 
         if (classReflection != null) {
-          var map =
-              value is Map<String, Object?>
-                  ? value
-                  : value.map((k, v) => MapEntry(k.toString(), v));
+          var map = value is Map<String, Object?>
+              ? value
+              : value.map((k, v) => MapEntry(k.toString(), v));
           var o = classReflection.createFromMapSync(
             map,
             entityCache: entityCache,
@@ -1025,15 +1021,14 @@ class APIRouteBuilder<M extends APIModule> {
   }
 
   List<APIRouteInfo> apiInfo([APIRequest? apiRequest]) {
-    var routesHandlers =
-        <APIRouteHandler>[
-          ...module._routesHandlers.values,
-          ...module._routesHandlersGET.values,
-          ...module._routesHandlersPOST.values,
-          ...module._routesHandlersPATH.values,
-          ...module._routesHandlersPUT.values,
-          ...module._routesHandlersDELETE.values,
-        ].toDistinctList();
+    var routesHandlers = <APIRouteHandler>[
+      ...module._routesHandlers.values,
+      ...module._routesHandlersGET.values,
+      ...module._routesHandlersPOST.values,
+      ...module._routesHandlersPATH.values,
+      ...module._routesHandlersPUT.values,
+      ...module._routesHandlersDELETE.values,
+    ].toDistinctList();
 
     var info = routesHandlers.map((e) => e.apiInfo(apiRequest)).toList();
     return info;
@@ -1229,8 +1224,9 @@ abstract class APIModuleProxyCallerListener<T>
     }
 
     var typeInfo = returnType.typeInfo;
-    var mainType =
-        typeInfo.isFuture ? (typeInfo.arguments0 ?? typeInfo) : typeInfo;
+    var mainType = typeInfo.isFuture
+        ? (typeInfo.arguments0 ?? typeInfo)
+        : typeInfo;
 
     // var debugJsonPretty = Json.encode(json, pretty: true);
     // print(debugJsonPretty);
@@ -1344,12 +1340,11 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
           if (!accessRules.isInnocuous) {
             return Json.toJson(
               payload,
-              toEncodableProvider:
-                  (o) => accessRules.toJsonEncodable(
-                    apiRequest,
-                    Json.defaultToEncodableJsonProvider(),
-                    o,
-                  ),
+              toEncodableProvider: (o) => accessRules.toJsonEncodable(
+                apiRequest,
+                Json.defaultToEncodableJsonProvider(),
+                o,
+              ),
             );
           }
         }

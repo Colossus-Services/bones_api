@@ -1200,10 +1200,9 @@ class DBAdapterRegister<C extends Object, A extends DBAdapter<C>> {
   DBAdapterRegister({this.superRegister});
 
   /// Creates a child register.
-  DBAdapterRegister<C2, A2> createRegister<
-    C2 extends Object,
-    A2 extends DBAdapter<C2>
-  >() => DBAdapterRegister<C2, A2>(superRegister: this);
+  DBAdapterRegister<C2, A2>
+  createRegister<C2 extends Object, A2 extends DBAdapter<C2>>() =>
+      DBAdapterRegister<C2, A2>(superRegister: this);
 
   final Map<String, DBAdapterInstantiator<C, A>> _registeredAdaptersByName = {};
   final Map<Type, DBAdapterInstantiator<C, A>> _registeredAdaptersByType = {};
@@ -1786,15 +1785,14 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       var ids = matcher.idsValues.whereType<I>().toList();
       // `existIDs` has no ordering/pagination hook, so it is applied here:
       return existIDs(ids, transaction: transaction).resolveMapped(
-        (existing) =>
-            applySelectOrderAndPagination(
-              existing,
-              (id) => id,
-              limit: limit,
-              offset: offset,
-              orderByID: orderByID,
-              orderDirection: orderDirection,
-            ).toList(),
+        (existing) => applySelectOrderAndPagination(
+          existing,
+          (id) => id,
+          limit: limit,
+          offset: offset,
+          orderByID: orderByID,
+          orderDirection: orderDirection,
+        ).toList(),
       );
     }
 
@@ -2057,8 +2055,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     if (results is! Iterable<Map<String, dynamic>>) {
       entries = results.nonNulls.toList();
     } else {
-      entries =
-          results is List<Map<String, dynamic>> ? results : results.toList();
+      entries = results is List<Map<String, dynamic>>
+          ? results
+          : results.toList();
     }
 
     var fieldsListEntity = _fieldsListEntity;
@@ -2206,10 +2205,9 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
                   resolutionRules: resolutionRulesResolved,
                 )
                 .resolveMapped(
-                  (entities) =>
-                      idsUniques
-                          .mapIndexed((i, id) => MapEntry(id, entities[i]))
-                          .toList(),
+                  (entities) => idsUniques
+                      .mapIndexed((i, id) => MapEntry(id, entities[i]))
+                      .toList(),
                 );
 
             return MapEntry(tableColumn, entities);
@@ -2265,9 +2263,8 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   int? _fieldsEntityNoRefLengthCache;
 
-  int get _fieldsEntityNoRefLength =>
-      _fieldsEntityNoRefLengthCache ??=
-          _fieldsEntity.length - _fieldsEntityRef.length;
+  int get _fieldsEntityNoRefLength => _fieldsEntityNoRefLengthCache ??=
+      _fieldsEntity.length - _fieldsEntityRef.length;
 
   Map<String, TypeInfo> get _fieldsListEntity =>
       entityHandler.fieldsWithTypeListEntityOrReference();
@@ -2277,21 +2274,19 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
   int? _fieldsListEntityNoRefLengthCache;
 
-  int get _fieldsListEntityNoRefLength =>
-      _fieldsListEntityNoRefLengthCache ??=
-          _fieldsListEntity.length - _fieldsListEntityRef.length;
+  int get _fieldsListEntityNoRefLength => _fieldsListEntityNoRefLengthCache ??=
+      _fieldsListEntity.length - _fieldsListEntityRef.length;
 
   Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
 
   Map<String, EntityRepository<Object>> _fieldsEntityRepositoriesAll() =>
-      _fieldsEntityRepositories ??=
-          _fieldsEntity.entries
-              .map((e) {
-                var repo = _resolveEntityRepository(e.value);
-                return repo != null ? MapEntry(e.key, repo) : null;
-              })
-              .nonNulls
-              .toMapFromEntries();
+      _fieldsEntityRepositories ??= _fieldsEntity.entries
+          .map((e) {
+            var repo = _resolveEntityRepository(e.value);
+            return repo != null ? MapEntry(e.key, repo) : null;
+          })
+          .nonNulls
+          .toMapFromEntries();
 
   Map<String, EntityRepository<Object>> _resolveFieldsEntityRepositories(
     EntityResolutionRulesResolved resolutionRulesResolved,
@@ -2397,8 +2392,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           return resolveRelationshipEntities(relationshipsEntities);
         }
 
-        var allTargetIds =
-            relationships.values.expand((e) => e).toSet().toList();
+        var allTargetIds = relationships.values
+            .expand((e) => e)
+            .toSet()
+            .toList();
 
         // ignore: discarded_futures
         var targetsAsync = targetEntityRepository.selectByIDs(
@@ -2416,11 +2413,15 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
           );
 
           var relationshipsEntities = relationships.map((id, targetIds) {
-            var targetEntities =
-                targetIds.map((id) => allTargetsById[id]).nonNulls.toList();
+            var targetEntities = targetIds
+                .map((id) => allTargetsById[id])
+                .nonNulls
+                .toList();
 
-            var targetEntitiesCast =
-                targetEntityHandler.castList(targetEntities, targetType)!;
+            var targetEntitiesCast = targetEntityHandler.castList(
+              targetEntities,
+              targetType,
+            )!;
 
             return MapEntry(id, targetEntitiesCast);
           });
@@ -2498,24 +2499,24 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   ) {
     var databaseAdapter = repositoryAdapter.databaseAdapter;
 
-    var entries =
-        fieldsListEntity.entries.map((e) {
-          var fieldName = e.key;
-          var targetType = e.value.arguments0!.type;
+    var entries = fieldsListEntity.entries.map((e) {
+      var fieldName = e.key;
+      var targetType = e.value.arguments0!.type;
 
-          var targetRepositoryAdapter = databaseAdapter
-              .getRepositoryAdapterByType(targetType);
-          if (targetRepositoryAdapter == null) return null;
+      var targetRepositoryAdapter = databaseAdapter.getRepositoryAdapterByType(
+        targetType,
+      );
+      if (targetRepositoryAdapter == null) return null;
 
-          var relationship = tableScheme.getTableRelationshipReference(
-            sourceTable: tableName,
-            sourceField: fieldName,
-            targetTable: targetRepositoryAdapter.name,
-          );
-          if (relationship == null) return null;
+      var relationship = tableScheme.getTableRelationshipReference(
+        sourceTable: tableName,
+        sourceField: fieldName,
+        targetTable: targetRepositoryAdapter.name,
+      );
+      if (relationship == null) return null;
 
-          return MapEntry(e.key, relationship);
-        }).nonNulls;
+      return MapEntry(e.key, relationship);
+    }).nonNulls;
 
     var relationshipFields =
         Map<String, TableRelationshipReference>.fromEntries(entries);
@@ -2704,11 +2705,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     checkNotClosed();
 
     return Transaction.executeBlock((transaction) {
-      var result =
-          os
-              .map((o) => store(o, transaction: transaction))
-              .toList(growable: false)
-              .resolveAll();
+      var result = os
+          .map((o) => store(o, transaction: transaction))
+          .toList(growable: false)
+          .resolveAll();
 
       return result;
     }, transaction: transaction);
@@ -2844,8 +2844,9 @@ abstract class DBEntityRepositoryProvider<A extends DBAdapter>
   ) {
     var repositoriesByType = repositories.groupBy((r) => (r.type, r.name));
 
-    var duplicatedRepositoriesGroups =
-        repositoriesByType.entries.where((e) => e.value.length > 1).toList();
+    var duplicatedRepositoriesGroups = repositoriesByType.entries
+        .where((e) => e.value.length > 1)
+        .toList();
 
     if (duplicatedRepositoriesGroups.isEmpty) return null;
 

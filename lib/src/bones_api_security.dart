@@ -33,8 +33,9 @@ abstract class APISecurity {
     String? sharedStoreID,
     SharedStoreProviderSync? storeProvider,
   }) : tokenDuration = tokenDuration ?? Duration(hours: 3),
-       tokenLength =
-           tokenLength != null && tokenLength > 32 ? tokenLength : 512,
+       tokenLength = tokenLength != null && tokenLength > 32
+           ? tokenLength
+           : 512,
        _sharedStoreField =
            SharedStoreField.tryFrom(
              sharedStoreField: sharedStoreField,
@@ -765,10 +766,9 @@ abstract class APISecurity {
               var credentialUsername = request.credential!.username;
               if (!usernames.contains(credentialUsername)) return null;
 
-              var tokensWithUsername =
-                  sessionTokens
-                      .where((t) => t.username == credentialUsername)
-                      .toSet();
+              var tokensWithUsername = sessionTokens
+                  .where((t) => t.username == credentialUsername)
+                  .toSet();
               return tokensWithUsername;
             } else {
               return sessionTokens;
@@ -872,8 +872,9 @@ abstract class APISecurity {
   ) {
     var username = getRequestParameterUsername(request).trim();
     var token = getRequestParameterToken(request).trim();
-    var refreshToken =
-        token.isEmpty ? getRequestParameterRefreshToken(request).trim() : '';
+    var refreshToken = token.isEmpty
+        ? getRequestParameterRefreshToken(request).trim()
+        : '';
 
     if (username.isNotEmpty) {
       if (token.isNotEmpty) {
@@ -972,8 +973,11 @@ abstract class APISecurity {
   }
 }
 
-typedef APITokenInfo =
-    ({APIToken apiToken, Object? data, List<APIPermission>? permissions});
+typedef APITokenInfo = ({
+  APIToken apiToken,
+  Object? data,
+  List<APIPermission>? permissions,
+});
 
 /// The tokens store for the [APISecurity].
 class APITokenStore {
@@ -1401,11 +1405,10 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
     var normalizedType = _expandoNormalizedTypes[this];
     if (normalizedType != null) return normalizedType;
 
-    normalizedType =
-        _requiredPermissionTypes
-            .map(APIPermission.normalizeType)
-            .where(APIPermission.validateType)
-            .toSet();
+    normalizedType = _requiredPermissionTypes
+        .map(APIPermission.normalizeType)
+        .where(APIPermission.validateType)
+        .toSet();
 
     _expandoNormalizedTypes[this] = normalizedType;
     return normalizedType;
@@ -1419,11 +1422,10 @@ class APIRoutePermissionTypeRule extends APIRouteAuthenticatedRule {
 
     var requiredPermissionTypes = this.requiredPermissionTypes;
 
-    var authPermissions =
-        authentication
-            .enabledPermissionsOfTypes(requiredPermissionTypes)
-            .map((e) => e.type)
-            .toSet();
+    var authPermissions = authentication
+        .enabledPermissionsOfTypes(requiredPermissionTypes)
+        .map((e) => e.type)
+        .toSet();
 
     return authPermissions.length == requiredPermissionTypes.length;
   }
@@ -1515,8 +1517,8 @@ class APIEntityRules extends APIRouteRule {
 }
 
 class SecureRandom implements Random {
-  static final Random _globalRandom1 =
-      Random()..advance(maxSteps: 211, random: Random());
+  static final Random _globalRandom1 = Random()
+    ..advance(maxSteps: 211, random: Random());
 
   static int _seedCounter = 0;
 

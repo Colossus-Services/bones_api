@@ -84,10 +84,9 @@ class APIDBModule extends APIModule {
 
       var table = pathParams.removeAt(0);
 
-      var eager =
-          pathParams.any((p) => equalsIgnoreAsciiCase(p, 'eager'))
-              ? true
-              : null;
+      var eager = pathParams.any((p) => equalsIgnoreAsciiCase(p, 'eager'))
+          ? true
+          : null;
 
       var json = _containsKey(pathParams, 'json');
       return select(table, request, eager: eager, json: json);
@@ -195,8 +194,8 @@ class APIDBModule extends APIModule {
   List<EntityRepositoryProvider>? _entityRepositoryProviders;
 
   Future<List<EntityRepositoryProvider>> get entityRepositoryProviders async =>
-      _entityRepositoryProviders ??=
-          await apiRoot.loadEntityRepositoryProviders();
+      _entityRepositoryProviders ??= await apiRoot
+          .loadEntityRepositoryProviders();
 
   Future<APIResponse<dynamic>> tables({bool json = false}) async {
     if (onlyOnDevelopment && !development) {
@@ -207,21 +206,19 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var allRepositoriesEntries =
-        allRepositories.entries
-            .sorted((a, b) => a.value.name.compareTo(b.value.name))
-            .toList();
+    var allRepositoriesEntries = allRepositories.entries
+        .sorted((a, b) => a.value.name.compareTo(b.value.name))
+        .toList();
 
     if (json) {
-      var map =
-          allRepositoriesEntries
-              .map((e) {
-                var type = e.key;
-                var repo = e.value;
-                return MapEntry('$type', repo.name);
-              })
-              .sorted((a, b) => a.key.compareTo(b.key))
-              .toMapFromEntries();
+      var map = allRepositoriesEntries
+          .map((e) {
+            var type = e.key;
+            var repo = e.value;
+            return MapEntry('$type', repo.name);
+          })
+          .sorted((a, b) => a.key.compareTo(b.key))
+          .toMapFromEntries();
 
       return APIResponse.ok(map, mimeType: 'json');
     }
@@ -482,12 +479,9 @@ class APIDBModule extends APIModule {
         var v2 = _resolveValue(v, fieldType);
 
         var entityType = fieldType.entityType ?? fieldType.listEntityType?.type;
-        var fieldEntityRepository =
-            entityType != null
-                ? entityRepositoryProviders.getEntityRepositoryByType(
-                  entityType,
-                )
-                : null;
+        var fieldEntityRepository = entityType != null
+            ? entityRepositoryProviders.getEntityRepositoryByType(entityType)
+            : null;
 
         if (fieldEntityRepository != null) {
           var repoName = fieldEntityRepository.name;
@@ -838,15 +832,13 @@ class APIDBModule extends APIModule {
 
       String typeStr;
       if (type.isEntityReferenceType) {
-        typeStr =
-            type.isValidGenericType
-                ? type.genericType.toString()
-                : type.toString(withT: false);
+        typeStr = type.isValidGenericType
+            ? type.genericType.toString()
+            : type.toString(withT: false);
       } else if (type.isEntityReferenceListType) {
-        typeStr =
-            type.isValidGenericType
-                ? type.genericType.toString()
-                : type.toString(withT: false);
+        typeStr = type.isValidGenericType
+            ? type.genericType.toString()
+            : type.toString(withT: false);
       } else if (type.isListEntity) {
         typeStr = type.genericType.toString();
       } else {
@@ -969,17 +961,15 @@ class APIDBModule extends APIModule {
 
     var allRepositories = (await entityRepositoryProviders).allRepositories();
 
-    var dump =
-        await allRepositories.values
-            .map((repo) => MapEntry(repo.name, repo.selectAll()))
-            .toMapFromEntries()
-            .resolveAllValues();
+    var dump = await allRepositories.values
+        .map((repo) => MapEntry(repo.name, repo.selectAll()))
+        .toMapFromEntries()
+        .resolveAllValues();
 
-    var dumpJson =
-        dump.entries
-            .map((e) => MapEntry(e.key, _entitiesToJsonMap(e.value)))
-            .where((e) => e.value.isNotEmpty)
-            .toMapFromEntries();
+    var dumpJson = dump.entries
+        .map((e) => MapEntry(e.key, _entitiesToJsonMap(e.value)))
+        .where((e) => e.value.isNotEmpty)
+        .toMapFromEntries();
 
     if (zip) {
       var apiName = apiRoot.name.toLowerCase().trim().replaceAll(
@@ -1049,8 +1039,9 @@ class APIDBModule extends APIModule {
     if (classReflection != null) {
       var entityHandler = classReflection.entityHandler;
 
-      var id =
-          o is List ? entityHandler.resolveIDs(o) : entityHandler.resolveID(o);
+      var id = o is List
+          ? entityHandler.resolveIDs(o)
+          : entityHandler.resolveID(o);
 
       return id;
     }

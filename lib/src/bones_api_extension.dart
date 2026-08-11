@@ -578,10 +578,9 @@ extension TypeReflectionEntityExtension<T> on TypeReflection<T> {
       isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
 
   /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
-  bool get isValidListEntityOrReferenceType =>
-      isListEntityOrReference
-          ? EntityHandler.isValidEntityType(arguments0!.type)
-          : false;
+  bool get isValidListEntityOrReferenceType => isListEntityOrReference
+      ? EntityHandler.isValidEntityType(arguments0!.type)
+      : false;
 
   /// Returns `true` if [type] is equals to [EntityReference].
   bool get isEntityReferenceType => type == EntityReference;
@@ -630,10 +629,9 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
       isListEntity ? EntityHandler.isValidEntityType(arguments0!.type) : false;
 
   /// Returns `true` if [isListEntityOrReference] AND [EntityHandler.isValidEntityType] for the entity type ([argumentType] `0`).
-  bool get isValidListEntityOrReferenceType =>
-      isListEntityOrReference
-          ? EntityHandler.isValidEntityType(arguments0!.type)
-          : false;
+  bool get isValidListEntityOrReferenceType => isListEntityOrReference
+      ? EntityHandler.isValidEntityType(arguments0!.type)
+      : false;
 
   /// Returns `true` if [type] is equals to [EntityReference].
   bool get isEntityReferenceType => type == EntityReference;
@@ -822,10 +820,9 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     EntityReference<E> castCall<E>() {
       EntityHandler<E>? oEntityHandler;
       if (entityHandler != null) {
-        oEntityHandler =
-            entityHandler is EntityHandler<E>
-                ? (entityHandler as EntityHandler<E>)
-                : entityHandler.getEntityHandler<E>(type: type);
+        oEntityHandler = entityHandler is EntityHandler<E>
+            ? (entityHandler as EntityHandler<E>)
+            : entityHandler.getEntityHandler<E>(type: type);
       }
 
       return _toEntityReferenceImpl<E>(
@@ -954,23 +951,20 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     }
 
     if (entityFetcher != null && entitiesFetcher == null) {
-      entitiesFetcher =
-          (ids, type) =>
-              ids
-                  // ignore: discarded_futures
-                  .map((id) => id == null ? null : entityFetcher(id, type))
-                  .toList()
-                  // ignore: discarded_futures
-                  .resolveAll();
+      entitiesFetcher = (ids, type) => ids
+          // ignore: discarded_futures
+          .map((id) => id == null ? null : entityFetcher(id, type))
+          .toList()
+          // ignore: discarded_futures
+          .resolveAll();
     }
 
     EntityReferenceList<E> castCall<E>() {
       EntityHandler<E>? oEntityHandler;
       if (entityHandler != null) {
-        oEntityHandler =
-            entityHandler is EntityHandler<E>
-                ? (entityHandler as EntityHandler<E>)
-                : entityHandler.getEntityHandler<E>(type: type);
+        oEntityHandler = entityHandler is EntityHandler<E>
+            ? (entityHandler as EntityHandler<E>)
+            : entityHandler.getEntityHandler<E>(type: type);
       }
 
       return _toEntityReferenceListImpl<E>(
@@ -1038,10 +1032,9 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
         );
       } else if (o is List<Map<String, dynamic>?> ||
           o.every((Object? e) => e == null || e is Map<String, Object?>)) {
-        var entitiesMaps =
-            o is List<Map<String, dynamic>?>
-                ? o
-                : o.cast<Map<String, dynamic>?>();
+        var entitiesMaps = o is List<Map<String, dynamic>?>
+            ? o
+            : o.cast<Map<String, dynamic>?>();
         return EntityReferenceList<E>.fromEntitiesMaps(
           entitiesMaps,
           type: type,

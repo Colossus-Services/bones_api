@@ -78,36 +78,31 @@ class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   List<DBSQLEntityRepository<Object>> buildRepositories(
     DBSQLAdapter<Object> adapter,
   ) {
-    return _repositories ??=
-        [
-          DBSQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
-          DBSQLEntityRepository<Address>(
-            adapter,
-            'address',
-            addressEntityHandler,
-          ),
-          DBSQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
-          DBSQLEntityRepository<UserInfo>(
-            adapter,
-            'user_info',
-            userInfoEntityHandler,
-          ),
-          DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler),
-          // Order-related tables
-          DBSQLEntityRepository<CampaignConfig>(
-            adapter,
-            'campaign_config',
-            campaignConfigEntityHandler,
-          ),
-          DBSQLEntityRepository<Campaign>(
-            adapter,
-            'campaign',
-            campaignEntityHandler,
-          ),
-          DBSQLEntityRepository<Bonus>(adapter, 'bonus', bonusEntityHandler),
-          DBSQLEntityRepository<Item>(adapter, 'item', itemEntityHandler),
-          DBSQLEntityRepository<Order>(adapter, 'order', orderEntityHandler),
-        ].asUnmodifiableListView();
+    return _repositories ??= [
+      DBSQLEntityRepository<Store>(adapter, 'store', storeEntityHandler),
+      DBSQLEntityRepository<Address>(adapter, 'address', addressEntityHandler),
+      DBSQLEntityRepository<Role>(adapter, 'role', roleEntityHandler),
+      DBSQLEntityRepository<UserInfo>(
+        adapter,
+        'user_info',
+        userInfoEntityHandler,
+      ),
+      DBSQLEntityRepository<User>(adapter, 'user', userEntityHandler),
+      // Order-related tables
+      DBSQLEntityRepository<CampaignConfig>(
+        adapter,
+        'campaign_config',
+        campaignConfigEntityHandler,
+      ),
+      DBSQLEntityRepository<Campaign>(
+        adapter,
+        'campaign',
+        campaignEntityHandler,
+      ),
+      DBSQLEntityRepository<Bonus>(adapter, 'bonus', bonusEntityHandler),
+      DBSQLEntityRepository<Item>(adapter, 'item', itemEntityHandler),
+      DBSQLEntityRepository<Order>(adapter, 'order', orderEntityHandler),
+    ].asUnmodifiableListView();
   }
 
   @override
@@ -155,10 +150,9 @@ class TestEntityRepositoryProvider2 extends DBEntityRepositoryProvider {
   List<DBEntityRepository<Object>> buildRepositories(
     DBAdapter<Object> adapter,
   ) {
-    return _repositories ??=
-        [
-          DBEntityRepository<Photo>(adapter, 'photo', photoEntityHandler),
-        ].asUnmodifiableListView();
+    return _repositories ??= [
+      DBEntityRepository<Photo>(adapter, 'photo', photoEntityHandler),
+    ].asUnmodifiableListView();
   }
 
   @override
@@ -172,58 +166,56 @@ TestEntityRepositoryProvider createEntityRepositoryProvider(
   DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator,
   int dbPort,
   Map<String, dynamic>? dbConfig,
-) =>
-    entityByReflection
-        ? TestEntityRepositoryProvider(
-          Store$reflection().entityHandler,
-          Address$reflection().entityHandler,
-          Role$reflection().entityHandler,
-          UserInfo$reflection().entityHandler,
-          User$reflection().entityHandler,
-          CampaignConfig$reflection().entityHandler,
-          Campaign$reflection().entityHandler,
-          Bonus$reflection().entityHandler,
-          Item$reflection().entityHandler,
-          Order$reflection().entityHandler,
-          sqlAdapterCreator,
-          dbPort,
-          dbConfig,
-        )
-        : TestEntityRepositoryProvider(
-          storeEntityHandler..inspectObject(Store.empty()),
-          addressEntityHandler..inspectObject(Address.empty()),
-          roleEntityHandler..inspectObject(Role.empty()),
-          userInfoEntityHandler..inspectObject(UserInfo.empty()),
-          userEntityHandler..inspectObject(User.empty()),
-          campaignConfigEntityHandler..inspectObject(CampaignConfig.empty()),
-          campaignEntityHandler..inspectObject(Campaign.empty()),
-          bonusEntityHandler..inspectObject(Bonus.empty()),
-          itemEntityHandler..inspectObject(Item.empty()),
-          orderEntityHandler..inspectObject(Order.empty()),
-          sqlAdapterCreator,
-          dbPort,
-          dbConfig,
-        );
+) => entityByReflection
+    ? TestEntityRepositoryProvider(
+        Store$reflection().entityHandler,
+        Address$reflection().entityHandler,
+        Role$reflection().entityHandler,
+        UserInfo$reflection().entityHandler,
+        User$reflection().entityHandler,
+        CampaignConfig$reflection().entityHandler,
+        Campaign$reflection().entityHandler,
+        Bonus$reflection().entityHandler,
+        Item$reflection().entityHandler,
+        Order$reflection().entityHandler,
+        sqlAdapterCreator,
+        dbPort,
+        dbConfig,
+      )
+    : TestEntityRepositoryProvider(
+        storeEntityHandler..inspectObject(Store.empty()),
+        addressEntityHandler..inspectObject(Address.empty()),
+        roleEntityHandler..inspectObject(Role.empty()),
+        userInfoEntityHandler..inspectObject(UserInfo.empty()),
+        userEntityHandler..inspectObject(User.empty()),
+        campaignConfigEntityHandler..inspectObject(CampaignConfig.empty()),
+        campaignEntityHandler..inspectObject(Campaign.empty()),
+        bonusEntityHandler..inspectObject(Bonus.empty()),
+        itemEntityHandler..inspectObject(Item.empty()),
+        orderEntityHandler..inspectObject(Order.empty()),
+        sqlAdapterCreator,
+        dbPort,
+        dbConfig,
+      );
 
 TestEntityRepositoryProvider2 createEntityRepositoryProvider2(
   bool entityByReflection,
   DBAdapterCreator<DBAdapter> objectAdapterCreator,
   int dbPort,
   Map<String, dynamic>? dbConfig,
-) =>
-    entityByReflection
-        ? TestEntityRepositoryProvider2(
-          Photo$reflection().entityHandler,
-          objectAdapterCreator,
-          dbPort,
-          dbConfig,
-        )
-        : TestEntityRepositoryProvider2(
-          photoEntityHandler..inspectObject(Photo.empty()),
-          objectAdapterCreator,
-          dbPort,
-          dbConfig,
-        );
+) => entityByReflection
+    ? TestEntityRepositoryProvider2(
+        Photo$reflection().entityHandler,
+        objectAdapterCreator,
+        dbPort,
+        dbConfig,
+      )
+    : TestEntityRepositoryProvider2(
+        photoEntityHandler..inspectObject(Photo.empty()),
+        objectAdapterCreator,
+        dbPort,
+        dbConfig,
+      );
 
 const String png1PixelBase64 =
     'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
@@ -376,10 +368,13 @@ Future<bool> runAdapterTests(
         var reS = r'(?:\s+|--[^\n]+\n?)+';
         var reAnyType = r'\w+[^\n]*?';
         var reArg = r'(?:\([^ \t\(\)]+\))';
+        // SQLite declares an auto-assigning ID as `INTEGER PRIMARY KEY
+        // AUTOINCREMENT` (it has no `SERIAL`/`AUTO_INCREMENT`).
+        var rePK = r'PRIMARY KEY(?:\s+AUTOINCREMENT)?';
 
         var tableAddressRegexp = RegExp(
           'CREATE TABLE IF NOT EXISTS ${q}address$q \\($reS'
-          '${q}id$q $reAnyType PRIMARY KEY,$reS'
+          '${q}id$q $reAnyType $rePK,$reS'
           '${q}city$q VARCHAR$reArg?,$reS'
           '${q}latitude$q DECIMAL$reArg?,$reS'
           '${q}longitude$q DECIMAL$reArg?,$reS'
@@ -412,7 +407,7 @@ Future<bool> runAdapterTests(
 
         var tableRoleRegexp = RegExp(
           'CREATE TABLE IF NOT EXISTS ${q}role$q \\($reS'
-          '${q}id$q $reAnyType PRIMARY KEY,$reS'
+          '${q}id$q $reAnyType $rePK,$reS'
           '${q}enabled$q BOOLEAN,$reS'
           '${q}type$q $reAnyType,$reS'
           '${q}value$q DECIMAL$reArg?$reS'
@@ -427,7 +422,7 @@ Future<bool> runAdapterTests(
 
         var tableUserRegexp = RegExp(
           'CREATE TABLE IF NOT EXISTS ${q}user$q \\(\\s*'
-          '${q}id$q $reAnyType PRIMARY KEY,\\s*'
+          '${q}id$q $reAnyType $rePK,\\s*'
           '${q}address$q BIGINT[^,\\n]*?,\\s*'
           '${q}creation_time$q TIMESTAMP,\\s*'
           '${q}email$q VARCHAR$reArg?,\\s*'
@@ -1220,18 +1215,16 @@ Future<bool> runAdapterTests(
           var user2 = await userAPIRepository.selectByEmail('joe@$testDomain');
           expect(user2!.toJsonEncoded(), equals(user.toJsonEncoded()));
 
-          var user3 =
-              (await userAPIRepository.select(
-                Condition.parse('email == ?'),
-                parameters: ['joe@$testDomain'],
-              )).first;
+          var user3 = (await userAPIRepository.select(
+            Condition.parse('email == ?'),
+            parameters: ['joe@$testDomain'],
+          )).first;
           expect(user3.toJsonEncoded(), equals(user.toJsonEncoded()));
 
-          var user4 =
-              (await userAPIRepository.select(
-                Condition.parse('email == ?'),
-                parameters: ['joex@$testDomain'],
-              )).firstOrNull;
+          var user4 = (await userAPIRepository.select(
+            Condition.parse('email == ?'),
+            parameters: ['joex@$testDomain'],
+          )).firstOrNull;
           expect(user4, isNull);
         }
 
@@ -2269,8 +2262,9 @@ Future<bool> runAdapterTests(
           await orderRepo.store(otherOrder);
 
           // Query orders by campaign id using multi-level chain
-          var results =
-              (await orderRepo.selectByCampaignId(campaignId)).toList();
+          var results = (await orderRepo.selectByCampaignId(
+            campaignId,
+          )).toList();
           var numbers = results.map((o) => o.orderNumber).toList();
 
           expect(numbers, contains('ORD-CHAIN-001'));
@@ -2330,11 +2324,10 @@ Future<bool> runAdapterTests(
             expect(orderClosedId, isNotNull);
 
             // Query orders where items.bonus.campaign.config.open == true
-            var results =
-                (await orderRepo.selectByQuery(
-                  ' items.bonus.campaign.config.open == ? ',
-                  parameters: [true],
-                )).toList();
+            var results = (await orderRepo.selectByQuery(
+              ' items.bonus.campaign.config.open == ? ',
+              parameters: [true],
+            )).toList();
 
             var numbers = results.map((o) => o.orderNumber).toList();
             expect(numbers, contains('ORD-CONFIG-001'));
@@ -2754,11 +2747,10 @@ Future<bool> runAdapterTests(
         );
 
         // Streaming walks every entry, in order:
-        var streamed =
-            await campaignRepo
-                .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
-                .stream()
-                .toList();
+        var streamed = await campaignRepo
+            .paginateByQuery(' id >= ? ', parameters: [ids.first], limit: 2)
+            .stream()
+            .toList();
         expect(streamed.map((e) => e.id).toList(), equals(ids));
 
         // A query matching nothing resolves as empty:

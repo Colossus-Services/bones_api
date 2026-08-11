@@ -234,10 +234,9 @@ class APIServerConfig {
     Object? args,
   }) : development = development ?? false,
        name = name != null && name.trim().isNotEmpty ? name : 'Bones_API',
-       version =
-           version != null && version.trim().isNotEmpty
-               ? version
-               : BonesAPI.VERSION,
+       version = version != null && version.trim().isNotEmpty
+           ? version
+           : BonesAPI.VERSION,
        address = normalizeAddress(address, apiConfig: apiConfig),
        port = resolvePort(port, apiConfig: apiConfig),
        securePort = resolveSecurePort(
@@ -352,14 +351,15 @@ class APIServerConfig {
     var address = a.optionAsString('address');
 
     var letsEncrypt = a.flag('letsencrypt');
-    var letsEncryptProduction =
-        letsEncrypt ? a.flagOr('letsencrypt-production', null) : false;
-    var allowRequestLetsEncryptCertificate =
-        letsEncrypt
-            ? a.flagOr('allow-request-letsencrypt-certificate', null)
-            : false;
-    var letsEncryptDirectory =
-        letsEncrypt ? a.optionAsDirectory('letsencrypt-directory') : null;
+    var letsEncryptProduction = letsEncrypt
+        ? a.flagOr('letsencrypt-production', null)
+        : false;
+    var allowRequestLetsEncryptCertificate = letsEncrypt
+        ? a.flagOr('allow-request-letsencrypt-certificate', null)
+        : false;
+    var letsEncryptDirectory = letsEncrypt
+        ? a.optionAsDirectory('letsencrypt-directory')
+        : null;
 
     var hotReload = a.flag('hot-reload');
     var totalWorkers = a.optionAsInt('total-workers');
@@ -522,24 +522,23 @@ class APIServerConfig {
     List domains, [
     Directory? rootDir,
   ]) {
-    var domainsRoots =
-        domains
-            .map((e) {
-              var s = e.toString();
-              var parts = s.split('=');
+    var domainsRoots = domains
+        .map((e) {
+          var s = e.toString();
+          var parts = s.split('=');
 
-              var domain = parts[0];
+          var domain = parts[0];
 
-              if (parts.length == 1) {
-                return rootDir != null ? MapEntry(domain, rootDir) : null;
-              } else {
-                var path = parts[1].trim();
-                var dir = path.isNotEmpty ? Directory(path) : rootDir;
-                return dir != null ? MapEntry(domain, dir) : null;
-              }
-            })
-            .nonNulls
-            .toMapFromEntries();
+          if (parts.length == 1) {
+            return rootDir != null ? MapEntry(domain, rootDir) : null;
+          } else {
+            var path = parts[1].trim();
+            var dir = path.isNotEmpty ? Directory(path) : rootDir;
+            return dir != null ? MapEntry(domain, dir) : null;
+          }
+        })
+        .nonNulls
+        .toMapFromEntries();
     return domainsRoots;
   }
 
@@ -706,24 +705,23 @@ class APIServerConfig {
       }
     }
 
-    List<Pattern> files =
-        list
-            .map((e) {
-              if (e is RegExp) return e;
+    List<Pattern> files = list
+        .map((e) {
+          if (e is RegExp) return e;
 
-              var s = e.toString().trim();
-              if (s.isEmpty) return null;
+          var s = e.toString().trim();
+          if (s.isEmpty) return null;
 
-              if (s.startsWith('re:')) {
-                return RegExp(s.substring(3));
-              } else if (s.startsWith('regexp:')) {
-                return RegExp(s.substring(7));
-              } else {
-                return s;
-              }
-            })
-            .nonNulls
-            .toList();
+          if (s.startsWith('re:')) {
+            return RegExp(s.substring(3));
+          } else if (s.startsWith('regexp:')) {
+            return RegExp(s.substring(7));
+          } else {
+            return s;
+          }
+        })
+        .nonNulls
+        .toList();
 
     if (list.isEmpty) {
       return def ?? [];
@@ -857,16 +855,15 @@ class APIServerConfig {
       values = [o];
     }
 
-    var entries =
-        values
-            .map(
-              (e) => parseDomainEntry(
-                e,
-                checkDirectoryExistence: checkDirectoryExistence,
-              ),
-            )
-            .nonNulls
-            .toList();
+    var entries = values
+        .map(
+          (e) => parseDomainEntry(
+            e,
+            checkDirectoryExistence: checkDirectoryExistence,
+          ),
+        )
+        .nonNulls
+        .toList();
     if (entries.isEmpty) return {};
 
     var map = _removeInvalidDomains(
@@ -978,14 +975,13 @@ class APIServerConfig {
     'apiCacheControl': apiCacheControl,
     'staticFilesCacheControl': staticFilesCacheControl,
     'longLivedStaticFilesCacheControl': longLivedStaticFilesCacheControl,
-    'longLivedStaticFilesCached':
-        longLivedStaticFilesCached.map((e) {
-          if (e is RegExp) {
-            return 'regexp:${e.pattern}';
-          } else {
-            return e.toString();
-          }
-        }).toList(),
+    'longLivedStaticFilesCached': longLivedStaticFilesCached.map((e) {
+      if (e is RegExp) {
+        return 'regexp:${e.pattern}';
+      } else {
+        return e.toString();
+      }
+    }).toList(),
     'cacheStaticFilesResponses': cacheStaticFilesResponses,
     'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
     'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
@@ -1265,11 +1261,10 @@ class APIServer extends _APIServerBase {
     if (totalAuxiliaryWorkers >= 1) {
       _log.info("Spawning $totalAuxiliaryWorkers parallel workers...");
 
-      workersSpawns =
-          await _auxiliaryWorkers
-              .map((e) => MapEntry(e, e.spawnIsolate()))
-              .toMapFromEntries()
-              .resolveAllValues();
+      workersSpawns = await _auxiliaryWorkers
+          .map((e) => MapEntry(e, e.spawnIsolate()))
+          .toMapFromEntries()
+          .resolveAllValues();
 
       _log.info("Spawned $totalAuxiliaryWorkers parallel workers.");
     }
@@ -1391,12 +1386,11 @@ class APIServer extends _APIServerBase {
     var connectionInfo = _getConnectionInfo(request);
     var requesterAddress = connectionInfo?.remoteAddress.address;
 
-    var requesterSource =
-        requesterAddress == null
-            ? APIRequesterSource.unknown
-            : (_isLocalAddress(requesterAddress)
-                ? APIRequesterSource.local
-                : APIRequesterSource.remote);
+    var requesterSource = requesterAddress == null
+        ? APIRequesterSource.unknown
+        : (_isLocalAddress(requesterAddress)
+              ? APIRequesterSource.local
+              : APIRequesterSource.remote);
 
     String? sessionID;
     bool newSession = false;
@@ -1439,10 +1433,9 @@ class APIServer extends _APIServerBase {
       if (mimeType != null && payload != null && mimeType.isFormURLEncoded) {
         var payloadMap = payload as Map<String, dynamic>;
 
-        parametersResolved =
-            parameters.isEmpty
-                ? payloadMap
-                : <String, dynamic>{...parameters, ...payloadMap};
+        parametersResolved = parameters.isEmpty
+            ? payloadMap
+            : <String, dynamic>{...parameters, ...payloadMap};
 
         payload = null;
         mimeType = null;
@@ -1495,8 +1488,9 @@ class APIServer extends _APIServerBase {
     return cookies;
   }
 
-  static final MimeType _mimeTypeTextPlain =
-      MimeType.parse(MimeType.textPlain)!;
+  static final MimeType _mimeTypeTextPlain = MimeType.parse(
+    MimeType.textPlain,
+  )!;
 
   static FutureOr<(MimeType, Object)?> _resolvePayload(
     Request request, {
@@ -1555,11 +1549,10 @@ class APIServer extends _APIServerBase {
       var requestedUri = request.requestedUri;
       mimeType = _resolveMimeTypeByExtension(requestedUri.path);
 
-      mimeType ??=
-          requestedUri.queryParameters.entries
-              .map((e) => _resolveMimeTypeByExtension(e.value))
-              .nonNulls
-              .firstOrNull;
+      mimeType ??= requestedUri.queryParameters.entries
+          .map((e) => _resolveMimeTypeByExtension(e.value))
+          .nonNulls
+          .firstOrNull;
     }
 
     return mimeType;
@@ -1580,34 +1573,35 @@ class APIServer extends _APIServerBase {
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => _loadPayloadString(
-    mimeType,
-    request,
-    maxPayloadLength: maxPayloadLength,
-    decompressPayload: decompressPayload,
-  ).then((s) {
-    if (s == null) return null;
+  }) =>
+      _loadPayloadString(
+        mimeType,
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      ).then((s) {
+        if (s == null) return null;
 
-    Object payload = s;
-    if (mimeType.isJSON) {
-      s = s.trim();
-      if (s.isEmpty) return null;
-      try {
-        payload = json.decode(s);
-      } catch (e, s) {
-        _log.severe(
-          "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
-          e,
-          s,
-        );
-        return null;
-      }
-    } else if (mimeType.isFormURLEncoded) {
-      payload = decodeQueryStringParameters(s, charset: mimeType.charset);
-    }
+        Object payload = s;
+        if (mimeType.isJSON) {
+          s = s.trim();
+          if (s.isEmpty) return null;
+          try {
+            payload = json.decode(s);
+          } catch (e, s) {
+            _log.severe(
+              "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
+              e,
+              s,
+            );
+            return null;
+          }
+        } else if (mimeType.isFormURLEncoded) {
+          payload = decodeQueryStringParameters(s, charset: mimeType.charset);
+        }
 
-    return (mimeType, payload);
-  });
+        return (mimeType, payload);
+      });
 
   static Future<String?> _loadPayloadString(
     MimeType mimeType,
@@ -1762,8 +1756,10 @@ class APIServer extends _APIServerBase {
     var idx = headerAuthorization.indexOf(_regExpSpace);
     if (idx <= 0) return null;
 
-    var credentialType =
-        headerAuthorization.substring(0, idx).trim().toLowerCase();
+    var credentialType = headerAuthorization
+        .substring(0, idx)
+        .trim()
+        .toLowerCase();
     var credential = headerAuthorization.substring(idx + 1).trim();
 
     if (credentialType == 'basic') {
@@ -1972,12 +1968,11 @@ class APIServer extends _APIServerBase {
           Json.encodeToSink(
             payload,
             bytesSink,
-            toEncodableProvider:
-                (o) => accessRules.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
+            toEncodableProvider: (o) => accessRules.toJsonEncodable(
+              apiRequest,
+              Json.defaultToEncodableJsonProvider(),
+              o,
+            ),
           );
 
           return _resolveJsonEncodePayloadBytes(
@@ -2049,28 +2044,25 @@ class APIServer extends _APIServerBase {
 
   @override
   String toString() {
-    var serverResponseDelayStr =
-        serverResponseDelay != null
-            ? ', serverResponseDelay: ${serverResponseDelay!.toStringUnit()}'
-            : '';
+    var serverResponseDelayStr = serverResponseDelay != null
+        ? ', serverResponseDelay: ${serverResponseDelay!.toStringUnit()}'
+        : '';
 
-    var domainsStr =
-        domainsRoots.isNotEmpty
-            ? ', domains: [${domainsRoots.entries.map((e) {
-              var key = e.key;
-              var val = e.value;
+    var domainsStr = domainsRoots.isNotEmpty
+        ? ', domains: [${domainsRoots.entries.map((e) {
+            var key = e.key;
+            var val = e.value;
 
-              return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
-            }).join(' ; ')}]'
-            : '';
+            return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
+          }).join(' ; ')}]'
+        : '';
 
-    var secureStr =
-        securePort < 10
-            ? ''
-            : ', securePort: $securePort, '
-                'letsEncrypt: $letsEncrypt'
-                '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
-                'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
+    var secureStr = securePort < 10
+        ? ''
+        : ', securePort: $securePort, '
+              'letsEncrypt: $letsEncrypt'
+              '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
+              'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
     return 'APIServer[${BonesAPI.VERSION}]{ '
         'apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), '
@@ -2128,15 +2120,14 @@ class APIServer extends _APIServerBase {
       address = _parseArg(args, 'address', 'a', 'localhost', 0);
       port = int.parse(_parseArg(args, 'port', 'p', '8080', 1));
 
-      var hotReloadStr =
-          _parseArg(
-            args,
-            'hotreload',
-            'r',
-            'false',
-            2,
-            flag: true,
-          ).toLowerCase();
+      var hotReloadStr = _parseArg(
+        args,
+        'hotreload',
+        'r',
+        'false',
+        2,
+        flag: true,
+      ).toLowerCase();
 
       hotReload = hotReloadStr == 'true' || hotReloadStr == 'hotreload';
 
@@ -2338,8 +2329,8 @@ final class APIServerWorker extends _APIServerBase {
   final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
 
   Handler _getDirectoryStaticHandler(Directory rootDirectory) =>
-      _directoriesStaticHandlers[rootDirectory
-          .path] ??= _createDirectoryHandler(rootDirectory);
+      _directoriesStaticHandlers[rootDirectory.path] ??=
+          _createDirectoryHandler(rootDirectory);
 
   APIServerResponseCache? _responseCache;
 
@@ -2351,11 +2342,10 @@ final class APIServerWorker extends _APIServerBase {
     var gzipCompressionLevel = 4;
 
     if (cacheStaticFilesResponses) {
-      var responseCache =
-          _responseCache = APIServerResponseCache(
-            maxMemorySize: staticFilesCacheMaxMemorySize,
-            maxContentLength: staticFilesCacheMaxContentLength,
-          );
+      var responseCache = _responseCache = APIServerResponseCache(
+        maxMemorySize: staticFilesCacheMaxMemorySize,
+        maxContentLength: staticFilesCacheMaxContentLength,
+      );
 
       pipeline = pipeline.addMiddleware(responseCache.middleware);
 
@@ -2630,10 +2620,9 @@ final class APIServerWorker extends _APIServerBase {
       _log.info('Using `SESSIONID` cookies.');
     }
 
-    var workerInfo =
-        totalWorkers > 1
-            ? '[${isMainWorker ? 'main' : 'auxiliary'} worker#$workerIndex/$totalWorkers]'
-            : '';
+    var workerInfo = totalWorkers > 1
+        ? '[${isMainWorker ? 'main' : 'auxiliary'} worker#$workerIndex/$totalWorkers]'
+        : '';
 
     _log.info('Started HTTP Server$workerInfo at: $address:$port');
 
@@ -3157,10 +3146,9 @@ final class APIServerWorker extends _APIServerBase {
       headers['keep-alive'] = 'timeout=$timeout, max=$max';
     }
 
-    var allMetrics =
-        apiRequest.hasMetrics
-            ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
-            : apiResponse.metrics;
+    var allMetrics = apiRequest.hasMetrics
+        ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
+        : apiResponse.metrics;
 
     headers['server-timing'] = APIServer.resolveServerTiming(
       allMetrics,
@@ -3281,23 +3269,21 @@ final class APIServerWorker extends _APIServerBase {
 
   @override
   String toString() {
-    var domainsStr =
-        domainsRoots.isNotEmpty
-            ? ', domains: [${domainsRoots.entries.map((e) {
-              var key = e.key;
-              var val = e.value;
+    var domainsStr = domainsRoots.isNotEmpty
+        ? ', domains: [${domainsRoots.entries.map((e) {
+            var key = e.key;
+            var val = e.value;
 
-              return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
-            }).join(' ; ')}]'
-            : '';
+            return '${key is RegExp ? 'r/${key.pattern}/' : '`$key`'}=${val.path}';
+          }).join(' ; ')}]'
+        : '';
 
-    var secureStr =
-        securePort < 10
-            ? ''
-            : ', securePort: $securePort, '
-                'letsEncrypt: $letsEncrypt'
-                '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
-                'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
+    var secureStr = securePort < 10
+        ? ''
+        : ', securePort: $securePort, '
+              'letsEncrypt: $letsEncrypt'
+              '${(letsEncrypt ? (letsEncryptProduction ? ' @production' : ' @staging') : '')}, '
+              'letsEncryptDirectory: ${letsEncryptDirectory?.path}';
 
     return 'APIServerWorker{ apiRoot: ${apiRoot.name}[${apiRoot.version}] (${apiRoot.runtimeTypeNameUnsafe}), address: $address, port: $port$secureStr, cacheStaticFilesResponses: $cacheStaticFilesResponses, hotReload: $hotReload (${APIHotReload.get().isEnabled ? 'enabled' : 'disabled'}), cookieless: $cookieless, SESSIONID: $useSessionID, started: $isStarted, stopped: $isStopped$domainsStr }';
   }

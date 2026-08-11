@@ -624,91 +624,66 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   FutureOr<bool> _checkDBTablesImpl(
     Map<EntityRepository<Object>, TableScheme?> repositorySchemes,
   ) {
-    var repositoriesChecks =
-        repositorySchemes.entries
-            .map((e) => _checkDBTableScheme(e.key, e.value))
-            .toList();
+    var repositoriesChecks = repositorySchemes.entries
+        .map((e) => _checkDBTableScheme(e.key, e.value))
+        .toList();
 
-    var repositoriesChecksErrors =
-        repositoriesChecks.where((e) => e.isError).toList();
+    var repositoriesChecksErrors = repositoriesChecks
+        .where((e) => e.isError)
+        .toList();
 
     if (repositoriesChecksErrors.isNotEmpty) {
-      var missingColumnsSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingColumns?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingColumnsSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingColumnsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingColumns?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingColumnsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingReferenceColumnsSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingReferenceColumns?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingReferenceColumnsSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingReferenceColumnsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingReferenceColumns?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingReferenceColumnsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingReferenceConstraintsSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingReferenceConstraints?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingReferenceConstraintsSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingReferenceConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingReferenceConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingReferenceConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingReferenceIndexesSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingReferenceIndexes?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingReferenceIndexesSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingReferenceIndexesSQLs = repositoriesChecksErrors
+          .where((e) => e.missingReferenceIndexes?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingReferenceIndexesSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingRelationshipReferenceIndexesSQLs =
-          repositoriesChecksErrors
-              .where(
-                (e) =>
-                    e.missingRelationshipReferenceIndexes?.isNotEmpty ?? false,
-              )
-              .expand(
-                (e) => e.generateMissingRelationshipReferenceIndexesSQLs(this),
-              )
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingRelationshipReferenceIndexesSQLs = repositoriesChecksErrors
+          .where(
+            (e) => e.missingRelationshipReferenceIndexes?.isNotEmpty ?? false,
+          )
+          .expand(
+            (e) => e.generateMissingRelationshipReferenceIndexesSQLs(this),
+          )
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingUniqueConstraintsSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingUniqueConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingUniqueConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingUniqueConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingEnumConstraintsSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingEnumConstraints?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingEnumConstraintsSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingEnumConstraintsSQLs = repositoriesChecksErrors
+          .where((e) => e.missingEnumConstraints?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingEnumConstraintsSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
-      var missingEnumValuesSQLs =
-          repositoriesChecksErrors
-              .where((e) => e.missingEnumValues?.isNotEmpty ?? false)
-              .expand((e) => e.generateMissingEnumValuesSQLs(this))
-              .expand(
-                (e) => e.buildAllSQLs(ifNotExists: true, multiline: false),
-              )
-              .toList();
+      var missingEnumValuesSQLs = repositoriesChecksErrors
+          .where((e) => e.missingEnumValues?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingEnumValuesSQLs(this))
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
 
       var alterTablesSQLs = [
         ...missingColumnsSQLs,
@@ -728,16 +703,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ...missingEnumValuesSQLs,
       ];
 
-      alterTablesSQLs =
-          alterTablesSQLs.expandIndexed((i, s) {
-            if (i > 0 && s.isEmpty) {
-              var prev = alterTablesSQLs[i - 1];
-              if (prev.isEmpty) {
-                return <String>[];
-              }
-            }
-            return [s];
-          }).toList();
+      alterTablesSQLs = alterTablesSQLs.expandIndexed((i, s) {
+        if (i > 0 && s.isEmpty) {
+          var prev = alterTablesSQLs[i - 1];
+          if (prev.isEmpty) {
+            return <String>[];
+          }
+        }
+        return [s];
+      }).toList();
 
       while (alterTablesSQLs.isNotEmpty && alterTablesSQLs.first.isEmpty) {
         alterTablesSQLs.removeAt(0);
@@ -799,8 +773,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var repoFieldsNames = entityFields.whereNotIn(hiddenFields).toList();
 
-    var repoFieldsMap =
-        repoFieldsNames.map((f) => MapEntry(f, f)).toMapFromEntries();
+    var repoFieldsMap = repoFieldsNames
+        .map((f) => MapEntry(f, f))
+        .toMapFromEntries();
 
     var repoTable = getTableForEntityRepository(repository);
 
@@ -809,16 +784,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       repoFieldsMap,
     );
 
-    var schemesTypes =
-        schemeToRepoMap.entries
-            .map((e) {
-              var schemeField = e.key;
-              var repoField = e.value;
-              if (repoField == null) return null;
-              return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
-            })
-            .nonNulls
-            .toMapFromEntries();
+    var schemesTypes = schemeToRepoMap.entries
+        .map((e) {
+          var schemeField = e.key;
+          var repoField = e.value;
+          if (repoField == null) return null;
+          return MapEntry(repoField, scheme.fieldsTypes[schemeField]);
+        })
+        .nonNulls
+        .toMapFromEntries();
 
     for (var e in schemesTypes.entries) {
       var field = e.key;
@@ -838,58 +812,54 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var fieldsInScheme = schemeToRepoMap.values.toList();
 
-    var repoFieldsNotInScheme =
-        repoFieldsNames.whereNot((f) => fieldsInScheme.contains(f)).toList();
+    var repoFieldsNotInScheme = repoFieldsNames
+        .whereNot((f) => fieldsInScheme.contains(f))
+        .toList();
 
-    var referenceFields =
-        repoFieldsNotInScheme
-            .map(
-              (f) => _checkDBTableSchemeReferenceField(
-                entityHandler,
-                scheme,
-                repoTable,
-                f,
-                allowCollectionFields: false,
-              ),
-            )
-            .nonNulls
-            .toMapFromEntries();
+    var referenceFields = repoFieldsNotInScheme
+        .map(
+          (f) => _checkDBTableSchemeReferenceField(
+            entityHandler,
+            scheme,
+            repoTable,
+            f,
+            allowCollectionFields: false,
+          ),
+        )
+        .nonNulls
+        .toMapFromEntries();
 
-    var collectionReferenceFields =
-        repoFieldsNotInScheme
-            .map(
-              (f) => _checkDBTableSchemeReferenceField(
-                entityHandler,
-                scheme,
-                repoTable,
-                f,
-                allowCollectionFields: true,
-              ),
-            )
-            .nonNulls
-            .toMapFromEntries();
+    var collectionReferenceFields = repoFieldsNotInScheme
+        .map(
+          (f) => _checkDBTableSchemeReferenceField(
+            entityHandler,
+            scheme,
+            repoTable,
+            f,
+            allowCollectionFields: true,
+          ),
+        )
+        .nonNulls
+        .toMapFromEntries();
 
-    var missingReferenceColumns =
-        referenceFields.entries
-            .where((e) => e.value == null)
-            .map((e) => e.key)
-            .toList();
+    var missingReferenceColumns = referenceFields.entries
+        .where((e) => e.value == null)
+        .map((e) => e.key)
+        .toList();
 
-    var missingCollectionReferenceColumns =
-        collectionReferenceFields.entries
-            .where((e) => e.value == null)
-            .map((e) => e.key)
-            .toList();
+    var missingCollectionReferenceColumns = collectionReferenceFields.entries
+        .where((e) => e.value == null)
+        .map((e) => e.key)
+        .toList();
 
-    var missingColumns =
-        repoFieldsNames
-            .whereNot(
-              (f) =>
-                  fieldsInScheme.contains(f) ||
-                  referenceFields.containsKey(f) ||
-                  collectionReferenceFields.containsKey(f),
-            )
-            .toList();
+    var missingColumns = repoFieldsNames
+        .whereNot(
+          (f) =>
+              fieldsInScheme.contains(f) ||
+              referenceFields.containsKey(f) ||
+              collectionReferenceFields.containsKey(f),
+        )
+        .toList();
 
     var missingFieldReferenceConstraints = <String>{};
     var missingFieldReferenceIndexes = <String>{};
@@ -906,137 +876,136 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       // REF CONSTRAINTS //
 
-      var fieldEntityTypes =
-          entityHandler
-              .getFieldsEntityTypes()
-              .entries
-              .map((e) {
-                var entityType = e.value.entityType;
-                if (entityType == null) return null;
+      var fieldEntityTypes = entityHandler
+          .getFieldsEntityTypes()
+          .entries
+          .map((e) {
+            var entityType = e.value.entityType;
+            if (entityType == null) return null;
 
-                var refRepository = repository.provider
-                    .getEntityRepositoryByType(entityType);
+            var refRepository = repository.provider.getEntityRepositoryByType(
+              entityType,
+            );
 
-                if (refRepository == null ||
-                    !refRepository.isSameEntityManager(repository)) {
-                  return null;
-                }
+            if (refRepository == null ||
+                !refRepository.isSameEntityManager(repository)) {
+              return null;
+            }
 
-                return MapEntry(e.key, entityType);
-              })
-              .nonNulls
-              .toMapFromEntries();
+            return MapEntry(e.key, entityType);
+          })
+          .nonNulls
+          .toMapFromEntries();
 
       if (fieldEntityTypes.isNotEmpty) {
         var fieldsReferencedTables = scheme.fieldsReferencedTables;
 
-        var fieldsReferences =
-            fieldsReferencedTables.entries
-                .map((e) {
-                  var colum = e.key;
-                  var field = schemeToRepoMap[colum] ?? colum;
+        var fieldsReferences = fieldsReferencedTables.entries
+            .map((e) {
+              var colum = e.key;
+              var field = schemeToRepoMap[colum] ?? colum;
 
-                  var entityType = fieldEntityTypes[field];
-                  if (entityType == null) return null;
+              var entityType = fieldEntityTypes[field];
+              if (entityType == null) return null;
 
-                  var refTable = e.value.targetTable;
-                  return MapEntry(field, refTable);
-                })
-                .nonNulls
-                .toMapFromEntries();
+              var refTable = e.value.targetTable;
+              return MapEntry(field, refTable);
+            })
+            .nonNulls
+            .toMapFromEntries();
 
-        missingFieldReferenceConstraints =
-            fieldEntityTypes.keys
-                .where((f) => !fieldsReferences.containsKey(f))
-                .toSet();
+        missingFieldReferenceConstraints = fieldEntityTypes.keys
+            .where((f) => !fieldsReferences.containsKey(f))
+            .toSet();
 
         if (!dialect.foreignKeyCreatesImplicitIndex) {
-          missingFieldReferenceIndexes =
-              fieldsReferencedTables.entries
-                  .where((e) => e.value.indexName == null)
-                  .map((e) => e.key)
-                  .toSet();
+          missingFieldReferenceIndexes = fieldsReferencedTables.entries
+              .where((e) => e.value.indexName == null)
+              .map((e) => e.key)
+              .toSet();
         }
       }
 
       // RELATIONSHIP CONSTRAINTS //
 
-      var fieldListEntityTypes =
-          entityHandler
-              .getFieldsListEntityTypes()
-              .entries
-              .map((e) {
-                var entityType = e.value.entityType;
-                if (entityType == null) return null;
+      var fieldListEntityTypes = entityHandler
+          .getFieldsListEntityTypes()
+          .entries
+          .map((e) {
+            var entityType = e.value.entityType;
+            if (entityType == null) return null;
 
-                var refRepository = repository.provider
-                    .getEntityRepositoryByType(entityType);
+            var refRepository = repository.provider.getEntityRepositoryByType(
+              entityType,
+            );
 
-                if (refRepository == null ||
-                    !refRepository.isSameEntityManager(repository)) {
-                  return null;
-                }
+            if (refRepository == null ||
+                !refRepository.isSameEntityManager(repository)) {
+              return null;
+            }
 
-                return MapEntry(e.key, entityType);
-              })
-              .nonNulls
-              .toMapFromEntries();
+            return MapEntry(e.key, entityType);
+          })
+          .nonNulls
+          .toMapFromEntries();
 
       if (fieldListEntityTypes.isNotEmpty) {
         if (!dialect.foreignKeyCreatesImplicitIndex) {
-          missingRelationshipFieldReferenceIndexes =
-              collectionReferenceFields.entries
-                  .expand((e) {
-                    var relFieldRef = e.value;
-                    if (relFieldRef == null) {
-                      return <(String, String, TypeInfo)>[];
-                    }
+          missingRelationshipFieldReferenceIndexes = collectionReferenceFields
+              .entries
+              .expand((e) {
+                var relFieldRef = e.value;
+                if (relFieldRef == null) {
+                  return <(String, String, TypeInfo)>[];
+                }
 
-                    return [
-                      if (relFieldRef.sourceRelationshipFieldIndex == null)
-                        (
-                          relFieldRef.relationshipTable,
-                          relFieldRef.sourceRelationshipField,
-                          relFieldRef.sourceFieldEntityType,
-                        ),
-                      if (relFieldRef.targetRelationshipFieldIndex == null)
-                        (
-                          relFieldRef.relationshipTable,
-                          relFieldRef.targetRelationshipField,
-                          relFieldRef.targetFieldEntityType,
-                        ),
-                    ];
-                  })
-                  .nonNulls
-                  .toSet();
+                return [
+                  if (relFieldRef.sourceRelationshipFieldIndex == null)
+                    (
+                      relFieldRef.relationshipTable,
+                      relFieldRef.sourceRelationshipField,
+                      relFieldRef.sourceFieldEntityType,
+                    ),
+                  if (relFieldRef.targetRelationshipFieldIndex == null)
+                    (
+                      relFieldRef.relationshipTable,
+                      relFieldRef.targetRelationshipField,
+                      relFieldRef.targetFieldEntityType,
+                    ),
+                ];
+              })
+              .nonNulls
+              .toSet();
         }
       }
 
       // UNIQUE CONSTRAINTS //
 
-      var uniqueConstraints =
-          scheme.constraints.whereType<TableUniqueConstraint>().toList();
+      var uniqueConstraints = scheme.constraints
+          .whereType<TableUniqueConstraint>()
+          .toList();
 
       var uniqueConstraintsFields = uniqueConstraints.toFields(
         fieldMap: schemeToRepoMap,
       );
 
-      var entityUniqueFields =
-          entityHandler
-              .getAllFieldsWithEntityAnnotation<EntityField>(
-                null,
-                (a) => a.isUnique,
-              )
-              .keys
-              .toList();
+      var entityUniqueFields = entityHandler
+          .getAllFieldsWithEntityAnnotation<EntityField>(
+            null,
+            (a) => a.isUnique,
+          )
+          .keys
+          .toList();
 
-      missingUniqueConstraints =
-          entityUniqueFields.whereNotIn(uniqueConstraintsFields).toSet();
+      missingUniqueConstraints = entityUniqueFields
+          .whereNotIn(uniqueConstraintsFields)
+          .toSet();
 
       // ENUM CONSTRAINTS //
 
-      var enumConstraints =
-          scheme.constraints.whereType<TableEnumConstraint>().toList();
+      var enumConstraints = scheme.constraints
+          .whereType<TableEnumConstraint>()
+          .toList();
 
       var enumConstraintsFields = enumConstraints.toFields(
         fieldMap: schemeToRepoMap,
@@ -1044,8 +1013,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var entityEnumFields = entityHandler.getFieldsEnumTypes().keys.toList();
 
-      missingEnumConstraints =
-          entityEnumFields.whereNotIn(enumConstraintsFields).toSet();
+      missingEnumConstraints = entityEnumFields
+          .whereNotIn(enumConstraintsFields)
+          .toSet();
 
       var entityFieldsNamesIndexes = entityHandler.fieldsNamesIndexes();
       var entityFieldsNames = entityHandler.fieldsNames();
@@ -1245,8 +1215,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   Future<Map<EntityRepository<Object>, TableScheme?>>
   getRepositoriesSchemes() async {
-    var reposBlocks =
-        entityRepositories.splitBeforeIndexed((i, r) => i % 2 == 0).toList();
+    var reposBlocks = entityRepositories
+        .splitBeforeIndexed((i, r) => i % 2 == 0)
+        .toList();
 
     final allSchemes = <EntityRepository<Object>, TableScheme?>{};
 
@@ -1255,16 +1226,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     final contextID = List.unmodifiable([this, "getRepositoriesSchemes"]);
 
     for (var block in reposBlocks) {
-      var repositorySchemes =
-          await block
-              .map(
-                (r) => MapEntry(
-                  r,
-                  getTableSchemeForEntityRepository(r, contextID: contextID),
-                ),
-              )
-              .toMapFromEntries()
-              .resolveAllValues();
+      var repositorySchemes = await block
+          .map(
+            (r) => MapEntry(
+              r,
+              getTableSchemeForEntityRepository(r, contextID: contextID),
+            ),
+          )
+          .toMapFromEntries()
+          .resolveAllValues();
 
       allSchemes.addAll(repositorySchemes);
     }
@@ -1492,20 +1462,19 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     bool ifNotExists = true,
     bool sortColumns = true,
     bool verbose = false,
-  }) =>
-      entityRepositories
-          .map(
-            (r) => MapEntry<EntityRepository, CreateTableSQL>(
-              r,
-              generateCreateTableSQL(
-                entityRepository: r,
-                ifNotExists: ifNotExists,
-                sortColumns: sortColumns,
-              ),
-            ),
-          )
-          .toHierarchicalOrder(verbose: verbose)
-          .toMapFromEntries();
+  }) => entityRepositories
+      .map(
+        (r) => MapEntry<EntityRepository, CreateTableSQL>(
+          r,
+          generateCreateTableSQL(
+            entityRepository: r,
+            ifNotExists: ifNotExists,
+            sortColumns: sortColumns,
+          ),
+        ),
+      )
+      .toHierarchicalOrder(verbose: verbose)
+      .toMapFromEntries();
 
   /// Generate all the SQLs to create the tables.
   @override
@@ -1518,11 +1487,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       sortColumns: sortColumns,
     );
 
-    var allSQLs =
-        sqls.values
-            .expand((e) => e.allSQLBuilders)
-            .toList()
-            .toHierarchicalOrder();
+    var allSQLs = sqls.values
+        .expand((e) => e.allSQLBuilders)
+        .toList()
+        .toHierarchicalOrder();
 
     return allSQLs;
   }
@@ -1558,16 +1526,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     String fieldName,
     Object? value,
     Map<String, Object?> fieldsValues,
-  ) => _resolveFieldValueToSQL(
-    context,
-    tableScheme,
-    fieldName,
-    value,
-  ).resolveMapped((refId) {
-    fieldsValues.putIfAbsent(fieldName, () => refId);
-    var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
-    return valueSQL;
-  });
+  ) => _resolveFieldValueToSQL(context, tableScheme, fieldName, value)
+      .resolveMapped((refId) {
+        fieldsValues.putIfAbsent(fieldName, () => refId);
+        var valueSQL = _conditionSQLGenerator.parameterPlaceholder(fieldName);
+        return valueSQL;
+      });
 
   FutureOr<Object?> _resolveFieldValueToSQL(
     EncodingContext context,
@@ -1601,10 +1565,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var refEntityHandler = refEntityRepository.entityHandler;
 
-      var refId =
-          fieldRef != null
-              ? refEntityHandler.getField(refEntity, fieldRef.targetField)
-              : refEntityHandler.getID(refEntity);
+      var refId = fieldRef != null
+          ? refEntityHandler.getField(refEntity, fieldRef.targetField)
+          : refEntityHandler.getID(refEntity);
 
       if (refId != null) return refId;
 
@@ -2121,18 +2084,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         );
       }
 
-      var sqls =
-          otherIds.isEmpty
-              ? [SQL.dummy]
-              : otherIds
-                  .map(
-                    (otherId) => _generateInsertRelationshipSQL(
-                      relationship,
-                      id,
-                      otherId,
-                    ),
-                  )
-                  .toList();
+      var sqls = otherIds.isEmpty
+          ? [SQL.dummy]
+          : otherIds
+                .map(
+                  (otherId) =>
+                      _generateInsertRelationshipSQL(relationship, id, otherId),
+                )
+                .toList();
 
       var constrainSQL = _generateConstrainRelationshipSQL(
         tableScheme,
@@ -2297,37 +2256,32 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return executeTransactionOperation(op, sqls.first, (connection) {
       _logTransactionOperationSQL('insertRelationshipSQLs', op, sqls);
 
-      var retInserts =
-          sqls.map((sql) {
-            var ret = doInsertRelationshipSQL(
-              entityName,
-              sql.mainTable ?? table,
-              sql,
-              op.transaction,
-              connection,
-            );
+      var retInserts = sqls.map((sql) {
+        var ret = doInsertRelationshipSQL(
+          entityName,
+          sql.mainTable ?? table,
+          sql,
+          op.transaction,
+          connection,
+        );
 
-            if (sql.hasPosSQL) {
-              return sql.posSQL!
-                  .map((e) {
-                    _logTransactionOperationSQL(
-                      'insertRelationship[POS]',
-                      op,
-                      e,
-                    );
-                    return doDeleteSQL(
-                      entityName,
-                      e.mainTable!,
-                      e,
-                      op.transaction,
-                      connection,
-                    );
-                  })
-                  .resolveAllWithValue(ret);
-            } else {
-              return ret;
-            }
-          }).resolveAll();
+        if (sql.hasPosSQL) {
+          return sql.posSQL!
+              .map((e) {
+                _logTransactionOperationSQL('insertRelationship[POS]', op, e);
+                return doDeleteSQL(
+                  entityName,
+                  e.mainTable!,
+                  e,
+                  op.transaction,
+                  connection,
+                );
+              })
+              .resolveAllWithValue(ret);
+        } else {
+          return ret;
+        }
+      }).resolveAll();
       return retInserts.resolveWithValue(true);
     });
   }
@@ -2563,14 +2517,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (isTransactionWithSingleOperation(op, sql)) {
       return executeWithPool(
         f,
-        onError:
-            (e, s) => transaction.notifyExecutionError(
-              e,
-              s,
-              errorResolver: resolveError,
-              operation: op,
-              debugInfo: () => sql.mainSQL.toString(),
-            ),
+        onError: (e, s) => transaction.notifyExecutionError(
+          e,
+          s,
+          errorResolver: resolveError,
+          operation: op,
+          debugInfo: () => sql.mainSQL.toString(),
+        ),
       );
     }
 
@@ -3052,7 +3005,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         sql.write(from);
 
         if (dialect.acceptsReturningSyntax) {
-          sql.write(' RETURNING "$tableAlias".*');
+          // Some dialects (SQLite) reject a table-qualified wildcard:
+          // "RETURNING may not use TABLE.* wildcards".
+          if (dialect.returningAcceptsTableWildcard) {
+            sql.write(' RETURNING "$tableAlias".*');
+          } else {
+            sql.write(' RETURNING *');
+          }
         }
 
         return sql.toString();
@@ -3601,8 +3560,9 @@ class _DBTableCheck {
       sqlGenerator,
     );
 
-    var constraints =
-        columnsSQLs.expand((e) => e.constraints ?? <AlterTableSQL>[]).toList();
+    var constraints = columnsSQLs
+        .expand((e) => e.constraints ?? <AlterTableSQL>[])
+        .toList();
 
     return constraints;
   }
@@ -3615,8 +3575,9 @@ class _DBTableCheck {
       sqlGenerator,
     );
 
-    var indexes =
-        columnsSQLs.expand((e) => e.indexes ?? <CreateIndexSQL>[]).toList();
+    var indexes = columnsSQLs
+        .expand((e) => e.indexes ?? <CreateIndexSQL>[])
+        .toList();
 
     return indexes;
   }
@@ -3629,8 +3590,9 @@ class _DBTableCheck {
       sqlGenerator,
     );
 
-    var indexes =
-        columnsSQLs.expand((e) => e.indexes ?? <CreateIndexSQL>[]).toList();
+    var indexes = columnsSQLs
+        .expand((e) => e.indexes ?? <CreateIndexSQL>[])
+        .toList();
 
     return indexes;
   }
@@ -3663,19 +3625,17 @@ class _DBTableCheck {
       return [];
     }
 
-    var sqls =
-        missing.map((f) {
-          var schemeName =
-              f is _DBRelationshipTableColumn
-                  ? f.relationshipTable
-                  : scheme.name;
-          return sqlGenerator.generateAddColumnAlterTableSQL(
-            schemeName,
-            f.name,
-            f.type,
-            entityFieldAnnotations: f.annotations,
-          );
-        }).toList();
+    var sqls = missing.map((f) {
+      var schemeName = f is _DBRelationshipTableColumn
+          ? f.relationshipTable
+          : scheme.name;
+      return sqlGenerator.generateAddColumnAlterTableSQL(
+        schemeName,
+        f.name,
+        f.type,
+        entityFieldAnnotations: f.annotations,
+      );
+    }).toList();
 
     return sqls;
   }
@@ -3689,15 +3649,14 @@ class _DBTableCheck {
       return [];
     }
 
-    var sqls =
-        missing.map((f) {
-          return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
-            scheme.name,
-            f.name,
-            f.type,
-            entityFieldAnnotations: f.annotations,
-          );
-        }).toList();
+    var sqls = missing.map((f) {
+      return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
+        scheme.name,
+        f.name,
+        f.type,
+        entityFieldAnnotations: f.annotations,
+      );
+    }).toList();
 
     return sqls;
   }
@@ -3711,15 +3670,14 @@ class _DBTableCheck {
       return [];
     }
 
-    var sqls =
-        missing.map((f) {
-          return sqlGenerator.generateAddEnumConstraintAlterTableSQL(
-            scheme.name,
-            f.name,
-            f.type,
-            entityFieldAnnotations: f.annotations,
-          );
-        }).toList();
+    var sqls = missing.map((f) {
+      return sqlGenerator.generateAddEnumConstraintAlterTableSQL(
+        scheme.name,
+        f.name,
+        f.type,
+        entityFieldAnnotations: f.annotations,
+      );
+    }).toList();
 
     return sqls;
   }
@@ -3824,11 +3782,10 @@ class _DBTableColumn {
         entityHandler.getFieldType(null, fieldName, resolveFiledName: true) ??
         TypeInfo.tString;
 
-    var annotations =
-        entityHandler
-            .getFieldEntityAnnotations(null, fieldName)
-            ?.whereType<EntityField>()
-            .toList();
+    var annotations = entityHandler
+        .getFieldEntityAnnotations(null, fieldName)
+        ?.whereType<EntityField>()
+        .toList();
     return _DBTableColumn(fieldName, type, annotations);
   }
 

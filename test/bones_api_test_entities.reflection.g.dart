@@ -132,7 +132,7 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Account$reflection withObject([Account? obj]) =>
@@ -335,8 +335,10 @@ class Account$reflection extends ClassReflection<Account>
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -347,8 +349,10 @@ class Account$reflection extends ClassReflection<Account>
           const __TR<User>(User),
           'user',
           false,
-          (o) => () => o!.user,
-          (o) => (v) => o!.user = v,
+          (o) =>
+              () => o!.user,
+          (o) =>
+              (v) => o!.user = v,
           obj,
           false,
         );
@@ -361,8 +365,10 @@ class Account$reflection extends ClassReflection<Account>
           ]),
           'userInfo',
           false,
-          (o) => () => o!.userInfo,
-          (o) => (v) => o!.userInfo = v,
+          (o) =>
+              () => o!.userInfo,
+          (o) =>
+              (v) => o!.userInfo = v,
           obj,
           false,
         );
@@ -373,7 +379,8 @@ class Account$reflection extends ClassReflection<Account>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -386,7 +393,8 @@ class Account$reflection extends ClassReflection<Account>
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -399,7 +407,8 @@ class Account$reflection extends ClassReflection<Account>
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -668,7 +677,7 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Address$reflection withObject([Address? obj]) =>
@@ -882,8 +891,10 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -894,8 +905,10 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tString,
           'state',
           false,
-          (o) => () => o!.state,
-          (o) => (v) => o!.state = v,
+          (o) =>
+              () => o!.state,
+          (o) =>
+              (v) => o!.state = v,
           obj,
           false,
           const [EntityField.indexed(), EntityField.maximum(3)],
@@ -907,8 +920,10 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tString,
           'city',
           false,
-          (o) => () => o!.city,
-          (o) => (v) => o!.city = v,
+          (o) =>
+              () => o!.city,
+          (o) =>
+              (v) => o!.city = v,
           obj,
           false,
           const [EntityField.maximum(100)],
@@ -920,8 +935,10 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tString,
           'street',
           false,
-          (o) => () => o!.street,
-          (o) => (v) => o!.street = v,
+          (o) =>
+              () => o!.street,
+          (o) =>
+              (v) => o!.street = v,
           obj,
           false,
           const [EntityField.maximum(200)],
@@ -933,8 +950,10 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tInt,
           'number',
           false,
-          (o) => () => o!.number,
-          (o) => (v) => o!.number = v,
+          (o) =>
+              () => o!.number,
+          (o) =>
+              (v) => o!.number = v,
           obj,
           false,
         );
@@ -945,8 +964,10 @@ class Address$reflection extends ClassReflection<Address>
           const __TR<Decimal>(Decimal),
           'latitude',
           false,
-          (o) => () => o!.latitude,
-          (o) => (v) => o!.latitude = v,
+          (o) =>
+              () => o!.latitude,
+          (o) =>
+              (v) => o!.latitude = v,
           obj,
           false,
         );
@@ -957,8 +978,10 @@ class Address$reflection extends ClassReflection<Address>
           const __TR<Decimal>(Decimal),
           'longitude',
           false,
-          (o) => () => o!.longitude,
-          (o) => (v) => o!.longitude = v,
+          (o) =>
+              () => o!.longitude,
+          (o) =>
+              (v) => o!.longitude = v,
           obj,
           false,
         );
@@ -969,8 +992,10 @@ class Address$reflection extends ClassReflection<Address>
           const __TR<List<Store>>(List, <__TR>[__TR<Store>(Store)]),
           'stores',
           false,
-          (o) => () => o!.stores,
-          (o) => (v) => o!.stores = v,
+          (o) =>
+              () => o!.stores,
+          (o) =>
+              (v) => o!.stores = v,
           obj,
           false,
         );
@@ -983,8 +1008,10 @@ class Address$reflection extends ClassReflection<Address>
           ]),
           'closedStores',
           false,
-          (o) => () => o!.closedStores,
-          (o) => (v) => o!.closedStores = v,
+          (o) =>
+              () => o!.closedStores,
+          (o) =>
+              (v) => o!.closedStores = v,
           obj,
           false,
         );
@@ -995,7 +1022,8 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -1008,7 +1036,8 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -1021,7 +1050,8 @@ class Address$reflection extends ClassReflection<Address>
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -1301,7 +1331,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Photo$reflection withObject([Photo? obj]) =>
@@ -1502,8 +1532,10 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           __TR.tString,
           'id',
           false,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -1514,8 +1546,10 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           const __TR<Uint8List>(Uint8List),
           'data',
           true,
-          (o) => () => o!.data,
-          (o) => (v) => o!.data = v,
+          (o) =>
+              () => o!.data,
+          (o) =>
+              (v) => o!.data = v,
           obj,
           false,
         );
@@ -1526,7 +1560,8 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           __TR.tString,
           'dataUrl',
           true,
-          (o) => () => o!.dataUrl,
+          (o) =>
+              () => o!.dataUrl,
           null,
           obj,
           false,
@@ -1538,7 +1573,8 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -1551,7 +1587,8 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -1564,7 +1601,8 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -1893,7 +1931,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Role$reflection withObject([Role? obj]) =>
@@ -2086,8 +2124,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -2098,8 +2138,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           const __TR<RoleType>(RoleType),
           'type',
           false,
-          (o) => () => o!.type,
-          (o) => (v) => o!.type = v,
+          (o) =>
+              () => o!.type,
+          (o) =>
+              (v) => o!.type = v,
           obj,
           false,
         );
@@ -2110,8 +2152,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           __TR.tBool,
           'enabled',
           false,
-          (o) => () => o!.enabled,
-          (o) => (v) => o!.enabled = v,
+          (o) =>
+              () => o!.enabled,
+          (o) =>
+              (v) => o!.enabled = v,
           obj,
           false,
         );
@@ -2122,8 +2166,10 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           const __TR<Decimal>(Decimal),
           'value',
           true,
-          (o) => () => o!.value,
-          (o) => (v) => o!.value = v,
+          (o) =>
+              () => o!.value,
+          (o) =>
+              (v) => o!.value = v,
           obj,
           false,
         );
@@ -2134,7 +2180,8 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -2147,7 +2194,8 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -2160,7 +2208,8 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -2440,7 +2489,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -2517,7 +2566,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   Store$reflection withObject([Store? obj]) =>
@@ -2698,8 +2747,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -2710,8 +2761,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
-          (o) => (v) => o!.name = v,
+          (o) =>
+              () => o!.name,
+          (o) =>
+              (v) => o!.name = v,
           obj,
           false,
           const [EntityField.maximum(100)],
@@ -2723,8 +2776,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tInt,
           'number',
           true,
-          (o) => () => o!.number,
-          (o) => (v) => o!.number = v,
+          (o) =>
+              () => o!.number,
+          (o) =>
+              (v) => o!.number = v,
           obj,
           false,
         );
@@ -2735,8 +2790,10 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           const __TR<User>(User),
           'owner',
           true,
-          (o) => () => o!.owner,
-          (o) => (v) => o!.owner = v,
+          (o) =>
+              () => o!.owner,
+          (o) =>
+              (v) => o!.owner = v,
           obj,
           false,
         );
@@ -2747,7 +2804,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -2760,7 +2818,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -2773,7 +2832,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -3073,7 +3133,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   User$reflection withObject([User? obj]) =>
@@ -3275,8 +3335,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -3287,8 +3349,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tString,
           'email',
           false,
-          (o) => () => o!.email,
-          (o) => (v) => o!.email = v,
+          (o) =>
+              () => o!.email,
+          (o) =>
+              (v) => o!.email = v,
           obj,
           false,
           const [
@@ -3304,8 +3368,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tString,
           'password',
           false,
-          (o) => () => o!.password,
-          (o) => (v) => o!.password = v,
+          (o) =>
+              () => o!.password,
+          (o) =>
+              (v) => o!.password = v,
           obj,
           false,
         );
@@ -3316,8 +3382,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const __TR<Address>(Address),
           'address',
           false,
-          (o) => () => o!.address,
-          (o) => (v) => o!.address = v,
+          (o) =>
+              () => o!.address,
+          (o) =>
+              (v) => o!.address = v,
           obj,
           false,
         );
@@ -3328,8 +3396,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const __TR<List<Role>>(List, <__TR>[__TR<Role>(Role)]),
           'roles',
           false,
-          (o) => () => o!.roles,
-          (o) => (v) => o!.roles = v,
+          (o) =>
+              () => o!.roles,
+          (o) =>
+              (v) => o!.roles = v,
           obj,
           false,
         );
@@ -3340,8 +3410,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tInt,
           'level',
           true,
-          (o) => () => o!.level,
-          (o) => (v) => o!.level = v,
+          (o) =>
+              () => o!.level,
+          (o) =>
+              (v) => o!.level = v,
           obj,
           false,
         );
@@ -3352,8 +3424,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const __TR<Time>(Time),
           'wakeUpTime',
           true,
-          (o) => () => o!.wakeUpTime,
-          (o) => (v) => o!.wakeUpTime = v,
+          (o) =>
+              () => o!.wakeUpTime,
+          (o) =>
+              (v) => o!.wakeUpTime = v,
           obj,
           false,
         );
@@ -3366,8 +3440,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           ]),
           'userInfo',
           false,
-          (o) => () => o!.userInfo,
-          (o) => (v) => o!.userInfo = v,
+          (o) =>
+              () => o!.userInfo,
+          (o) =>
+              (v) => o!.userInfo = v,
           obj,
           false,
         );
@@ -3378,8 +3454,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const __TR<Photo>(Photo),
           'photo',
           true,
-          (o) => () => o!.photo,
-          (o) => (v) => o!.photo = v,
+          (o) =>
+              () => o!.photo,
+          (o) =>
+              (v) => o!.photo = v,
           obj,
           false,
         );
@@ -3390,8 +3468,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           const __TR<DateTime>(DateTime),
           'creationTime',
           false,
-          (o) => () => o!.creationTime,
-          (o) => (v) => o!.creationTime = v,
+          (o) =>
+              () => o!.creationTime,
+          (o) =>
+              (v) => o!.creationTime = v,
           obj,
           false,
         );
@@ -3402,7 +3482,8 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -3415,7 +3496,8 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -3428,7 +3510,8 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -3754,7 +3837,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   UserInfo$reflection withObject([UserInfo? obj]) =>
@@ -3930,8 +4013,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           __TR.tInt,
           'id',
           true,
-          (o) => () => o!.id,
-          (o) => (v) => o!.id = v,
+          (o) =>
+              () => o!.id,
+          (o) =>
+              (v) => o!.id = v,
           obj,
           false,
         );
@@ -3942,8 +4027,10 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           __TR.tString,
           'info',
           false,
-          (o) => () => o!.info,
-          (o) => (v) => o!.info = v,
+          (o) =>
+              () => o!.info,
+          (o) =>
+              (v) => o!.info = v,
           obj,
           false,
           const [EntityField.maximum(1000)],
@@ -3955,7 +4042,8 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -3968,7 +4056,8 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           __TR.tString,
           'idFieldName',
           false,
-          (o) => () => o!.idFieldName,
+          (o) =>
+              () => o!.idFieldName,
           null,
           obj,
           false,
@@ -3981,7 +4070,8 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           __TR.tListString,
           'fieldsNames',
           false,
-          (o) => () => o!.fieldsNames,
+          (o) =>
+              () => o!.fieldsNames,
           null,
           obj,
           false,
@@ -4399,10 +4489,8 @@ List<Reflection> _listSiblingsReflection() => <Reflection>[
 ];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() =>
-    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
-      _listSiblingsReflection(),
-    );
+List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
+    List<Reflection>.unmodifiable(_listSiblingsReflection());
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

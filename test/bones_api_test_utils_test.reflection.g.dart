@@ -78,7 +78,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.7.0');
+  Version get languageVersion => Version.parse('3.10.0');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
@@ -255,7 +255,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const __TR<APIRoot>(APIRoot),
           'apiRoot',
           false,
-          (o) => () => o!.apiRoot,
+          (o) =>
+              () => o!.apiRoot,
           null,
           obj,
           true,
@@ -267,7 +268,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tString,
           'name',
           false,
-          (o) => () => o!.name,
+          (o) =>
+              () => o!.name,
           null,
           obj,
           true,
@@ -279,7 +281,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tString,
           'version',
           true,
-          (o) => () => o!.version,
+          (o) =>
+              () => o!.version,
           null,
           obj,
           true,
@@ -291,7 +294,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const __TR<APIConfig>(APIConfig),
           'apiConfig',
           false,
-          (o) => () => o!.apiConfig,
+          (o) =>
+              () => o!.apiConfig,
           null,
           obj,
           false,
@@ -303,7 +307,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tString,
           'defaultRouteName',
           true,
-          (o) => () => o!.defaultRouteName,
+          (o) =>
+              () => o!.defaultRouteName,
           null,
           obj,
           false,
@@ -315,7 +320,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tSetString,
           'allRoutesNames',
           false,
-          (o) => () => o!.allRoutesNames,
+          (o) =>
+              () => o!.allRoutesNames,
           null,
           obj,
           false,
@@ -329,7 +335,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           ]),
           'routes',
           false,
-          (o) => () => o!.routes,
+          (o) =>
+              () => o!.routes,
           null,
           obj,
           false,
@@ -341,7 +348,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tString,
           'authenticationRoute',
           false,
-          (o) => () => o!.authenticationRoute,
+          (o) =>
+              () => o!.authenticationRoute,
           null,
           obj,
           false,
@@ -353,7 +361,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const __TR<APISecurity>(APISecurity),
           'security',
           true,
-          (o) => () => o!.security,
+          (o) =>
+              () => o!.security,
           null,
           obj,
           false,
@@ -365,7 +374,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tInt,
           'hashCode',
           false,
-          (o) => () => o!.hashCode,
+          (o) =>
+              () => o!.hashCode,
           null,
           obj,
           false,
@@ -378,7 +388,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const __TR<InitializationStatus>(InitializationStatus),
           'initializationStatus',
           false,
-          (o) => () => o!.initializationStatus,
+          (o) =>
+              () => o!.initializationStatus,
           null,
           obj,
           false,
@@ -390,7 +401,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tBool,
           'isInitialized',
           false,
-          (o) => () => o!.isInitialized,
+          (o) =>
+              () => o!.isInitialized,
           null,
           obj,
           false,
@@ -402,7 +414,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tBool,
           'isInitializing',
           false,
-          (o) => () => o!.isInitializing,
+          (o) =>
+              () => o!.isInitializing,
           null,
           obj,
           false,
@@ -414,7 +427,8 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           __TR.tBool,
           'isAsyncInitialization',
           false,
-          (o) => () => o!.isAsyncInitialization,
+          (o) =>
+              () => o!.isAsyncInitialization,
           null,
           obj,
           false,
@@ -1000,10 +1014,8 @@ List<Reflection> _listSiblingsReflection() => <Reflection>[
 ];
 
 List<Reflection>? _siblingsReflectionList;
-List<Reflection> _siblingsReflection() =>
-    _siblingsReflectionList ??= List<Reflection>.unmodifiable(
-      _listSiblingsReflection(),
-    );
+List<Reflection> _siblingsReflection() => _siblingsReflectionList ??=
+    List<Reflection>.unmodifiable(_listSiblingsReflection());
 
 bool _registerSiblingsReflectionCalled = false;
 void _registerSiblingsReflection() {

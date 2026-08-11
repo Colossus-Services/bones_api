@@ -113,8 +113,9 @@ class APIConfig {
 
       var valueResolved = value.replaceAllMapped(_regexpValueVariable, (m) {
         var k = m[1];
-        var v =
-            k != null ? _getVariable(k, !equalsIgnoreAsciiCase(k, key)) : m[0];
+        var v = k != null
+            ? _getVariable(k, !equalsIgnoreAsciiCase(k, key))
+            : m[0];
         return v ?? '';
       });
 
@@ -542,18 +543,17 @@ class APIConfig {
   ) {
     var lines = properties.split(_regexpLineBreak);
 
-    var l =
-        lines.expand((l) {
-          if (_regexpKeyLine.hasMatch(l)) {
-            var idx = l.indexOf(_regexpKeyDelimiter);
-            var k = l.substring(0, idx).trim();
-            var v = l.substring(idx + 1);
-            var val = _parseJsonValue(v);
-            return <MapEntry<String, dynamic>>[MapEntry(k, val)];
-          } else {
-            return <MapEntry<String, dynamic>>[];
-          }
-        }).toList();
+    var l = lines.expand((l) {
+      if (_regexpKeyLine.hasMatch(l)) {
+        var idx = l.indexOf(_regexpKeyDelimiter);
+        var k = l.substring(0, idx).trim();
+        var v = l.substring(idx + 1);
+        var val = _parseJsonValue(v);
+        return <MapEntry<String, dynamic>>[MapEntry(k, val)];
+      } else {
+        return <MapEntry<String, dynamic>>[];
+      }
+    }).toList();
 
     return l;
   }

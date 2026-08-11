@@ -72,11 +72,10 @@ class APITestConfigDockerPostgreSQL
     var body = res.split(RegExp(r'--+\+--+\+--+\+'))[1];
     var parts = body.split(RegExp(r'[\r\n]'));
 
-    var names =
-        parts
-            .where((p) => p.contains(RegExp(r'\s+\|\s+\w+\s+\|')))
-            .map((p) => p.split(RegExp(r'\s+\|\s+'))[1].trim())
-            .toList();
+    var names = parts
+        .where((p) => p.contains(RegExp(r'\s+\|\s+\w+\s+\|')))
+        .map((p) => p.split(RegExp(r'\s+\|\s+'))[1].trim())
+        .toList();
 
     return names;
   }

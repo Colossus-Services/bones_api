@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.13.0';
+  static const String VERSION = '1.14.0';
 
   static bool _boot = false;
 
@@ -649,12 +649,11 @@ abstract class APIRoot with Initializable, Closable {
         if (response is Future<APIResponse<T>>) {
           return response.then(
             (response) => _callZonedReturn(callZone, request, response),
-            onError:
-                (e, s) => _callZonedReturn(
-                  callZone,
-                  request,
-                  _resolveErrorAPIResponse(e, s),
-                ),
+            onError: (e, s) => _callZonedReturn(
+              callZone,
+              request,
+              _resolveErrorAPIResponse(e, s),
+            ),
           );
         } else {
           return _callZonedReturn(callZone, request, response);
@@ -692,10 +691,9 @@ abstract class APIRoot with Initializable, Closable {
       var original = identical(request.credential, request.originalCredential);
 
       if (original) {
-        var credential =
-            request.credential = request.credential?.copy(
-              withUsernameEntity: false,
-            );
+        var credential = request.credential = request.credential?.copy(
+          withUsernameEntity: false,
+        );
 
         request.originalCredential = credential;
       } else {
@@ -1018,17 +1016,15 @@ abstract class APIRouteHandler<T> {
       _entityResolutionRules ??= _entityResolutionRulesIml();
 
   EntityResolutionRules _entityResolutionRulesIml() {
-    var resolutionRules1 =
-        rules
-            .whereType<APIEntityResolutionRules>()
-            .map((e) => e.resolutionRules)
-            .toList();
+    var resolutionRules1 = rules
+        .whereType<APIEntityResolutionRules>()
+        .map((e) => e.resolutionRules)
+        .toList();
 
-    var resolutionRules2 =
-        rules
-            .whereType<APIEntityRules>()
-            .expand((e) => e.entityResolutionRules)
-            .toList();
+    var resolutionRules2 = rules
+        .whereType<APIEntityRules>()
+        .expand((e) => e.entityResolutionRules)
+        .toList();
 
     if (resolutionRules1.isEmpty && resolutionRules2.isEmpty) {
       return EntityResolutionRules.innocuous;
@@ -1050,17 +1046,15 @@ abstract class APIRouteHandler<T> {
       _entityAccessRules ??= _entityAccessRulesImpl();
 
   EntityAccessRules _entityAccessRulesImpl() {
-    var accessRules1 =
-        rules
-            .whereType<APIEntityAccessRules>()
-            .map((e) => e.accessRules)
-            .toList();
+    var accessRules1 = rules
+        .whereType<APIEntityAccessRules>()
+        .map((e) => e.accessRules)
+        .toList();
 
-    var accessRules2 =
-        rules
-            .whereType<APIEntityRules>()
-            .expand((e) => e.entityAccessRules)
-            .toList();
+    var accessRules2 = rules
+        .whereType<APIEntityRules>()
+        .expand((e) => e.entityAccessRules)
+        .toList();
 
     if (accessRules1.isEmpty && accessRules2.isEmpty) {
       return EntityAccessRules.innocuous;
@@ -1193,10 +1187,9 @@ class APIRouteInfo {
 
   /// Returns the [Uri] of the route.
   Uri get uri {
-    var baseUri =
-        apiRequest != null
-            ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
-            : Uri.base;
+    var baseUri = apiRequest != null
+        ? Uri.tryParse(apiRequest!.origin) ?? Uri.base
+        : Uri.base;
     var module = routeHandler.module;
     var path = '${module.name}/$name';
 
@@ -1440,13 +1433,12 @@ abstract class APIMetricSet {
     Duration? duration,
     String? description,
     int? n,
-  }) =>
-      metrics[name] = APIMetric(
-        name,
-        duration: duration,
-        description: description,
-        n: n,
-      );
+  }) => metrics[name] = APIMetric(
+    name,
+    duration: duration,
+    description: description,
+    n: n,
+  );
 
   /// Returns a metric.
   APIMetric? getMetric(String name) => metrics[name];
@@ -1650,10 +1642,9 @@ class APIRequest extends APIMetricSet with APIPayload {
        requestedUri =
            requestedUri ??
            Uri(
-             host:
-                 requesterSource == APIRequesterSource.local
-                     ? 'localhost'
-                     : null,
+             host: requesterSource == APIRequesterSource.local
+                 ? 'localhost'
+                 : null,
              path: path,
              queryParameters: parameters?.map(
                (key, value) => MapEntry(
@@ -1737,11 +1728,10 @@ class APIRequest extends APIMetricSet with APIPayload {
     }
 
     var methodVal = arguments.parameters.remove('method');
-    var method =
-        methodVal != null
-            ? parseAPIRequestMethod(methodVal.toString().toLowerCase()) ??
-                APIRequestMethod.GET
-            : APIRequestMethod.GET;
+    var method = methodVal != null
+        ? parseAPIRequestMethod(methodVal.toString().toLowerCase()) ??
+              APIRequestMethod.GET
+        : APIRequestMethod.GET;
 
     var payload = arguments.parameters.remove('payload');
 
@@ -2295,10 +2285,9 @@ class APIRequest extends APIMetricSet with APIPayload {
   @override
   String toString({bool withHeaders = true, bool withPayload = true}) {
     var headersStr = withHeaders ? ', headers: $headers' : '';
-    var payloadStr =
-        withPayload && hasPayload
-            ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
-            : '';
+    var payloadStr = withPayload && hasPayload
+        ? ', payloadLength: $payloadLength, payloadMimeType: $payloadMimeType'
+        : '';
 
     return 'APIRequest#$id{ method: ${method.name}, '
         'path: $path, '
@@ -2874,10 +2863,9 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   }) {
     return APIResponse(
         status ?? this.status,
-        payload:
-            nullPayload
-                ? null
-                : (payload ?? (payloadDynamic == null ? this.payload : null)),
+        payload: nullPayload
+            ? null
+            : (payload ?? (payloadDynamic == null ? this.payload : null)),
         payloadDynamic: nullPayload ? null : payloadDynamic,
         payloadMimeType: mimeType ?? payloadMimeType,
         payloadFileExtension: payloadFileExtension,
@@ -3333,8 +3321,9 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
     headers["Access-Control-Allow-Methods"] =
         allowMethods?.join(',') ?? 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS';
 
-    headers["Access-Control-Allow-Credentials"] =
-        allowCredentials ? 'true' : 'false';
+    headers["Access-Control-Allow-Credentials"] = allowCredentials
+        ? 'true'
+        : 'false';
 
     if (localhost) {
       headers["Access-Control-Allow-Headers"] =

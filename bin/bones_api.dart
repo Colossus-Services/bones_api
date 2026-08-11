@@ -26,13 +26,12 @@ void main(List<String> args) async {
   await commandInfo.configure();
   await commandCreate.configure();
 
-  var commandRunner =
-      CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
-        ..addCommand(MyCommandServe())
-        ..addCommand(MyCommandConsole())
-        ..addCommand(MyCommandInspect())
-        ..addCommand(commandInfo)
-        ..addCommand(commandCreate);
+  var commandRunner = CommandRunner<bool>('bones_api', '$cliTitle - CLI Tool')
+    ..addCommand(MyCommandServe())
+    ..addCommand(MyCommandConsole())
+    ..addCommand(MyCommandInspect())
+    ..addCommand(commandInfo)
+    ..addCommand(commandCreate);
 
   commandRunner.argParser.addFlag(
     'version',
@@ -248,19 +247,17 @@ class MyCommandServe extends CommandSourceFileBase {
     var val = argResults!['domain'];
     if (val == null) return <String, String>{};
 
-    var values =
-        (val is List ? val : [val])
-            .map((e) => e != null ? '$e'.trim() : '')
-            .where((e) => e.isNotEmpty)
-            .toList();
+    var values = (val is List ? val : [val])
+        .map((e) => e != null ? '$e'.trim() : '')
+        .where((e) => e.isNotEmpty)
+        .toList();
 
-    var entries =
-        values.map((e) {
-          var parts = e.split('=');
-          var domain = parts[0].trim();
-          var path = parts.length > 1 ? parts[1].trim() : '';
-          return MapEntry(domain, path);
-        }).toList();
+    var entries = values.map((e) {
+      var parts = e.split('=');
+      var domain = parts[0].trim();
+      var path = parts.length > 1 ? parts[1].trim() : '';
+      return MapEntry(domain, path);
+    }).toList();
 
     return Map<String, String>.fromEntries(entries);
   }
@@ -635,7 +632,8 @@ class MyCommandServe extends CommandSourceFileBase {
     String projectLibraryName,
     String apiRootClass,
   ) {
-    var script = '''
+    var script =
+        '''
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/bones_api_dart_spawner.dart';
 
@@ -852,7 +850,8 @@ class MyCommandConsole extends CommandSourceFileBase {
     String projectLibraryName,
     String apiRootClass,
   ) {
-    var script = '''
+    var script =
+        '''
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

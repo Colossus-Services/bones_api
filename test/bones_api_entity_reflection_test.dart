@@ -166,13 +166,12 @@ void main() {
 
         var json = account.toJson();
 
-        var account2 =
-            Account$reflection.staticInstance
-                .createInstanceWithConstructorByName(
-                  'entityReference',
-                  json,
-                  fieldValueResolver: fieldValueResolver,
-                )!;
+        var account2 = Account$reflection.staticInstance
+            .createInstanceWithConstructorByName(
+              'entityReference',
+              json,
+              fieldValueResolver: fieldValueResolver,
+            )!;
 
         expect(account2.userInfo.isNull, isFalse);
         expect(account2.toJson(), equals(json));
@@ -185,13 +184,12 @@ void main() {
 
         var json = account.toJson();
 
-        var account2 =
-            Account$reflection.staticInstance
-                .createInstanceWithConstructorByName(
-                  'entityReference',
-                  json,
-                  fieldValueResolver: fieldValueResolver,
-                )!;
+        var account2 = Account$reflection.staticInstance
+            .createInstanceWithConstructorByName(
+              'entityReference',
+              json,
+              fieldValueResolver: fieldValueResolver,
+            )!;
 
         expect(account2.userInfo.isNull, isTrue);
         expect(account2.toJson(), equals(json));
