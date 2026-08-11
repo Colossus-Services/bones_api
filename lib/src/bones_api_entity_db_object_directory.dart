@@ -749,14 +749,18 @@ class DBObjectDirectoryAdapter
     return _finishOperation(op, id, preFinish);
   }
 
-  Future<void> _saveObject(
-    String table,
-    Object? id,
-    Map<String, dynamic> obj,
-  ) async {
+  /// Writes synchronously, and must stay synchronous.
+  ///
+  /// Every reader in this adapter checks the filesystem synchronously
+  /// ([Directory.listSync], [File.existsSync]), so an asynchronous write would
+  /// let a store return before its object is visible: a `store` immediately
+  /// followed by a `selectAll`/`selectByID` could miss it, and
+  /// [_doSelectAllImpl] would silently drop it (a not-yet-written file reads
+  /// back as `null`, which `resolveAllNotNull` discards).
+  void _saveObject(String table, Object? id, Map<String, dynamic> obj) {
     var file = _resolveObjectFile(table, id);
     var enc = dart_convert.json.encode(obj);
-    await file.writeAsString(enc);
+    file.writeAsStringSync(enc);
   }
 
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
