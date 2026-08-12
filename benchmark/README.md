@@ -109,9 +109,32 @@ Linear: roughly 8.5us fixed plus ~0.24us per row. Only the fixed part is
 framework cost shared with a real SQL adapter, where the database does the
 filtering — so do not read 20us as "the cost of a query" in production.
 
-Of that fixed part, an empty `Transaction.executeBlock` is 2.4us. That is the
-most promising remaining target, and wants a real profiler
-(`dart run --observe`) rather than more micro-benchmarks.
+Of that fixed part, an empty `Transaction.executeBlock` is ~2.3us. That is the
+floor under every DB operation, and the largest remaining fixed cost.
+
+### What the transaction floor is *not*
+
+Measured and ruled out, so this does not have to be repeated:
+
+| | us/op |
+|---|---|
+| `Transaction()` constructor | 0.068 |
+| `Zone.current.fork()` | 0.032 |
+| `asyncTry` (sync block, `onError` + `onFinally`) | 0.030 |
+| `Completer()` | 0.011 |
+| commit logging (`root=INFO` vs `OFF`) | ~0.23 |
+| **`Transaction.executeBlock` (empty)** | **2.3** |
+
+A nested `executeBlock` adds only ~0.04us, since it short-circuits to the
+enclosing transaction — that path is already optimal.
+
+None of the named pieces accounts for the total. What is left is the async
+plumbing itself: the commit path threads through several `resolveMapped` hops,
+completers and zone-field reads, and an `await` of an already-completed value
+costs ~0.15us on its own. Cutting it means restructuring the synchronous path
+so it stops allocating futures, which is a real refactor of core transaction
+code rather than an incremental fix — worth doing deliberately, with a
+profiler, not opportunistically.
 
 Note `ConditionParser` builds its PetitParser grammar lazily on first use
 (~125us). `bones_api` holds it in a `static final`, so this is a one-off
