@@ -395,7 +395,15 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
-  }) => add(null, name, function, parameters: parameters, rules: rules);
+    APIRouteConfig? config,
+  }) => add(
+    null,
+    name,
+    function,
+    parameters: parameters,
+    rules: rules,
+    config: config,
+  );
 
   /// Adds a route of [name] with [handler] for `GET` request method.
   APIModule get(
@@ -403,12 +411,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.GET,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for `POST` request method.
@@ -417,12 +427,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.POST,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for `PUT` request method.
@@ -431,12 +443,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.PUT,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for `DELETE` request method.
@@ -445,12 +459,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.DELETE,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for `PATCH` request method.
@@ -459,12 +475,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.PATCH,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for `HEAD` request method.
@@ -473,12 +491,14 @@ class APIRouteBuilder<M extends APIModule> {
     APIRouteFunction function, {
     Map<String, TypeInfo>? parameters,
     Iterable<APIRouteRule>? rules,
+    APIRouteConfig? config,
   }) => add(
     APIRequestMethod.HEAD,
     name,
     function,
     parameters: parameters,
     rules: rules,
+    config: config,
   );
 
   /// Adds a route of [name] with [handler] for the request [method].

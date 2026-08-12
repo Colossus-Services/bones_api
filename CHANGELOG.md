@@ -1,3 +1,43 @@
+## 1.15.0
+
+- Faster request dispatch. A logged route call is **~2.9x** faster
+  (measured in-process, `APIRoot.call` on a trivial route: 2.76us -> 0.90us).
+
+  - `LoggerHandler` no longer builds the formatted log message when nothing
+    would consume it. Every record reaching the root listener was fully
+    formatted — timestamp, padded/truncated isolate and logger names, plus a
+    `Zone` lookup for the current `APIRequest` id — and then discarded when no
+    destination (`logAllTo`/`logErrorTo`/`logDbTo`/console) was configured,
+    which is the default. This was ~1us per record, and a route call emits two
+    (`CALL>` and `RESPONSE>`).
+  - `APIRouteHandler` caches its `CALL>` message and `RESPONSE>` prefix. Both
+    are fixed once a route is registered, but were re-interpolated per request
+    (including stringifying the declared `parameters` `Map`).
+  - `APIRoot._callImpl` no longer copies the path parts list just to read the
+    first one.
+  - `APIServer.toAPIRequest` no longer copies the query-parameters `Map` a
+    second time.
+
+- The `routes` builder now accepts `config:` on `any`/`get`/`post`/`put`/
+  `delete`/`patch`/`head`, matching `APIModule.addRoute`. Previously an
+  `APIRouteConfig` could only be set through `addRoute`, so per-route logging
+  could not be turned off through the usual API:
+
+  ```dart
+  routes.get('ping', handler, config: const APIRouteConfig(log: false));
+  ```
+
+  Route logging is on by default and costs roughly 4x the rest of a trivial
+  dispatch, so this is worth setting on hot routes.
+
+- New `benchmark/` suite covering the request path, with a layered breakdown so
+  a regression can be attributed rather than just observed. See
+  `benchmark/README.md`.
+
+  ```
+  dart run benchmark/bones_api_benchmark.dart
+  ```
+
 ## 1.14.0
 
 - New `DBSQLiteAdapter`: an embedded SQLite DB adapter, backed by the

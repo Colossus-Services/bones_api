@@ -1440,7 +1440,9 @@ class APIServer extends _APIServerBase {
         payload = null;
         mimeType = null;
       } else {
-        parametersResolved = Map<String, dynamic>.from(parameters);
+        // `parameters` was just built by this method and is not shared, so
+        // there is nothing to defend against by copying it again.
+        parametersResolved = parameters;
       }
 
       var req = APIRequest(

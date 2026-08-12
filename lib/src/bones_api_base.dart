@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.14.0';
+  static const String VERSION = '1.15.0';
 
   static bool _boot = false;
 
@@ -738,7 +738,9 @@ abstract class APIRoot with Initializable, Closable {
     APIRequest apiRequest,
     APISecurity? apiSecurity,
   ) {
-    var pathPartRoot = apiRequest.pathParts[0];
+    // `pathParts` copies the backing list on every read; this only needs the
+    // first part.
+    var pathPartRoot = apiRequest.pathPartFirst;
 
     if (pathPartRoot == 'API-INFO') {
       var info = apiInfo(apiRequest);
@@ -1073,6 +1075,31 @@ abstract class APIRouteHandler<T> {
     );
   }
 
+  Map<String, TypeInfo>? _logMessagesParameters;
+  String? _callLogMessage;
+  String? _responseLogPrefix;
+
+  /// The `CALL>` log message, built once per handler.
+  ///
+  /// [module], [routeName] and [parameters] are fixed once a route is
+  /// registered, so interpolating this on every request (which includes
+  /// stringifying the [parameters] `Map`) was pure per-request cost. Rebuilt
+  /// if [parameters] is replaced; an in-place mutation of that `Map` is not
+  /// tracked, and would only stale this log line.
+  String get _callLogMessageCached {
+    var params = parameters;
+    var cached = _callLogMessage;
+    if (cached != null && identical(params, _logMessagesParameters)) {
+      return cached;
+    }
+    _logMessagesParameters = params;
+    _responseLogPrefix = null;
+    return _callLogMessage = "CALL> ${module.name}.$routeName( $params )";
+  }
+
+  String get _responseLogPrefixCached =>
+      _responseLogPrefix ??= "RESPONSE> ${module.name}.$routeName: ";
+
   /// Calls this route.
   FutureOr<APIResponse<T>> call(APIRequest request) {
     request._routeHandler = this;
@@ -1088,7 +1115,7 @@ abstract class APIRouteHandler<T> {
     }
 
     if (config.log && _log.isLoggable(logging.Level.INFO)) {
-      _log.info("CALL> ${module.name}.$routeName( $parameters )");
+      _log.info(_callLogMessageCached);
     }
 
     final initTime = DateTime.now();
@@ -1110,7 +1137,8 @@ abstract class APIRouteHandler<T> {
         );
       } else {
         _log.info(
-          "RESPONSE> ${module.name}.$routeName: ${response.status.name} (${time.inMilliseconds} ms)",
+          "$_responseLogPrefixCached${response.status.name} "
+          "(${time.inMilliseconds} ms)",
         );
       }
     }
