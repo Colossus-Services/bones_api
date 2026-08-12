@@ -271,12 +271,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
           case 'IN':
             {
               context.write('IS NULL ');
+              _markPlaceholderInlinedAsNull(value, context);
               return context;
             }
           case '!=':
           case 'NOT IN':
             {
               context.write('IS NOT NULL ');
+              _markPlaceholderInlinedAsNull(value, context);
               return context;
             }
         }
@@ -288,6 +290,20 @@ class ConditionSQLEncoder extends ConditionEncoder {
       context.write(' ');
       return context;
     });
+  }
+
+  /// Records that [value]'s placeholder was written as `IS NULL`/`IS NOT NULL`,
+  /// so its parameter can be dropped if nothing else references it.
+  ///
+  /// Only a placeholder is registered as a parameter; an inlined
+  /// [EncodingValueNull] never was, so it has nothing to drop.
+  void _markPlaceholderInlinedAsNull(
+    EncodingValue<String, Object?> value,
+    EncodingContext context,
+  ) {
+    if (value is EncodingPlaceholder) {
+      context.markPlaceholderInlinedAsNull(value.key);
+    }
   }
 
   /// Whether [value] is a comparison against SQL `NULL`.
