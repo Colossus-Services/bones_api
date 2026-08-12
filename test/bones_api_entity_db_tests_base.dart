@@ -1385,6 +1385,52 @@ Future<bool> runAdapterTests(
           }
 
           {
+            // A null supplied as a parameter must become `IS NULL`, not `= ?`
+            // bound to null — which is never true in SQL, so the query
+            // silently returned nothing instead of the rows whose column is
+            // null. An inlined null was already handled; passing it as a
+            // parameter was not, and that is the form entity queries take.
+            var nullLevel = await userAPIRepository.selectByQuery(
+              " level == ? ",
+              parameters: {'level': null},
+            );
+
+            expect(
+              nullLevel,
+              isNotEmpty,
+              reason: 'there are users with no level',
+            );
+            expect(
+              nullLevel.map((e) => e.level),
+              everyElement(isNull),
+              reason: 'a null parameter must select the rows that are null',
+            );
+
+            // Compounded with another term — the shape that made this visible,
+            // since a true half cannot rescue a half that never matches.
+            var nullLevelCompound = await userAPIRepository.selectByQuery(
+              " level == ? && email != ? ",
+              parameters: {'level': null, 'email': 'nobody@$testDomain'},
+            );
+
+            expect(nullLevelCompound, isNotEmpty);
+            expect(nullLevelCompound.map((e) => e.level), everyElement(isNull));
+
+            // And the negation, which has to become `IS NOT NULL`.
+            var notNullLevel = await userAPIRepository.selectByQuery(
+              " level != ? ",
+              parameters: {'level': null},
+            );
+
+            expect(notNullLevel, isNotEmpty);
+            expect(
+              notNullLevel.map((e) => e.level),
+              everyElement(isNotNull),
+              reason: 'a negated null parameter must select the non-null rows',
+            );
+          }
+
+          {
             var user4 = await userAPIRepository.selectFirstByQuery(
               "roles =~ ?",
               parameters: {

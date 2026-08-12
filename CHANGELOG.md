@@ -1,3 +1,29 @@
+## 1.15.1
+
+- Fixed: a condition comparing a field to `null` **passed as a parameter** was
+  encoded as `field = ?` bound to `null`. `= NULL` is never true in SQL, so the
+  query returned no rows instead of the rows whose column is null.
+
+  `ConditionSQLEncoder` did turn `=`/`IN` against null into `IS NULL` (and
+  `!=`/`NOT IN` into `IS NOT NULL`), but only when the null was written
+  straight into the statement. A null arriving as a parameter is encoded as a
+  placeholder, whose text never equals `'null'`, so the conversion was skipped.
+  Entity queries take the parameter form, which is why it surfaced there:
+
+  ```dart
+  // Returned [] with matching rows present; now returns the rows whose
+  // `state` is null.
+  repository.selectByQuery(' state == ? && active == ? ',
+      parameters: {'state': null, 'active': true});
+  ```
+
+  The encoder is shared, so this affected every SQL adapter — SQLite,
+  PostgreSQL and MySQL alike — and any condition compared against a null
+  parameter, including compound ones whose other terms matched.
+
+  Covered now by the shared adapter test suite, so all three adapters exercise
+  it.
+
 ## 1.15.0
 
 - Faster request dispatch. A logged route call is **~2.9x** faster
