@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.15.0';
+  static const String VERSION = '1.15.1';
 
   static bool _boot = false;
 
@@ -511,10 +511,14 @@ abstract class APIRoot with Initializable, Closable {
         if (response is APIResponse) {
           return response;
         } else if (response is Future<APIResponse<T>?>) {
-          return response.then(
+          // The type argument is explicit on both branches: `onError` takes an
+          // untyped `(e, s)` closure, so there is no return context to infer
+          // from and `_callHandlersAsync` resolved to `dynamic` — which is not
+          // assignable to what `then` expects here.
+          return response.then<APIResponse<T>?>(
             (resp) {
               if (resp != null) return resp;
-              return _callHandlersAsync(
+              return _callHandlersAsync<T>(
                 handlersIterator,
                 request,
                 handlersType,
@@ -522,7 +526,7 @@ abstract class APIRoot with Initializable, Closable {
             },
             onError: (e, s) {
               _logCallHandlersError(handlersType, handler, e, s);
-              return _callHandlersAsync(
+              return _callHandlersAsync<T>(
                 handlersIterator,
                 request,
                 handlersType,
@@ -566,7 +570,11 @@ abstract class APIRoot with Initializable, Closable {
         if (response == null) continue;
 
         if (response is APIResponse) {
-          return response;
+          // Awaited rather than returned bare: the declared type is a
+          // `FutureOr`, so the analyzer cannot rule out a future here, and a
+          // future returned from inside this `try` would carry its error past
+          // the `catch` below instead of into it.
+          return await response;
         } else if (response is Future<APIResponse<T>?>) {
           var resp = await response;
           if (resp != null) {
@@ -647,12 +655,15 @@ abstract class APIRoot with Initializable, Closable {
         // to be rethrown by the previous `Zone`.
 
         if (response is Future<APIResponse<T>>) {
-          return response.then(
-            (response) => _callZonedReturn(callZone, request, response),
-            onError: (e, s) => _callZonedReturn(
+          // Explicit type arguments: `onError` takes an untyped `(e, s)`
+          // closure, so there is no return context to infer `T` from and both
+          // helpers resolved to `dynamic`, which `then` will not accept here.
+          return response.then<APIResponse<T>>(
+            (response) => _callZonedReturn<T>(callZone, request, response),
+            onError: (e, s) => _callZonedReturn<T>(
               callZone,
               request,
-              _resolveErrorAPIResponse(e, s),
+              _resolveErrorAPIResponse<T>(e, s),
             ),
           );
         } else {

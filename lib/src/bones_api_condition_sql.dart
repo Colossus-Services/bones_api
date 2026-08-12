@@ -253,7 +253,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
     context.write(tableKey);
     context.write(' ');
 
-    var valueSQLRet = valueToSQL(
+    // The encoding value rather than only its text: a null supplied as a
+    // parameter encodes to a placeholder, so the text alone cannot say whether
+    // the comparison is against null.
+    var valueRet = valueToParameterValue(
       context,
       values,
       fieldKey: fieldKey,
@@ -261,8 +264,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
       valueAsList: valueAsList,
     );
 
-    return valueSQLRet.resolveMapped((valueSQL) {
-      if (valueSQL == 'null') {
+    return valueRet.resolveMapped((value) {
+      if (isNullEncodingValue(value, context)) {
         switch (operator) {
           case '=':
           case 'IN':
@@ -281,10 +284,35 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       context.write(operator);
       context.write(' ');
-      context.write(valueSQL);
+      context.write(value.encode);
       context.write(' ');
       return context;
     });
+  }
+
+  /// Whether [value] is a comparison against SQL `NULL`.
+  ///
+  /// A null written straight into the statement arrives as an
+  /// [EncodingValueNull], which is the case this encoder has always handled. A
+  /// null supplied as a *parameter* arrives as an [EncodingPlaceholder]: its
+  /// text is the placeholder and the value itself is held in the context, so
+  /// it has to be looked up there.
+  ///
+  /// Missing that produced `field = ?` bound to null. `= NULL` is never true
+  /// in SQL, so such a query returned nothing at all rather than the rows whose
+  /// column is null.
+  bool isNullEncodingValue(
+    EncodingValue<String, Object?> value,
+    EncodingContext context,
+  ) {
+    if (value is EncodingValueNull) return true;
+
+    if (value is EncodingPlaceholder) {
+      // Absent and present-but-null both mean the statement binds null.
+      return context.parametersPlaceholders[value.key] == null;
+    }
+
+    return false;
   }
 
   FutureOr<MapEntry<Type, String>> keyToSQL(

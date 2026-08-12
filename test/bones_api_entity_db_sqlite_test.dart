@@ -16,7 +16,7 @@ class SQLiteTestConfig extends APITestConfigSQLite {
   SQLiteTestConfig({
     required bool generateTables,
     required bool checkTables,
-    required bool memory,
+    required super.memory,
   }) : super({
          'db': {
            'sqlite': {
@@ -26,7 +26,7 @@ class SQLiteTestConfig extends APITestConfigSQLite {
              'checkTables': checkTables,
            },
          },
-       }, memory: memory);
+       });
 }
 
 Future<void> main() async {
