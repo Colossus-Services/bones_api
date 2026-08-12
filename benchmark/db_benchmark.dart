@@ -10,9 +10,14 @@ import 'src/bench_runner.dart';
 /// dart run benchmark/db_benchmark.dart
 /// ```
 ///
-/// The memory adapter keeps the storage cost near zero, so what is measured is
-/// the framework around it: condition parsing, SQL generation, and mapping
-/// rows to and from entities. That is the part every SQL adapter pays.
+/// The memory adapter keeps I/O out of the picture, so most of what is left is
+/// framework: condition parsing, SQL generation, and mapping rows to and from
+/// entities.
+///
+/// One exception, and it is easy to misread: the memory adapter answers a
+/// non-ID condition by *scanning* the table and evaluating the condition per
+/// row, which a real SQL adapter does not do. `selectByQuery` is therefore
+/// linear in the row count — see `--rows=N` below and `README.md`.
 Future<void> main(List<String> args) async {
   var provider = _BenchProvider();
   await provider.ensureInitialized();
@@ -100,8 +105,9 @@ Future<void> main(List<String> args) async {
   // -----------------------------------------------------------------------
   // Repository operations, end to end through the adapter.
   //
-  // The memory adapter's storage is a `Map`, so the gap between these and the
-  // pieces above is the repository/transaction machinery around the query.
+  // `selectByID` is a keyed lookup and so is flat in the row count.
+  // `selectByQuery` is not: it is roughly a fixed cost plus a per-row scan,
+  // and only the fixed part is shared with a real SQL adapter.
   // -----------------------------------------------------------------------
 
   await runner.runAsync(
@@ -123,7 +129,7 @@ Future<void> main(List<String> args) async {
   );
 
   await runner.runAsync(
-    'repository.selectAll (50)',
+    'repository.selectAll (all rows)',
     () => repository.select(ConditionANY()),
   );
 
