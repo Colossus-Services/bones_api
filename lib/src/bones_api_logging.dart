@@ -248,11 +248,47 @@ abstract class LoggerHandler {
     return max;
   }
 
+  /// Whether any destination could consume a record with these properties.
+  ///
+  /// Deliberately conservative: it may answer `true` and let the dispatch
+  /// below decide, but must never answer `false` while a destination exists.
+  bool _hasLogDestination(
+    logging.Level level,
+    bool isDBLog,
+    bool isFromDBLogger,
+  ) {
+    if (_logToConsole) return true;
+
+    if (_allMessageLogger != null &&
+        (!isDBLog || _allMessageLoggerIncludeDBLogs)) {
+      return true;
+    }
+
+    if (level >= logging.Level.SEVERE && _resolveErrorMessageLogger() != null) {
+      return true;
+    }
+
+    if ((isDBLog || isFromDBLogger) && _resolveDBMessageLogger() != null) {
+      return true;
+    }
+
+    return false;
+  }
+
   void _logRootMsg(logging.LogRecord msg) {
     var level = msg.level;
-    var logMsg = _buildMsg(msg);
 
     var isDBLog = msg.object is DBLog;
+    var isFromDBLogger = !isDBLog && isDbLoggerName(msg.loggerName);
+
+    // `_buildMsg` is comparatively costly — it formats the timestamp, pads and
+    // truncates the isolate/logger names, and looks the current `APIRequest`
+    // up in the record's `Zone`. By default no destination is configured, so
+    // building it here would be pure waste on every logged call.
+    if (!_hasLogDestination(level, isDBLog, isFromDBLogger)) return;
+
+    var logMsg = _buildMsg(msg);
+
     if (!isDBLog || _allMessageLoggerIncludeDBLogs) {
       logAllMessage(level, logMsg);
     }
@@ -266,11 +302,8 @@ abstract class LoggerHandler {
       if (level < logging.Level.WARNING) {
         return;
       }
-    } else {
-      var isFromDBLogger = isDbLoggerName(msg.loggerName);
-      if (isFromDBLogger) {
-        logDBMessage(level, logMsg);
-      }
+    } else if (isFromDBLogger) {
+      logDBMessage(level, logMsg);
     }
 
     if (_logToConsole) {
@@ -450,7 +483,7 @@ abstract class LoggerHandler {
     }
   }
 
-  void logErrorMessage(logging.Level level, String message) {
+  MessageLogger? _resolveErrorMessageLogger() {
     var messageLogger = _errorMessageLogger;
 
     if (messageLogger == null) {
@@ -458,6 +491,12 @@ abstract class LoggerHandler {
       messageLogger = parent?._errorMessageLogger;
       messageLogger ??= LoggerHandler.root._errorMessageLogger;
     }
+
+    return messageLogger;
+  }
+
+  void logErrorMessage(logging.Level level, String message) {
+    var messageLogger = _resolveErrorMessageLogger();
 
     if (messageLogger != null) {
       messageLogger(level, message);
