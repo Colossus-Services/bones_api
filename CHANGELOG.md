@@ -30,13 +30,27 @@
   Route logging is on by default and costs roughly 4x the rest of a trivial
   dispatch, so this is worth setting on hot routes.
 
-- New `benchmark/` suite covering the request path, with a layered breakdown so
-  a regression can be attributed rather than just observed. See
-  `benchmark/README.md`.
+- New `benchmark/` suites, with layered breakdowns so a regression can be
+  attributed rather than just observed. See `benchmark/README.md`.
 
   ```
-  dart run benchmark/bones_api_benchmark.dart
+  dart run benchmark/bones_api_benchmark.dart   # request path
+  dart run benchmark/json_benchmark.dart        # JSON request/response
+  dart run benchmark/db_benchmark.dart          # DB entity path
   ```
+
+  They record that query parsing is well cached (~300x cheaper than parsing)
+  and SQL generation is under a microsecond. JSON encoding already runs close
+  to a bare `dart:convert` encode, and request bodies use `dart:convert`
+  directly, so no JSON optimization came out of that suite.
+
+- `DBSQLMemoryAdapter` now answers a select by ID with a direct lookup in the
+  table `Map`, which is already keyed by ID, instead of scanning it. A miss
+  still falls through to the scan, so results are unchanged.
+
+  `selectByID` was O(rows) and is now flat: 7.8us -> 7.1us at 10 rows,
+  9.7us -> 7.2us at 50, and 25.3us -> 7.2us at 400. This mostly speeds up the
+  test suite and development, since the memory adapter is where those run.
 
 ## 1.14.0
 
