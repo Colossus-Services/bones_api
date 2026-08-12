@@ -73,7 +73,7 @@ small map), and is *faster* for larger payloads because it writes bytes to a
 sink instead of building a `String`. Request bodies are parsed with
 `dart:convert` directly, so there is no `bones_api` layer to remove there.
 
-**DB**, per `db_benchmark.dart`:
+**DB**, per `db_benchmark.dart` (50 rows):
 
 | | us/op |
 |---|---|
@@ -83,16 +83,35 @@ sink instead of building a `String`. Request bodies are parsed with
 | `EntityHandler.createFromMap` | 1.11 |
 | `ConditionParser.parse` (shared parser) | 2.67 |
 | `Transaction.executeBlock` (empty) | 2.40 |
-| `repository.selectByID` | 9.8 |
-| `repository.selectByQuery` | 20.6 |
+| `repository.selectByID` | 7.2 |
+| `repository.selectByQuery` | 20.4 |
 
 The two things a query is *assumed* to be expensive for are not: query parsing
 is cached (~300x cheaper than parsing), and SQL generation is under a
-microsecond. The cost is the repository/transaction machinery around them —
-an empty `Transaction.executeBlock` alone is 2.4us, and a `selectByQuery`
-against an in-memory `Map` is 20us. That is where a future optimization pass
-should look, ideally with a real profiler (`dart run --observe`) rather than
-more micro-benchmarks.
+microsecond.
+
+**Read `selectByQuery` with the row count in mind.** `DBSQLMemoryAdapter`
+answers a non-ID condition by scanning the table `Map` and evaluating the
+condition per row, so that number is mostly the scan, not framework overhead.
+Use `--rows=N` to separate the two:
+
+```bash
+dart run benchmark/db_benchmark.dart --rows=400
+```
+
+| rows | `selectByQuery` |
+|---|---|
+| 10 | 10.9us |
+| 50 | 20.4us |
+| 400 | 105.9us |
+
+Linear: roughly 8.5us fixed plus ~0.24us per row. Only the fixed part is
+framework cost shared with a real SQL adapter, where the database does the
+filtering — so do not read 20us as "the cost of a query" in production.
+
+Of that fixed part, an empty `Transaction.executeBlock` is 2.4us. That is the
+most promising remaining target, and wants a real profiler
+(`dart run --observe`) rather than more micro-benchmarks.
 
 Note `ConditionParser` builds its PetitParser grammar lazily on first use
 (~125us). `bones_api` holds it in a `static final`, so this is a one-off

@@ -20,12 +20,25 @@ Future<void> main(List<String> args) async {
   var adapter = await provider.adapter;
   var repository = provider.userRepository;
 
-  // Seed a small table.
-  for (var i = 1; i <= 50; ++i) {
+  // `DBSQLMemoryAdapter` answers a non-ID condition with a full scan of the
+  // table `Map`, so the row count is a parameter of the result, not a detail.
+  // Vary it with `--rows=N` to separate per-row cost from fixed cost.
+  var rows =
+      int.tryParse(
+        args
+            .firstWhere((a) => a.startsWith('--rows='), orElse: () => '')
+            .split('=')
+            .last,
+      ) ??
+      50;
+
+  for (var i = 1; i <= rows; ++i) {
     await repository.store(
       BenchUser('user$i', 'user$i@example.com', i, id: null),
     );
   }
+
+  print('-- table rows: $rows');
 
   var runner = BenchRunner();
 
