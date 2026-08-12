@@ -29,6 +29,13 @@
   Covered now by the shared adapter test suite, so all three adapters exercise
   it.
 
+- `reflection_factory`: `^2.8.1` → `^2.9.0`.
+  - 2.8.1 pinned `dart_style` to the formatter bundled with Dart 3.12, so on
+    Dart 3.13 the generated `*.reflection.g.dart` no longer matched this
+    package's own `dart format`, making `dart format --set-exit-if-changed` and
+    `test/ensure_build_test.dart` mutually exclusive. 2.9.0 tracks the
+    formatter the SDK ships.
+
 ## 1.15.0
 
 - Faster request dispatch. A logged route call is **~2.9x** faster
