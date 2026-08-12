@@ -1,12 +1,19 @@
 # Benchmarks
 
-In-process benchmarks for the request path: building an `APIRequest`, resolving
-the module/route, dispatching through `APIRoot.call`, and serializing the
-response payload. No socket and no HTTP client are involved, so what is
-measured is the framework's own overhead.
+In-process benchmarks for the framework's own overhead — no socket, no HTTP
+client, and (for the DB suite) an in-memory adapter, so what is measured is
+`bones_api` itself rather than I/O.
+
+| Suite | Covers |
+|---|---|
+| `bones_api_benchmark.dart` | The request path: `APIRequest`, routing, `APIRoot.call` |
+| `json_benchmark.dart` | JSON request/response encoding and decoding |
+| `db_benchmark.dart` | The DB entity path against `DBSQLMemoryAdapter` |
 
 ```bash
 dart run benchmark/bones_api_benchmark.dart
+dart run benchmark/json_benchmark.dart
+dart run benchmark/db_benchmark.dart
 ```
 
 To compare a change, record a baseline on your machine first — throughput is
@@ -55,3 +62,38 @@ Disable it per route when throughput matters more than the audit trail:
 ```dart
 routes.get('ping', handler, config: const APIRouteConfig(log: false));
 ```
+
+## Where the DB and JSON time goes
+
+Recorded once on one machine, as orders of magnitude rather than targets.
+
+**JSON** is in reasonable shape. `Json.encodeToSink` — the response path — runs
+close to a bare `dart:convert` encode of the same value (~1.5us vs ~1.2us for a
+small map), and is *faster* for larger payloads because it writes bytes to a
+sink instead of building a `String`. Request bodies are parsed with
+`dart:convert` directly, so there is no `bones_api` layer to remove there.
+
+**DB**, per `db_benchmark.dart`:
+
+| | us/op |
+|---|---|
+| `ConditionParseCache.parseQuery` (cached) | 0.009 |
+| `Entity.toJson` | 0.074 |
+| `generateSelectSQL` | 0.81 |
+| `EntityHandler.createFromMap` | 1.11 |
+| `ConditionParser.parse` (shared parser) | 2.67 |
+| `Transaction.executeBlock` (empty) | 2.40 |
+| `repository.selectByID` | 9.8 |
+| `repository.selectByQuery` | 20.6 |
+
+The two things a query is *assumed* to be expensive for are not: query parsing
+is cached (~300x cheaper than parsing), and SQL generation is under a
+microsecond. The cost is the repository/transaction machinery around them —
+an empty `Transaction.executeBlock` alone is 2.4us, and a `selectByQuery`
+against an in-memory `Map` is 20us. That is where a future optimization pass
+should look, ideally with a real profiler (`dart run --observe`) rather than
+more micro-benchmarks.
+
+Note `ConditionParser` builds its PetitParser grammar lazily on first use
+(~125us). `bones_api` holds it in a `static final`, so this is a one-off
+startup cost — but constructing a `ConditionParser` per query would not be.

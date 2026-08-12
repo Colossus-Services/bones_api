@@ -30,13 +30,22 @@
   Route logging is on by default and costs roughly 4x the rest of a trivial
   dispatch, so this is worth setting on hot routes.
 
-- New `benchmark/` suite covering the request path, with a layered breakdown so
-  a regression can be attributed rather than just observed. See
-  `benchmark/README.md`.
+- New `benchmark/` suites, with layered breakdowns so a regression can be
+  attributed rather than just observed. See `benchmark/README.md`.
 
   ```
-  dart run benchmark/bones_api_benchmark.dart
+  dart run benchmark/bones_api_benchmark.dart   # request path
+  dart run benchmark/json_benchmark.dart        # JSON request/response
+  dart run benchmark/db_benchmark.dart          # DB entity path
   ```
+
+  The JSON and DB suites are measurement only — no optimization came out of
+  them. They record that query parsing is well cached (~300x cheaper than
+  parsing) and SQL generation is under a microsecond, while the cost of a
+  query sits in the repository/transaction machinery around it (an empty
+  `Transaction.executeBlock` is ~2.4us). JSON encoding already runs close to
+  a bare `dart:convert` encode, and request bodies use `dart:convert`
+  directly.
 
 ## 1.14.0
 
