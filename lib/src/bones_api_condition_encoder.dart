@@ -1198,9 +1198,50 @@ abstract class ConditionEncoder {
         s.write(groupCloser);
       }
 
+      pruneUnusedParametersPlaceholders(context);
+
       return context;
     });
   }
+
+  /// Drops the placeholders that the encoded output never references.
+  ///
+  /// A null compared with `==`/`!=` is written as `IS NULL`/`IS NOT NULL`
+  /// rather than as the placeholder, which leaves its parameter resolved but
+  /// unmentioned by the statement. PostgreSQL rejects a statement carrying
+  /// variables it does not use, so the entry has to go.
+  void pruneUnusedParametersPlaceholders(EncodingContext context) {
+    var parametersPlaceholders = context.parametersPlaceholders;
+    if (parametersPlaceholders.isEmpty) return;
+
+    var output = context.outputString;
+
+    parametersPlaceholders.removeWhere(
+      (key, _) => !_isPlaceholderInOutput(output, parameterPlaceholder(key)),
+    );
+  }
+
+  static bool _isPlaceholderInOutput(String output, String placeholder) {
+    for (var i = output.indexOf(placeholder); i >= 0;) {
+      var end = i + placeholder.length;
+
+      // A longer placeholder that merely starts with this one is a different
+      // parameter: `@level` vs. `@level_0`, the indexed form used for lists.
+      if (end >= output.length || !_isPlaceholderChar(output.codeUnitAt(end))) {
+        return true;
+      }
+
+      i = output.indexOf(placeholder, i + 1);
+    }
+
+    return false;
+  }
+
+  static bool _isPlaceholderChar(int c) =>
+      (c >= 0x30 && c <= 0x39) || // 0-9
+      (c >= 0x41 && c <= 0x5a) || // A-Z
+      (c >= 0x61 && c <= 0x7a) || // a-z
+      c == 0x5f; // _
 
   FutureOr<EncodingContext> encodeCondition(
     Condition c,
