@@ -1093,22 +1093,17 @@ extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
   }
 
   Future<List<String>> mapKeys(Map<String, dynamic> map) {
-    var ret = onCall(
-      this,
-      'mapKeys',
-      <String, dynamic>{'map': map},
-      const __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]),
-    );
+    var ret = onCall(this, 'mapKeys', <String, dynamic>{
+      'map': map,
+    }, const __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
     return __retFut$<List<String>>(ret);
   }
 
   Future<List<int>> listMultiplier(List<int> list, int m) {
-    var ret = onCall(
-      this,
-      'listMultiplier',
-      <String, dynamic>{'list': list, 'm': m},
-      const __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]),
-    );
+    var ret = onCall(this, 'listMultiplier', <String, dynamic>{
+      'list': list,
+      'm': m,
+    }, const __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
     return __retFut$<List<int>>(ret);
   }
 }
