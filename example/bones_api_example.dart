@@ -60,7 +60,7 @@ class MyBTCModule extends APIModule {
 
 /// The `APIRoot` defines the API version and modules to use:
 class MyAPI extends APIRoot {
-  MyAPI({dynamic apiConfig}) : super('example', '1.0', apiConfig: apiConfig);
+  MyAPI({super.apiConfig}) : super('example', '1.0');
 
   // Load the modules used by this API:
   @override

@@ -26,18 +26,13 @@ class APITestConfigDockerPostgreSQL
   APITestConfigDockerPostgreSQL(
     Map<String, dynamic> apiConfig, {
     DockerHost? dockerHost,
-    String? containerNamePrefix,
+    super.containerNamePrefix,
     this.postgresPort,
     this.maxConnections,
     this.logStatement,
     this.version = 'latest',
     super.cleanContainer,
-  }) : super(
-         dockerHost ?? DockerHostLocal(),
-         'PostgreSQL',
-         apiConfig,
-         containerNamePrefix: containerNamePrefix,
-       ) {
+  }) : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig) {
     DBPostgreSQLAdapter.boot();
   }
 
