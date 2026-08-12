@@ -21,6 +21,11 @@
   PostgreSQL and MySQL alike — and any condition compared against a null
   parameter, including compound ones whose other terms matched.
 
+  Rewriting the comparison also leaves the parameter unmentioned by the
+  statement, so it is now dropped once the condition is encoded: PostgreSQL
+  rejects a statement carrying variables it does not use. A placeholder still
+  referenced by another operator (`field > ?` bound to null) keeps its binding.
+
   Covered now by the shared adapter test suite, so all three adapters exercise
   it.
 
