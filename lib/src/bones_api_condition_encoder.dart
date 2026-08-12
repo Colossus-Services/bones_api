@@ -926,6 +926,22 @@ class EncodingContext {
   /// The encoded parameters placeholders and values.
   final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
 
+  /// The placeholders whose comparison was written as `IS NULL`/`IS NOT NULL`
+  /// instead of as the placeholder itself. Only these can end up resolved but
+  /// unreferenced, so only these are worth looking for in the output.
+  ///
+  /// Left null while empty: the common encoding compares nothing against null,
+  /// and allocating a `Set` per encoded condition is not free.
+  Set<String>? _nullInlinedPlaceholders;
+
+  /// Marks [parameterKey] as having been written as SQL `NULL` inline.
+  void markPlaceholderInlinedAsNull(String parameterKey) =>
+      (_nullInlinedPlaceholders ??= <String>{}).add(parameterKey);
+
+  /// The keys marked by [markPlaceholderInlinedAsNull].
+  Iterable<String> get nullInlinedPlaceholders =>
+      _nullInlinedPlaceholders ?? const <String>{};
+
   /// The table aliases used in the encoded output.
   final Map<String, String> tableAliases = <String, String>{};
 
@@ -1210,15 +1226,30 @@ abstract class ConditionEncoder {
   /// rather than as the placeholder, which leaves its parameter resolved but
   /// unmentioned by the statement. PostgreSQL rejects a statement carrying
   /// variables it does not use, so the entry has to go.
+  ///
+  /// Only a placeholder rewritten that way can become unreferenced, so a
+  /// condition that compares nothing against null returns here immediately —
+  /// without materializing the output or scanning it.
   void pruneUnusedParametersPlaceholders(EncodingContext context) {
+    var nullInlined = context.nullInlinedPlaceholders;
+    if (nullInlined.isEmpty) return;
+
     var parametersPlaceholders = context.parametersPlaceholders;
     if (parametersPlaceholders.isEmpty) return;
 
-    var output = context.outputString;
+    // Resolved lazily: a marked key may still be referenced by another
+    // operator, and then there is nothing to scan for.
+    String? output;
 
-    parametersPlaceholders.removeWhere(
-      (key, _) => !_isPlaceholderInOutput(output, parameterPlaceholder(key)),
-    );
+    for (var key in nullInlined) {
+      if (!parametersPlaceholders.containsKey(key)) continue;
+
+      output ??= context.outputString;
+
+      if (!_isPlaceholderInOutput(output, parameterPlaceholder(key))) {
+        parametersPlaceholders.remove(key);
+      }
+    }
   }
 
   static bool _isPlaceholderInOutput(String output, String placeholder) {

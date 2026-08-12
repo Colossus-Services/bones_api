@@ -1,3 +1,24 @@
+## 1.15.2
+
+- The placeholder pruning added in 1.15.1 no longer runs on every encoded
+  condition.
+
+  Rewriting `field == ?` bound to null into `field IS NULL` leaves that
+  parameter unreferenced, and 1.15.1 found it by materializing the encoded
+  output and scanning it for *every* placeholder. That cost was paid by every
+  query, including the overwhelmingly common one that compares nothing against
+  null: **~0.30us per encoded condition** (measured on a 3-placeholder
+  condition), against the ~0.90us of a whole logged route call after the 1.15.0
+  dispatch work.
+
+  Only a placeholder actually rewritten to `IS NULL`/`IS NOT NULL` can become
+  unreferenced, so those keys are now recorded as they are written, and a
+  condition that compares nothing against null returns immediately — without
+  materializing the output or scanning it. The output is materialized lazily
+  even then, since a recorded key may still be referenced by another operator.
+
+  No behaviour change: same statements, same bound parameters.
+
 ## 1.15.1
 
 - Fixed: a condition comparing a field to `null` **passed as a parameter** was
