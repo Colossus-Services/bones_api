@@ -1,3 +1,83 @@
+## 1.16.0
+
+- Added the `cross_origin` configuration entry, grouping every cross-origin
+  response header and splitting it by the kind of response it applies to, the
+  same shape the `cache` entry already uses:
+
+  ```yaml
+  cross_origin:
+    api:
+      allow_origin: ''
+      allow_methods: 'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS'
+      allow_headers: 'Content-Type, Access-Control-Allow-Headers, Authorization'
+      allow_credentials: true
+      expose_headers: 'Content-Length, Content-Type, Last-Modified, X-Access-Token, X-Access-Token-Expiration'
+      max_age: 0
+      vary_origin: true
+    static_files:
+      opener_policy: 'same-origin-allow-popups'
+      embedder_policy: ''
+      resource_policy: ''
+  ```
+
+  The split is not cosmetic: `CORS` is set on API responses only, while the
+  cross-origin isolation policies are set on static file responses only, and
+  the two never meet on the same response.
+
+  Every entry is also a command-line option
+  (`--cross-origin-api-max-age`, `--cross-origin-static-files-opener-policy`,
+  ...), and an `APICrossOriginConfig` can be passed straight to `APIServer`.
+  See `APICORSConfig` and `APICrossOriginPolicies`.
+
+  Until now all of these values were hardcoded in `APIServer.setCORS`, with no
+  way to change them short of rewriting the response.
+
+- **Behavior change**: static `text/html` responses are now served with
+  `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
+
+  It severs the opener relationship with a cross-origin document that opened
+  the page — the isolation of `same-origin` — while still allowing the popups
+  the page itself opens to keep a handle back to it. That is what popup-based
+  sign-in flows need (`Sign in with Google`, OAuth popups): the popup reports
+  its result by calling back into its opener.
+
+  A document served by this server that is itself opened as a *cross-origin*
+  popup and calls `window.opener` (an OAuth callback landing page) must now opt
+  out with `opener_policy: none`.
+
+  `COOP` and `COEP` are only sent for `text/html`, since they are document
+  headers, while `CORP` applies to every static file. `COEP` and `CORP` are
+  disabled by default.
+
+- **Behavior change**: API responses are now served with `Vary: Origin`.
+
+  `Access-Control-Allow-Origin` reflects the request `Origin`, and without
+  `Vary` a shared cache is free to serve one origin's
+  `Access-Control-Allow-Origin` to another. Disable with `vary_origin: false`.
+
+- `allow_origin` accepts an allowlist. When set, the request `Origin` is
+  reflected only if it matches, otherwise no `Access-Control-Allow-Origin` is
+  sent and the browser blocks the cross-origin read.
+
+  Worth noting for anyone leaving it empty: reflecting any origin together with
+  `Access-Control-Allow-Credentials: true` — the behavior before this version,
+  and still the default — lets any site make credentialed calls to the API and
+  read the responses. The browser only rejects that pairing for a literal `*`.
+
+- `Access-Control-Max-Age` is now available through `max_age`, sent only on
+  `OPTIONS` responses, the only ones a browser caches. Defaults to `0`, which
+  omits the header.
+
+- Fixed: a `cookieless` server did not apply the cookieless guarantee to static
+  file responses.
+
+  `Set-Cookie` was dropped and `X-Cookieless-Server: Blocking all cookies` was
+  added by the API response builder, but a static file response is built by the
+  `shelf` handler and returned before reaching it. So the header was missing
+  from every static file, and nothing enforced the absence of `Set-Cookie`
+  there. Both now happen for static files as well, including the non-`2xx`
+  responses.
+
 ## 1.15.2
 
 - The placeholder pruning added in 1.15.1 no longer runs on every encoded

@@ -38,6 +38,389 @@ final _log = logging.Logger('APIServer');
 
 final _logLetsEncrypt = logging.Logger('LetsEncrypt');
 
+/// The cross-origin configuration of an [APIServer].
+///
+/// Configured at the `cross_origin` entry of the [APIConfig], split by the
+/// kind of response it applies to, mirroring the `cache` entry:
+///
+/// ```yaml
+/// cross_origin:
+///   api:
+///     allow_origin: ''
+///     allow_credentials: true
+///   static_files:
+///     opener_policy: 'same-origin-allow-popups'
+/// ```
+///
+/// The two groups never apply to the same response: static files are served
+/// without `CORS` headers, and the cross-origin isolation policies are
+/// document headers, meaningless on an API payload.
+class APICrossOriginConfig {
+  /// The `CORS` configuration of API responses. See [APICORSConfig].
+  final APICORSConfig api;
+
+  /// The cross-origin isolation policies of static file responses.
+  /// See [APICrossOriginPolicies].
+  final APICrossOriginPolicies staticFiles;
+
+  APICrossOriginConfig({
+    APICORSConfig? api,
+    APICrossOriginPolicies? staticFiles,
+  }) : api = api ?? APICORSConfig(),
+       staticFiles = staticFiles ?? APICrossOriginPolicies();
+
+  /// Resolves from the `cross_origin` entry of [apiConfig], overridden by the
+  /// command-line options in [args].
+  factory APICrossOriginConfig.resolve({
+    APIConfig? apiConfig,
+    ArgsSimple? args,
+  }) => APICrossOriginConfig(
+    api: APICORSConfig.resolve(apiConfig: apiConfig, args: args),
+    staticFiles: APICrossOriginPolicies.resolve(
+      apiConfig: apiConfig,
+      args: args,
+    ),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'api': api.toJson(),
+    'static_files': staticFiles.toJson(),
+  };
+
+  factory APICrossOriginConfig.fromJson(Map json) => APICrossOriginConfig(
+    api: json['api'] is Map ? APICORSConfig.fromJson(json['api']) : null,
+    staticFiles: json['static_files'] is Map
+        ? APICrossOriginPolicies.fromJson(json['static_files'])
+        : null,
+  );
+
+  @override
+  String toString() =>
+      'APICrossOriginConfig{api: $api, staticFiles: $staticFiles}';
+}
+
+/// The `CORS` (Cross-Origin Resource Sharing) configuration of API responses.
+///
+/// Configured at `cross_origin/api`. See [APICrossOriginConfig].
+class APICORSConfig {
+  /// The allowed origins (`Access-Control-Allow-Origin`).
+  ///
+  /// - Empty (the default): the request `Origin` is reflected, preserving the
+  ///   behavior of servers configured before this entry existed.
+  /// - Not empty: an allowlist. The request `Origin` is reflected only when it
+  ///   matches an entry, otherwise no `Access-Control-Allow-Origin` is sent and
+  ///   the browser blocks the cross-origin read. An entry `*` allows any origin.
+  ///
+  /// Note that reflecting any origin together with [allowCredentials] lets any
+  /// site perform credentialed calls to this API and read the responses: the
+  /// browser only rejects that pairing for a literal `*`. An allowlist here is
+  /// the fix.
+  final List<String> allowOrigin;
+
+  /// The `Access-Control-Allow-Methods` value. Empty omits the header.
+  final List<String> allowMethods;
+
+  /// The `Access-Control-Allow-Headers` value. Empty omits the header.
+  /// See [localhostAllowHeaders].
+  final List<String> allowHeaders;
+
+  /// The `Access-Control-Allow-Credentials` value.
+  final bool allowCredentials;
+
+  /// The `Access-Control-Expose-Headers` value. Empty omits the header.
+  final List<String> exposeHeaders;
+
+  /// The `Access-Control-Max-Age` value, in seconds, allowing the browser to
+  /// cache a preflight and skip an `OPTIONS` round-trip per cross-origin call.
+  /// Only sent on `OPTIONS` responses. Zero (the default) omits the header.
+  final int maxAge;
+
+  /// If `true` (the default) sends `Vary: Origin`.
+  ///
+  /// [allowOrigin] reflects the request `Origin`, so without this a shared
+  /// cache may serve one origin's `Access-Control-Allow-Origin` to another.
+  final bool varyOrigin;
+
+  APICORSConfig({
+    Object? allowOrigin,
+    Object? allowMethods,
+    Object? allowHeaders,
+    bool? allowCredentials,
+    Object? exposeHeaders,
+    int? maxAge,
+    bool? varyOrigin,
+  }) : allowOrigin = parseHeaderList(allowOrigin, const []),
+       allowMethods = parseHeaderList(allowMethods, defaultAllowMethods),
+       allowHeaders = parseHeaderList(allowHeaders, defaultAllowHeaders),
+       allowCredentials = allowCredentials ?? true,
+       exposeHeaders = parseHeaderList(exposeHeaders, defaultExposeHeaders),
+       maxAge = maxAge ?? 0,
+       varyOrigin = varyOrigin ?? true;
+
+  /// The default value for [allowMethods].
+  static const List<String> defaultAllowMethods = [
+    'GET',
+    'HEAD',
+    'PUT',
+    'POST',
+    'PATCH',
+    'DELETE',
+    'OPTIONS',
+  ];
+
+  /// The default value for [allowHeaders].
+  static const List<String> defaultAllowHeaders = [
+    'Content-Type',
+    'Access-Control-Allow-Headers',
+    'Authorization',
+  ];
+
+  /// Extra [allowHeaders] sent only to `localhost` origins: the Dart
+  /// development server (`webdev`) sends an `x-ijt` header.
+  static const List<String> localhostAllowHeaders = ['x-ijt'];
+
+  /// The default value for [exposeHeaders].
+  static const List<String> defaultExposeHeaders = [
+    'Content-Length',
+    'Content-Type',
+    'Last-Modified',
+    APIServer.headerXAccessToken,
+    APIServer.headerXAccessTokenExpiration,
+  ];
+
+  /// Resolves from the `cross_origin/api` entry of [apiConfig], overridden by
+  /// the command-line options in [args].
+  factory APICORSConfig.resolve({APIConfig? apiConfig, ArgsSimple? args}) {
+    Object? opt(String argKey, String configKey) =>
+        args?.optionAsString(argKey) ??
+        apiConfig?.getPath('cross_origin', 'api', configKey);
+
+    return APICORSConfig(
+      allowOrigin: opt('cross-origin-api-allow-origin', 'allow_origin'),
+      allowMethods: opt('cross-origin-api-allow-methods', 'allow_methods'),
+      allowHeaders: opt('cross-origin-api-allow-headers', 'allow_headers'),
+      allowCredentials: parseBool(
+        opt('cross-origin-api-allow-credentials', 'allow_credentials'),
+      ),
+      exposeHeaders: opt('cross-origin-api-expose-headers', 'expose_headers'),
+      maxAge: parseMaxAge(opt('cross-origin-api-max-age', 'max_age')),
+      varyOrigin: parseBool(opt('cross-origin-api-vary-origin', 'vary_origin')),
+    );
+  }
+
+  /// Parses a header list [value], accepting a [List] or a comma separated
+  /// [String]. Returns [def] for a `null` [value], and an empty list for an
+  /// explicitly empty [value].
+  static List<String> parseHeaderList(Object? value, List<String> def) {
+    if (value == null) return def;
+
+    if (value is Iterable) {
+      return value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    return value
+        .toString()
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  /// Parses a [maxAge] value, accepting an [int] or a [String].
+  static int? parseMaxAge(Object? value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString().trim());
+  }
+
+  /// Normalizes an [origin] for comparison: lower-case and without a
+  /// trailing `/` (added by [APIServer.getOrigin] when a request has no
+  /// `Origin` header).
+  static String normalizeOrigin(String origin) {
+    origin = origin.trim().toLowerCase();
+    while (origin.endsWith('/')) {
+      origin = origin.substring(0, origin.length - 1);
+    }
+    return origin;
+  }
+
+  /// Returns `true` if [origin] is a `localhost` origin.
+  static bool isLocalhostOrigin(String origin) =>
+      origin.contains("://localhost:") ||
+      origin.contains("://127.0.0.1:") ||
+      origin.contains("://::1");
+
+  /// Resolves the `Access-Control-Allow-Origin` value for [origin], or `null`
+  /// when [origin] is not allowed and no header should be sent.
+  String? resolveAllowOrigin(String origin) {
+    if (origin.isEmpty) {
+      return allowOrigin.isEmpty ? '*' : null;
+    }
+
+    if (allowOrigin.isEmpty) return origin;
+
+    var o = normalizeOrigin(origin);
+
+    var allowed = allowOrigin.any((e) => e == '*' || normalizeOrigin(e) == o);
+
+    return allowed ? origin : null;
+  }
+
+  /// Resolves the `Access-Control-Allow-Headers` value for [origin],
+  /// appending [localhostAllowHeaders] for a `localhost` origin.
+  List<String> resolveAllowHeaders(String origin) {
+    if (allowHeaders.isEmpty || !isLocalhostOrigin(origin)) return allowHeaders;
+
+    var extra = localhostAllowHeaders.where((e) => !allowHeaders.contains(e));
+    if (extra.isEmpty) return allowHeaders;
+
+    return [...allowHeaders, ...extra];
+  }
+
+  Map<String, dynamic> toJson() => {
+    'allow_origin': allowOrigin,
+    'allow_methods': allowMethods,
+    'allow_headers': allowHeaders,
+    'allow_credentials': allowCredentials,
+    'expose_headers': exposeHeaders,
+    'max_age': maxAge,
+    'vary_origin': varyOrigin,
+  };
+
+  factory APICORSConfig.fromJson(Map json) => APICORSConfig(
+    allowOrigin: json['allow_origin'],
+    allowMethods: json['allow_methods'],
+    allowHeaders: json['allow_headers'],
+    allowCredentials: parseBool(json['allow_credentials']),
+    exposeHeaders: json['expose_headers'],
+    maxAge: parseMaxAge(json['max_age']),
+    varyOrigin: parseBool(json['vary_origin']),
+  );
+
+  @override
+  String toString() => 'APICORSConfig${toJson()}';
+}
+
+/// The cross-origin isolation policies of static file responses.
+///
+/// Configured at `cross_origin/static_files`. See [APICrossOriginConfig].
+///
+/// Every policy accepts `none` (or an empty value) to omit its header.
+class APICrossOriginPolicies {
+  /// The `Cross-Origin-Opener-Policy` (COOP) header, sent only for `text/html`
+  /// responses, since COOP applies to top-level documents.
+  ///
+  /// Defaults to [defaultOpenerPolicy].
+  final String openerPolicy;
+
+  /// The `Cross-Origin-Embedder-Policy` (COEP) header, sent only for
+  /// `text/html` responses. Disabled by default.
+  ///
+  /// Enabling `require-corp` blocks every cross-origin subresource that does
+  /// not opt in via `CORP`/`CORS`, so it should only be enabled by a document
+  /// that needs cross-origin isolation (e.g. for `SharedArrayBuffer`).
+  final String embedderPolicy;
+
+  /// The `Cross-Origin-Resource-Policy` (CORP) header, sent for every static
+  /// file response, since CORP is a per-resource header. Disabled by default.
+  ///
+  /// `same-site` or `same-origin` prevents other sites from embedding or
+  /// reading these files.
+  final String resourcePolicy;
+
+  APICrossOriginPolicies({
+    Object? openerPolicy,
+    Object? embedderPolicy,
+    Object? resourcePolicy,
+  }) : openerPolicy = normalizePolicy(openerPolicy, defaultOpenerPolicy),
+       embedderPolicy = normalizePolicy(embedderPolicy, defaultEmbedderPolicy),
+       resourcePolicy = normalizePolicy(resourcePolicy, defaultResourcePolicy);
+
+  /// The `Cross-Origin-Opener-Policy` header name.
+  static const String headerOpenerPolicy = 'Cross-Origin-Opener-Policy';
+
+  /// The `Cross-Origin-Embedder-Policy` header name.
+  static const String headerEmbedderPolicy = 'Cross-Origin-Embedder-Policy';
+
+  /// The `Cross-Origin-Resource-Policy` header name.
+  static const String headerResourcePolicy = 'Cross-Origin-Resource-Policy';
+
+  /// The default value for [openerPolicy]: `same-origin-allow-popups`.
+  ///
+  /// Severs the opener relationship with a cross-origin document that opened
+  /// this one (the isolation of `same-origin`), while still allowing the popups
+  /// *this* document opens to keep a handle back to it. That is what
+  /// popup-based sign-in flows need (Sign in with Google, OAuth popups): the
+  /// popup reports its result by calling back into its opener.
+  ///
+  /// A document served by this server that is itself opened as a *cross-origin*
+  /// popup and calls `window.opener` (an OAuth callback landing page) must
+  /// disable this with `none`.
+  static const String defaultOpenerPolicy = 'same-origin-allow-popups';
+
+  /// The default value for [embedderPolicy]: disabled.
+  static const String defaultEmbedderPolicy = '';
+
+  /// The default value for [resourcePolicy]: disabled.
+  static const String defaultResourcePolicy = '';
+
+  /// Resolves from the `cross_origin/static_files` entry of [apiConfig],
+  /// overridden by the command-line options in [args].
+  factory APICrossOriginPolicies.resolve({
+    APIConfig? apiConfig,
+    ArgsSimple? args,
+  }) {
+    Object? opt(String argKey, String configKey) =>
+        args?.optionAsString(argKey) ??
+        apiConfig?.getPath('cross_origin', 'static_files', configKey);
+
+    return APICrossOriginPolicies(
+      openerPolicy: opt(
+        'cross-origin-static-files-opener-policy',
+        'opener_policy',
+      ),
+      embedderPolicy: opt(
+        'cross-origin-static-files-embedder-policy',
+        'embedder_policy',
+      ),
+      resourcePolicy: opt(
+        'cross-origin-static-files-resource-policy',
+        'resource_policy',
+      ),
+    );
+  }
+
+  /// Normalizes a policy [value]: `null` resolves to [def], while an empty
+  /// value or the `none` sentinel resolves to `''`, omitting the header.
+  static String normalizePolicy(Object? value, String def) {
+    if (value == null) return def;
+
+    var s = value.toString().trim();
+    if (s.isEmpty || equalsIgnoreAsciiCase(s, 'none')) return '';
+
+    return s;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'opener_policy': openerPolicy,
+    'embedder_policy': embedderPolicy,
+    'resource_policy': resourcePolicy,
+  };
+
+  factory APICrossOriginPolicies.fromJson(Map json) => APICrossOriginPolicies(
+    openerPolicy: json['opener_policy'],
+    embedderPolicy: json['embedder_policy'],
+    resourcePolicy: json['resource_policy'],
+  );
+
+  @override
+  String toString() => 'APICrossOriginPolicies${toJson()}';
+}
+
 /// API Server Config.
 class APIServerConfig {
   final bool development;
@@ -157,6 +540,12 @@ class APIServerConfig {
     '/pwa_sw.js',
   ];
 
+  /// The cross-origin configuration: the `CORS` headers of API responses and
+  /// the cross-origin isolation headers of static file responses.
+  ///
+  /// See [APICrossOriginConfig] and the `cross_origin` [APIConfig] entry.
+  final APICrossOriginConfig crossOrigin;
+
   /// If `true` will cache static files. Default: true
   final bool cacheStaticFilesResponses;
 
@@ -222,6 +611,7 @@ class APIServerConfig {
     String? staticFilesCacheControl,
     String? longLivedStaticFilesCacheControl,
     Object? longLivedStaticFilesCached,
+    APICrossOriginConfig? crossOrigin,
     bool? cacheStaticFilesResponses,
     int? staticFilesCacheMaxMemorySize,
     int? staticFilesCacheMaxContentLength,
@@ -293,6 +683,8 @@ class APIServerConfig {
          def: defaultLongLivedStaticFilesCached,
          apiConfig: apiConfig,
        ),
+       crossOrigin =
+           crossOrigin ?? APICrossOriginConfig.resolve(apiConfig: apiConfig),
        cacheStaticFilesResponses = resolveCacheStaticFilesResponses(
          cacheStaticFilesResponses,
          apiConfig: apiConfig,
@@ -421,6 +813,11 @@ class APIServerConfig {
           apiConfig?.getPath<String>('server', 'response-delay'),
     );
 
+    var crossOrigin = APICrossOriginConfig.resolve(
+      apiConfig: apiConfig,
+      args: a,
+    );
+
     return APIServerConfig(
       development: development ?? apiConfig?.development,
       name: name,
@@ -442,6 +839,7 @@ class APIServerConfig {
       staticFilesCacheControl: staticFilesCacheControl,
       longLivedStaticFilesCacheControl: longLivedStaticFilesCacheControl,
       longLivedStaticFilesCached: longLivedStaticFilesCached,
+      crossOrigin: crossOrigin,
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
@@ -982,6 +1380,7 @@ class APIServerConfig {
         return e.toString();
       }
     }).toList(),
+    'crossOrigin': crossOrigin.toJson(),
     'cacheStaticFilesResponses': cacheStaticFilesResponses,
     'staticFilesCacheMaxMemorySize': staticFilesCacheMaxMemorySize,
     'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
@@ -1012,6 +1411,9 @@ class APIServerConfig {
       longLivedStaticFilesCacheControl:
           json['longLivedStaticFilesCacheControl'],
       longLivedStaticFilesCached: json['longLivedStaticFilesCached'],
+      crossOrigin: json['crossOrigin'] is Map
+          ? APICrossOriginConfig.fromJson(json['crossOrigin'])
+          : null,
       cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
       maxPayloadLength: json['maxPayloadLength'],
       decompressPayload: json['decompressPayload'],
@@ -1061,6 +1463,7 @@ abstract class _APIServerBase extends APIServerConfig {
     super.staticFilesCacheControl,
     super.longLivedStaticFilesCacheControl,
     super.longLivedStaticFilesCached,
+    super.crossOrigin,
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
@@ -1093,6 +1496,7 @@ abstract class _APIServerBase extends APIServerConfig {
         longLivedStaticFilesCacheControl:
             apiServerConfig.longLivedStaticFilesCacheControl,
         longLivedStaticFilesCached: apiServerConfig.longLivedStaticFilesCached,
+        crossOrigin: apiServerConfig.crossOrigin,
         cacheStaticFilesResponses: apiServerConfig.cacheStaticFilesResponses,
         staticFilesCacheMaxMemorySize:
             apiServerConfig.staticFilesCacheMaxMemorySize,
@@ -1220,6 +1624,7 @@ class APIServer extends _APIServerBase {
     super.staticFilesCacheControl,
     super.longLivedStaticFilesCacheControl,
     super.longLivedStaticFilesCached,
+    super.crossOrigin,
     super.cacheStaticFilesResponses,
     super.maxPayloadLength,
     super.decompressPayload,
@@ -1316,6 +1721,7 @@ class APIServer extends _APIServerBase {
       staticFilesCacheControl: staticFilesCacheControl,
       longLivedStaticFilesCacheControl: longLivedStaticFilesCacheControl,
       longLivedStaticFilesCached: longLivedStaticFilesCached,
+      crossOrigin: crossOrigin,
       cacheStaticFilesResponses: cacheStaticFilesResponses,
       staticFilesCacheMaxMemorySize: staticFilesCacheMaxMemorySize,
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
@@ -1793,45 +2199,88 @@ class APIServer extends _APIServerBase {
     return val is HttpConnectionInfo ? val : null;
   }
 
-  static final String headerXAccessToken = "X-Access-Token";
-  static final String headerXAccessTokenExpiration =
+  static const String headerXAccessToken = "X-Access-Token";
+  static const String headerXAccessTokenExpiration =
       "X-Access-Token-Expiration";
 
-  static final String exposeHeaders =
-      "Content-Length, Content-Type, Last-Modified, $headerXAccessToken, $headerXAccessTokenExpiration";
+  /// The header flagging a `cookieless` server. See [headerXCookielessServerValue].
+  static const String headerXCookielessServer = "X-Cookieless-Server";
 
-  static void setCORS(APIRequest request, APIResponse response) {
+  /// The [headerXCookielessServer] value.
+  static const String headerXCookielessServerValue = "Blocking all cookies";
+
+  static final String exposeHeaders = APICORSConfig.defaultExposeHeaders.join(
+    ', ',
+  );
+
+  /// Sets the `CORS` headers of [response], as configured by [cors]
+  /// (defaults to [APICORSConfig] defaults).
+  static void setCORS(
+    APIRequest request,
+    APIResponse response, {
+    APICORSConfig? cors,
+  }) {
+    cors ??= APICORSConfig();
+
     var origin = getOrigin(request);
 
-    var localhost = false;
-
-    if (origin.isEmpty) {
-      response.headers[HttpHeaders.accessControlAllowOriginHeader] = "*";
-    } else {
-      response.headers[HttpHeaders.accessControlAllowOriginHeader] = origin;
-
-      if (origin.contains("://localhost:") ||
-          origin.contains("://127.0.0.1:") ||
-          origin.contains("://::1")) {
-        localhost = true;
-      }
+    var allowOrigin = cors.resolveAllowOrigin(origin);
+    if (allowOrigin != null) {
+      response.headers[HttpHeaders.accessControlAllowOriginHeader] =
+          allowOrigin;
     }
 
-    response.headers[HttpHeaders.accessControlAllowMethodsHeader] =
-        "GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS";
-
-    response.headers[HttpHeaders.accessControlAllowCredentialsHeader] = "true";
-
-    if (localhost) {
-      response.headers[HttpHeaders.accessControlAllowHeadersHeader] =
-          "Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt";
-    } else {
-      response.headers[HttpHeaders.accessControlAllowHeadersHeader] =
-          "Content-Type, Access-Control-Allow-Headers, Authorization";
+    if (cors.varyOrigin) {
+      response.headers[HttpHeaders.varyHeader] = _resolveVaryWithOrigin(
+        response.headers[HttpHeaders.varyHeader],
+      );
     }
 
-    response.headers[HttpHeaders.accessControlExposeHeadersHeader] =
-        exposeHeaders;
+    var allowMethods = cors.allowMethods;
+    if (allowMethods.isNotEmpty) {
+      response.headers[HttpHeaders.accessControlAllowMethodsHeader] =
+          allowMethods.join(',');
+    }
+
+    response.headers[HttpHeaders.accessControlAllowCredentialsHeader] =
+        cors.allowCredentials ? "true" : "false";
+
+    var allowHeaders = cors.resolveAllowHeaders(origin);
+    if (allowHeaders.isNotEmpty) {
+      response.headers[HttpHeaders.accessControlAllowHeadersHeader] =
+          allowHeaders.join(', ');
+    }
+
+    var exposeHeaders = cors.exposeHeaders;
+    if (exposeHeaders.isNotEmpty) {
+      response.headers[HttpHeaders.accessControlExposeHeadersHeader] =
+          exposeHeaders.join(', ');
+    }
+
+    // Only a preflight response can be cached by `Access-Control-Max-Age`:
+    if (cors.maxAge > 0 && request.method == APIRequestMethod.OPTIONS) {
+      response.headers[HttpHeaders.accessControlMaxAgeHeader] = cors.maxAge
+          .toString();
+    }
+  }
+
+  /// Returns [currentVary] with `Origin` appended, preserving any other field
+  /// already listed.
+  static String _resolveVaryWithOrigin(Object? currentVary) {
+    var vary = currentVary?.toString().trim() ?? '';
+    if (vary.isEmpty || vary == '*') {
+      return vary.isEmpty ? 'Origin' : vary;
+    }
+
+    var fields = vary
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (fields.any((e) => equalsIgnoreAsciiCase(e, 'Origin'))) return vary;
+
+    return [...fields, 'Origin'].join(', ');
   }
 
   static String getOrigin(APIRequest request) {
@@ -2286,6 +2735,7 @@ final class APIServerWorker extends _APIServerBase {
     super.staticFilesCacheControl,
     super.longLivedStaticFilesCacheControl,
     super.longLivedStaticFilesCached,
+    super.crossOrigin,
     super.cacheStaticFilesResponses,
     super.staticFilesCacheMaxMemorySize,
     super.staticFilesCacheMaxContentLength,
@@ -2390,9 +2840,19 @@ final class APIServerWorker extends _APIServerBase {
     Request request,
     Response response,
   ) {
+    response = removeStaticFileCookies(response);
+
+    var headers = <String, String>{};
+
+    if (cookieless) {
+      headers[APIServer.headerXCookielessServer] =
+          APIServer.headerXCookielessServerValue;
+    }
+
     var statusCode = response.statusCode;
     if (statusCode < 200 || statusCode > 299) {
       return response.change(
+        headers: headers.isNotEmpty ? headers : null,
         context: _buildResponseContext(rootDirectory, request, response),
       );
     }
@@ -2404,15 +2864,73 @@ final class APIServerWorker extends _APIServerBase {
       cacheControl = longLivedStaticFilesCacheControl;
     }
 
-    var headers = <String, String>{
-      if (cacheControl.isNotEmpty) HttpHeaders.cacheControlHeader: cacheControl,
-      HttpHeaders.serverHeader: serverName,
-    };
+    if (cacheControl.isNotEmpty) {
+      headers[HttpHeaders.cacheControlHeader] = cacheControl;
+    }
+
+    headers[HttpHeaders.serverHeader] = serverName;
+
+    _addCrossOriginPolicies(response, headers);
 
     return response.change(
       headers: headers,
       context: _buildResponseContext(rootDirectory, request, response),
     );
+  }
+
+  /// Removes any `Set-Cookie` from a static file [response] when [cookieless]
+  /// is on, returning [response] untouched otherwise.
+  ///
+  /// A [cookieless] server must not set a cookie in a static file response
+  /// either, and a static file response is built by the `shelf` handler,
+  /// never passing through the API response builder that drops it.
+  ///
+  /// Called again right before the [Response] is handed over, since a
+  /// `Set-Cookie` can be introduced after the headers are configured.
+  Response removeStaticFileCookies(Response response) {
+    if (!cookieless) return response;
+
+    // `Response.headers` is case-insensitive and unmodifiable, so the header
+    // is removed through `change`, where a `null` value drops the entry:
+    if (!response.headers.containsKey(HttpHeaders.setCookieHeader)) {
+      return response;
+    }
+
+    return response.change(headers: {HttpHeaders.setCookieHeader: null});
+  }
+
+  /// Adds the configured cross-origin isolation headers to [headers].
+  ///
+  /// `COOP` and `COEP` are only sent for `text/html` responses, since they are
+  /// document headers, while `CORP` applies to every static file.
+  ///
+  /// See [APICrossOriginPolicies].
+  void _addCrossOriginPolicies(Response response, Map<String, String> headers) {
+    var policies = crossOrigin.staticFiles;
+
+    var resourcePolicy = policies.resourcePolicy;
+    if (resourcePolicy.isNotEmpty) {
+      headers[APICrossOriginPolicies.headerResourcePolicy] = resourcePolicy;
+    }
+
+    if (!_isHTMLDocumentResponse(response)) return;
+
+    var openerPolicy = policies.openerPolicy;
+    if (openerPolicy.isNotEmpty) {
+      headers[APICrossOriginPolicies.headerOpenerPolicy] = openerPolicy;
+    }
+
+    var embedderPolicy = policies.embedderPolicy;
+    if (embedderPolicy.isNotEmpty) {
+      headers[APICrossOriginPolicies.headerEmbedderPolicy] = embedderPolicy;
+    }
+  }
+
+  static bool _isHTMLDocumentResponse(Response response) {
+    var contentType = response.headers[HttpHeaders.contentTypeHeader];
+    if (contentType == null) return false;
+
+    return contentType.trimLeft().toLowerCase().startsWith('text/html');
   }
 
   /// Returns `true` if [filePath] matches any pattern in [longLivedStaticFilesCached].
@@ -2944,10 +3462,11 @@ final class APIServerWorker extends _APIServerBase {
     APIRequest apiRequest,
     APIResponse apiResponse,
   ) {
-    APIServer.setCORS(apiRequest, apiResponse);
+    APIServer.setCORS(apiRequest, apiResponse, cors: crossOrigin.api);
 
     if (apiResponse is _APIResponseStaticFile) {
-      return apiResponse.fileResponse;
+      // Later checkpoint: the last handover of a static file `Response`.
+      return removeStaticFileCookies(apiResponse.fileResponse);
     }
 
     var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
@@ -3011,7 +3530,9 @@ final class APIServerWorker extends _APIServerBase {
     var headers = <String, Object>{};
 
     if (!apiResponse.hasCORS) {
-      apiResponse.setCORS(apiRequest);
+      // Use the configured `CORS`, not the [APIResponse] defaults, so that a
+      // header this server is configured to omit is not added back here:
+      APIServer.setCORS(apiRequest, apiResponse, cors: crossOrigin.api);
     }
 
     if (apiResponse.requiresAuthentication) {
@@ -3159,7 +3680,8 @@ final class APIServerWorker extends _APIServerBase {
 
     if (cookieless) {
       headers.remove(HttpHeaders.setCookieHeader);
-      headers['X-Cookieless-Server'] = 'Blocking all cookies';
+      headers[APIServer.headerXCookielessServer] =
+          APIServer.headerXCookielessServerValue;
     }
 
     switch (apiResponse.status) {
