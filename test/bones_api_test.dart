@@ -928,6 +928,269 @@ void main() {
       expect(headers3['x-api-server-cache'], isNotEmpty);
     });
 
+    test('cross-origin[default] /index.html', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/index.html',
+      );
+
+      expect(status, equals(200));
+
+      expect(
+        headers['cross-origin-opener-policy']?.firstOrNull,
+        equals('same-origin-allow-popups'),
+      );
+
+      // `COEP` and `CORP` are disabled by default:
+      expect(headers['cross-origin-embedder-policy'], isNull);
+      expect(headers['cross-origin-resource-policy'], isNull);
+    });
+
+    test('cross-origin[default] /foo.txt (not a document)', () async {
+      var (status, data, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/foo.txt',
+      );
+
+      expect(status, equals(200));
+      expect(data, isNotEmpty);
+
+      // `COOP` and `COEP` are document headers, not sent for a non-HTML file:
+      expect(headers['cross-origin-opener-policy'], isNull);
+      expect(headers['cross-origin-embedder-policy'], isNull);
+    });
+
+    test('cors[default] base/foo', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}base/foo',
+        headers: {'Origin': 'https://foo.com'},
+      );
+
+      expect(status, equals(200));
+
+      // No allowlist configured: the request `Origin` is reflected.
+      expect(
+        headers['access-control-allow-origin']?.firstOrNull,
+        equals('https://foo.com'),
+      );
+
+      expect(headers['vary']?.firstOrNull, equals('Origin'));
+
+      expect(
+        headers['access-control-allow-credentials']?.firstOrNull,
+        equals('true'),
+      );
+
+      // Not sent without `max_age`:
+      expect(headers['access-control-max-age'], isNull);
+
+      // API responses never get the static file isolation policies:
+      expect(headers['cross-origin-opener-policy'], isNull);
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+    });
+  });
+
+  group('APIServer + docRoot + cross_origin', () {
+    late final APIServer apiServer;
+
+    setUpAll(() async {
+      // A dedicated `APIRoot` instance: servers sharing an `APIRoot` also
+      // share its `posApiRequestHandlers`, so the static file handler of the
+      // server above (configured with the defaults) would answer these
+      // requests. Instantiated here, and not while declaring the group, to
+      // not replace the `MyAPI` singleton before the `APIRoot` group runs.
+      apiServer = APIServer(
+        MyAPI.withConfig(),
+        'localhost',
+        5547,
+        documentRoot: _resolveServerDocRoot(),
+        crossOrigin: APICrossOriginConfig(
+          api: APICORSConfig(allowOrigin: 'https://allowed.com', maxAge: 600),
+          staticFiles: APICrossOriginPolicies(
+            openerPolicy: 'same-origin',
+            embedderPolicy: 'credentialless',
+            resourcePolicy: 'same-site',
+          ),
+        ),
+      );
+
+      await apiServer.start();
+    });
+
+    test('/index.html', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/index.html',
+      );
+
+      expect(status, equals(200));
+
+      expect(
+        headers['cross-origin-opener-policy']?.firstOrNull,
+        equals('same-origin'),
+      );
+      expect(
+        headers['cross-origin-embedder-policy']?.firstOrNull,
+        equals('credentialless'),
+      );
+      expect(
+        headers['cross-origin-resource-policy']?.firstOrNull,
+        equals('same-site'),
+      );
+    });
+
+    test('/foo.txt (CORP only)', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/foo.txt',
+      );
+
+      expect(status, equals(200));
+
+      // `CORP` is a per-resource header, sent for every static file:
+      expect(
+        headers['cross-origin-resource-policy']?.firstOrNull,
+        equals('same-site'),
+      );
+
+      expect(headers['cross-origin-opener-policy'], isNull);
+      expect(headers['cross-origin-embedder-policy'], isNull);
+    });
+
+    test('cors: allowed origin', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}base/foo',
+        headers: {'Origin': 'https://allowed.com'},
+      );
+
+      expect(status, equals(200));
+
+      expect(
+        headers['access-control-allow-origin']?.firstOrNull,
+        equals('https://allowed.com'),
+      );
+      expect(headers['vary']?.firstOrNull, equals('Origin'));
+
+      // `Access-Control-Max-Age` only caches a preflight:
+      expect(headers['access-control-max-age'], isNull);
+    });
+
+    test('cors: origin out of the allowlist', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}base/foo',
+        headers: {'Origin': 'https://evil.com'},
+      );
+
+      expect(status, equals(200));
+
+      // No `Access-Control-Allow-Origin`: the browser blocks the read.
+      expect(headers['access-control-allow-origin'], isNull);
+
+      // The other headers are still sent, and the response still varies
+      // on `Origin`:
+      expect(headers['vary']?.firstOrNull, equals('Origin'));
+      expect(headers['access-control-allow-methods'], isNotEmpty);
+    });
+
+    test('cors: preflight max-age', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}base/foo',
+        method: APIRequestMethod.OPTIONS,
+        headers: {'Origin': 'https://allowed.com'},
+      );
+
+      expect(status, equals(200));
+
+      expect(headers['access-control-max-age']?.firstOrNull, equals('600'));
+      expect(
+        headers['access-control-allow-origin']?.firstOrNull,
+        equals('https://allowed.com'),
+      );
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+    });
+  });
+
+  group('APIServer + docRoot + cookieless', () {
+    late final APIServer apiServer;
+
+    setUpAll(() async {
+      // A dedicated `APIRoot` instance: see the group above.
+      apiServer = APIServer(
+        MyAPI.withConfig(),
+        'localhost',
+        5548,
+        documentRoot: _resolveServerDocRoot(),
+        cookieless: true,
+      );
+
+      await apiServer.start();
+    });
+
+    test('/index.html', () async {
+      var (status, data, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/index.html',
+      );
+
+      expect(status, equals(200));
+      expect(data, isNotEmpty);
+
+      expect(
+        headers['x-cookieless-server']?.firstOrNull,
+        equals('Blocking all cookies'),
+      );
+
+      expect(headers[HttpHeaders.setCookieHeader], isNull);
+    });
+
+    test('/foo.txt', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/foo.txt',
+      );
+
+      expect(status, equals(200));
+
+      expect(
+        headers['x-cookieless-server']?.firstOrNull,
+        equals('Blocking all cookies'),
+      );
+
+      expect(headers[HttpHeaders.setCookieHeader], isNull);
+    });
+
+    test('/not-a-file.html (404)', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}/not-a-file.html',
+      );
+
+      expect(status, equals(404));
+
+      // A `404` is also served without a cookie:
+      expect(
+        headers['x-cookieless-server']?.firstOrNull,
+        equals('Blocking all cookies'),
+      );
+
+      expect(headers[HttpHeaders.setCookieHeader], isNull);
+    });
+
+    test('base/foo (API)', () async {
+      var (status, _, headers) = await _getUrlAndHeaders(
+        '${apiServer.url}base/foo',
+      );
+
+      expect(status, equals(200));
+
+      expect(
+        headers['x-cookieless-server']?.firstOrNull,
+        equals('Blocking all cookies'),
+      );
+
+      // No `SESSIONID` is set by a cookieless server:
+      expect(headers[HttpHeaders.setCookieHeader], isNull);
+    });
+
     tearDownAll(() async {
       await apiServer.stop();
     });
