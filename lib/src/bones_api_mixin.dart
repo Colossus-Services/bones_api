@@ -566,7 +566,7 @@ mixin FieldsFromMap {
   /// Resolves [fieldName] to one that matches a [fieldsNames] element.
   String? resolveFiledName(
     List<String> fieldsNames,
-    final String fieldName, {
+    String fieldName, {
     Map<String, int>? fieldsNamesIndexes,
     List<String>? fieldsNamesLC,
     List<String>? fieldsNamesSimple,
