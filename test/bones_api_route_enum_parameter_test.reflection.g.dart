@@ -15,7 +15,7 @@
 // ignore_for_file: unnecessary_cast
 // ignore_for_file: unnecessary_type_check
 
-part of 'bones_api_test.dart';
+part of 'bones_api_route_enum_parameter_test.dart';
 
 typedef __TR<T> = TypeReflection<T>;
 typedef __TI<T> = TypeInfo<T>;
@@ -48,26 +48,34 @@ Symbol? _getSymbol(String? key) {
   }
 }
 
-Future<T> __retFut$<T>(Object? o) => ClassProxy.returnFuture<T>(o);
-
 // ignore: non_constant_identifier_names
-MyInfoModule MyInfoModule$fromJson(Map<String, Object?> map) =>
-    MyInfoModule$reflection.staticInstance.fromJson(map);
+Currency? Currency$from(Object? o) =>
+    Currency$reflection.staticInstance.from(o);
 // ignore: non_constant_identifier_names
-MyInfoModule MyInfoModule$fromJsonEncoded(String jsonEncoded) =>
-    MyInfoModule$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+ExternalIntegrationModule ExternalIntegrationModule$fromJson(
+  Map<String, Object?> map,
+) => ExternalIntegrationModule$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+ExternalIntegrationModule ExternalIntegrationModule$fromJsonEncoded(
+  String jsonEncoded,
+) => ExternalIntegrationModule$reflection.staticInstance.fromJsonEncoded(
+  jsonEncoded,
+);
+// ignore: non_constant_identifier_names
+PaymentType? PaymentType$from(Object? o) =>
+    PaymentType$reflection.staticInstance.from(o);
 
-class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
+class Currency$reflection extends EnumReflection<Currency>
     with __ReflectionMixin {
-  static final Expando<MyInfoModule$reflection> _objectReflections = Expando();
+  static final Expando<Currency$reflection> _objectReflections = Expando();
 
-  factory MyInfoModule$reflection([MyInfoModule? object]) {
+  factory Currency$reflection([Currency? object]) {
     if (object == null) return staticInstance;
-    return _objectReflections[object] ??= MyInfoModule$reflection._(object);
+    return _objectReflections[object] ??= Currency$reflection._(object);
   }
 
-  MyInfoModule$reflection._([MyInfoModule? object])
-    : super(MyInfoModule, r'MyInfoModule', object);
+  Currency$reflection._([Currency? object])
+    : super(Currency, r'Currency', object);
 
   static bool _registered = false;
   @override
@@ -83,53 +91,142 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   Version get languageVersion => Version.parse('3.10.0');
 
   @override
-  MyInfoModule$reflection withObject([MyInfoModule? obj]) =>
-      MyInfoModule$reflection(obj)..setupInternalsWith(this);
+  Currency$reflection withObject([Currency? obj]) => Currency$reflection(obj);
 
-  static MyInfoModule$reflection? _withoutObjectInstance;
+  static Currency$reflection? _withoutObjectInstance;
   @override
-  MyInfoModule$reflection withoutObjectInstance() => staticInstance;
+  Currency$reflection withoutObjectInstance() => staticInstance;
 
   @override
   Symbol? getSymbol(String? key) => _getSymbol(key);
 
-  static MyInfoModule$reflection get staticInstance =>
-      _withoutObjectInstance ??= MyInfoModule$reflection._();
+  static Currency$reflection get staticInstance =>
+      _withoutObjectInstance ??= Currency$reflection._();
 
   @override
-  MyInfoModule$reflection getStaticInstance() => staticInstance;
+  Currency$reflection getStaticInstance() => staticInstance;
 
   static bool _boot = false;
   static void boot() {
     if (_boot) return;
     _boot = true;
-    MyInfoModule$reflection.staticInstance;
+    Currency$reflection.staticInstance;
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<String> _staticFieldsNames = const <String>[
+    'brl',
+    'eur',
+    'usd',
+  ];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  static const Map<String, Currency> _valuesByName = const <String, Currency>{
+    'brl': Currency.brl,
+    'eur': Currency.eur,
+    'usd': Currency.usd,
+  };
+
+  @override
+  Map<String, Currency> get valuesByName => _valuesByName;
+  @override
+  List<Currency> get values => Currency.values;
+
+  static const List<String> _fieldsNames = const <String>[];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+}
+
+class ExternalIntegrationModule$reflection
+    extends ClassReflection<ExternalIntegrationModule>
+    with __ReflectionMixin {
+  static final Expando<ExternalIntegrationModule$reflection>
+  _objectReflections = Expando();
+
+  factory ExternalIntegrationModule$reflection([
+    ExternalIntegrationModule? object,
+  ]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??=
+        ExternalIntegrationModule$reflection._(object);
+  }
+
+  ExternalIntegrationModule$reflection._([ExternalIntegrationModule? object])
+    : super(ExternalIntegrationModule, r'ExternalIntegrationModule', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.10.0');
+
+  @override
+  ExternalIntegrationModule$reflection withObject([
+    ExternalIntegrationModule? obj,
+  ]) => ExternalIntegrationModule$reflection(obj)..setupInternalsWith(this);
+
+  static ExternalIntegrationModule$reflection? _withoutObjectInstance;
+  @override
+  ExternalIntegrationModule$reflection withoutObjectInstance() =>
+      staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static ExternalIntegrationModule$reflection get staticInstance =>
+      _withoutObjectInstance ??= ExternalIntegrationModule$reflection._();
+
+  @override
+  ExternalIntegrationModule$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    ExternalIntegrationModule$reflection.staticInstance;
   }
 
   @override
   bool get hasDefaultConstructor => false;
   @override
-  MyInfoModule? createInstanceWithDefaultConstructor() => null;
+  ExternalIntegrationModule? createInstanceWithDefaultConstructor() => null;
 
   @override
   bool get hasEmptyConstructor => false;
   @override
-  MyInfoModule? createInstanceWithEmptyConstructor() => null;
+  ExternalIntegrationModule? createInstanceWithEmptyConstructor() => null;
   @override
   bool get hasNoRequiredArgsConstructor => false;
   @override
-  MyInfoModule? createInstanceWithNoRequiredArgsConstructor() => null;
+  ExternalIntegrationModule? createInstanceWithNoRequiredArgsConstructor() =>
+      null;
 
   static const List<String> _constructorsNames = const <String>[''];
 
   @override
   List<String> get constructorsNames => _constructorsNames;
 
-  static final Map<String, ConstructorReflection<MyInfoModule>> _constructors =
-      {};
+  static final Map<String, ConstructorReflection<ExternalIntegrationModule>>
+  _constructors = {};
 
   @override
-  ConstructorReflection<MyInfoModule>? constructor(String constructorName) {
+  ConstructorReflection<ExternalIntegrationModule>? constructor(
+    String constructorName,
+  ) {
     var c = _constructors[constructorName];
     if (c != null) return c;
     c = _constructorImpl(constructorName);
@@ -138,18 +235,18 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     return c;
   }
 
-  ConstructorReflection<MyInfoModule>? _constructorImpl(
+  ConstructorReflection<ExternalIntegrationModule>? _constructorImpl(
     String constructorName,
   ) {
     var lc = constructorName.trim().toLowerCase();
 
     switch (lc) {
       case '':
-        return ConstructorReflection<MyInfoModule>(
+        return ConstructorReflection<ExternalIntegrationModule>(
           this,
-          MyInfoModule,
+          ExternalIntegrationModule,
           '',
-          () => MyInfoModule.new,
+          () => ExternalIntegrationModule.new,
           const <__PR>[__PR(__TR<APIRoot>(APIRoot), 'apiRoot', false, true)],
           null,
           null,
@@ -174,7 +271,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   bool get hasMethodToJson => false;
 
   @override
-  Object? callMethodToJson([MyInfoModule? obj]) => null;
+  Object? callMethodToJson([ExternalIntegrationModule? obj]) => null;
 
   static const List<String> _fieldsNames = const <String>[
     'allRoutesNames',
@@ -196,15 +293,16 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   @override
   List<String> get fieldsNames => _fieldsNames;
 
-  static final Map<String, FieldReflection<MyInfoModule, dynamic>>
+  static final Map<String, FieldReflection<ExternalIntegrationModule, dynamic>>
   _fieldsNoObject = {};
 
-  final Map<String, FieldReflection<MyInfoModule, dynamic>> _fieldsObject = {};
+  final Map<String, FieldReflection<ExternalIntegrationModule, dynamic>>
+  _fieldsObject = {};
 
   @override
-  FieldReflection<MyInfoModule, T>? field<T>(
+  FieldReflection<ExternalIntegrationModule, T>? field<T>(
     String fieldName, [
-    MyInfoModule? obj,
+    ExternalIntegrationModule? obj,
   ]) {
     if (obj == null) {
       if (object != null) {
@@ -218,21 +316,25 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
   }
 
-  FieldReflection<MyInfoModule, T>? _fieldNoObjectImpl<T>(String fieldName) {
+  FieldReflection<ExternalIntegrationModule, T>? _fieldNoObjectImpl<T>(
+    String fieldName,
+  ) {
     final f = _fieldsNoObject[fieldName];
     if (f != null) {
-      return f as FieldReflection<MyInfoModule, T>;
+      return f as FieldReflection<ExternalIntegrationModule, T>;
     }
     final f2 = _fieldImpl(fieldName, null);
     if (f2 == null) return null;
     _fieldsNoObject[fieldName] = f2;
-    return f2 as FieldReflection<MyInfoModule, T>;
+    return f2 as FieldReflection<ExternalIntegrationModule, T>;
   }
 
-  FieldReflection<MyInfoModule, T>? _fieldObjectImpl<T>(String fieldName) {
+  FieldReflection<ExternalIntegrationModule, T>? _fieldObjectImpl<T>(
+    String fieldName,
+  ) {
     final f = _fieldsObject[fieldName];
     if (f != null) {
-      return f as FieldReflection<MyInfoModule, T>;
+      return f as FieldReflection<ExternalIntegrationModule, T>;
     }
     var f2 = _fieldNoObjectImpl<T>(fieldName);
     if (f2 == null) return null;
@@ -241,9 +343,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     return f2;
   }
 
-  FieldReflection<MyInfoModule, dynamic>? _fieldImpl(
+  FieldReflection<ExternalIntegrationModule, dynamic>? _fieldImpl(
     String fieldName,
-    MyInfoModule? obj,
+    ExternalIntegrationModule? obj,
   ) {
     obj ??= object;
 
@@ -251,7 +353,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
 
     switch (lc) {
       case 'apiroot':
-        return FieldReflection<MyInfoModule, APIRoot>(
+        return FieldReflection<ExternalIntegrationModule, APIRoot>(
           this,
           APIModule,
           const __TR<APIRoot>(APIRoot),
@@ -264,7 +366,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           true,
         );
       case 'name':
-        return FieldReflection<MyInfoModule, String>(
+        return FieldReflection<ExternalIntegrationModule, String>(
           this,
           APIModule,
           __TR.tString,
@@ -277,7 +379,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           true,
         );
       case 'version':
-        return FieldReflection<MyInfoModule, String?>(
+        return FieldReflection<ExternalIntegrationModule, String?>(
           this,
           APIModule,
           __TR.tString,
@@ -290,7 +392,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           true,
         );
       case 'apiconfig':
-        return FieldReflection<MyInfoModule, APIConfig>(
+        return FieldReflection<ExternalIntegrationModule, APIConfig>(
           this,
           APIModule,
           const __TR<APIConfig>(APIConfig),
@@ -303,7 +405,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'defaultroutename':
-        return FieldReflection<MyInfoModule, String?>(
+        return FieldReflection<ExternalIntegrationModule, String?>(
           this,
           APIModule,
           __TR.tString,
@@ -316,7 +418,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'allroutesnames':
-        return FieldReflection<MyInfoModule, Set<String>>(
+        return FieldReflection<ExternalIntegrationModule, Set<String>>(
           this,
           APIModule,
           __TR.tSetString,
@@ -329,7 +431,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'routes':
-        return FieldReflection<MyInfoModule, APIRouteBuilder<APIModule>>(
+        return FieldReflection<
+          ExternalIntegrationModule,
+          APIRouteBuilder<APIModule>
+        >(
           this,
           APIModule,
           const __TR<APIRouteBuilder<APIModule>>(APIRouteBuilder, <__TR>[
@@ -344,7 +449,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'authenticationroute':
-        return FieldReflection<MyInfoModule, String>(
+        return FieldReflection<ExternalIntegrationModule, String>(
           this,
           APIModule,
           __TR.tString,
@@ -357,7 +462,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'security':
-        return FieldReflection<MyInfoModule, APISecurity?>(
+        return FieldReflection<ExternalIntegrationModule, APISecurity?>(
           this,
           APIModule,
           const __TR<APISecurity>(APISecurity),
@@ -370,7 +475,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'hashcode':
-        return FieldReflection<MyInfoModule, int>(
+        return FieldReflection<ExternalIntegrationModule, int>(
           this,
           APIModule,
           __TR.tInt,
@@ -384,7 +489,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const [override],
         );
       case 'initializationstatus':
-        return FieldReflection<MyInfoModule, InitializationStatus>(
+        return FieldReflection<ExternalIntegrationModule, InitializationStatus>(
           this,
           Initializable,
           const __TR<InitializationStatus>(InitializationStatus),
@@ -397,7 +502,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'isinitialized':
-        return FieldReflection<MyInfoModule, bool>(
+        return FieldReflection<ExternalIntegrationModule, bool>(
           this,
           Initializable,
           __TR.tBool,
@@ -410,7 +515,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'isinitializing':
-        return FieldReflection<MyInfoModule, bool>(
+        return FieldReflection<ExternalIntegrationModule, bool>(
           this,
           Initializable,
           __TR.tBool,
@@ -423,7 +528,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           false,
         );
       case 'isasyncinitialization':
-        return FieldReflection<MyInfoModule, bool>(
+        return FieldReflection<ExternalIntegrationModule, bool>(
           this,
           Initializable,
           __TR.tBool,
@@ -442,7 +547,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
 
   @override
   Map<String, dynamic> getFieldsValues(
-    MyInfoModule? obj, {
+    ExternalIntegrationModule? obj, {
     bool withHashCode = false,
   }) {
     obj ??= object;
@@ -470,8 +575,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticFieldsNames => _staticFieldsNames;
 
   @override
-  StaticFieldReflection<MyInfoModule, T>? staticField<T>(String fieldName) =>
-      null;
+  StaticFieldReflection<ExternalIntegrationModule, T>? staticField<T>(
+    String fieldName,
+  ) => null;
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
@@ -482,7 +588,6 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'checkInitialized',
     'configure',
     'doInitialization',
-    'echo',
     'ensureConfigured',
     'ensureInitialized',
     'ensureInitializedAsync',
@@ -492,26 +597,23 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'getRoutesHandlersNames',
     'initialize',
     'initializeDependencies',
-    'listMultiplier',
-    'mapKeys',
     'resolveRoute',
-    'toUpperCase',
-    'withPayload',
+    'updateOrderStatusFromBroker',
   ];
 
   @override
   List<String> get methodsNames => _methodsNames;
 
-  static final Map<String, MethodReflection<MyInfoModule, dynamic>>
+  static final Map<String, MethodReflection<ExternalIntegrationModule, dynamic>>
   _methodsNoObject = {};
 
-  final Map<String, MethodReflection<MyInfoModule, dynamic>> _methodsObject =
-      {};
+  final Map<String, MethodReflection<ExternalIntegrationModule, dynamic>>
+  _methodsObject = {};
 
   @override
-  MethodReflection<MyInfoModule, R>? method<R>(
+  MethodReflection<ExternalIntegrationModule, R>? method<R>(
     String methodName, [
-    MyInfoModule? obj,
+    ExternalIntegrationModule? obj,
   ]) {
     if (obj == null) {
       if (object != null) {
@@ -525,21 +627,25 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     return _methodNoObjectImpl<R>(methodName)?.withObject(obj);
   }
 
-  MethodReflection<MyInfoModule, R>? _methodNoObjectImpl<R>(String methodName) {
+  MethodReflection<ExternalIntegrationModule, R>? _methodNoObjectImpl<R>(
+    String methodName,
+  ) {
     final m = _methodsNoObject[methodName];
     if (m != null) {
-      return m as MethodReflection<MyInfoModule, R>;
+      return m as MethodReflection<ExternalIntegrationModule, R>;
     }
     final m2 = _methodImpl(methodName, null);
     if (m2 == null) return null;
     _methodsNoObject[methodName] = m2;
-    return m2 as MethodReflection<MyInfoModule, R>;
+    return m2 as MethodReflection<ExternalIntegrationModule, R>;
   }
 
-  MethodReflection<MyInfoModule, R>? _methodObjectImpl<R>(String methodName) {
+  MethodReflection<ExternalIntegrationModule, R>? _methodObjectImpl<R>(
+    String methodName,
+  ) {
     final m = _methodsObject[methodName];
     if (m != null) {
-      return m as MethodReflection<MyInfoModule, R>;
+      return m as MethodReflection<ExternalIntegrationModule, R>;
     }
     var m2 = _methodNoObjectImpl<R>(methodName);
     if (m2 == null) return null;
@@ -548,9 +654,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     return m2;
   }
 
-  MethodReflection<MyInfoModule, dynamic>? _methodImpl(
+  MethodReflection<ExternalIntegrationModule, dynamic>? _methodImpl(
     String methodName,
-    MyInfoModule? obj,
+    ExternalIntegrationModule? obj,
   ) {
     obj ??= object;
 
@@ -558,9 +664,9 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
 
     switch (lc) {
       case 'configure':
-        return MethodReflection<MyInfoModule, void>(
+        return MethodReflection<ExternalIntegrationModule, void>(
           this,
-          MyInfoModule,
+          ExternalIntegrationModule,
           'configure',
           __TR.tVoid,
           false,
@@ -571,99 +677,37 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           const [override],
         );
-      case 'echo':
-        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
-          this,
-          MyInfoModule,
-          'echo',
-          const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
-            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
-          ]),
-          false,
-          (o) => o!.echo,
-          obj,
-          const <__PR>[
-            __PR(__TR.tString, 'msg', false, true),
-            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
-          ],
-          null,
-          null,
-          null,
-        );
-      case 'touppercase':
-        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
-          this,
-          MyInfoModule,
-          'toUpperCase',
-          const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
-            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
-          ]),
-          false,
-          (o) => o!.toUpperCase,
-          obj,
-          const <__PR>[__PR(__TR.tString, 'msg', false, true)],
-          null,
-          null,
-          null,
-        );
-      case 'withpayload':
-        return MethodReflection<MyInfoModule, FutureOr<APIResponse<String>>>(
-          this,
-          MyInfoModule,
-          'withPayload',
-          const __TR<FutureOr<APIResponse<String>>>(FutureOr, <__TR>[
-            __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
-          ]),
-          false,
-          (o) => o!.withPayload,
-          obj,
-          const <__PR>[__PR(__TR<Uint8List>(Uint8List), 'payload', true, true)],
-          null,
-          null,
-          null,
-        );
-      case 'mapkeys':
+      case 'updateorderstatusfrombroker':
         return MethodReflection<
-          MyInfoModule,
-          FutureOr<APIResponse<List<String>>>
+          ExternalIntegrationModule,
+          APIResponse<Map<dynamic, dynamic>>
         >(
           this,
-          MyInfoModule,
-          'mapKeys',
-          const __TR<FutureOr<APIResponse<List<String>>>>(FutureOr, <__TR>[
-            __TR<APIResponse<List<String>>>(APIResponse, <__TR>[
-              __TR.tListString,
+          ExternalIntegrationModule,
+          'updateOrderStatusFromBroker',
+          const __TR<APIResponse<Map>>(APIResponse, <__TR>[
+            __TR<Map<dynamic, dynamic>>(Map, <__TR>[
+              __TR.tDynamic,
+              __TR.tDynamic,
             ]),
           ]),
           false,
-          (o) => o!.mapKeys,
-          obj,
-          const <__PR>[__PR(__TR.tMapStringDynamic, 'map', false, true)],
-          null,
-          null,
-          null,
-        );
-      case 'listmultiplier':
-        return MethodReflection<MyInfoModule, FutureOr<APIResponse<List<int>>>>(
-          this,
-          MyInfoModule,
-          'listMultiplier',
-          const __TR<FutureOr<APIResponse<List<int>>>>(FutureOr, <__TR>[
-            __TR<APIResponse<List<int>>>(APIResponse, <__TR>[__TR.tListInt]),
-          ]),
-          false,
-          (o) => o!.listMultiplier,
+          (o) => o!.updateOrderStatusFromBroker,
           obj,
           const <__PR>[
-            __PR(__TR.tListInt, 'list', false, true),
-            __PR(__TR.tInt, 'm', false, true),
+            __PR(__TR.tInt, 'orderId', false, true),
+            __PR(__TR.tString, 'status', false, true),
+            __PR(__TR.tBool, 'paid', false, true),
+            __PR(__TR<PaymentType>(PaymentType), 'paymentType', true, true),
+            __PR(__TR<Currency>(Currency), 'chargedCurrency', true, true),
+            __PR(__TR.tDouble, 'chargedPrice', true, true),
           ],
           null,
           null,
           null,
         );
       case 'ensureconfigured':
-        return MethodReflection<MyInfoModule, void>(
+        return MethodReflection<ExternalIntegrationModule, void>(
           this,
           APIModule,
           'ensureConfigured',
@@ -677,7 +721,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'initialize':
-        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<InitializationResult>
+        >(
           this,
           APIModule,
           'initialize',
@@ -693,7 +740,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           const [override],
         );
       case 'getrouteshandlersnames':
-        return MethodReflection<MyInfoModule, Iterable<String>>(
+        return MethodReflection<ExternalIntegrationModule, Iterable<String>>(
           this,
           APIModule,
           'getRoutesHandlersNames',
@@ -714,7 +761,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'addroute':
-        return MethodReflection<MyInfoModule, APIModule>(
+        return MethodReflection<ExternalIntegrationModule, APIModule>(
           this,
           APIModule,
           'addRoute',
@@ -768,7 +815,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'addroutehandler':
-        return MethodReflection<MyInfoModule, APIModule>(
+        return MethodReflection<ExternalIntegrationModule, APIModule>(
           this,
           APIModule,
           'addRouteHandler',
@@ -791,7 +838,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'getroutehandler':
-        return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          APIRouteHandler<dynamic>?
+        >(
           this,
           APIModule,
           'getRouteHandler',
@@ -814,7 +864,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'getroutehandlerbyrequest':
-        return MethodReflection<MyInfoModule, APIRouteHandler<dynamic>?>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          APIRouteHandler<dynamic>?
+        >(
           this,
           APIModule,
           'getRouteHandlerByRequest',
@@ -832,7 +885,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'resolveroute':
-        return MethodReflection<MyInfoModule, String>(
+        return MethodReflection<ExternalIntegrationModule, String>(
           this,
           APIModule,
           'resolveRoute',
@@ -848,7 +901,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'call':
-        return MethodReflection<MyInfoModule, FutureOr<APIResponse<dynamic>>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<APIResponse<dynamic>>
+        >(
           this,
           APIModule,
           'call',
@@ -866,7 +922,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'acceptsrequest':
-        return MethodReflection<MyInfoModule, bool>(
+        return MethodReflection<ExternalIntegrationModule, bool>(
           this,
           APIModule,
           'acceptsRequest',
@@ -882,7 +938,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'apiinfo':
-        return MethodReflection<MyInfoModule, APIModuleInfo>(
+        return MethodReflection<ExternalIntegrationModule, APIModuleInfo>(
           this,
           APIModule,
           'apiInfo',
@@ -898,7 +954,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'ensureinitialized':
-        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<InitializationResult>
+        >(
           this,
           Initializable,
           'ensureInitialized',
@@ -921,7 +980,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'ensureinitializedasync':
-        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<InitializationResult>
+        >(
           this,
           Initializable,
           'ensureInitializedAsync',
@@ -944,7 +1006,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'doinitialization':
-        return MethodReflection<MyInfoModule, FutureOr<InitializationResult>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<InitializationResult>
+        >(
           this,
           Initializable,
           'doInitialization',
@@ -967,7 +1032,10 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'initializedependencies':
-        return MethodReflection<MyInfoModule, FutureOr<List<Initializable>>>(
+        return MethodReflection<
+          ExternalIntegrationModule,
+          FutureOr<List<Initializable>>
+        >(
           this,
           Initializable,
           'initializeDependencies',
@@ -985,7 +1053,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'checkinitialized':
-        return MethodReflection<MyInfoModule, void>(
+        return MethodReflection<ExternalIntegrationModule, void>(
           this,
           Initializable,
           'checkInitialized',
@@ -999,7 +1067,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
         );
       case 'executeinitialized':
-        return MethodReflection<MyInfoModule, FutureOr<dynamic>>(
+        return MethodReflection<ExternalIntegrationModule, FutureOr<dynamic>>(
           this,
           Initializable,
           'executeInitialized',
@@ -1040,23 +1108,125 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   List<String> get staticMethodsNames => _staticMethodsNames;
 
   @override
-  StaticMethodReflection<MyInfoModule, R>? staticMethod<R>(String methodName) =>
-      null;
+  StaticMethodReflection<ExternalIntegrationModule, R>? staticMethod<R>(
+    String methodName,
+  ) => null;
 }
 
-extension MyInfoModule$reflectionExtension on MyInfoModule {
-  /// Returns a [ClassReflection] for type [MyInfoModule]. (Generated by [ReflectionFactory])
-  ClassReflection<MyInfoModule> get reflection => MyInfoModule$reflection(this);
+class PaymentType$reflection extends EnumReflection<PaymentType>
+    with __ReflectionMixin {
+  static final Expando<PaymentType$reflection> _objectReflections = Expando();
 
-  /// Returns a JSON for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  factory PaymentType$reflection([PaymentType? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= PaymentType$reflection._(object);
+  }
+
+  PaymentType$reflection._([PaymentType? object])
+    : super(PaymentType, r'PaymentType', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.10.0');
+
+  @override
+  PaymentType$reflection withObject([PaymentType? obj]) =>
+      PaymentType$reflection(obj);
+
+  static PaymentType$reflection? _withoutObjectInstance;
+  @override
+  PaymentType$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static PaymentType$reflection get staticInstance =>
+      _withoutObjectInstance ??= PaymentType$reflection._();
+
+  @override
+  PaymentType$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    PaymentType$reflection.staticInstance;
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<String> _staticFieldsNames = const <String>[
+    'creditCard',
+    'debitCard',
+    'pix',
+  ];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  static const Map<String, PaymentType> _valuesByName =
+      const <String, PaymentType>{
+        'creditCard': PaymentType.creditCard,
+        'debitCard': PaymentType.debitCard,
+        'pix': PaymentType.pix,
+      };
+
+  @override
+  Map<String, PaymentType> get valuesByName => _valuesByName;
+  @override
+  List<PaymentType> get values => PaymentType.values;
+
+  static const List<String> _fieldsNames = const <String>[];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+}
+
+extension Currency$reflectionExtension on Currency {
+  /// Returns a [EnumReflection] for type [Currency]. (Generated by [ReflectionFactory])
+  EnumReflection<Currency> get reflection => Currency$reflection(this);
+
+  /// Returns the name of the [Currency] instance. (Generated by [ReflectionFactory])
+  String get enumName => Currency$reflection(this).name()!;
+
+  /// Returns a JSON for type [Currency]. (Generated by [ReflectionFactory])
+  String? toJson() => reflection.toJson();
+
+  /// Returns a JSON [Map] for type [Currency]. (Generated by [ReflectionFactory])
+  Map<String, Object>? toJsonMap() => reflection.toJsonMap();
+
+  /// Returns an encoded JSON [String] for type [Currency]. (Generated by [ReflectionFactory])
+  String toJsonEncoded({bool pretty = false}) =>
+      reflection.toJsonEncoded(pretty: pretty);
+}
+
+extension ExternalIntegrationModule$reflectionExtension
+    on ExternalIntegrationModule {
+  /// Returns a [ClassReflection] for type [ExternalIntegrationModule]. (Generated by [ReflectionFactory])
+  ClassReflection<ExternalIntegrationModule> get reflection =>
+      ExternalIntegrationModule$reflection(this);
+
+  /// Returns a JSON for type [ExternalIntegrationModule]. (Generated by [ReflectionFactory])
   Object? toJson({bool duplicatedEntitiesAsID = false}) =>
       reflection.toJson(null, null, duplicatedEntitiesAsID);
 
-  /// Returns a JSON [Map] for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  /// Returns a JSON [Map] for type [ExternalIntegrationModule]. (Generated by [ReflectionFactory])
   Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
       reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 
-  /// Returns an encoded JSON [String] for type [MyInfoModule]. (Generated by [ReflectionFactory])
+  /// Returns an encoded JSON [String] for type [ExternalIntegrationModule]. (Generated by [ReflectionFactory])
   String toJsonEncoded({
     bool pretty = false,
     bool duplicatedEntitiesAsID = false,
@@ -1065,51 +1235,33 @@ extension MyInfoModule$reflectionExtension on MyInfoModule {
     duplicatedEntitiesAsID: duplicatedEntitiesAsID,
   );
 
-  /// Returns a JSON for type [MyInfoModule] using the class fields. (Generated by [ReflectionFactory])
+  /// Returns a JSON for type [ExternalIntegrationModule] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
-extension MyInfoModuleProxy$reflectionProxy on MyInfoModuleProxy {
-  Future<String> echo(String msg) {
-    var ret = onCall(this, 'echo', <String, dynamic>{
-      'msg': msg,
-    }, __TR.tFutureString);
-    return __retFut$<String>(ret);
-  }
+extension PaymentType$reflectionExtension on PaymentType {
+  /// Returns a [EnumReflection] for type [PaymentType]. (Generated by [ReflectionFactory])
+  EnumReflection<PaymentType> get reflection => PaymentType$reflection(this);
 
-  Future<String> toUpperCase(String msg) {
-    var ret = onCall(this, 'toUpperCase', <String, dynamic>{
-      'msg': msg,
-    }, __TR.tFutureString);
-    return __retFut$<String>(ret);
-  }
+  /// Returns the name of the [PaymentType] instance. (Generated by [ReflectionFactory])
+  String get enumName => PaymentType$reflection(this).name()!;
 
-  Future<String> withPayload(Uint8List? payload) {
-    var ret = onCall(this, 'withPayload', <String, dynamic>{
-      'payload': payload,
-    }, __TR.tFutureString);
-    return __retFut$<String>(ret);
-  }
+  /// Returns a JSON for type [PaymentType]. (Generated by [ReflectionFactory])
+  String? toJson() => reflection.toJson();
 
-  Future<List<String>> mapKeys(Map<String, dynamic> map) {
-    var ret = onCall(this, 'mapKeys', <String, dynamic>{
-      'map': map,
-    }, const __TR<Future<List<String>>>(Future, <__TR>[__TR.tListString]));
-    return __retFut$<List<String>>(ret);
-  }
+  /// Returns a JSON [Map] for type [PaymentType]. (Generated by [ReflectionFactory])
+  Map<String, Object>? toJsonMap() => reflection.toJsonMap();
 
-  Future<List<int>> listMultiplier(List<int> list, int m) {
-    var ret = onCall(this, 'listMultiplier', <String, dynamic>{
-      'list': list,
-      'm': m,
-    }, const __TR<Future<List<int>>>(Future, <__TR>[__TR.tListInt]));
-    return __retFut$<List<int>>(ret);
-  }
+  /// Returns an encoded JSON [String] for type [PaymentType]. (Generated by [ReflectionFactory])
+  String toJsonEncoded({bool pretty = false}) =>
+      reflection.toJsonEncoded(pretty: pretty);
 }
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
-  MyInfoModule$reflection(),
+  Currency$reflection(),
+  ExternalIntegrationModule$reflection(),
+  PaymentType$reflection(),
 ];
 
 List<Reflection>? _siblingsReflectionList;

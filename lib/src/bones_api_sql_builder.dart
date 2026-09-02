@@ -1044,8 +1044,8 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
   }
 
   int _bestOrderImpl(
-    final Map<SQLBuilder, List<String>> entriesReferences,
-    final Map<SQLBuilder, List<String>> entriesRelationships,
+    Map<SQLBuilder, List<String>> entriesReferences,
+    Map<SQLBuilder, List<String>> entriesRelationships,
   ) {
     final length = this.length;
 

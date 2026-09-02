@@ -510,7 +510,7 @@ abstract class LoggerHandler {
     }
   }
 
-  MessageLogger? resolveLogDestiny(final Object? logDestiny) {
+  MessageLogger? resolveLogDestiny(Object? logDestiny) {
     if (logDestiny == null) return null;
 
     if (logDestiny is Map) {
