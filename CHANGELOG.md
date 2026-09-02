@@ -1,3 +1,20 @@
+## 1.16.1
+
+- A route parameter typed as an `enum` no longer fails when the value arrives as
+  a qualified name (`Currency.brl`), the form an `enum.toString()` produces and
+  the one external callers tend to send:
+
+  ```
+  type 'String' is not a subtype of type 'Currency?' of 'chargedCurrency'
+  ```
+
+  `EnumReflection.from` only read a bare value name, so the qualified form
+  parsed to `null`, `APIRouteBuilder.resolveValueByType` fell back to the value
+  it was given, and the raw `String` reached `Function.apply`. The bare name
+  (`brl`), in any case, already resolved.
+
+- deps: `reflection_factory: ^2.10.0`, which resolves the qualified `enum` name.
+
 ## 1.16.0
 
 - Added the `cross_origin` configuration entry, grouping every cross-origin
