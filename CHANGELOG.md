@@ -1,3 +1,22 @@
+## 1.17.0
+
+- `APITestConfigDockerDB` (and the PostgreSQL and MySQL configs):
+  - `dockerChosenPort`: Docker chooses a free host port for the database
+    when the container starts, and it is written to the `port` of the DB
+    config. Unlike a port resolved before starting the container, parallel
+    test runs can't pick the same one. The container is named
+    `<prefix>_<session>_<n>`, so a container left by an interrupted run
+    can't take its name.
+  - `runOptions`: further `docker run` options for the container
+    (`DockerRunOptions`: tmpfs, labels, resources, health check...).
+- `APITestConfigDockerPostgreSQL`: `settings` (each `-c key=value`),
+  `initdbArgs`, `extraEnvironment`, and `ephemeral` (a throwaway database:
+  durability off, data directory in memory).
+- `APITestConfigDockerMySQL`: `settings`, `extraEnvironment` and `ephemeral`.
+
+- Dependency updates:
+  - `docker_commander`: ^3.1.0
+
 ## 1.16.1
 
 - A route parameter typed as an `enum` no longer fails when the value arrives as

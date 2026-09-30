@@ -14,6 +14,16 @@ class APITestConfigDockerMySQL
 
   final bool forceNativePasswordAuthentication;
 
+  /// Further server settings, each passed as `--key=value`.
+  final Map<String, String>? settings;
+
+  /// A throwaway database: durability off and the data directory in memory.
+  /// See [MySQLContainerConfig.ephemeral].
+  final bool ephemeral;
+
+  /// More environment variables for the container.
+  final Map<String, String>? extraEnvironment;
+
   final String version;
 
   APITestConfigDockerMySQL(
@@ -21,8 +31,13 @@ class APITestConfigDockerMySQL
     DockerHost? dockerHost,
     super.containerNamePrefix,
     this.forceNativePasswordAuthentication = true,
+    this.settings,
+    this.ephemeral = false,
+    this.extraEnvironment,
     this.version = 'latest',
     super.cleanContainer,
+    super.dockerChosenPort,
+    super.runOptions,
   }) : super(dockerHost ?? DockerHostLocal(), 'MySQL', apiConfig) {
     DBMySQLAdapter.boot();
   }
@@ -40,6 +55,10 @@ class APITestConfigDockerMySQL
         dbName: dbName,
         hostPort: dbPort,
         forceNativePasswordAuthentication: forceNativePasswordAuthentication,
+        settings: settings,
+        ephemeral: ephemeral,
+        extraEnvironment: extraEnvironment,
+        options: runOptions,
       );
 
   @override

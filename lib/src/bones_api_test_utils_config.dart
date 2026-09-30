@@ -425,18 +425,36 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
   /// If `true` will clean the container after stop. (`docker run --rm`)
   final bool cleanContainer;
 
+  /// If `true`, Docker chooses a free host port for the database when the
+  /// container starts, and it is written to the `port` of [dbConfig].
+  /// Free of races between tests running in parallel, unlike a port
+  /// resolved before starting the container (see [dbPort]).
+  final bool dockerChosenPort;
+
+  /// Further `docker run` options for the container: tmpfs, labels,
+  /// resources, health check...
+  final DockerRunOptions? runOptions;
+
   APITestConfigDockerDB(
     DockerHost dockerHost,
     this.dbType,
     Map<String, dynamic> apiConfig, {
     String? containerNamePrefix,
     this.cleanContainer = true,
+    this.dockerChosenPort = false,
+    this.runOptions,
   }) : containerNamePrefix =
            containerNamePrefix ?? 'api_test_${dbType.trim().toLowerCase()}',
        super(dockerHost, apiConfig);
 
+  static int _containerCounter = 0;
+
   @override
   Future<C> createContainer(DockerCommander dockerCommander) async {
+    if (dockerChosenPort) {
+      return _createContainerWithDockerChosenPort(dockerCommander);
+    }
+
     var dbPort = await this.dbPort;
 
     _log.info(
@@ -456,7 +474,44 @@ abstract class APITestConfigDockerDB<C extends DockerContainer>
     return container;
   }
 
-  /// The [DockerContainerConfig] instantiator.
+  Future<C> _createContainerWithDockerChosenPort(
+    DockerCommander dockerCommander,
+  ) async {
+    _log.info(
+      'Initializing $dbType container at a port chosen by Docker (cleanContainer: $cleanContainer)',
+    );
+
+    var containerConfig = createDBContainerConfig(0);
+
+    // Unique, unlike `prefix_port`: a container left by an interrupted run
+    // can't take the name.
+    var container = await containerConfig.run(
+      dockerCommander,
+      name:
+          '${containerNamePrefix}_${dockerCommander.session}_${++_containerCounter}',
+      cleanContainer: cleanContainer,
+    );
+
+    var containerPort = containerConfig.containerPorts?.firstOrNull;
+    var hostPort = containerPort != null
+        ? container.hostPortFor(containerPort)
+        : null;
+
+    if (hostPort == null) {
+      throw StateError(
+        "Can't resolve the host port chosen by Docker for $dbType: $container",
+      );
+    }
+
+    dbConfig['port'] = hostPort;
+
+    _log.info('Container initialized at port $hostPort: $container');
+
+    return container;
+  }
+
+  /// The [DockerContainerConfig] instantiator. A [dbPort] of `0` lets
+  /// Docker choose the host port (see [dockerChosenPort]).
   DockerContainerConfig<C> createDBContainerConfig(int dbPort);
 }
 
@@ -471,5 +526,7 @@ abstract class APITestConfigDockerDBSQL<C extends DockerContainer>
     super.apiConfig, {
     super.containerNamePrefix,
     super.cleanContainer,
+    super.dockerChosenPort,
+    super.runOptions,
   });
 }

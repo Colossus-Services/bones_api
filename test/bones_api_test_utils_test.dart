@@ -152,6 +152,122 @@ Future<void> main() async {
       tags: ['docker', 'slow'],
     );
   });
+
+  group('APITestConfig (Docker-chosen port)', () {
+    APITestConfigDockerPostgreSQL newPostgresConfig() =>
+        APITestConfigDockerPostgreSQL(
+          apiConfigPostgres,
+          dockerHost: dockerHostLocal,
+          containerNamePrefix: 'bones_api_test_postgres',
+          dockerChosenPort: true,
+          ephemeral: true,
+          settings: {'max_connections': '42'},
+          runOptions: DockerRunOptions(
+            labels: {'bones_api.test': 'docker-chosen-port'},
+          ),
+        );
+
+    test(
+      'postgres: two in parallel, each API on its own port',
+      () async {
+        var configs = [newPostgresConfig(), newPostgresConfig()];
+
+        var starters = configs
+            .map(
+              (c) => c.createAPIRootStarter(
+                (apiConfig) => MyAPI.withConfig(apiConfig),
+              ),
+            )
+            .toList();
+
+        try {
+          expect(
+            await Future.wait(starters.map((s) async => await s.start())),
+            everyElement(isTrue),
+          );
+
+          var ports = configs.map((c) => c.dbConfig['port'] as int).toList();
+          _log.info('Ports chosen by Docker: $ports');
+          expect(ports.toSet(), hasLength(2));
+
+          for (var (i, config) in configs.indexed) {
+            var container = config.container!;
+            expect(container.hostPortFor(5432), equals(ports[i]));
+            expect(container.name, startsWith('bones_api_test_postgres_'));
+
+            // The API connects on the chosen port:
+            var api = starters[i].apiRoot!;
+            var apiDbConfig = api.apiConfig['db'] as Map;
+            expect((apiDbConfig['postgres'] as Map)['port'], equals(ports[i]));
+
+            var adapter = await DBSQLAdapter.fromConfig(api.apiConfig['db']);
+            var connection = await adapter.createPoolElement();
+            expect(connection, isNotNull);
+            expect(adapter.disposePoolElement(connection!), isTrue);
+
+            // `settings`, `ephemeral` and `runOptions` reached the container:
+            expect(
+              await container.runSQLScript('SHOW max_connections;'),
+              contains('42'),
+            );
+            expect(
+              await container.runSQLScript('SHOW fsync;'),
+              contains('off'),
+            );
+          }
+
+          var dockerCommander = DockerCommander(dockerHostLocal);
+          expect(
+            await dockerCommander.listContainersByLabel({
+              'bones_api.test': 'docker-chosen-port',
+            }),
+            containsAll(configs.map((c) => c.container!.name)),
+          );
+        } finally {
+          for (var s in starters) {
+            expect(await s.stop(), isTrue);
+          }
+        }
+      },
+      skip: apiTestConfigPostgres.unsupportedReason,
+      tags: ['docker', 'slow'],
+    );
+
+    test('postgres: container config with a Docker-chosen port', () {
+      var config = newPostgresConfig();
+      var containerConfig = config.createDBContainerConfig(0);
+
+      expect(containerConfig.hostPorts, equals([0]));
+      expect(containerConfig.ephemeral, isTrue);
+      expect(
+        containerConfig.imageArgs,
+        containsAllInOrder(['-c', 'max_connections=42']),
+      );
+      expect(
+        containerConfig.options!.labels,
+        equals({'bones_api.test': 'docker-chosen-port'}),
+      );
+    });
+
+    test('mysql: container config', () {
+      var config = APITestConfigDockerMySQL(
+        apiConfigMysql,
+        dockerHost: dockerHostLocal,
+        version: '8.0.37',
+        dockerChosenPort: true,
+        ephemeral: true,
+        settings: {'max-connections': '50'},
+        runOptions: DockerRunOptions(memory: '512m'),
+      );
+
+      var containerConfig = config.createDBContainerConfig(0);
+      expect(containerConfig.hostPorts, equals([0]));
+      expect(containerConfig.imageArgs, contains('--max-connections=50'));
+      expect(containerConfig.imageArgs, contains('--skip-log-bin'));
+      expect(containerConfig.options!.memory, equals('512m'));
+      expect(config.dockerChosenPort, isTrue);
+    });
+  });
 }
 
 class MyAPI extends APIRoot {
