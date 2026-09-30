@@ -21,6 +21,19 @@ class APITestConfigDockerPostgreSQL
   /// Runtime Postgres configuration: `-c log_statement=$logStatement`
   String? logStatement;
 
+  /// Further runtime settings, each passed as `-c key=value`.
+  final Map<String, String>? settings;
+
+  /// Arguments to `initdb` (`POSTGRES_INITDB_ARGS`).
+  final String? initdbArgs;
+
+  /// A throwaway database: durability off and the data directory in memory.
+  /// See [PostgreSQLContainerConfig.ephemeral].
+  final bool ephemeral;
+
+  /// More environment variables for the container.
+  final Map<String, String>? extraEnvironment;
+
   final String version;
 
   APITestConfigDockerPostgreSQL(
@@ -30,8 +43,14 @@ class APITestConfigDockerPostgreSQL
     this.postgresPort,
     this.maxConnections,
     this.logStatement,
+    this.settings,
+    this.initdbArgs,
+    this.ephemeral = false,
+    this.extraEnvironment,
     this.version = 'latest',
     super.cleanContainer,
+    super.dockerChosenPort,
+    super.runOptions,
   }) : super(dockerHost ?? DockerHostLocal(), 'PostgreSQL', apiConfig) {
     DBPostgreSQLAdapter.boot();
   }
@@ -51,6 +70,11 @@ class APITestConfigDockerPostgreSQL
         postgresPort: postgresPort,
         maxConnections: maxConnections,
         logStatement: logStatement,
+        settings: settings,
+        initdbArgs: initdbArgs,
+        ephemeral: ephemeral,
+        extraEnvironment: extraEnvironment,
+        options: runOptions,
       );
 
   @override
