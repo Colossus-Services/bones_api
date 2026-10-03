@@ -2274,6 +2274,105 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('Entity tracking: changed fields', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final addressAPIRepository =
+            entityRepositoryProvider.addressAPIRepository;
+        final roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+        final userRepository = userAPIRepository.entityRepository;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'tracking@mail.com',
+            '123',
+            Address('TR', 'Track City', 'Track Street', 1),
+            [Role(RoleType.guest)],
+          ),
+        );
+
+        Future<User> load() async =>
+            (await userAPIRepository.selectByID(userId))!;
+
+        // Untouched:
+        {
+          var user = await load();
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+          expect(userRepository.entityHasChangedFields(user), isFalse);
+        }
+
+        // A scalar field:
+        {
+          var user = await load();
+          user.email = 'tracking2@mail.com';
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['email']),
+          );
+        }
+
+        // A field of the referenced entity is not a change of the user:
+        {
+          var user = await load();
+          user.address.city = 'Other City';
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+        }
+
+        // Another referenced entity:
+        {
+          var otherAddress = Address('TR', 'Track City 2', 'Track Street', 2);
+          await addressAPIRepository.store(otherAddress);
+
+          var user = await load();
+          user.address = otherAddress;
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['address']),
+          );
+        }
+
+        // The same referenced entity, as another instance:
+        {
+          var user = await load();
+          user.address = (await addressAPIRepository.selectByID(
+            user.address.id,
+          ))!;
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+        }
+
+        // A list of entities: same IDs, added, removed:
+        {
+          var user = await load();
+          user.roles = user.roles.toList();
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+
+          var admin = Role(RoleType.admin);
+          await roleAPIRepository.store(admin);
+
+          user = await load();
+          user.roles = [...user.roles, admin];
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['roles']),
+          );
+
+          user = await load();
+          user.roles = [];
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['roles']),
+          );
+        }
+
+        // Storing a change updates the tracked state:
+        {
+          var user = await load();
+          user.email = 'tracking3@mail.com';
+          await userAPIRepository.store(user);
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+          expect((await load()).email, equals('tracking3@mail.com'));
+        }
+      });
+
       test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 
