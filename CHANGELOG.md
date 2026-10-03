@@ -1,3 +1,10 @@
+## 1.17.1
+
+- `benchmark/db_users`: a Users API benchmark sub-project — an `APIRoot` with
+  reflection-wired modules and `Role`/`Address`/`User` entities, measured end
+  to end against memory, SQLite or PostgreSQL (`--docker` or an existing
+  server), with latency percentiles and a results history (`HISTORY.md`).
+
 ## 1.17.0
 
 - `APITestConfigDockerDB` (and the PostgreSQL and MySQL configs):

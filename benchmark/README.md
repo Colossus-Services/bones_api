@@ -16,6 +16,10 @@ dart run benchmark/json_benchmark.dart
 dart run benchmark/db_benchmark.dart
 ```
 
+For an end-to-end benchmark of a whole application against a real database
+(memory, SQLite or PostgreSQL), with recorded results, see the
+[`db_users/`](db_users/README.md) sub-project.
+
 To compare a change, record a baseline on your machine first — throughput is
 hardware- and load-specific, so numbers are only meaningful relative to a run
 on the same machine:
