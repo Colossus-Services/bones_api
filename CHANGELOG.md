@@ -5,6 +5,37 @@
   to end against memory, SQLite or PostgreSQL (`--docker` or an existing
   server), with latency percentiles and a results history (`HISTORY.md`).
 
+- Performance, found and measured with `benchmark/db_users`:
+  - Entity tracking: a loaded entity's referenced entities (and lists of
+    them) are snapshotted by ID, not by a reflective deep copy. Change
+    detection already compared them by ID. SQLite: reads +22%, lists +40%,
+    updates +30%.
+  - PostgreSQL: the reads of a transaction that hasn't written yet run
+    without `BEGIN`/`COMMIT` — a select of an entity with references was
+    `BEGIN`, its queries and `COMMIT`. Its first write opens the transaction.
+    `DBSQLAdapter.readsOutsideTransaction`, on by default for PostgreSQL
+    (`READ COMMITTED`), opt-out with `readsOutsideTransaction: false`.
+    Single-entity reads 2x faster.
+  - `DBSQLMemoryAdapter`: relationship selects and inserts go through the
+    relationship indexes; a delete by ID takes its row by key and resolves
+    only it; a relationship delete is narrowed through the index. Reads up
+    to 3x, writes up to 7x faster.
+
+- Fixes:
+  - `LoggerHandler.root` threw a `LateInitializationError` when it was the
+    first logging access.
+  - `DBSQLMemoryAdapter`: after a rollback, a relationship restored in its
+    table was missing from the relationship index (an index entry is a `Set`
+    changed in place, which `MapHistory` can't roll back), so queries through
+    the relationship missed it. Its indexes versions snapshot was also never
+    refreshed.
+
+- Dependency updates:
+  - `reflection_factory`: ^2.10.1 (faster constructor lookup when decoding
+    entities: +10–15% on reads)
+  - `map_history`: ^1.0.7 (`consolidate` visits only the changed keys: the
+    memory adapter's commits no longer scale with the table size)
+
 ## 1.17.0
 
 - `APITestConfigDockerDB` (and the PostgreSQL and MySQL configs):
