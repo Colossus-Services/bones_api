@@ -6062,6 +6062,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   List<TransactionOperation> get operations =>
       UnmodifiableListView(_operations);
 
+  /// `true` if [op] and every operation added before it only read.
+  bool isReadOnlyUntil(TransactionOperation op) {
+    if (!op.type.isRead) return false;
+
+    for (var o in _operations) {
+      if (identical(o, op)) return true;
+      if (!o.type.isRead) return false;
+    }
+
+    return false;
+  }
+
   /// Returns the 1st [operations].
   TransactionOperation? get mainOperation => _operations.firstOrNull;
 
@@ -7642,6 +7654,15 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
         throw ArgumentError("Unknown: $this");
     }
   }
+
+  /// `true` for an operation that only reads.
+  bool get isRead => switch (this) {
+    TransactionOperationType.select ||
+    TransactionOperationType.count ||
+    TransactionOperationType.selectRelationship ||
+    TransactionOperationType.selectRelationships => true,
+    _ => false,
+  };
 }
 
 class TransactionEntityProvider

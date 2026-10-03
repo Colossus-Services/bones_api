@@ -2423,6 +2423,52 @@ Future<bool> runAdapterTests(
         expect(await usersWithAdmin(), contains(userId));
       });
 
+      test('readsOutsideTransaction', () async {
+        final sqlAdapter = await entityRepositoryProvider.adapter;
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'reads@mail.com',
+            '123',
+            Address('RO', 'Reads City', 'Reads Street', 1),
+            [Role(RoleType.guest)],
+          ),
+        );
+
+        // Only reads (the user, its roles and its address):
+        {
+          var transaction = Transaction();
+          var user = await transaction.execute(
+            () => userAPIRepository.selectByID(userId),
+          );
+
+          expect(user!.email, equals('reads@mail.com'));
+          expect(user.roles, hasLength(1));
+          expect(transaction.length, greaterThan(1));
+          expect(transaction.isCommitted, isTrue);
+          // With `readsOutsideTransaction` there is no `BEGIN` to send:
+          expect(transaction.isOpen, !sqlAdapter.readsOutsideTransaction);
+        }
+
+        // A read, then a write: the write opens the transaction.
+        {
+          var transaction = Transaction();
+          await transaction.execute(() async {
+            var user = (await userAPIRepository.selectByID(userId))!;
+            user.email = 'reads2@mail.com';
+            await userAPIRepository.store(user);
+          });
+
+          expect(transaction.isCommitted, isTrue);
+          expect(transaction.isOpen, isTrue);
+          expect(
+            (await userAPIRepository.selectByID(userId))!.email,
+            equals('reads2@mail.com'),
+          );
+        }
+      });
+
       test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 
