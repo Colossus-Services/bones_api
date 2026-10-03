@@ -2373,6 +2373,56 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('Transaction abort restores relationships', () async {
+        final sqlAdapter = await entityRepositoryProvider.adapter;
+        if (!sqlAdapter.capability.transactionAbort) return;
+
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+
+        var admin = Role(RoleType.admin);
+        var guest = Role(RoleType.guest);
+        await roleAPIRepository.store(admin);
+        await roleAPIRepository.store(guest);
+
+        var userId = await userAPIRepository.store(
+          User(
+            'rollback@mail.com',
+            '123',
+            Address('RB', 'Rollback City', 'Rollback Street', 1),
+            [admin, guest],
+          ),
+        );
+
+        Future<List<int?>> roleIdsOfUser() async =>
+            (await userAPIRepository.selectByID(
+              userId,
+            ))!.roles.map((r) => r.id).toList()..sort();
+
+        Future<List<int?>> usersWithAdmin() async =>
+            (await userAPIRepository.selectByRoleId(
+              admin.id!,
+            )).map((u) => u.id).toList();
+
+        expect(await roleIdsOfUser(), equals([admin.id, guest.id]..sort()));
+        expect(await usersWithAdmin(), contains(userId));
+
+        // Remove the `admin` link, then abort:
+        var transaction = Transaction();
+        await transaction.execute(() async {
+          var user = (await userAPIRepository.selectByID(userId))!;
+          user.roles = [guest];
+          await userAPIRepository.store(user);
+          transaction.abort(reason: 'Test');
+        });
+        expect(transaction.isAborted, isTrue);
+
+        // Both the user's own roles and a query through the relationship
+        // must see the link again:
+        expect(await roleIdsOfUser(), equals([admin.id, guest.id]..sort()));
+        expect(await usersWithAdmin(), contains(userId));
+      });
+
       test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 

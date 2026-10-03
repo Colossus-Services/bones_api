@@ -238,6 +238,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   void _onTablesModification() {
     _tablesVersions = null;
+    _tablesIndexesVersions = null;
   }
 
   Map<String, int>? _tablesVersions;
@@ -1637,10 +1638,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       _rollbackTable(table, version);
     }
 
-    for (var e in tablesIndexesVersions.entries) {
-      var table = e.key;
-      var indexesVersions = e.value;
-      _rollbackTableIndexes(table, indexesVersions);
+    // An index entry is a `Set` of IDs, changed in place, which a `MapHistory`
+    // rollback can't revert: the indexes are rebuilt from the rolled back
+    // tables instead.
+    for (var table in {...tablesVersions.keys, ...tablesIndexesVersions.keys}) {
+      _rebuildTableIndexes(table);
     }
   }
 
@@ -1650,17 +1652,25 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     _onTablesModification();
   }
 
-  void _rollbackTableIndexes(
-    String table,
-    Map<String, int> indexesTargetVersion,
-  ) {
+  void _rebuildTableIndexes(String table) {
     var tableIndexes = _tablesIndexes[table];
+    if (tableIndexes == null || tableIndexes.isEmpty) return;
 
-    for (var e in indexesTargetVersion.entries) {
-      var field = e.key;
-      var targetVersion = e.value;
-      var index = tableIndexes?[field];
-      index?.rollback(targetVersion);
+    for (var fieldIndex in tableIndexes.values) {
+      fieldIndex.clear();
+    }
+
+    var tableMap = _tables[table];
+    if (tableMap != null) {
+      for (var e in tableMap.entries) {
+        var id = e.key;
+        for (var f in e.value.entries) {
+          var value = f.value;
+          if (value != null) {
+            _indexAddEntry(table, id, f.key, value);
+          }
+        }
+      }
     }
 
     _onTablesModification();
