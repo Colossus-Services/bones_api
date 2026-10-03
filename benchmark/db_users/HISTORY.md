@@ -14,6 +14,32 @@ changes on top of that commit.
 
 ---
 
+### 2026-10-03 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.17.1 (`af958b4`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |
+|---|--:|--:|--:|--:|--:|
+| `user/byId` | 699 | 1430.8 | 1418 | 1536 | 1734 |
+| `user/byEmail` | 735 | 1361.1 | 1345 | 1444 | 1664 |
+| `user/byState (join, limit 20)` | 464 | 2154.5 | 2073 | 2790 | 3053 |
+| `user/list (page of 20)` | 465 | 2149.2 | 2069 | 2823 | 3080 |
+| `user/count` | 6321 | 158.2 | 157 | 175 | 206 |
+| `authenticate (login)` | 754 | 1325.9 | 1330 | 1428 | 1500 |
+| `user/register` | 601 | 1663.7 | 1623 | 2050 | 2277 |
+| `user/update` | 471 | 2124.9 | 2065 | 2403 | 2597 |
+| `user/remove` | 853 | 1172.5 | 1180 | 1265 | 1327 |
+
+Server in Docker Desktop on the same machine (`--docker`), so every query
+crosses the Docker VM's network. Round trips likely dominate (`count`, a
+single query, is ~160 us; `byId`, which also loads the address and roles,
+~1.4 ms) — not profiled. Not comparable to a native or remote server.
+
 ### 2026-10-03 — `sqlite` — Mac17,3 (Apple M5)
 
 - **bones_api:** 1.17.1 (`84102a8 (modified)`)
