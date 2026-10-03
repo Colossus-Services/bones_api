@@ -20,6 +20,10 @@ jobs:
         run: dart pub get
       - name: Upgrade dependencies
         run: dart pub upgrade
+      # A nested package: `dart analyze .` covers it, so it must be resolved too.
+      - name: Install dependencies (benchmark/db_users)
+        run: dart pub get
+        working-directory: benchmark/db_users
       - name: dart format
         run: dart format -o none --set-exit-if-changed .
       - name: dart analyze

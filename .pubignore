@@ -1,0 +1,22 @@
+# `.pubignore` replaces `.gitignore` for `dart pub publish`, so the entries
+# of `.gitignore` are repeated here.
+
+# Files and directories created by pub.
+.dart_tool/
+.packages
+
+# Conventional directory for build outputs.
+build/
+
+# test_cov files:
+coverage/
+
+pubspec.lock
+
+.DS_Store
+
+# Local dependency overrides (developer-specific).
+pubspec_overrides.yaml
+
+# A separate package (its own `pubspec.yaml`), not part of `bones_api`:
+benchmark/db_users/
