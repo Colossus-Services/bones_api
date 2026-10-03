@@ -22,9 +22,10 @@ void _boot() {
 }
 
 void _setupRootLogger() {
-  var loggerHandler = _resolveLoggerHandler();
   var rootLogger = LoggerHandler.rootLogger;
-  rootLogger.onRecord.listen(loggerHandler._logRootMsg);
+  // `LoggerHandler.root` is resolved per record, not here: `_boot` runs from
+  // the `LoggerHandler` constructor, which may itself be building `root`.
+  rootLogger.onRecord.listen((msg) => LoggerHandler.root._logRootMsg(msg));
 }
 
 LoggerHandler _resolveLoggerHandler([LoggerHandler? loggerHandler]) {
