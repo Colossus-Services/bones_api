@@ -2423,6 +2423,36 @@ Future<bool> runAdapterTests(
         expect(await usersWithAdmin(), contains(userId));
       });
 
+      test('selectRelationships with a repeated entity', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final userRepository =
+            userAPIRepository.entityRepository
+                as DBRelationalEntityRepository<User>;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'repeated@mail.com',
+            '123',
+            Address('RE', 'Repeated City', 'Repeated Street', 1),
+            [Role(RoleType.guest), Role(RoleType.admin)],
+          ),
+        );
+
+        var user = (await userAPIRepository.selectByID(userId))!;
+        var roleIds = user.roles.map((r) => r.id).toList()..sort();
+        expect(roleIds, hasLength(2));
+
+        // The same entity twice (`"user" IN (id, id)`): each relationship
+        // must still be returned once.
+        var relationships = await userRepository.selectRelationships([
+          user,
+          user,
+        ], 'roles');
+
+        expect(relationships.keys, equals([userId]));
+        expect(relationships[userId]!.toList()..sort(), equals(roleIds));
+      });
+
       test('readsOutsideTransaction', () async {
         final sqlAdapter = await entityRepositoryProvider.adapter;
         final userAPIRepository = entityRepositoryProvider.userAPIRepository;

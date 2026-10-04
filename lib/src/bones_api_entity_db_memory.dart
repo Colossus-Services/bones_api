@@ -925,7 +925,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var entries = <MapEntry<Object, Map<String, dynamic>>>[];
 
-    for (var value in values) {
+    // A repeated value (`IN (1, 1)`) must not repeat its rows, as a scan
+    // returns each row once:
+    for (var value in values.toSet()) {
       if (value == null || value is ConditionParameter) return null;
 
       var ids = fieldIndex[value];
