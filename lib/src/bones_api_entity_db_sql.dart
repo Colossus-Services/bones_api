@@ -2507,6 +2507,28 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         (sql == null || (sql.sqlsLength == 1 && !sql.mainSQL.hasPreOrPosSQL));
   }
 
+  /// If `true`, the reads of a transaction that hasn't written yet run on a
+  /// pooled connection, without opening the database transaction (`BEGIN`):
+  /// a read-only transaction then costs no `BEGIN`/`COMMIT` round trips. The
+  /// database transaction is only opened by its first write.
+  ///
+  /// It's only equivalent when each statement reads its own snapshot anyway,
+  /// as with `READ COMMITTED` and plain `SELECT`s (no locks). Default: `false`.
+  bool get readsOutsideTransaction => false;
+
+  /// See [readsOutsideTransaction].
+  bool canReadOutsideTransaction(TransactionOperation op, SQLWrapper sql) {
+    if (!readsOutsideTransaction) return false;
+
+    var transaction = op.transaction;
+
+    return !transaction.isOpen &&
+        !transaction.isOpening &&
+        sql.sqlsLength == 1 &&
+        !sql.mainSQL.hasPreOrPosSQL &&
+        transaction.isReadOnlyUntil(op);
+  }
+
   FutureOr<R> executeTransactionOperation<R>(
     TransactionOperation op,
     SQLWrapper sql,
@@ -2514,7 +2536,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   ) {
     var transaction = op.transaction;
 
-    if (isTransactionWithSingleOperation(op, sql)) {
+    if (isTransactionWithSingleOperation(op, sql) ||
+        canReadOutsideTransaction(op, sql)) {
       return executeWithPool(
         f,
         onError: (e, s) => transaction.notifyExecutionError(

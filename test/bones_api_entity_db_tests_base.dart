@@ -2274,6 +2274,231 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('Entity tracking: changed fields', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final addressAPIRepository =
+            entityRepositoryProvider.addressAPIRepository;
+        final roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+        final userRepository = userAPIRepository.entityRepository;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'tracking@mail.com',
+            '123',
+            Address('TR', 'Track City', 'Track Street', 1),
+            [Role(RoleType.guest)],
+          ),
+        );
+
+        Future<User> load() async =>
+            (await userAPIRepository.selectByID(userId))!;
+
+        // Untouched:
+        {
+          var user = await load();
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+          expect(userRepository.entityHasChangedFields(user), isFalse);
+        }
+
+        // A scalar field:
+        {
+          var user = await load();
+          user.email = 'tracking2@mail.com';
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['email']),
+          );
+        }
+
+        // A field of the referenced entity is not a change of the user:
+        {
+          var user = await load();
+          user.address.city = 'Other City';
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+        }
+
+        // Another referenced entity:
+        {
+          var otherAddress = Address('TR', 'Track City 2', 'Track Street', 2);
+          await addressAPIRepository.store(otherAddress);
+
+          var user = await load();
+          user.address = otherAddress;
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['address']),
+          );
+        }
+
+        // The same referenced entity, as another instance:
+        {
+          var user = await load();
+          user.address = (await addressAPIRepository.selectByID(
+            user.address.id,
+          ))!;
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+        }
+
+        // A list of entities: same IDs, added, removed:
+        {
+          var user = await load();
+          user.roles = user.roles.toList();
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+
+          var admin = Role(RoleType.admin);
+          await roleAPIRepository.store(admin);
+
+          user = await load();
+          user.roles = [...user.roles, admin];
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['roles']),
+          );
+
+          user = await load();
+          user.roles = [];
+          expect(
+            userRepository.getEntityChangedFields(user),
+            equals(['roles']),
+          );
+        }
+
+        // Storing a change updates the tracked state:
+        {
+          var user = await load();
+          user.email = 'tracking3@mail.com';
+          await userAPIRepository.store(user);
+          expect(userRepository.getEntityChangedFields(user), isEmpty);
+          expect((await load()).email, equals('tracking3@mail.com'));
+        }
+      });
+
+      test('Transaction abort restores relationships', () async {
+        final sqlAdapter = await entityRepositoryProvider.adapter;
+        if (!sqlAdapter.capability.transactionAbort) return;
+
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final roleAPIRepository = entityRepositoryProvider.roleAPIRepository;
+
+        var admin = Role(RoleType.admin);
+        var guest = Role(RoleType.guest);
+        await roleAPIRepository.store(admin);
+        await roleAPIRepository.store(guest);
+
+        var userId = await userAPIRepository.store(
+          User(
+            'rollback@mail.com',
+            '123',
+            Address('RB', 'Rollback City', 'Rollback Street', 1),
+            [admin, guest],
+          ),
+        );
+
+        Future<List<int?>> roleIdsOfUser() async =>
+            (await userAPIRepository.selectByID(
+              userId,
+            ))!.roles.map((r) => r.id).toList()..sort();
+
+        Future<List<int?>> usersWithAdmin() async =>
+            (await userAPIRepository.selectByRoleId(
+              admin.id!,
+            )).map((u) => u.id).toList();
+
+        expect(await roleIdsOfUser(), equals([admin.id, guest.id]..sort()));
+        expect(await usersWithAdmin(), contains(userId));
+
+        // Remove the `admin` link, then abort:
+        var transaction = Transaction();
+        await transaction.execute(() async {
+          var user = (await userAPIRepository.selectByID(userId))!;
+          user.roles = [guest];
+          await userAPIRepository.store(user);
+          transaction.abort(reason: 'Test');
+        });
+        expect(transaction.isAborted, isTrue);
+
+        // Both the user's own roles and a query through the relationship
+        // must see the link again:
+        expect(await roleIdsOfUser(), equals([admin.id, guest.id]..sort()));
+        expect(await usersWithAdmin(), contains(userId));
+      });
+
+      test('selectRelationships with a repeated entity', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final userRepository =
+            userAPIRepository.entityRepository
+                as DBRelationalEntityRepository<User>;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'repeated@mail.com',
+            '123',
+            Address('RE', 'Repeated City', 'Repeated Street', 1),
+            [Role(RoleType.guest), Role(RoleType.admin)],
+          ),
+        );
+
+        var user = (await userAPIRepository.selectByID(userId))!;
+        var roleIds = user.roles.map((r) => r.id).toList()..sort();
+        expect(roleIds, hasLength(2));
+
+        // The same entity twice (`"user" IN (id, id)`): each relationship
+        // must still be returned once.
+        var relationships = await userRepository.selectRelationships([
+          user,
+          user,
+        ], 'roles');
+
+        expect(relationships.keys, equals([userId]));
+        expect(relationships[userId]!.toList()..sort(), equals(roleIds));
+      });
+
+      test('readsOutsideTransaction', () async {
+        final sqlAdapter = await entityRepositoryProvider.adapter;
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'reads@mail.com',
+            '123',
+            Address('RO', 'Reads City', 'Reads Street', 1),
+            [Role(RoleType.guest)],
+          ),
+        );
+
+        // Only reads (the user, its roles and its address):
+        {
+          var transaction = Transaction();
+          var user = await transaction.execute(
+            () => userAPIRepository.selectByID(userId),
+          );
+
+          expect(user!.email, equals('reads@mail.com'));
+          expect(user.roles, hasLength(1));
+          expect(transaction.length, greaterThan(1));
+          expect(transaction.isCommitted, isTrue);
+          // With `readsOutsideTransaction` there is no `BEGIN` to send:
+          expect(transaction.isOpen, !sqlAdapter.readsOutsideTransaction);
+        }
+
+        // A read, then a write: the write opens the transaction.
+        {
+          var transaction = Transaction();
+          await transaction.execute(() async {
+            var user = (await userAPIRepository.selectByID(userId))!;
+            user.email = 'reads2@mail.com';
+            await userAPIRepository.store(user);
+          });
+
+          expect(transaction.isCommitted, isTrue);
+          expect(transaction.isOpen, isTrue);
+          expect(
+            (await userAPIRepository.selectByID(userId))!.email,
+            equals('reads2@mail.com'),
+          );
+        }
+      });
+
       test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 

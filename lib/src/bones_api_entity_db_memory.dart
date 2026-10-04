@@ -238,6 +238,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   void _onTablesModification() {
     _tablesVersions = null;
+    _tablesIndexesVersions = null;
   }
 
   Map<String, int>? _tablesVersions;
@@ -501,11 +502,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var map = _getTableMap(table, true, relationship: true)!;
 
-    var prevEntry = map.entries.firstWhereOrNull(
-      (e) => isEqualsDeep(e.value, entry),
-    );
-    if (prevEntry != null) {
-      return prevEntry.key;
+    var prevID = _findRelationshipEntryID(table, map, entry);
+    if (prevID != null) {
+      return prevID;
     }
 
     var id = nextID(table);
@@ -519,6 +518,38 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     _onTablesModification();
     return id;
+  }
+
+  /// The ID of a relationship row equal to [entry], if there is one.
+  ///
+  /// Only rows sharing the value of [entry]'s first field can be equal, and
+  /// the index of that field lists them: no need to compare every row.
+  Object? _findRelationshipEntryID(
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Map<String, dynamic> entry,
+  ) {
+    if (map.isEmpty) return null;
+
+    var first = entry.entries.firstOrNull;
+    var firstValue = first?.value;
+    var fieldIndex = first != null ? (_tablesIndexes[table]?[first.key]) : null;
+
+    if (firstValue == null || fieldIndex == null) {
+      return map.entries
+          .firstWhereOrNull((e) => isEqualsDeep(e.value, entry))
+          ?.key;
+    }
+
+    var ids = fieldIndex[firstValue];
+    if (ids == null) return null;
+
+    for (var id in ids) {
+      var row = map[id];
+      if (row != null && isEqualsDeep(row, entry)) return id;
+    }
+
+    return null;
   }
 
   final _tablesIndexes =
@@ -829,6 +860,97 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     return sel;
   }
 
+  /// The entry of [map] that [sql]'s condition selects by ID, if its
+  /// condition is a [ConditionID] and the ID is a key of [map].
+  MapEntry<Object, Map<String, dynamic>>? _entryByConditionID(
+    Map<Object, Map<String, dynamic>> map,
+    SQL sql,
+  ) {
+    var condition = sql.condition;
+    if (condition is! ConditionID) return null;
+
+    var parametersByPlaceholder = sql.parametersByPlaceholder;
+
+    var id = condition.resolveIDValue(
+      parameters:
+          sql.namedParameters ??
+          (parametersByPlaceholder.isNotEmpty
+              ? parametersByPlaceholder
+              : sql.positionalParameters),
+    );
+    if (id == null) return null;
+
+    var entry = map[id];
+    return entry != null ? MapEntry(id, entry) : null;
+  }
+
+  /// The entries of a relationship table that a `field == value` or
+  /// `field IN (values)` [condition] selects, through the index of `field`
+  /// (each relationship table is indexed by each of its fields).
+  ///
+  /// With [narrowAND], a [GroupConditionAND] is narrowed by its first
+  /// `field == value`: the caller must still match the whole condition.
+  ///
+  /// Returns `null` to scan the table instead, when the index can't answer
+  /// exactly as the scan would: e.g. a value of another type than the indexed
+  /// ones (a `String` '7' against an `int` 7) matches nothing in the index but
+  /// may match in the scan.
+  List<MapEntry<Object, Map<String, dynamic>>>? _relationshipEntriesByIndex(
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Condition? condition, {
+    bool narrowAND = false,
+  }) {
+    if (narrowAND && condition is GroupConditionAND) {
+      condition = condition.conditions.firstOrNull;
+    }
+
+    List<Object?> values;
+    if (condition is KeyConditionEQ) {
+      values = [condition.value];
+    } else if (condition is KeyConditionIN) {
+      values = condition.value;
+    } else {
+      return null;
+    }
+
+    var keys = (condition as KeyCondition).keys;
+    if (keys.length != 1) return null;
+
+    var key = keys.first;
+    if (key is! ConditionKeyField) return null;
+
+    var fieldIndex = _tablesIndexes[table]?[key.name];
+    if (fieldIndex == null) return map.isEmpty ? [] : null;
+
+    var entries = <MapEntry<Object, Map<String, dynamic>>>[];
+
+    // A repeated value (`IN (1, 1)`) must not repeat its rows, as a scan
+    // returns each row once:
+    for (var value in values.toSet()) {
+      if (value == null || value is ConditionParameter) return null;
+
+      var ids = fieldIndex[value];
+      if (ids == null) {
+        // No row with `value`, if `value` is of the indexed type:
+        var indexedValue = fieldIndex.keys.firstOrNull;
+        if (indexedValue == null ||
+            indexedValue.runtimeType != value.runtimeType) {
+          return null;
+        }
+        continue;
+      }
+
+      for (var id in ids) {
+        var entry = map[id];
+        if (entry == null) return null;
+        entries.add(MapEntry(id, entry));
+      }
+    }
+
+    return entries;
+  }
+
   List<Map<String, dynamic>> _selectEntries(String table, SQL sql) {
     var map = _getTableMap(table, false);
 
@@ -851,27 +973,23 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     // A miss falls through to the scan below, so a `ConditionID` whose value
     // does not match a key exactly (a `String` '7' against an `int` 7, say)
     // still resolves exactly as before — only slower, as it always was.
-    if (condition is ConditionID) {
-      var parametersByPlaceholder = sql.parametersByPlaceholder;
+    var byID = _entryByConditionID(map, sql);
+    if (byID != null) {
+      itr = [byID.value];
+    }
 
-      var id = condition.resolveIDValue(
-        parameters:
-            sql.namedParameters ??
-            (parametersByPlaceholder.isNotEmpty
-                ? parametersByPlaceholder
-                : sql.positionalParameters),
-      );
-
-      if (id != null) {
-        var entry = map[id];
-        if (entry != null) {
-          itr = [entry];
-        }
-      }
+    // A relationship table is indexed by each of its fields, and its selects
+    // are `field == id` / `field IN (ids)`: e.g. the roles of a user.
+    if (itr == null && sql.relationship != null) {
+      itr = _relationshipEntriesByIndex(
+        table,
+        map,
+        condition,
+      )?.map((e) => e.value);
     }
 
     if (itr != null) {
-      // Resolved by ID.
+      // Resolved by ID or by an index.
     } else if (condition == null) {
       itr = map.values;
     } else if (tableScheme == null ||
@@ -962,8 +1080,42 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var entityHandler = getEntityHandler(tableName: table);
 
-    if (tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0) {
-      var entries = map.entries.where((e) {
+    final noReferences =
+        tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0;
+
+    // A delete by ID needs neither a scan nor resolving every row (below):
+    // only the deleted row. A miss falls back to the scan, as in a select.
+    var byID = _entryByConditionID(map, sql);
+    if (byID != null) {
+      var entries = [
+        noReferences
+            ? byID
+            : MapEntry(
+                byID.key,
+                _resolveEntityMap(byID.value, entityHandler, tableScheme),
+              ),
+      ];
+
+      _checkNotReferencedEntities(entries, table, sql);
+
+      return _removeEntries(table, entries, map);
+    }
+
+    // A relationship delete (e.g. the roles a user no longer has) only needs
+    // the rows of its `field == id`; the whole condition is still matched.
+    Iterable<MapEntry<Object, Map<String, dynamic>>> candidates = map.entries;
+    if (sql.relationship != null) {
+      var byIndex = _relationshipEntriesByIndex(
+        table,
+        map,
+        sql.condition,
+        narrowAND: true,
+      );
+      if (byIndex != null) candidates = byIndex;
+    }
+
+    if (noReferences) {
+      var entries = candidates.where((e) {
         return sql.condition!.matchesEntityMap(
           e.value,
           namedParameters: sql.parametersByPlaceholder,
@@ -976,7 +1128,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       return _removeEntries(table, entries, map);
     }
 
-    var entries = map.entries
+    var entries = candidates
         .map((e) {
           var obj = _resolveEntityMap(e.value, entityHandler, tableScheme);
 
@@ -1637,10 +1789,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       _rollbackTable(table, version);
     }
 
-    for (var e in tablesIndexesVersions.entries) {
-      var table = e.key;
-      var indexesVersions = e.value;
-      _rollbackTableIndexes(table, indexesVersions);
+    // An index entry is a `Set` of IDs, changed in place, which a `MapHistory`
+    // rollback can't revert: the indexes are rebuilt from the rolled back
+    // tables instead.
+    for (var table in {...tablesVersions.keys, ...tablesIndexesVersions.keys}) {
+      _rebuildTableIndexes(table);
     }
   }
 
@@ -1650,17 +1803,25 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     _onTablesModification();
   }
 
-  void _rollbackTableIndexes(
-    String table,
-    Map<String, int> indexesTargetVersion,
-  ) {
+  void _rebuildTableIndexes(String table) {
     var tableIndexes = _tablesIndexes[table];
+    if (tableIndexes == null || tableIndexes.isEmpty) return;
 
-    for (var e in indexesTargetVersion.entries) {
-      var field = e.key;
-      var targetVersion = e.value;
-      var index = tableIndexes?[field];
-      index?.rollback(targetVersion);
+    for (var fieldIndex in tableIndexes.values) {
+      fieldIndex.clear();
+    }
+
+    var tableMap = _tables[table];
+    if (tableMap != null) {
+      for (var e in tableMap.entries) {
+        var id = e.key;
+        for (var f in e.value.entries) {
+          var value = f.value;
+          if (value != null) {
+            _indexAddEntry(table, id, f.key, value);
+          }
+        }
+      }
     }
 
     _onTablesModification();

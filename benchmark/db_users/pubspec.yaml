@@ -9,7 +9,7 @@ environment:
 dependencies:
   bones_api:
     path: ../..
-  reflection_factory: ^2.10.0
+  reflection_factory: ^2.10.1
   args: ^2.7.0
   logging: ^1.3.0
 

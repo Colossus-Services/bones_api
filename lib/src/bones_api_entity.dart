@@ -5277,8 +5277,38 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       return o.copy();
     }
 
+    // `EntityHandler.equalsValues` compares an entity with an ID by that ID
+    // alone, so the ID is all the snapshot needs — not a (reflective) deep
+    // copy of the entity and everything it references.
+    var id = _trackingEntityID(o);
+    if (id != null) return id;
+
+    if (o is List && o.isNotEmpty) {
+      var ids = List<Object?>.filled(o.length, null);
+      for (var i = 0; i < o.length; ++i) {
+        var e = o[i];
+        var eId = e != null ? _trackingEntityID(e) : null;
+        if (eId == null) {
+          ids = const [];
+          break;
+        }
+        ids[i] = eId;
+      }
+      if (ids.isNotEmpty) return ids;
+    }
+
     var v2 = deepCopy(o);
     return v2;
+  }
+
+  /// The ID of [o] if it's an entity with an ID, otherwise `null`.
+  Object? _trackingEntityID(Object o) {
+    if (TypeParser.isCollectionValue(o) || TypeParser.isPrimitiveValue(o)) {
+      return null;
+    }
+
+    var handler = entityHandler.getEntityHandler(obj: o);
+    return handler?.getID(o);
   }
 
   @override
@@ -6031,6 +6061,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
   List<TransactionOperation> get operations =>
       UnmodifiableListView(_operations);
+
+  /// `true` if [op] and every operation added before it only read.
+  bool isReadOnlyUntil(TransactionOperation op) {
+    if (!op.type.isRead) return false;
+
+    for (var o in _operations) {
+      if (identical(o, op)) return true;
+      if (!o.type.isRead) return false;
+    }
+
+    return false;
+  }
 
   /// Returns the 1st [operations].
   TransactionOperation? get mainOperation => _operations.firstOrNull;
@@ -7612,6 +7654,15 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
         throw ArgumentError("Unknown: $this");
     }
   }
+
+  /// `true` for an operation that only reads.
+  bool get isRead => switch (this) {
+    TransactionOperationType.select ||
+    TransactionOperationType.count ||
+    TransactionOperationType.selectRelationship ||
+    TransactionOperationType.selectRelationships => true,
+    _ => false,
+  };
 }
 
 class TransactionEntityProvider

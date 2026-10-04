@@ -80,6 +80,16 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
+  /// Default `true`: PostgreSQL defaults to `READ COMMITTED`, where each
+  /// statement reads its own snapshot even inside a transaction, so the reads
+  /// before a transaction's first write don't need its `BEGIN`.
+  ///
+  /// Set it to `false` (config `readsOutsideTransaction: false`) if the
+  /// server's `default_transaction_isolation` is `REPEATABLE READ` or
+  /// `SERIALIZABLE`, where the reads of a transaction share one snapshot.
+  @override
+  final bool readsOutsideTransaction;
+
   DBPostgreSQLAdapter(
     this.databaseName,
     this.username, {
@@ -89,6 +99,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     int? port = 5432,
     int minConnections = 1,
     int maxConnections = 3,
+    this.readsOutsideTransaction = true,
     super.generateTables,
     super.checkTables,
     super.populateTables,
@@ -188,6 +199,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
+    var readsOutsideTransaction =
+        config?.getMultiKeyAsBool(const [
+          'readsOutsideTransaction',
+          'reads_outside_transaction',
+          'reads-outside-transaction',
+        ]) ??
+        true;
+
     var connectivityStr = (config?['connectivity'] ?? '')
         .toString()
         .toLowerCase()
@@ -208,6 +227,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       port: port,
       minConnections: minConnections,
       maxConnections: maxConnections,
+      readsOutsideTransaction: readsOutsideTransaction,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
