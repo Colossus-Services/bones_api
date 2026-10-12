@@ -606,10 +606,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// - [checkDBTables] is only called if `checkTables: true` is passed to the constructor.
   bool get checkedTables => _checkedTables;
 
-  FutureOr<bool> checkDBTables() {
-    if (!_checkTables) {
+  /// Checks the DB tables against the entities (columns, references,
+  /// constraints, enums and indexes, including `@EntityIndex`): throws a
+  /// [StateError] with the SQLs to fix them when something is missing.
+  ///
+  /// Only once, and only with `checkTables: true`, unless [force] (e.g. to
+  /// check again after a migration): the table schemes are then read again.
+  FutureOr<bool> checkDBTables({bool force = false}) {
+    if (!_checkTables && !force) {
       _log.warning("Ignoring check of DB tables for $this.");
       return true;
+    }
+
+    if (force) {
+      for (var repository in entityRepositories) {
+        disposeTableSchemeCache(getTableForEntityRepository(repository));
+      }
     }
 
     _checkTables = false;
@@ -685,6 +697,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
           .toList();
 
+      var missingEntityIndexesSQLs = repositoriesChecksErrors
+          .where((e) => e.missingEntityIndexes?.isNotEmpty ?? false)
+          .expand((e) => e.generateMissingEntityIndexesSQLs())
+          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .toList();
+
       var alterTablesSQLs = [
         ...missingColumnsSQLs,
         '',
@@ -701,6 +719,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ...missingEnumConstraintsSQLs,
         '',
         ...missingEnumValuesSQLs,
+        '',
+        ...missingEntityIndexesSQLs,
       ];
 
       alterTablesSQLs = alterTablesSQLs.expandIndexed((i, s) {
@@ -1055,6 +1075,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       }
     }
 
+    // The entity's indexes (`@EntityIndex`) without an index over their
+    // columns (in order, any name), when the adapter knows the indexes:
+    var missingEntityIndexes = scheme.indexes == null
+        ? const <CreateIndexSQL>[]
+        : generateEntityIndexesSQLs(
+            entityHandler,
+            schemeTableName,
+          ).where((sql) => scheme.hasIndexOn(sql.columns) != true).toList();
+
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
         missingCollectionReferenceColumns.isNotEmpty ||
@@ -1063,9 +1092,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         missingRelationshipFieldReferenceIndexes.isNotEmpty ||
         missingUniqueConstraints.isNotEmpty ||
         missingEnumConstraints.isNotEmpty ||
-        missingEnumValues.isNotEmpty) {
+        missingEnumValues.isNotEmpty ||
+        missingEntityIndexes.isNotEmpty) {
       _log.severe(
         "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
+        "${missingEntityIndexes.isNotEmpty ? '-- missingEntityIndexes: ${missingEntityIndexes.map((e) => e.indexName).toList()}\n' : ''}"
         "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
         "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
         "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
@@ -1112,6 +1143,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               ),
             )
             .toMapFromEntries(),
+        missingEntityIndexes: missingEntityIndexes,
       );
     }
 
@@ -3534,6 +3566,9 @@ class _DBTableCheck {
   List<_DBTableColumn>? missingEnumConstraints;
   Map<_DBTableColumn, List<String>>? missingEnumValues;
 
+  /// The entity's indexes (`@EntityIndex`) missing in the table.
+  List<CreateIndexSQL>? missingEntityIndexes;
+
   _DBTableCheck.missing(
     this.repository,
     this.scheme,
@@ -3545,8 +3580,9 @@ class _DBTableCheck {
     this.missingRelationshipReferenceIndexes,
     this.missingUniqueConstraints,
     this.missingEnumConstraints,
-    this.missingEnumValues,
-  );
+    this.missingEnumValues, {
+    this.missingEntityIndexes,
+  });
 
   String? error;
 
@@ -3564,9 +3600,14 @@ class _DBTableCheck {
       (missingRelationshipReferenceIndexes?.isEmpty ?? true) &&
       (missingUniqueConstraints?.isEmpty ?? true) &&
       (missingEnumConstraints?.isEmpty ?? true) &&
-      (missingEnumValues?.isEmpty ?? true);
+      (missingEnumValues?.isEmpty ?? true) &&
+      (missingEntityIndexes?.isEmpty ?? true);
 
   bool get isError => !isOK;
+
+  /// The `CREATE INDEX` SQLs of the [missingEntityIndexes].
+  List<CreateIndexSQL> generateMissingEntityIndexesSQLs() =>
+      missingEntityIndexes ?? <CreateIndexSQL>[];
 
   List<AlterTableSQL> generateMissingColumnsSQLs(SQLGenerator sqlGenerator) =>
       _generateMissingColumnSQLs(missingColumns, sqlGenerator);
@@ -3716,13 +3757,15 @@ class _DBTableCheck {
     var missingReferenceIndexes = this.missingReferenceIndexes ?? [];
     var missingRelationshipReferenceIndexes =
         this.missingRelationshipReferenceIndexes ?? [];
+    var missingEntityIndexes = this.missingEntityIndexes ?? [];
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
         missingCollectionReferenceColumns.isNotEmpty ||
         missingReferenceConstraints.isNotEmpty ||
         missingReferenceIndexes.isNotEmpty ||
-        missingRelationshipReferenceIndexes.isNotEmpty) {
+        missingRelationshipReferenceIndexes.isNotEmpty ||
+        missingEntityIndexes.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
 
@@ -3767,6 +3810,8 @@ class _DBTableCheck {
           "  -- missingRelationshipReferenceIndexes: [$missingRelationshipReferenceIndexesStr]",
         if (missingCollectionReferenceColumns.isNotEmpty)
           "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
+        if (missingEntityIndexes.isNotEmpty)
+          "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) => '${e.indexName}(${e.columns.join(', ')})').join(' , ')}]",
       ].join('\n');
 
       return '$errorMsg\n';

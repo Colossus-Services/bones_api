@@ -384,6 +384,29 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     ]).toList();
   }
 
+  /// The indexes of [table]: by name, its columns (in order). Expression
+  /// indexes (no column) are ignored.
+  Map<String, List<String>> _findIndexes(
+    DBSQLiteConnectionWrapper connection,
+    String table,
+  ) {
+    var rows = connection.select(
+      'SELECT il.name AS index_name, ii.name AS column_name, ii.seqno AS seqno '
+      'FROM pragma_index_list(?) AS il, pragma_index_info(il.name) AS ii '
+      'ORDER BY il.name, ii.seqno',
+      [table],
+    );
+
+    var indexes = <String, List<String>>{};
+    for (var row in rows) {
+      var indexName = row['index_name']?.toString();
+      var columnName = row['column_name']?.toString();
+      if (indexName == null || columnName == null) continue;
+      (indexes[indexName] ??= []).add(columnName);
+    }
+    return indexes;
+  }
+
   Map<String, Type> _fieldsTypes(List<Row> columns) {
     return Map<String, Type>.fromEntries(
       columns.map((c) {
@@ -430,6 +453,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
           fieldsTypes: fieldsTypes,
           fieldsReferencedTables: fieldsReferencedTables,
           relationshipTables: relationshipTables,
+          indexes: _findIndexes(connection, table),
         );
 
         _log.info('$tableScheme');

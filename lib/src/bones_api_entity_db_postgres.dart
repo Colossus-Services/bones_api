@@ -630,6 +630,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       var constraints = await _findConstraints(connection, table, fieldsTypes);
 
+      var indexes = await _findIndexes(connection, table);
+
       await releaseIntoPool(connection);
 
       var tableScheme = TableScheme(
@@ -640,6 +642,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         constraints: constraints,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
+        indexes: indexes,
       );
 
       _log.info('$tableScheme');
@@ -649,6 +652,41 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       await disposePoolElement(connection);
       rethrow;
     }
+  }
+
+  /// The indexes of [table]: by name, its columns (in order). Expression
+  /// indexes (no column) are ignored.
+  Future<Map<String, List<String>>> _findIndexes(
+    PostgreSQLConnectionWrapper connection,
+    String table,
+  ) async {
+    var sql =
+        '''
+    SELECT
+      i.relname AS index_name,
+      a.attname AS column_name,
+      k.n AS column_position
+    FROM pg_index ix
+      JOIN pg_class t ON t.oid = ix.indrelid
+      JOIN pg_class i ON i.oid = ix.indexrelid
+      JOIN LATERAL unnest(ix.indkey::int2[]) WITH ORDINALITY AS k(attnum, n)
+        ON true
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+    WHERE
+      t.relname = '$table' AND t.relkind = 'r'
+    ORDER BY i.relname, k.n;
+    ''';
+
+    var rows = await connection.mappedResultsQuery(sql);
+
+    var indexes = <String, List<String>>{};
+    for (var row in rows) {
+      var indexName = row['index_name']?.toString();
+      var columnName = row['column_name']?.toString();
+      if (indexName == null || columnName == null) continue;
+      (indexes[indexName] ??= []).add(columnName);
+    }
+    return indexes;
   }
 
   Future<Set<TableConstraint>> _findConstraints(

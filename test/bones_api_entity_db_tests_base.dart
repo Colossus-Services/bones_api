@@ -566,6 +566,82 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('EntityIndex: generated, introspected and checked', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var q = sqlAdapter.dialect.elementQuote;
+
+        // `Address`: `@EntityIndex(['state', 'city'])` (default name) and
+        // `@EntityIndex(['city', 'number'], name: ...)`:
+        var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
+          withDate: false,
+        );
+
+        var defaultIndexSQL =
+            '${q}address__state_city__idx$q ON ${q}address$q '
+            '(${q}state$q, ${q}city$q)';
+        var namedIndexSQL =
+            '${q}address_city_number_custom_idx$q ON ${q}address$q '
+            '(${q}city$q, ${q}number$q)';
+
+        expect(fullCreateTableSQLs, contains(defaultIndexSQL));
+        expect(fullCreateTableSQLs, contains(namedIndexSQL));
+
+        if (testConfigDB is! APITestConfigDBSQL) {
+          _log.info("Not a `APITestConfigDBSQL`: skipping index checks.");
+          return;
+        }
+
+        var testConfigSQL = testConfigDB;
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var scheme = await sqlAdapter.getTableScheme('address');
+        expect(scheme, isNotNull);
+
+        // The adapter must introspect the indexes (not `null`):
+        expect(scheme!.indexes, isNotNull, reason: '${sqlAdapter.runtimeType}');
+        expect(scheme.hasIndexOn(['state', 'city']), isTrue);
+        expect(scheme.hasIndexOn(['city', 'number']), isTrue);
+        expect(scheme.indexes!.keys, contains('address__state_city__idx'));
+        expect(
+          scheme.indexes!.keys,
+          contains('address_city_number_custom_idx'),
+        );
+        // The columns' order matters:
+        expect(scheme.hasIndexOn(['city', 'state']), isFalse);
+
+        // The tables are OK (`force`: checked again, whatever the config):
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        // Without the index: `checkTables` reports it, with its SQL.
+        var dropSQL = sqlAdapter.dialect.name.toLowerCase().contains('mysql')
+            ? 'DROP INDEX ${q}address__state_city__idx$q ON ${q}address$q'
+            : 'DROP INDEX ${q}address__state_city__idx$q';
+        await testConfigSQL.runSQL(dropSQL);
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var scheme2 = await sqlAdapter.getTableScheme('address');
+        expect(scheme2!.hasIndexOn(['state', 'city']), isFalse);
+
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('missingEntityIndexes'),
+                contains('address__state_city__idx(state, city)'),
+              ),
+            ),
+          ),
+        );
+
+        // Created again (the generated SQL): OK again.
+        await testConfigSQL.runSQL('CREATE INDEX $defaultIndexSQL');
+
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+      });
+
       test('TestEntityRepositoryProvider', () async {
         final sqlAdapter = await entityRepositoryProvider.adapter;
         final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;

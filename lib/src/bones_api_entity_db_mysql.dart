@@ -398,6 +398,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         contextID: contextID,
       );
 
+      var indexes = await _findIndexes(connection, table);
+
       await releaseIntoPool(connection);
 
       var tableScheme = TableScheme(
@@ -407,6 +409,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         fieldsTypes: fieldsTypes,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
+        indexes: indexes,
       );
 
       _log.info('$tableScheme');
@@ -597,6 +600,35 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       table,
       () => _findFieldsReferencedTablesImpl(connection, table),
     );
+  }
+
+  /// The indexes of [table]: by name, its columns (in order). Expression
+  /// indexes (no column) are ignored.
+  Future<Map<String, List<String>>> _findIndexes(
+    DBMySqlConnectionWrapper connection,
+    String table,
+  ) async {
+    var results = await connection.query('SHOW INDEX FROM `$table`');
+
+    var rows = results.toList()
+      ..sort((a, b) {
+        var c = a['Key_name'].toString().compareTo(b['Key_name'].toString());
+        if (c != 0) return c;
+        return (int.tryParse('${a['Seq_in_index']}') ?? 0).compareTo(
+          int.tryParse('${b['Seq_in_index']}') ?? 0,
+        );
+      });
+
+    var indexes = <String, List<String>>{};
+    for (var row in rows) {
+      var indexName = row['Key_name']?.toString();
+      var columnName = row['Column_name']?.toString();
+      if (indexName == null || columnName == null || columnName.isEmpty) {
+        continue;
+      }
+      (indexes[indexName] ??= []).add(columnName);
+    }
+    return indexes;
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(

@@ -8,6 +8,65 @@ abstract class EntityAnnotation {
   const EntityAnnotation();
 }
 
+/// An index of an entity's table over one or more [fields] (in this
+/// order): a composite index, which [EntityField.indexed] (one field)
+/// can't express.
+///
+/// ```dart
+/// @EnableReflection()
+/// @EntityIndex(['establishment', 'creationDate'])
+/// class OrderClosing extends Entity { ... }
+/// ```
+///
+/// - [fields]: the entity's field names (not the columns' names); a
+///   reference field (e.g. `EntityReference<Establishment>`) is its column.
+///   Collection (relationship) fields can't be indexed.
+/// - [name]: the index name; default: `<table>__<column1>_<column2>__idx`.
+///
+/// Generated with the table (`CREATE INDEX`); checked by `checkTables`
+/// (an existing table without an index over these columns, in this order,
+/// is reported with the SQL to create it).
+@Target({TargetKind.classType})
+class EntityIndex extends EntityAnnotation {
+  /// The indexed fields, in the index's order.
+  final List<String> fields;
+
+  /// The index name (`null`: the default name).
+  final String? name;
+
+  const EntityIndex(this.fields, {this.name});
+
+  /// The default index name of [table] over [columns].
+  static String defaultName(String table, List<String> columns) =>
+      '${table}__${columns.join('_')}__idx';
+
+  /// The index name of [table] over [columns]: [name] or [defaultName].
+  String indexName(String table, List<String> columns) =>
+      name ?? defaultName(table, columns);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntityIndex &&
+          name == other.name &&
+          _listEquals(fields, other.fields);
+
+  @override
+  int get hashCode => Object.hash(name, Object.hashAll(fields));
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; ++i) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  String toString() =>
+      'EntityIndex(${fields.join(', ')}${name != null ? ' ; name: $name' : ''})';
+}
+
 /// Configuration of a entity field.
 /// - `hidden`: this field won't be stored if is hidden.
 /// - `unique`: this filed should be unique in the repository/table.

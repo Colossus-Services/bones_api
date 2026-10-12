@@ -282,6 +282,27 @@ class TableScheme with FieldsFromMap {
   /// Reference tables (many-to-many).
   final Set<TableRelationshipReference> _relationshipTables;
 
+  /// The table's indexes: by index name, its columns (in order); `null` if
+  /// unknown (the adapter doesn't provide them).
+  final Map<String, List<String>>? indexes;
+
+  /// Whether the table has an index over exactly [columns] (in this order,
+  /// any name). `null` if the [indexes] are unknown.
+  bool? hasIndexOn(List<String> columns) {
+    var indexes = this.indexes;
+    if (indexes == null) return null;
+
+    return indexes.values.any((indexColumns) {
+      if (indexColumns.length != columns.length) return false;
+      for (var i = 0; i < columns.length; ++i) {
+        if (indexColumns[i].toLowerCase() != columns[i].toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   late final Map<String, int> _fieldsNamesIndexes;
   late final List<String> _fieldsNamesLC;
   late final List<String> _fieldsNamesSimple;
@@ -298,7 +319,13 @@ class TableScheme with FieldsFromMap {
     Iterable<TableRelationshipReference>? relationshipTables,
     Iterable<TableConstraint>? constraints,
     this.relationship = false,
-  }) : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
+    Map<String, List<String>>? indexes,
+  }) : indexes = indexes == null
+           ? null
+           : Map<String, List<String>>.unmodifiable(
+               indexes.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))),
+             ),
+       fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
        fieldsTypes = Map.unmodifiable(fieldsTypes),
        constraints = ((constraints?.toList() ?? [])..sort()).toSet(),
        _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(

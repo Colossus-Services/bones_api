@@ -265,19 +265,41 @@ class CreateIndexSQL extends SQLBuilder {
   /// The table name.
   final String table;
 
-  /// The column;
+  /// The (first) column.
   final String column;
+
+  /// The indexed columns, in order (one for a single-column index).
+  final List<String> columns;
 
   /// The name of the index;
   final String? indexName;
 
+  /// A single-[column] index.
   CreateIndexSQL(
     SQLDialect dialect,
     this.table,
     this.column,
     this.indexName, {
     String q = '"',
-  }) : super(dialect, q);
+  }) : columns = List<String>.unmodifiable([column]),
+       super(dialect, q);
+
+  /// An index over [columns] (in this order), e.g. a composite index
+  /// ([EntityIndex]).
+  CreateIndexSQL.columns(
+    SQLDialect dialect,
+    this.table,
+    List<String> columns,
+    this.indexName, {
+    String q = '"',
+  }) : columns = List<String>.unmodifiable(columns),
+       column = columns.isNotEmpty
+           ? columns.first
+           : throw ArgumentError.value(columns, 'columns', 'Empty columns'),
+       super(dialect, q);
+
+  /// Whether it's an index over more than one column.
+  bool get isComposite => columns.length > 1;
 
   @override
   String get mainTable => table;
@@ -292,7 +314,9 @@ class CreateIndexSQL extends SQLBuilder {
       sql.write('IF NOT EXISTS ');
     }
 
-    sql.write('$q$indexName$q ON $q$table$q ($q$column$q) ;');
+    var columnsSQL = columns.map((c) => '$q$c$q').join(', ');
+
+    sql.write('$q$indexName$q ON $q$table$q ($columnsSQL) ;');
 
     return sql.toString();
   }
@@ -2013,6 +2037,9 @@ abstract mixin class SQLGenerator {
       }
     });
 
+    // The entity's composite indexes (`@EntityIndex`):
+    indexSQLs.addAll(generateEntityIndexesSQLs(entityHandler, table));
+
     var createSQL = CreateTableSQL(
       dialect,
       table,
@@ -2178,6 +2205,70 @@ abstract mixin class SQLGenerator {
 
   String normalizeColumnName(String fieldName) =>
       StringUtils.toLowerCaseUnderscore(fieldName, simple: true);
+
+  /// The columns of the [entityIndex] fields of the [entityHandler]'s
+  /// entity (in the index's order).
+  ///
+  /// Throws an [ArgumentError] for an unknown, hidden or collection
+  /// (relationship) field, or an empty index.
+  List<String> resolveEntityIndexColumns(
+    EntityHandler entityHandler,
+    EntityIndex entityIndex,
+  ) {
+    var fields = entityIndex.fields;
+    if (fields.isEmpty) {
+      throw ArgumentError(
+        "Empty `EntityIndex` fields: `${entityHandler.type}`",
+      );
+    }
+
+    var fieldsTypes = entityHandler.fieldsTypes();
+
+    return fields.map((fieldName) {
+      var fieldType = fieldsTypes[fieldName];
+      if (fieldType == null) {
+        throw ArgumentError(
+          "Unknown `EntityIndex` field `$fieldName` in `${entityHandler.type}`: "
+          "$entityIndex",
+        );
+      }
+
+      if (fieldType.isListEntityOrReference) {
+        throw ArgumentError(
+          "Can't index a collection (relationship) field: "
+          "`${entityHandler.type}.$fieldName` ($entityIndex)",
+        );
+      }
+
+      var annotations = entityHandler
+          .getFieldEntityAnnotations(null, fieldName)
+          ?.whereType<EntityField>()
+          .toList();
+      if (annotations != null && annotations.hasHidden) {
+        throw ArgumentError(
+          "Can't index a hidden field: `${entityHandler.type}.$fieldName` "
+          "($entityIndex)",
+        );
+      }
+
+      return normalizeColumnName(fieldName);
+    }).toList();
+  }
+
+  /// The `CREATE INDEX` SQLs of the [EntityIndex]es of the [entityHandler]'s
+  /// entity, in [table].
+  List<CreateIndexSQL> generateEntityIndexesSQLs(
+    EntityHandler entityHandler,
+    String table,
+  ) {
+    var q = dialect.elementQuote;
+
+    return entityHandler.getEntityIndexes().map((entityIndex) {
+      var columns = resolveEntityIndexColumns(entityHandler, entityIndex);
+      var indexName = entityIndex.indexName(table, columns);
+      return CreateIndexSQL.columns(dialect, table, columns, indexName, q: q);
+    }).toList();
+  }
 
   /// Generate a full text with all the SQLs to create the tables.
   Future<String> generateFullCreateTableSQLs({

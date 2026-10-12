@@ -1,3 +1,33 @@
+## 1.18.0
+
+- `@EntityIndex`: indexes over one or more fields (composite indexes),
+  declared on the entity class, which `@EntityField.indexed()` (one field)
+  can't express:
+  ```dart
+  @EnableReflection()
+  @EntityIndex(['establishment', 'creationDate'])
+  class OrderClosing extends Entity { ... }
+  ```
+  - Default name: `<table>__<column1>_<column2>__idx`; or `name:`.
+  - Generated with the table (`generateCreateTableSQL` /
+    `generateFullCreateTableSQLs`, `generateTables`).
+  - `checkTables`: an existing table without an index over these columns (in
+    this order, any name) is reported (`missingEntityIndexes`), with its
+    `CREATE INDEX` SQL.
+  - An unknown, hidden or collection (relationship) field is an
+    `ArgumentError`.
+  - `EntityHandler.getEntityIndexes()`: the class annotations
+    (`ClassReflectionEntityHandler`), or `GenericEntityHandler(entityIndexes:)`.
+- `CreateIndexSQL.columns`: an index over several columns (`columns`,
+  `isComposite`); `SQLGenerator.resolveEntityIndexColumns` /
+  `generateEntityIndexesSQLs`.
+- `TableScheme.indexes` (by name, its columns in order) and `hasIndexOn`:
+  introspected by the PostgreSQL (`pg_index`), MySQL (`SHOW INDEX`) and SQLite
+  (`pragma_index_list`/`pragma_index_info`) adapters; `null` when unknown
+  (memory).
+- `DBSQLAdapter.checkDBTables({force})`: checks again on demand (e.g. after a
+  migration), reading the table schemes again.
+
 ## 1.17.1
 
 - `benchmark/db_users`: a Users API benchmark sub-project — an `APIRoot` with
