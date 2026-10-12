@@ -13,7 +13,8 @@
     `generateFullCreateTableSQLs`, `generateTables`).
   - `checkTables`: an existing table without an index over these columns (in
     this order, any name) is reported (`missingEntityIndexes`), with its
-    `CREATE INDEX` SQL.
+    `CREATE INDEX` SQL. If its name is in use by an index over other columns,
+    that's reported too (drop it first: `IF NOT EXISTS` would skip it).
   - An unknown, hidden or collection (relationship) field is an
     `ArgumentError`.
   - `EntityHandler.getEntityIndexes()`: the class annotations
@@ -21,12 +22,16 @@
 - `CreateIndexSQL.columns`: an index over several columns (`columns`,
   `isComposite`); `SQLGenerator.resolveEntityIndexColumns` /
   `generateEntityIndexesSQLs`.
-- `TableScheme.indexes` (by name, its columns in order) and `hasIndexOn`:
-  introspected by the PostgreSQL (`pg_index`), MySQL (`SHOW INDEX`) and SQLite
+- `TableScheme.indexes` (by name, its key columns in order) and `hasIndexOn`:
+  introspected by the PostgreSQL (`pg_index`: the table visible in the search
+  path, also partitioned tables), MySQL (`SHOW INDEX`) and SQLite
   (`pragma_index_list`/`pragma_index_info`) adapters; `null` when unknown
-  (memory).
+  (memory). Only usable plain-column indexes: partial, expression/functional
+  and (PostgreSQL) invalid indexes are ignored, and `INCLUDE` columns aren't
+  key columns.
 - `DBSQLAdapter.checkDBTables({force})`: checks again on demand (e.g. after a
-  migration), reading the table schemes again.
+  migration), reading the entities' table schemes and fields types again
+  (`disposeTableSchemeCache(table, fieldsTypes: true)`).
 
 ## 1.17.1
 
