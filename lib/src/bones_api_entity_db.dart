@@ -932,8 +932,6 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   List<EntityRepository> get registeredEntityRepositories =>
       _entityRepositories.values.toList();
 
-  bool _callingGetEntityRepository = false;
-
   @override
   EntityRepository<O>? getEntityRepository<O extends Object>({
     O? obj,
@@ -943,11 +941,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }) {
     if (isClosed) return null;
 
-    if (_callingGetEntityRepository) return null;
-    _callingGetEntityRepository = true;
-
-    try {
-      return _getEntityRepositoryImpl<O>(
+    // Each provider asked once per lookup:
+    return EntityRepositoryProvider.traverseLookup(
+      this,
+      () =>
+          _getEntityRepositoryImpl<O>(
             obj: obj,
             type: type,
             name: name,
@@ -957,10 +955,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
             obj: obj,
             type: type,
             name: name,
-          );
-    } finally {
-      _callingGetEntityRepository = false;
-    }
+          ),
+    );
   }
 
   EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>({
@@ -1048,17 +1044,15 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
     if (isClosed) return null;
 
-    if (_callingGetEntityRepository) return null;
-    _callingGetEntityRepository = true;
-
-    try {
-      return _getEntityRepositoryByTypeImpl<O>(type) ??
+    // Each provider asked once per lookup:
+    return EntityRepositoryProvider.traverseLookup(
+      this,
+      () =>
+          _getEntityRepositoryByTypeImpl<O>(type) ??
           EntityRepositoryProvider.globalProvider.getEntityRepositoryByType<O>(
             type,
-          );
-    } finally {
-      _callingGetEntityRepository = false;
-    }
+          ),
+    );
   }
 
   EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
@@ -1112,7 +1106,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     for (var e in _knownEntityRepositoryProviders) {
-      e.allRepositories(allRepositories: allRepositories);
+      e.allRepositories(
+        allRepositories: allRepositories,
+        traversedProviders: traversedProviders,
+      );
     }
 
     return allRepositories;

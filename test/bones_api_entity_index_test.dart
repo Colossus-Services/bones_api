@@ -21,8 +21,7 @@ class _IndexTestProvider extends EntityRepositoryProvider {
     DBSQLEntityRepository<Address>(sqlAdapter, 'address', addressHandler);
 
     // Closed at the test's end: the open providers are all known to each
-    // other (global provider), and a lookup of a type none has (e.g. the
-    // `Address.stores` `Store`) traverses them, slower with each one.
+    // other (global provider), so the tests stay isolated.
     addTearDown(() {
       sqlAdapter.close();
       close();
