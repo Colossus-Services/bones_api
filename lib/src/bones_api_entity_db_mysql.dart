@@ -602,8 +602,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     );
   }
 
-  /// The indexes of [table]: by name, its columns (in order). Expression
-  /// indexes (no column) are ignored.
+  /// The indexes of [table]: by name, its columns (in order). Only
+  /// plain-column indexes: functional indexes (a key part without a column)
+  /// are ignored entirely.
   Future<Map<String, List<String>>> _findIndexes(
     DBMySqlConnectionWrapper connection,
     String table,
@@ -620,14 +621,19 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       });
 
     var indexes = <String, List<String>>{};
+    var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['Key_name']?.toString();
+      if (indexName == null) continue;
+
       var columnName = row['Column_name']?.toString();
-      if (indexName == null || columnName == null || columnName.isEmpty) {
+      if (columnName == null || columnName.isEmpty) {
+        ignored.add(indexName);
         continue;
       }
       (indexes[indexName] ??= []).add(columnName);
     }
+    ignored.forEach(indexes.remove);
     return indexes;
   }
 

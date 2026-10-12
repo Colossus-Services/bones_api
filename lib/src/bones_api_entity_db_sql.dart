@@ -611,7 +611,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// [StateError] with the SQLs to fix them when something is missing.
   ///
   /// Only once, and only with `checkTables: true`, unless [force] (e.g. to
-  /// check again after a migration): the table schemes are then read again.
+  /// check again after a migration): the entities' table schemes and fields
+  /// types are then read again (a scheme load already in progress isn't
+  /// restarted).
   FutureOr<bool> checkDBTables({bool force = false}) {
     if (!_checkTables && !force) {
       _log.warning("Ignoring check of DB tables for $this.");
@@ -620,7 +622,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     if (force) {
       for (var repository in entityRepositories) {
-        disposeTableSchemeCache(getTableForEntityRepository(repository));
+        disposeTableSchemeCache(
+          getTableForEntityRepository(repository),
+          fieldsTypes: true,
+        );
       }
     }
 
@@ -699,8 +704,19 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var missingEntityIndexesSQLs = repositoriesChecksErrors
           .where((e) => e.missingEntityIndexes?.isNotEmpty ?? false)
-          .expand((e) => e.generateMissingEntityIndexesSQLs())
-          .expand((e) => e.buildAllSQLs(ifNotExists: true, multiline: false))
+          .expand(
+            (e) => e.generateMissingEntityIndexesSQLs().expand((sql) {
+              var conflict = e.entityIndexesNameConflicts?[sql.indexName];
+              var conflictComment = conflict == null
+                  ? null
+                  : '-- `${sql.indexName}` exists over '
+                        '(${conflict.join(', ')}): drop it first:';
+              return [
+                ?conflictComment,
+                ...sql.buildAllSQLs(ifNotExists: true, multiline: false),
+              ];
+            }),
+          )
           .toList();
 
       var alterTablesSQLs = [
@@ -1084,6 +1100,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             schemeTableName,
           ).where((sql) => scheme.hasIndexOn(sql.columns) != true).toList();
 
+    // A missing index whose name is in use by another index (other
+    // columns): `CREATE INDEX IF NOT EXISTS` would do nothing; it must be
+    // dropped first. By index name, the existing index's columns.
+    var entityIndexesNameConflicts = <String, List<String>>{
+      for (var sql in missingEntityIndexes)
+        if (sql.indexName case var indexName?)
+          if (scheme.indexes?[indexName] case var columns?) indexName: columns,
+    };
+
+    if (entityIndexesNameConflicts.isNotEmpty) {
+      _log.severe(
+        "Table `$schemeTableName`: `@EntityIndex` names in use by other "
+        "indexes (drop them first): $entityIndexesNameConflicts",
+      );
+    }
+
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
         missingCollectionReferenceColumns.isNotEmpty ||
@@ -1144,6 +1176,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             )
             .toMapFromEntries(),
         missingEntityIndexes: missingEntityIndexes,
+        entityIndexesNameConflicts: entityIndexesNameConflicts,
       );
     }
 
@@ -3569,6 +3602,10 @@ class _DBTableCheck {
   /// The entity's indexes (`@EntityIndex`) missing in the table.
   List<CreateIndexSQL>? missingEntityIndexes;
 
+  /// Of the [missingEntityIndexes], the ones whose name is in use by another
+  /// index: by name, that index's columns.
+  Map<String, List<String>>? entityIndexesNameConflicts;
+
   _DBTableCheck.missing(
     this.repository,
     this.scheme,
@@ -3582,6 +3619,7 @@ class _DBTableCheck {
     this.missingEnumConstraints,
     this.missingEnumValues, {
     this.missingEntityIndexes,
+    this.entityIndexesNameConflicts,
   });
 
   String? error;
@@ -3811,7 +3849,11 @@ class _DBTableCheck {
         if (missingCollectionReferenceColumns.isNotEmpty)
           "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
         if (missingEntityIndexes.isNotEmpty)
-          "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) => '${e.indexName}(${e.columns.join(', ')})').join(' , ')}]",
+          "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) {
+            var conflict = entityIndexesNameConflicts?[e.indexName];
+            var desc = '${e.indexName}(${e.columns.join(', ')})';
+            return conflict == null ? desc : '$desc <name in use over (${conflict.join(', ')}): drop it first>';
+          }).join(' , ')}]",
       ].join('\n');
 
       return '$errorMsg\n';

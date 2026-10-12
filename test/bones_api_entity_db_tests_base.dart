@@ -593,7 +593,14 @@ Future<bool> runAdapterTests(
 
         var testConfigSQL = testConfigDB;
 
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
         sqlAdapter.disposeTableSchemeCache('address');
+        if (await sqlAdapter.getTableScheme('address') == null) {
+          await sqlAdapter.populateTables(fullCreateTableSQLs);
+          sqlAdapter.disposeTableSchemeCache('address');
+        }
+
         var scheme = await sqlAdapter.getTableScheme('address');
         expect(scheme, isNotNull);
 
@@ -672,6 +679,61 @@ Future<bool> runAdapterTests(
         );
 
         await expectMissingStateCity();
+
+        if (!isMySQL) {
+          // Not usable as the index: a partial index (`WHERE`) over the
+          // same columns, or an expression index (PostgreSQL, SQLite).
+          await testConfigSQL.runSQL(
+            '${createIndexSQL('address_partial_tmp_idx', ['state', 'city'])} '
+            'WHERE ${q}number$q > 0',
+          );
+          await testConfigSQL.runSQL(
+            'CREATE INDEX ${q}address_expr_tmp_idx$q ON ${q}address$q '
+            '(lower(${q}state$q), ${q}city$q)',
+          );
+
+          sqlAdapter.disposeTableSchemeCache('address');
+          var schemeTmp = await sqlAdapter.getTableScheme('address');
+          expect(
+            schemeTmp!.indexes!.keys,
+            isNot(
+              anyOf(
+                contains('address_partial_tmp_idx'),
+                contains('address_expr_tmp_idx'),
+              ),
+            ),
+          );
+
+          await expectMissingStateCity();
+          await testConfigSQL.runSQL(dropIndexSQL('address_partial_tmp_idx'));
+          await testConfigSQL.runSQL(dropIndexSQL('address_expr_tmp_idx'));
+        }
+
+        // The name in use by an index over other columns: reported, to be
+        // dropped first (`CREATE INDEX IF NOT EXISTS` would do nothing).
+        await testConfigSQL.runSQL(
+          dropIndexSQL('address_city_number_custom_idx'),
+        );
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_city_number_custom_idx', ['number', 'city']),
+        );
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('address_city_number_custom_idx(city, number)'),
+                contains('name in use over (number, city)'),
+              ),
+            ),
+          ),
+        );
+        await testConfigSQL.runSQL(
+          dropIndexSQL('address_city_number_custom_idx'),
+        );
+        await testConfigSQL.runSQL('CREATE INDEX $namedIndexSQL');
 
         // Created again (the generated SQL): OK again.
         await testConfigSQL.runSQL('CREATE INDEX $defaultIndexSQL');

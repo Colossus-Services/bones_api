@@ -654,8 +654,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     }
   }
 
-  /// The indexes of [table]: by name, its columns (in order). Expression
-  /// indexes (no column) are ignored.
+  /// The indexes of [table] (the one visible in the search path, e.g. not a
+  /// same-named table of another schema): by name, its key columns (in
+  /// order). Only usable plain-column indexes: invalid (e.g. a failed
+  /// `CREATE INDEX CONCURRENTLY`), partial (`WHERE`) and expression indexes
+  /// are ignored, and `INCLUDE` columns aren't key columns.
   Future<Map<String, List<String>>> _findIndexes(
     PostgreSQLConnectionWrapper connection,
     String table,
@@ -673,7 +676,13 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ON true
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
     WHERE
-      t.relname = '$table' AND t.relkind = 'r'
+      t.relname = '$table'
+      AND t.relkind IN ('r', 'p')
+      AND pg_table_is_visible(t.oid)
+      AND ix.indisvalid
+      AND ix.indpred IS NULL
+      AND ix.indexprs IS NULL
+      AND k.n <= ix.indnkeyatts
     ORDER BY i.relname, k.n;
     ''';
 

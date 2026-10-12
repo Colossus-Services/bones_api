@@ -872,8 +872,15 @@ abstract class SchemeProvider {
   }
 
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
-  TableScheme? disposeTableSchemeCache(String table) =>
-      _tablesSchemes.remove(table);
+  /// With [fieldsTypes], also its fields types ([getTableFieldsTypes]), e.g.
+  /// after a migration changed its columns.
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    if (fieldsTypes) _tablesFieldsTypes.remove(table);
+    return _tablesSchemes.remove(table);
+  }
 
   /// Returns the table name for [entityRepository].
   String getTableForEntityRepository(EntityRepository entityRepository) {
