@@ -17,6 +17,55 @@ class _IndexTestProvider extends EntityRepositoryProvider {
   }
 }
 
+/// An entity with a hidden field (`secret`), for [GenericEntityHandler].
+class _SecretEntity extends Entity {
+  int? id;
+  String name;
+  String secret;
+
+  _SecretEntity({this.id, this.name = '', this.secret = ''});
+
+  @override
+  String get idFieldName => 'id';
+
+  @override
+  List<String> get fieldsNames => const ['id', 'name', 'secret'];
+
+  @override
+  V? getField<V>(String key) => switch (key) {
+    'id' => id as V?,
+    'name' => name as V?,
+    'secret' => secret as V?,
+    _ => null,
+  };
+
+  @override
+  TypeInfo? getFieldType(String key) => switch (key) {
+    'id' => TypeInfo.tInt,
+    'name' || 'secret' => TypeInfo.tString,
+    _ => null,
+  };
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) =>
+      key == 'secret' ? const [EntityField.hidden()] : null;
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        id = value as int?;
+      case 'name':
+        name = value as String;
+      case 'secret':
+        secret = value as String;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'secret': secret};
+}
+
 const _addressIndexes = [
   EntityIndex(['state', 'city']),
   EntityIndex(['city', 'number'], name: 'address_city_number_custom_idx'),
@@ -262,6 +311,104 @@ void main() {
         () => adapter.resolveEntityIndexColumns(handler, const EntityIndex([])),
         throwsArgumentError,
       );
+    });
+
+    test('resolveEntityIndexColumns: column names (camelCase, references)', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+      var userHandler = User$reflection().entityHandler;
+
+      // camelCase -> snake_case; `EntityReference<UserInfo> userInfo` and
+      // `Address address`: their reference column.
+      expect(
+        adapter.resolveEntityIndexColumns(
+          userHandler,
+          const EntityIndex(['userInfo', 'creationTime']),
+        ),
+        ['user_info', 'creation_time'],
+      );
+      expect(
+        adapter.resolveEntityIndexColumns(
+          userHandler,
+          const EntityIndex(['address', 'email']),
+        ),
+        ['address', 'email'],
+      );
+
+      // `List<Role> roles`: a relationship.
+      expect(
+        () => adapter.resolveEntityIndexColumns(
+          userHandler,
+          const EntityIndex(['roles']),
+        ),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains("Can't index a collection"),
+          ),
+        ),
+      );
+
+      expect(
+        adapter.generateEntityIndexesSQLs(userHandler, 'user'),
+        isEmpty,
+        reason: '`User` has no `@EntityIndex`',
+      );
+    });
+
+    test('resolveEntityIndexColumns: a hidden field', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+
+      var handler = GenericEntityHandler<_SecretEntity>(
+        instantiatorDefault: _SecretEntity.new,
+        sampleEntity: _SecretEntity(),
+        entityIndexes: const [
+          EntityIndex(['name', 'secret']),
+        ],
+      );
+
+      expect(
+        adapter.resolveEntityIndexColumns(handler, const EntityIndex(['name'])),
+        ['name'],
+      );
+
+      expect(
+        () => adapter.generateEntityIndexesSQLs(handler, 'secret_entity'),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains("Can't index a hidden field"),
+          ),
+        ),
+      );
+    });
+
+    test('generateEntityIndexesSQLs: per dialect', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+      var handler = Address$reflection().entityHandler;
+
+      var sqls = adapter
+          .generateEntityIndexesSQLs(handler, 'address')
+          .map((e) => e.buildSQL(ifNotExists: false))
+          .toList();
+
+      var q = adapter.dialect.elementQuote;
+      var stateCity =
+          'CREATE INDEX ${q}address__state_city__idx$q ON ${q}address$q '
+          '(${q}state$q, ${q}city$q) ;';
+      var cityNumber =
+          'CREATE INDEX ${q}address_city_number_custom_idx$q ON ${q}address$q '
+          '(${q}city$q, ${q}number$q) ;';
+      expect(sqls, [stateCity, cityNumber]);
+
+      // Other tables' indexes have the table in their default name:
+      var other = adapter.generateEntityIndexesSQLs(handler, 'address_v2');
+      expect(other.first.indexName, 'address_v2__state_city__idx');
+      expect(other.last.indexName, 'address_city_number_custom_idx');
     });
   });
 }
