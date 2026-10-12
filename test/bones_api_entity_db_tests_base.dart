@@ -566,6 +566,320 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('EntityIndex: generated, introspected and checked', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var q = sqlAdapter.dialect.elementQuote;
+
+        // `Address`: `@EntityIndex(['state', 'city'])` (default name) and
+        // `@EntityIndex(['city', 'number'], name: ...)`:
+        var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
+          withDate: false,
+        );
+
+        var defaultIndexSQL =
+            '${q}address__state_city__idx$q ON ${q}address$q '
+            '(${q}state$q, ${q}city$q)';
+        var namedIndexSQL =
+            '${q}address_city_number_custom_idx$q ON ${q}address$q '
+            '(${q}city$q, ${q}number$q)';
+
+        expect(fullCreateTableSQLs, contains(defaultIndexSQL));
+        expect(fullCreateTableSQLs, contains(namedIndexSQL));
+
+        if (testConfigDB is! APITestConfigDBSQL) {
+          _log.info("Not a `APITestConfigDBSQL`: skipping index checks.");
+          return;
+        }
+
+        var testConfigSQL = testConfigDB;
+
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
+        sqlAdapter.disposeTableSchemeCache('address');
+        if (await sqlAdapter.getTableScheme('address') == null) {
+          await sqlAdapter.populateTables(fullCreateTableSQLs);
+          sqlAdapter.disposeTableSchemeCache('address');
+        }
+
+        var scheme = await sqlAdapter.getTableScheme('address');
+        expect(scheme, isNotNull);
+
+        // The adapter must introspect the indexes (not `null`):
+        expect(scheme!.indexes, isNotNull, reason: '${sqlAdapter.runtimeType}');
+        expect(scheme.hasIndexOn(['state', 'city']), isTrue);
+        expect(scheme.hasIndexOn(['city', 'number']), isTrue);
+        expect(scheme.indexes!.keys, contains('address__state_city__idx'));
+        expect(
+          scheme.indexes!.keys,
+          contains('address_city_number_custom_idx'),
+        );
+        // The columns' order matters:
+        expect(scheme.hasIndexOn(['city', 'state']), isFalse);
+
+        // Single-field indexes, besides the composite (`state, city`): each
+        // one its own index, read with its column. `state` is also
+        // `@EntityField.indexed()`: one index (the same name).
+        expect(scheme.hasIndexOn(['state']), isTrue);
+        expect(scheme.hasIndexOn(['city']), isTrue);
+        expect(scheme.indexes!['address__state__idx'], ['state']);
+        expect(scheme.indexes!['address__city__idx'], ['city']);
+        expect(scheme.indexes!['address__state_city__idx'], ['state', 'city']);
+        expect(scheme.indexes!['address_city_number_custom_idx'], [
+          'city',
+          'number',
+        ]);
+        expect(
+          scheme.indexes!.values.where((c) => c.length == 1 && c[0] == 'state'),
+          hasLength(1),
+          reason: '${scheme.indexes}',
+        );
+
+        // The tables are OK (`force`: checked again, whatever the config):
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+        expect(sqlAdapter.checkedTables, isTrue);
+
+        var isMySQL = sqlAdapter.dialect.name.toLowerCase().contains('mysql');
+
+        String dropIndexSQL(String indexName) => isMySQL
+            ? 'DROP INDEX $q$indexName$q ON ${q}address$q'
+            : 'DROP INDEX $q$indexName$q';
+
+        String createIndexSQL(String indexName, List<String> columns) =>
+            'CREATE INDEX $q$indexName$q ON ${q}address$q '
+            '(${columns.map((c) => '$q$c$q').join(', ')})';
+
+        Future<void> expectMissingStateCity() => expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('missingEntityIndexes'),
+                contains('address__state_city__idx(state, city)'),
+                // The other `@EntityIndex`es are there: not reported (the
+                // single-field ones don't make the composite).
+                isNot(contains('address_city_number_custom_idx(')),
+                isNot(contains('address__state__idx(')),
+                isNot(contains('address__city__idx(')),
+              ),
+            ),
+          ),
+        );
+
+        // A single-field index (B: `city`) missing, while the composite
+        // (A+B) and the other single one (A: `state`) are there: only it.
+        // The composites starting with `city` (`city, number`) aren't it.
+        await testConfigSQL.runSQL(dropIndexSQL('address__city__idx'));
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var schemeNoCity = await sqlAdapter.getTableScheme('address');
+        expect(schemeNoCity!.hasIndexOn(['city']), isFalse);
+        expect(schemeNoCity.hasIndexOn(['state']), isTrue);
+        expect(schemeNoCity.hasIndexOn(['state', 'city']), isTrue);
+        expect(schemeNoCity.hasIndexOn(['city', 'number']), isTrue);
+
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('address__city__idx(city)'),
+                isNot(contains('address__state__idx(')),
+                isNot(contains('address__state_city__idx(')),
+                isNot(contains('address_city_number_custom_idx(')),
+              ),
+            ),
+          ),
+        );
+        // A failed (forced) check: not checked.
+        expect(sqlAdapter.checkedTables, isFalse);
+
+        if (!isMySQL) {
+          // The name in use by another table's index (PostgreSQL, SQLite:
+          // unique per schema): reported, `CREATE INDEX IF NOT EXISTS`
+          // would do nothing. (MySQL: unique per table, no conflict.)
+          await testConfigSQL.runSQL(
+            'CREATE TABLE ${q}index_name_tmp$q (${q}x$q INT)',
+          );
+          await testConfigSQL.runSQL(
+            'CREATE INDEX ${q}address__city__idx$q ON ${q}index_name_tmp$q '
+            '(${q}x$q)',
+          );
+
+          await expectLater(
+            () async => await sqlAdapter.checkDBTables(force: true),
+            throwsA(
+              isA<StateError>().having(
+                (e) => e.message,
+                'message',
+                contains(
+                  'address__city__idx(city) <name in use on table '
+                  '`index_name_tmp`: drop it first>',
+                ),
+              ),
+            ),
+          );
+
+          await testConfigSQL.runSQL('DROP TABLE ${q}index_name_tmp$q');
+        }
+
+        // The name in use by an index of the table not usable as it: a
+        // prefix (MySQL) or expression (PostgreSQL, SQLite) index. Ignored
+        // by the scheme, but its name reported.
+        await testConfigSQL.runSQL(
+          isMySQL
+              ? 'CREATE INDEX ${q}address__city__idx$q ON ${q}address$q '
+                    '(${q}city$q(10))'
+              : 'CREATE INDEX ${q}address__city__idx$q ON ${q}address$q '
+                    '(lower(${q}city$q))',
+        );
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var schemeUnusable = await sqlAdapter.getTableScheme('address');
+        expect(schemeUnusable!.hasIndexOn(['city']), isFalse);
+        expect(
+          schemeUnusable.indexes!.keys,
+          isNot(contains('address__city__idx')),
+        );
+
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              contains(
+                'address__city__idx(city) <name in use by an index not usable',
+              ),
+            ),
+          ),
+        );
+        await testConfigSQL.runSQL(dropIndexSQL('address__city__idx'));
+
+        // Another name, the same column: OK.
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_city_other_name', ['city']),
+        );
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+        expect(sqlAdapter.checkedTables, isTrue);
+        await testConfigSQL.runSQL(dropIndexSQL('address_city_other_name'));
+
+        await testConfigSQL.runSQL(
+          'CREATE INDEX ${q}address__city__idx$q ON ${q}address$q '
+          '(${q}city$q)',
+        );
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        // Without the index: `checkTables` reports it (only it).
+        await testConfigSQL.runSQL(dropIndexSQL('address__state_city__idx'));
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var scheme2 = await sqlAdapter.getTableScheme('address');
+        expect(scheme2!.hasIndexOn(['state', 'city']), isFalse);
+        expect(
+          scheme2.indexes!.keys,
+          isNot(contains('address__state_city__idx')),
+        );
+
+        await expectMissingStateCity();
+
+        // A prefix (`state`) or other order (`city`, `state`): not the index.
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_prefix_tmp_idx', ['state']),
+        );
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_reversed_tmp_idx', ['city', 'state']),
+        );
+        await expectMissingStateCity();
+        await testConfigSQL.runSQL(dropIndexSQL('address_prefix_tmp_idx'));
+        await testConfigSQL.runSQL(dropIndexSQL('address_reversed_tmp_idx'));
+
+        // Another name, the same columns (e.g. a hand-made migration): OK.
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_state_city_other_name', ['state', 'city']),
+        );
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+        await testConfigSQL.runSQL(
+          dropIndexSQL('address_state_city_other_name'),
+        );
+
+        await expectMissingStateCity();
+
+        if (!isMySQL) {
+          // Not usable as the index: a partial index (`WHERE`) over the
+          // same columns, or an expression index (PostgreSQL, SQLite).
+          await testConfigSQL.runSQL(
+            '${createIndexSQL('address_partial_tmp_idx', ['state', 'city'])} '
+            'WHERE ${q}number$q > 0',
+          );
+          await testConfigSQL.runSQL(
+            'CREATE INDEX ${q}address_expr_tmp_idx$q ON ${q}address$q '
+            '(lower(${q}state$q), ${q}city$q)',
+          );
+
+          sqlAdapter.disposeTableSchemeCache('address');
+          var schemeTmp = await sqlAdapter.getTableScheme('address');
+          expect(
+            schemeTmp!.indexes!.keys,
+            isNot(
+              anyOf(
+                contains('address_partial_tmp_idx'),
+                contains('address_expr_tmp_idx'),
+              ),
+            ),
+          );
+
+          await expectMissingStateCity();
+          await testConfigSQL.runSQL(dropIndexSQL('address_partial_tmp_idx'));
+          await testConfigSQL.runSQL(dropIndexSQL('address_expr_tmp_idx'));
+        }
+
+        // The name in use by an index over other columns: reported, to be
+        // dropped first (`CREATE INDEX IF NOT EXISTS` would do nothing).
+        await testConfigSQL.runSQL(
+          dropIndexSQL('address_city_number_custom_idx'),
+        );
+        await testConfigSQL.runSQL(
+          createIndexSQL('address_city_number_custom_idx', ['number', 'city']),
+        );
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('address_city_number_custom_idx(city, number)'),
+                contains('name in use over (number, city)'),
+              ),
+            ),
+          ),
+        );
+        await testConfigSQL.runSQL(
+          dropIndexSQL('address_city_number_custom_idx'),
+        );
+        await testConfigSQL.runSQL('CREATE INDEX $namedIndexSQL');
+
+        // Created again (the generated SQL): OK again.
+        await testConfigSQL.runSQL('CREATE INDEX $defaultIndexSQL');
+
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        var scheme3 = await sqlAdapter.getTableScheme('address');
+        expect(scheme3!.indexes!['address__state_city__idx'], [
+          'state',
+          'city',
+        ]);
+        expect(scheme3.indexes!['address_city_number_custom_idx'], [
+          'city',
+          'number',
+        ]);
+      });
+
       test('TestEntityRepositoryProvider', () async {
         final sqlAdapter = await entityRepositoryProvider.adapter;
         final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;

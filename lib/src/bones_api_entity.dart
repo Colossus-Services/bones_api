@@ -1651,6 +1651,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key);
 
+  /// The entity's indexes ([EntityIndex], e.g. composite indexes): none by
+  /// default.
+  List<EntityIndex> getEntityIndexes() => const <EntityIndex>[];
+
   Map<String, List<EntityAnnotation>>? getAllFieldsEntityAnnotations([O? o]) {
     var fieldsNames = this.fieldsNames(o);
 
@@ -2651,6 +2655,9 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
 
   final InstantiatorFromMap<O>? instantiatorFromMap;
 
+  /// The entity's indexes (see [getEntityIndexes]).
+  final List<EntityIndex> entityIndexes;
+
   GenericEntityHandler({
     this.instantiatorDefault,
     this.instantiatorFromMap,
@@ -2658,7 +2665,9 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     String? typeName,
     O? sampleEntity,
     EntityHandlerProvider? provider,
-  }) : super(provider, type: type ?? O, typeName: typeName) {
+    List<EntityIndex>? entityIndexes,
+  }) : entityIndexes = List<EntityIndex>.unmodifiable(entityIndexes ?? []),
+       super(provider, type: type ?? O, typeName: typeName) {
     if (instantiatorDefault == null && instantiatorFromMap == null) {
       throw ArgumentError(
         "Null instantiators: `instantiatorDefault`, `instantiatorFromMap`",
@@ -2877,6 +2886,9 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   }
 
   @override
+  List<EntityIndex> getEntityIndexes() => entityIndexes;
+
+  @override
   FutureOr<O?> createDefault() {
     var instantiatorDefault = this.instantiatorDefault;
     if (instantiatorDefault == null) return null;
@@ -3021,6 +3033,15 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   @override
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key) =>
       getFieldAnnotations(o, key)?.whereType<EntityAnnotation>().toList();
+
+  List<EntityIndex>? _entityIndexes;
+
+  /// The [EntityIndex] annotations of the entity's class.
+  @override
+  List<EntityIndex> getEntityIndexes() =>
+      _entityIndexes ??= List<EntityIndex>.unmodifiable(
+        reflection.classAnnotations.whereType<EntityIndex>(),
+      );
 
   @override
   void setField<V>(

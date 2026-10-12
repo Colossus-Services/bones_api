@@ -384,6 +384,64 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     ]).toList();
   }
 
+  /// The indexes of [table]: by name, its columns (in order). Only
+  /// plain-column indexes: partial (`WHERE`) and expression indexes (a
+  /// column without a name) are ignored entirely.
+  Map<String, List<String>> _findIndexes(
+    DBSQLiteConnectionWrapper connection,
+    String table,
+  ) {
+    var rows = connection.select(
+      'SELECT il.name AS index_name, il.partial AS partial, '
+      'ii.name AS column_name, ii.seqno AS seqno '
+      'FROM pragma_index_list(?) AS il, pragma_index_info(il.name) AS ii '
+      'ORDER BY il.name, ii.seqno',
+      [table],
+    );
+
+    var indexes = <String, List<String>>{};
+    var ignored = <String>{};
+    for (var row in rows) {
+      var indexName = row['index_name']?.toString();
+      if (indexName == null) continue;
+
+      var columnName = row['column_name']?.toString();
+      var partial = row['partial'];
+      if (columnName == null || (partial is int && partial != 0)) {
+        ignored.add(indexName);
+        continue;
+      }
+      (indexes[indexName] ??= []).add(columnName);
+    }
+    ignored.forEach(indexes.remove);
+    return indexes;
+  }
+
+  /// Names are unique per database (an index, a table, a view...).
+  @override
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) {
+    var names = indexesNames.toList();
+    if (names.isEmpty) return <String, String?>{};
+
+    return executeWithPool((connection) {
+      var rows = connection.select(
+        'SELECT name, type, tbl_name FROM sqlite_master '
+        'WHERE name IN (${names.map((_) => '?').join(', ')})',
+        names,
+      );
+
+      return <String, String?>{
+        for (var row in rows)
+          row['name'].toString(): row['type'] == 'index'
+              ? row['tbl_name']?.toString()
+              : null,
+      };
+    });
+  }
+
   Map<String, Type> _fieldsTypes(List<Row> columns) {
     return Map<String, Type>.fromEntries(
       columns.map((c) {
@@ -430,6 +488,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
           fieldsTypes: fieldsTypes,
           fieldsReferencedTables: fieldsReferencedTables,
           relationshipTables: relationshipTables,
+          indexes: _findIndexes(connection, table),
         );
 
         _log.info('$tableScheme');
@@ -536,6 +595,21 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   final TimedMap<String, Map<String, TableFieldReference>>
   _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
+
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
 
   final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
   _findFieldsReferencedTablesContextCache = Expando();

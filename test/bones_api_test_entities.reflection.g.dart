@@ -796,7 +796,12 @@ class Address$reflection extends ClassReflection<Address>
     }
   }
 
-  static const List<Object> _classAnnotations = <Object>[];
+  static const List<Object> _classAnnotations = const [
+    EntityIndex(['state', 'city']),
+    EntityIndex(['city', 'number'], name: 'address_city_number_custom_idx'),
+    EntityIndex(['state']),
+    EntityIndex(['city']),
+  ];
 
   @override
   List<Object> get classAnnotations => _classAnnotations;

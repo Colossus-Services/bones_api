@@ -282,6 +282,27 @@ class TableScheme with FieldsFromMap {
   /// Reference tables (many-to-many).
   final Set<TableRelationshipReference> _relationshipTables;
 
+  /// The table's indexes: by index name, its columns (in order); `null` if
+  /// unknown (the adapter doesn't provide them).
+  final Map<String, List<String>>? indexes;
+
+  /// Whether the table has an index over exactly [columns] (in this order,
+  /// any name). `null` if the [indexes] are unknown.
+  bool? hasIndexOn(List<String> columns) {
+    var indexes = this.indexes;
+    if (indexes == null) return null;
+
+    return indexes.values.any((indexColumns) {
+      if (indexColumns.length != columns.length) return false;
+      for (var i = 0; i < columns.length; ++i) {
+        if (indexColumns[i].toLowerCase() != columns[i].toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   late final Map<String, int> _fieldsNamesIndexes;
   late final List<String> _fieldsNamesLC;
   late final List<String> _fieldsNamesSimple;
@@ -298,7 +319,13 @@ class TableScheme with FieldsFromMap {
     Iterable<TableRelationshipReference>? relationshipTables,
     Iterable<TableConstraint>? constraints,
     this.relationship = false,
-  }) : fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
+    Map<String, List<String>>? indexes,
+  }) : indexes = indexes == null
+           ? null
+           : Map<String, List<String>>.unmodifiable(
+               indexes.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))),
+             ),
+       fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
        fieldsTypes = Map.unmodifiable(fieldsTypes),
        constraints = ((constraints?.toList() ?? [])..sort()).toSet(),
        _fieldsReferencedTables = Map<String, TableFieldReference>.unmodifiable(
@@ -845,8 +872,27 @@ abstract class SchemeProvider {
   }
 
   /// Disposes a [TableScheme] for [table]. Forces refresh of previous scheme.
-  TableScheme? disposeTableSchemeCache(String table) =>
-      _tablesSchemes.remove(table);
+  /// With [fieldsTypes], also its fields types ([getTableFieldsTypes]), e.g.
+  /// after a migration changed its columns.
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    if (fieldsTypes) _tablesFieldsTypes.remove(table);
+    return _tablesSchemes.remove(table);
+  }
+
+  /// Disposes all the loaded [TableScheme]s (see [disposeTableSchemeCache]),
+  /// e.g. the referenced and relationship tables too, after a migration.
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    var tables = {
+      ..._tablesSchemes.keys,
+      if (fieldsTypes) ..._tablesFieldsTypes.keys,
+    };
+    for (var table in tables) {
+      disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+    }
+  }
 
   /// Returns the table name for [entityRepository].
   String getTableForEntityRepository(EntityRepository entityRepository) {

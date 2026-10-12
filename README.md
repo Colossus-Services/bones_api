@@ -344,6 +344,27 @@ class Address {
 
 See [reflection_factory] for more Reflection documentation.
 
+### Indexes
+
+`@EntityField.indexed()` indexes one field. For an index over several fields
+(a composite index), annotate the entity class with `@EntityIndex`:
+
+```dart
+@EnableReflection()
+@EntityIndex(['state', 'city'])                     // address__state_city__idx
+@EntityIndex(['zipCode', 'address1'], name: 'address_zip_idx')
+class Address {
+  // ...
+}
+```
+
+The indexes are created with the tables (`generateTables`), and
+`checkTables` reports a table missing one (an index over the same columns, in
+the same order, with any name), with the `CREATE INDEX` SQL to create it.
+
+Index names are unique per schema in PostgreSQL and SQLite (not per table):
+a `name:` in use by another table's index is reported by `checkTables`.
+
 ## Repositories & Database
 
 To stored entities in Databases and manipulate them you can set up an `EntityRepositoryProvider`:

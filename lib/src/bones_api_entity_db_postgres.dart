@@ -129,6 +129,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              acceptsInsertOnConflict: true,
              acceptsVarcharWithoutMaximumSize: true,
              foreignKeyCreatesImplicitIndex: false,
+             maxIdentifierLength: 63,
            ),
            transactions: true,
            transactionAbort: true,
@@ -630,6 +631,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       var constraints = await _findConstraints(connection, table, fieldsTypes);
 
+      var indexes = await _findIndexes(connection, table);
+
       await releaseIntoPool(connection);
 
       var tableScheme = TableScheme(
@@ -640,6 +643,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         constraints: constraints,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
+        indexes: indexes,
       );
 
       _log.info('$tableScheme');
@@ -649,6 +653,99 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       await disposePoolElement(connection);
       rethrow;
     }
+  }
+
+  /// The indexes of [table] (the one visible in the search path, e.g. not a
+  /// same-named table of another schema): by name, its key columns (in
+  /// order). Only usable plain-column indexes: invalid (e.g. a failed
+  /// `CREATE INDEX CONCURRENTLY`), partial (`WHERE`) and expression indexes
+  /// are ignored, and `INCLUDE` columns aren't key columns.
+  ///
+  /// `null` (unknown) if the indexes can't be read: the table scheme is still
+  /// loaded.
+  Future<Map<String, List<String>>?> _findIndexes(
+    PostgreSQLConnectionWrapper connection,
+    String table,
+  ) async {
+    // `indnkeyatts` (key columns, without `INCLUDE`) is from PostgreSQL 11:
+    // read through `to_jsonb` (not a column reference) to also work before
+    // it, when all the columns are key columns (`indnatts`).
+    var sql =
+        '''
+    SELECT
+      i.relname AS index_name,
+      a.attname AS column_name,
+      k.n AS column_position
+    FROM pg_index ix
+      JOIN pg_class t ON t.oid = ix.indrelid
+      JOIN pg_class i ON i.oid = ix.indexrelid
+      JOIN LATERAL unnest(ix.indkey::int2[]) WITH ORDINALITY AS k(attnum, n)
+        ON true
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+    WHERE
+      t.relname = '$table'
+      AND t.relkind IN ('r', 'p')
+      AND pg_table_is_visible(t.oid)
+      AND ix.indisvalid
+      AND ix.indpred IS NULL
+      AND ix.indexprs IS NULL
+      AND k.n <= coalesce((to_jsonb(ix) ->> 'indnkeyatts')::int, ix.indnatts)
+    ORDER BY i.relname, k.n;
+    ''';
+
+    List<Map<String, dynamic>> rows;
+    try {
+      rows = await connection.mappedResultsQuery(sql);
+    } catch (e, s) {
+      _log.warning("Can't read the indexes of table `$table`", e, s);
+      return null;
+    }
+
+    var indexes = <String, List<String>>{};
+    for (var row in rows) {
+      var indexName = row['index_name']?.toString();
+      var columnName = row['column_name']?.toString();
+      if (indexName == null || columnName == null) continue;
+      (indexes[indexName] ??= []).add(columnName);
+    }
+    return indexes;
+  }
+
+  /// Relation names are unique per schema (an index, a table, a sequence...):
+  /// the ones visible in the search path.
+  @override
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) {
+    var names = indexesNames
+        .map((n) => "'${n.replaceAll("'", "''")}'")
+        .join(', ');
+    if (names.isEmpty) return <String, String?>{};
+
+    var sql =
+        '''
+    SELECT
+      c.relname AS name,
+      t.relname AS table_name
+    FROM pg_class c
+      LEFT JOIN pg_index ix ON ix.indexrelid = c.oid
+      LEFT JOIN pg_class t ON t.oid = ix.indrelid
+    WHERE
+      c.relname IN ($names)
+      AND pg_table_is_visible(c.oid);
+    ''';
+
+    return executeWithPool(
+      (connection) => connection
+          .mappedResultsQuery(sql)
+          .then(
+            (rows) => <String, String?>{
+              for (var row in rows)
+                row['name'].toString(): row['table_name']?.toString(),
+            },
+          ),
+    );
   }
 
   Future<Set<TableConstraint>> _findConstraints(
@@ -929,6 +1026,21 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final TimedMap<String, Map<String, TableFieldReference>>
   _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
+
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
 
   final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
   _findFieldsReferencedTablesContextCache = Expando();
