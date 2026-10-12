@@ -119,6 +119,10 @@ class SQLDialect extends DBDialect {
   /// Whether the SQL dialect supports `IF NOT EXISTS` on `CREATE INDEX`.
   final bool createIndexIfNotExists;
 
+  /// Whether a constraint can be added to an existing table
+  /// (`ALTER TABLE ... ADD CONSTRAINT`): not in SQLite.
+  final bool alterTableAddConstraint;
+
   /// If `true` this dialect can't parse an `OFFSET` clause that is not preceded
   /// by a `LIMIT` clause (MySQL). See [offsetMaxLimitValue].
   final bool offsetRequiresLimit;
@@ -149,6 +153,7 @@ class SQLDialect extends DBDialect {
     this.acceptsVarcharWithoutMaximumSize = false,
     this.foreignKeyCreatesImplicitIndex = true,
     this.createIndexIfNotExists = true,
+    this.alterTableAddConstraint = true,
     this.offsetRequiresLimit = false,
     this.offsetMaxLimitValue = '18446744073709551615',
     this.maxIdentifierLength,
@@ -216,6 +221,7 @@ class SQLDialect extends DBDialect {
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
+        'alterTableAddConstraint: $alterTableAddConstraint, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
         'offsetMaxLimitValue: $offsetMaxLimitValue, '
         'maxIdentifierLength: $maxIdentifierLength'
@@ -281,6 +287,9 @@ class CreateIndexSQL extends SQLBuilder {
   /// The name of the index;
   final String? indexName;
 
+  /// Whether it's a unique index (`CREATE UNIQUE INDEX`).
+  final bool unique;
+
   /// A single-[column] index.
   CreateIndexSQL(
     SQLDialect dialect,
@@ -288,6 +297,7 @@ class CreateIndexSQL extends SQLBuilder {
     this.column,
     this.indexName, {
     String q = '"',
+    this.unique = false,
   }) : columns = List<String>.unmodifiable([column]),
        super(dialect, q);
 
@@ -299,6 +309,7 @@ class CreateIndexSQL extends SQLBuilder {
     List<String> columns,
     this.indexName, {
     String q = '"',
+    this.unique = false,
   }) : columns = List<String>.unmodifiable(columns),
        column = columns.isNotEmpty
            ? columns.first
@@ -315,7 +326,7 @@ class CreateIndexSQL extends SQLBuilder {
   String buildSQL({bool multiline = true, bool ifNotExists = true}) {
     final sql = StringBuffer();
 
-    sql.write('CREATE INDEX ');
+    sql.write(unique ? 'CREATE UNIQUE INDEX ' : 'CREATE INDEX ');
 
     if (ifNotExists && dialect.createIndexIfNotExists) {
       sql.write('IF NOT EXISTS ');
@@ -1739,7 +1750,8 @@ abstract mixin class SQLGenerator {
     var q = dialect.elementQuote;
     var columnName = normalizeColumnName(fieldName);
 
-    var constraintName = '${table}_${columnName}__unique';
+    // The same name as in the `CREATE TABLE`:
+    var constraintName = '${table}__${columnName}__unique';
 
     var comment = '${fieldType.toString(withT: false)} $fieldName UNIQUE';
 
@@ -1749,9 +1761,44 @@ abstract mixin class SQLGenerator {
       comment: comment,
     );
 
-    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry]);
+    var alterTableSQL = AlterTableSQL(dialect, table, [columnEntry], q: q);
 
     return alterTableSQL;
+  }
+
+  /// Adds the unique constraint [name] over [columns] to the existing
+  /// [table]: `ALTER TABLE ... ADD CONSTRAINT ... UNIQUE (...)` (as in the
+  /// `CREATE TABLE`), or, if the dialect can't add a constraint to a table
+  /// ([SQLDialect.alterTableAddConstraint]: SQLite), a `CREATE UNIQUE INDEX`
+  /// (the same uniqueness).
+  SQLBuilder generateAddUniqueConstraintSQL(
+    String table,
+    String name,
+    List<String> columns, {
+    String? comment,
+  }) {
+    var q = dialect.elementQuote;
+
+    if (!dialect.alterTableAddConstraint) {
+      return CreateIndexSQL.columns(
+        dialect,
+        table,
+        columns,
+        name,
+        q: q,
+        unique: true,
+      );
+    }
+
+    var columnsSQL = columns.map((c) => '$q$c$q').join(', ');
+
+    return AlterTableSQL(dialect, table, [
+      SQLEntry(
+        'ADD',
+        ' ADD CONSTRAINT $q$name$q UNIQUE ($columnsSQL)',
+        comment: comment,
+      ),
+    ], q: q);
   }
 
   AlterTableSQL generateAddEnumConstraintAlterTableSQL(
@@ -1866,6 +1913,10 @@ abstract mixin class SQLGenerator {
     ];
 
     var indexSQLs = <CreateIndexSQL>[];
+
+    // The `UNIQUE` constraints in `sqlEntries` (name and columns): to not
+    // repeat them with an `@EntityIndex`.
+    var uniqueConstraints = <({String name, List<String> columns})>[];
 
     var fieldsEntries = entityHandler
         .fieldsTypes()
@@ -1989,6 +2040,11 @@ abstract mixin class SQLGenerator {
               ],
             ),
           );
+
+          uniqueConstraints.add((
+            name: constrainUniqueName,
+            columns: [columnName],
+          ));
         } else if (entityFieldAnnotations.hasIndexed) {
           var indexName = '${table}__${columnName}__idx';
           indexSQLs.add(
@@ -2044,27 +2100,53 @@ abstract mixin class SQLGenerator {
       }
     });
 
-    // The entity's indexes (`@EntityIndex`): one over the same columns as
-    // an index already here (e.g. a single field also `indexed` or a
-    // reference) isn't created twice.
-    for (var sql in generateEntityIndexesSQLs(entityHandler, table)) {
-      var sameColumns = indexSQLs.firstWhereOrNull(
-        (e) => e.columns.equals(sql.columns),
-      );
-      if (sameColumns != null) continue;
+    // The entity's indexes (`@EntityIndex`), not repeating an index or
+    // unique constraint over the same columns (e.g. a field also `indexed`,
+    // `unique` or a reference). A unique one is a `UNIQUE` constraint, whose
+    // index also serves as the non-unique one over its columns (the unique
+    // ones first; a non-unique index over its columns is dropped).
+    var entityIndexes = generateEntityIndexesSQLs(entityHandler, table);
+    for (var sql in [
+      ...entityIndexes.where((e) => e.unique),
+      ...entityIndexes.where((e) => !e.unique),
+    ]) {
+      var name = sql.indexName;
+      var columns = sql.columns;
 
-      var sameName = indexSQLs.firstWhereOrNull(
-        (e) => e.indexName == sql.indexName,
-      );
+      if (uniqueConstraints.any((e) => e.columns.equals(columns))) continue;
+      if (!sql.unique && indexSQLs.any((e) => e.columns.equals(columns))) {
+        continue;
+      }
+
+      if (sql.unique) {
+        indexSQLs.removeWhere((e) => !e.unique && e.columns.equals(columns));
+      }
+
+      var sameName = [
+        ...uniqueConstraints,
+        for (var e in indexSQLs) (name: e.indexName, columns: e.columns),
+      ].firstWhereOrNull((e) => e.name == name);
       if (sameName != null) {
         throw ArgumentError(
-          "`EntityIndex` name `${sql.indexName}` (${sql.columns.join(', ')}) "
+          "`EntityIndex` name `$name` (${columns.join(', ')}) "
           "already in use by another index of table `$table` "
           "(${sameName.columns.join(', ')}): `${entityHandler.type}`",
         );
       }
 
-      indexSQLs.add(sql);
+      if (sql.unique) {
+        var columnsSQL = columns.map((c) => '$q$c$q').join(', ');
+        sqlEntries.add(
+          SQLEntry(
+            'CONSTRAINT',
+            ' CONSTRAINT $q$name$q UNIQUE ($columnsSQL)',
+            columns: [for (var c in columns) SQLColumn(table, c)],
+          ),
+        );
+        uniqueConstraints.add((name: name!, columns: columns));
+      } else {
+        indexSQLs.add(sql);
+      }
     }
 
     var createSQL = CreateTableSQL(
@@ -2310,7 +2392,14 @@ abstract mixin class SQLGenerator {
             .toList();
       }
 
-      return CreateIndexSQL.columns(dialect, table, columns, indexName, q: q);
+      return CreateIndexSQL.columns(
+        dialect,
+        table,
+        columns,
+        indexName,
+        q: q,
+        unique: entityIndex.unique,
+      );
     }).toList();
   }
 

@@ -3248,7 +3248,10 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
     }
   }
 
-  static const List<Object> _classAnnotations = <Object>[];
+  static const List<Object> _classAnnotations = const [
+    EntityIndex(['email', 'address'], unique: true),
+    EntityIndex(['email'], unique: true),
+  ];
 
   @override
   List<Object> get classAnnotations => _classAnnotations;

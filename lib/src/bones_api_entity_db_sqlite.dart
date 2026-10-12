@@ -145,6 +145,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              // SQLite does NOT create an implicit index for a foreign key:
              foreignKeyCreatesImplicitIndex: false,
              createIndexIfNotExists: true,
+             // SQLite can't `ALTER TABLE ... ADD CONSTRAINT`:
+             alterTableAddConstraint: false,
              // SQLite can't parse an `OFFSET` without a preceding `LIMIT`,
              // and uses `LIMIT -1` as "no limit":
              offsetRequiresLimit: true,
@@ -384,15 +386,17 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     ]).toList();
   }
 
-  /// The indexes of [table]: by name, its columns (in order). Only
-  /// plain-column indexes: partial (`WHERE`) and expression indexes (a
-  /// column without a name) are ignored entirely.
-  Map<String, List<String>> _findIndexes(
+  /// The indexes of [table]: by name, its columns (in order), and the names
+  /// of the unique ones (also the `sqlite_autoindex_*` of `UNIQUE`
+  /// constraints). Only plain-column indexes: partial (`WHERE`) and
+  /// expression indexes (a column without a name) are ignored entirely.
+  ({Map<String, List<String>> indexes, Set<String> unique}) _findIndexes(
     DBSQLiteConnectionWrapper connection,
     String table,
   ) {
     var rows = connection.select(
       'SELECT il.name AS index_name, il.partial AS partial, '
+      'il."unique" AS is_unique, '
       'ii.name AS column_name, ii.seqno AS seqno '
       'FROM pragma_index_list(?) AS il, pragma_index_info(il.name) AS ii '
       'ORDER BY il.name, ii.seqno',
@@ -400,6 +404,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     );
 
     var indexes = <String, List<String>>{};
+    var unique = <String>{};
     var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['index_name']?.toString();
@@ -412,9 +417,12 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
         continue;
       }
       (indexes[indexName] ??= []).add(columnName);
+      var isUnique = row['is_unique'];
+      if (isUnique is int && isUnique != 0) unique.add(indexName);
     }
     ignored.forEach(indexes.remove);
-    return indexes;
+    unique.removeAll(ignored);
+    return (indexes: indexes, unique: unique);
   }
 
   /// Names are unique per database (an index, a table, a view...).
@@ -481,6 +489,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
       );
 
       return relationshipTablesRet.resolveMapped((relationshipTables) {
+        var indexes = _findIndexes(connection, table);
+
         var tableScheme = TableScheme(
           table,
           relationship: relationship != null,
@@ -488,7 +498,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
           fieldsTypes: fieldsTypes,
           fieldsReferencedTables: fieldsReferencedTables,
           relationshipTables: relationshipTables,
-          indexes: _findIndexes(connection, table),
+          indexes: indexes.indexes,
+          uniqueIndexes: indexes.unique,
         );
 
         _log.info('$tableScheme');
@@ -1077,13 +1088,24 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
       // SQLITE_CONSTRAINT_UNIQUE / SQLITE_CONSTRAINT_PRIMARYKEY:
       if (extendedCode == 2067 || extendedCode == 1555) {
-        var (tableName, fieldName) = _parseConstraintTableField(error.message);
+        // A composite constraint names all its columns:
+        var (tableName, fieldsNames) = parseConstraintTableFields(
+          error.message,
+        );
+        var fieldName = fieldsNames?.join(', ');
+        var composite = fieldsNames != null && fieldsNames.length > 1;
+        var sqliteError = error;
 
         return EntityFieldInvalid(
           "unique",
-          _invalidValue(failedSQL, fieldName, error),
+          composite
+              ? fieldsNames
+                    .map((f) => _invalidValue(failedSQL, f, sqliteError))
+                    .toList()
+              : _invalidValue(failedSQL, fieldName, sqliteError),
           tableName: tableName,
           fieldName: fieldName,
+          fieldsNames: composite ? fieldsNames : null,
           parentError: error,
           parentStackTrace: stackTrace,
           previousError: previousError,
@@ -1159,6 +1181,21 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     var match = _regExpConstraintField.firstMatch(message);
     if (match == null) return (null, null);
     return (match[1], match[2]);
+  }
+
+  static final RegExp _regExpConstraintFields = RegExp(
+    r'constraint failed:\s*(\w+\.\w+(?:\s*,\s*\w+\.\w+)*)',
+    caseSensitive: false,
+  );
+
+  /// All the `table.column`s of a constraint message (a composite
+  /// constraint names each one): the table and the columns, in order.
+  static (String?, List<String>?) parseConstraintTableFields(String message) {
+    var match = _regExpConstraintFields.firstMatch(message);
+    if (match == null) return (null, null);
+
+    var pairs = match[1]!.split(',').map((p) => p.trim().split('.')).toList();
+    return (pairs.first[0], pairs.map((p) => p[1]).toList());
   }
 
   /// The value that violated a constraint.

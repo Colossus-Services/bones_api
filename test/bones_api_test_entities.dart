@@ -42,6 +42,11 @@ final userInfoEntityHandler = GenericEntityHandler<UserInfo>(
 final userEntityHandler = GenericEntityHandler<User>(
   instantiatorDefault: User.empty,
   instantiatorFromMap: User.fromMap,
+  // The same as `User`'s `@EntityIndex` annotations (reflection):
+  entityIndexes: const [
+    EntityIndex(['email', 'address'], unique: true),
+    EntityIndex(['email'], unique: true),
+  ],
 );
 
 class StoreAPIRepository extends APIRepository<Store> {
@@ -226,6 +231,10 @@ class Account extends Entity {
 }
 
 @EnableReflection()
+// A composite unique constraint (`email` is unique: it always holds):
+@EntityIndex(['email', 'address'], unique: true)
+// The same as `email`'s `@EntityField.unique()` (not created twice):
+@EntityIndex(['email'], unique: true)
 class User extends Entity {
   int? id;
 

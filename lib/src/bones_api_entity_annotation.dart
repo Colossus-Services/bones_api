@@ -25,12 +25,22 @@ abstract class EntityAnnotation {
 ///   reference field (e.g. `EntityReference<Establishment>`) is its column.
 ///   Collection (relationship) fields can't be indexed.
 /// - [name]: the index name; default: `<table>__<column1>_<column2>__idx`
-///   (shortened with a hash past the dialect's identifier limit). Index
-///   names are unique per schema in PostgreSQL and SQLite (not per table).
+///   (`__unique` if [unique]; shortened with a hash past the dialect's
+///   identifier limit). Index names are unique per schema in PostgreSQL and
+///   SQLite (not per table).
+/// - [unique]: the fields' values are unique together (a composite unique
+///   constraint, which [EntityField.unique] (one field) can't express):
+///   ```dart
+///   @EntityIndex(['establishment', 'day'], unique: true)
+///   class SalesDay extends Entity { ... }
+///   ```
+///   `CONSTRAINT "sales_day__establishment_day__unique" UNIQUE
+///   ("establishment", "day")`.
 ///
-/// Generated with the table (`CREATE INDEX`); checked by `checkTables`
-/// (an existing table without an index over these columns, in this order,
-/// is reported with the SQL to create it).
+/// Generated with the table (`CREATE INDEX`, or a `UNIQUE` constraint);
+/// checked by `checkTables` (an existing table without an index over these
+/// columns, in this order, unique if [unique], is reported with the SQL to
+/// create it).
 @Target({TargetKind.classType})
 class EntityIndex extends EntityAnnotation {
   /// The indexed fields, in the index's order.
@@ -39,23 +49,30 @@ class EntityIndex extends EntityAnnotation {
   /// The index name (`null`: the default name).
   final String? name;
 
-  const EntityIndex(this.fields, {this.name});
+  /// Whether the [fields]' values are unique together (a `UNIQUE`
+  /// constraint).
+  final bool unique;
 
-  /// The default index name of [table] over [columns].
+  const EntityIndex(this.fields, {this.name, this.unique = false});
+
+  /// The default index name of [table] over [columns]:
+  /// `<table>__<columns>__idx`, or `__unique` if [unique].
   ///
   /// With [maxLength] (bytes, the dialect's identifier limit), a longer name
-  /// is shortened (stable): `<prefix>_<hash>__idx`, the hash of the full
-  /// name keeping it unique.
+  /// is shortened (stable): `<prefix>_<hash>__idx` (or `__unique`), the hash
+  /// of the full name keeping it unique.
   static String defaultName(
     String table,
     List<String> columns, {
     int? maxLength,
+    bool unique = false,
   }) {
-    var name = '${table}__${columns.join('_')}__idx';
+    var end = unique ? '__unique' : '__idx';
+    var name = '${table}__${columns.join('_')}$end';
     if (maxLength == null || _byteLength(name) <= maxLength) return name;
 
-    var suffix = '_${_hash(name)}__idx';
-    var prefix = name.substring(0, name.length - '__idx'.length);
+    var suffix = '_${_hash(name)}$end';
+    var prefix = name.substring(0, name.length - end.length);
     var prefixMaxLength = maxLength - suffix.length;
 
     while (prefix.isNotEmpty && _byteLength(prefix) > prefixMaxLength) {
@@ -72,7 +89,7 @@ class EntityIndex extends EntityAnnotation {
   String indexName(String table, List<String> columns, {int? maxLength}) {
     var name = this.name;
     if (name == null) {
-      return defaultName(table, columns, maxLength: maxLength);
+      return defaultName(table, columns, maxLength: maxLength, unique: unique);
     }
 
     if (maxLength != null && _byteLength(name) > maxLength) {
@@ -105,14 +122,16 @@ class EntityIndex extends EntityAnnotation {
       identical(this, other) ||
       other is EntityIndex &&
           name == other.name &&
+          unique == other.unique &&
           _fieldsEquality.equals(fields, other.fields);
 
   @override
-  int get hashCode => Object.hash(name, _fieldsEquality.hash(fields));
+  int get hashCode => Object.hash(name, unique, _fieldsEquality.hash(fields));
 
   @override
   String toString() =>
-      'EntityIndex(${fields.join(', ')}${name != null ? ' ; name: $name' : ''})';
+      'EntityIndex(${fields.join(', ')}${unique ? ' ; unique' : ''}'
+      '${name != null ? ' ; name: $name' : ''})';
 }
 
 /// Configuration of a entity field.
@@ -344,8 +363,14 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
   /// The table of the [entityType].
   final String? tableName;
 
-  /// The field name of the [value].
+  /// The field name of the [value]. For a violation of a composite constraint
+  /// (e.g. `@EntityIndex(unique: true)`): its [fieldsNames] joined by `, `.
   final String? fieldName;
+
+  /// The fields of a violated composite constraint (e.g.
+  /// `@EntityIndex(unique: true)`), in order, when known; [value] is then
+  /// their values (in order, when known). `null` for a single field.
+  final List<String>? fieldsNames;
 
   /// The errors of the sub-entity ([value]) in the [fieldName].
   final Map<String, EntityFieldInvalid>? subEntityErrors;
@@ -369,6 +394,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     this.entityType,
     this.tableName,
     this.fieldName,
+    this.fieldsNames,
     this.subEntityErrors,
     this.parentError,
     this.parentStackTrace,
@@ -382,6 +408,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     Type? entityType,
     String? tableName,
     String? fieldName,
+    List<String>? fieldsNames,
     Map<String, EntityFieldInvalid>? subEntityErrors,
     Object? parentError,
     StackTrace? parentStackTrace,
@@ -391,6 +418,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     entityType: entityType ?? this.entityType,
     tableName: tableName ?? this.tableName,
     fieldName: fieldName ?? this.fieldName,
+    fieldsNames: fieldsNames ?? this.fieldsNames,
     subEntityErrors: subEntityErrors ?? this.subEntityErrors,
     parentError: parentError ?? this.parentError,
     parentStackTrace: parentStackTrace ?? this.parentStackTrace,

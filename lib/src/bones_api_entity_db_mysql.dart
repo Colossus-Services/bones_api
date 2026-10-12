@@ -410,7 +410,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         fieldsTypes: fieldsTypes,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
-        indexes: indexes,
+        indexes: indexes.indexes,
+        uniqueIndexes: indexes.unique,
       );
 
       _log.info('$tableScheme');
@@ -618,14 +619,13 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     );
   }
 
-  /// The indexes of [table]: by name, its columns (in order). Only
-  /// plain-column indexes: functional indexes (a key part without a column)
-  /// and prefix indexes (a key part over a column's prefix, `Sub_part`) are
-  /// ignored entirely.
-  Future<Map<String, List<String>>> _findIndexes(
-    DBMySqlConnectionWrapper connection,
-    String table,
-  ) async {
+  /// The indexes of [table]: by name, its columns (in order), and the names
+  /// of the unique ones (`Non_unique = 0`: also `UNIQUE` constraints and the
+  /// `PRIMARY` key). Only plain-column indexes: functional indexes (a key
+  /// part without a column) and prefix indexes (a key part over a column's
+  /// prefix, `Sub_part`) are ignored entirely.
+  Future<({Map<String, List<String>> indexes, Set<String> unique})>
+  _findIndexes(DBMySqlConnectionWrapper connection, String table) async {
     var results = await connection.query('SHOW INDEX FROM `$table`');
 
     var rows = results.toList()
@@ -638,6 +638,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       });
 
     var indexes = <String, List<String>>{};
+    var unique = <String>{};
     var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['Key_name']?.toString();
@@ -652,9 +653,11 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         continue;
       }
       (indexes[indexName] ??= []).add(columnName);
+      if ('${row['Non_unique']}' == '0') unique.add(indexName);
     }
     ignored.forEach(indexes.remove);
-    return indexes;
+    unique.removeAll(ignored);
+    return (indexes: indexes, unique: unique);
   }
 
   /// Index names are unique per table: the ones of [table] (also the
@@ -1088,11 +1091,19 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
           fieldName = mField ?? mKey;
         }
 
+        // The key is the constraint/index name (e.g. `user__email__unique`):
+        // its columns, from the loaded table scheme (all of a composite one).
+        var columns = loadedIndexColumns(tableName, fieldName);
+        if (columns != null && columns.isNotEmpty) {
+          fieldName = columns.join(', ');
+        }
+
         return EntityFieldInvalid(
           "unique",
           error.message,
           tableName: tableName,
           fieldName: fieldName,
+          fieldsNames: columns != null && columns.length > 1 ? columns : null,
           parentError: error,
           parentStackTrace: stackTrace,
           previousError: previousError,
