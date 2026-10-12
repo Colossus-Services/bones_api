@@ -384,15 +384,17 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     ]).toList();
   }
 
-  /// The indexes of [table]: by name, its columns (in order). Only
-  /// plain-column indexes: partial (`WHERE`) and expression indexes (a
-  /// column without a name) are ignored entirely.
-  Map<String, List<String>> _findIndexes(
+  /// The indexes of [table]: by name, its columns (in order), and the names
+  /// of the unique ones (also the `sqlite_autoindex_*` of `UNIQUE`
+  /// constraints). Only plain-column indexes: partial (`WHERE`) and
+  /// expression indexes (a column without a name) are ignored entirely.
+  ({Map<String, List<String>> indexes, Set<String> unique}) _findIndexes(
     DBSQLiteConnectionWrapper connection,
     String table,
   ) {
     var rows = connection.select(
       'SELECT il.name AS index_name, il.partial AS partial, '
+      'il."unique" AS is_unique, '
       'ii.name AS column_name, ii.seqno AS seqno '
       'FROM pragma_index_list(?) AS il, pragma_index_info(il.name) AS ii '
       'ORDER BY il.name, ii.seqno',
@@ -400,6 +402,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     );
 
     var indexes = <String, List<String>>{};
+    var unique = <String>{};
     var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['index_name']?.toString();
@@ -412,9 +415,12 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
         continue;
       }
       (indexes[indexName] ??= []).add(columnName);
+      var isUnique = row['is_unique'];
+      if (isUnique is int && isUnique != 0) unique.add(indexName);
     }
     ignored.forEach(indexes.remove);
-    return indexes;
+    unique.removeAll(ignored);
+    return (indexes: indexes, unique: unique);
   }
 
   /// Names are unique per database (an index, a table, a view...).
@@ -481,6 +487,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
       );
 
       return relationshipTablesRet.resolveMapped((relationshipTables) {
+        var indexes = _findIndexes(connection, table);
+
         var tableScheme = TableScheme(
           table,
           relationship: relationship != null,
@@ -488,7 +496,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
           fieldsTypes: fieldsTypes,
           fieldsReferencedTables: fieldsReferencedTables,
           relationshipTables: relationshipTables,
-          indexes: _findIndexes(connection, table),
+          indexes: indexes.indexes,
+          uniqueIndexes: indexes.unique,
         );
 
         _log.info('$tableScheme');

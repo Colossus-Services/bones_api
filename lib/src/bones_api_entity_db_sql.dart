@@ -1163,20 +1163,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var missingEntityIndexes = scheme.indexes == null
         ? const <CreateIndexSQL>[]
         : generateEntityIndexesSQLs(
-            entityHandler,
-            schemeTableName,
-            fieldColumn: (f) => repoToSchemeMap[f],
-          ).where((sql) => scheme.hasIndexOn(sql.columns) != true).toList();
+                entityHandler,
+                schemeTableName,
+                fieldColumn: (f) => repoToSchemeMap[f],
+              )
+              .where(
+                (sql) =>
+                    scheme.hasIndexOn(sql.columns, unique: sql.unique) != true,
+              )
+              .toList();
 
     // A missing index whose name is in use by another index (other
-    // columns): `CREATE INDEX IF NOT EXISTS` would do nothing; it must be
-    // dropped first. By index name, where it's in use (other tables:
-    // [findIndexesNamesInUse], in `_checkDBTablesImpl`).
+    // columns, or not unique): `CREATE INDEX IF NOT EXISTS` would do
+    // nothing; it must be dropped first. By index name, where it's in use
+    // (other tables: [findIndexesNamesInUse], in `_checkDBTablesImpl`).
     var entityIndexesNameConflicts = <String, String>{
       for (var sql in missingEntityIndexes)
         if (sql.indexName case var indexName?)
           if (scheme.indexes?[indexName] case var columns?)
-            indexName: 'over (${columns.join(', ')})',
+            indexName:
+                'over (${columns.join(', ')})'
+                '${sql.unique && !(scheme.uniqueIndexes?.contains(indexName) ?? false) ? ', not unique' : ''}',
     };
 
     if (entityIndexesNameConflicts.isNotEmpty) {
@@ -3918,7 +3925,7 @@ class _DBTableCheck {
         if (missingEntityIndexes.isNotEmpty)
           "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) {
             var conflict = entityIndexesNameConflicts?[e.indexName];
-            var desc = '${e.indexName}(${e.columns.join(', ')})';
+            var desc = '${e.indexName}(${e.columns.join(', ')})${e.unique ? ' UNIQUE' : ''}';
             return conflict == null ? desc : '$desc <name in use $conflict: drop it first>';
           }).join(' , ')}]",
       ].join('\n');

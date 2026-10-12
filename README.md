@@ -362,6 +362,17 @@ The indexes are created with the tables (`generateTables`), and
 `checkTables` reports a table missing one (an index over the same columns, in
 the same order, with any name), with the `CREATE INDEX` SQL to create it.
 
+With `unique: true` it's a composite unique constraint (as
+`@EntityField.unique()` for one field):
+
+```dart
+@EntityIndex(['establishment', 'day'], unique: true)
+// CONSTRAINT "sales_day__establishment_day__unique" UNIQUE ("establishment", "day")
+class SalesDay {
+  // ...
+}
+```
+
 Index names are unique per schema in PostgreSQL and SQLite (not per table):
 a `name:` in use by another table's index is reported by `checkTables`.
 

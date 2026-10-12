@@ -1,3 +1,27 @@
+## 1.18.1
+
+- `@EntityIndex(..., unique: true)`: a composite unique constraint, which
+  `@EntityField.unique()` (one field) can't express:
+  ```dart
+  @EntityIndex(['establishment', 'day'], unique: true)
+  class SalesDay extends Entity { ... }
+  ```
+  - Generated in the `CREATE TABLE` as the single-field ones:
+    `CONSTRAINT "sales_day__establishment_day__unique" UNIQUE ("establishment", "day")`.
+    Default name: `<table>__<column1>_<column2>__unique`; or `name:`.
+  - Not repeated: a unique `@EntityIndex` over a field already
+    `@EntityField.unique()` (the same constraint); a non-unique `@EntityIndex`
+    over the same columns (served by the unique one).
+  - `checkTables`: only a unique index over these columns (in this order, any
+    name: also a `UNIQUE` constraint's) satisfies it; a missing one is
+    reported with a `CREATE UNIQUE INDEX` SQL (SQLite can't add a constraint
+    to a table). A non-unique index with its name: reported as a conflict.
+- `TableScheme.uniqueIndexes` (the names of the unique indexes, also of
+  `UNIQUE`/`PRIMARY KEY` constraints) and `hasIndexOn(columns, unique:)`:
+  introspected by the PostgreSQL (`indisunique`), MySQL (`Non_unique`) and
+  SQLite (`pragma_index_list.unique`) adapters.
+- `CreateIndexSQL.unique` (`CREATE UNIQUE INDEX`).
+
 ## 1.18.0
 
 - `@EntityIndex`: indexes over one or more fields (composite indexes),

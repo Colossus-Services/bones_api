@@ -209,6 +209,50 @@ void main() {
         const EntityIndex(['a', 'b']).hashCode,
         EntityIndex(['a', 'b']).hashCode,
       );
+      expect(
+        const EntityIndex(['a', 'b']),
+        isNot(equals(const EntityIndex(['a', 'b'], unique: true))),
+      );
+      expect(
+        const EntityIndex(['a', 'b'], unique: true),
+        equals(EntityIndex(['a', 'b'], unique: true)),
+      );
+    });
+
+    test('unique: default name, toString', () {
+      const index = EntityIndex(['establishment', 'day'], unique: true);
+      expect(index.unique, isTrue);
+      expect(const EntityIndex(['a']).unique, isFalse);
+
+      // As the single-field unique constraints (`<table>__<column>__unique`):
+      expect(
+        index.indexName('sales_day', ['establishment', 'day']),
+        'sales_day__establishment_day__unique',
+      );
+      expect(
+        EntityIndex.defaultName('t', ['a', 'b'], unique: true),
+        't__a_b__unique',
+      );
+
+      const named = EntityIndex(['a', 'b'], unique: true, name: 'my_unique');
+      expect(named.indexName('t', ['a', 'b']), 'my_unique');
+
+      // Shortened: still `__unique`.
+      var long = EntityIndex.defaultName(
+        't' * 80,
+        ['a', 'b'],
+        maxLength: 63,
+        unique: true,
+      );
+      expect(long.length, 63);
+      expect(long, matches(RegExp(r'_[0-9a-f]{8}__unique$')));
+      expect(
+        long,
+        isNot(EntityIndex.defaultName('t' * 80, ['a', 'b'], maxLength: 63)),
+      );
+
+      expect(index.toString(), 'EntityIndex(establishment, day ; unique)');
+      expect(named.toString(), 'EntityIndex(a, b ; unique ; name: my_unique)');
     });
   });
 
@@ -253,6 +297,39 @@ void main() {
         mysql.buildSQL(),
         'CREATE INDEX `address__state_city__idx` ON `address` (`state`, `city`) ;',
       );
+    });
+
+    test('unique', () {
+      var sql = CreateIndexSQL.columns(
+        _postgres,
+        'sales_day',
+        ['establishment', 'day'],
+        'sales_day__establishment_day__unique',
+        unique: true,
+      );
+      expect(sql.unique, isTrue);
+      expect(
+        sql.buildSQL(),
+        'CREATE UNIQUE INDEX IF NOT EXISTS "sales_day__establishment_day__unique" '
+        'ON "sales_day" ("establishment", "day") ;',
+      );
+
+      var mysql = CreateIndexSQL.columns(
+        _mysql,
+        'sales_day',
+        ['establishment', 'day'],
+        'sales_day__establishment_day__unique',
+        q: '`',
+        unique: true,
+      );
+      expect(
+        mysql.buildSQL(),
+        'CREATE UNIQUE INDEX `sales_day__establishment_day__unique` '
+        'ON `sales_day` (`establishment`, `day`) ;',
+      );
+
+      // Default: not unique.
+      expect(CreateIndexSQL(_postgres, 't', 'a', 'i').unique, isFalse);
     });
 
     test('columns: empty', () {
@@ -341,6 +418,52 @@ void main() {
         () => scheme.indexes!['address__state__idx']!.add('x'),
         throwsUnsupportedError,
       );
+    });
+
+    test('unique', () {
+      var scheme = TableScheme(
+        'sales_day',
+        idFieldName: 'id',
+        fieldsTypes: {'id': int, 'establishment': int, 'day': String},
+        indexes: {
+          'sales_day_pkey': ['id'],
+          'sales_day__establishment_day__unique': ['establishment', 'day'],
+          'sales_day__day__idx': ['day'],
+        },
+        uniqueIndexes: [
+          'sales_day_pkey',
+          'sales_day__establishment_day__unique',
+        ],
+      );
+
+      expect(scheme.hasIndexOn(['establishment', 'day'], unique: true), isTrue);
+      // A unique index is an index too:
+      expect(scheme.hasIndexOn(['establishment', 'day']), isTrue);
+      expect(scheme.hasIndexOn(['id'], unique: true), isTrue);
+
+      // Not unique, or other columns/order:
+      expect(scheme.hasIndexOn(['day']), isTrue);
+      expect(scheme.hasIndexOn(['day'], unique: true), isFalse);
+      expect(
+        scheme.hasIndexOn(['day', 'establishment'], unique: true),
+        isFalse,
+      );
+      expect(scheme.hasIndexOn(['establishment'], unique: true), isFalse);
+
+      // Unknown unique indexes: `null` (only when asked for a unique one).
+      var noUnique = TableScheme(
+        'sales_day',
+        idFieldName: 'id',
+        fieldsTypes: {'id': int, 'day': String},
+        indexes: {
+          'x': ['day'],
+        },
+      );
+      expect(noUnique.uniqueIndexes, isNull);
+      expect(noUnique.hasIndexOn(['day']), isTrue);
+      expect(noUnique.hasIndexOn(['day'], unique: true), isNull);
+
+      expect(() => scheme.uniqueIndexes!.add('x'), throwsUnsupportedError);
     });
 
     test('empty indexes (known): no index', () {
@@ -544,11 +667,17 @@ void main() {
         ),
       );
 
-      expect(
-        adapter.generateEntityIndexesSQLs(userHandler, 'user'),
-        isEmpty,
-        reason: '`User` has no `@EntityIndex`',
-      );
+      // `User`'s unique `@EntityIndex`es (a reference column):
+      var userIndexes = adapter.generateEntityIndexesSQLs(userHandler, 'user');
+      expect(userIndexes.map((e) => e.indexName), [
+        'user__email_address__unique',
+        'user__email__unique',
+      ]);
+      expect(userIndexes.map((e) => e.columns), [
+        ['email', 'address'],
+        ['email'],
+      ]);
+      expect(userIndexes.every((e) => e.unique), isTrue);
     });
 
     test('resolveEntityIndexColumns: a hidden field', () {
@@ -671,6 +800,115 @@ void main() {
       expect(indexesNames, contains('address__city_number__idx'));
       expect(indexesNames, isNot(contains('address_state_other_idx')));
       expect(indexesNames, isNot(contains('address_city_number2')));
+    });
+
+    test('generateCreateTableSQL: unique (a constraint)', () {
+      var provider = _IndexTestProvider(
+        GenericEntityHandler<Address>(
+          instantiatorDefault: Address.empty,
+          sampleEntity: Address.empty(),
+          entityIndexes: const [
+            // Non-unique first: the unique one over the same columns serves
+            // it (not created).
+            EntityIndex(['state', 'city']),
+            EntityIndex(['state', 'city'], unique: true),
+            // Unique over `state` (`indexed`: a non-unique index): both.
+            EntityIndex(['state'], unique: true),
+            // Named:
+            EntityIndex(
+              ['street', 'number'],
+              unique: true,
+              name: 'address_street_number_uq',
+            ),
+          ],
+        ),
+      );
+      var adapter = provider.sqlAdapter;
+      var q = adapter.dialect.elementQuote;
+      var repository = provider.getEntityRepositoryByType(Address)!;
+
+      var createTableSQL = adapter.generateCreateTableSQL(
+        entityRepository: repository,
+      );
+      var sqls = createTableSQL.buildAllSQLs().join('\n');
+
+      // In the `CREATE TABLE` (as `EntityField.unique`):
+      expect(
+        sqls,
+        contains(
+          'CONSTRAINT ${q}address__state_city__unique$q '
+          'UNIQUE (${q}state$q, ${q}city$q)',
+        ),
+      );
+      expect(
+        sqls,
+        contains(
+          'CONSTRAINT ${q}address__state__unique$q UNIQUE (${q}state$q)',
+        ),
+      );
+      expect(
+        sqls,
+        contains(
+          'CONSTRAINT ${q}address_street_number_uq$q '
+          'UNIQUE (${q}street$q, ${q}number$q)',
+        ),
+      );
+
+      var createTable = createTableSQL.buildSQL();
+      expect(createTable, contains('address__state_city__unique'));
+      expect(createTable, contains('address_street_number_uq'));
+
+      // Not `CREATE INDEX`es:
+      var indexesNames = createTableSQL.indexes!
+          .map((e) => e.indexName)
+          .toList();
+      expect(indexesNames, isNot(contains('address__state_city__unique')));
+      expect(indexesNames, isNot(contains('address_street_number_uq')));
+      expect(sqls, isNot(contains('UNIQUE INDEX')));
+
+      // The non-unique `state, city`: served by the unique constraint.
+      expect(indexesNames, isNot(contains('address__state_city__idx')));
+      // `state` (`indexed`): still its index.
+      expect(indexesNames, contains('address__state__idx'));
+    });
+
+    test('generateCreateTableSQL: unique, the same as a unique field', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+      var userHandler = User$reflection().entityHandler;
+
+      // `User.email` is `@EntityField.unique()`, and `@EntityIndex(['email'],
+      // unique: true)`: one constraint (the same name and column).
+      var indexes = adapter.generateEntityIndexesSQLs(userHandler, 'user');
+      var emailUnique = indexes.firstWhere((e) => e.columns.length == 1);
+      expect(emailUnique.indexName, 'user__email__unique');
+      expect(emailUnique.unique, isTrue);
+    });
+
+    test('generateCreateTableSQL: unique, a name in use', () {
+      var provider = _IndexTestProvider(
+        GenericEntityHandler<Address>(
+          instantiatorDefault: Address.empty,
+          sampleEntity: Address.empty(),
+          entityIndexes: const [
+            // The name of the `state` index (`indexed`):
+            EntityIndex(['city'], unique: true, name: 'address__state__idx'),
+          ],
+        ),
+      );
+      var adapter = provider.sqlAdapter;
+      var repository = provider.getEntityRepositoryByType(Address)!;
+
+      expect(
+        () => adapter.generateCreateTableSQL(entityRepository: repository),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('`address__state__idx` (city)'),
+          ),
+        ),
+      );
     });
 
     test('generateCreateTableSQL: a name in use (other columns)', () {

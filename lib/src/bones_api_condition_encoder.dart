@@ -286,13 +286,24 @@ class TableScheme with FieldsFromMap {
   /// unknown (the adapter doesn't provide them).
   final Map<String, List<String>>? indexes;
 
+  /// The names of the unique [indexes] (also the ones of `UNIQUE` and
+  /// `PRIMARY KEY` constraints); `null` if unknown.
+  final Set<String>? uniqueIndexes;
+
   /// Whether the table has an index over exactly [columns] (in this order,
-  /// any name). `null` if the [indexes] are unknown.
-  bool? hasIndexOn(List<String> columns) {
+  /// any name), a unique one if [unique]. `null` if the [indexes] (or the
+  /// [uniqueIndexes]) are unknown.
+  bool? hasIndexOn(List<String> columns, {bool unique = false}) {
     var indexes = this.indexes;
     if (indexes == null) return null;
 
-    return indexes.values.any((indexColumns) {
+    var uniqueIndexes = this.uniqueIndexes;
+    if (unique && uniqueIndexes == null) return null;
+
+    return indexes.entries.any((e) {
+      if (unique && !uniqueIndexes!.contains(e.key)) return false;
+
+      var indexColumns = e.value;
       if (indexColumns.length != columns.length) return false;
       for (var i = 0; i < columns.length; ++i) {
         if (indexColumns[i].toLowerCase() != columns[i].toLowerCase()) {
@@ -320,11 +331,15 @@ class TableScheme with FieldsFromMap {
     Iterable<TableConstraint>? constraints,
     this.relationship = false,
     Map<String, List<String>>? indexes,
+    Iterable<String>? uniqueIndexes,
   }) : indexes = indexes == null
            ? null
            : Map<String, List<String>>.unmodifiable(
                indexes.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))),
              ),
+       uniqueIndexes = uniqueIndexes == null
+           ? null
+           : Set<String>.unmodifiable(uniqueIndexes),
        fieldsNames = List<String>.unmodifiable(fieldsTypes.keys),
        fieldsTypes = Map.unmodifiable(fieldsTypes),
        constraints = ((constraints?.toList() ?? [])..sort()).toSet(),

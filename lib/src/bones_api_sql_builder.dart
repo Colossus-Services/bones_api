@@ -281,6 +281,9 @@ class CreateIndexSQL extends SQLBuilder {
   /// The name of the index;
   final String? indexName;
 
+  /// Whether it's a unique index (`CREATE UNIQUE INDEX`).
+  final bool unique;
+
   /// A single-[column] index.
   CreateIndexSQL(
     SQLDialect dialect,
@@ -288,6 +291,7 @@ class CreateIndexSQL extends SQLBuilder {
     this.column,
     this.indexName, {
     String q = '"',
+    this.unique = false,
   }) : columns = List<String>.unmodifiable([column]),
        super(dialect, q);
 
@@ -299,6 +303,7 @@ class CreateIndexSQL extends SQLBuilder {
     List<String> columns,
     this.indexName, {
     String q = '"',
+    this.unique = false,
   }) : columns = List<String>.unmodifiable(columns),
        column = columns.isNotEmpty
            ? columns.first
@@ -315,7 +320,7 @@ class CreateIndexSQL extends SQLBuilder {
   String buildSQL({bool multiline = true, bool ifNotExists = true}) {
     final sql = StringBuffer();
 
-    sql.write('CREATE INDEX ');
+    sql.write(unique ? 'CREATE UNIQUE INDEX ' : 'CREATE INDEX ');
 
     if (ifNotExists && dialect.createIndexIfNotExists) {
       sql.write('IF NOT EXISTS ');
@@ -1867,6 +1872,10 @@ abstract mixin class SQLGenerator {
 
     var indexSQLs = <CreateIndexSQL>[];
 
+    // The `UNIQUE` constraints (`sqlEntries`), as unique indexes: to not
+    // repeat them with an `@EntityIndex`.
+    var uniqueConstraints = <CreateIndexSQL>[];
+
     var fieldsEntries = entityHandler
         .fieldsTypes()
         .entries
@@ -1989,6 +1998,17 @@ abstract mixin class SQLGenerator {
               ],
             ),
           );
+
+          uniqueConstraints.add(
+            CreateIndexSQL(
+              dialect,
+              table,
+              columnName,
+              constrainUniqueName,
+              q: q,
+              unique: true,
+            ),
+          );
         } else if (entityFieldAnnotations.hasIndexed) {
           var indexName = '${table}__${columnName}__idx';
           indexSQLs.add(
@@ -2045,15 +2065,23 @@ abstract mixin class SQLGenerator {
     });
 
     // The entity's indexes (`@EntityIndex`): one over the same columns as
-    // an index already here (e.g. a single field also `indexed` or a
-    // reference) isn't created twice.
-    for (var sql in generateEntityIndexesSQLs(entityHandler, table)) {
-      var sameColumns = indexSQLs.firstWhereOrNull(
-        (e) => e.columns.equals(sql.columns),
+    // an index or unique constraint already here (e.g. a single field also
+    // `indexed`, `unique` or a reference) isn't created twice. A unique one
+    // is a `UNIQUE` constraint (and also serves as a non-unique index over
+    // its columns: the unique ones first).
+    var entityIndexes = generateEntityIndexesSQLs(entityHandler, table);
+    for (var sql in [
+      ...entityIndexes.where((e) => e.unique),
+      ...entityIndexes.where((e) => !e.unique),
+    ]) {
+      var existing = [...uniqueConstraints, ...indexSQLs];
+
+      var sameColumns = existing.firstWhereOrNull(
+        (e) => e.columns.equals(sql.columns) && (e.unique || !sql.unique),
       );
       if (sameColumns != null) continue;
 
-      var sameName = indexSQLs.firstWhereOrNull(
+      var sameName = existing.firstWhereOrNull(
         (e) => e.indexName == sql.indexName,
       );
       if (sameName != null) {
@@ -2064,7 +2092,19 @@ abstract mixin class SQLGenerator {
         );
       }
 
-      indexSQLs.add(sql);
+      if (sql.unique) {
+        var columnsSQL = sql.columns.map((c) => '$q$c$q').join(', ');
+        sqlEntries.add(
+          SQLEntry(
+            'CONSTRAINT',
+            ' CONSTRAINT $q${sql.indexName}$q UNIQUE ($columnsSQL)',
+            columns: [for (var c in sql.columns) SQLColumn(table, c)],
+          ),
+        );
+        uniqueConstraints.add(sql);
+      } else {
+        indexSQLs.add(sql);
+      }
     }
 
     var createSQL = CreateTableSQL(
@@ -2310,7 +2350,14 @@ abstract mixin class SQLGenerator {
             .toList();
       }
 
-      return CreateIndexSQL.columns(dialect, table, columns, indexName, q: q);
+      return CreateIndexSQL.columns(
+        dialect,
+        table,
+        columns,
+        indexName,
+        q: q,
+        unique: entityIndex.unique,
+      );
     }).toList();
   }
 

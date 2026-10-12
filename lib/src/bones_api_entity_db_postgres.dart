@@ -643,7 +643,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         constraints: constraints,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
-        indexes: indexes,
+        indexes: indexes?.indexes,
+        uniqueIndexes: indexes?.unique,
       );
 
       _log.info('$tableScheme');
@@ -657,16 +658,16 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
   /// The indexes of [table] (the one visible in the search path, e.g. not a
   /// same-named table of another schema): by name, its key columns (in
-  /// order). Only usable plain-column indexes: invalid (e.g. a failed
-  /// `CREATE INDEX CONCURRENTLY`), partial (`WHERE`) and expression indexes
-  /// are ignored, and `INCLUDE` columns aren't key columns.
+  /// order), and the names of the unique ones (also of `UNIQUE` and
+  /// `PRIMARY KEY` constraints). Only usable plain-column indexes: invalid
+  /// (e.g. a failed `CREATE INDEX CONCURRENTLY`), partial (`WHERE`) and
+  /// expression indexes are ignored, and `INCLUDE` columns aren't key
+  /// columns.
   ///
   /// `null` (unknown) if the indexes can't be read: the table scheme is still
   /// loaded.
-  Future<Map<String, List<String>>?> _findIndexes(
-    PostgreSQLConnectionWrapper connection,
-    String table,
-  ) async {
+  Future<({Map<String, List<String>> indexes, Set<String> unique})?>
+  _findIndexes(PostgreSQLConnectionWrapper connection, String table) async {
     // `indnkeyatts` (key columns, without `INCLUDE`) is from PostgreSQL 11:
     // read through `to_jsonb` (not a column reference) to also work before
     // it, when all the columns are key columns (`indnatts`).
@@ -675,7 +676,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     SELECT
       i.relname AS index_name,
       a.attname AS column_name,
-      k.n AS column_position
+      k.n AS column_position,
+      ix.indisunique AS is_unique
     FROM pg_index ix
       JOIN pg_class t ON t.oid = ix.indrelid
       JOIN pg_class i ON i.oid = ix.indexrelid
@@ -702,13 +704,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     }
 
     var indexes = <String, List<String>>{};
+    var unique = <String>{};
     for (var row in rows) {
       var indexName = row['index_name']?.toString();
       var columnName = row['column_name']?.toString();
       if (indexName == null || columnName == null) continue;
       (indexes[indexName] ??= []).add(columnName);
+      if (row['is_unique'] == true) unique.add(indexName);
     }
-    return indexes;
+    return (indexes: indexes, unique: unique);
   }
 
   /// Relation names are unique per schema (an index, a table, a sequence...):
