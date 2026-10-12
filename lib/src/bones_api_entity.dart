@@ -5,6 +5,7 @@ import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:data_serializer/data_serializer.dart' show hex;
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart' show internal;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart'
     show
@@ -4227,7 +4228,47 @@ class EntityRepositoryProvider
           .map((e) => MapEntry(e, e.information(extended: true)))
           .toMapFromEntries();
 
-  bool _callingGetEntityRepository = false;
+  /// The providers already asked in the current (synchronous) lookup of an
+  /// [EntityRepository] across the known providers: each one at most once,
+  /// however many providers know it (the [globalProvider] knows them all).
+  /// `null` outside a lookup.
+  ///
+  /// (A per-provider "calling" flag only blocked a provider while it was on
+  /// the stack, so a miss walked every order of the known providers: N!.)
+  static Set<EntityRepositoryProvider>? _lookupTraversed;
+
+  /// Runs [lookup] for [provider] in the current lookup (or starts one):
+  /// `null` if the [provider] was already asked in it. Its [initialize] (e.g.
+  /// `checkInitialized`) runs outside the lookup: its own lookups are
+  /// independent.
+  @internal
+  static R? traverseLookup<R>(
+    EntityRepositoryProvider provider,
+    R? Function() lookup, {
+    void Function()? initialize,
+  }) {
+    var traversed = _lookupTraversed;
+    if (traversed != null && traversed.contains(provider)) return null;
+
+    if (initialize != null) {
+      _lookupTraversed = null;
+      try {
+        initialize();
+      } finally {
+        _lookupTraversed = traversed;
+      }
+    }
+
+    var root = traversed == null;
+    traversed ??= _lookupTraversed = <EntityRepositoryProvider>{};
+    traversed.add(provider);
+
+    try {
+      return lookup();
+    } finally {
+      if (root) _lookupTraversed = null;
+    }
+  }
 
   EntityRepository<O>? getEntityRepository<O extends Object>({
     O? obj,
@@ -4236,12 +4277,7 @@ class EntityRepositoryProvider
   }) {
     if (isClosed) return null;
 
-    if (_callingGetEntityRepository) return null;
-    _callingGetEntityRepository = true;
-
-    checkInitialized();
-
-    try {
+    return traverseLookup(this, initialize: checkInitialized, () {
       var entityRepository = _getEntityRepositoryImpl<O>(
         obj: obj,
         type: type,
@@ -4252,7 +4288,7 @@ class EntityRepositoryProvider
       }
 
       if (!identical(this, _globalProvider)) {
-        return _globalProvider._getEntityRepositoryImpl<O>(
+        return _globalProvider.getEntityRepository<O>(
           obj: obj,
           type: type,
           name: name,
@@ -4260,9 +4296,7 @@ class EntityRepositoryProvider
       }
 
       return null;
-    } finally {
-      _callingGetEntityRepository = false;
-    }
+    });
   }
 
   EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>({
@@ -4329,25 +4363,18 @@ class EntityRepositoryProvider
   EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
     if (isClosed) return null;
 
-    if (_callingGetEntityRepository) return null;
-    _callingGetEntityRepository = true;
-
-    checkInitialized();
-
-    try {
+    return traverseLookup(this, initialize: checkInitialized, () {
       var entityRepository = _getEntityRepositoryByTypeImpl<O>(type);
       if (entityRepository != null) {
         return entityRepository;
       }
 
       if (!identical(this, _globalProvider)) {
-        return _globalProvider._getEntityRepositoryByTypeImpl<O>(type);
+        return _globalProvider.getEntityRepositoryByType<O>(type);
       }
 
       return null;
-    } finally {
-      _callingGetEntityRepository = false;
-    }
+    });
   }
 
   EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
@@ -4422,7 +4449,10 @@ class EntityRepositoryProvider
     }
 
     for (var e in _knownEntityRepositoryProviders) {
-      e.allRepositories(allRepositories: allRepositories);
+      e.allRepositories(
+        allRepositories: allRepositories,
+        traversedProviders: traversedProviders,
+      );
     }
 
     return allRepositories;

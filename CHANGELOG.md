@@ -1,3 +1,17 @@
+## 1.19.1
+
+- `EntityRepositoryProvider` / `DBAdapter`: an `EntityRepository` lookup
+  (`getEntityRepository`, `getEntityRepositoryByType`) asks each provider at
+  most once. A per-provider "calling" flag only blocked a provider while it
+  was on the stack, and the fallback to the global provider (which knows all
+  of them) skipped even that, so a miss (a type no provider has) walked every
+  order of the open providers: N!, a hang with a dozen of them (e.g. tests
+  opening a provider each, or many adapters). Now one set of the providers
+  asked per lookup (`EntityRepositoryProvider.traverseLookup`); a provider's
+  initialization still runs outside it.
+- `allRepositories`: passes the traversed providers on (it restarted them for
+  each known provider: endless with providers known to each other).
+
 ## 1.19.0
 
 - `@EntityIndex(..., unique: true)`: a composite unique constraint, which
