@@ -362,6 +362,9 @@ The indexes are created with the tables (`generateTables`), and
 `checkTables` reports a table missing one (an index over the same columns, in
 the same order, with any name), with the `CREATE INDEX` SQL to create it.
 
+Index names are unique per schema in PostgreSQL and SQLite (not per table):
+a `name:` in use by another table's index is reported by `checkTables`.
+
 ## Repositories & Database
 
 To stored entities in Databases and manipulate them you can set up an `EntityRepositoryProvider`:

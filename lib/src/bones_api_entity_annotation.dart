@@ -1,3 +1,6 @@
+import 'dart:convert' show utf8;
+
+import 'package:collection/collection.dart' show ListEquality;
 import 'package:meta/meta_meta.dart';
 import 'package:statistics/statistics.dart';
 
@@ -21,7 +24,9 @@ abstract class EntityAnnotation {
 /// - [fields]: the entity's field names (not the columns' names); a
 ///   reference field (e.g. `EntityReference<Establishment>`) is its column.
 ///   Collection (relationship) fields can't be indexed.
-/// - [name]: the index name; default: `<table>__<column1>_<column2>__idx`.
+/// - [name]: the index name; default: `<table>__<column1>_<column2>__idx`
+///   (shortened with a hash past the dialect's identifier limit). Index
+///   names are unique per schema in PostgreSQL and SQLite (not per table).
 ///
 /// Generated with the table (`CREATE INDEX`); checked by `checkTables`
 /// (an existing table without an index over these columns, in this order,
@@ -37,30 +42,73 @@ class EntityIndex extends EntityAnnotation {
   const EntityIndex(this.fields, {this.name});
 
   /// The default index name of [table] over [columns].
-  static String defaultName(String table, List<String> columns) =>
-      '${table}__${columns.join('_')}__idx';
+  ///
+  /// With [maxLength] (bytes, the dialect's identifier limit), a longer name
+  /// is shortened (stable): `<prefix>_<hash>__idx`, the hash of the full
+  /// name keeping it unique.
+  static String defaultName(
+    String table,
+    List<String> columns, {
+    int? maxLength,
+  }) {
+    var name = '${table}__${columns.join('_')}__idx';
+    if (maxLength == null || _byteLength(name) <= maxLength) return name;
+
+    var suffix = '_${_hash(name)}__idx';
+    var prefix = name.substring(0, name.length - '__idx'.length);
+    var prefixMaxLength = maxLength - suffix.length;
+
+    while (prefix.isNotEmpty && _byteLength(prefix) > prefixMaxLength) {
+      prefix = String.fromCharCodes(prefix.runes.toList()..removeLast());
+    }
+
+    return '$prefix$suffix';
+  }
 
   /// The index name of [table] over [columns]: [name] or [defaultName].
-  String indexName(String table, List<String> columns) =>
-      name ?? defaultName(table, columns);
+  ///
+  /// Throws an [ArgumentError] if [name] is longer than [maxLength] (bytes):
+  /// it would be truncated (PostgreSQL) or rejected (MySQL).
+  String indexName(String table, List<String> columns, {int? maxLength}) {
+    var name = this.name;
+    if (name == null) {
+      return defaultName(table, columns, maxLength: maxLength);
+    }
+
+    if (maxLength != null && _byteLength(name) > maxLength) {
+      throw ArgumentError.value(
+        name,
+        'name',
+        "`EntityIndex` name longer than $maxLength bytes (table `$table`)",
+      );
+    }
+
+    return name;
+  }
+
+  static int _byteLength(String s) => utf8.encode(s).length;
+
+  /// A 32 bits hash of [s], in hex: stable (unlike [String.hashCode]) and
+  /// exact on every platform (no product above 2^53).
+  static String _hash(String s) {
+    var h = 0;
+    for (var b in utf8.encode(s)) {
+      h = (h * 31 + b) & 0xffffffff;
+    }
+    return h.toRadixString(16).padLeft(8, '0');
+  }
+
+  static const _fieldsEquality = ListEquality<String>();
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is EntityIndex &&
           name == other.name &&
-          _listEquals(fields, other.fields);
+          _fieldsEquality.equals(fields, other.fields);
 
   @override
-  int get hashCode => Object.hash(name, Object.hashAll(fields));
-
-  static bool _listEquals(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; ++i) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
+  int get hashCode => Object.hash(name, _fieldsEquality.hash(fields));
 
   @override
   String toString() =>

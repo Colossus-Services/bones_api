@@ -129,6 +129,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              acceptsInsertOnConflict: true,
              acceptsVarcharWithoutMaximumSize: true,
              foreignKeyCreatesImplicitIndex: false,
+             maxIdentifierLength: 63,
            ),
            transactions: true,
            transactionAbort: true,
@@ -659,10 +660,16 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   /// order). Only usable plain-column indexes: invalid (e.g. a failed
   /// `CREATE INDEX CONCURRENTLY`), partial (`WHERE`) and expression indexes
   /// are ignored, and `INCLUDE` columns aren't key columns.
-  Future<Map<String, List<String>>> _findIndexes(
+  ///
+  /// `null` (unknown) if the indexes can't be read: the table scheme is still
+  /// loaded.
+  Future<Map<String, List<String>>?> _findIndexes(
     PostgreSQLConnectionWrapper connection,
     String table,
   ) async {
+    // `indnkeyatts` (key columns, without `INCLUDE`) is from PostgreSQL 11:
+    // read through `to_jsonb` (not a column reference) to also work before
+    // it, when all the columns are key columns (`indnatts`).
     var sql =
         '''
     SELECT
@@ -682,11 +689,17 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       AND ix.indisvalid
       AND ix.indpred IS NULL
       AND ix.indexprs IS NULL
-      AND k.n <= ix.indnkeyatts
+      AND k.n <= coalesce((to_jsonb(ix) ->> 'indnkeyatts')::int, ix.indnatts)
     ORDER BY i.relname, k.n;
     ''';
 
-    var rows = await connection.mappedResultsQuery(sql);
+    List<Map<String, dynamic>> rows;
+    try {
+      rows = await connection.mappedResultsQuery(sql);
+    } catch (e, s) {
+      _log.warning("Can't read the indexes of table `$table`", e, s);
+      return null;
+    }
 
     var indexes = <String, List<String>>{};
     for (var row in rows) {
@@ -696,6 +709,43 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       (indexes[indexName] ??= []).add(columnName);
     }
     return indexes;
+  }
+
+  /// Relation names are unique per schema (an index, a table, a sequence...):
+  /// the ones visible in the search path.
+  @override
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) {
+    var names = indexesNames
+        .map((n) => "'${n.replaceAll("'", "''")}'")
+        .join(', ');
+    if (names.isEmpty) return <String, String?>{};
+
+    var sql =
+        '''
+    SELECT
+      c.relname AS name,
+      t.relname AS table_name
+    FROM pg_class c
+      LEFT JOIN pg_index ix ON ix.indexrelid = c.oid
+      LEFT JOIN pg_class t ON t.oid = ix.indrelid
+    WHERE
+      c.relname IN ($names)
+      AND pg_table_is_visible(c.oid);
+    ''';
+
+    return executeWithPool(
+      (connection) => connection
+          .mappedResultsQuery(sql)
+          .then(
+            (rows) => <String, String?>{
+              for (var row in rows)
+                row['name'].toString(): row['table_name']?.toString(),
+            },
+          ),
+    );
   }
 
   Future<Set<TableConstraint>> _findConstraints(
@@ -976,6 +1026,21 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   final TimedMap<String, Map<String, TableFieldReference>>
   _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
+
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
 
   final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
   _findFieldsReferencedTablesContextCache = Expando();

@@ -606,14 +606,27 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// - [checkDBTables] is only called if `checkTables: true` is passed to the constructor.
   bool get checkedTables => _checkedTables;
 
+  /// Of [indexesNames], the ones in use where a new index of [table] would
+  /// clash with them: by name, the table of the index using it (`null`: not
+  /// an index, e.g. a table). Index names are unique per schema/database in
+  /// PostgreSQL and SQLite (any table), but per table in MySQL.
+  ///
+  /// `null` if unknown (the default): only [TableScheme.indexes] (the same
+  /// table) are checked.
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) => null;
+
   /// Checks the DB tables against the entities (columns, references,
   /// constraints, enums and indexes, including `@EntityIndex`): throws a
   /// [StateError] with the SQLs to fix them when something is missing.
   ///
   /// Only once, and only with `checkTables: true`, unless [force] (e.g. to
-  /// check again after a migration): the entities' table schemes and fields
-  /// types are then read again (a scheme load already in progress isn't
-  /// restarted).
+  /// check again after a migration): all the loaded table schemes (also of
+  /// referenced and relationship tables), fields types and references are
+  /// then read again (a scheme load already in progress isn't restarted),
+  /// and [checkedTables] is `false` until it passes.
   FutureOr<bool> checkDBTables({bool force = false}) {
     if (!_checkTables && !force) {
       _log.warning("Ignoring check of DB tables for $this.");
@@ -621,12 +634,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
 
     if (force) {
-      for (var repository in entityRepositories) {
-        disposeTableSchemeCache(
-          getTableForEntityRepository(repository),
-          fieldsTypes: true,
-        );
-      }
+      _checkedTables = false;
+      disposeTablesSchemesCaches(fieldsTypes: true);
     }
 
     _checkTables = false;
@@ -645,6 +654,58 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .map((e) => _checkDBTableScheme(e.key, e.value))
         .toList();
 
+    return _checkEntityIndexesNamesInUse(
+      repositoriesChecks,
+    ).resolveMapped((_) => _checkDBTablesResults(repositoriesChecks));
+  }
+
+  /// Of the missing `@EntityIndex`es, the ones whose name is in use outside
+  /// [TableScheme.indexes] (e.g. by another table's index, in PostgreSQL and
+  /// SQLite): added to [_DBTableCheck.entityIndexesNameConflicts].
+  FutureOr<bool> _checkEntityIndexesNamesInUse(
+    List<_DBTableCheck> repositoriesChecks,
+  ) {
+    var checks = repositoriesChecks.where(
+      (e) => e.scheme != null && (e.missingEntityIndexes?.isNotEmpty ?? false),
+    );
+
+    return checks
+        .map((check) {
+          var table = check.scheme!.name;
+          var conflicts = check.entityIndexesNameConflicts ??= {};
+
+          var names = check.missingEntityIndexes!
+              .map((sql) => sql.indexName)
+              .nonNulls
+              .whereNot(conflicts.containsKey)
+              .toList();
+          if (names.isEmpty) return true;
+
+          return findIndexesNamesInUse(table, names).resolveMapped((inUse) {
+            if (inUse == null || inUse.isEmpty) return true;
+
+            for (var e in inUse.entries) {
+              var inUseTable = e.value;
+              conflicts[e.key] = inUseTable == null
+                  ? 'by another relation (not an index)'
+                  : inUseTable == table
+                  ? 'by an index not usable as it (partial, expression or prefix)'
+                  : 'on table `$inUseTable`';
+            }
+
+            _log.severe(
+              "Table `$table`: `@EntityIndex` names in use (drop them "
+              "first): $inUse",
+            );
+            return true;
+          });
+        })
+        .toList()
+        .resolveAll()
+        .resolveMapped((_) => true);
+  }
+
+  FutureOr<bool> _checkDBTablesResults(List<_DBTableCheck> repositoriesChecks) {
     var repositoriesChecksErrors = repositoriesChecks
         .where((e) => e.isError)
         .toList();
@@ -705,12 +766,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var missingEntityIndexesSQLs = repositoriesChecksErrors
           .where((e) => e.missingEntityIndexes?.isNotEmpty ?? false)
           .expand(
-            (e) => e.generateMissingEntityIndexesSQLs().expand((sql) {
+            (e) => e.missingEntityIndexes!.expand((sql) {
               var conflict = e.entityIndexesNameConflicts?[sql.indexName];
               var conflictComment = conflict == null
                   ? null
-                  : '-- `${sql.indexName}` exists over '
-                        '(${conflict.join(', ')}): drop it first:';
+                  : '-- `${sql.indexName}` in use $conflict: drop it first:';
               return [
                 ?conflictComment,
                 ...sql.buildAllSQLs(ifNotExists: true, multiline: false),
@@ -1092,21 +1152,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
 
     // The entity's indexes (`@EntityIndex`) without an index over their
-    // columns (in order, any name), when the adapter knows the indexes:
+    // columns (in order, any name), when the adapter knows the indexes. The
+    // columns are the table's ones mapped to the fields, as for the other
+    // checks (e.g. a legacy `creationDate` column):
+    var repoToSchemeMap = <String, String>{
+      for (var e in schemeToRepoMap.entries)
+        if (e.value case var field?) field: e.key,
+    };
+
     var missingEntityIndexes = scheme.indexes == null
         ? const <CreateIndexSQL>[]
         : generateEntityIndexesSQLs(
             entityHandler,
             schemeTableName,
+            fieldColumn: (f) => repoToSchemeMap[f],
           ).where((sql) => scheme.hasIndexOn(sql.columns) != true).toList();
 
     // A missing index whose name is in use by another index (other
     // columns): `CREATE INDEX IF NOT EXISTS` would do nothing; it must be
-    // dropped first. By index name, the existing index's columns.
-    var entityIndexesNameConflicts = <String, List<String>>{
+    // dropped first. By index name, where it's in use (other tables:
+    // [findIndexesNamesInUse], in `_checkDBTablesImpl`).
+    var entityIndexesNameConflicts = <String, String>{
       for (var sql in missingEntityIndexes)
         if (sql.indexName case var indexName?)
-          if (scheme.indexes?[indexName] case var columns?) indexName: columns,
+          if (scheme.indexes?[indexName] case var columns?)
+            indexName: 'over (${columns.join(', ')})',
     };
 
     if (entityIndexesNameConflicts.isNotEmpty) {
@@ -3603,8 +3673,9 @@ class _DBTableCheck {
   List<CreateIndexSQL>? missingEntityIndexes;
 
   /// Of the [missingEntityIndexes], the ones whose name is in use by another
-  /// index: by name, that index's columns.
-  Map<String, List<String>>? entityIndexesNameConflicts;
+  /// index (or relation): by name, where (e.g. `over (a, b)`, `on table
+  /// `t2``).
+  Map<String, String>? entityIndexesNameConflicts;
 
   _DBTableCheck.missing(
     this.repository,
@@ -3642,10 +3713,6 @@ class _DBTableCheck {
       (missingEntityIndexes?.isEmpty ?? true);
 
   bool get isError => !isOK;
-
-  /// The `CREATE INDEX` SQLs of the [missingEntityIndexes].
-  List<CreateIndexSQL> generateMissingEntityIndexesSQLs() =>
-      missingEntityIndexes ?? <CreateIndexSQL>[];
 
   List<AlterTableSQL> generateMissingColumnsSQLs(SQLGenerator sqlGenerator) =>
       _generateMissingColumnSQLs(missingColumns, sqlGenerator);
@@ -3852,7 +3919,7 @@ class _DBTableCheck {
           "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) {
             var conflict = entityIndexesNameConflicts?[e.indexName];
             var desc = '${e.indexName}(${e.columns.join(', ')})';
-            return conflict == null ? desc : '$desc <name in use over (${conflict.join(', ')}): drop it first>';
+            return conflict == null ? desc : '$desc <name in use $conflict: drop it first>';
           }).join(' , ')}]",
       ].join('\n');
 

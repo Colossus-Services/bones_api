@@ -131,6 +131,11 @@ class SQLDialect extends DBDialect {
   /// (`18446744073709551615`, 2^64-1) is out of range of a Dart [int].
   final String offsetMaxLimitValue;
 
+  /// The maximum length (in bytes) of an identifier (e.g. an index name):
+  /// 63 in PostgreSQL (longer ones are truncated), 64 in MySQL (rejected).
+  /// `null`: no limit.
+  final int? maxIdentifierLength;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -146,6 +151,7 @@ class SQLDialect extends DBDialect {
     this.createIndexIfNotExists = true,
     this.offsetRequiresLimit = false,
     this.offsetMaxLimitValue = '18446744073709551615',
+    this.maxIdentifierLength,
   });
 
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause
@@ -211,7 +217,8 @@ class SQLDialect extends DBDialect {
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
-        'offsetMaxLimitValue: $offsetMaxLimitValue'
+        'offsetMaxLimitValue: $offsetMaxLimitValue, '
+        'maxIdentifierLength: $maxIdentifierLength'
         '}';
   }
 }
@@ -2037,8 +2044,28 @@ abstract mixin class SQLGenerator {
       }
     });
 
-    // The entity's composite indexes (`@EntityIndex`):
-    indexSQLs.addAll(generateEntityIndexesSQLs(entityHandler, table));
+    // The entity's indexes (`@EntityIndex`): one over the same columns as
+    // an index already here (e.g. a single field also `indexed` or a
+    // reference) isn't created twice.
+    for (var sql in generateEntityIndexesSQLs(entityHandler, table)) {
+      var sameColumns = indexSQLs.firstWhereOrNull(
+        (e) => e.columns.equals(sql.columns),
+      );
+      if (sameColumns != null) continue;
+
+      var sameName = indexSQLs.firstWhereOrNull(
+        (e) => e.indexName == sql.indexName,
+      );
+      if (sameName != null) {
+        throw ArgumentError(
+          "`EntityIndex` name `${sql.indexName}` (${sql.columns.join(', ')}) "
+          "already in use by another index of table `$table` "
+          "(${sameName.columns.join(', ')}): `${entityHandler.type}`",
+        );
+      }
+
+      indexSQLs.add(sql);
+    }
 
     var createSQL = CreateTableSQL(
       dialect,
@@ -2257,15 +2284,32 @@ abstract mixin class SQLGenerator {
 
   /// The `CREATE INDEX` SQLs of the [EntityIndex]es of the [entityHandler]'s
   /// entity, in [table].
+  ///
+  /// - [fieldColumn]: a field's actual column in an existing table (e.g. a
+  ///   legacy `creationDate` column), `null` for the generated one
+  ///   ([normalizeColumnName]). The index name is always from the generated
+  ///   columns (the same as in `CREATE TABLE`).
   List<CreateIndexSQL> generateEntityIndexesSQLs(
     EntityHandler entityHandler,
-    String table,
-  ) {
+    String table, {
+    String? Function(String fieldName)? fieldColumn,
+  }) {
     var q = dialect.elementQuote;
 
     return entityHandler.getEntityIndexes().map((entityIndex) {
       var columns = resolveEntityIndexColumns(entityHandler, entityIndex);
-      var indexName = entityIndex.indexName(table, columns);
+      var indexName = entityIndex.indexName(
+        table,
+        columns,
+        maxLength: dialect.maxIdentifierLength,
+      );
+
+      if (fieldColumn != null) {
+        columns = entityIndex.fields
+            .mapIndexed((i, f) => fieldColumn(f) ?? columns[i])
+            .toList();
+      }
+
       return CreateIndexSQL.columns(dialect, table, columns, indexName, q: q);
     }).toList();
   }

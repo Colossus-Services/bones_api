@@ -110,6 +110,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              createIndexIfNotExists: false,
              // MySQL can't parse an `OFFSET` without a preceding `LIMIT`:
              offsetRequiresLimit: true,
+             maxIdentifierLength: 64,
            ),
            transactions: true,
            transactionAbort: true,
@@ -578,6 +579,21 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
 
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
+
   final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
   _findFieldsReferencedTablesContextCache = Expando();
 
@@ -604,7 +620,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
   /// The indexes of [table]: by name, its columns (in order). Only
   /// plain-column indexes: functional indexes (a key part without a column)
-  /// are ignored entirely.
+  /// and prefix indexes (a key part over a column's prefix, `Sub_part`) are
+  /// ignored entirely.
   Future<Map<String, List<String>>> _findIndexes(
     DBMySqlConnectionWrapper connection,
     String table,
@@ -627,7 +644,10 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       if (indexName == null) continue;
 
       var columnName = row['Column_name']?.toString();
-      if (columnName == null || columnName.isEmpty) {
+      var subPart = row['Sub_part']?.toString() ?? '';
+      if (columnName == null ||
+          columnName.isEmpty ||
+          (subPart.isNotEmpty && subPart.toUpperCase() != 'NULL')) {
         ignored.add(indexName);
         continue;
       }
@@ -635,6 +655,36 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     }
     ignored.forEach(indexes.remove);
     return indexes;
+  }
+
+  /// Index names are unique per table: the ones of [table] (also the
+  /// indexes that [TableScheme.indexes] ignores, e.g. prefix indexes).
+  @override
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) {
+    var names = indexesNames
+        .map((n) => "'${n.replaceAll("'", "''")}'")
+        .join(', ');
+    if (names.isEmpty) return <String, String?>{};
+
+    var sql =
+        "SELECT DISTINCT INDEX_NAME AS index_name "
+        "FROM information_schema.STATISTICS "
+        "WHERE TABLE_SCHEMA = DATABASE() "
+        "AND TABLE_NAME = '${table.replaceAll("'", "''")}' "
+        "AND INDEX_NAME IN ($names)";
+
+    return executeWithPool(
+      (connection) => connection
+          .query(sql)
+          .then(
+            (results) => <String, String?>{
+              for (var row in results) row['index_name'].toString(): table,
+            },
+          ),
+    );
   }
 
   Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(

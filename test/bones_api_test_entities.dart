@@ -21,6 +21,8 @@ final addressEntityHandler = GenericEntityHandler<Address>(
   entityIndexes: const [
     EntityIndex(['state', 'city']),
     EntityIndex(['city', 'number'], name: 'address_city_number_custom_idx'),
+    EntityIndex(['state']),
+    EntityIndex(['city']),
   ],
 );
 
@@ -798,6 +800,10 @@ class Store extends Entity {
 @EnableReflection()
 @EntityIndex(['state', 'city'])
 @EntityIndex(['city', 'number'], name: 'address_city_number_custom_idx')
+// Single-field indexes too, besides the composite `state, city`: `state` is
+// also `@EntityField.indexed()` (the same index, not created twice).
+@EntityIndex(['state'])
+@EntityIndex(['city'])
 class Address extends Entity {
   int? id;
 

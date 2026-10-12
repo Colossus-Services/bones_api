@@ -882,6 +882,18 @@ abstract class SchemeProvider {
     return _tablesSchemes.remove(table);
   }
 
+  /// Disposes all the loaded [TableScheme]s (see [disposeTableSchemeCache]),
+  /// e.g. the referenced and relationship tables too, after a migration.
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    var tables = {
+      ..._tablesSchemes.keys,
+      if (fieldsTypes) ..._tablesFieldsTypes.keys,
+    };
+    for (var table in tables) {
+      disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+    }
+  }
+
   /// Returns the table name for [entityRepository].
   String getTableForEntityRepository(EntityRepository entityRepository) {
     if (entityRepository is DBSQLEntityRepository) {

@@ -417,6 +417,31 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     return indexes;
   }
 
+  /// Names are unique per database (an index, a table, a view...).
+  @override
+  FutureOr<Map<String, String?>?> findIndexesNamesInUse(
+    String table,
+    Iterable<String> indexesNames,
+  ) {
+    var names = indexesNames.toList();
+    if (names.isEmpty) return <String, String?>{};
+
+    return executeWithPool((connection) {
+      var rows = connection.select(
+        'SELECT name, type, tbl_name FROM sqlite_master '
+        'WHERE name IN (${names.map((_) => '?').join(', ')})',
+        names,
+      );
+
+      return <String, String?>{
+        for (var row in rows)
+          row['name'].toString(): row['type'] == 'index'
+              ? row['tbl_name']?.toString()
+              : null,
+      };
+    });
+  }
+
   Map<String, Type> _fieldsTypes(List<Row> columns) {
     return Map<String, Type>.fromEntries(
       columns.map((c) {
@@ -570,6 +595,21 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   final TimedMap<String, Map<String, TableFieldReference>>
   _findFieldsReferencedTablesCache =
       TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
+
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
 
   final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
   _findFieldsReferencedTablesContextCache = Expando();

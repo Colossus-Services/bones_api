@@ -8,13 +8,23 @@
   @EntityIndex(['establishment', 'creationDate'])
   class OrderClosing extends Entity { ... }
   ```
-  - Default name: `<table>__<column1>_<column2>__idx`; or `name:`.
+  - Default name: `<table>__<column1>_<column2>__idx`; or `name:`. A default
+    name past the dialect's identifier limit (`SQLDialect.maxIdentifierLength`:
+    PostgreSQL 63, MySQL 64) is shortened with a stable hash
+    (`<prefix>_<hash>__idx`); a too long `name:` is an `ArgumentError`.
   - Generated with the table (`generateCreateTableSQL` /
-    `generateFullCreateTableSQLs`, `generateTables`).
+    `generateFullCreateTableSQLs`, `generateTables`). An `@EntityIndex` over
+    the same columns as another index of the table (e.g. a single field also
+    `indexed` or a reference) isn't created twice; the same name over other
+    columns is an `ArgumentError`.
   - `checkTables`: an existing table without an index over these columns (in
     this order, any name) is reported (`missingEntityIndexes`), with its
-    `CREATE INDEX` SQL. If its name is in use by an index over other columns,
-    that's reported too (drop it first: `IF NOT EXISTS` would skip it).
+    `CREATE INDEX` SQL. The columns are the table's ones mapped to the fields,
+    as for the other checks (e.g. a legacy `creationDate` column). If its name
+    is in use (drop it first: `IF NOT EXISTS` would skip it), that's reported
+    too: by an index over other columns, an index not usable as it, or
+    another table's index or relation (PostgreSQL, SQLite: names unique per
+    schema; `DBSQLAdapter.findIndexesNamesInUse`).
   - An unknown, hidden or collection (relationship) field is an
     `ArgumentError`.
   - `EntityHandler.getEntityIndexes()`: the class annotations
@@ -26,12 +36,15 @@
   introspected by the PostgreSQL (`pg_index`: the table visible in the search
   path, also partitioned tables), MySQL (`SHOW INDEX`) and SQLite
   (`pragma_index_list`/`pragma_index_info`) adapters; `null` when unknown
-  (memory). Only usable plain-column indexes: partial, expression/functional
-  and (PostgreSQL) invalid indexes are ignored, and `INCLUDE` columns aren't
-  key columns.
+  (memory). Only usable plain-column indexes: partial, expression/functional,
+  (MySQL) prefix and (PostgreSQL) invalid indexes are ignored, and `INCLUDE`
+  columns aren't key columns. PostgreSQL before 11 (no `indnkeyatts`) is
+  supported; indexes that can't be read are `null`, not a scheme error.
 - `DBSQLAdapter.checkDBTables({force})`: checks again on demand (e.g. after a
-  migration), reading the entities' table schemes and fields types again
-  (`disposeTableSchemeCache(table, fieldsTypes: true)`).
+  migration), reading all the loaded table schemes (also referenced and
+  relationship tables), fields types and references again
+  (`SchemeProvider.disposeTablesSchemesCaches`; the adapters' references
+  cache too). `checkedTables` is `false` until a forced check passes.
 
 ## 1.17.1
 
