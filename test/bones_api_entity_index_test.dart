@@ -4,6 +4,9 @@ library;
 import 'dart:convert';
 
 import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/bones_api_db_postgre.dart';
+import 'package:bones_api/bones_api_db_sqlite.dart';
+import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -16,6 +19,30 @@ class _IndexTestProvider extends EntityRepositoryProvider {
   _IndexTestProvider(EntityHandler<Address> addressHandler) {
     sqlAdapter = DBSQLMemoryAdapter(parentRepositoryProvider: this);
     DBSQLEntityRepository<Address>(sqlAdapter, 'address', addressHandler);
+
+    // Closed at the test's end: the open providers are all known to each
+    // other (global provider), and a lookup of a type none has (e.g. the
+    // `Address.stores` `Store`) traverses them, slower with each one.
+    addTearDown(() {
+      sqlAdapter.close();
+      close();
+    });
+  }
+}
+
+/// A provider with a [DBSQLMemoryAdapter] and the `Role` repository (no
+/// relationships: storable alone).
+class _RoleTestProvider extends EntityRepositoryProvider {
+  late final DBSQLMemoryAdapter sqlAdapter;
+
+  _RoleTestProvider(EntityHandler<Role> roleHandler) {
+    sqlAdapter = DBSQLMemoryAdapter(parentRepositoryProvider: this);
+    DBSQLEntityRepository<Role>(sqlAdapter, 'role', roleHandler);
+
+    addTearDown(() {
+      sqlAdapter.close();
+      close();
+    });
   }
 }
 
@@ -89,6 +116,24 @@ const _mysql = SQLDialect(
   elementQuote: '`',
   createIndexIfNotExists: false,
 );
+
+const _sqlite = SQLDialect(
+  'SQLite',
+  elementQuote: '"',
+  alterTableAddConstraint: false,
+);
+
+/// A [DBSQLMemoryAdapter] generating the SQL of another [SQLDialect].
+class _DialectMemoryAdapter extends DBSQLMemoryAdapter {
+  final SQLDialect _dialect;
+
+  _DialectMemoryAdapter(this._dialect) {
+    addTearDown(close);
+  }
+
+  @override
+  SQLDialect get dialect => _dialect;
+}
 
 void main() {
   group('EntityIndex', () {
@@ -449,6 +494,34 @@ void main() {
         isFalse,
       );
       expect(scheme.hasIndexOn(['establishment'], unique: true), isFalse);
+
+      // Case insensitive columns (as the non-unique):
+      expect(scheme.hasIndexOn(['ESTABLISHMENT', 'Day'], unique: true), isTrue);
+
+      // A unique name without columns (e.g. an ignored index): no index.
+      var orphanUnique = TableScheme(
+        'sales_day',
+        idFieldName: 'id',
+        fieldsTypes: {'id': int, 'day': String},
+        indexes: {
+          'x': ['day'],
+        },
+        uniqueIndexes: ['ignored_expression_idx'],
+      );
+      expect(orphanUnique.hasIndexOn(['day'], unique: true), isFalse);
+      expect(orphanUnique.hasIndexOn(['day']), isTrue);
+
+      // Known, none unique:
+      var noneUnique = TableScheme(
+        'sales_day',
+        idFieldName: 'id',
+        fieldsTypes: {'id': int, 'day': String},
+        indexes: {
+          'x': ['day'],
+        },
+        uniqueIndexes: const [],
+      );
+      expect(noneUnique.hasIndexOn(['day'], unique: true), isFalse);
 
       // Unknown unique indexes: `null` (only when asked for a unique one).
       var noUnique = TableScheme(
@@ -812,7 +885,8 @@ void main() {
             // it (not created).
             EntityIndex(['state', 'city']),
             EntityIndex(['state', 'city'], unique: true),
-            // Unique over `state` (`indexed`: a non-unique index): both.
+            // Unique over `state` (`indexed`: a non-unique index): only the
+            // constraint (its index serves as the non-unique one).
             EntityIndex(['state'], unique: true),
             // Named:
             EntityIndex(
@@ -868,9 +942,92 @@ void main() {
 
       // The non-unique `state, city`: served by the unique constraint.
       expect(indexesNames, isNot(contains('address__state_city__idx')));
-      // `state` (`indexed`): still its index.
-      expect(indexesNames, contains('address__state__idx'));
+      // `state` (`indexed`): its non-unique index dropped (redundant).
+      expect(indexesNames, isNot(contains('address__state__idx')));
+      expect(sqls, isNot(contains('${q}address__state__idx$q')));
     });
+
+    test('generateCreateTableSQL: unique over an `indexed` field, renamed', () {
+      var provider = _IndexTestProvider(
+        GenericEntityHandler<Address>(
+          instantiatorDefault: Address.empty,
+          sampleEntity: Address.empty(),
+          entityIndexes: const [
+            // The name of the dropped (redundant) `state` index: free.
+            EntityIndex(['state'], unique: true, name: 'address__state__idx'),
+          ],
+        ),
+      );
+      var adapter = provider.sqlAdapter;
+      var q = adapter.dialect.elementQuote;
+      var repository = provider.getEntityRepositoryByType(Address)!;
+
+      var createTableSQL = adapter.generateCreateTableSQL(
+        entityRepository: repository,
+      );
+
+      expect(
+        createTableSQL.buildSQL(),
+        contains('CONSTRAINT ${q}address__state__idx$q UNIQUE (${q}state$q)'),
+      );
+      expect(
+        createTableSQL.indexes!.map((e) => e.indexName),
+        isNot(contains('address__state__idx')),
+      );
+    });
+
+    test('generateAddUniqueConstraintSQL: per dialect', () {
+      for (var (dialect, expected) in [
+        (
+          _postgres,
+          'ALTER TABLE "sales_day" ADD CONSTRAINT '
+              '"sales_day__establishment_day__unique" '
+              'UNIQUE ("establishment", "day")',
+        ),
+        (
+          _mysql,
+          'ALTER TABLE `sales_day` ADD CONSTRAINT '
+              '`sales_day__establishment_day__unique` '
+              'UNIQUE (`establishment`, `day`)',
+        ),
+        (
+          // SQLite can't add a constraint: a unique index.
+          _sqlite,
+          'CREATE UNIQUE INDEX IF NOT EXISTS '
+              '"sales_day__establishment_day__unique" '
+              'ON "sales_day" ("establishment", "day")',
+        ),
+      ]) {
+        var adapter = _DialectMemoryAdapter(dialect);
+        var sql = adapter.generateAddUniqueConstraintSQL(
+          'sales_day',
+          'sales_day__establishment_day__unique',
+          ['establishment', 'day'],
+        );
+
+        var sqlStr = sql
+            .buildAllSQLs(multiline: false)
+            .join(' ')
+            .replaceAll(RegExp(r'\s+'), ' ');
+        expect(sqlStr, contains(expected), reason: dialect.name);
+      }
+    });
+
+    test(
+      'generateAddUniqueConstraintAlterTableSQL: the `CREATE TABLE` name',
+      () {
+        var adapter = _DialectMemoryAdapter(_mysql);
+        var sql = adapter
+            .generateAddUniqueConstraintAlterTableSQL(
+              'user',
+              'email',
+              TypeInfo.tString,
+            )
+            .buildSQL(multiline: false);
+        expect(sql, contains('`user__email__unique`'));
+        expect(sql, contains('ALTER TABLE `user`'));
+      },
+    );
 
     test('generateCreateTableSQL: unique, the same as a unique field', () {
       var provider = _IndexTestProvider(Address$reflection().entityHandler);
@@ -883,6 +1040,91 @@ void main() {
       var emailUnique = indexes.firstWhere((e) => e.columns.length == 1);
       expect(emailUnique.indexName, 'user__email__unique');
       expect(emailUnique.unique, isTrue);
+    });
+
+    test('generateCreateTableSQL: unique, edge cases', () {
+      var provider = _IndexTestProvider(
+        GenericEntityHandler<Address>(
+          instantiatorDefault: Address.empty,
+          sampleEntity: Address.empty(),
+          entityIndexes: const [
+            // Twice the same columns (other names): one constraint.
+            EntityIndex(['city', 'number'], unique: true),
+            EntityIndex(['city', 'number'], unique: true, name: 'addr_cn_2'),
+            // The same columns in another order: another constraint.
+            EntityIndex(['number', 'city'], unique: true),
+            // Unique and non-unique over the same columns, the non-unique
+            // first and named: only the unique one.
+            EntityIndex(['street'], name: 'address_street_named_idx'),
+            EntityIndex(['street'], unique: true),
+          ],
+        ),
+      );
+      var adapter = provider.sqlAdapter;
+      var q = adapter.dialect.elementQuote;
+      var repository = provider.getEntityRepositoryByType(Address)!;
+
+      var createTableSQL = adapter.generateCreateTableSQL(
+        entityRepository: repository,
+      );
+      var createTable = createTableSQL.buildSQL();
+      var indexesNames = createTableSQL.indexes!
+          .map((e) => e.indexName)
+          .toList();
+
+      expect(
+        'UNIQUE (${q}city$q, ${q}number$q)'.allMatches(createTable).length,
+        1,
+        reason: createTable,
+      );
+      expect(createTable, contains('address__city_number__unique'));
+      expect(createTable, isNot(contains('addr_cn_2')));
+
+      expect(
+        createTable,
+        contains(
+          'CONSTRAINT ${q}address__number_city__unique$q '
+          'UNIQUE (${q}number$q, ${q}city$q)',
+        ),
+      );
+
+      expect(
+        createTable,
+        contains(
+          'CONSTRAINT ${q}address__street__unique$q UNIQUE (${q}street$q)',
+        ),
+      );
+      expect(indexesNames, isNot(contains('address_street_named_idx')));
+    });
+
+    test('generateEntityIndexesSQLs: unique over a reference column', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+
+      var handler = GenericEntityHandler<User>(
+        instantiatorDefault: User.empty,
+        sampleEntity: User.empty(),
+        entityIndexes: const [
+          EntityIndex(['address', 'creationTime'], unique: true),
+        ],
+      );
+
+      var sql = adapter.generateEntityIndexesSQLs(handler, 'user').single;
+      expect(sql.unique, isTrue);
+      expect(sql.columns, ['address', 'creation_time']);
+      expect(sql.indexName, 'user__address_creation_time__unique');
+
+      // An existing table's (legacy) column: the same name.
+      var legacy = adapter
+          .generateEntityIndexesSQLs(
+            handler,
+            'user',
+            fieldColumn: (f) => f == 'creationTime' ? 'creationTime' : null,
+          )
+          .single;
+      expect(legacy.columns, ['address', 'creationTime']);
+      expect(legacy.indexName, 'user__address_creation_time__unique');
+      expect(legacy.unique, isTrue);
     });
 
     test('generateCreateTableSQL: unique, a name in use', () {
@@ -939,6 +1181,149 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('unique violations', () {
+    test('DBSQLMemoryAdapter: a composite unique `@EntityIndex`', () async {
+      var provider = _RoleTestProvider(
+        GenericEntityHandler<Role>(
+          instantiatorDefault: Role.empty,
+          instantiatorFromMap: Role.fromMap,
+          sampleEntity: Role.empty(),
+          entityIndexes: const [
+            EntityIndex(['type', 'enabled'], unique: true),
+          ],
+        ),
+      );
+      var repository = provider.getEntityRepositoryByType<Role>(Role)!;
+
+      var r1 = Role(RoleType.admin, enabled: true);
+      expect(await repository.store(r1), isNotNull);
+
+      // Another `enabled`: OK.
+      var r2 = Role(RoleType.admin, enabled: false);
+      expect(await repository.store(r2), isNotNull);
+
+      // Another `type`, the same `enabled`: OK.
+      var r3 = Role(RoleType.guest, enabled: true);
+      expect(await repository.store(r3), isNotNull);
+
+      // The same (`type`, `enabled`): a violation of both fields.
+      var dup = Role(RoleType.admin, enabled: true, value: Decimal.parse('2'));
+      EntityFieldInvalid? error;
+      try {
+        await repository.store(dup);
+      } on EntityFieldInvalid catch (e) {
+        error = e;
+      }
+      expect(error, isNotNull);
+      expect(error!.reason, 'unique');
+      expect(error.fieldName, 'type, enabled');
+      expect(error.fieldsNames, ['type', 'enabled']);
+      expect(error.value, isA<List>().having((l) => l.length, 'length', 2));
+      expect(error.tableName, 'role');
+      expect(
+        error.toString(),
+        contains('field(type, enabled)> reason: unique'),
+      );
+
+      // Updating itself (the same `type`, `enabled`): OK.
+      r1.value = Decimal.parse('1.5');
+      expect(await repository.store(r1), r1.id);
+
+      // Updating into the other's values: a violation.
+      r2.enabled = true;
+      EntityFieldInvalid? error2;
+      try {
+        await repository.store(r2);
+      } on EntityFieldInvalid catch (e) {
+        error2 = e;
+      }
+      expect(error2?.fieldsNames, ['type', 'enabled']);
+
+      expect(
+        (await repository.selectAll()).map(
+          (e) => '${e.type.name}/${e.enabled}',
+        ),
+        unorderedEquals(['admin/true', 'admin/false', 'guest/true']),
+      );
+    });
+
+    test('SQLite: the columns of a composite constraint message', () {
+      var (table, columns) = DBSQLiteAdapter.parseConstraintTableFields(
+        'UNIQUE constraint failed: sales_day.establishment, sales_day.day',
+      );
+      expect(table, 'sales_day');
+      expect(columns, ['establishment', 'day']);
+
+      var (table2, columns2) = DBSQLiteAdapter.parseConstraintTableFields(
+        'UNIQUE constraint failed: user.email',
+      );
+      expect(table2, 'user');
+      expect(columns2, ['email']);
+
+      var (table3, columns3) = DBSQLiteAdapter.parseConstraintTableFields(
+        'something else',
+      );
+      expect(table3, isNull);
+      expect(columns3, isNull);
+    });
+
+    test('PostgreSQL: the columns of a unique violation detail', () {
+      expect(
+        DBPostgreSQLAdapter.parseUniqueViolationColumns(
+          'Key (establishment, day)=(1, 2024-01-01) already exists.',
+        ),
+        ['establishment', 'day'],
+      );
+      expect(
+        DBPostgreSQLAdapter.parseUniqueViolationColumns(
+          'Key (email)=(joe@mail.com) already exists.',
+        ),
+        ['email'],
+      );
+      expect(
+        DBPostgreSQLAdapter.parseUniqueViolationColumns(
+          'Key ("creationDate", day)=(x, y) already exists.',
+        ),
+        ['creationDate', 'day'],
+      );
+      expect(DBPostgreSQLAdapter.parseUniqueViolationColumns(null), isNull);
+      expect(DBPostgreSQLAdapter.parseUniqueViolationColumns('other'), isNull);
+    });
+
+    test('loadedIndexColumns: unknown', () {
+      var provider = _IndexTestProvider(Address$reflection().entityHandler);
+      var adapter = provider.sqlAdapter;
+      expect(adapter.loadedIndexColumns(null, 'x'), isNull);
+      expect(adapter.loadedIndexColumns('address', null), isNull);
+      // Not loaded / no indexes (memory):
+      expect(adapter.loadedIndexColumns('address', 'x'), isNull);
+    });
+
+    test('EntityFieldInvalid.fieldsNames', () {
+      var error = EntityFieldInvalid(
+        'unique',
+        [1, 'a'],
+        fieldName: 'establishment, day',
+        fieldsNames: ['establishment', 'day'],
+        tableName: 'sales_day',
+      );
+      expect(error.fieldsNames, ['establishment', 'day']);
+      expect(
+        error.toString(),
+        startsWith(
+          'Invalid entity(@table:sales_day) field(establishment, day)> '
+          'reason: unique',
+        ),
+      );
+
+      var copy = error.copyWith(reason: 'other');
+      expect(copy.fieldsNames, ['establishment', 'day']);
+      expect(copy.reason, 'other');
+
+      expect(EntityFieldInvalid('unique', 1).fieldsNames, isNull);
     });
   });
 }

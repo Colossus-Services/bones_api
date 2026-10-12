@@ -394,10 +394,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       o,
     );
 
-    var uniques = fieldsEntityAnnotations?.entries
-        .where((e) => e.value.hasUnique)
-        .toList();
-    if (uniques == null || uniques.isEmpty) return;
+    var uniques =
+        fieldsEntityAnnotations?.entries
+            .where((e) => e.value.hasUnique)
+            .toList() ??
+        [];
 
     for (var e in uniques) {
       var field = e.key;
@@ -420,7 +421,59 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         );
       }
     }
+
+    // The composite unique constraints (`@EntityIndex(unique: true)`), as
+    // the SQL databases: a `null` value never conflicts.
+    for (var entityIndex in entityHandler.getEntityIndexes()) {
+      if (!entityIndex.unique) continue;
+
+      var fields = entityIndex.fields;
+
+      var values = _normalizeEntityJSON({
+        for (var f in fields) f: entityHandler.getField(o, f),
+      }, table: table);
+      if (values.values.any((v) => v == null)) continue;
+
+      var conflict = map.entries.any((e) {
+        if (entityId != null && entityId == e.key) return false;
+        var elem = e.value;
+        return fields.every(
+          (f) => _sameValue(_entryFieldValue(elem, f), values[f]),
+        );
+      });
+
+      if (conflict) {
+        throw EntityFieldInvalid(
+          'unique',
+          fields.map((f) => values[f]).toList(),
+          fieldName: fields.join(', '),
+          fieldsNames: fields,
+          entityType: entityHandler.type,
+          tableName: table,
+        );
+      }
+    }
   }
+
+  /// Whether a stored value [a] and an entity's value [b] are the same, as
+  /// stored (e.g. an `enum` by its name).
+  static bool _sameValue(Object? a, Object? b) {
+    if (a == b) return true;
+    if (a == null || b == null) return false;
+    return _storedForm(a) == _storedForm(b);
+  }
+
+  static Object _storedForm(Object v) => switch (v) {
+    Enum() => v.name,
+    num() || bool() || String() => v,
+    _ => v.toString(),
+  };
+
+  /// The [field] value of a stored [entry] (by field name, or its column).
+  Object? _entryFieldValue(Map<String, dynamic> entry, String field) =>
+      entry.containsKey(field)
+      ? entry[field]
+      : entry[normalizeColumnName(field)];
 
   bool _containsEntryWithConflictFieldValue<O>(
     Map<Object, Map<String, dynamic>> map,

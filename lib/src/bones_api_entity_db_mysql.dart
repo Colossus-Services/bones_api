@@ -1091,11 +1091,19 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
           fieldName = mField ?? mKey;
         }
 
+        // The key is the constraint/index name (e.g. `user__email__unique`):
+        // its columns, from the loaded table scheme (all of a composite one).
+        var columns = loadedIndexColumns(tableName, fieldName);
+        if (columns != null && columns.isNotEmpty) {
+          fieldName = columns.join(', ');
+        }
+
         return EntityFieldInvalid(
           "unique",
           error.message,
           tableName: tableName,
           fieldName: fieldName,
+          fieldsNames: columns != null && columns.length > 1 ? columns : null,
           parentError: error,
           parentStackTrace: stackTrace,
           previousError: previousError,

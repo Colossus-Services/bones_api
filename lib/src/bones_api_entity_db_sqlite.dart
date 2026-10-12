@@ -145,6 +145,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              // SQLite does NOT create an implicit index for a foreign key:
              foreignKeyCreatesImplicitIndex: false,
              createIndexIfNotExists: true,
+             // SQLite can't `ALTER TABLE ... ADD CONSTRAINT`:
+             alterTableAddConstraint: false,
              // SQLite can't parse an `OFFSET` without a preceding `LIMIT`,
              // and uses `LIMIT -1` as "no limit":
              offsetRequiresLimit: true,
@@ -1086,13 +1088,24 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
       // SQLITE_CONSTRAINT_UNIQUE / SQLITE_CONSTRAINT_PRIMARYKEY:
       if (extendedCode == 2067 || extendedCode == 1555) {
-        var (tableName, fieldName) = _parseConstraintTableField(error.message);
+        // A composite constraint names all its columns:
+        var (tableName, fieldsNames) = parseConstraintTableFields(
+          error.message,
+        );
+        var fieldName = fieldsNames?.join(', ');
+        var composite = fieldsNames != null && fieldsNames.length > 1;
+        var sqliteError = error;
 
         return EntityFieldInvalid(
           "unique",
-          _invalidValue(failedSQL, fieldName, error),
+          composite
+              ? fieldsNames
+                    .map((f) => _invalidValue(failedSQL, f, sqliteError))
+                    .toList()
+              : _invalidValue(failedSQL, fieldName, sqliteError),
           tableName: tableName,
           fieldName: fieldName,
+          fieldsNames: composite ? fieldsNames : null,
           parentError: error,
           parentStackTrace: stackTrace,
           previousError: previousError,
@@ -1168,6 +1181,21 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     var match = _regExpConstraintField.firstMatch(message);
     if (match == null) return (null, null);
     return (match[1], match[2]);
+  }
+
+  static final RegExp _regExpConstraintFields = RegExp(
+    r'constraint failed:\s*(\w+\.\w+(?:\s*,\s*\w+\.\w+)*)',
+    caseSensitive: false,
+  );
+
+  /// All the `table.column`s of a constraint message (a composite
+  /// constraint names each one): the table and the columns, in order.
+  static (String?, List<String>?) parseConstraintTableFields(String message) {
+    var match = _regExpConstraintFields.firstMatch(message);
+    if (match == null) return (null, null);
+
+    var pairs = match[1]!.split(',').map((p) => p.trim().split('.')).toList();
+    return (pairs.first[0], pairs.map((p) => p[1]).toList());
   }
 
   /// The value that violated a constraint.

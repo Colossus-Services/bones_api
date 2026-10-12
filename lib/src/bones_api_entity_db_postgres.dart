@@ -274,6 +274,21 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     ];
   }
 
+  static final RegExp _regExpUniqueViolationKey = RegExp(r'Key \((.+?)\)=\(');
+
+  /// The columns of a unique violation `detail`
+  /// (`Key (a, b)=(1, 2) already exists.`); `null` if not found.
+  static List<String>? parseUniqueViolationColumns(String? detail) {
+    if (detail == null) return null;
+    var match = _regExpUniqueViolationKey.firstMatch(detail);
+    if (match == null) return null;
+    return match[1]!
+        .split(',')
+        .map((c) => c.trim().replaceAll('"', ''))
+        .where((c) => c.isNotEmpty)
+        .toList();
+  }
+
   @override
   Object resolveError(
     Object error,
@@ -286,10 +301,17 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     } else if (error is ServerException) {
       if (error.severity == Severity.error) {
         if (error.code == '23505') {
+          // `Key (establishment, day)=(1, 2024-01-01) already exists.`: all
+          // the columns of a composite constraint (or from its name).
+          var columns =
+              parseUniqueViolationColumns(error.detail) ??
+              loadedIndexColumns(error.tableName, error.constraintName);
+
           return EntityFieldInvalid(
             "unique",
             error.detail,
-            fieldName: error.columnName,
+            fieldName: error.columnName ?? columns?.join(', '),
+            fieldsNames: columns != null && columns.length > 1 ? columns : null,
             tableName: error.tableName,
             parentError: error,
             previousError: previousError,
@@ -797,7 +819,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           ?.replaceAll("'", '')
           .replaceAll('"', '')
           .trim();
-      return field == null ? null : TableUniqueConstraint(field);
+      // A composite `UNIQUE (a, b)` (`@EntityIndex(unique: true)`) isn't a
+      // field's constraint (`TableUniqueConstraint`): it's in
+      // `TableScheme.uniqueIndexes`.
+      if (field == null || field.contains(',')) return null;
+      return TableUniqueConstraint(field);
     } else if (definition.startsWith("CHECK")) {
       var idx1 = definition.indexOf('(');
       var idx2 = definition.lastIndexOf(')');

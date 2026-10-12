@@ -1,4 +1,4 @@
-## 1.18.1
+## 1.19.0
 
 - `@EntityIndex(..., unique: true)`: a composite unique constraint, which
   `@EntityField.unique()` (one field) can't express:
@@ -11,16 +11,41 @@
     Default name: `<table>__<column1>_<column2>__unique`; or `name:`.
   - Not repeated: a unique `@EntityIndex` over a field already
     `@EntityField.unique()` (the same constraint); a non-unique `@EntityIndex`
-    over the same columns (served by the unique one).
+    over the same columns (served by the unique one). A non-unique index over
+    the same columns (e.g. an `indexed` field, a reference) is dropped: the
+    constraint's index serves it.
   - `checkTables`: only a unique index over these columns (in this order, any
-    name: also a `UNIQUE` constraint's) satisfies it; a missing one is
-    reported with a `CREATE UNIQUE INDEX` SQL (SQLite can't add a constraint
-    to a table). A non-unique index with its name: reported as a conflict.
+    name: also a `UNIQUE` constraint's) satisfies it. A missing one is
+    reported with `ALTER TABLE ... ADD CONSTRAINT ... UNIQUE` (as in the
+    `CREATE TABLE`; SQLite, which can't add a constraint to a table:
+    `CREATE UNIQUE INDEX`). A non-unique index with its name: reported as a
+    conflict. Not reported twice (as `generateCreateTableSQL`): an
+    `@EntityIndex` over the same columns as a missing `unique` field's
+    constraint, or as another missing one.
+  - Enforced by the memory adapter (`DBSQLMemoryAdapter`), as the SQL
+    databases (a `null` value never conflicts).
+  - A violation: `EntityFieldInvalid('unique')` with all its fields:
+    `fieldsNames` (new) and `fieldName` (`establishment, day`); from SQLite's
+    `table.column, table.column`, PostgreSQL's `Key (a, b)=(...)` and MySQL's
+    key name (its columns from the loaded table scheme:
+    `DBSQLAdapter.loadedIndexColumns`; a single-field one: its column, not
+    the key name).
+- `checkTables`: `@EntityField.unique()` fields are checked by all the SQL
+  adapters (from `TableScheme.uniqueIndexes`; it was PostgreSQL only, from its
+  constraints), with the `CREATE TABLE` constraint name
+  (`<table>__<column>__unique`, was `<table>_<column>__unique`) and reported
+  in the error message (`missingUniqueConstraints`).
+- PostgreSQL: a composite `UNIQUE (a, b)` isn't a field's
+  `TableUniqueConstraint` (was one for a field named `a, b`).
 - `TableScheme.uniqueIndexes` (the names of the unique indexes, also of
   `UNIQUE`/`PRIMARY KEY` constraints) and `hasIndexOn(columns, unique:)`:
   introspected by the PostgreSQL (`indisunique`), MySQL (`Non_unique`) and
   SQLite (`pragma_index_list.unique`) adapters.
-- `CreateIndexSQL.unique` (`CREATE UNIQUE INDEX`).
+- `CreateIndexSQL.unique` (`CREATE UNIQUE INDEX`);
+  `SQLGenerator.generateAddUniqueConstraintSQL`;
+  `SQLDialect.alterTableAddConstraint` (`false`: SQLite).
+- `DBSQLiteAdapter.parseConstraintTableFields`,
+  `DBPostgreSQLAdapter.parseUniqueViolationColumns`.
 
 ## 1.18.0
 

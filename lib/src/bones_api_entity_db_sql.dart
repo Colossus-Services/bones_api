@@ -606,6 +606,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// - [checkDBTables] is only called if `checkTables: true` is passed to the constructor.
   bool get checkedTables => _checkedTables;
 
+  /// The columns of the index (or unique constraint) [indexName] of [table],
+  /// from its loaded scheme ([TableScheme.indexes]), e.g. to resolve a
+  /// violated constraint's columns; `null` if unknown.
+  List<String>? loadedIndexColumns(String? table, String? indexName) {
+    if (table == null || indexName == null) return null;
+    return getTableSchemeIfLoaded(table)?.indexes?[indexName];
+  }
+
   /// Of [indexesNames], the ones in use where a new index of [table] would
   /// clash with them: by name, the table of the index using it (`null`: not
   /// an index, e.g. a table). Index names are unique per schema/database in
@@ -771,9 +779,20 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               var conflictComment = conflict == null
                   ? null
                   : '-- `${sql.indexName}` in use $conflict: drop it first:';
+
+              // A unique one: a constraint, as in the `CREATE TABLE`
+              // (SQLite: a unique index).
+              var fixSQL = sql.unique
+                  ? generateAddUniqueConstraintSQL(
+                      sql.table,
+                      sql.indexName!,
+                      sql.columns,
+                    )
+                  : sql;
+
               return [
                 ?conflictComment,
-                ...sql.buildAllSQLs(ifNotExists: true, multiline: false),
+                ...fixSQL.buildAllSQLs(ifNotExists: true, multiline: false),
               ];
             }),
           )
@@ -962,7 +981,33 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var missingRelationshipFieldReferenceIndexes =
         <(String, String, TypeInfo)>{};
 
-    var missingUniqueConstraints = <String>{};
+    // The table's columns of the entity's fields (e.g. a legacy
+    // `creationDate` column), as the other checks map them:
+    var repoToSchemeMap = <String, String>{
+      for (var e in schemeToRepoMap.entries)
+        if (e.value case var field?) field: e.key,
+    };
+
+    String fieldColumn(String field) =>
+        repoToSchemeMap[field] ?? normalizeColumnName(field);
+
+    var entityUniqueFields = entityHandler
+        .getAllFieldsWithEntityAnnotation<EntityField>(null, (a) => a.isUnique)
+        .keys
+        .toList();
+
+    // UNIQUE fields (`@EntityField.unique()`): a unique index over their
+    // column (also of a `UNIQUE` constraint), when the adapter knows the
+    // unique indexes (all the SQL adapters). Otherwise from the table's
+    // `UNIQUE` constraints (below, with `constraintSupport`).
+    var missingUniqueConstraints = scheme.uniqueIndexes == null
+        ? <String>{}
+        : entityUniqueFields
+              .where(
+                (f) =>
+                    scheme.hasIndexOn([fieldColumn(f)], unique: true) == false,
+              )
+              .toSet();
 
     var missingEnumConstraints = <String>{};
     var missingEnumValues = <String, List<String>>{};
@@ -1075,27 +1120,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         }
       }
 
-      // UNIQUE CONSTRAINTS //
+      // UNIQUE CONSTRAINTS (unique indexes unknown) //
 
-      var uniqueConstraints = scheme.constraints
-          .whereType<TableUniqueConstraint>()
-          .toList();
+      if (scheme.uniqueIndexes == null) {
+        var uniqueConstraints = scheme.constraints
+            .whereType<TableUniqueConstraint>()
+            .toList();
 
-      var uniqueConstraintsFields = uniqueConstraints.toFields(
-        fieldMap: schemeToRepoMap,
-      );
+        var uniqueConstraintsFields = uniqueConstraints.toFields(
+          fieldMap: schemeToRepoMap,
+        );
 
-      var entityUniqueFields = entityHandler
-          .getAllFieldsWithEntityAnnotation<EntityField>(
-            null,
-            (a) => a.isUnique,
-          )
-          .keys
-          .toList();
-
-      missingUniqueConstraints = entityUniqueFields
-          .whereNotIn(uniqueConstraintsFields)
-          .toSet();
+        missingUniqueConstraints = entityUniqueFields
+            .whereNotIn(uniqueConstraintsFields)
+            .toSet();
+      }
 
       // ENUM CONSTRAINTS //
 
@@ -1152,16 +1191,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
 
     // The entity's indexes (`@EntityIndex`) without an index over their
-    // columns (in order, any name), when the adapter knows the indexes. The
-    // columns are the table's ones mapped to the fields, as for the other
-    // checks (e.g. a legacy `creationDate` column):
-    var repoToSchemeMap = <String, String>{
-      for (var e in schemeToRepoMap.entries)
-        if (e.value case var field?) field: e.key,
-    };
-
+    // columns (in order, any name; unique if `unique`), when the adapter
+    // knows the indexes (the table's columns of the fields):
     var missingEntityIndexes = scheme.indexes == null
-        ? const <CreateIndexSQL>[]
+        ? <CreateIndexSQL>[]
         : generateEntityIndexesSQLs(
                 entityHandler,
                 schemeTableName,
@@ -1172,6 +1205,32 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
                     scheme.hasIndexOn(sql.columns, unique: sql.unique) != true,
               )
               .toList();
+
+    // As in the `CREATE TABLE`, not one over the same columns as another
+    // missing one: a unique field's constraint (reported with the field), a
+    // unique `@EntityIndex` (also serving a non-unique one), or the same
+    // index twice.
+    var missingUniqueColumns = [
+      for (var f in missingUniqueConstraints) [fieldColumn(f)],
+    ];
+    var missingEntityIndexesKept = <CreateIndexSQL>[];
+    for (var sql in [
+      ...missingEntityIndexes.where((e) => e.unique),
+      ...missingEntityIndexes.where((e) => !e.unique),
+    ]) {
+      var columns = sql.columns;
+      if (missingUniqueColumns.any((c) => c.equals(columns))) continue;
+      if (missingEntityIndexesKept.any(
+        (e) => e.columns.equals(columns) && (e.unique || !sql.unique),
+      )) {
+        continue;
+      }
+      missingEntityIndexesKept.add(sql);
+    }
+    // In the declared order:
+    missingEntityIndexes = missingEntityIndexes
+        .where(missingEntityIndexesKept.contains)
+        .toList();
 
     // A missing index whose name is in use by another index (other
     // columns, or not unique): `CREATE INDEX IF NOT EXISTS` would do
@@ -3773,7 +3832,7 @@ class _DBTableCheck {
     return indexes;
   }
 
-  List<AlterTableSQL> generateMissingUniqueConstraintsSQLs(
+  List<SQLBuilder> generateMissingUniqueConstraintsSQLs(
     SQLGenerator sqlGenerator,
   ) => _generateMissingUniqueConstraintsSQLs(
     missingUniqueConstraints,
@@ -3816,7 +3875,7 @@ class _DBTableCheck {
     return sqls;
   }
 
-  List<AlterTableSQL> _generateMissingUniqueConstraintsSQLs(
+  List<SQLBuilder> _generateMissingUniqueConstraintsSQLs(
     Iterable<_DBTableColumn>? missing,
     SQLGenerator sqlGenerator,
   ) {
@@ -3825,12 +3884,15 @@ class _DBTableCheck {
       return [];
     }
 
+    // As in the `CREATE TABLE` (SQLite: a unique index):
     var sqls = missing.map((f) {
-      return sqlGenerator.generateAddUniqueConstraintAlterTableSQL(
-        scheme.name,
-        f.name,
-        f.type,
-        entityFieldAnnotations: f.annotations,
+      var table = scheme.name;
+      var column = sqlGenerator.normalizeColumnName(f.name);
+      return sqlGenerator.generateAddUniqueConstraintSQL(
+        table,
+        '${table}__${column}__unique',
+        [column],
+        comment: '${f.type.toString(withT: false)} ${f.name} UNIQUE',
       );
     }).toList();
 
@@ -3870,6 +3932,7 @@ class _DBTableCheck {
     var missingRelationshipReferenceIndexes =
         this.missingRelationshipReferenceIndexes ?? [];
     var missingEntityIndexes = this.missingEntityIndexes ?? [];
+    var missingUniqueConstraints = this.missingUniqueConstraints ?? [];
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
@@ -3877,6 +3940,7 @@ class _DBTableCheck {
         missingReferenceConstraints.isNotEmpty ||
         missingReferenceIndexes.isNotEmpty ||
         missingRelationshipReferenceIndexes.isNotEmpty ||
+        missingUniqueConstraints.isNotEmpty ||
         missingEntityIndexes.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
@@ -3922,6 +3986,8 @@ class _DBTableCheck {
           "  -- missingRelationshipReferenceIndexes: [$missingRelationshipReferenceIndexesStr]",
         if (missingCollectionReferenceColumns.isNotEmpty)
           "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
+        if (missingUniqueConstraints.isNotEmpty)
+          "  -- missingUniqueConstraints: [${missingUniqueConstraints.map((e) => e.name).join(' , ')}]",
         if (missingEntityIndexes.isNotEmpty)
           "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) {
             var conflict = entityIndexesNameConflicts?[e.indexName];

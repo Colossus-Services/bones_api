@@ -999,6 +999,75 @@ Future<bool> runAdapterTests(
         await expectMissingUnique();
         await testConfigSQL.runSQL(dropIndexSQL('user_email_address_tmp_idx'));
 
+        // A unique index over the same columns in another order: not it.
+        await testConfigSQL.runSQL(
+          'CREATE UNIQUE INDEX ${q}user_address_email_tmp_uq$q ON ${q}user$q '
+          '(${q}address$q, ${q}email$q)',
+        );
+        sqlAdapter.disposeTableSchemeCache('user');
+        var schemeReversed = await sqlAdapter.getTableScheme('user');
+        expect(
+          schemeReversed!.hasIndexOn(['address', 'email'], unique: true),
+          isTrue,
+        );
+        expect(
+          schemeReversed.hasIndexOn(['email', 'address'], unique: true),
+          isFalse,
+        );
+        await expectMissingUnique();
+        await testConfigSQL.runSQL(dropIndexSQL('user_address_email_tmp_uq'));
+
+        if (isMySQL) {
+          // A unique prefix index (`email(50)`): not usable as it (and
+          // stricter: unique by the prefix; long enough for the test data).
+          await testConfigSQL.runSQL(
+            'CREATE UNIQUE INDEX ${q}user__email_address__unique$q ON '
+            '${q}user$q (${q}email$q(50), ${q}address$q)',
+          );
+        } else {
+          // A partial unique index (`WHERE`): unique only for some rows.
+          await testConfigSQL.runSQL(
+            'CREATE UNIQUE INDEX ${q}user__email_address__unique$q ON '
+            '${q}user$q (${q}email$q, ${q}address$q) '
+            'WHERE ${q}level$q > 0',
+          );
+        }
+        sqlAdapter.disposeTableSchemeCache('user');
+        var schemeUnusable = await sqlAdapter.getTableScheme('user');
+        expect(
+          schemeUnusable!.indexes!.keys,
+          isNot(contains('user__email_address__unique')),
+        );
+        expect(
+          schemeUnusable.uniqueIndexes,
+          isNot(contains('user__email_address__unique')),
+        );
+        expect(
+          schemeUnusable.hasIndexOn(['email', 'address'], unique: true),
+          isFalse,
+        );
+        // Its name in use (`CREATE UNIQUE INDEX IF NOT EXISTS` would skip):
+        await expectMissingUnique(
+          conflict:
+              'by an index not usable as it (partial, expression or '
+              'prefix)',
+        );
+        await testConfigSQL.runSQL(dropIndexSQL('user__email_address__unique'));
+
+        if (!isMySQL) {
+          // Its name in use by another table's index (PostgreSQL: unique
+          // per schema).
+          await testConfigSQL.runSQL(
+            'CREATE TABLE ${q}user_index_name_tmp$q (${q}x$q INT)',
+          );
+          await testConfigSQL.runSQL(
+            'CREATE UNIQUE INDEX ${q}user__email_address__unique$q ON '
+            '${q}user_index_name_tmp$q (${q}x$q)',
+          );
+          await expectMissingUnique(conflict: 'on table `user_index_name_tmp`');
+          await testConfigSQL.runSQL('DROP TABLE ${q}user_index_name_tmp$q');
+        }
+
         // A non-unique index with its name (the same columns): a conflict.
         await testConfigSQL.runSQL(
           'CREATE INDEX ${q}user__email_address__unique$q ON ${q}user$q '
@@ -1022,6 +1091,55 @@ Future<bool> runAdapterTests(
           'ALTER TABLE ${q}user$q ADD CONSTRAINT '
           '${q}user__email_address__unique$q '
           'UNIQUE (${q}email$q, ${q}address$q)',
+        );
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        // `email`'s own constraint (`@EntityField.unique()`, also an
+        // `@EntityIndex(['email'], unique: true)`) missing: reported once,
+        // as the field's (all the SQL adapters: from the unique indexes).
+        await testConfigSQL.runSQL(
+          isMySQL
+              ? 'ALTER TABLE ${q}user$q DROP INDEX ${q}user__email__unique$q'
+              : 'ALTER TABLE ${q}user$q DROP CONSTRAINT '
+                    '${q}user__email__unique$q',
+        );
+
+        sqlAdapter.disposeTableSchemeCache('user');
+        var schemeNoEmail = await sqlAdapter.getTableScheme('user');
+        expect(schemeNoEmail!.hasIndexOn(['email'], unique: true), isFalse);
+        // The composite one: still there.
+        expect(
+          schemeNoEmail.hasIndexOn(['email', 'address'], unique: true),
+          isTrue,
+        );
+
+        await expectLater(
+          () async => await sqlAdapter.checkDBTables(force: true),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf([
+                contains('missingUniqueConstraints: [email]'),
+                isNot(contains('user__email__unique(email) UNIQUE')),
+                isNot(contains('missingEntityIndexes')),
+              ]),
+            ),
+          ),
+        );
+
+        // A unique index (any name) over `email`: OK.
+        await testConfigSQL.runSQL(
+          'CREATE UNIQUE INDEX ${q}user_email_other_uq$q ON ${q}user$q '
+          '(${q}email$q)',
+        );
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+        await testConfigSQL.runSQL(dropIndexSQL('user_email_other_uq'));
+
+        // Restored (the `CREATE TABLE` name):
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}user$q ADD CONSTRAINT ${q}user__email__unique$q '
+          'UNIQUE (${q}email$q)',
         );
         expect(await sqlAdapter.checkDBTables(force: true), isTrue);
       });

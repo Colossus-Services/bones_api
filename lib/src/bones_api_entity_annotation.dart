@@ -363,8 +363,14 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
   /// The table of the [entityType].
   final String? tableName;
 
-  /// The field name of the [value].
+  /// The field name of the [value]. For a violation of a composite constraint
+  /// (e.g. `@EntityIndex(unique: true)`): its [fieldsNames] joined by `, `.
   final String? fieldName;
+
+  /// The fields of a violated composite constraint (e.g.
+  /// `@EntityIndex(unique: true)`), in order, when known; [value] is then
+  /// their values (in order, when known). `null` for a single field.
+  final List<String>? fieldsNames;
 
   /// The errors of the sub-entity ([value]) in the [fieldName].
   final Map<String, EntityFieldInvalid>? subEntityErrors;
@@ -388,6 +394,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     this.entityType,
     this.tableName,
     this.fieldName,
+    this.fieldsNames,
     this.subEntityErrors,
     this.parentError,
     this.parentStackTrace,
@@ -401,6 +408,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     Type? entityType,
     String? tableName,
     String? fieldName,
+    List<String>? fieldsNames,
     Map<String, EntityFieldInvalid>? subEntityErrors,
     Object? parentError,
     StackTrace? parentStackTrace,
@@ -410,6 +418,7 @@ class EntityFieldInvalid extends Error implements RecursiveToString {
     entityType: entityType ?? this.entityType,
     tableName: tableName ?? this.tableName,
     fieldName: fieldName ?? this.fieldName,
+    fieldsNames: fieldsNames ?? this.fieldsNames,
     subEntityErrors: subEntityErrors ?? this.subEntityErrors,
     parentError: parentError ?? this.parentError,
     parentStackTrace: parentStackTrace ?? this.parentStackTrace,
