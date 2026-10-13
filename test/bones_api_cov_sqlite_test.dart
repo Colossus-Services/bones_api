@@ -1181,22 +1181,16 @@ void main() {
       expect(adapter.checkedTables, isTrue);
     });
 
-    test(
-      'no table',
-      () async {
-        var provider = _Provider(generateTables: false, checkTables: false);
-        addTearDown(provider.dispose);
-        await provider.ensureInitialized();
+    test('no table', () async {
+      var provider = _Provider(generateTables: false, checkTables: false);
+      addTearDown(provider.dispose);
+      await provider.ensureInitialized();
 
-        var error = await _checkError(provider.adapter);
-        expect(error, contains('No scheme for repository `item` (`_Item`)'));
-      },
-      skip:
-          'lib bug: `getRepositoriesSchemes` uses `resolveAllValues` (non '
-          'nullable) over the schemes: a missing table (`null` scheme) throws '
-          'a null-check `TypeError` instead of the `No scheme for repository` '
-          'check error',
-    );
+      // A missing table: reported by the check (not a `TypeError`).
+      var error = await _checkError(provider.adapter);
+      expect(error, contains('No scheme for repository `item` (`_Item`)'));
+      expect(provider.adapter.checkedTables, isFalse);
+    });
 
     test('invalid column type', () async {
       var provider = _Provider(generateTables: false, checkTables: false);

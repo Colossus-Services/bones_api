@@ -719,15 +719,17 @@ void main() {
       expect(listJson, equals('[{"id":1,"name":"a"},{"id":2,"name":"b"}]'));
       expect(covIntHandler.encodeObjectListJson([]), equals('[]'));
 
-      // NOTE: `decodeObjectListJson` delegates to `decodeObjectJson`, which
-      // casts the decoded JSON (a `List`) to `O`, so it can't decode a list
-      // (reported as a lib bug). Accept both behaviors here:
-      try {
-        var list = covIntHandler.decodeObjectListJson(listJson);
-        expect(list.map((e) => e.values), equals([o1.values, o2.values]));
-      } on TypeError catch (e) {
-        expect('$e', contains('List'));
-      }
+      var list = covIntHandler.decodeObjectListJson(listJson);
+      expect(list, everyElement(isA<CovInt>()));
+      expect(list.map((e) => e.values), equals([o1.values, o2.values]));
+      expect(covIntHandler.decodeObjectListJson('[]'), isEmpty);
+
+      // A `jsonReviver` that already returns a `List<O>`: returned as is.
+      var revived = <CovInt>[o1, o2];
+      covIntHandler.jsonReviver = (k, v) =>
+          k == null && v is List ? revived : v;
+      expect(covIntHandler.decodeObjectListJson(listJson), same(revived));
+      covIntHandler.jsonReviver = null;
 
       var decoded = covIntHandler.decodeObjectJson('{"id":3,"name":"c"}');
       expect(decoded.values, equals({'id': 3, 'name': 'c'}));

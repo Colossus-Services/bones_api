@@ -1967,8 +1967,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   O decodeObjectJson(String json) => decodeJson<O>(json)!;
 
   List<O> decodeObjectListJson(String json) {
-    var itr = decodeObjectJson(json) as Iterable<O>;
-    return itr is List<O> ? itr : itr.toList();
+    // The `jsonReviver` resolves only the top-level object (`key == null`):
+    // each element of the list is resolved as one.
+    var itr = decodeJson<Iterable>(json)!;
+    if (itr is List<O>) return itr;
+    return itr.map((e) => e is O ? e : jsonReviver(null, e) as O).toList();
   }
 
   T? decodeJson<T>(String json) {
@@ -7050,12 +7053,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _errorsTransactions[errorResolved] = this;
 
-    var firstExecutionError = false;
     var extraN = 0;
 
     if (previousError == null) {
       _error = errorResolved;
-      firstExecutionError = true;
     } else {
       var extraErrors = _extraErrors ??= [];
       extraErrors.add(errorResolved);
@@ -7078,7 +7079,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _doAutoCommit();
 
-    if (rethrowError && firstExecutionError) {
+    // Also an extra error (after the first one): the operation failed (and
+    // its error is not a result).
+    if (rethrowError) {
       Error.throwWithStackTrace(errorResolved, stackTrace);
     } else {
       return errorResolved as R;
@@ -8288,19 +8291,19 @@ abstract class IterableEntityRepository<O extends Object>
         resolveFiledName: false,
       )!;
 
-      if (!EntityHandler.isValidEntityType(fieldType.type)) {
-        return null;
-      }
-
+      // A `List` of entities (a `List` is not an entity type itself):
       if (value is List && fieldType.isList && fieldType.hasArguments) {
         var elementType = fieldType.arguments.first;
+        if (!EntityHandler.isValidEntityType(elementType.type)) {
+          return null;
+        }
 
         var elementRepository = provider.getEntityRepositoryByTypeInfo(
           elementType,
         );
         if (elementRepository == null) return null;
 
-        var futures = value.map((e) {
+        var futures = value.nonNulls.map((e) {
           return elementRepository.ensureStored(
             e,
             transaction: transaction,
@@ -8309,19 +8312,23 @@ abstract class IterableEntityRepository<O extends Object>
         }).toList();
 
         return futures.resolveAll();
-      } else {
-        var repository = provider.getEntityRepository(
-          type: fieldType.type,
-          obj: value,
-        );
-        if (repository == null) return null;
-
-        return repository.ensureStored(
-          value,
-          transaction: transaction,
-          operation: operation,
-        );
       }
+
+      if (!EntityHandler.isValidEntityType(fieldType.type)) {
+        return null;
+      }
+
+      var repository = provider.getEntityRepository(
+        type: fieldType.type,
+        obj: value,
+      );
+      if (repository == null) return null;
+
+      return repository.ensureStored(
+        value,
+        transaction: transaction,
+        operation: operation,
+      );
     });
 
     return futures.resolveAllWithValue(true);

@@ -1710,7 +1710,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             ),
           )
           .toMapFromEntries()
-          .resolveAllValues();
+          // A missing table: a `null` scheme (reported by the check).
+          .resolveAllValuesNullable();
 
       allSchemes.addAll(repositorySchemes);
     }

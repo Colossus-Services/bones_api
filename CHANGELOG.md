@@ -65,6 +65,16 @@
   values had no description (now `missingEnumConstraints` and
   `missingEnumValues`); `missingCollectionReferenceColumns` also listed the
   non-collection reference fields.
+- Fix: `checkDBTables` with a missing table threw a null-check `TypeError`
+  (`getRepositoriesSchemes`) instead of reporting `No scheme for repository`.
+- Fix: `Transaction`: an error after the first one (e.g. of an operation
+  after the abort) was returned as the operation's result (`as R`: a
+  `TypeError`, or the error object as the result); now it's rethrown (and
+  still added to `extraErrors`).
+- Fix: `IterableEntityRepository.ensureReferencesStored` (`store`,
+  `ensureStored`) didn't store the entities of `List<Entity>` fields.
+- Fix: `EntityHandler.decodeObjectListJson` couldn't decode a list (cast to
+  `O`): each element is now resolved as an entity.
 
 ## 1.21.1
 

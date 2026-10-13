@@ -632,10 +632,10 @@ void main() {
       expect(id, isNotNull);
       // The single entity reference is stored:
       expect(c3.getID(), isNotNull);
-      // NOTE: `IterableEntityRepository.ensureReferencesStored` skips `List`
-      // fields (`isValidEntityType(List)` is `false`), so `c1`/`c2` are not
-      // stored here (reported as a lib bug). Accept both behaviors:
-      expect(await itemRepo.count(), anyOf(equals(1), equals(3)));
+      // And the entities of the `List` field:
+      expect(c1.getID(), isNotNull);
+      expect(c2.getID(), isNotNull);
+      expect(await itemRepo.count(), equals(3));
 
       // Already stored and unchanged:
       expect(await parentRepo.ensureStored(p), equals(id));
