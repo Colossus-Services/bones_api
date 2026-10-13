@@ -12,7 +12,144 @@ and [README.md](README.md#recording-a-result) for how to add an entry.
 A commit marked `(modified)` was run from a working tree with uncommitted
 changes on top of that commit.
 
+## Progression
+
+ops/sec per operation (higher is better), one column per date, oldest
+first, from the entries below; in parentheses, the change from the
+previous date. A date with more than one run shows its
+last one (2026-10-03: the optimized runs at `98cc744 (modified)`; the
+first runs of that day are in their entries). When adding an entry, add
+its date's column here too.
+
+### `memory`
+
+| Operation | 2026-10-03 | 2026-10-13 |
+|---|--:|--:|
+| `user/byId` | 25303 | 25688 (+1.5%) |
+| `user/byEmail` | 1407 | 1526 (+8.5%) |
+| `user/byState (join, limit 20)` | 1409 | 1454 (+3.2%) |
+| `user/list (page of 20)` | 682 | 690 (+1.2%) |
+| `user/count` | 193802 | 153540 (-20.8%) |
+| `authenticate (login)` | 1393 | 1426 (+2.4%) |
+| `user/register` | 2623 | 2611 (-0.5%) |
+| `user/update` | 1881 | 1944 (+3.3%) |
+| `user/remove` | 19969 | 21245 (+6.4%) |
+
+### `sqlite`
+
+| Operation | 2026-10-03 | 2026-10-13 |
+|---|--:|--:|
+| `user/byId` | 17138 | 17403 (+1.5%) |
+| `user/byEmail` | 16580 | 16535 (-0.3%) |
+| `user/byState (join, limit 20)` | 2326 | 2348 (+0.9%) |
+| `user/list (page of 20)` | 2405 | 2419 (+0.6%) |
+| `user/count` | 121903 | 122422 (+0.4%) |
+| `authenticate (login)` | 14764 | 14835 (+0.5%) |
+| `user/register` | 7727 | 7690 (-0.5%) |
+| `user/update` | 10302 | 10282 (-0.2%) |
+| `user/remove` | 13036 | 13250 (+1.6%) |
+
+### `postgres`
+
+| Operation | 2026-10-03 | 2026-10-13 |
+|---|--:|--:|
+| `user/byId` | 1453 | 1461 (+0.6%) |
+| `user/byEmail` | 1518 | 1521 (+0.2%) |
+| `user/byState (join, limit 20)` | 537 | 403 (-25.0%) |
+| `user/list (page of 20)` | 490 | 302 (-38.4%) |
+| `user/count` | 6167 | 6199 (+0.5%) |
+| `authenticate (login)` | 1474 | 1482 (+0.5%) |
+| `user/register` | 611 | 592 (-3.1%) |
+| `user/update` | 713 | 713 (0.0%) |
+| `user/remove` | 803 | 882 (+9.8%) |
+
+PostgreSQL runs in Docker Desktop, where `byState` and `list` vary a lot
+between runs of the same code (see the entries' notes); the 2026-10-13 dip
+is that variance, not a regression. `memory`'s `count` (~5 us per call)
+also varies between runs.
+
 ---
+
+### 2026-10-13 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`1c10511`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |
+|---|--:|--:|--:|--:|--:|
+| `user/byId` | 1461 | 684.3 | 676 | 761 | 818 |
+| `user/byEmail` | 1521 | 657.3 | 648 | 710 | 833 |
+| `user/byState (join, limit 20)` | 403 | 2483.8 | 2487 | 3758 | 4586 |
+| `user/list (page of 20)` | 302 | 3314.2 | 2749 | 6418 | 7273 |
+| `user/count` | 6199 | 161.3 | 159 | 178 | 204 |
+| `authenticate (login)` | 1482 | 674.7 | 667 | 735 | 791 |
+| `user/register` | 592 | 1689.1 | 1631 | 2059 | 2293 |
+| `user/update` | 713 | 1402.9 | 1338 | 1678 | 1978 |
+| `user/remove` | 882 | 1133.4 | 1150 | 1207 | 1239 |
+
+The release with #169 (auth token fixes) and #170 (concurrency tests;
+SQLite transactions queued, leaked auto-commit transaction, pool size);
+`1c10511` has the same tree as master's merge of #170, `a7ec311`. Single
+reads and writes match the previous entry.
+
+`list` and `byState` are lower here, but that is the Docker Desktop
+variance noted below, not a regression. Re-runs of the two gave `list`
+484–578/s. An A/B against v1.21.1, alternating 3 runs each on one
+container, overlapped: `byState` 429–485/s (v1.21.1) vs 354–570/s, and
+`list` 357–575/s vs 534–578/s.
+
+### 2026-10-13 — `sqlite` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`1c10511`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** sqlite (temporary file)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |
+|---|--:|--:|--:|--:|--:|
+| `user/byId` | 17403 | 57.5 | 55 | 65 | 111 |
+| `user/byEmail` | 16535 | 60.5 | 59 | 68 | 114 |
+| `user/byState (join, limit 20)` | 2348 | 426.0 | 415 | 484 | 519 |
+| `user/list (page of 20)` | 2419 | 413.4 | 403 | 471 | 496 |
+| `user/count` | 122422 | 8.2 | 8 | 8 | 10 |
+| `authenticate (login)` | 14835 | 67.4 | 65 | 74 | 133 |
+| `user/register` | 7690 | 130.0 | 115 | 152 | 470 |
+| `user/update` | 10282 | 97.3 | 93 | 106 | 160 |
+| `user/remove` | 13250 | 75.5 | 73 | 82 | 127 |
+
+Same code as the `postgres` entry above. Within noise of the previous
+entry on every operation, writes included: queueing SQLite transactions
+(one at a time, for concurrent callers) costs nothing for a single client.
+
+### 2026-10-13 — `memory` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`1c10511`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** memory (DBSQLMemoryAdapter)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |
+|---|--:|--:|--:|--:|--:|
+| `user/byId` | 25688 | 38.9 | 37 | 45 | 94 |
+| `user/byEmail` | 1526 | 655.1 | 657 | 1202 | 1270 |
+| `user/byState (join, limit 20)` | 1454 | 687.7 | 674 | 757 | 775 |
+| `user/list (page of 20)` | 690 | 1450.0 | 1448 | 1519 | 1557 |
+| `user/count` | 153540 | 6.5 | 5 | 15 | 29 |
+| `authenticate (login)` | 1426 | 701.3 | 725 | 1247 | 1325 |
+| `user/register` | 2611 | 383.1 | 380 | 505 | 565 |
+| `user/update` | 1944 | 514.3 | 509 | 574 | 596 |
+| `user/remove` | 21245 | 47.1 | 45 | 56 | 104 |
+
+Same code as the `postgres` entry above. Within noise of the previous
+entry (`count`'s p95/p99 vary between runs at ~5 us per call).
 
 ### 2026-10-03 — `postgres` — Mac17,3 (Apple M5)
 
