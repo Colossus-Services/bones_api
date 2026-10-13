@@ -41,17 +41,24 @@ class BenchRunner {
   ///
   /// If [setup] is given it runs before each [body] call, untimed, and its
   /// result is passed to [body] (e.g. a row created only to be deleted).
+  ///
+  /// If [afterRound] is given it runs after the warm-up and after each
+  /// round, untimed (e.g. to remove the rows a round inserted, so every
+  /// round, and the next operations, run on the same table sizes).
   Future<BenchResult> run<S>(
     String name,
     FutureOr<void> Function(int i, S setupValue) body, {
     FutureOr<S> Function(int i)? setup,
+    FutureOr<void> Function()? afterRound,
   }) async {
     var i = await _loop(body, setup, warmup, 0, null);
+    await afterRound?.call();
 
     var rounds = <List<int>>[];
     for (var r = 0; r < repeat; ++r) {
       var latencies = <int>[];
       i = await _loop(body, setup, duration, i, latencies);
+      await afterRound?.call();
       rounds.add(latencies);
     }
 

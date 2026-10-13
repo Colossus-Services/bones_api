@@ -239,9 +239,26 @@ class _UsersBench {
     for (var i = 0; i < users; ++i) {
       var user = await _register('user$i@bench.test', i) as User;
       _userIds.add(user.id!);
+      _lastSeededAddressId = user.address.id!;
     }
 
     print('** Seeded $users users in ${chronometer.elapsedMilliseconds} ms.');
+  }
+
+  int _lastSeededAddressId = 0;
+
+  /// Removes the users (and their addresses) registered after [seed].
+  Future<void> _removeRegistered() async {
+    await _moduleUser.userRepository.deleteByQuery(
+      ' id > ? ',
+      parameters: [_userIds.last],
+    );
+
+    var addresses = AddressAPIRepository(api.entityRepositoryProvider);
+    await addresses.deleteByQuery(
+      ' id > ? ',
+      parameters: [_lastSeededAddressId],
+    );
   }
 
   Future<Object?> _register(String email, int i) => _call('/user/register', {
@@ -297,6 +314,9 @@ class _UsersBench {
         await runner.run<void>(
           'user/register',
           (i, _) => _register('new-$runID-$i@bench.test', i),
+          // Remove the registered users: otherwise each round (and `update`
+          // and `remove` after it) would run on a bigger table.
+          afterRound: _removeRegistered,
         );
       case 'update':
         await runner.run<void>(
