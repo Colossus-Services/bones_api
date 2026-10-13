@@ -103,19 +103,40 @@ void main() {
 
         expect(identical(repo.onStore, repo.entityRepository.onStore), isTrue);
 
+        var stored = <UserInfo>[];
+        var subStore = repo.onStore.listen(stored.add);
+
         var deleted = <UserInfo>[];
         var sub = repo.onDelete.listen(deleted.add);
 
         var o = UserInfo('evt');
         var id = await repo.store(o);
 
+        // An insert:
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(1));
+        expect(stored.first, same(o));
+
+        // An update (changed):
+        o.info = 'evt2';
+        await repo.store(o);
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(2));
+        expect(stored.last, same(o));
+
+        // Unchanged: nothing stored, no event.
+        await repo.store(o);
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(2));
+
         var del = await repo.deleteByID(id);
-        expect(del?.info, equals('evt'));
+        expect(del?.info, equals('evt2'));
 
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(deleted.map((e) => e.info), contains('evt'));
+        expect(deleted.map((e) => e.info), contains('evt2'));
 
+        await subStore.cancel();
         await sub.cancel();
       });
 

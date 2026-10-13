@@ -836,6 +836,33 @@ void _runObjectAdapterTests(
       expect(user2.address.id, equals(231));
       expect(user2.roles.map((r) => r.type), equals([RoleType.unknown]));
     });
+
+    test('onStore (DBEntityRepository)', () async {
+      var storeRepo = provider.repo<Store>();
+
+      var stored = <Store>[];
+      var sub = storeRepo.onStore.listen(stored.add);
+
+      // An insert:
+      var s = Store('evt', 1, id: 841);
+      expect(await storeRepo.store(s), equals(841));
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(1));
+      expect(stored.first, same(s));
+
+      // An update (changed):
+      s.name = 'evt2';
+      await storeRepo.store(s);
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(2));
+
+      // Unchanged: nothing stored, no event.
+      await storeRepo.store(s);
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(2));
+
+      await sub.cancel();
+    });
   });
 }
 

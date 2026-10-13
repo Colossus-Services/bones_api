@@ -160,8 +160,12 @@ void main() {
         ),
       );
 
-      // `PAGE` without a `LIMIT`:
-      var noLimit = await call('PAGE=2');
+      // `PAGE` without a `LIMIT`: a page of the default `LIMIT`.
+      var defaultLimit = await call('PAGE=2');
+      expect(defaultLimit.isOK, isTrue);
+
+      // `PAGE` without a limit (`LIMIT=0`):
+      var noLimit = await call('LIMIT=0&PAGE=2');
       expect(noLimit.isOK, isFalse);
       expect(noLimit.toString(), contains('Invalid pagination'));
 

@@ -88,6 +88,20 @@
   the same transaction, waited for the operation, that waited for them. The
   object adapters (also `DBObjectMemoryAdapter`) now finish an operation
   after its transaction execution (as the SQL adapters).
+- Fix: `onStore` never notified the stores of `DBEntityRepository` and
+  `DBRelationalEntityRepository` (inserts and updates with changes; an
+  unchanged entity isn't stored, nor notified).
+- Fix: `APIDBModule`: `select`, `insert`, `update` and `delete` without a
+  table (e.g. `/db/select`) threw a `RangeError` (an error response), now
+  `notFound`.
+- `APIDBModule.select`: paginated by default:
+  - `defaultSelectLimit` (default: `1000`): the `LIMIT` of a request
+    without one (`LIMIT=<n>` in the URL query: a custom one; `LIMIT=0`: no
+    limit). `PAGE=<n>` without a `LIMIT` is now a page of
+    `defaultSelectLimit` entities.
+  - The HTML view has `previous`/`next` page links (keeping the query and
+    the `EAGER`/`ORDER` directives), and the `[first - last]` entities shown;
+    its JSON link is for the same page (and with the query now URL-encoded).
 
 ## 1.21.1
 

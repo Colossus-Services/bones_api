@@ -2557,7 +2557,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         preFinish: (id) {
           entityHandler.setID(o, id);
 
-          trackEntity(o);
+          trackEntity(o, stored: true);
           return id; // pre-finish
         },
       );
@@ -2613,7 +2613,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       idFieldName: idFieldsName,
       allowAutoInsert: allowAutoInsert,
       preFinish: (id) {
-        trackEntity(o);
+        trackEntity(o, stored: true);
         return id; // pre-finish
       },
     );
