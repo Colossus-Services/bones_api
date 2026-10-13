@@ -7,6 +7,23 @@ import 'package:swiss_knife/swiss_knife.dart' show parseBool;
 /// and store/fecth/delete the objects.
 ///
 /// All [DBObjectAdapter]s comes with a built-in connection pool.
+///
+/// ## Unique fields are not enforced
+///
+/// The [DBObjectAdapter]s ([DBObjectMemoryAdapter], `DBObjectDirectoryAdapter`
+/// and `DBObjectGCSAdapter`) store each entity as an independent object (by
+/// ID), and don't enforce the unique fields: [EntityField.unique] and
+/// [EntityIndex.unique]. Two entities with the same unique value are both
+/// stored, without an error.
+///
+/// Object storages (e.g. Google Cloud Storage, Amazon S3) are not designed
+/// for that: there's no index over the objects' values, nor transactions over
+/// multiple objects. Checking by scanning the stored objects is slow and,
+/// with concurrent writers, not reliable.
+///
+/// When the uniqueness is required, use a SQL adapter (the database's
+/// `UNIQUE` constraints: `DBPostgreSQLAdapter`, `DBMySQLAdapter`,
+/// `DBSQLiteAdapter`), or [DBSQLMemoryAdapter] (in memory, it checks them).
 abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
   static bool _boot = false;
 

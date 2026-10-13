@@ -44,6 +44,9 @@ typedef DBMemoryObjectAdapter = DBObjectMemoryAdapter;
 /// A [DBObjectAdapter] that stores objects in memory.
 ///
 /// Simulates an Object Database adapter. Useful for tests.
+///
+/// Doesn't enforce unique fields, as the other [DBObjectAdapter]s (see
+/// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectMemoryAdapter
     extends DBObjectAdapter<DBObjectMemoryAdapterContext> {
   static bool _boot = false;

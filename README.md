@@ -376,6 +376,10 @@ class SalesDay {
 Index names are unique per schema in PostgreSQL and SQLite (not per table):
 a `name:` in use by another table's index is reported by `checkTables`.
 
+The unique constraints (`unique: true`, `@EntityField.unique()`) are enforced
+by the SQL adapters and the `DBSQLMemoryAdapter`, not by the object adapters
+(see [ObjectAdapter](#objectadapter)).
+
 ## Repositories & Database
 
 To stored entities in Databases and manipulate them you can set up an `EntityRepositoryProvider`:
@@ -599,6 +603,29 @@ Use `memory: true` (or `path: ':memory:'`) for an in-memory database.
 [mysql]: https://www.mysql.com/
 [sqlite]: https://www.sqlite.org/
 [sqlite3_pkg]: https://pub.dev/packages/sqlite3
+
+## ObjectAdapter
+
+A `DBObjectAdapter` stores each entity as an independent object (a JSON, by
+ID), in an object storage:
+
+- `DBObjectGCSAdapter`: [Google Cloud Storage][gcs] (config: `object.gcs`).
+  Import: `package:bones_api/bones_api_db_gcp.dart`
+- `DBObjectDirectoryAdapter`: a local directory, a file per object. Useful for
+  development (config: `object.directory`).
+  Import: `package:bones_api/bones_api_db_directory.dart`
+- `DBObjectMemoryAdapter`: in memory. Useful for tests (config:
+  `object.memory`).
+
+**Unique fields are not enforced** by the `DBObjectAdapter`s
+(`@EntityField.unique()` and `@EntityIndex(..., unique: true)`): two entities
+with the same unique value are both stored, without an error. Object storages
+(e.g. Google Cloud Storage, Amazon S3) are not designed for that: there's no
+index over the objects' values, nor transactions over multiple objects. When
+the uniqueness is required, use a `SQLAdapter` (the database's `UNIQUE`
+constraints) or the `DBSQLMemoryAdapter`.
+
+[gcs]: https://cloud.google.com/storage
 
 ## Bones_UI
 

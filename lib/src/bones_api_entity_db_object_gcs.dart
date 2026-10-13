@@ -51,6 +51,10 @@ class DBObjectGCSAdapterContext
 /// A [DBObjectAdapter] that stores objects in Google Cloud Storage (GCS).
 ///
 /// - See https://cloud.google.com/storage
+///
+/// Doesn't enforce unique fields: GCS (an object storage) has no index over
+/// the objects' values, nor transactions over multiple objects (see
+/// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   static bool _boot = false;
 

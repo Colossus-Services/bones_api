@@ -43,6 +43,9 @@ class DBObjectDirectoryAdapterContext
 /// A [DBObjectAdapter] that stores objects in a [Directory].
 ///
 /// Simulates an Object Database adapter. Useful for development.
+///
+/// Doesn't enforce unique fields, as the other [DBObjectAdapter]s (see
+/// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectDirectoryAdapter
     extends DBObjectAdapter<DBObjectDirectoryAdapterContext> {
   static bool _boot = false;

@@ -131,6 +131,12 @@
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)
   is now tested.
+- Docs: the `DBObjectAdapter`s (memory, directory, GCS) don't enforce unique
+  fields (`@EntityField.unique()`, `@EntityIndex(unique: true)`): object
+  storages (e.g. GCS, S3) are not designed for that (no index over the
+  objects' values, nor transactions over multiple objects). Documented in
+  `DBObjectAdapter`, each object adapter, `EntityField`/`EntityIndex.unique`
+  and the README (new `ObjectAdapter` section).
 - Fix: `DBObjectGCSAdapter`: a partial update with an error reading the
   stored object (other than not found: e.g. a timeout or a 5xx response)
   overwrote it with only the changed fields: now the update fails (the
