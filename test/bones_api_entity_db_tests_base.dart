@@ -3443,6 +3443,36 @@ Future<bool> runAdapterTests(
         expect(await usersWithAdmin(), contains(userId));
       });
 
+      test('setRelationship: replaces the relationship', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final userRepository =
+            userAPIRepository.entityRepository
+                as DBRelationalEntityRepository<User>;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'set-relationship@mail.com',
+            '123',
+            Address('SR', 'Set City', 'Set Street', 1),
+            [Role(RoleType.guest), Role(RoleType.admin)],
+          ),
+        );
+
+        var user = (await userAPIRepository.selectByID(userId))!;
+        expect(user.roles, hasLength(2));
+
+        var admin = user.roles.firstWhere((r) => r.type == RoleType.admin);
+
+        // Directly (not through `store`): only the admin role is kept.
+        expect(
+          await userRepository.setRelationship(user, 'roles', [admin]),
+          isTrue,
+        );
+
+        var user2 = (await userAPIRepository.selectByID(userId))!;
+        expect(user2.roles.map((r) => r.id), equals([admin.id]));
+      });
+
       test('selectRelationships with a repeated entity', () async {
         final userAPIRepository = entityRepositoryProvider.userAPIRepository;
         final userRepository =
