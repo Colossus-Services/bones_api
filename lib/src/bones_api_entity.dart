@@ -4280,6 +4280,8 @@ class EntityRepositoryProvider
             : ask(globalProvider, asked));
   }
 
+  void _checkInitializedForLookup() => checkInitialized(allowInProgress: true);
+
   /// - [traversed]: internal, the providers already asked in the current
   ///   lookup (see [lookupEntityRepository]).
   EntityRepository<O>? getEntityRepository<O extends Object>({
@@ -4292,7 +4294,9 @@ class EntityRepositoryProvider
     knownProviders: _knownEntityRepositoryProviders,
     type: type,
     traversed: traversed,
-    initialize: checkInitialized,
+    // A lookup visits every known provider: one initializing elsewhere is
+    // fine (its repositories are registered on construction).
+    initialize: _checkInitializedForLookup,
     local: () => _getLocalEntityRepository<O>(obj: obj, type: type, name: name),
     ask: (p, traversed) => p.getEntityRepository<O>(
       obj: obj,
@@ -4368,7 +4372,9 @@ class EntityRepositoryProvider
     knownProviders: _knownEntityRepositoryProviders,
     type: type,
     traversed: traversed,
-    initialize: checkInitialized,
+    // A lookup visits every known provider: one initializing elsewhere is
+    // fine (its repositories are registered on construction).
+    initialize: _checkInitializedForLookup,
     local: () => _getLocalEntityRepositoryByType<O>(type),
     ask: (p, traversed) =>
         p.getEntityRepositoryByType<O>(type, traversed: traversed),

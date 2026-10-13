@@ -1,6 +1,94 @@
-import 'package:async_extension/async_extension.dart';
+/// The initialization framework: objects that must be initialized, once,
+/// after their dependencies, possibly asynchronously, in graphs that can be
+/// cyclic (self-referenced).
+///
+/// ## Model
+///
+/// An [Initializable] declares:
+/// - [Initializable.initializeDependencies]: the dependencies to initialize
+///   **before** its [Initializable.initialize] (pre-dependencies).
+/// - [Initializable.initialize]: its own initialization. The returned
+///   [InitializationResult.dependencies] are initialized **after** it
+///   (post-dependencies). If the result is of another [Initializable] `X`
+///   (e.g. `return adapter.ensureInitialized(parent: this)`), `X` is a
+///   post-dependency too (a *merged* initializable), and its dependencies are
+///   reported as this one's.
+///
+/// Calling [Initializable.ensureInitialized] / [Initializable.doInitialization]
+/// runs the phases: pre-dependencies → `initialize()` → post-dependencies →
+/// (root only) drain → initialized.
+///
+/// ## Lifecycle ([InitializationStatus])
+///
+/// `idle` → `initializing` → `finalizing` (post-dependencies) →
+/// `initialized`. On error: `failed` (also [InitializationStatus.idle]): the
+/// next call starts a new attempt (retry).
+///
+/// ## One attempt, one result
+///
+/// Each object has at most one initialization attempt in progress. Every
+/// caller of that attempt gets **its** result: synchronously, when the whole
+/// initialization was synchronous (no [Future] involved), otherwise the same
+/// [Future]. A result is never fabricated: OK means the object was
+/// initialized (or, for [InitializationResult.cyclic], see below).
+///
+/// ## Cycles: the waits-for graph
+///
+/// While attempts are in progress, the framework keeps a *waits-for* graph:
+/// an edge `W → D` means the attempt of `W` is waiting for the attempt of
+/// `D`. Before `W` waits for an in-progress `D`, it checks whether `D`
+/// already (transitively) waits for `W`:
+/// - **No:** the edge `W → D` is added, and `W` waits for `D`'s result.
+/// - **Yes:** waiting would never end (a cycle). `W` doesn't wait: it gets an
+///   OK result with [InitializationResult.cyclic] `true`, and `D` is listed
+///   in `W`'s [Initializable.cyclicDependencies].
+///
+/// Example: `A` depends on `B`, and `B` on `A`. `A` starts, waits for `B`
+/// (`A → B`). `B` starts and asks for `A`: `A` already waits for `B`, so `B`
+/// doesn't wait for `A` (`B.cyclicDependencies == [A]`). `B` initializes,
+/// then `A`. The same rule covers a self-dependency, synchronous re-entry,
+/// asynchronous cycles, cliques and concurrent roots: the graph is always
+/// acyclic, so the framework's waits never deadlock. There are no delays,
+/// retries or timeouts.
+///
+/// ## Who is waiting
+///
+/// A dependency requested from a hook ([Initializable.initializeDependencies]
+/// or [Initializable.initialize]) is attributed to the hook's object, even
+/// with no `parent` (or another one): first the innermost hook running
+/// synchronously, then the hook's [Zone] (after an `await` in the hook),
+/// then the explicit `parent`'s attempt. Otherwise the caller is a *root*.
+///
+/// Limitation: code running after an `await` in a [Zone] not forked from
+/// the hook's one (e.g. a zone forked from a captured/static zone), that
+/// requests a dependency with no `parent`, can't be attributed: it waits as
+/// a root, and would wait forever if that dependency waits for the hook's
+/// object. Pass `parent:` in such code.
+///
+/// ## Guarantees
+///
+/// - No timeouts; no deadlock among the framework's waits.
+/// - When an attempt completes OK, all its dependencies completed OK, except
+///   the ones that were waiting for it ([Initializable.cyclicDependencies]):
+///   those are still initializing (they need this one first).
+/// - A root attempt (no waiter) also waits for every in-progress object of
+///   its dependencies' closure (except the ones waiting for it).
+/// - Errors are results ([InitializationResult.ok] `false`, with the
+///   [InitializationResult.error] and [InitializationResult.stackTrace]):
+///   the futures never fail. A failed object can be initialized again.
+///
+/// ## Complexity
+///
+/// Each dependency request is O(1), plus a cycle check (an iterative
+/// depth-first search over the in-progress waits only) when the dependency is
+/// in progress. A root's drain visits its dependencies' closure once per
+/// round (O(V + E)).
+library;
+
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:logging/logging.dart' as logging;
-import 'package:statistics/statistics.dart';
 
 import 'bones_api_logging.dart';
 import 'bones_api_utils.dart';
@@ -10,6 +98,14 @@ final _log = logging.Logger('Initializable');
 typedef ExecuteInitializedCallback<R> = FutureOr<R> Function();
 
 /// The initialization status of the [initializable] instance.
+///
+/// | state          | [initialized] | [initializing] | [finalizing] | [failed] | [idle] |
+/// |----------------|---------------|----------------|--------------|----------|--------|
+/// | `idle`         | false         | false          | false        | false    | true   |
+/// | `initializing` | false         | true           | false        | false    | false  |
+/// | `finalizing`   | false         | true           | true         | false    | false  |
+/// | `initialized`  | true          | false          | false        | false    | false  |
+/// | `failed`       | false         | false          | false        | true     | true   |
 class InitializationStatus {
   /// The [Initializable] instance of this status.
   final Initializable initializable;
@@ -20,7 +116,8 @@ class InitializationStatus {
 
   int _id = 0;
 
-  /// The [initializable] ID (defined by initialization order).
+  /// The [initializable] ID: the order its (last) initialization attempt
+  /// started.
   int get id => _id;
 
   bool _initialized = false;
@@ -34,6 +131,9 @@ class InitializationStatus {
     _initializedTime = DateTime.now();
     _initializing = false;
     _finalizing = false;
+    _failed = false;
+    _error = null;
+    _stackTrace = null;
   }
 
   bool _initializing = false;
@@ -42,10 +142,16 @@ class InitializationStatus {
   void _setInitializing() {
     _initializing = true;
     _initializingTime = DateTime.now();
+    _initializedTime = null;
+    _finalizing = false;
+    _failed = false;
+    _error = null;
+    _stackTrace = null;
     _id = ++_idCount;
   }
 
-  /// Returns `true` if [initializable] is initializing.
+  /// Returns `true` if [initializable] is initializing (an attempt is in
+  /// progress, including [finalizing]).
   bool get initializing => _initializing;
 
   DateTime? get initializingTime => _initializingTime;
@@ -65,12 +171,36 @@ class InitializationStatus {
     _finalizing = true;
   }
 
-  /// Returns `true` if [initializable] is finalizing.
+  /// Returns `true` if [initializable] is finalizing: its `initialize()`
+  /// completed and it's initializing its post-dependencies.
   bool get finalizing => _finalizing;
+
+  bool _failed = false;
+  Object? _error;
+  StackTrace? _stackTrace;
+
+  void _setFailed(Object? error, StackTrace? stackTrace) {
+    _initializing = false;
+    _finalizing = false;
+    _failed = true;
+    _error = error;
+    _stackTrace = stackTrace;
+  }
+
+  /// Returns `true` if the last initialization attempt failed (see [error]).
+  /// The next initialization call starts a new attempt.
+  bool get failed => _failed;
+
+  /// The error of the last (failed) initialization attempt.
+  Object? get error => _error;
+
+  /// The [StackTrace] of the [error].
+  StackTrace? get stackTrace => _stackTrace;
 
   bool _asynchronous = false;
 
-  /// Returns `true` if [initializable] has an asynchronous initialization.
+  /// Returns `true` if [initializable] has an asynchronous initialization
+  /// (an attempt that didn't complete synchronously).
   bool get asynchronous => _asynchronous;
 
   void _markAsynchronous(bool async) {
@@ -79,14 +209,16 @@ class InitializationStatus {
     }
   }
 
-  /// Returns `true` if is not initialized yet and not initializing.
+  /// Returns `true` if is not initialized yet and not initializing (also
+  /// after a [failed] attempt).
   bool get idle => !initialized && !initializing;
 
   /// Returns the initialization status as [String]. Examples:
-  /// - `initialized`
-  /// - `initializing`
-  /// - `initialized[async]`
-  /// - `initializing[async]`
+  /// - `idle`
+  /// - `initializing` / `initializing[async]`
+  /// - `finalizing` / `finalizing[async]`
+  /// - `initialized` / `initialized[async]`
+  /// - `failed` / `failed[async]`
   String get status {
     var asyncStr = asynchronous ? '[async]' : '';
 
@@ -96,6 +228,8 @@ class InitializationStatus {
       return 'finalizing$asyncStr';
     } else if (initializing) {
       return 'initializing$asyncStr';
+    } else if (_failed) {
+      return 'failed$asyncStr';
     } else {
       return 'idle';
     }
@@ -110,12 +244,22 @@ class InitializationStatus {
 }
 
 /// The initialization result of a [Initializable] instance.
+///
+/// - [ok] `true`: [initializable] is initialized, or, if [cyclic], it's
+///   still initializing and waiting (transitively) for the requester, which
+///   can't wait for it (see [Initializable.cyclicDependencies]).
+/// - [ok] `false`: the initialization failed: [error] and [stackTrace].
 class InitializationResult {
   /// The [Initializable] of this result.
   final Initializable initializable;
 
   /// `true` if the initialization was OK.
   final bool ok;
+
+  /// `true` if [initializable] wasn't waited for: it's waiting
+  /// (transitively) for the requester (a cycle). See
+  /// [Initializable.cyclicDependencies].
+  final bool cyclic;
 
   /// The dependencies of this [Initializable] instance.
   final List<Initializable> dependencies;
@@ -132,6 +276,7 @@ class InitializationResult {
     Iterable<Initializable>? dependencies,
     this.error,
     this.stackTrace,
+    this.cyclic = false,
   }) : dependencies = dependencies?.toList() ?? <Initializable>[];
 
   factory InitializationResult.ok(
@@ -163,7 +308,8 @@ class InitializationResult {
         : '';
 
     if (ok) {
-      return '[OK]@${initializable.initializationStatus}$depsStr';
+      var okStr = cyclic ? 'OK:CYCLIC' : 'OK';
+      return '[$okStr]@${initializable.initializationStatus}$depsStr';
     } else {
       var s = '[ERROR]@${initializable.initializationStatus}$depsStr';
       return error == null
@@ -191,363 +337,155 @@ extension IterableInitializationResultExtension
 class InitializationError extends StateError {
   final Initializable initializable;
 
-  InitializationError(this.initializable, super.message) : super();
+  /// The original error (e.g. thrown by `initialize()`), if any.
+  final Object? cause;
+
+  /// The [cause] [StackTrace].
+  final StackTrace? causeStackTrace;
+
+  InitializationError(
+    this.initializable,
+    super.message, {
+    this.cause,
+    this.causeStackTrace,
+  }) : super();
 
   @override
-  String toString() => "Initialization error> $message";
+  String toString() {
+    var cause = this.cause;
+    return cause == null
+        ? "Initialization error> $message"
+        : "Initialization error> $message\nCaused by: $cause";
+  }
 }
 
-class _InitializationChain {
-  final Initializable initializable;
+/// The [Zone] key of the hook's [_Attempt] (see [Initializable._runHook]).
+final Object _attemptZoneKey = Object();
 
-  _InitializationChain._(this.initializable);
+/// The attempts whose hook is running synchronously (innermost last).
+final List<_Attempt> _hookStack = <_Attempt>[];
 
-  List<Initializable>? _parents;
+/// The current mark of the depth-first searches ([_reaches]).
+int _searchEpoch = 0;
 
-  List<Initializable> get parents => _parents?.toList() ?? <Initializable>[];
+/// An initialization attempt of [node]: a node of the waits-for graph.
+final class _Attempt {
+  final Initializable node;
 
-  int get parentsLength => _parents?.length ?? 0;
+  /// `true` if started by a root caller (no waiter).
+  final bool root;
 
-  Initializable? get firstParent => _parents?.first;
+  /// The result: set once, when completed.
+  InitializationResult? result;
 
-  bool _addParent(Initializable parent) {
-    var parents = _parents ??= <Initializable>[];
-    return parents.addUnique(parent);
-  }
+  Completer<InitializationResult>? _completer;
 
-  bool _isParent(Initializable o) {
-    var parents = _parents;
-    if (parents == null || parents.isEmpty) return false;
+  /// The attempts this one is waiting for (waits-for edges).
+  final Set<_Attempt> waitingOn = HashSet<_Attempt>.identity();
 
-    var allParents = <Initializable>{
-      // Avoid analyzing dependencies of `initializable`
-      // if it exists in the parent's tree:
-      initializable,
-    };
+  /// The attempts waiting for this one (incoming edges).
+  final Set<_Attempt> waiters = HashSet<_Attempt>.identity();
 
-    var parents2 = <Initializable>{};
+  int _mark = 0;
 
-    for (var p in parents) {
-      if (identical(p, o)) return true;
-      parents2.addAllNew(p._chain.parents, allParents);
-    }
+  _Attempt(this.node, {required this.root});
 
-    if (parents2.isEmpty) return false;
+  /// `true` while in progress (not completed, and [node]'s current one).
+  bool get isActive =>
+      result == null && identical(node._initState.current, this);
 
-    var parents3 = <Initializable>{};
-
-    for (var p in parents2) {
-      if (identical(p, o)) return true;
-      parents3.addAllNew(p._chain.parents, allParents);
-    }
-
-    if (parents3.isEmpty) return false;
-
-    var parents4 = <Initializable>{};
-
-    for (var p in parents3) {
-      if (identical(p, o)) return true;
-      parents4.addAllNew(p._chain.parents, allParents);
-    }
-
-    if (parents4.isEmpty) return false;
-
-    var parents5 = <Initializable>{};
-
-    for (var p in parents4) {
-      if (identical(p, o)) return true;
-      parents5.addAllNew(p._chain.parents, allParents);
-    }
-
-    if (parents5.isEmpty) return false;
-
-    for (var p in parents5) {
-      if (identical(p, o)) return true;
-    }
-
-    for (var p in parents5) {
-      if (p._chain._isParent(o)) return true;
-    }
-
-    return false;
-  }
-
-  bool _isAnyParent(Iterable<Initializable> elems) => elems.any(_isParent);
-
-  bool _isCircularParent(Initializable parent) {
-    if (parent._chain._isParent(initializable)) {
-      return true;
-    }
-
-    var parent0 = firstParent;
-    if (parent0 == null) return false;
-
-    if (identical(parent, parent0)) {
-      return false;
-    }
-
-    var parentParents = parent._chain._parents;
-    if (parentParents == null || parentParents.isEmpty) return false;
-
-    if (parent0._chain._isAnyParent(parentParents)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  List<Initializable>? _dependencies;
-
-  List<Initializable> get dependencies =>
-      _dependencies?.toList() ?? <Initializable>[];
-
-  List<Initializable> get dependenciesDeep {
-    var allDeps = <Initializable>{};
-    _dependenciesDeepImpl(allDeps);
-    allDeps.remove(initializable);
-    return allDeps.toList();
-  }
-
-  void _dependenciesDeepImpl(Set<Initializable> allDeps) {
-    if (!allDeps.add(initializable)) return;
-
-    var dependencies = _dependencies;
-    if (dependencies == null) return;
-
-    for (var dep in dependencies) {
-      dep._chain._dependenciesDeepImpl(allDeps);
-    }
-  }
-
-  void _addAllDependencies(Iterable<Initializable> deps) {
-    var depsValid = deps.where((dep) => !identical(dep, initializable));
-
-    var dependencies = _dependencies ??= <Initializable>[];
-    dependencies.addAllUnique(depsValid);
-  }
-
-  void _checkDependency(Initializable dependency) {
-    var dependencies = _dependencies;
-    if (dependencies == null || !dependencies.containsIdentical(dependency)) {
-      _forceLogFlushMessages();
-      throw InitializationError(
-        initializable,
-        "Dependency not in chain: $dependency\nInitializable: $initializable",
-      );
-    }
-  }
-
-  ({
-    List<Initializable> valids,
-    List<Initializable> circular,
-    List<Initializable> finalizing,
-  })
-  _filterValidDependencies(Iterable<Initializable> dependencies) {
-    var valids = <Initializable>[];
-    var circular = <Initializable>[];
-    var finalizing = <Initializable>[];
-
-    for (var e in dependencies) {
-      if (identical(e, initializable) || e._status.initialized) {
-        continue;
-      }
-
-      if (!_isParent(e) && !e._chain._isParent(initializable)) {
-        valids.add(e);
-      } else if (e._status.finalizing) {
-        finalizing.add(e);
-      } else {
-        circular.add(e);
-      }
-    }
-
-    return (valids: valids, circular: circular, finalizing: finalizing);
-  }
-
-  List<Initializable>? _initializedDependencies;
-
-  bool _markInitializedDependency(Initializable dependency) {
-    _checkDependency(dependency);
-
-    var initializedDependencies = _initializedDependencies ??=
-        <Initializable>[];
-    return initializedDependencies.addUnique(dependency);
-  }
-
-  void _markInitializedDependencies(Iterable<Initializable> dependencies) {
-    for (var dep in dependencies) {
-      _markInitializedDependency(dep);
-    }
-  }
-
-  List<Initializable> _allInitializedDependenciesDeeply([
-    List<Initializable>? allDeep,
-  ]) {
-    allDeep ??= <Initializable>[];
-
-    var deps = _initializedDependencies;
-    if (deps == null || deps.isEmpty) return allDeep;
-
-    var newDeps = deps.where((d) => !allDeep!.containsIdentical(d)).toList();
-    allDeep.addAll(newDeps);
-
-    for (var d in newDeps) {
-      d._chain._allInitializedDependenciesDeeply(allDeep);
-    }
-
-    return allDeep;
-  }
-
-  Map<Initializable, Completer<InitializationResult>>?
-  _initializedDependenciesCompleters;
-
-  void _setInitializedDependencyCompleter(
-    Initializable dependency,
-    Completer<InitializationResult> completer,
-  ) {
-    _checkDependency(dependency);
-
-    var initializedDependenciesCompleters =
-        _initializedDependenciesCompleters ??=
-            <Initializable, Completer<InitializationResult>>{};
-
-    var prev = initializedDependenciesCompleters[dependency];
-    if (prev != null && !identical(prev, completer)) {
-      _forceLogFlushMessages();
-      throw InitializationError(
-        initializable,
-        "Dependency completer already set!\nInitializable: $initializable",
-      );
-    }
-
-    initializedDependenciesCompleters[dependency] = completer;
-  }
-
-  void _setInitializedDependenciesCompleters(
-    Iterable<MapEntry<Initializable, Completer<InitializationResult>>> entries,
-  ) {
-    for (var e in entries) {
-      _setInitializedDependencyCompleter(e.key, e.value);
-    }
-  }
-
-  bool _completeCircularDependency(
-    Initializable dependency,
-    List<Initializable> callChain,
-  ) {
-    if (identical(initializable, dependency)) return false;
-
-    if (callChain.containsIdentical(initializable)) return false;
-    callChain.add(initializable);
-
-    var completed = false;
-
-    var completers = _initializedDependenciesCompleters;
-    if (completers != null) {
-      var completer = completers[dependency];
-
-      if (completer != null && !completer.isCompleted) {
-        _log.warning(
-          '[$runtimeTypeNameUnsafe] Not waiting self reference `${dependency.initializationStatus}` '
-          'in async initialization graph of `${initializable.initializationStatus}`.',
-        );
-
-        completer.complete(dependency._resultOk());
-        completed = true;
-      }
-
-      for (var e in completers.entries) {
-        var dep = e.key;
-        if (dep._chain._isParent(dependency)) {
-          var completer = e.value;
-
-          if (!completer.isCompleted) {
-            _log.warning(
-              '[$runtimeTypeNameUnsafe] Not waiting indirect self reference `${dependency.initializationStatus}` '
-              'in async initialization graph of `${initializable.initializationStatus}`.',
-            );
-
-            completer.complete(dependency._resultOk());
-            completed = true;
-          }
-        }
-      }
-    }
-
-    var initializedDependencies = _initializedDependencies;
-    if (initializedDependencies != null) {
-      for (var dep in initializedDependencies) {
-        if (dep.isInitializing) {
-          if (dep._chain._completeCircularDependency(dependency, callChain)) {
-            completed = true;
-          }
-        }
-      }
-    }
-
-    return completed;
-  }
-
-  void _checkAllCircularDependencies() {
-    _checkCircularDependencies();
-    _checkParentsCircularDependencies();
-  }
-
-  void _checkParentsCircularDependencies() {
-    var parents = _parents;
-    if (parents == null) return;
-
-    for (var p in parents) {
-      p._chain._checkCircularDependencies();
-    }
-  }
-
-  void _checkCircularDependencies([List<Initializable>? dependencies]) {
-    dependencies ??= _dependencies;
-    if (dependencies == null || dependencies.isEmpty) return;
-
-    var depsInitializingAsync = dependencies
-        .whereInitializing()
-        .whereAsyncInitialization();
-
-    if (depsInitializingAsync.isEmpty) return;
-
-    var subDepsInitializing = depsInitializingAsync
-        ._subDependenciesInitialized();
-
-    //print('!!! depsInitializingAsync: $runtimeTypeNameUnsafe >> ${depsInitializingAsync.toInitializationStatus()}');
-    //print('!!! subDepsInitializing: $runtimeTypeNameUnsafe >> ${subDepsInitializing.toInitializationStatus()}');
-
-    if (subDepsInitializing.containsIdentical(initializable)) {
-      var callChain = <Initializable>[];
-      var completed = false;
-
-      for (var dep in dependencies) {
-        if (dep._chain._completeCircularDependency(initializable, callChain)) {
-          completed = true;
-        }
-      }
-
-      if (completed) {
-        _log.warning(
-          '[${initializable.runtimeTypeNameUnsafe}] Found self reference in async initialization graph: ${initializable.initializationStatus} -> '
-          '${depsInitializingAsync.length <= 3 ? '${depsInitializingAsync.toInitializationStatus()}' : '${depsInitializingAsync.length}'} ->> '
-          '${subDepsInitializing.length <= 3 ? '${subDepsInitializing.toInitializationStatus()}' : '${subDepsInitializing.length}'}',
-        );
-      }
-    }
+  /// The [result], when completed.
+  Future<InitializationResult> get future {
+    var result = this.result;
+    if (result != null) return Future.value(result);
+    return (_completer ??= Completer<InitializationResult>()).future;
   }
 
   @override
-  String toString() =>
-      '_InitializationChain{'
-      '_parents: ${_parents?.length ?? ''}, '
-      '_dependencies: ${_dependencies?.length ?? ''}, '
-      '_initializedDependencies: ${_initializedDependencies?.length ?? ''}, '
-      '_initializedDependenciesCompleters: ${_initializedDependenciesCompleters?.length ?? ''}'
-      '}@$initializable';
+  String toString() => '_Attempt{${node.initializationStatus}}';
 }
 
+/// Adds the waits-for edge [waiter] → [target].
+void _addWaitEdge(_Attempt waiter, _Attempt target) {
+  if (waiter.waitingOn.add(target)) {
+    target.waiters.add(waiter);
+  }
+}
+
+/// Returns `true` if [from] is (transitively) waiting for [target]. An
+/// iterative depth-first search over the waits-for edges (no recursion).
+bool _reaches(_Attempt from, _Attempt target) {
+  if (identical(from, target)) return true;
+  if (from.waitingOn.isEmpty) return false;
+
+  var mark = ++_searchEpoch;
+  from._mark = mark;
+
+  var stack = <_Attempt>[from];
+  while (stack.isNotEmpty) {
+    var attempt = stack.removeLast();
+    for (var next in attempt.waitingOn) {
+      if (identical(next, target)) return true;
+      if (next._mark != mark) {
+        next._mark = mark;
+        stack.add(next);
+      }
+    }
+  }
+
+  return false;
+}
+
+/// [f] with the value of [value]: synchronous if [value] is not a [Future].
+FutureOr<R> _then<T, R>(FutureOr<T> value, FutureOr<R> Function(T value) f) {
+  if (value is Future<T>) {
+    return value.then(f);
+  } else {
+    return f(value);
+  }
+}
+
+/// The first not OK result, if any.
+InitializationResult? _firstNotOk(Iterable<InitializationResult> results) {
+  for (var r in results) {
+    if (!r.ok) return r;
+  }
+  return null;
+}
+
+/// The initialization state of an [Initializable].
+final class _InitializationState {
+  /// The attempt in progress: `null` when idle, failed or initialized.
+  _Attempt? current;
+
+  /// The dependencies (pre and post), in the order they were declared.
+  final Set<Initializable> dependencies =
+      LinkedHashSet<Initializable>.identity();
+
+  /// The dependencies not waited for in the last attempt (see
+  /// [Initializable.cyclicDependencies]).
+  final Set<Initializable> cyclic = LinkedHashSet<Initializable>.identity();
+}
+
+/// An instance that must be initialized (once) before use, after its
+/// dependencies. See the library documentation for the model, the cycles
+/// handling and the guarantees.
+///
+/// Implement:
+/// - [initializeDependencies]: the dependencies to initialize before
+///   [initialize].
+/// - [initialize]: the initialization. Return [InitializationResult.ok] (with
+///   the post-dependencies, if any) or [InitializationResult.error] (or
+///   throw).
+///
+/// Use:
+/// - [ensureInitialized] / [doInitialization]: initialize it (if not yet).
+/// - [executeInitialized]: run code after it's initialized.
+/// - [checkInitialized]: initialize it synchronously, or throw.
+///
+/// From a hook ([initializeDependencies] / [initialize]), other instances
+/// can be initialized directly (e.g. `other.ensureInitialized()`): they are
+/// dependencies of this one (attributed by the framework).
 mixin Initializable {
   static const Set<String> interfaceMethodsNames = <String>{
     'checkInitialized',
@@ -559,9 +497,9 @@ mixin Initializable {
     'initializeDependencies',
   };
 
-  late final _InitializationChain _chain = _InitializationChain._(this);
-
   late final InitializationStatus _status = InitializationStatus._(this);
+
+  late final _InitializationState _initState = _InitializationState();
 
   /// Returns the current [InitializationStatus].
   InitializationStatus get initializationStatus => _status;
@@ -569,8 +507,15 @@ mixin Initializable {
   int get _initializationID => _status._id;
 
   /// Ensures that this instance is initialized.
+  ///
+  /// Returns the [InitializationResult]: synchronously if the initialization
+  /// is (or was) synchronous. The returned [Future] never fails: an error is
+  /// a result with [InitializationResult.ok] `false`.
+  ///
+  /// - [parent]: the instance that needs this one (when not called from its
+  ///   hooks, where it's resolved automatically).
   FutureOr<InitializationResult> ensureInitialized({Initializable? parent}) =>
-      _doInitializationImpl(parent);
+      _ensure(_resolveWaiter(parent));
 
   /// Ensures that this instance is initialized. If is not
   /// initialized yet it will force an asynchronous initialization
@@ -578,15 +523,17 @@ mixin Initializable {
   FutureOr<InitializationResult> ensureInitializedAsync({
     Initializable? parent,
   }) {
-    if (_status.initialized) return _resultOk();
+    if (_status.initialized) return _resultInitialized();
+    var waiter = _resolveWaiter(parent);
     return Future<InitializationResult>.microtask(
-      () => _doInitializationImpl(parent),
+      () => _ensure(waiter != null && waiter.isActive ? waiter : null),
     );
   }
 
-  /// Initialize this instance if is not initialized yet.
+  /// Initialize this instance if is not initialized yet. Same as
+  /// [ensureInitialized].
   FutureOr<InitializationResult> doInitialization({Initializable? parent}) =>
-      _doInitializationImpl(parent);
+      _ensure(_resolveWaiter(parent));
 
   /// Returns `true` if this instance is already initialized.
   bool get isInitialized => _status.initialized;
@@ -597,492 +544,391 @@ mixin Initializable {
   /// Returns `true` if this instance initialization was asynchronous.
   bool get isAsyncInitialization => _status._asynchronous;
 
-  Future<InitializationResult>? _initializeDependenciesAsync;
-  Future<InitializationResult>? _initializeAsync;
+  /// The dependencies of the current (or last) initialization attempt that
+  /// were not waited for: they were (transitively) waiting for this instance
+  /// (a cycle), so they may still be initializing when [initialize] runs or
+  /// when this instance is initialized.
+  List<Initializable> get cyclicDependencies =>
+      List<Initializable>.unmodifiable(_initState.cyclic);
 
-  FutureOr<InitializationResult> _doInitializationImpl([
-    Initializable? parent,
-  ]) {
-    if (_status.initialized) return _resultOk();
+  InitializationResult _resultInitialized() =>
+      InitializationResult.ok(this, dependencies: _initState.dependencies);
 
-    final chain = _chain;
+  InitializationResult _resultCyclic() => InitializationResult(
+    this,
+    true,
+    dependencies: _initState.dependencies,
+    cyclic: true,
+  );
+
+  /// The attempt waiting for this instance: the innermost hook running
+  /// synchronously, the hook's [Zone], or the [parent]'s attempt.
+  static _Attempt? _resolveWaiter(Initializable? parent) {
+    if (_hookStack.isNotEmpty) {
+      var attempt = _hookStack.last;
+      if (attempt.isActive) return attempt;
+    }
+
+    var zoneAttempt = Zone.current[_attemptZoneKey];
+    if (zoneAttempt is _Attempt && zoneAttempt.isActive) return zoneAttempt;
 
     if (parent != null) {
-      if (!chain._addParent(parent)) {
-        chain._checkAllCircularDependencies();
-        return _resultOk();
-      }
+      var attempt = parent._initState.current;
+      if (attempt != null && attempt.isActive) return attempt;
+    }
 
-      if (!parent._status.initialized && chain._isCircularParent(parent)) {
-        // _log.warning('AVOIDING CIRCULAR INITIALIZATION: $this -> $parent');
-        chain._checkAllCircularDependencies();
+    return null;
+  }
 
-        var initCircular = _doInitializationImpl2(parent);
+  /// Runs a hook of [attempt] (attributing the dependencies requested in it).
+  static FutureOr<T> _runHook<T>(
+    _Attempt attempt,
+    FutureOr<T> Function() hook,
+  ) {
+    _hookStack.add(attempt);
+    try {
+      return runZoned(hook, zoneValues: {_attemptZoneKey: attempt});
+    } finally {
+      _hookStack.removeLast();
+    }
+  }
 
-        if (initCircular is! Future<InitializationResult>) {
-          return initCircular;
+  FutureOr<InitializationResult> _ensure(_Attempt? waiter) {
+    if (_status.initialized) return _resultInitialized();
+
+    var attempt = _initState.current;
+
+    if (attempt == null) {
+      attempt = _Attempt(this, root: waiter == null);
+      _initState.current = attempt;
+      _initState.cyclic.clear();
+      _status._setInitializing();
+
+      // A new attempt waits for nothing yet: no cycle possible.
+      if (waiter != null) _addWaitEdge(waiter, attempt);
+
+      _run(attempt);
+
+      var result = attempt.result;
+      if (result != null) return result;
+
+      _status._markAsynchronous(true);
+      return attempt.future;
+    }
+
+    // A root caller: waits for the attempt.
+    if (waiter == null) return attempt.future;
+
+    // A self-dependency, or a re-entrant call from its own hooks:
+    if (identical(waiter, attempt)) return _resultCyclic();
+
+    if (_reaches(attempt, waiter)) {
+      // This attempt is waiting for the waiter: a cycle.
+      waiter.node._initState.cyclic.add(this);
+      _log.fine(
+        () =>
+            "Cyclic dependency (not waited): ${waiter.node.initializationStatus} -> $_status",
+      );
+      return _resultCyclic();
+    }
+
+    _addWaitEdge(waiter, attempt);
+    return attempt.future;
+  }
+
+  /// Runs the phases of [attempt]: it always completes it (OK or error).
+  void _run(_Attempt attempt) {
+    FutureOr<Object?> ret;
+    try {
+      ret = _phaseDependencies(attempt);
+    } catch (e, s) {
+      _fail(attempt, e, s);
+      return;
+    }
+
+    if (ret is Future<Object?>) {
+      // ignore: discarded_futures
+      ret.then(
+        (_) {},
+        onError: (Object e, StackTrace s) => _fail(attempt, e, s),
+      );
+    }
+  }
+
+  /// Phase 1: the pre-dependencies ([initializeDependencies]).
+  FutureOr<Object?> _phaseDependencies(_Attempt attempt) {
+    var deps = _runHook(attempt, initializeDependencies);
+
+    return _then<List<Initializable>, Object?>(deps, (deps) {
+      var depsInit = _initializeDependencies(attempt, deps, deps);
+
+      return _then<InitializationResult?, Object?>(depsInit, (depsError) {
+        if (depsError != null) {
+          _failDependency(attempt, depsError);
+          return null;
         }
-
-        final circularInitTime = DateTime.now();
-
-        var parentsLength1 = chain.parents.length;
-
-        return initCircular.timeout(
-          Duration(milliseconds: 1000),
-          onTimeout: () async {
-            var parentsLength2 = chain.parents.length;
-
-            // Extra timeout if a new parent is added:
-            if (parentsLength2 > parentsLength1) {
-              _log.warning(
-                "Circular initialization with extra parents... ($this)",
-              );
-
-              const circularTimeoutError = "!!CIRCULAR TIMEOUT!!";
-
-              var r = await initCircular.timeout(
-                Duration(milliseconds: 1000),
-                onTimeout: () =>
-                    InitializationResult.error(this, circularTimeoutError),
-              );
-              if (r.ok) {
-                return r;
-              } else if (r.error != circularTimeoutError) {
-                return r;
-              } else {
-                var parentsLength3 = chain.parents.length;
-
-                if (parentsLength3 > parentsLength2) {
-                  var r2 = await initCircular.timeout(
-                    Duration(milliseconds: 1000),
-                    onTimeout: () =>
-                        InitializationResult.error(this, circularTimeoutError),
-                  );
-
-                  if (r2.ok) {
-                    return r;
-                  } else if (r2.error != circularTimeoutError) {
-                    return r;
-                  }
-                }
-              }
-            }
-
-            final circularTime = DateTime.now().difference(circularInitTime);
-
-            _log.warning(
-              "Circular initialization timeout (${circularTime.inMilliseconds} ms): $this",
-            );
-            return _resultOk();
-          },
-        );
-      }
-    }
-
-    return _doInitializationImpl2(parent);
-  }
-
-  FutureOr<InitializationResult> _doInitializationImpl2(Initializable? parent) {
-    final chain = _chain;
-    final status = _status;
-
-    var initializeAsync = _initializeAsync;
-    if (initializeAsync != null) {
-      return initializeAsync;
-    }
-
-    var initializeDependenciesAsync = _initializeDependenciesAsync;
-    if (initializeDependenciesAsync != null) {
-      return initializeDependenciesAsync;
-    }
-
-    // Avoid recursive call to this initialization:
-    if (status.initializing) {
-      chain._checkAllCircularDependencies();
-      return _resultOk();
-    }
-
-    status._setInitializing();
-
-    _log.info(
-      '[$runtimeTypeNameUnsafe#$_initializationID] Initializing${parent == null ? ' (ROOT)' : ''}...',
-    );
-
-    var initDeps = initializeDependencies();
-
-    if (initDeps is Future<List<Initializable>>) {
-      status._markAsynchronous(true);
-
-      return _initializeDependenciesAsync = initDeps.then((initDeps) async {
-        return _doDependenciesInitialization.tryCallThen(initDeps, (depsInit) {
-          _checkAllDependenciesOk(depsInit.results);
-          return _callInitialize();
-        }, onError: (e, s) => _onInitializationError(e, s));
-      }, onError: (e, s) => _onInitializationError(e, s));
-    } else {
-      var hasAsyncDep = initDeps.any((dep) => dep.isAsyncInitialization);
-      status._markAsynchronous(hasAsyncDep);
-
-      return _doDependenciesInitialization.tryCallThen(initDeps, (depsInit) {
-        _checkAllDependenciesOk(depsInit.results);
-        return _callInitialize();
-      }, onError: (e, s) => _onInitializationError(e, s));
-    }
-  }
-
-  InitializationResult _onInitializationError(e, s) {
-    _forceLogFlushMessages();
-    return InitializationResult.error(this, e, s);
-  }
-
-  void _checkAllDependenciesOk(List<InitializationResult> depsInit) {
-    var depsWithError = depsInit.where((res) => !res.ok).toList();
-    if (depsWithError.isNotEmpty) {
-      var errors = depsWithError.allToString();
-      _forceLogFlushMessages();
-      throw InitializationError(
-        this,
-        "Error initializing dependencies: $this\n$errors",
-      );
-    }
-  }
-
-  InitializationResult _resultOk() =>
-      InitializationResult.ok(this, dependencies: _chain._dependencies);
-
-  FutureOr<_DependenciesInitialization> _doDependenciesInitialization(
-    List<Initializable> dependencies, {
-    bool forceCircular = false,
-  }) {
-    if (dependencies.isEmpty) {
-      return _DependenciesInitialization(
-        <InitializationResult>[],
-        dependencies: null,
-      );
-    }
-
-    final chain = _chain;
-    chain._addAllDependencies(dependencies);
-
-    dependencies = dependencies.where((e) => !e.isInitialized).toList();
-
-    var depsStep1 = chain._filterValidDependencies(dependencies);
-    var initValids1 = _doDependenciesInitializationImpl(depsStep1.valids);
-
-    if (depsStep1.circular.isEmpty && depsStep1.finalizing.isEmpty) {
-      return _DependenciesInitialization.async(
-        initValids1,
-        dependencies: dependencies,
-      );
-    }
-
-    if (forceCircular) {
-      return initValids1.resolveMapped((initValids1) {
-        var initCirculars1 = _doDependenciesInitializationImpl(
-          depsStep1.circular,
-        );
-
-        return initCirculars1.resolveMapped((initCirculars1) {
-          return _DependenciesInitialization([
-            ...initValids1,
-            ...initCirculars1,
-          ], dependencies: dependencies);
-        });
-      });
-    }
-
-    // All dependencies are circular:
-    if (depsStep1.valids.isEmpty) {
-      return Future.delayed(Duration(milliseconds: 1), () {
-        var depsStep2 = chain._filterValidDependencies(depsStep1.circular);
-        var initValids2 = _doDependenciesInitializationImpl(depsStep2.valids);
-
-        return initValids2.resolveMapped((initValids2) {
-          return _DependenciesInitialization(
-            initValids2,
-            dependencies: dependencies,
-          );
-        });
-      });
-    }
-
-    return initValids1.resolveMapped((initValids1) {
-      var depsStep2 = chain._filterValidDependencies(depsStep1.circular);
-      var initValids2 = _doDependenciesInitializationImpl(depsStep2.valids);
-
-      if (depsStep2.circular.isEmpty) {
-        return initValids2.resolveMapped((initValids2) {
-          return _DependenciesInitialization([
-            ...initValids1,
-            ...initValids2,
-          ], dependencies: dependencies);
-        });
-      }
-
-      return Future.delayed(Duration(milliseconds: 1), () {
-        return initValids2.resolveMapped((initValids2) {
-          var depsStep3 = chain._filterValidDependencies(depsStep2.circular);
-          var initValids3 = _doDependenciesInitializationImpl(depsStep3.valids);
-
-          return initValids3.resolveMapped((initValids3) {
-            return _DependenciesInitialization([
-              ...initValids1,
-              ...initValids2,
-              ...initValids3,
-            ], dependencies: dependencies);
-          });
-        });
+        return _phaseInitialize(attempt);
       });
     });
   }
 
-  FutureOr<List<InitializationResult>> _doDependenciesInitializationImpl(
-    List<Initializable> dependencies,
-  ) {
-    if (dependencies.isEmpty) {
-      return <InitializationResult>[];
-    }
+  /// Phase 2: [initialize].
+  FutureOr<Object?> _phaseInitialize(_Attempt attempt) {
+    var result = _runHook(attempt, initialize);
 
-    final chain = _chain;
-
-    chain._markInitializedDependencies(dependencies);
-
-    var depsInits = dependencies
-        .map((e) => MapEntry(e, e._doInitializationImpl(this)))
-        .toList();
-
-    var depsInitsAsync = depsInits
-        .where((e) => e.value is Future<InitializationResult>)
-        .map((e) => MapEntry(e.key, e.value as Future<InitializationResult>))
-        .toList();
-
-    var depsCompleters = depsInitsAsync
-        .map((e) => MapEntry(e.key, e.value.toCompleter()))
-        .toList();
-
-    chain._setInitializedDependenciesCompleters(depsCompleters);
-
-    chain._checkCircularDependencies(dependencies);
-
-    var depsInitsResolved =
-        Map<Initializable, FutureOr<InitializationResult>>.fromEntries(
-          depsInits,
+    return _then<InitializationResult, Object?>(result, (result) {
+      if (!result.ok) {
+        _fail(
+          attempt,
+          result.error ?? InitializationError(this, "Error result: $result"),
+          result.stackTrace,
         );
-
-    for (var e in depsCompleters) {
-      depsInitsResolved[e.key] = e.value.future;
-    }
-
-    return depsInitsResolved.values.resolveAll();
-  }
-
-  FutureOr<InitializationResult> _callInitialize() {
-    try {
-      var ret = initialize();
-
-      if (ret is Future<InitializationResult>) {
-        _status._markAsynchronous(true);
-        return _initializeAsync = ret.then(
-          _finalizeInitialization,
-          onError: (e, s) => _onInitializationError(e, s),
-        );
-      } else {
-        return _finalizeInitialization(ret);
+        return null;
       }
-    } catch (e, s) {
-      return InitializationResult.error(this, e, s);
-    }
+      return _phasePostDependencies(attempt, result);
+    });
   }
 
-  FutureOr<InitializationResult> _finalizeInitialization(
+  /// Phase 3: the post-dependencies (of the [initialize] result).
+  FutureOr<Object?> _phasePostDependencies(
+    _Attempt attempt,
     InitializationResult result,
   ) {
-    if (!result.ok) {
-      _log.info(
-        '[$runtimeTypeNameUnsafe] Initialized #$_initializationID: ERROR',
-      );
-      _forceLogFlushMessages();
-      throw InitializationError(this, "Error initializing (async): $this");
-    }
-
     _status._setFinalizing();
 
-    var dependencies = result.dependencies.uniqueEntries();
+    // A result of another instance (merged): it's a post-dependency (waited
+    // for), and its dependencies are reported as this one's (not waited for:
+    // that instance already waited for them).
+    var initializable = result.initializable;
+    var merged = !identical(initializable, this);
 
-    if (!identical(this, result.initializable)) {
-      dependencies = <Initializable>[
-        result.initializable,
-        ...dependencies,
-      ].uniqueEntries();
-      result = InitializationResult.ok(this, dependencies: dependencies);
-    }
+    var postDeps = merged
+        ? <Initializable>[initializable, ...result.dependencies]
+        : result.dependencies;
 
-    if (dependencies.isEmpty) {
-      _log.info('[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK');
-
-      _status._setInitialized();
-      _initializeAsync = null;
-
-      return result;
-    }
-
-    return _doDependenciesInitialization.tryCallThen(dependencies, (
-      depsResults,
-    ) {
-      if (depsResults.hasSkipped) {
-        var skipped = depsResults.skipped
-            ?.notInitialized(ignoreFinalizing: true)
-            .toList();
-
-        if (skipped?.isNotEmpty ?? false) {
-          return (() => _doDependenciesInitialization(
-            dependencies,
-            forceCircular: true,
-          )).tryCallThen((depsResults2) {
-            var allDepsResults = depsResults.merge(
-              depsResults2,
-              dependencies: dependencies,
-            );
-            return _finalizeInitializationWithDeps(allDepsResults, result);
-          }, onError: (e, s) => _onInitializationError(e, s));
-        }
-      }
-
-      return _finalizeInitializationWithDeps(depsResults, result);
-    }, onError: (e, s) => _onInitializationError(e, s));
-  }
-
-  FutureOr<InitializationResult> _finalizeInitializationWithDeps(
-    _DependenciesInitialization depsResults,
-    InitializationResult result,
-  ) {
-    var dependenciesDeep = _chain.dependenciesDeep;
-
-    var depsInitializing = dependenciesDeep
-        .where((e) => e.initializationStatus.initializing)
-        .toList();
-
-    if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
-      _log.info(
-        '[$initializationStatus] Waiting Still initializing dependencies: ${depsInitializing.length} ...',
-      );
-
-      var waitInitializingDeps = depsInitializing
-          .map((e) => e.ensureInitialized())
-          .toList()
-          .resolveAll()
-          .asFuture
-          .timeout(
-            Duration(minutes: 2),
-            onTimeout: () {
-              _log.warning(
-                '[$initializationStatus] Timeout waiting still initializing dependencies:',
-              );
-              for (var dep in depsInitializing) {
-                _log.warning('-- $dep (${dep.initializationStatus})');
-              }
-              return depsInitializing.map((e) => e._resultOk()).toList();
-            },
-          );
-
-      return waitInitializingDeps.then((depsInitializingResults) {
-        for (var result in depsInitializingResults) {
-          var initializable = result.initializable;
-          if (initializable.initializationStatus.initializing) {
-            _log.warning(
-              '[$initializationStatus] Still initializing: $initializable (${initializable.initializationStatus})',
-            );
-          }
-        }
-
-        return _finalizeInitializationWithDeps2(depsResults, result);
-      }, onError: (e, s) => _onInitializationError(e, s));
-    } else {
-      return _finalizeInitializationWithDeps2(depsResults, result);
-    }
-  }
-
-  FutureOr<InitializationResult> _finalizeInitializationWithDeps2(
-    _DependenciesInitialization depsResults,
-    InitializationResult result,
-  ) {
-    if (depsResults.hasSkipped) {
-      var skipped = depsResults.skipped
-          ?.notInitialized(ignoreFinalizing: true)
-          .toList();
-
-      if (skipped?.isNotEmpty ?? false) {
-        _log.warning(
-          '[$initializationStatus] Skipped from initialization> $runtimeTypeNameUnsafe  -> ${skipped?.toInitializationStatus()}',
-        );
-      }
-    }
-
-    _checkAllDependenciesOk(depsResults.results);
-
-    var dependenciesDeep = _chain.dependenciesDeep;
-
-    var depsInitializing = dependenciesDeep
-        .where((e) => e.initializationStatus.initializing)
-        .toList();
-
-    if (_chain.parentsLength == 0 && depsInitializing.isNotEmpty) {
-      _log.warning(
-        '[$initializationStatus] Still initializing dependencies: ${depsInitializing.length}',
-      );
-
-      for (var dep in depsInitializing) {
-        _log.warning('-- $dep (${dep.initializationStatus})');
-      }
-    }
-
-    _status._setInitialized();
-    _initializeAsync = null;
-
-    var initializationTime = _status.initializationTime;
-
-    _log.info(
-      '[$runtimeTypeNameUnsafe#$_initializationID] Initialized: OK (${initializationTime != null ? '${initializationTime.toStringUnit()} ; ' : ''}result dependencies: ${depsResults.resultsLength} ; deep dependencies: ${dependenciesDeep.length})',
+    var postDepsInit = _initializeDependencies(
+      attempt,
+      postDeps,
+      merged ? <Initializable>[initializable] : postDeps,
     );
 
-    return result;
+    return _then<InitializationResult?, Object?>(postDepsInit, (depsError) {
+      if (depsError != null) {
+        _failDependency(attempt, depsError);
+        return null;
+      }
+
+      if (!attempt.root) {
+        _complete(attempt, _resultInitialized());
+        return null;
+      }
+
+      return _phaseDrain(attempt);
+    });
+  }
+
+  /// Phase 4 (root attempts only): the in-progress dependencies' closure.
+  FutureOr<Object?> _phaseDrain(_Attempt attempt) {
+    return _then<InitializationResult?, Object?>(_drain(attempt), (drainError) {
+      if (drainError != null) {
+        _failDependency(attempt, drainError);
+        return null;
+      }
+
+      _complete(attempt, _resultInitialized());
+      return null;
+    });
+  }
+
+  /// Initializes the [wait] dependencies (and reports the [deps]): returns
+  /// the first error result, if any.
+  FutureOr<InitializationResult?> _initializeDependencies(
+    _Attempt attempt,
+    Iterable<Initializable> deps,
+    Iterable<Initializable> wait,
+  ) {
+    var dependencies = _initState.dependencies;
+    for (var dep in deps) {
+      if (!identical(dep, this)) dependencies.add(dep);
+    }
+
+    List<Future<InitializationResult>>? futures;
+    var seen = HashSet<Initializable>.identity();
+
+    for (var dep in wait) {
+      if (identical(dep, this) || !seen.add(dep) || dep.isInitialized) {
+        continue;
+      }
+
+      var result = dep._ensure(attempt);
+
+      if (result is Future<InitializationResult>) {
+        (futures ??= []).add(result);
+      } else if (!result.ok) {
+        return result;
+      }
+    }
+
+    if (futures == null) return null;
+
+    return Future.wait(futures).then(_firstNotOk);
+  }
+
+  /// A root attempt waits for every in-progress instance of its
+  /// dependencies' closure (except the ones waiting for it), until none is
+  /// left.
+  FutureOr<InitializationResult?> _drain(_Attempt attempt) {
+    var visited = HashSet<Initializable>.identity()..add(this);
+    var queue = <Initializable>[..._initState.dependencies];
+
+    List<Future<InitializationResult>>? futures;
+
+    while (queue.isNotEmpty) {
+      var dep = queue.removeLast();
+      if (!visited.add(dep)) continue;
+
+      queue.addAll(dep._initState.dependencies);
+
+      var depAttempt = dep._initState.current;
+      if (depAttempt == null || !depAttempt.isActive) continue;
+      if (_reaches(depAttempt, attempt)) continue;
+
+      _addWaitEdge(attempt, depAttempt);
+      (futures ??= []).add(depAttempt.future);
+    }
+
+    if (futures == null) return null;
+
+    return Future.wait(futures).then((results) {
+      var error = _firstNotOk(results);
+      if (error != null) return error;
+      // The closure can have new dependencies:
+      return _drain(attempt);
+    });
+  }
+
+  void _failDependency(_Attempt attempt, InitializationResult depError) {
+    _fail(
+      attempt,
+      InitializationError(
+        this,
+        "Error initializing dependency of $this: ${depError.initializable}",
+        cause: depError.error,
+        causeStackTrace: depError.stackTrace,
+      ),
+      depError.stackTrace,
+    );
+  }
+
+  void _fail(_Attempt attempt, Object error, StackTrace? stackTrace) {
+    if (attempt.result != null) return;
+
+    _log.severe("Initialization error: $_status", error, stackTrace);
+    _forceLogFlushMessages();
+
+    _complete(attempt, InitializationResult.error(this, error, stackTrace));
+  }
+
+  void _complete(_Attempt attempt, InitializationResult result) {
+    if (attempt.result != null) return;
+    attempt.result = result;
+
+    for (var waiter in attempt.waiters) {
+      waiter.waitingOn.remove(attempt);
+    }
+    for (var target in attempt.waitingOn) {
+      target.waiters.remove(attempt);
+    }
+    attempt.waiters.clear();
+    attempt.waitingOn.clear();
+
+    if (identical(_initState.current, attempt)) {
+      _initState.current = null;
+    }
+
+    if (result.ok) {
+      _status._setInitialized();
+    } else {
+      _status._setFailed(result.error, result.stackTrace);
+    }
+
+    attempt._completer?.complete(result);
   }
 
   /// Return a [List] of [Initializable] instances that need to be initialized
   /// BEFORE [initialize] this instance.
+  ///
+  /// A dependency that is (transitively) waiting for this instance (a cycle)
+  /// isn't waited for: see [cyclicDependencies].
   ///
   /// See [doInitialization].
   FutureOr<List<Initializable>> initializeDependencies() => <Initializable>[];
 
   /// Initialization implementation. Do not call it directly, use [doInitialization].
   ///
-  /// It can be a synchronous (returning a [bool]) or an asynchronous
-  /// implementation (returning a [Future]<[bool]>).
+  /// It can be a synchronous (returning an [InitializationResult]) or an
+  /// asynchronous implementation (returning a [Future]). A thrown error, or
+  /// an [InitializationResult.error], fails the initialization.
+  ///
+  /// The returned [InitializationResult.dependencies] are initialized after
+  /// this (post-dependencies). A result of another [Initializable] makes it a
+  /// post-dependency too (its dependencies are reported as this one's).
   ///
   /// See [initializeDependencies].
   FutureOr<InitializationResult> initialize() => InitializationResult.ok(this);
 
-  /// Checks if this instance is initialized.
+  /// Checks if this instance is initialized, initializing it if possible.
   ///
-  /// Throws a [InitializationError] if is not initialized and
-  /// can't initialize it synchronously.
-  void checkInitialized() {
-    if (!isInitialized) {
-      if (isInitializing) return;
+  /// - Initialized: returns.
+  /// - Initializing: returns if called from its own initialization or from a
+  ///   dependency it's waiting for (a cycle), or if [allowInProgress].
+  ///   Otherwise throws an [InitializationError].
+  /// - Not initialized: initializes it. Throws an [InitializationError] if it
+  ///   can't be initialized synchronously, or if it fails (with the
+  ///   [InitializationError.cause]).
+  void checkInitialized({bool allowInProgress = false}) {
+    if (_status.initialized) return;
 
-      // ignore: discarded_futures
-      var ret = _doInitializationImpl();
-      if (ret is Future<InitializationResult>) {
-        _forceLogFlushMessages();
-        throw InitializationError(
-          this,
-          "Not initialized yet! Async initialization for: $this",
-        );
-      }
+    var waiter = _resolveWaiter(null);
+
+    var attempt = _initState.current;
+    if (attempt != null) {
+      if (allowInProgress) return;
+      if (waiter != null && _reaches(attempt, waiter)) return;
+
+      _forceLogFlushMessages();
+      throw InitializationError(this, "Initialization in progress: $this");
+    }
+
+    var result = _ensure(waiter);
+
+    if (result is Future<InitializationResult>) {
+      _forceLogFlushMessages();
+      throw InitializationError(
+        this,
+        "Not initialized yet! Async initialization for: $this",
+      );
+    }
+
+    if (!result.ok) {
+      _forceLogFlushMessages();
+      throw InitializationError(
+        this,
+        "Error initializing: $this",
+        cause: result.error,
+        causeStackTrace: result.stackTrace,
+      );
     }
   }
 
-  /// Executes the [callback] ensuring that this instances was fully initialized.
+  /// Executes the [callback] ensuring that this instance was initialized.
+  ///
+  /// Throws an [InitializationError] (with the [InitializationError.cause])
+  /// if the initialization fails.
+  ///
+  /// In a cycle ([InitializationResult.cyclic]: this instance is waiting for
+  /// the caller), the [callback] runs while this instance is still
+  /// initializing.
   FutureOr<R> executeInitialized<R>(
     ExecuteInitializedCallback<R> callback, {
     Initializable? parent,
@@ -1091,103 +937,32 @@ mixin Initializable {
       return callback();
     }
 
-    var ret = ensureInitialized(parent: parent);
+    var result = ensureInitialized(parent: parent);
 
-    if (ret is Future<InitializationResult>) {
-      return ret.then(
-        (result) {
-          if (!result.ok) {
-            _forceLogFlushMessages();
-            throw InitializationError(
-              this,
-              "Error initializing (async): $this",
-            );
-          }
-          return callback();
-        },
-        onError: (e, s) {
-          throw InitializationError(this, "Error initializing (async): $this");
-        },
-      );
-    } else {
-      if (!ret.ok) {
-        _forceLogFlushMessages();
-        throw InitializationError(this, "Error initializing: $this");
-      }
-
-      return callback();
-    }
-  }
-}
-
-class _DependenciesInitialization {
-  final List<InitializationResult> results;
-
-  late final List<Initializable>? skipped;
-
-  _DependenciesInitialization(
-    this.results, {
-    required List<Initializable>? dependencies,
-  }) {
-    List<Initializable>? skipped;
-
-    if (dependencies != null) {
-      var resultsDeps = results
-          .map((e) => e.initializable)
-          .toList(growable: false);
-      skipped = dependencies.where((e) => !resultsDeps.contains(e)).toList();
-
-      if (skipped.isNotEmpty) {
-        var skippedFinished = skipped.initialized;
-
-        if (skippedFinished.isNotEmpty) {
-          skipped.removeAll(skippedFinished);
-
-          var skippedFinishedResults = skippedFinished.map(
-            (e) => e._resultOk(),
-          );
-          results.addAll(skippedFinishedResults);
-        }
-      }
-
-      if (skipped.isEmpty) {
-        skipped = null;
-      }
-    }
-
-    this.skipped = skipped;
-  }
-
-  static FutureOr<_DependenciesInitialization> async(
-    FutureOr<List<InitializationResult>> results, {
-    required List<Initializable>? dependencies,
-  }) {
-    return results.resolveMapped(
-      (results) =>
-          _DependenciesInitialization(results, dependencies: dependencies),
+    return _then(
+      result,
+      (InitializationResult result) => _executeWithResult(result, callback),
     );
   }
 
-  bool get hasSkipped => skipped?.isNotEmpty ?? false;
+  FutureOr<R> _executeWithResult<R>(
+    InitializationResult result,
+    ExecuteInitializedCallback<R> callback,
+  ) {
+    if (!result.ok) {
+      _forceLogFlushMessages();
+      Error.throwWithStackTrace(
+        InitializationError(
+          this,
+          "Error initializing: $this",
+          cause: result.error,
+          causeStackTrace: result.stackTrace,
+        ),
+        result.stackTrace ?? StackTrace.current,
+      );
+    }
 
-  int get resultsLength => results.length;
-
-  _DependenciesInitialization merge(
-    _DependenciesInitialization other, {
-    required List<Initializable>? dependencies,
-  }) {
-    var allResults = [...results, ...other.results]
-        .groupBy((dep) => dep.initializable)
-        .map((dep, res) => MapEntry(dep, res.first))
-        .values
-        .toList();
-
-    return _DependenciesInitialization(allResults, dependencies: dependencies);
-  }
-
-  @override
-  String toString() {
-    return '_DependenciesInitialization{results: $results, skipped: $skipped}';
+    return callback();
   }
 }
 
@@ -1203,16 +978,6 @@ extension InitializableListExtension<T extends Initializable> on List<T> {
 
   List<T> whereAsyncInitialization() =>
       where((e) => e.isAsyncInitialization).toList();
-
-  List<Initializable> _subDependenciesInitialized() {
-    var subDeps = <Initializable>[];
-
-    for (var dep in this) {
-      dep._chain._allInitializedDependenciesDeeply(subDeps);
-    }
-
-    return subDeps;
-  }
 
   List<InitializationStatus> toInitializationStatus() =>
       map((e) => e.initializationStatus).toList();
@@ -1230,66 +995,6 @@ extension InitializableListExtension<T extends Initializable> on List<T> {
     (e) =>
         !e._status.initialized && (!ignoreFinalizing || !e._status.finalizing),
   ).toList();
-}
-
-extension _ListExtension<T> on List<T> {
-  bool containsIdentical(T elem) => any((e) => identical(e, elem));
-
-  bool addUnique(T elem) {
-    if (!containsIdentical(elem)) {
-      add(elem);
-      return true;
-    }
-    return false;
-  }
-
-  void addAllUnique(Iterable<T> elems) {
-    for (var e in elems) {
-      addUnique(e);
-    }
-  }
-
-  List<T> uniqueEntries() {
-    var l = <T>[];
-    l.addAllUnique(this);
-    return l;
-  }
-}
-
-extension _SetExtension<T> on Set<T> {
-  void addAllNew(Iterable<T> elems, Set<T> seen) {
-    for (var e in elems) {
-      addNew(e, seen);
-    }
-  }
-
-  bool addNew(T elem, Set<T> seen) {
-    if (seen.add(elem)) {
-      add(elem);
-      return true;
-    }
-    return false;
-  }
-}
-
-extension _FutureExtension<T> on Future<T> {
-  Completer<T> toCompleter() {
-    var completer = Completer<T>();
-    // ignore: discarded_futures
-    then(
-      (val) {
-        if (!completer.isCompleted) {
-          completer.complete(val);
-        }
-      },
-      onError: (e, s) {
-        if (!completer.isCompleted) {
-          completer.completeError(e, s);
-        }
-      },
-    );
-    return completer;
-  }
 }
 
 void _forceLogFlushMessages() {

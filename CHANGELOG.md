@@ -1,3 +1,50 @@
+## 1.20.0
+
+- `Initializable`: a new dependency resolver (the public API is unchanged,
+  with additions). Cycles (self-referenced graphs) are resolved
+  deterministically by a waits-for graph: a dependency already waiting
+  (transitively) for the requester isn't waited for (a cycle), anything else
+  is. No delays, timeouts or fabricated results; the framework's waits can't
+  deadlock. The framework is described in the library dartdoc.
+  - Fixes:
+    - A concurrent caller got an OK while the dependencies were still
+      initializing (the attempt's future wasn't shared). Now every caller
+      gets the attempt's result.
+    - After a failure the instance stayed "initializing" forever: a retry
+      got an OK (not initialized), and `checkInitialized` passed. Now a
+      failed instance is `failed` (and idle), and is initialized again on the
+      next call.
+    - Timeouts (1 s for cycles, 2 min for a root) turned into OK results,
+      and a cycle timeout returned the wrong result; forced cycle breaking
+      completed waits with another instance's result, swallowing errors; the
+      same parent asking twice got an OK. All gone with the new resolver.
+    - Two concurrent roots in a cycle could wait for each other forever.
+    - A cycle's outcome depended on timing (1 ms re-checks), dropping
+      dependencies still in a cycle.
+    - The parents walk restarted its visited set every 5 levels (endless on
+      long parent cycles, exponential on dense graphs); list-based
+      uniqueness and repeated deep scans (O(N²)–O(N³)).
+    - `checkInitialized` ignored a synchronous error, and `executeInitialized`
+      lost the original error.
+  - Behavior:
+    - Errors are results (`ok == false`, with the `error`/`stackTrace`): the
+      futures never fail.
+    - A fully synchronous cycle now initializes synchronously.
+    - A result of another instance (e.g. a repository adapter returning its
+      adapter's result) waits only for it (its dependencies are reported,
+      not waited for again: no more repository clique).
+    - `checkInitialized` throws if the instance is initializing elsewhere
+      (not in a cycle with the caller), unless `allowInProgress: true` (used
+      by the repository lookups).
+  - New: `InitializationResult.cyclic`, `Initializable.cyclicDependencies`
+    (the dependencies not waited for, in a cycle), `InitializationStatus`
+    `failed`/`error`/`stackTrace`, `InitializationError.cause` /
+    `causeStackTrace`, `checkInitialized(allowInProgress:)`.
+- Tests: the framework (cycles of every shape, sync/async, concurrent roots
+  and callers, errors and retries, `checkInitialized`/`executeInitialized`,
+  merged results, zones/waiter attribution, a DB-shaped graph), and the
+  initialization of the real providers/adapters/repositories (integration).
+
 ## 1.19.3
 
 - `checkTables`:
