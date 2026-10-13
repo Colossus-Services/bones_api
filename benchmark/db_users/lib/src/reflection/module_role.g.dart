@@ -972,7 +972,7 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
               'allowInProgress',
               false,
               false,
-              false,
+              true,
             ),
           },
           null,

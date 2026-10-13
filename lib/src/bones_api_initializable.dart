@@ -53,11 +53,22 @@
 ///
 /// ## Who is waiting
 ///
-/// A dependency requested from a hook ([Initializable.initializeDependencies]
-/// or [Initializable.initialize]) is attributed to the hook's object, even
-/// with no `parent` (or another one): first the innermost hook running
-/// synchronously, then the hook's [Zone] (after an `await` in the hook),
-/// then the explicit `parent`'s attempt. Otherwise the caller is a *root*.
+/// A request has up to two waiters:
+/// - The code calling: a dependency requested from a hook
+///   ([Initializable.initializeDependencies] or [Initializable.initialize]) is
+///   attributed to the hook's object, with or without a `parent`: the
+///   innermost hook running synchronously, or the hook's [Zone] (after an
+///   `await` in the hook).
+/// - The explicit `parent`'s attempt (if another one): declared.
+///
+/// It's a cycle if the dependency waits for either. With no waiter, the
+/// caller is a *root*.
+///
+/// A call from a hook (`ensureInitialized`, `executeInitialized`, ...) is
+/// considered waited for by the hook until the hook completes: its future
+/// may be discarded, so the wait doesn't outlive the hook. The framework's
+/// own waits (the declared dependencies) last until the dependency
+/// completes.
 ///
 /// Limitation: code running after an `await` in a [Zone] not forked from
 /// the hook's one (e.g. a zone forked from a captured/static zone), that
@@ -71,11 +82,14 @@
 /// - When an attempt completes OK, all its dependencies completed OK, except
 ///   the ones that were waiting for it ([Initializable.cyclicDependencies]):
 ///   those are still initializing (they need this one first).
-/// - A root attempt (no waiter) also waits for every in-progress object of
-///   its dependencies' closure (except the ones waiting for it).
+/// - An attempt started or joined by a root caller (no waiter) also waits
+///   for every in-progress object of its dependencies' closure (except the
+///   ones waiting for it). A root call on an initialized object returns
+///   right away.
 /// - Errors are results ([InitializationResult.ok] `false`, with the
 ///   [InitializationResult.error] and [InitializationResult.stackTrace]):
-///   the futures never fail. A failed object can be initialized again.
+///   the futures never fail. A failed object can be initialized again (a new
+///   attempt, with its own dependencies).
 ///
 /// ## Complexity
 ///
@@ -359,7 +373,7 @@ class InitializationError extends StateError {
   }
 }
 
-/// The [Zone] key of the hook's [_Attempt] (see [Initializable._runHook]).
+/// The [Zone] key of the hook's [_AttemptRef] (see [Initializable._runHook]).
 final Object _attemptZoneKey = Object();
 
 /// The attempts whose hook is running synchronously (innermost last).
@@ -368,12 +382,22 @@ final List<_Attempt> _hookStack = <_Attempt>[];
 /// The current mark of the depth-first searches ([_reaches]).
 int _searchEpoch = 0;
 
+/// A reference to an [_Attempt], held by its hooks' zones: cleared when the
+/// attempt completes, so a zone outliving it (e.g. a listener or timer
+/// created in a hook) doesn't retain it (and its graph).
+final class _AttemptRef {
+  _Attempt? attempt;
+
+  _AttemptRef(this.attempt);
+}
+
 /// An initialization attempt of [node]: a node of the waits-for graph.
 final class _Attempt {
   final Initializable node;
 
-  /// `true` if started by a root caller (no waiter).
-  final bool root;
+  /// `true` if a root caller (no waiter) started or joined it: it drains
+  /// its dependencies' closure before completing.
+  bool root;
 
   /// The result: set once, when completed.
   InitializationResult? result;
@@ -385,6 +409,14 @@ final class _Attempt {
 
   /// The attempts waiting for this one (incoming edges).
   final Set<_Attempt> waiters = HashSet<_Attempt>.identity();
+
+  /// Of [waitingOn], the waits of calls from its hooks (not the framework's
+  /// own waits): a hook may discard the future, so they last only until the
+  /// hook completes.
+  final Set<_Attempt> hookWaits = HashSet<_Attempt>.identity();
+
+  /// The reference held by its hooks' zones.
+  late final _AttemptRef ref = _AttemptRef(this);
 
   int _mark = 0;
 
@@ -405,11 +437,37 @@ final class _Attempt {
   String toString() => '_Attempt{${node.initializationStatus}}';
 }
 
-/// Adds the waits-for edge [waiter] → [target].
-void _addWaitEdge(_Attempt waiter, _Attempt target) {
+/// Adds the waits-for edge [waiter] → [target]. A [hook] wait (a call from a
+/// hook of [waiter]) lasts until the hook completes; a framework wait
+/// replaces it.
+void _addWaitEdge(_Attempt waiter, _Attempt target, {required bool hook}) {
   if (waiter.waitingOn.add(target)) {
     target.waiters.add(waiter);
+    if (hook) waiter.hookWaits.add(target);
+  } else if (!hook) {
+    waiter.hookWaits.remove(target);
   }
+}
+
+/// Removes the waits-for edge [waiter] → [target].
+void _removeWaitEdge(_Attempt waiter, _Attempt target) {
+  if (waiter.waitingOn.remove(target)) {
+    target.waiters.remove(waiter);
+  }
+  waiter.hookWaits.remove(target);
+}
+
+/// Removes the hook waits of [attempt] (its hook completed).
+void _clearHookWaits(_Attempt attempt) {
+  var hookWaits = attempt.hookWaits;
+  if (hookWaits.isEmpty) return;
+
+  for (var target in hookWaits) {
+    if (attempt.waitingOn.remove(target)) {
+      target.waiters.remove(attempt);
+    }
+  }
+  hookWaits.clear();
 }
 
 /// Returns `true` if [from] is (transitively) waiting for [target]. An
@@ -465,6 +523,9 @@ final class _InitializationState {
   /// The dependencies not waited for in the last attempt (see
   /// [Initializable.cyclicDependencies]).
   final Set<Initializable> cyclic = LinkedHashSet<Initializable>.identity();
+
+  /// The result once initialized (shared by every later call).
+  InitializationResult? initializedResult;
 }
 
 /// An instance that must be initialized (once) before use, after its
@@ -515,7 +576,7 @@ mixin Initializable {
   /// - [parent]: the instance that needs this one (when not called from its
   ///   hooks, where it's resolved automatically).
   FutureOr<InitializationResult> ensureInitialized({Initializable? parent}) =>
-      _ensure(_resolveWaiter(parent));
+      _ensure(_resolveWaiters(parent));
 
   /// Ensures that this instance is initialized. If is not
   /// initialized yet it will force an asynchronous initialization
@@ -524,16 +585,16 @@ mixin Initializable {
     Initializable? parent,
   }) {
     if (_status.initialized) return _resultInitialized();
-    var waiter = _resolveWaiter(parent);
+    var waiters = _resolveWaiters(parent);
     return Future<InitializationResult>.microtask(
-      () => _ensure(waiter != null && waiter.isActive ? waiter : null),
+      () => _ensure(waiters.where((w) => w.isActive).toList()),
     );
   }
 
   /// Initialize this instance if is not initialized yet. Same as
   /// [ensureInitialized].
   FutureOr<InitializationResult> doInitialization({Initializable? parent}) =>
-      _ensure(_resolveWaiter(parent));
+      _ensure(_resolveWaiters(parent));
 
   /// Returns `true` if this instance is already initialized.
   bool get isInitialized => _status.initialized;
@@ -551,8 +612,18 @@ mixin Initializable {
   List<Initializable> get cyclicDependencies =>
       List<Initializable>.unmodifiable(_initState.cyclic);
 
-  InitializationResult _resultInitialized() =>
-      InitializationResult.ok(this, dependencies: _initState.dependencies);
+  /// The OK result (once initialized, the same instance for every call: no
+  /// copy of the dependencies per call).
+  InitializationResult _resultInitialized() {
+    var state = _initState;
+    if (!_status.initialized) {
+      return InitializationResult.ok(this, dependencies: state.dependencies);
+    }
+    return state.initializedResult ??= InitializationResult.ok(
+      this,
+      dependencies: state.dependencies,
+    );
+  }
 
   InitializationResult _resultCyclic() => InitializationResult(
     this,
@@ -561,23 +632,37 @@ mixin Initializable {
     cyclic: true,
   );
 
-  /// The attempt waiting for this instance: the innermost hook running
-  /// synchronously, the hook's [Zone], or the [parent]'s attempt.
-  static _Attempt? _resolveWaiter(Initializable? parent) {
+  /// The attempts waiting for this instance (0 to 2):
+  /// - The innermost hook running synchronously, or the hook's [Zone] (after
+  ///   an `await` in the hook): the code that is calling.
+  /// - The [parent]'s attempt (declared), if another one.
+  static List<_Attempt> _resolveWaiters(Initializable? parent) {
+    _Attempt? hookAttempt;
+
     if (_hookStack.isNotEmpty) {
       var attempt = _hookStack.last;
-      if (attempt.isActive) return attempt;
+      if (attempt.isActive) hookAttempt = attempt;
     }
 
-    var zoneAttempt = Zone.current[_attemptZoneKey];
-    if (zoneAttempt is _Attempt && zoneAttempt.isActive) return zoneAttempt;
+    if (hookAttempt == null) {
+      var ref = Zone.current[_attemptZoneKey];
+      if (ref is _AttemptRef) {
+        var attempt = ref.attempt;
+        if (attempt != null && attempt.isActive) hookAttempt = attempt;
+      }
+    }
 
+    _Attempt? parentAttempt;
     if (parent != null) {
       var attempt = parent._initState.current;
-      if (attempt != null && attempt.isActive) return attempt;
+      if (attempt != null &&
+          attempt.isActive &&
+          !identical(attempt, hookAttempt)) {
+        parentAttempt = attempt;
+      }
     }
 
-    return null;
+    return [?hookAttempt, ?parentAttempt];
   }
 
   /// Runs a hook of [attempt] (attributing the dependencies requested in it).
@@ -587,25 +672,36 @@ mixin Initializable {
   ) {
     _hookStack.add(attempt);
     try {
-      return runZoned(hook, zoneValues: {_attemptZoneKey: attempt});
+      return runZoned(hook, zoneValues: {_attemptZoneKey: attempt.ref});
     } finally {
       _hookStack.removeLast();
     }
   }
 
-  FutureOr<InitializationResult> _ensure(_Attempt? waiter) {
+  /// Initializes this instance (if not yet) for the [waiters] (none: a root
+  /// caller). A [hook] call (from code, not a framework wait) waits only
+  /// until the waiters' hook completes (it may discard the future).
+  FutureOr<InitializationResult> _ensure(
+    List<_Attempt> waiters, {
+    bool hook = true,
+  }) {
     if (_status.initialized) return _resultInitialized();
 
-    var attempt = _initState.current;
+    var state = _initState;
+    var attempt = state.current;
 
     if (attempt == null) {
-      attempt = _Attempt(this, root: waiter == null);
-      _initState.current = attempt;
-      _initState.cyclic.clear();
+      attempt = _Attempt(this, root: waiters.isEmpty);
+      state.current = attempt;
+      state.dependencies.clear();
+      state.cyclic.clear();
+      state.initializedResult = null;
       _status._setInitializing();
 
       // A new attempt waits for nothing yet: no cycle possible.
-      if (waiter != null) _addWaitEdge(waiter, attempt);
+      for (var waiter in waiters) {
+        _addWaitEdge(waiter, attempt, hook: hook);
+      }
 
       _run(attempt);
 
@@ -616,24 +712,42 @@ mixin Initializable {
       return attempt.future;
     }
 
-    // A root caller: waits for the attempt.
-    if (waiter == null) return attempt.future;
-
-    // A self-dependency, or a re-entrant call from its own hooks:
-    if (identical(waiter, attempt)) return _resultCyclic();
-
-    if (_reaches(attempt, waiter)) {
-      // This attempt is waiting for the waiter: a cycle.
-      waiter.node._initState.cyclic.add(this);
-      _log.fine(
-        () =>
-            "Cyclic dependency (not waited): ${waiter.node.initializationStatus} -> $_status",
-      );
-      return _resultCyclic();
+    // A root caller: waits for the attempt (that also drains its closure).
+    if (waiters.isEmpty) {
+      attempt.root = true;
+      return attempt.future;
     }
 
-    _addWaitEdge(waiter, attempt);
+    if (_isCyclic(attempt, waiters)) return _resultCyclic();
+
+    for (var waiter in waiters) {
+      _addWaitEdge(waiter, attempt, hook: hook);
+    }
     return attempt.future;
+  }
+
+  /// Returns `true` if [attempt] is (transitively) waiting for one of the
+  /// [waiters] (a cycle: they can't wait for it), and records it in their
+  /// [cyclicDependencies].
+  bool _isCyclic(_Attempt attempt, List<_Attempt> waiters) {
+    var cyclic = false;
+
+    for (var waiter in waiters) {
+      // A self-dependency, a re-entrant call from its own hooks, or this
+      // attempt waiting for the waiter:
+      if (identical(waiter, attempt) || _reaches(attempt, waiter)) {
+        cyclic = true;
+        if (!identical(waiter, attempt)) {
+          waiter.node._initState.cyclic.add(this);
+          _log.fine(
+            () =>
+                "Cyclic dependency (not waited): ${waiter.node.initializationStatus} -> $_status",
+          );
+        }
+      }
+    }
+
+    return cyclic;
   }
 
   /// Runs the phases of [attempt]: it always completes it (OK or error).
@@ -660,6 +774,8 @@ mixin Initializable {
     var deps = _runHook(attempt, initializeDependencies);
 
     return _then<List<Initializable>, Object?>(deps, (deps) {
+      _clearHookWaits(attempt);
+
       var depsInit = _initializeDependencies(attempt, deps, deps);
 
       return _then<InitializationResult?, Object?>(depsInit, (depsError) {
@@ -677,6 +793,8 @@ mixin Initializable {
     var result = _runHook(attempt, initialize);
 
     return _then<InitializationResult, Object?>(result, (result) {
+      _clearHookWaits(attempt);
+
       if (!result.ok) {
         _fail(
           attempt,
@@ -697,20 +815,25 @@ mixin Initializable {
     _status._setFinalizing();
 
     // A result of another instance (merged): it's a post-dependency (waited
-    // for), and its dependencies are reported as this one's (not waited for:
-    // that instance already waited for them).
+    // for), and its dependencies are reported as this one's. Its own
+    // dependencies aren't waited for again (that instance already waits for
+    // them); any other listed dependency is.
     var initializable = result.initializable;
     var merged = !identical(initializable, this);
 
-    var postDeps = merged
-        ? <Initializable>[initializable, ...result.dependencies]
-        : result.dependencies;
+    List<Initializable> postDeps, wait;
+    if (merged) {
+      postDeps = <Initializable>[initializable, ...result.dependencies];
+      var ownDeps = initializable._initState.dependencies;
+      wait = <Initializable>[
+        initializable,
+        ...result.dependencies.where((d) => !ownDeps.contains(d)),
+      ];
+    } else {
+      postDeps = wait = result.dependencies;
+    }
 
-    var postDepsInit = _initializeDependencies(
-      attempt,
-      postDeps,
-      merged ? <Initializable>[initializable] : postDeps,
-    );
+    var postDepsInit = _initializeDependencies(attempt, postDeps, wait);
 
     return _then<InitializationResult?, Object?>(postDepsInit, (depsError) {
       if (depsError != null) {
@@ -760,7 +883,7 @@ mixin Initializable {
         continue;
       }
 
-      var result = dep._ensure(attempt);
+      var result = dep._ensure([attempt], hook: false);
 
       if (result is Future<InitializationResult>) {
         (futures ??= []).add(result);
@@ -793,7 +916,7 @@ mixin Initializable {
       if (depAttempt == null || !depAttempt.isActive) continue;
       if (_reaches(depAttempt, attempt)) continue;
 
-      _addWaitEdge(attempt, depAttempt);
+      _addWaitEdge(attempt, depAttempt, hook: false);
       (futures ??= []).add(depAttempt.future);
     }
 
@@ -841,6 +964,10 @@ mixin Initializable {
     }
     attempt.waiters.clear();
     attempt.waitingOn.clear();
+    attempt.hookWaits.clear();
+
+    // Zones of its hooks that outlive it don't retain it:
+    attempt.ref.attempt = null;
 
     if (identical(_initState.current, attempt)) {
       _initState.current = null;
@@ -848,6 +975,8 @@ mixin Initializable {
 
     if (result.ok) {
       _status._setInitialized();
+      // Every later call gets this same result:
+      _initState.initializedResult = result;
     } else {
       _status._setFailed(result.error, result.stackTrace);
     }
@@ -880,29 +1009,39 @@ mixin Initializable {
   /// Checks if this instance is initialized, initializing it if possible.
   ///
   /// - Initialized: returns.
-  /// - Initializing: returns if called from its own initialization or from a
-  ///   dependency it's waiting for (a cycle), or if [allowInProgress].
-  ///   Otherwise throws an [InitializationError].
+  /// - Initializing: returns (as before 1.20.0). With
+  ///   `allowInProgress: false`, it returns only if called from its own
+  ///   initialization or from a dependency it's waiting for (a cycle), and
+  ///   throws an [InitializationError] otherwise. A cycle is recorded in the
+  ///   caller's [cyclicDependencies].
   /// - Not initialized: initializes it. Throws an [InitializationError] if it
-  ///   can't be initialized synchronously, or if it fails (with the
-  ///   [InitializationError.cause]).
-  void checkInitialized({bool allowInProgress = false}) {
+  ///   can't be initialized synchronously (the initialization goes on), or if
+  ///   it fails (with the [InitializationError.cause]).
+  void checkInitialized({bool allowInProgress = true}) {
     if (_status.initialized) return;
 
-    var waiter = _resolveWaiter(null);
+    var waiters = _resolveWaiters(null);
 
     var attempt = _initState.current;
     if (attempt != null) {
-      if (allowInProgress) return;
-      if (waiter != null && _reaches(attempt, waiter)) return;
+      var cyclic = waiters.isNotEmpty && _isCyclic(attempt, waiters);
+      if (cyclic || allowInProgress) return;
 
       _forceLogFlushMessages();
       throw InitializationError(this, "Initialization in progress: $this");
     }
 
-    var result = _ensure(waiter);
+    var result = _ensure(waiters);
 
     if (result is Future<InitializationResult>) {
+      // The caller doesn't wait (it gets an error): not a wait.
+      var current = _initState.current;
+      if (current != null) {
+        for (var waiter in waiters) {
+          _removeWaitEdge(waiter, current);
+        }
+      }
+
       _forceLogFlushMessages();
       throw InitializationError(
         this,

@@ -419,6 +419,30 @@ Future<bool> runAdapterTests(
         // The provider's dependencies: its adapter and repositories.
         expect(result.dependencies, contains(sqlAdapter));
 
+        // A repository's dependencies: its adapter and repository adapter,
+        // not the other repositories (no clique of every repository waiting
+        // for every other).
+        var repositoriesSet = repositories.toSet();
+        for (var r in repositories) {
+          var deps =
+              (r.ensureInitialized() as InitializationResult).dependencies;
+          expect(deps, isNotEmpty, reason: '$r');
+          expect(
+            deps.where((d) => d != r && repositoriesSet.contains(d)),
+            isEmpty,
+            reason: '$r -> $deps',
+          );
+        }
+
+        // Initialized: the same result instance on every call.
+        expect(
+          identical(
+            entityRepositoryProvider.ensureInitialized(),
+            entityRepositoryProvider.ensureInitialized(),
+          ),
+          isTrue,
+        );
+
         // Checks and executions: synchronous, no error.
         sqlAdapter.checkInitialized();
         expect(sqlAdapter.executeInitialized(() => 123), 123);

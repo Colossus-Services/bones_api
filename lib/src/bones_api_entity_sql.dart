@@ -28,12 +28,14 @@ class DBSQLEntityRepository<O extends Object>
         () => repositoryAdapter.ensureInitialized(parent: this),
         parent: this,
       )
-      .resolveMapped((result) {
-        return InitializationResult.ok(
+      // Its dependencies: the adapter and its repository adapter (see
+      // `DBEntityRepository.initialize`).
+      .resolveMapped(
+        (_) => InitializationResult.ok(
           this,
-          dependencies: [provider, repositoryAdapter, ...result.dependencies],
-        );
-      });
+          dependencies: [provider, repositoryAdapter],
+        ),
+      );
 
   @override
   SQLDialect get dialect => repositoryAdapter.dialect;

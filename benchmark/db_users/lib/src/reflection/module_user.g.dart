@@ -1139,7 +1139,7 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
               'allowInProgress',
               false,
               false,
-              false,
+              true,
             ),
           },
           null,
