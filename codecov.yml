@@ -1,9 +1,9 @@
-# The VM tests run in 3 parallel CI jobs (unit, postgres, mysql), each
-# uploading its coverage: report (and set the statuses) after all of them,
-# not after the first (partial) one.
+# The VM tests run in 4 parallel CI jobs (unit, postgres, mysql, docker),
+# each uploading its coverage: report (and set the statuses) after all of
+# them, not after the first (partial) one.
 codecov:
   notify:
-    after_n_builds: 3
+    after_n_builds: 4
 
 comment:
-  after_n_builds: 3
+  after_n_builds: 4
