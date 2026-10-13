@@ -262,6 +262,38 @@ void main() {
         expect((await provider.storeRepo.selectByID(i))!.name, equals('s$i'));
       }
     });
+
+    test('the files limit: parallel stores (one check at a time)', () async {
+      var gcs = FakeGCS('cov-limit-parallel');
+
+      var provider = _GCSProvider(
+        gcs,
+        cacheDirectory: tmpDir,
+        cacheFilesLimit: 3,
+        cacheLimit: 1024 * 1024,
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      // Each cache write over the limit starts a check: concurrent checks
+      // deleted the same files (an unhandled `PathNotFoundException`).
+      for (var round = 0; round < 5; ++round) {
+        var ids = [for (var i = 1; i <= 12; ++i) round * 100 + i];
+        await Future.wait(
+          ids.map(
+            (id) => Future.sync(
+              () => provider.storeRepo.store(Store('p$id', id, id: id)),
+            ),
+          ),
+        );
+      }
+
+      for (var i = 0; i < 50 && cacheFiles(tmpDir).length > 3; ++i) {
+        await Future.delayed(Duration(milliseconds: 20));
+      }
+      expect(cacheFiles(tmpDir).length, lessThanOrEqualTo(3));
+      expect(gcs.objects.length, equals(60));
+    });
   });
 
   group('DBObjectGCSAdapter.fromConfig', () {
