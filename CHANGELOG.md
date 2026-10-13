@@ -131,6 +131,14 @@
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)
   is now tested.
+- `SetEntityRepository`: its entries by ID (a `LinkedHashMap`): `selectByID`,
+  `existsID` and `store` look up the ID without a scan
+  (`IterableEntityRepository.getStoredByID`), and an updated copy replaces
+  the stored entity in its position (`IterableEntityRepository.replace`;
+  previously moved to the end of the iteration order).
+- Fix: `checkTables` reported a missing unique column's constraint also as a
+  missing unique constraint (its `ADD COLUMN` brings it): the suggested SQLs
+  had it twice.
 - Fix: an error in an operation's `preFinish` (run after its transaction
   execution: e.g. building the entities of a select, or storing the
   relationships of an insert) didn't abort the transaction: the operation

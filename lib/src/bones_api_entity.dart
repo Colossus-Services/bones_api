@@ -7832,6 +7832,20 @@ abstract class IterableEntityRepository<O extends Object>
 
   void remove(O o);
 
+  /// The stored entity with [id], or `null`.
+  /// (Scans [iterable]: an implementation can index it by ID.)
+  O? getStoredByID(Object id) => iterable().firstWhereOrNull(
+    (e) => getID(e, entityHandler: entityHandler) == id,
+  );
+
+  /// Replaces the stored entity [stored] by [o] (with the same ID).
+  /// (Removes [stored] and puts [o]: an implementation can keep its
+  /// position.)
+  void replace(O stored, O o) {
+    remove(stored);
+    put(o);
+  }
+
   @override
   bool hasReferencedEntities() {
     final fieldsEntity = entityHandler.fieldsWithTypeEntityOrReference();
@@ -7886,13 +7900,8 @@ abstract class IterableEntityRepository<O extends Object>
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
     checkNotClosed();
-
-    var o = iterable().firstWhereOrNull((o) {
-      var oId = getID(o, entityHandler: entityHandler);
-      return oId == id;
-    });
-
-    return o != null;
+    if (id == null) return false;
+    return getStoredByID(id) != null;
   }
 
   @override
@@ -8002,10 +8011,7 @@ abstract class IterableEntityRepository<O extends Object>
   }) {
     checkNotClosed();
 
-    var o = iterable().firstWhereOrNull((o) {
-      var oId = getID(o, entityHandler: entityHandler);
-      return oId == id;
-    });
+    var o = id == null ? null : getStoredByID(id);
 
     return trackEntityNullable(o);
   }
@@ -8054,16 +8060,13 @@ abstract class IterableEntityRepository<O extends Object>
         put(o);
       } else {
         // An update (or an insert with a defined ID):
-        var stored = iterable().firstWhereOrNull(
-          (e) => getID(e, entityHandler: entityHandler) == oId,
-        );
+        var stored = getStoredByID(oId);
 
         if (stored == null) {
           put(o);
         } else if (!identical(stored, o)) {
           // Another instance (e.g. an updated copy): replaces the stored one.
-          remove(stored);
-          put(o);
+          replace(stored, o);
         }
       }
 
@@ -8490,10 +8493,17 @@ class SetEntityRepository<O extends Object>
     extends IterableEntityRepository<O> {
   SetEntityRepository(super.name, super.entityHandler, {super.provider});
 
-  final Set<O> _entries = <O>{};
+  // The entries by ID, in the insertion order (a `LinkedHashMap`): a lookup by
+  // ID without a scan, and a replaced entry keeps its position.
+  final Map<Object, O> _entries = <Object, O>{};
+
+  // The entries without an ID (only put directly: `store` defines the ID).
+  final Set<O> _entriesWithoutID = <O>{};
 
   @override
-  Iterable<O> iterable() => _entries;
+  Iterable<O> iterable() => _entriesWithoutID.isEmpty
+      ? _entries.values
+      : _entries.values.followedBy(_entriesWithoutID);
 
   // The greatest `int` ID put (an ID is never reused, also after a remove).
   int _lastID = 0;
@@ -8502,21 +8512,50 @@ class SetEntityRepository<O extends Object>
   int nextID() => _lastID + 1;
 
   @override
-  int length({Transaction? transaction}) => _entries.length;
+  int length({Transaction? transaction}) =>
+      _entries.length + _entriesWithoutID.length;
+
+  @override
+  O? getStoredByID(Object id) => _entries[id];
 
   @override
   void put(O o) {
-    _entries.add(o);
-
     var id = entityHandler.getID(o);
+
+    if (id == null) {
+      _entriesWithoutID.add(o);
+      return;
+    }
+
+    _entries[id] = o;
+
     if (id is int && id > _lastID) {
       _lastID = id;
     }
   }
 
   @override
+  void replace(O stored, O o) {
+    var id = entityHandler.getID(o);
+
+    // The same ID: the same position.
+    if (id != null && identical(_entries[id], stored)) {
+      _entries[id] = o;
+    } else {
+      super.replace(stored, o);
+    }
+  }
+
+  @override
   void remove(O o) {
-    _entries.remove(o);
+    var id = entityHandler.getID(o);
+
+    if (id != null && identical(_entries[id], o)) {
+      _entries.remove(id);
+    } else if (!_entriesWithoutID.remove(o)) {
+      // (Its ID changed after it was put.)
+      _entries.removeWhere((k, e) => identical(e, o));
+    }
   }
 
   final Map<Type, Map<Object, Set<Object>>> _relationships =

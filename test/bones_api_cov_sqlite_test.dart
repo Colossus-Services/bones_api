@@ -1124,11 +1124,13 @@ void main() {
         error,
         contains('  -- missingCollectionReferenceColumns: [List<_Tag> tags]'),
       );
-      expect(error, contains('  -- missingUniqueConstraints: [code]'));
+      // `code` (unique) is a missing column: its unique constraint comes with
+      // its `ADD COLUMN` (not also a missing unique constraint).
+      expect(error, isNot(contains('missingUniqueConstraints')));
 
       // SQLite (no `ALTER TABLE ... ADD CONSTRAINT`, nor `ADD COLUMN IF NOT
       // EXISTS`): the foreign key in the column (`REFERENCES`), a unique
-      // index for `UNIQUE` (once).
+      // index for `UNIQUE` (once: with the `ADD COLUMN`).
       const suggestionTitle =
           'Suggestion of SQLs (`SQLite`) to fix missing columns in tables:\n\n';
       expect(

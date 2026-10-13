@@ -1097,13 +1097,6 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         ...missingEntityIndexesSQLs,
       ];
 
-      // A SQL once (e.g. a unique index of a missing column, also of the
-      // missing unique constraints):
-      var suggestedSQLs = <String>{};
-      alterTablesSQLs = alterTablesSQLs
-          .where((s) => s.isEmpty || suggestedSQLs.add(s))
-          .toList();
-
       alterTablesSQLs = alterTablesSQLs.expandIndexed((i, s) {
         if (i > 0 && s.isEmpty) {
           var prev = alterTablesSQLs[i - 1];
@@ -1479,6 +1472,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
                     scheme.hasIndexOn(sql.columns, unique: sql.unique) == false,
               )
               .toList();
+
+    // A missing column's unique constraint comes with its `ADD COLUMN` (a
+    // constraint, or a unique index): not a missing one (reported twice).
+    missingUniqueConstraints.removeWhere(
+      (f) => missingColumns.contains(f) || missingReferenceColumns.contains(f),
+    );
 
     // As in the `CREATE TABLE`, not one over the same columns as another
     // missing one: a unique field's constraint (reported with the field), a

@@ -689,6 +689,61 @@ void main() {
         expect(uniqRepo.selectByID(72), isNull);
       });
 
+      test('an updated copy keeps the iteration order (44)', () async {
+        var a = CovUniq({'code': 'o1'});
+        var b = CovUniq({'code': 'o2'});
+        var c = CovUniq({'code': 'o3'});
+        var idA = await uniqRepo.store(a);
+        var idB = await uniqRepo.store(b);
+        var idC = await uniqRepo.store(c);
+
+        List<Object?> codes() =>
+            uniqRepo.iterable().map((e) => e.values['code']).toList();
+
+        expect(codes(), equals(['o1', 'o2', 'o3']));
+
+        // An updated copy of the first: in the same position.
+        var copyA = CovUniq({'id': idA, 'code': 'o1b'});
+        await uniqRepo.store(copyA);
+        expect(codes(), equals(['o1b', 'o2', 'o3']));
+        expect(uniqRepo.selectByID(idA), same(copyA));
+
+        // The same instance updated: also in place.
+        b.values['code'] = 'o2b';
+        await uniqRepo.store(b);
+        expect(codes(), equals(['o1b', 'o2b', 'o3']));
+
+        expect(await uniqRepo.existsID(idC), isTrue);
+        expect(await uniqRepo.existsID(999), isFalse);
+        expect(await uniqRepo.existsID(null), isFalse);
+        expect(uniqRepo.getStoredByID(idB), same(b));
+        expect(uniqRepo.getStoredByID(999), isNull);
+        expect(uniqRepo.selectByID(null), isNull);
+      });
+
+      test('put/remove (also without an ID)', () async {
+        var noID = CovUniq({'code': 'n1'});
+        uniqRepo.put(noID);
+        expect(uniqRepo.iterable(), contains(noID));
+        expect(uniqRepo.length(), equals(1));
+
+        var withID = CovUniq({'id': 50, 'code': 'n2'});
+        uniqRepo.put(withID);
+        expect(uniqRepo.getStoredByID(50), same(withID));
+        expect(uniqRepo.length(), equals(2));
+
+        uniqRepo.remove(noID);
+        uniqRepo.remove(withID);
+        expect(uniqRepo.iterable(), isEmpty);
+
+        // An ID changed after it was put: still removed.
+        var changed = CovUniq({'id': 60, 'code': 'n3'});
+        uniqRepo.put(changed);
+        changed.values['id'] = 61;
+        uniqRepo.remove(changed);
+        expect(uniqRepo.iterable(), isEmpty);
+      });
+
       test('IDs are not reused (after a delete)', () async {
         var id1 = await uniqRepo.store(CovUniq({'code': 'd1'}));
         var id2 = await uniqRepo.store(CovUniq({'code': 'd2'}));
