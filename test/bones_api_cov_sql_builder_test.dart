@@ -297,6 +297,39 @@ void main() {
       expect(c.constraints, isEmpty);
     });
 
+    test('the quote: the dialect `elementQuote` by default', () {
+      const mysql = SQLDialect(
+        'MySQL',
+        elementQuote: '`',
+        alterTableAddColumnIfNotExists: false,
+      );
+      const generic = SQLDialect('generic');
+
+      // MySQL: backticks (not `"`, a string in MySQL), and no
+      // `ADD COLUMN IF NOT EXISTS` (a syntax error in MySQL):
+      var alter = AlterTableSQL(mysql, 't', [
+        SQLEntry('ADD', ' ADD COLUMN `x` INT'),
+      ]);
+      expect(alter.q, equals('`'));
+      expect(
+        alter.buildSQL(multiline: false),
+        equals('ALTER TABLE `t`  ADD COLUMN `x` INT ;'),
+      );
+
+      expect(CreateIndexSQL(mysql, 't', 'x', 't__x__idx').q, equals('`'));
+      expect(
+        CreateIndexSQL.columns(mysql, 't', ['x', 'y'], 't__x_y__idx').q,
+        equals('`'),
+      );
+
+      // A dialect without a quote: `"`.
+      expect(AlterTableSQL(generic, 't', []).q, equals('"'));
+      expect(CreateIndexSQL(generic, 't', 'x', 'i').q, equals('"'));
+
+      // An explicit quote:
+      expect(AlterTableSQL(mysql, 't', [], q: '"').q, equals('"'));
+    });
+
     test('CreateTableSQL / AlterTableSQL: buildSQL and toString', () {
       var t = CreateTableSQL(_pg, 't', [
         SQLEntry('COLUMN', ' "id" INT', comment: 'int id'),

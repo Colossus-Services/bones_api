@@ -106,6 +106,15 @@
 - Fix: `DBAdapter.instantiateAdaptor` ignored an `async` instantiator
   (returning a `Future<A?>`, as declared by `DBAdapterInstantiator`), and
   didn't skip an async `null`.
+- Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
+  - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
+    `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.
+  - The table quoted with `"` (`ALTER TABLE "store" ...`: a string in
+    MySQL): `AlterTableSQL`/`CreateTableSQL`/`CreateIndexSQL` (`SQLBuilder`)
+    now use the dialect's `elementQuote` by default (`"` if it has none).
+- Fix: `DBMySQLAdapter.getTableScheme`/`getTableFieldsTypes` threw for a
+  table that doesn't exist (`ER_NO_SUCH_TABLE`), instead of `null` (as the
+  other adapters).
 - `APIDBModule.select`: paginated by default:
   - `defaultSelectLimit` (default: `1000`): the `LIMIT` of a request
     without one (`LIMIT=<n>` in the URL query: a custom one; `LIMIT=0`: no

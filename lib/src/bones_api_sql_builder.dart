@@ -249,7 +249,14 @@ abstract class SQLBuilder implements Comparable<SQLBuilder> {
   /// The quote of the dialect.
   final String q;
 
-  SQLBuilder(this.dialect, this.q);
+  /// - [q]: the elements quote (default: the [dialect]'s
+  ///   [SQLDialect.elementQuote], or `"` if it has none).
+  SQLBuilder(this.dialect, [String? q]) : q = q ?? _defaultQuote(dialect);
+
+  static String _defaultQuote(SQLDialect dialect) {
+    var q = dialect.elementQuote;
+    return q.isNotEmpty ? q : '"';
+  }
 
   /// The main table of the SQL.
   String get mainTable;
@@ -308,7 +315,7 @@ class CreateIndexSQL extends SQLBuilder {
     this.table,
     this.column,
     this.indexName, {
-    String q = '"',
+    String? q,
     this.unique = false,
   }) : columns = List<String>.unmodifiable([column]),
        super(dialect, q);
@@ -320,7 +327,7 @@ class CreateIndexSQL extends SQLBuilder {
     this.table,
     List<String> columns,
     this.indexName, {
-    String q = '"',
+    String? q,
     this.unique = false,
   }) : columns = List<String>.unmodifiable(columns),
        column = columns.isNotEmpty
@@ -404,7 +411,7 @@ abstract class TableSQL extends SQLBuilder {
     SQLDialect dialect,
     this.table,
     this.entries, {
-    String q = '"',
+    String? q,
     this.parentTable,
   }) : super(dialect, q);
 

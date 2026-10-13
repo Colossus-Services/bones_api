@@ -686,6 +686,61 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('checkTables: a missing column (the suggested SQL runs)', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var q = sqlAdapter.dialect.elementQuote;
+
+        if (testConfigDB is! APITestConfigDBSQL) {
+          _log.info("Not a `APITestConfigDBSQL`: skipping.");
+          return;
+        }
+
+        var testConfigSQL = testConfigDB;
+
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+
+        sqlAdapter.disposeTableSchemeCache('store');
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        // `store.number` missing (renamed: its values kept):
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q RENAME COLUMN ${q}number$q TO '
+          '${q}number_tmp$q',
+        );
+        sqlAdapter.disposeTableSchemeCache('store');
+
+        // The suggested `ADD COLUMN` runs in this DB (MySQL and SQLite: no
+        // `IF NOT EXISTS`):
+        var ifNotExists = sqlAdapter.dialect.alterTableAddColumnIfNotExists;
+        await _checkFixedBySuggestedSQLs(
+          sqlAdapter,
+          testConfigSQL,
+          expectedSQLs: [
+            ifNotExists
+                ? 'ADD COLUMN IF NOT EXISTS ${q}number$q'
+                : 'ADD COLUMN ${q}number$q',
+          ],
+        );
+
+        // The original column back:
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q DROP COLUMN ${q}number$q',
+        );
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q RENAME COLUMN ${q}number_tmp$q TO '
+          '${q}number$q',
+        );
+        sqlAdapter.disposeTableSchemeCache('store');
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+      });
+
       test('EntityIndex: generated, introspected and checked', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
         var q = sqlAdapter.dialect.elementQuote;
