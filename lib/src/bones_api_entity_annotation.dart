@@ -50,7 +50,8 @@ class EntityIndex extends EntityAnnotation {
   final String? name;
 
   /// Whether the [fields]' values are unique together (a `UNIQUE`
-  /// constraint).
+  /// constraint). Enforced by the SQL adapters and `DBSQLMemoryAdapter`; not
+  /// by the `DBObjectAdapter`s (object storages: see `DBObjectAdapter`).
   final bool unique;
 
   const EntityIndex(this.fields, {this.name, this.unique = false});
@@ -137,6 +138,9 @@ class EntityIndex extends EntityAnnotation {
 /// Configuration of a entity field.
 /// - `hidden`: this field won't be stored if is hidden.
 /// - `unique`: this filed should be unique in the repository/table.
+///   Enforced by the SQL adapters (a `UNIQUE` constraint), `DBSQLMemoryAdapter`
+///   and `SetEntityRepository`; not by the `DBObjectAdapter`s (object
+///   storages: see `DBObjectAdapter`).
 /// - `minimum`: defines the minimum value or minimum size of the field.
 /// - `maximum`: defines the maximum value or maximum size of the field.
 /// - `regexp`: defines the [RegExp] pattern of the field.

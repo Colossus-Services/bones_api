@@ -103,20 +103,158 @@ void main() {
 
         expect(identical(repo.onStore, repo.entityRepository.onStore), isTrue);
 
+        var stored = <UserInfo>[];
+        var subStore = repo.onStore.listen(stored.add);
+
         var deleted = <UserInfo>[];
         var sub = repo.onDelete.listen(deleted.add);
 
         var o = UserInfo('evt');
         var id = await repo.store(o);
 
+        // An insert:
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(1));
+        expect(stored.first, same(o));
+
+        // An update (changed):
+        o.info = 'evt2';
+        await repo.store(o);
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(2));
+        expect(stored.last, same(o));
+
+        // Unchanged: nothing stored, no event.
+        await repo.store(o);
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(stored, hasLength(2));
+
         var del = await repo.deleteByID(id);
-        expect(del?.info, equals('evt'));
+        expect(del?.info, equals('evt2'));
 
         await Future.delayed(Duration(milliseconds: 10));
 
-        expect(deleted.map((e) => e.info), contains('evt'));
+        expect(deleted.map((e) => e.info), contains('evt2'));
 
+        await subStore.cancel();
         await sub.cancel();
+      });
+
+      test(
+        'unique field (`email`): insert, multiple and partial updates',
+        () async {
+          var repo = provider.userAPIRepository;
+
+          var user = User(
+            'uq@cov.com',
+            'pw1',
+            Address('TX', 'Austin', 'Main', 3),
+            // No new `Role` (the other tests count them):
+            [],
+            level: 1,
+            creationTime: DateTime.utc(2022, 1, 1),
+          );
+
+          // Insert:
+          var id = await repo.store(user);
+
+          Future<User> selectStored() async {
+            var u = (await repo.selectByID(id))!;
+            expect(u, isNot(same(user)));
+            return u;
+          }
+
+          expect((await selectStored()).email, equals('uq@cov.com'));
+
+          // A partial update (not the unique field): not a conflict with
+          // itself.
+          user.level = 2;
+          expect(await repo.store(user), equals(id));
+          var u1 = await selectStored();
+          expect(u1.level, equals(2));
+          expect(u1.email, equals('uq@cov.com'));
+          expect(u1.password, equals('pw1'));
+
+          // A partial update (the unique field):
+          user.email = 'uq2@cov.com';
+          expect(await repo.store(user), equals(id));
+          var u2 = await selectStored();
+          expect(u2.email, equals('uq2@cov.com'));
+          expect(u2.level, equals(2));
+
+          // Multiple updates (unchanged and changed):
+          expect(await repo.store(user), equals(id));
+          user.password = 'pw2';
+          expect(await repo.store(user), equals(id));
+          var u3 = await selectStored();
+          expect(u3.password, equals('pw2'));
+          expect(u3.email, equals('uq2@cov.com'));
+          expect(u3.level, equals(2));
+
+          // The email of another user: a conflict.
+          user.email = 'joe@cov.com';
+          await expectLater(
+            () async => await repo.store(user),
+            throwsA(
+              isA<EntityFieldInvalid>()
+                  .having((e) => e.reason, 'reason', 'unique')
+                  .having((e) => e.fieldName, 'fieldName', 'email'),
+            ),
+          );
+          expect((await selectStored()).email, equals('uq2@cov.com'));
+
+          // A new user with an email in use: a conflict.
+          await expectLater(
+            () async => await repo.store(
+              User('uq2@cov.com', 'x', Address('A', 'B', 'C', 4), []),
+            ),
+            throwsA(isA<EntityFieldInvalid>()),
+          );
+
+          // The previous email is free again:
+          var other = User('uq@cov.com', 'x', Address('A', 'B', 'C', 5), []);
+          var otherId = await repo.store(other);
+          expect(otherId, isNot(equals(id)));
+
+          // Cleanup (the other tests count the users):
+          user.email = 'uq2@cov.com';
+          await repo.deleteByID(otherId);
+          await repo.deleteByID(id);
+        },
+      );
+
+      test('a preFinish error aborts the transaction (41)', () async {
+        var repo =
+            provider.userInfoAPIRepository.entityRepository
+                as DBSQLEntityRepository<UserInfo>;
+
+        var id = await repo.store(UserInfo('pf-info'));
+
+        var t = Transaction(autoCommit: true);
+        var op = TransactionOperationSelect(
+          repo.name,
+          false,
+          sqlAdapter,
+          ConditionID(id),
+          transaction: t,
+        );
+
+        Object? error;
+        try {
+          await repo.repositoryAdapter.doSelectByID<UserInfo>(
+            op,
+            id,
+            preFinish: (r) => throw StateError('preFinish error'),
+          );
+        } catch (e) {
+          error = e;
+        }
+
+        expect('$error', contains('preFinish error'));
+        expect(t.isAborted, isTrue);
+        expect(t.isOpen, isFalse);
+
+        await repo.deleteByID(id);
       });
 
       test('countByQuery / selectIDsBy / existIDs', () async {
@@ -184,6 +322,30 @@ void main() {
         expect(d2?.info, equals('del-2'));
 
         expect(await repo.tryDeleteByID(o2.id), isNull);
+      });
+
+      test('delete (with transaction)', () async {
+        var repo = provider.userInfoAPIRepository;
+
+        var o = UserInfo('del-t');
+        await repo.store(o);
+
+        // Not `executing`: only reached if passed through.
+        var t = Transaction(autoCommit: true);
+
+        var del = await repo.delete(
+          Condition.parse('info == ?'),
+          positionalParameters: ['del-t'],
+          transaction: t,
+        );
+        expect(del.map((e) => e.info), equals(['del-t']));
+
+        // The delete is an operation of the given transaction:
+        expect(
+          t.operations.whereType<TransactionOperationDelete>(),
+          isNotEmpty,
+        );
+        expect(await repo.existsID(o.id), isFalse);
       });
 
       test('storeAllFromJson', () async {

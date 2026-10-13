@@ -463,7 +463,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (log is Map) {
       var logSql = log.getIgnoreCase('sql');
       if (logSql != null) {
-        return parseBool(log);
+        return parseBool(logSql);
       }
     }
     if (log != null) {
@@ -1212,7 +1212,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             scheme,
             repoTable,
             f,
-            allowCollectionFields: false,
+            collectionFields: false,
           ),
         )
         .nonNulls
@@ -1225,7 +1225,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             scheme,
             repoTable,
             f,
-            allowCollectionFields: true,
+            collectionFields: true,
           ),
         )
         .nonNulls
@@ -1473,6 +1473,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
               )
               .toList();
 
+    // A missing column's unique constraint comes with its `ADD COLUMN` (a
+    // constraint, or a unique index): not a missing one (reported twice).
+    missingUniqueConstraints.removeWhere(
+      (f) => missingColumns.contains(f) || missingReferenceColumns.contains(f),
+    );
+
     // As in the `CREATE TABLE`, not one over the same columns as another
     // missing one: a unique field's constraint (reported with the field), a
     // unique `@EntityIndex` (also serving a non-unique one), or the same
@@ -1594,7 +1600,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     TableScheme scheme,
     String table,
     String fieldName, {
-    required bool allowCollectionFields,
+    required bool collectionFields,
   }) {
     var fieldType = entityHandler.getFieldType(
       null,
@@ -1603,7 +1609,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     );
     if (fieldType == null) return null;
 
-    if (!allowCollectionFields && fieldType.isListEntityOrReference) {
+    // Only the collection fields (`collectionFields`), or only the others:
+    if (fieldType.isListEntityOrReference != collectionFields) {
       return null;
     }
 
@@ -1702,7 +1709,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             ),
           )
           .toMapFromEntries()
-          .resolveAllValues();
+          // A missing table: a `null` scheme (reported by the check).
+          .resolveAllValuesNullable();
 
       allSchemes.addAll(repositorySchemes);
     }
@@ -1828,7 +1836,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   static String removeSQLsComments(String sqls) {
     sqls = sqls.replaceAllMapped(
       RegExp(r'/\*.*?\*/', dotAll: true),
-      (m) => m[1]!,
+      (m) => ' ',
     );
 
     while (true) {
@@ -3621,13 +3629,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     TransactionOperation op,
     T res,
     PreFinishDBOperation<T, R>? preFinish,
-  ) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
+  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
 
   FutureOr<R> _finishSQLOperation<T, R>(
     Object sql,
@@ -4240,6 +4242,8 @@ class _DBTableCheck {
         this.missingRelationshipReferenceIndexes ?? [];
     var missingEntityIndexes = this.missingEntityIndexes ?? [];
     var missingUniqueConstraints = this.missingUniqueConstraints ?? [];
+    var missingEnumConstraints = this.missingEnumConstraints ?? [];
+    var missingEnumValues = this.missingEnumValues ?? {};
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
@@ -4248,6 +4252,8 @@ class _DBTableCheck {
         missingReferenceIndexes.isNotEmpty ||
         missingRelationshipReferenceIndexes.isNotEmpty ||
         missingUniqueConstraints.isNotEmpty ||
+        missingEnumConstraints.isNotEmpty ||
+        missingEnumValues.isNotEmpty ||
         missingEntityIndexes.isNotEmpty) {
       var repoType = repository?.type;
       var schemeTableName = scheme?.name;
@@ -4295,6 +4301,10 @@ class _DBTableCheck {
           "  -- missingCollectionReferenceColumns: [$missingCollectionReferenceColumnsStr]",
         if (missingUniqueConstraints.isNotEmpty)
           "  -- missingUniqueConstraints: [${missingUniqueConstraints.map((e) => e.name).join(' , ')}]",
+        if (missingEnumConstraints.isNotEmpty)
+          "  -- missingEnumConstraints: [${missingEnumConstraints.map((e) => '${e.type.toString(withT: false)} ${e.name}').join(' , ')}]",
+        if (missingEnumValues.isNotEmpty)
+          "  -- missingEnumValues: [${missingEnumValues.entries.map((e) => '${e.key.name}: ${e.value.join(', ')}').join(' , ')}]",
         if (missingEntityIndexes.isNotEmpty)
           "  -- missingEntityIndexes: [${missingEntityIndexes.map((e) {
             var conflict = entityIndexesNameConflicts?[e.indexName];

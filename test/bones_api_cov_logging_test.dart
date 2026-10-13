@@ -87,6 +87,21 @@ void main() {
       ml2(logging.Level.INFO, 'b');
       expect(received, equals(['a', 'b']));
 
+      // Functions of 2 parameters (`Object` or `dynamic`): `MessageLogger`s.
+      var both = <Object?>[];
+      var mlObj = handler.resolveLogDestiny(
+        (Object l, Object m) => both.addAll([l, m]),
+      )!;
+      mlObj(logging.Level.INFO, 'o');
+      var mlDyn = handler.resolveLogDestiny(
+        (dynamic l, dynamic m) => both.addAll([l, m]),
+      )!;
+      mlDyn(logging.Level.WARNING, 'd');
+      expect(
+        both,
+        equals([logging.Level.INFO, 'o', logging.Level.WARNING, 'd']),
+      );
+
       var single = <Object>[];
       var ml3 = handler.resolveLogDestiny((Object m) => single.add(m))!;
       ml3(logging.Level.INFO, 'c');
@@ -279,6 +294,32 @@ void main() {
 
       expect(dbLogger.isDbLogger, isFalse);
       expect(LoggerHandler.isDbLoggerName('cov_db_logger'), isFalse);
+    });
+
+    test('registerAsDbLogger: a dotted (hierarchical) logger name', () async {
+      var prevHierarchical = logging.hierarchicalLoggingEnabled;
+      logging.hierarchicalLoggingEnabled = true;
+
+      var dbLogger = logging.Logger('cov_parent.cov_child_db');
+      try {
+        expect(dbLogger.name, equals('cov_child_db'));
+        expect(dbLogger.fullName, equals('cov_parent.cov_child_db'));
+
+        expect(dbLogger.registerAsDbLogger(), isTrue);
+
+        // Checked against `LogRecord.loggerName` (the full name):
+        logging.LogRecord? record;
+        var sub = dbLogger.onRecord.listen((r) => record = r);
+        dbLogger.info('x');
+        await sub.cancel();
+        expect(record!.loggerName, equals('cov_parent.cov_child_db'));
+        expect(LoggerHandler.isDbLoggerName(record!.loggerName), isTrue);
+      } finally {
+        expect(await dbLogger.unregisterAsDbLogger(), isTrue);
+        logging.hierarchicalLoggingEnabled = prevHierarchical;
+      }
+
+      expect(LoggerHandler.isDbLoggerName('cov_parent.cov_child_db'), isFalse);
     });
 
     test('DBLog', () {

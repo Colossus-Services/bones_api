@@ -1,15 +1,19 @@
 @TestOn('vm')
 @Tags(['entities'])
 @Timeout(Duration(seconds: 60))
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_directory.dart';
+import 'package:bones_api/bones_api_db_gcp.dart';
 import 'package:bones_api/src/bones_api_entity_db_object.dart';
+import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
+import 'bones_api_test_fake_gcs.dart';
 
 typedef _AdapterCreator =
     DBAdapter Function(EntityRepositoryProvider parentRepositoryProvider);
@@ -87,6 +91,49 @@ Future<void> main() async {
     },
   );
 
+  // `DBObjectGCSAdapter`, with an in-memory fake of the GCS JSON API:
+  _runObjectAdapterTests(
+    'DBObjectGCSAdapter',
+    () {
+      var gcs = FakeGCS('cov-shared');
+      return (p) => DBObjectGCSAdapter(
+        gcs.client,
+        'cov-project',
+        gcs.bucket,
+        parentRepositoryProvider: p,
+      );
+    },
+    rollbackOnAbort: false,
+    jsonOnly: true,
+  );
+
+  // With a local cache of the objects:
+  late Directory gcsCacheDir;
+
+  _runObjectAdapterTests(
+    'DBObjectGCSAdapter (cache)',
+    () {
+      gcsCacheDir = Directory.systemTemp.createTempSync('bones_api_cov_gcs_');
+      var gcs = FakeGCS('cov-shared-cache');
+      return (p) => DBObjectGCSAdapter(
+        gcs.client,
+        'cov-project',
+        gcs.bucket,
+        cacheDirectory: gcsCacheDir,
+        cacheLimit: 1024 * 1024,
+        cacheFilesLimit: 1000,
+        parentRepositoryProvider: p,
+      );
+    },
+    rollbackOnAbort: false,
+    jsonOnly: true,
+    tearDown: () {
+      try {
+        gcsCacheDir.deleteSync(recursive: true);
+      } catch (_) {}
+    },
+  );
+
   _runMemoryAdapterSpecificTests();
   _runDirectoryAdapterSpecificTests();
   _runObjectAdapterRegisterTests();
@@ -114,16 +161,6 @@ void _runObjectAdapterTests(
       tearDown?.call();
     });
 
-    test('capability and dialect', () {
-      expect(adapter.dialectName, equals('object'));
-      expect(adapter.dialect, equals(const DBDialect('object')));
-      expect(adapter.capability.transactions, isTrue);
-      expect(adapter.capability.constraintSupport, isFalse);
-      expect(adapter.capability.info, contains('transactions: true'));
-      expect(adapter.capability.toString(), contains('DBAdapterCapability'));
-      expect(adapter.toString(), contains(adapter.runtimeType.toString()));
-    });
-
     /// Stores [fields] directly through the repository adapter (`doUpdate`),
     /// which normalizes the entity values to IDs.
     Future<Object?> putRaw<O extends Object>(
@@ -135,6 +172,16 @@ void _runObjectAdapterTests(
       var op = TransactionOperationUpdate(repo.name, false, adapter, o);
       return repo.repositoryAdapter.doUpdate(op, o, id, fields);
     }
+
+    test('capability and dialect', () {
+      expect(adapter.dialectName, equals('object'));
+      expect(adapter.dialect, equals(const DBDialect('object')));
+      expect(adapter.capability.transactions, isTrue);
+      expect(adapter.capability.constraintSupport, isFalse);
+      expect(adapter.capability.info, contains('transactions: true'));
+      expect(adapter.capability.toString(), contains('DBAdapterCapability'));
+      expect(adapter.toString(), contains(adapter.runtimeType.toString()));
+    });
 
     test('empty table', () async {
       // No `Store` stored yet:
@@ -173,28 +220,15 @@ void _runObjectAdapterTests(
         id: 'PHOTO-401',
       );
 
-      if (jsonOnly) {
-        // Enum values aren't JSON encodable by `DBObjectDirectoryAdapter`:
-        expect(await putRaw(role, 101, {'id': 101, 'type': 'admin'}), 101);
-        expect(
-          await putRaw(role2, 102, {
-            'id': 102,
-            'type': 'guest',
-            'enabled': false,
-          }),
-          102,
-        );
-      } else {
-        expect(await roleRepo.store(role), equals(101));
-        expect(await roleRepo.store(role2), equals(102));
-      }
+      expect(await roleRepo.store(role), equals(101));
+      expect(await roleRepo.store(role2), equals(102));
 
       expect(await storeRepo.store(store), equals(801));
       expect(await userInfoRepo.store(userInfo), equals(301));
       expect(await photoRepo.store(photo), equals('PHOTO-401'));
 
-      // `closedStores` as a `List` (an `EntityReferenceList` value is
-      // not unwrapped by the object adapters):
+      // `closedStores` as a `List` (an `EntityReferenceList` value: see the
+      // `EntityReferenceList field` test):
       expect(
         await putRaw(address, 201, {
           'id': 201,
@@ -310,10 +344,9 @@ void _runObjectAdapterTests(
       expect(await userRepo.count(matcher: ConditionID(501)), equals(1));
       expect(await userRepo.count(matcher: ConditionID(999)), equals(0));
 
-      // `DBObjectDirectoryAdapter` can't resolve the sub-entities of
-      // `User`/`Address` (a nested select in the same transaction never
-      // completes), nor JSON encode a `DateTime`/enum field:
-      if (jsonOnly) return;
+      // Resolving the sub-entities (selected in the same transaction, after
+      // the `User`'s select: previously a deadlock in
+      // `DBObjectDirectoryAdapter`):
 
       var user1 = await userRepo.selectByID(
         501,
@@ -598,7 +631,8 @@ void _runObjectAdapterTests(
       await provider.repo<UserInfo>().store(UserInfo('i', id: 6001));
 
       var info = adapter.information(extended: true);
-      expect(info['tables'], isNotNull);
+      // The tables (memory, directory), or the bucket (GCS):
+      expect(info['tables'] ?? info['bucket'], isNotNull);
 
       var repoInfo = provider.repo<UserInfo>().information(extended: true);
       expect(repoInfo['dialect'], equals('object'));
@@ -679,6 +713,311 @@ void _runObjectAdapterTests(
       }
       expect(error2, isA<DBObjectAdapterException>());
       expect(error2.toString(), contains('Operation>>'));
+    });
+
+    // The last one: it stores entities used by the previous tests' counts.
+    test('EntityReferenceList field: stored as IDs (edge cases)', () async {
+      var storeRepo = provider.repo<Store>();
+      var addressRepo = provider.repo<Address>();
+
+      var s1 = Store('S1', 1, id: 811);
+      var s2 = Store('S2', 2, id: 812);
+      expect(await storeRepo.store(s1), equals(811));
+      expect(await storeRepo.store(s2), equals(812));
+
+      Future<Map<String, dynamic>> selectRawAddress(int id) async {
+        var op = TransactionOperationSelect(
+          addressRepo.name,
+          false,
+          adapter,
+          ConditionID(id),
+        );
+        var raw = await addressRepo.repositoryAdapter
+            .doSelectByID<Map<String, dynamic>>(op, id);
+        return raw!;
+      }
+
+      Future<Object?> storedClosedStores(
+        int id,
+        EntityReferenceList<Store> closedStores,
+      ) async {
+        var address = Address('NY', 'New York', 'Broadway', id, id: id);
+
+        Object? stored;
+        if (jsonOnly) {
+          // Without the `Decimal` fields (not JSON encodable by
+          // `DBObjectDirectoryAdapter`):
+          stored = await putRaw(address, id, {
+            'id': id,
+            'state': 'NY',
+            'city': 'New York',
+            'street': 'Broadway',
+            'number': id,
+            'stores': <Store>[],
+            'closedStores': closedStores,
+          });
+        } else {
+          address.closedStores = closedStores;
+          stored = await addressRepo.store(address);
+        }
+        expect(stored, equals(id));
+
+        return (await selectRawAddress(id))['closedStores'];
+      }
+
+      // With the entities (stored): their IDs.
+      expect(
+        await storedClosedStores(
+          221,
+          EntityReferenceList<Store>.fromEntities([s1, s2]),
+        ),
+        equals([811, 812]),
+      );
+
+      // With only the IDs (the order is kept):
+      expect(
+        await storedClosedStores(
+          222,
+          EntityReferenceList<Store>.fromIDs([812, 811]),
+        ),
+        equals([812, 811]),
+      );
+
+      // A single element:
+      expect(
+        await storedClosedStores(
+          223,
+          EntityReferenceList<Store>.fromEntities([s2]),
+        ),
+        equals([812]),
+      );
+
+      // Empty (from entities, from IDs, `asEmpty`): an empty list.
+      expect(
+        await storedClosedStores(
+          224,
+          EntityReferenceList<Store>.fromEntities([]),
+        ),
+        equals([]),
+      );
+      expect(
+        await storedClosedStores(225, EntityReferenceList<Store>.fromIDs([])),
+        equals([]),
+      );
+      expect(
+        await storedClosedStores(226, EntityReferenceList<Store>.asEmpty()),
+        equals([]),
+      );
+
+      // `null` (`asNull`): no value.
+      expect(
+        await storedClosedStores(227, EntityReferenceList<Store>.asNull()),
+        isNull,
+      );
+
+      // The `EntityReferenceList` itself is never stored (not even wrapped):
+      for (var id in [221, 222, 223, 224, 225, 226, 227]) {
+        var closedStores = (await selectRawAddress(id))['closedStores'];
+        expect(closedStores, isNot(isA<EntityReferenceList>()));
+        expect(closedStores ?? [], isNot(contains(isA<EntityReferenceList>())));
+      }
+
+      // Read back as an `EntityReferenceList` (previously: "Can't cast to
+      // List<Store> due to null elements"):
+      var a1 = await addressRepo.selectByID(221);
+      expect(a1!.closedStores.ids, equals([811, 812]));
+      expect(a1.closedStores.length, equals(2));
+
+      var a4 = await addressRepo.selectByID(224);
+      expect(a4!.closedStores.ids ?? [], isEmpty);
+    });
+
+    test('store and select: DateTime, enum and Decimal fields', () async {
+      var roleRepo = provider.repo<Role>();
+      var addressRepo = provider.repo<Address>();
+      var userRepo = provider.repo<User>();
+
+      // Through the repositories (previously not JSON encodable by
+      // `DBObjectDirectoryAdapter`):
+      var role = Role(RoleType.unknown, id: 131, value: Decimal.parse('12.5'));
+      expect(await roleRepo.store(role), equals(131));
+
+      var address = Address(
+        'CA',
+        'LA',
+        'Sunset',
+        3,
+        id: 231,
+        latitude: Decimal.parse('34.098'),
+        longitude: Decimal.parse('-118.326'),
+      );
+      expect(await addressRepo.store(address), equals(231));
+
+      var creationTime = DateTime.utc(2024, 2, 3, 4, 5, 6, 7);
+      var user = User(
+        'dt@mail.com',
+        'pass',
+        address,
+        [role],
+        id: 531,
+        creationTime: creationTime,
+        wakeUpTime: Time(7, 30),
+      );
+      expect(await userRepo.store(user), equals(531));
+
+      // Read back with the same values:
+      var role2 = await roleRepo.selectByID(131);
+      expect(role2!.type, equals(RoleType.unknown));
+      expect(role2.value, equals(Decimal.parse('12.5')));
+
+      var address2 = await addressRepo.selectByID(231);
+      expect(address2!.latitude, equals(Decimal.parse('34.098')));
+      expect(address2.longitude, equals(Decimal.parse('-118.326')));
+
+      var user2 = await userRepo.selectByID(
+        531,
+        resolutionRules: EntityResolutionRules(allEager: true),
+      );
+      expect(user2!.creationTime, equals(creationTime));
+      expect(user2.wakeUpTime, equals(Time(7, 30)));
+      expect(user2.address.id, equals(231));
+      expect(user2.roles.map((r) => r.type), equals([RoleType.unknown]));
+    });
+
+    test('store: insert, multiple and partial updates', () async {
+      var storeRepo = provider.repo<Store>();
+
+      // The stored entry (not an instance tracked/cached by the repository),
+      // its data fields:
+      Future<Map<String, dynamic>?> stored(int id) async {
+        var op = TransactionOperationSelect(
+          storeRepo.name,
+          false,
+          adapter,
+          ConditionID(id),
+        );
+        var entry = await storeRepo.repositoryAdapter
+            .doSelectByID<Map<String, dynamic>>(op, id);
+        if (entry == null) return null;
+        return {
+          for (var k in ['id', 'name', 'number'])
+            if (entry.containsKey(k)) k: entry[k],
+        };
+      }
+
+      // Insert:
+      var s = Store('st1', 10, id: 851);
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1', 'number': 10}),
+      );
+
+      // A partial update (only `name` changed): `number` kept.
+      s.name = 'st1b';
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1b', 'number': 10}),
+      );
+
+      // Another partial update (only `number`): `name` kept.
+      s.number = 11;
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1b', 'number': 11}),
+      );
+
+      // Both fields:
+      s.name = 'st1c';
+      s.number = 12;
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1c', 'number': 12}),
+      );
+
+      // Unchanged:
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1c', 'number': 12}),
+      );
+
+      // Another instance with the same ID (an updated copy):
+      var copy = Store('st1d', 13, id: 851);
+      expect(await storeRepo.store(copy), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1d', 'number': 13}),
+      );
+
+      expect(await storeRepo.count(matcher: ConditionID(851)), equals(1));
+    });
+
+    test('a preFinish error aborts the transaction (41)', () async {
+      var storeRepo = provider.repo<Store>();
+      expect(await storeRepo.store(Store('pf', 1, id: 861)), equals(861));
+
+      // An auto-commit transaction (as a repository call without one):
+      var t = Transaction(autoCommit: true);
+
+      var op = TransactionOperationSelect(
+        storeRepo.name,
+        false,
+        adapter,
+        ConditionID(861),
+        transaction: t,
+      );
+
+      Object? error;
+      try {
+        await storeRepo.repositoryAdapter.doSelectByID<Store>(
+          op,
+          861,
+          preFinish: (r) => throw StateError('preFinish error'),
+        );
+      } catch (e) {
+        error = e;
+      }
+
+      // The error reaches the caller (resolved by the adapter):
+      expect(error, isA<DBObjectAdapterException>());
+      expect('$error', contains('preFinish error'));
+
+      // And the transaction is aborted (previously: never finished, neither
+      // committed nor aborted):
+      expect(t.isAborted, isTrue);
+      expect(t.error, same(error));
+      expect(t.isOpen, isFalse);
+    });
+
+    test('onStore (DBEntityRepository)', () async {
+      var storeRepo = provider.repo<Store>();
+
+      var stored = <Store>[];
+      var sub = storeRepo.onStore.listen(stored.add);
+
+      // An insert:
+      var s = Store('evt', 1, id: 841);
+      expect(await storeRepo.store(s), equals(841));
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(1));
+      expect(stored.first, same(s));
+
+      // An update (changed):
+      s.name = 'evt2';
+      await storeRepo.store(s);
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(2));
+
+      // Unchanged: nothing stored, no event.
+      await storeRepo.store(s);
+      await Future.delayed(Duration(milliseconds: 10));
+      expect(stored, hasLength(2));
+
+      await sub.cancel();
     });
   });
 }
@@ -774,6 +1113,38 @@ void _runDirectoryAdapterSpecificTests() {
       try {
         tempDir.deleteSync(recursive: true);
       } catch (_) {}
+    });
+
+    test('update of a corrupt (truncated) stored file: rewritten', () async {
+      var provider = _ObjectEntitiesProvider(
+        (p) => DBObjectDirectoryAdapter(tempDir, parentRepositoryProvider: p),
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      var storeRepo = provider.repo<Store>();
+
+      var s = Store('c1', 1, id: 7);
+      expect(await storeRepo.store(s), equals(7));
+
+      // Truncated (e.g. a crash in the middle of a write):
+      var file = File('${tempDir.path}/store/7.json');
+      expect(file.existsSync(), isTrue);
+      file.writeAsStringSync('{"id": 7, "na');
+
+      // A partial update: can't merge with it, the file is rewritten.
+      s.name = 'c2';
+      expect(await storeRepo.store(s), equals(7));
+
+      var json = jsonDecode(file.readAsStringSync()) as Map;
+      expect(json['id'], equals(7));
+      expect(json['name'], equals('c2'));
+
+      // A full update (a copy) restores all the fields:
+      expect(await storeRepo.store(Store('c3', 3, id: 7)), equals(7));
+      var s2 = (await storeRepo.selectByID(7))!;
+      expect(s2.name, equals('c3'));
+      expect(s2.number, equals(3));
     });
 
     test('context', () {

@@ -73,6 +73,12 @@ Future<APIServer> runTestAPIServer<A extends APIRoot>(
       await apiServer.stop();
       channel.sink.close();
     } else {
+      logPrintter(
+        '** Unknown CMD: stopping Test `$testServerName` API Server...',
+      );
+      // (Also closes the `APIRoot`.)
+      await apiServer.stop();
+      channel.sink.close();
       throw UnsupportedError("CMD: $cmd");
     }
   }

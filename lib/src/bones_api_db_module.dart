@@ -25,11 +25,16 @@ class APIDBModule extends APIModule {
 
   final APICredential? credential;
 
+  /// The default maximum number of entities returned by [select] (a page),
+  /// when the request has no `LIMIT` directive. See [selectQueryDirectives].
+  final int defaultSelectLimit;
+
   APIDBModule(
     APIRoot apiRoot, {
     String name = 'db',
     this.onlyOnDevelopment = true,
     this.credential,
+    this.defaultSelectLimit = 1000,
   }) : super(apiRoot, name);
 
   bool get development => apiConfig.development;
@@ -78,7 +83,8 @@ class APIDBModule extends APIModule {
       if (authResp != null) return authResp;
 
       var pathParams = _parsePath(request, 'select');
-      if (pathParams == null) {
+      // No table (e.g. `/db/select`):
+      if (pathParams == null || pathParams.isEmpty) {
         return APIResponse.notFound();
       }
 
@@ -97,7 +103,7 @@ class APIDBModule extends APIModule {
       if (authResp != null) return authResp;
 
       var pathParams = _parsePath(request, 'insert');
-      if (pathParams == null) {
+      if (pathParams == null || pathParams.isEmpty) {
         return APIResponse.notFound();
       }
 
@@ -111,7 +117,7 @@ class APIDBModule extends APIModule {
       if (authResp != null) return authResp;
 
       var pathParams = _parsePath(request, 'update');
-      if (pathParams == null) {
+      if (pathParams == null || pathParams.isEmpty) {
         return APIResponse.notFound();
       }
 
@@ -126,7 +132,7 @@ class APIDBModule extends APIModule {
       if (authResp != null) return authResp;
 
       var pathParams = _parsePath(request, 'delete');
-      if (pathParams == null) {
+      if (pathParams == null || pathParams.isEmpty) {
         return APIResponse.notFound();
       }
 
@@ -267,10 +273,10 @@ class APIDBModule extends APIModule {
   ///
   /// - `EAGER=true`: resolves the referenced entities.
   /// - `LIMIT=<n>`: the maximum number of returned entities, and the page size
-  ///   of `PAGE`.
+  ///   of `PAGE` (default: [defaultSelectLimit]; `LIMIT=0`: no limit).
   /// - `OFFSET=<n>`: the return offset, for pagination.
-  /// - `PAGE=<n>`: the 1-based page to return; requires `LIMIT` and can't be
-  ///   combined with `OFFSET`. See [resolveSelectOffset].
+  /// - `PAGE=<n>`: the 1-based page (of `LIMIT` entities) to return; can't be
+  ///   combined with `OFFSET` (nor `LIMIT=0`). See [resolveSelectOffset].
   /// - `ORDER=asc|desc`: the [OrderDirection] of the ordering.
   ///
   /// Example: `/db/select/user/json?email == "a@b.c"&LIMIT=10&PAGE=3`
@@ -354,6 +360,10 @@ class APIDBModule extends APIModule {
       var extracted = _extractQueryDirective(query, 'LIMIT');
       query = extracted.query;
       limit ??= int.tryParse(extracted.value?.trim() ?? '');
+
+      // A page of `defaultSelectLimit` by default (`LIMIT=0`: no limit).
+      limit ??= defaultSelectLimit;
+      if (limit <= 0) limit = null;
     }
 
     {
@@ -525,8 +535,38 @@ class APIDBModule extends APIModule {
 
     content.add('</table>');
 
+    // The query `String` of a page (`OFFSET`) of this select:
+    String pageQuery(int? pageOffset) => [
+      if (query.isNotEmpty) Uri.encodeQueryComponent(query),
+      if (eager!) 'EAGER=true',
+      if (orderDirection != null) 'ORDER=${orderDirection.name}',
+      'LIMIT=${limit ?? 0}',
+      if (pageOffset != null && pageOffset > 0) 'OFFSET=$pageOffset',
+    ].join('&');
+
+    if (limit != null) {
+      var pageOffset = offset ?? 0;
+      var first = list.isEmpty ? pageOffset : pageOffset + 1;
+      var last = pageOffset + list.length;
+
+      // A full page: maybe a next one.
+      var hasNext = list.length >= limit;
+      var hasPrevious = pageOffset > 0;
+
+      var previousOffset = (pageOffset - limit).clamp(0, pageOffset);
+      var nextOffset = pageOffset + limit;
+
+      content.add(
+        '<br><div style="width: 100%; text-align: center;">'
+        '${hasPrevious ? '<a href="${basePath}select/$repoName?${pageQuery(previousOffset)}">&lt;&lt; previous</a> &nbsp; ' : ''}'
+        '[$first - $last]'
+        '${hasNext ? ' &nbsp; <a href="${basePath}select/$repoName?${pageQuery(nextOffset)}">next &gt;&gt;</a>' : ''}'
+        '</div>',
+      );
+    }
+
     content.add(
-      '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json${query.isNotEmpty ? '?$query' : ''}">JSON</a></i></div>',
+      '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json?${pageQuery(offset)}">JSON</a></i></div>',
     );
 
     htmlDoc.content = content;

@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.21.1';
+  static const String VERSION = '1.21.2';
 
   static bool _boot = false;
 
@@ -119,13 +119,13 @@ abstract class APIRoot with Initializable, Closable {
 
     if (lng == 1) {
       var apiRoot = _instances.values.first;
-      var apiRequest = apiRoot.currentAPIRequest.get(zone);
+      var apiRequest = apiRoot.getCurrentAPIRequest(zone);
       if (apiRequest != null) {
         return (apiRoot: apiRoot, apiRequest: apiRequest);
       }
     } else if (lng > 1) {
       for (var apiRoot in _instances.values) {
-        var apiRequest = apiRoot.currentAPIRequest.get(zone);
+        var apiRequest = apiRoot.getCurrentAPIRequest(zone);
         if (apiRequest != null) {
           return (apiRoot: apiRoot, apiRequest: apiRequest);
         }
@@ -355,7 +355,7 @@ abstract class APIRoot with Initializable, Closable {
   FutureOr<List<Initializable>> loadDependencies() => <Initializable>[];
 
   @override
-  FutureOr<InitializationResult> initialize() => _ensureModulesLoaded();
+  FutureOr<InitializationResult> initialize() => _ensureReady();
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
@@ -391,13 +391,13 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns the names of the modules of this API.
   Set<String> get modulesNames {
-    _ensureModulesLoadedSync('modulesNames');
+    _ensureReadySync('modulesNames');
     return _modules!.keys.toSet();
   }
 
   /// Returns the modules of this API.
   Set<APIModule> get modules {
-    _ensureModulesLoadedSync('modules');
+    _ensureReadySync('modules');
     return _modules!.values.toSet();
   }
 
@@ -406,8 +406,9 @@ abstract class APIRoot with Initializable, Closable {
 
   Future<InitializationResult>? _modulesLoading;
 
-  FutureOr<InitializationResult> _ensureModulesLoaded() {
+  FutureOr<InitializationResult> _ensureReady() {
     _setupInstance();
+    _initializeInternals();
 
     if (_modules != null) {
       return InitializationResult.ok(this, dependencies: _modules!.values);
@@ -417,8 +418,6 @@ abstract class APIRoot with Initializable, Closable {
     if (modulesLoading != null) {
       return modulesLoading;
     }
-
-    EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
 
     var ret = loadModules().resolveMapped((modules) {
       _modules ??= Map.fromEntries(modules.map((e) => MapEntry(e.name, e)));
@@ -433,9 +432,9 @@ abstract class APIRoot with Initializable, Closable {
     return ret;
   }
 
-  void _ensureModulesLoadedSync(String caller) {
+  void _ensureReadySync(String caller) {
     // ignore: discarded_futures
-    var ret = _ensureModulesLoaded();
+    var ret = _ensureReady();
     if (ret is Future) {
       _log.warning(
         "Accessing `$caller` before fully load modules! "
@@ -449,7 +448,7 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns a module with [name].
   APIModule? getModule(String name) {
-    _ensureModulesLoadedSync('getModule');
+    _ensureReadySync('getModule');
     var module = _modules![name];
     if (module != null) {
       module.ensureConfigured();
@@ -461,7 +460,7 @@ abstract class APIRoot with Initializable, Closable {
   ///
   /// Calls [resolveModule] to determine the module name.
   APIModule? getModuleByRequest(APIRequest request) {
-    _ensureModulesLoadedSync('getModuleByRequest');
+    _ensureReadySync('getModuleByRequest');
     var moduleName = resolveModule(request);
     return _modules![moduleName];
   }
@@ -604,7 +603,7 @@ abstract class APIRoot with Initializable, Closable {
       );
     }
 
-    var modulesLoadAsync = _ensureModulesLoaded();
+    var modulesLoadAsync = _ensureReady();
 
     if (modulesLoadAsync is Future<InitializationResult>) {
       return modulesLoadAsync.then((_) => _callZoned<T>(request, externalCall));
@@ -613,8 +612,106 @@ abstract class APIRoot with Initializable, Closable {
     }
   }
 
+  // The `currentAPIRequest` of this `Isolate` (the fast path: a field). Its
+  // parent `Zone` (of the calls' zones): the `Zone` of the constructor.
+  //
+  // A `ZoneField` holds its parent `Zone`, that is unsendable (except
+  // `Zone.root`): `null` while this instance is sent to (copied into) other
+  // isolates (see `prepareForIsolateCopy`), and in a copy until initialized.
+  ZoneField<APIRequest>? _currentAPIRequest = ZoneField(Zone.current);
+
+  // While this instance is being copied (between `prepareForIsolateCopy` and
+  // `finishIsolateCopy`): the `currentAPIRequest` of this `Isolate`, out of
+  // the instance (a static: not copied).
+  static final Expando<ZoneField<APIRequest>> _currentAPIRequestWhileCopied =
+      Expando<ZoneField<APIRequest>>();
+
+  // Whether the internals are initialized in this `Isolate` (reset for a
+  // copy: see `prepareForIsolateCopy`).
+  bool _internalsInitialized = false;
+
   /// Returns the current [APIRequest] of the current [call].
-  final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
+  ///
+  /// Its parent [Zone] (of the calls' zones) is the [Zone] where this
+  /// instance was created, or, in another `Isolate` (a copy of it), where
+  /// [initializeIsolateCopy] was called (else where it's first used there).
+  ZoneField<APIRequest> get currentAPIRequest =>
+      _currentAPIRequest ?? _resolveCurrentAPIRequest();
+
+  ZoneField<APIRequest> _resolveCurrentAPIRequest() =>
+      // This `Isolate` while being copied (not put back in the instance:
+      // until `finishIsolateCopy`):
+      _currentAPIRequestWhileCopied[this] ??
+      // A copy (in another `Isolate`) not initialized yet:
+      (_currentAPIRequest = ZoneField(Zone.current));
+
+  /// Returns the [APIRequest] of the [contextZone] (or of the current [call]),
+  /// or `null` if none.
+  APIRequest? getCurrentAPIRequest([Zone? contextZone]) =>
+      (_currentAPIRequest ?? _currentAPIRequestWhileCopied[this])?.get(
+        contextZone,
+      );
+
+  /// Initializes the internals of this instance in the current `Isolate`
+  /// (idempotent; not for a closed instance).
+  void _initializeInternals() {
+    if (_internalsInitialized || isClosed) return;
+    _internalsInitialized = true;
+
+    // Registered per `Isolate` (also by a copy with the modules loaded):
+    EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
+  }
+
+  /// Initializes this instance in the current `Isolate`, when it's a copy
+  /// from another one (e.g. by an auxiliary `APIServerWorker`, before its
+  /// start): its [currentAPIRequest] (with the [Zone.current] as the parent
+  /// of the calls' zones) and its internals (idempotent).
+  void initializeIsolateCopy() {
+    // (Not in this `Isolate` while being copied: kept out of the instance.)
+    if (_currentAPIRequest == null &&
+        _currentAPIRequestWhileCopied[this] == null) {
+      _currentAPIRequest = ZoneField(Zone.current);
+    }
+    _initializeInternals();
+  }
+
+  /// Prepares this instance to be sent to (copied into) other `Isolate`s,
+  /// like the auxiliary `APIServerWorker`s (called by the `APIServer` before
+  /// spawning them): its unsendable internals (a [Zone]) are moved out of the
+  /// instance (the same [currentAPIRequest] in this `Isolate`), until
+  /// [finishIsolateCopy]. A copy is initialized in its `Isolate` by
+  /// [initializeIsolateCopy].
+  ///
+  /// Throws a [StateError] if the modules are being loaded (a [Future]: not
+  /// sendable).
+  void prepareForIsolateCopy() {
+    if (_modulesLoading != null) {
+      throw StateError(
+        "Can't prepare `APIRoot` `$name` for an `Isolate` copy while "
+        "loading its modules.",
+      );
+    }
+
+    var currentAPIRequest = _currentAPIRequest;
+    if (currentAPIRequest != null) {
+      _currentAPIRequestWhileCopied[this] = currentAPIRequest;
+      _currentAPIRequest = null;
+    }
+
+    // A copy initializes its internals in its `Isolate`:
+    _internalsInitialized = false;
+  }
+
+  /// Finishes the copies prepared by [prepareForIsolateCopy] (called by the
+  /// `APIServer` after spawning the workers): its internals back in the
+  /// instance (the fast path).
+  void finishIsolateCopy() {
+    var currentAPIRequest = _currentAPIRequestWhileCopied[this];
+    if (currentAPIRequest != null) {
+      _currentAPIRequest ??= currentAPIRequest;
+      _currentAPIRequestWhileCopied[this] = null;
+    }
+  }
 
   static void _uncaughtAsynchronousError(
     Zone self,
@@ -905,17 +1002,17 @@ abstract class APIRoot with Initializable, Closable {
 
 class _APIRootEntityRulesContextProvider implements EntityRulesContextProvider {
   final APIRoot apiRoot;
-  final ZoneField<APIRequest> currentAPIRequest;
 
-  _APIRootEntityRulesContextProvider(this.apiRoot)
-    : currentAPIRequest = apiRoot.currentAPIRequest;
+  _APIRootEntityRulesContextProvider(this.apiRoot);
 
   @override
   EntityResolutionRules? getContextEntityResolutionRules({
     Zone? contextZone,
     Object? contextIdentifier,
   }) {
-    var request = currentAPIRequest.get(contextZone) ?? currentAPIRequest.get();
+    var request =
+        apiRoot.getCurrentAPIRequest(contextZone) ??
+        apiRoot.getCurrentAPIRequest();
     if (request == null) return null;
 
     var routeHandler = request.routeHandler;
@@ -1349,7 +1446,7 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
     case 'patch':
     case 'PATCH':
       return APIRequestMethod.PATCH;
-    case 'optionS':
+    case 'options':
     case 'OPTIONS':
       return APIRequestMethod.OPTIONS;
     case 'head':
@@ -1632,7 +1729,7 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Returns `true` if this request is authenticated and the token is not expired.
   bool get isAuthenticated =>
-      authentication != null && authentication!.isExpired();
+      authentication != null && !authentication!.isExpired();
 
   final String? scheme;
 
@@ -1929,7 +2026,7 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// Returns the [path] part at [index] in [pathParts].
   /// - Negative [index] will return in reversed index order.
   String? pathPartAt(int index) {
-    var idx = index >= 0 ? index : _pathParts.length - index;
+    var idx = index >= 0 ? index : _pathParts.length + index;
     return idx >= 0 && idx < _pathParts.length ? _pathParts[idx] : null;
   }
 
@@ -2117,7 +2214,7 @@ class APIRequest extends APIMetricSet with APIPayload {
     if (val != null) return val;
 
     for (var k in headers.keys) {
-      if (equalsIgnoreAsciiCase(k, key1)) return parameters[k];
+      if (equalsIgnoreAsciiCase(k, key1)) return headers[k];
 
       if (key2 != null && equalsIgnoreAsciiCase(k, key2)) {
         return headers[k];

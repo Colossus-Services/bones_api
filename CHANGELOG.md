@@ -1,3 +1,203 @@
+## 1.21.2
+
+- `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
+  `decodeAsync<Map>` with nested JSON lists (previously lazily cast lists that
+  threw when read). Reflection code regenerated (only the builder version
+  changed).
+  - dev: `build_runner: ^2.16.2` (`analyzer` 14, required by it).
+
+- Fix: `APIRequest.isAuthenticated` was `true` only when the token was
+  expired (it is now `true` only when it isn't).
+- Fix: `APISecurity.autoValidateAllTokens` never ran (the elapsed time was
+  computed backwards, always ≤ 0): the expired tokens are now validated
+  (removed) at most every 5 minutes, as intended.
+- Fix: `APIToken.fromJson` parsed the `duration` from `issueTime`; it now
+  reads `duration` (seconds), defaulting to 3 hours when absent.
+- Fix: `APIRequest.pathPartAt` with a negative index (from the end) always
+  returned `null`.
+- Fix: `parseAPIRequestMethod('options')` returned `null` (a `'optionS'`
+  typo).
+- Fix: `APIRequest.getHeaderFirstOf`: the case-insensitive match of the
+  first key returned a parameter instead of the header.
+- Fix: `APIRouteBuilder.from` with an `Iterable` of providers threw a
+  `TypeError` (swapped arguments).
+- Fix: `DBSQLAdapter.parseConfigLogSQL` with `log: {sql: ...}` parsed the
+  `log` `Map` (always `false`) instead of its `sql` value.
+- Fix: `DBSQLAdapter.removeSQLsComments` threw a `RangeError` on any
+  `/* ... */` comment (now replaced by a space).
+- Fix: `EntityReferenceList.toEntityReference` threw a `RangeError` on an
+  empty list with entities; `EntityReferenceList.getAt` with an
+  `entitiesFetcher` fetched all the IDs (as a nested list) instead of the one
+  at `index`.
+- Fix: `TransactionOperationTypeExtension.name` threw for
+  `selectRelationships`.
+- Fix: `APIRepository.delete` ignored its `transaction`.
+- Fix: `APIConfig.fromAsync` (`loadAPIConfigFromUri`) of an `http(s)` URL
+  discarded the downloaded configuration (and requested the URL with a
+  trailing `/`): now it's returned (`null`, or the default, if not found).
+- Fix: `APIServer` with `totalWorkers > 1` failed to spawn the workers
+  (`object is unsendable - _CustomZone`) when the `APIRoot` was created (or
+  initialized) in a `Zone` other than `Zone.root` (e.g. `runZoned`,
+  `runZonedGuarded`, a test): `APIRoot.currentAPIRequest` (a `ZoneField`,
+  holding its parent `Zone`) is moved out of the instance while it's copied.
+  - `APIRoot.prepareForIsolateCopy` / `finishIsolateCopy`: called by
+    `APIServer` before and after spawning the workers. In between, the
+    `ZoneField` of this `Isolate` is kept out of the instance (in a static
+    `Expando`: not copied), and still used by this `Isolate`. Otherwise it's
+    an instance field (the fast path), created by the constructor, as before
+    (the calls' zones forked from the constructor's `Zone`).
+  - `APIRoot.initializeIsolateCopy`: initializes a copy in its `Isolate`
+    (its `currentAPIRequest` forked from that `Isolate`'s `Zone`), called by
+    an auxiliary `APIServerWorker` before its start (otherwise created when
+    first used there).
+  - `APIRoot.getCurrentAPIRequest([contextZone])`: the current `APIRequest`
+    (or `null`), without creating the `ZoneField`.
+  - The `EntityRulesResolver` context provider of an `APIRoot` is registered
+    once per `Isolate` (also by a copy with its modules already loaded), and
+    not again after `close`.
+- Fix: `APIServerResponseCache` wrote a double comma (`,,`) in a cached
+  response's `server-timing` header.
+- Fix: `AlterTableSQL` with `ifNotExists` cut the column name of an entry
+  with leading spaces (`line.substring(11)` over the untrimmed line).
+- Fix: `APIConfig.getPath` threw a `RangeError` for a `List` index out of
+  range (now `null`).
+- Fix: `registerAsDbLogger` of a logger with a dotted (hierarchical) name:
+  its records weren't identified as DB logs (`LogRecord.loggerName` is the
+  full name).
+- Fix: `runTestAPIServer` left the server running on an unknown channel
+  command (now stopped, also closing its `APIRoot`, as on `stop`).
+- Fix: `checkTables` (SQLite) suggested SQLs that SQLite can't run:
+  - `SQLDialect.alterTableAddColumnIfNotExists` (`false` for SQLite): no
+    `ADD COLUMN IF NOT EXISTS`.
+  - Without `SQLDialect.alterTableAddConstraint`, a missing column's foreign
+    key is in the column (`REFERENCES`), and a `UNIQUE` one is a unique
+    index (no `ADD CONSTRAINT`).
+  - A repeated suggested SQL is listed once.
+- Fix: `checkTables` errors with only missing enum `CHECK` constraints or
+  values had no description (now `missingEnumConstraints` and
+  `missingEnumValues`); `missingCollectionReferenceColumns` also listed the
+  non-collection reference fields.
+- Fix: `checkDBTables` with a missing table threw a null-check `TypeError`
+  (`getRepositoriesSchemes`) instead of reporting `No scheme for repository`.
+- Fix: `Transaction`: an error after the first one (e.g. of an operation
+  after the abort) was returned as the operation's result (`as R`: a
+  `TypeError`, or the error object as the result); now it's rethrown (and
+  still added to `extraErrors`).
+- Fix: `IterableEntityRepository.ensureReferencesStored` (`store`,
+  `ensureStored`) didn't store the entities of `List<Entity>` fields.
+- Fix: `EntityHandler.decodeObjectListJson` couldn't decode a list (cast to
+  `O`): each element is now resolved as an entity.
+- Fix: `DBObjectMemoryAdapter`/`DBObjectDirectoryAdapter` stored an
+  `EntityReferenceList` field as the object itself (wrapped in a `List`),
+  not its IDs: the entity couldn't be read back.
+- Fix: `DBObjectDirectoryAdapter`/`DBObjectGCSAdapter` couldn't store a
+  `DateTime`, enum or `Decimal` field (not JSON encodable): now encoded as
+  `Json.toJson` (`DBObjectAdapter.toEncodableJson`), and parsed back by the
+  entity's handler.
+- Fix: `DBObjectDirectoryAdapter`/`DBObjectGCSAdapter`: selecting an entity
+  with sub-entities (e.g. a `User`, with its `Address` and `Role`s) never
+  completed: the sub-entities' selects (by the operation's `preFinish`), in
+  the same transaction, waited for the operation, that waited for them. The
+  object adapters (also `DBObjectMemoryAdapter`) now finish an operation
+  after its transaction execution (as the SQL adapters).
+- Fix: `onStore` never notified the stores of `DBEntityRepository` and
+  `DBRelationalEntityRepository` (inserts and updates with changes; an
+  unchanged entity isn't stored, nor notified).
+- Fix: `APIDBModule`: `select`, `insert`, `update` and `delete` without a
+  table (e.g. `/db/select`) threw a `RangeError` (an error response), now
+  `notFound`.
+- Fix: `EntityHandler.equalsValuesBasic`/`equalsValuesEntity`/
+  `equalsValuesEntityMap`: values without an ID (or a resolvable one) were
+  equal (`null == null`), e.g. two unrelated non-entity objects, or two
+  entities not stored yet: a `null` ID now never matches (as
+  `EntityHandler.equalsValues`).
+- Fix: `APIServer` always sent the `X-Access-Token` header back, also when
+  the client sent the token (the `Authorization` header was checked in the
+  response headers, not in the request's).
+- Fix: `APIAuthentication.isExpired(now:)` ignored `now`.
+- Fix: `DBAdapter.instantiateAdaptor` ignored an `async` instantiator
+  (returning a `Future<A?>`, as declared by `DBAdapterInstantiator`), and
+  didn't skip an async `null`.
+- Fix: `IterableEntityRepository` (e.g. `SetEntityRepository`): re-storing
+  an entity with a unique field (`@EntityField.unique()`) threw
+  `EntityFieldInvalid(unique)` against itself: the unique values are now
+  checked against the other entities (not the same instance or ID).
+- Fix: `SetEntityRepository` (`IterableEntityRepository.store`): an entity
+  with an ID (an update, or an insert with a defined ID) was only "stored"
+  if it was the same instance already stored: an entity with a new ID wasn't
+  stored, and another instance with the same ID (an updated copy) didn't
+  replace the stored one. `SetEntityRepository.nextID` (`length + 1`) could
+  reuse an ID after a remove: now the greatest ID + 1.
+- Fix: `DBObjectMemoryAdapter`/`DBObjectDirectoryAdapter`/`DBObjectGCSAdapter`:
+  a partial update (`store` of a tracked entity: only its changed fields)
+  replaced the stored object with only those fields (the others lost): now
+  merged into the stored object.
+- Fix: `APITokenStore.storeAPIToken`: a `Map<String, Object>` data became an
+  `UnmodifiableMapView<String, Object?>` (not a `Map<String, Object>`): its
+  check was after the `Map<String, Object?>` one (that also matches it).
+- Removed unreachable code: `LoggerHandler.resolveLogDestiny`'s 2-parameter
+  function branches (already `MessageLogger`s), `APIConfig`'s `%var%`
+  fallback (the group always matches) and a duplicated
+  `DBAdapterException.resolveToString` branch.
+- `APIServerWorker._startLetsEncrypt`: removed the unreachable `null`
+  directory check (only called with a directory: `canUseLetsEncrypt`); the
+  "directory doesn't exist" check (removed after the worker's constructor)
+  is now tested.
+- Fix: `DBObjectDirectoryAdapter`: a partial update of an object whose file
+  can't be parsed (e.g. truncated by a crash in the middle of a write) failed
+  (the merge read it): now the update rewrites it (logged).
+- `SetEntityRepository`: its entries by ID (a `LinkedHashMap`): `selectByID`,
+  `existsID` and `store` look up the ID without a scan
+  (`IterableEntityRepository.getStoredByID`), and an updated copy replaces
+  the stored entity in its position (`IterableEntityRepository.replace`;
+  previously moved to the end of the iteration order).
+- Fix: `checkTables` reported a missing unique column's constraint also as a
+  missing unique constraint (its `ADD COLUMN` brings it): the suggested SQLs
+  had it twice.
+- Fix: an error in an operation's `preFinish` (run after its transaction
+  execution: e.g. building the entities of a select, or storing the
+  relationships of an insert) didn't abort the transaction: the operation
+  was never finished, and the transaction never committed nor aborted
+  (in an auto-commit transaction, a SQL adapter's connection held). Now
+  `DBAdapter.finishOperation` (used by all the adapters) notifies it to the
+  transaction (`notifyExecutionError`): aborted, and the error (resolved by
+  the adapter) rethrown.
+- Docs: the `DBObjectAdapter`s (memory, directory, GCS) don't enforce unique
+  fields (`@EntityField.unique()`, `@EntityIndex(unique: true)`): object
+  storages (e.g. GCS, S3) are not designed for that (no index over the
+  objects' values, nor transactions over multiple objects). Documented in
+  `DBObjectAdapter`, each object adapter, `EntityField`/`EntityIndex.unique`
+  and the README (new `ObjectAdapter` section).
+- Fix: `DBObjectGCSAdapter`: a partial update with an error reading the
+  stored object (other than not found: e.g. a timeout or a 5xx response)
+  overwrote it with only the changed fields: now the update fails (the
+  stored object is kept). A select still handles a read error as not found.
+- Tests: `DBObjectGCSAdapter` (with an in-memory fake of the GCS JSON API):
+  insert, partial updates, updated copies, read errors, enum/`Decimal`
+  fields, deletes, the local cache (limits, `cacheDevelopment`) and
+  `fromConfig`; also the shared object adapters tests (without and with a
+  cache).
+- Fix: `DBObjectGCSAdapter` stored an `EntityReferenceList` field as the
+  object itself (wrapped in a `List`), not its IDs (as fixed for the memory
+  and directory adapters).
+- Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
+  - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
+    `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.
+  - The table quoted with `"` (`ALTER TABLE "store" ...`: a string in
+    MySQL): `AlterTableSQL`/`CreateTableSQL`/`CreateIndexSQL` (`SQLBuilder`)
+    now use the dialect's `elementQuote` by default (`"` if it has none).
+- Fix: `DBMySQLAdapter.getTableScheme`/`getTableFieldsTypes` threw for a
+  table that doesn't exist (`ER_NO_SUCH_TABLE`), instead of `null` (as the
+  other adapters).
+- `APIDBModule.select`: paginated by default:
+  - `defaultSelectLimit` (default: `1000`): the `LIMIT` of a request
+    without one (`LIMIT=<n>` in the URL query: a custom one; `LIMIT=0`: no
+    limit). `PAGE=<n>` without a `LIMIT` is now a page of
+    `defaultSelectLimit` entities.
+  - The HTML view has `previous`/`next` page links (keeping the query and
+    the `EAGER`/`ORDER` directives), and the `[first - last]` entities shown;
+    its JSON link is for the same page (and with the query now URL-encoded).
+
 ## 1.21.1
 
 - Tests: line coverage raised from 70.3% to 95.1% (VM suite, including the

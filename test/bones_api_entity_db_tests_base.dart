@@ -686,6 +686,132 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('checkTables: a missing column (the suggested SQL runs)', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var q = sqlAdapter.dialect.elementQuote;
+
+        if (testConfigDB is! APITestConfigDBSQL) {
+          _log.info("Not a `APITestConfigDBSQL`: skipping.");
+          return;
+        }
+
+        var testConfigSQL = testConfigDB;
+
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+
+        sqlAdapter.disposeTableSchemeCache('store');
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        // `store.number` missing (renamed: its values kept):
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q RENAME COLUMN ${q}number$q TO '
+          '${q}number_tmp$q',
+        );
+        sqlAdapter.disposeTableSchemeCache('store');
+
+        // The suggested `ADD COLUMN` runs in this DB (MySQL and SQLite: no
+        // `IF NOT EXISTS`):
+        var ifNotExists = sqlAdapter.dialect.alterTableAddColumnIfNotExists;
+        await _checkFixedBySuggestedSQLs(
+          sqlAdapter,
+          testConfigSQL,
+          expectedSQLs: [
+            ifNotExists
+                ? 'ADD COLUMN IF NOT EXISTS ${q}number$q'
+                : 'ADD COLUMN ${q}number$q',
+          ],
+        );
+
+        // The original column back:
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q DROP COLUMN ${q}number$q',
+        );
+        await testConfigSQL.runSQL(
+          'ALTER TABLE ${q}store$q RENAME COLUMN ${q}number_tmp$q TO '
+          '${q}number$q',
+        );
+        sqlAdapter.disposeTableSchemeCache('store');
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+      });
+
+      test('store: insert, multiple and partial updates', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+
+        final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
+
+        // A new instance, from the DB (not the tracked one):
+        Future<Map<String, Object?>> stored(Object id, Store s) async {
+          var o = (await storeAPIRepository.selectByID(id))!;
+          expect(o, isNot(same(s)));
+          return {'id': o.id, 'name': o.name, 'number': o.number};
+        }
+
+        // Insert:
+        var s = Store('pu-1', 10);
+        var id = await storeAPIRepository.store(s);
+        expect(id, isNotNull);
+
+        try {
+          expect(await stored(id, s), {'id': id, 'name': 'pu-1', 'number': 10});
+
+          // A partial update (only `name`): `number` kept.
+          s.name = 'pu-2';
+          expect(await storeAPIRepository.store(s), equals(id));
+          expect(await stored(id, s), {'id': id, 'name': 'pu-2', 'number': 10});
+
+          // A partial update (only `number`): `name` kept.
+          s.number = 11;
+          expect(await storeAPIRepository.store(s), equals(id));
+          expect(await stored(id, s), {'id': id, 'name': 'pu-2', 'number': 11});
+
+          // Both, and then unchanged (multiple updates):
+          s.name = 'pu-3';
+          s.number = 12;
+          expect(await storeAPIRepository.store(s), equals(id));
+          expect(await storeAPIRepository.store(s), equals(id));
+          expect(await stored(id, s), {'id': id, 'name': 'pu-3', 'number': 12});
+
+          // A `null` (a partial update to `null`):
+          s.number = null;
+          expect(await storeAPIRepository.store(s), equals(id));
+          expect(await stored(id, s), {
+            'id': id,
+            'name': 'pu-3',
+            'number': null,
+          });
+
+          // Another instance with the same ID (an updated copy):
+          var copy = Store('pu-4', 14, id: id as int);
+          expect(await storeAPIRepository.store(copy), equals(id));
+          expect(await stored(id, copy), {
+            'id': id,
+            'name': 'pu-4',
+            'number': 14,
+          });
+        } finally {
+          // The other tests count the stores:
+          await storeAPIRepository.deleteByID(id);
+        }
+
+        expect(await storeAPIRepository.selectByID(id), isNull);
+      });
+
       test('EntityIndex: generated, introspected and checked', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
         var q = sqlAdapter.dialect.elementQuote;

@@ -1967,8 +1967,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   O decodeObjectJson(String json) => decodeJson<O>(json)!;
 
   List<O> decodeObjectListJson(String json) {
-    var itr = decodeObjectJson(json) as Iterable<O>;
-    return itr is List<O> ? itr : itr.toList();
+    // The `jsonReviver` resolves only the top-level object (`key == null`):
+    // each element of the list is resolved as one.
+    var itr = decodeJson<Iterable>(json)!;
+    if (itr is List<O>) return itr;
+    return itr.map((e) => e is O ? e : jsonReviver(null, e) as O).toList();
   }
 
   T? decodeJson<T>(String json) {
@@ -2208,23 +2211,27 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       if (entityHandler2 != null) {
         if (entityHandler1 != entityHandler2) return false;
         var id2 = entityHandler2.getID(value2);
-        return id1 == id2;
+        return _equalsIDs(id1, id2);
       } else {
         var id2 = entityHandler1.resolveID(value2);
-        return id1 == id2;
+        return _equalsIDs(id1, id2);
       }
     } else if (entityHandler2 != null) {
       var id1 = entityHandler2.resolveID(value1);
       var id2 = entityHandler2.getID(value2);
-      return id1 == id2;
+      return _equalsIDs(id1, id2);
     } else if (entityHandler != null) {
       var id1 = entityHandler.resolveID(value1);
       var id2 = entityHandler.resolveID(value2);
-      return id1 == id2;
+      return _equalsIDs(id1, id2);
     }
 
     return equalsValuesEntityMap(value1, value2, entityHandler: entityHandler);
   }
+
+  /// Equals by ID: a `null` ID (no ID, or not resolved) is never equal (the
+  /// values were not `==` already). See [equalsValuesEntity].
+  static bool _equalsIDs(Object? id1, Object? id2) => id1 != null && id1 == id2;
 
   static bool equalsValuesEntityMap(
     Object value1,
@@ -2238,7 +2245,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var id1 = getEntityIDFrom(value1, entityHandler: entityHandler);
     var id2 = getEntityIDFrom(value2, entityHandler: entityHandler);
 
-    return id1 == id2;
+    return _equalsIDs(id1, id2);
   }
 
   static Object? getEntityIDFrom(Object o, {EntityHandler? entityHandler}) {
@@ -7050,12 +7057,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _errorsTransactions[errorResolved] = this;
 
-    var firstExecutionError = false;
     var extraN = 0;
 
     if (previousError == null) {
       _error = errorResolved;
-      firstExecutionError = true;
     } else {
       var extraErrors = _extraErrors ??= [];
       extraErrors.add(errorResolved);
@@ -7078,7 +7083,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _doAutoCommit();
 
-    if (rethrowError && firstExecutionError) {
+    // Also an extra error (after the first one): the operation failed (and
+    // its error is not a result).
+    if (rethrowError) {
       Error.throwWithStackTrace(errorResolved, stackTrace);
     } else {
       return errorResolved as R;
@@ -7725,12 +7732,12 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
         return 'constrainRelationship';
       case TransactionOperationType.selectRelationship:
         return 'selectRelationship';
+      case TransactionOperationType.selectRelationships:
+        return 'selectRelationships';
       case TransactionOperationType.update:
         return 'update';
       case TransactionOperationType.delete:
         return 'delete';
-      default:
-        throw ArgumentError("Unknown: $this");
     }
   }
 
@@ -7825,6 +7832,20 @@ abstract class IterableEntityRepository<O extends Object>
 
   void remove(O o);
 
+  /// The stored entity with [id], or `null`.
+  /// (Scans [iterable]: an implementation can index it by ID.)
+  O? getStoredByID(Object id) => iterable().firstWhereOrNull(
+    (e) => getID(e, entityHandler: entityHandler) == id,
+  );
+
+  /// Replaces the stored entity [stored] by [o] (with the same ID).
+  /// (Removes [stored] and puts [o]: an implementation can keep its
+  /// position.)
+  void replace(O stored, O o) {
+    remove(stored);
+    put(o);
+  }
+
   @override
   bool hasReferencedEntities() {
     final fieldsEntity = entityHandler.fieldsWithTypeEntityOrReference();
@@ -7879,13 +7900,8 @@ abstract class IterableEntityRepository<O extends Object>
   @override
   FutureOr<bool> existsID(dynamic id, {Transaction? transaction}) {
     checkNotClosed();
-
-    var o = iterable().firstWhereOrNull((o) {
-      var oId = getID(o, entityHandler: entityHandler);
-      return oId == id;
-    });
-
-    return o != null;
+    if (id == null) return false;
+    return getStoredByID(id) != null;
   }
 
   @override
@@ -7995,10 +8011,7 @@ abstract class IterableEntityRepository<O extends Object>
   }) {
     checkNotClosed();
 
-    var o = iterable().firstWhereOrNull((o) {
-      var oId = getID(o, entityHandler: entityHandler);
-      return oId == id;
-    });
+    var o = id == null ? null : getStoredByID(id);
 
     return trackEntityNullable(o);
   }
@@ -8041,9 +8054,20 @@ abstract class IterableEntityRepository<O extends Object>
       var oId = getID(o, entityHandler: entityHandler);
 
       if (oId == null) {
+        // An insert:
         oId = nextID();
         setID(o, oId, entityHandler: entityHandler);
         put(o);
+      } else {
+        // An update (or an insert with a defined ID):
+        var stored = getStoredByID(oId);
+
+        if (stored == null) {
+          put(o);
+        } else if (!identical(stored, o)) {
+          // Another instance (e.g. an updated copy): replaces the stored one.
+          replace(stored, o);
+        }
       }
 
       op.finish(oId);
@@ -8072,7 +8096,7 @@ abstract class IterableEntityRepository<O extends Object>
       var value = getField(o, field);
       if (value == null) continue;
 
-      if (_containsEntryWithFieldValue(field, value)) {
+      if (_containsOtherEntryWithFieldValue(o, field, value)) {
         throw EntityFieldInvalid(
           "unique",
           value,
@@ -8084,11 +8108,19 @@ abstract class IterableEntityRepository<O extends Object>
     }
   }
 
-  bool _containsEntryWithFieldValue(String field, value) =>
-      iterable().any((elem) {
-        var elemValue = getField(elem, field);
-        return elemValue == value;
-      });
+  /// Whether an entry other than [o] (not the same instance, nor with the
+  /// same ID: a re-stored entity) has the [field] [value].
+  bool _containsOtherEntryWithFieldValue(O o, String field, Object value) {
+    var id = entityHandler.getID(o);
+
+    return iterable().any((elem) {
+      if (identical(elem, o)) return false;
+      if (id != null && entityHandler.getID(elem) == id) return false;
+
+      var elemValue = getField(elem, field);
+      return elemValue == value;
+    });
+  }
 
   @override
   FutureOr<List<dynamic>> storeAll(Iterable<O> os, {Transaction? transaction}) {
@@ -8288,19 +8320,19 @@ abstract class IterableEntityRepository<O extends Object>
         resolveFiledName: false,
       )!;
 
-      if (!EntityHandler.isValidEntityType(fieldType.type)) {
-        return null;
-      }
-
+      // A `List` of entities (a `List` is not an entity type itself):
       if (value is List && fieldType.isList && fieldType.hasArguments) {
         var elementType = fieldType.arguments.first;
+        if (!EntityHandler.isValidEntityType(elementType.type)) {
+          return null;
+        }
 
         var elementRepository = provider.getEntityRepositoryByTypeInfo(
           elementType,
         );
         if (elementRepository == null) return null;
 
-        var futures = value.map((e) {
+        var futures = value.nonNulls.map((e) {
           return elementRepository.ensureStored(
             e,
             transaction: transaction,
@@ -8309,19 +8341,23 @@ abstract class IterableEntityRepository<O extends Object>
         }).toList();
 
         return futures.resolveAll();
-      } else {
-        var repository = provider.getEntityRepository(
-          type: fieldType.type,
-          obj: value,
-        );
-        if (repository == null) return null;
-
-        return repository.ensureStored(
-          value,
-          transaction: transaction,
-          operation: operation,
-        );
       }
+
+      if (!EntityHandler.isValidEntityType(fieldType.type)) {
+        return null;
+      }
+
+      var repository = provider.getEntityRepository(
+        type: fieldType.type,
+        obj: value,
+      );
+      if (repository == null) return null;
+
+      return repository.ensureStored(
+        value,
+        transaction: transaction,
+        operation: operation,
+      );
     });
 
     return futures.resolveAllWithValue(true);
@@ -8457,25 +8493,72 @@ class SetEntityRepository<O extends Object>
     extends IterableEntityRepository<O> {
   SetEntityRepository(super.name, super.entityHandler, {super.provider});
 
-  final Set<O> _entries = <O>{};
+  // The entries by ID, in the insertion order (a `LinkedHashMap`): a lookup by
+  // ID without a scan, and a replaced entry keeps its position.
+  final Map<Object, O> _entries = <Object, O>{};
+
+  // The entries without an ID (only put directly: `store` defines the ID).
+  final Set<O> _entriesWithoutID = <O>{};
 
   @override
-  Iterable<O> iterable() => _entries;
+  Iterable<O> iterable() => _entriesWithoutID.isEmpty
+      ? _entries.values
+      : _entries.values.followedBy(_entriesWithoutID);
+
+  // The greatest `int` ID put (an ID is never reused, also after a remove).
+  int _lastID = 0;
 
   @override
-  int nextID() => _entries.length + 1;
+  int nextID() => _lastID + 1;
 
   @override
-  int length({Transaction? transaction}) => _entries.length;
+  int length({Transaction? transaction}) =>
+      _entries.length + _entriesWithoutID.length;
+
+  @override
+  O? getStoredByID(Object id) => _entries[id];
 
   @override
   void put(O o) {
-    _entries.add(o);
+    var id = entityHandler.getID(o);
+
+    if (id == null) {
+      _entriesWithoutID.add(o);
+      return;
+    }
+
+    // (If put before without an ID: now by its ID, not twice.)
+    _entriesWithoutID.remove(o);
+
+    _entries[id] = o;
+
+    if (id is int && id > _lastID) {
+      _lastID = id;
+    }
+  }
+
+  @override
+  void replace(O stored, O o) {
+    var id = entityHandler.getID(o);
+
+    // The same ID: the same position.
+    if (id != null && identical(_entries[id], stored)) {
+      _entries[id] = o;
+    } else {
+      super.replace(stored, o);
+    }
   }
 
   @override
   void remove(O o) {
-    _entries.remove(o);
+    var id = entityHandler.getID(o);
+
+    if (id != null && identical(_entries[id], o)) {
+      _entries.remove(id);
+    } else if (!_entriesWithoutID.remove(o)) {
+      // (Its ID changed after it was put.)
+      _entries.removeWhere((k, e) => identical(e, o));
+    }
   }
 
   final Map<Type, Map<Object, Set<Object>>> _relationships =

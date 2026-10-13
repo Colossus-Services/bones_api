@@ -71,6 +71,10 @@ void main() {
       expect(config.getPath<Map>('a', 'b', 'c', 0, 'd'), equals({'e': '12'}));
       expect(config.getPath<int>('a', 'b', 'c', 0, 'x'), isNull);
       expect(config.getPath<int>('a', 'b', 'x'), isNull);
+      // A `List` index out of range (or negative): `null`.
+      expect(config.getPath<Map>('a', 'b', 'c', 1), isNull);
+      expect(config.getPath<Map>('a', 'b', 'c', -1), isNull);
+      expect(config.getPath<int>('a', 'b', 'c', 5, 'd'), isNull);
       expect(
         config.getPath<Map>('a', 'b', 'c', 0),
         equals({
@@ -337,8 +341,12 @@ void main() {
       var served = Completer<String>();
 
       server.listen((request) async {
-        request.response.headers.contentType = ContentType.json;
-        request.response.write('{"remote": true}');
+        if (request.uri.path == '/missing.json') {
+          request.response.statusCode = HttpStatus.notFound;
+        } else {
+          request.response.headers.contentType = ContentType.json;
+          request.response.write('{"remote": true}');
+        }
         await request.response.close();
         if (!served.isCompleted) served.complete(request.uri.path);
       });
@@ -348,17 +356,25 @@ void main() {
 
         // Sync mode doesn't download:
         expect(APIConfig.fromSync(url), isNull);
+        expect(APIConfig.fromSync(url, {'fallback': 1})!['fallback'], 1);
 
-        // Async mode triggers the download, but the downloaded configuration
-        // is currently not returned by `loadAPIConfigFromUri`:
+        // Async mode returns the downloaded configuration:
         var config = await APIConfig.fromAsync(url, {'fallback': 1});
-        expect(config!['fallback'], equals(1));
+        expect(config!['remote'], isTrue);
+        expect(config['fallback'], isNull);
+        expect(config.source, equals(url));
 
+        // The exact URL (no trailing `/`):
         expect(
           await served.future.timeout(Duration(seconds: 10)),
-          startsWith('/cov-config.json'),
+          equals('/cov-config.json'),
         );
-        await Future.delayed(Duration(milliseconds: 50));
+
+        // Not found: the default.
+        var missingURL = 'http://127.0.0.1:${server.port}/missing.json';
+        var config2 = await APIConfig.fromAsync(missingURL, {'fallback': 2});
+        expect(config2!['fallback'], equals(2));
+        expect(await APIConfig.fromAsync(missingURL), isNull);
       } finally {
         await server.close(force: true);
       }

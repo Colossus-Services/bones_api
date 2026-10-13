@@ -112,10 +112,9 @@ class APIConfig {
       }
 
       var valueResolved = value.replaceAllMapped(_regexpValueVariable, (m) {
-        var k = m[1];
-        var v = k != null
-            ? _getVariable(k, !equalsIgnoreAsciiCase(k, key))
-            : m[0];
+        // The group 1 always matches (`%(\w+)%`):
+        var k = m[1]!;
+        var v = _getVariable(k, !equalsIgnoreAsciiCase(k, key));
         return v ?? '';
       });
 
@@ -165,27 +164,10 @@ class APIConfig {
     Object? val = get(k0);
     if (val == null) return null;
 
-    if (k1 != null) {
-      key = k1;
-      val = val is Map ? val[k1] : (k1 is int && val is List ? val[k1] : null);
-      if (val == null) return null;
-    }
-
-    if (k2 != null) {
-      key = k2;
-      val = val is Map ? val[k2] : (k2 is int && val is List ? val[k2] : null);
-      if (val == null) return null;
-    }
-
-    if (k3 != null) {
-      key = k3;
-      val = val is Map ? val[k3] : (k3 is int && val is List ? val[k3] : null);
-      if (val == null) return null;
-    }
-
-    if (k4 != null) {
-      key = k4;
-      val = val is Map ? val[k4] : (k4 is int && val is List ? val[k4] : null);
+    for (var k in [k1, k2, k3, k4]) {
+      if (k == null) continue;
+      key = k;
+      val = _getPathEntry(val, k);
       if (val == null) return null;
     }
 
@@ -200,6 +182,16 @@ class APIConfig {
     }
 
     return val;
+  }
+
+  /// The entry [k] of a [Map], or the index [k] of a [List] (`null` if out of
+  /// range).
+  static Object? _getPathEntry(Object? val, Object k) {
+    if (val is Map) return val[k];
+    if (k is int && val is List) {
+      return k >= 0 && k < val.length ? val[k] : null;
+    }
+    return null;
   }
 
   /// Alias to [get] returning a [Map].
@@ -344,8 +336,13 @@ class APIConfig {
       var uri = resolveStringUri(o);
 
       if (uri != null) {
-        return APIConfig.fromUri(uri, allowAsync: allowAsync) ??
-            _fromImpl(def, allowAsync: allowAsync);
+        var config = APIConfig.fromUri(uri, allowAsync: allowAsync);
+        if (config is Future<APIConfig?>) {
+          return config.then(
+            (config) => config ?? _fromImpl(def, allowAsync: allowAsync),
+          );
+        }
+        return config ?? _fromImpl(def, allowAsync: allowAsync);
       } else {
         return APIConfig.fromContent(o) ??
             _fromImpl(def, allowAsync: allowAsync);

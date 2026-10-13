@@ -353,20 +353,20 @@ void main() {
       expect(DBSQLAdapter.parseConfigLogSQL({'log': 'no'}), isFalse);
     });
 
-    test(
-      'parseConfigLogSQL: `log: {sql: true}`',
-      () {
-        expect(
-          DBSQLAdapter.parseConfigLogSQL({
-            'log': {'sql': true},
-          }),
-          isTrue,
-        );
-      },
-      skip:
-          'lib bug: `parseConfigLogSQL` parses the `log` Map instead of its '
-          '`sql` value (`parseBool(log)`), returning `false`',
-    );
+    test('parseConfigLogSQL: `log: {sql: ...}`', () {
+      expect(
+        DBSQLAdapter.parseConfigLogSQL({
+          'log': {'sql': true},
+        }),
+        isTrue,
+      );
+      expect(
+        DBSQLAdapter.parseConfigLogSQL({
+          'log': {'sql': false},
+        }),
+        isFalse,
+      );
+    });
 
     test('parseConfigDBGenerateTablesAndCheckTables', () {
       expect(
@@ -635,18 +635,17 @@ void main() {
       );
     });
 
-    test(
-      'removeSQLsComments: a block comment',
-      () {
-        expect(
-          DBSQLAdapter.removeSQLsComments('CREATE TABLE a (id INT) ; /* x */'),
-          equals('CREATE TABLE a (id INT) ; '),
-        );
-      },
-      skip:
-          'lib bug: `removeSQLsComments` replaces `/* ... */` with `m[1]` of '
-          'a RegExp without groups: RangeError',
-    );
+    test('removeSQLsComments: block comments', () {
+      expect(
+        DBSQLAdapter.removeSQLsComments('CREATE TABLE a (id INT) ; /* x */'),
+        equals('CREATE TABLE a (id INT) ;  '),
+      );
+      // Replaced by a space: tokens around it aren't joined.
+      expect(
+        DBSQLAdapter.removeSQLsComments('SELECT/* a\n b */1'),
+        equals('SELECT 1'),
+      );
+    });
   });
 
   group('DBSQLiteAdapter entities', () {
@@ -1105,7 +1104,7 @@ void main() {
         'CREATE TABLE item (id INTEGER PRIMARY KEY AUTOINCREMENT, title VARCHAR)',
       );
 
-      var error = await _checkError(adapter);
+      var error = (await _checkError(adapter))!;
       expect(adapter.checkedTables, isFalse);
 
       expect(
@@ -1120,47 +1119,59 @@ void main() {
         contains('  -- missingColumns: [String code , RoleType kind]'),
       );
       expect(error, contains('  -- missingReferenceColumns: [_Owner owner]'));
+      // Only the collection (`List`) reference fields:
       expect(
         error,
-        contains(
-          '  -- missingCollectionReferenceColumns: '
-          '[_Owner owner , List<_Tag> tags]',
-        ),
+        contains('  -- missingCollectionReferenceColumns: [List<_Tag> tags]'),
       );
-      expect(error, contains('  -- missingUniqueConstraints: [code]'));
+      // `code` (unique) is a missing column: its unique constraint comes with
+      // its `ADD COLUMN` (not also a missing unique constraint).
+      expect(error, isNot(contains('missingUniqueConstraints')));
 
+      // SQLite (no `ALTER TABLE ... ADD CONSTRAINT`, nor `ADD COLUMN IF NOT
+      // EXISTS`): the foreign key in the column (`REFERENCES`), a unique
+      // index for `UNIQUE` (once: with the `ADD COLUMN`).
+      const suggestionTitle =
+          'Suggestion of SQLs (`SQLite`) to fix missing columns in tables:\n\n';
       expect(
         error,
         contains(
-          'Suggestion of SQLs (`SQLite`) to fix missing columns in tables:\n\n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "code" VARCHAR(20) ;\n'
-          '  ALTER TABLE "item"  ADD CONSTRAINT "item__code__unique" UNIQUE ("code") ;\n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "kind" VARCHAR '
+          '$suggestionTitle'
+          '  ALTER TABLE "item"  ADD COLUMN "code" VARCHAR(20) ;\n'
+          '  CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique" '
+          'ON "item" ("code") ;\n'
+          '  ALTER TABLE "item"  ADD COLUMN "kind" VARCHAR '
           "CHECK( \"kind\" IN ('admin','guest','unknown') ) ;\n"
           '  \n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "owner" BIGINT ;\n'
+          '  ALTER TABLE "item"  ADD COLUMN "owner" BIGINT '
+          'REFERENCES "owner"("id") ;\n'
           '  CREATE INDEX IF NOT EXISTS "item__owner__idx" ON "item" ("owner") ;\n'
-          '  ALTER TABLE "item"  ADD CONSTRAINT "item__owner__fkey" '
-          'FOREIGN KEY ("owner") REFERENCES "owner"("id") ;\n'
-          '  \n'
-          '  CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique" '
-          'ON "item" ("code") ;\n',
+          '  \n',
         ),
       );
+      expect(error, isNot(contains('ADD CONSTRAINT')));
+      expect(error, isNot(contains('ADD COLUMN IF NOT EXISTS')));
+      expect(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique"'
+            .allMatches(error)
+            .length,
+        equals(1),
+      );
 
-      // Fixing the item table (SQLite: no `ADD CONSTRAINT`), and creating the
-      // relationship table: OK.
-      adapter.executeRawSQL('ALTER TABLE item ADD COLUMN code VARCHAR(20)');
-      adapter.executeRawSQL(
-        "ALTER TABLE item ADD COLUMN kind VARCHAR "
-        "CHECK( kind IN ('admin','guest','unknown') )",
-      );
-      adapter.executeRawSQL(
-        'ALTER TABLE item ADD COLUMN owner BIGINT REFERENCES owner(id)',
-      );
-      adapter.executeRawSQL(
-        'CREATE UNIQUE INDEX item__code__unique ON item (code)',
-      );
+      // Fixing the item table with the suggested SQLs (valid in SQLite), and
+      // creating the relationship table: OK.
+      var suggestedSQLs = error
+          .substring(error.indexOf(suggestionTitle) + suggestionTitle.length)
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      expect(suggestedSQLs, hasLength(5));
+
+      for (var sql in suggestedSQLs) {
+        adapter.executeRawSQL(sql);
+      }
+
       adapter.executeRawSQL(
         'CREATE TABLE item__tags__rel ('
         'item_id BIGINT NOT NULL REFERENCES item(id), '
@@ -1172,22 +1183,16 @@ void main() {
       expect(adapter.checkedTables, isTrue);
     });
 
-    test(
-      'no table',
-      () async {
-        var provider = _Provider(generateTables: false, checkTables: false);
-        addTearDown(provider.dispose);
-        await provider.ensureInitialized();
+    test('no table', () async {
+      var provider = _Provider(generateTables: false, checkTables: false);
+      addTearDown(provider.dispose);
+      await provider.ensureInitialized();
 
-        var error = await _checkError(provider.adapter);
-        expect(error, contains('No scheme for repository `item` (`_Item`)'));
-      },
-      skip:
-          'lib bug: `getRepositoriesSchemes` uses `resolveAllValues` (non '
-          'nullable) over the schemes: a missing table (`null` scheme) throws '
-          'a null-check `TypeError` instead of the `No scheme for repository` '
-          'check error',
-    );
+      // A missing table: reported by the check (not a `TypeError`).
+      var error = await _checkError(provider.adapter);
+      expect(error, contains('No scheme for repository `item` (`_Item`)'));
+      expect(provider.adapter.checkedTables, isFalse);
+    });
 
     test('invalid column type', () async {
       var provider = _Provider(generateTables: false, checkTables: false);

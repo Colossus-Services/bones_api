@@ -687,7 +687,7 @@ class DBRelationalEntityRepository<O extends Object>
 
             return _ensureRelationshipsStored(o, op.transaction).resolveWith(
               () {
-                trackEntity(o);
+                trackEntity(o, stored: true);
                 return id; // pre-finish
               },
             );
@@ -759,7 +759,7 @@ class DBRelationalEntityRepository<O extends Object>
               op.transaction,
               changedFields,
             ).resolveWith(() {
-              trackEntity(o);
+              trackEntity(o, stored: true);
               return id; // pre-finish
             });
           },

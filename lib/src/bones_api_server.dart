@@ -1649,6 +1649,10 @@ class APIServer extends _APIServerBase {
     var totalAuxiliaryWorkers = totalWorkers - 1;
 
     if (totalAuxiliaryWorkers >= 1) {
+      // The `apiRoot` is sent to (copied into) the auxiliary workers'
+      // `Isolate`s:
+      apiRoot.prepareForIsolateCopy();
+
       auxiliaryWorkers = List.generate(
         totalAuxiliaryWorkers,
         (i) => _createWorker(i + 1),
@@ -1666,10 +1670,15 @@ class APIServer extends _APIServerBase {
     if (totalAuxiliaryWorkers >= 1) {
       _log.info("Spawning $totalAuxiliaryWorkers parallel workers...");
 
-      workersSpawns = await _auxiliaryWorkers
-          .map((e) => MapEntry(e, e.spawnIsolate()))
-          .toMapFromEntries()
-          .resolveAllValues();
+      try {
+        workersSpawns = await _auxiliaryWorkers
+            .map((e) => MapEntry(e, e.spawnIsolate()))
+            .toMapFromEntries()
+            .resolveAllValues();
+      } finally {
+        // Copied: the `apiRoot` internals back in the instance.
+        apiRoot.finishIsolateCopy();
+      }
 
       _log.info("Spawned $totalAuxiliaryWorkers parallel workers.");
     }
@@ -3050,6 +3059,10 @@ final class APIServerWorker extends _APIServerBase {
     final worker = params.worker;
     final mainWorkerPort = params.mainWorkerPort;
 
+    // The `apiRoot` is a copy: initialized in this `Isolate` (its calls'
+    // zones forked from this one, not from the first request's).
+    worker.apiRoot.initializeIsolateCopy();
+
     final workerDebugName = worker.workerDebugName;
 
     var resumePort = ReceivePort('$workerDebugName:resumePort');
@@ -3217,12 +3230,13 @@ final class APIServerWorker extends _APIServerBase {
     }
   }
 
+  /// Called only if [canUseLetsEncrypt] (with a [letsEncryptDirectory]).
   Future<void> _startLetsEncrypt() async {
-    var letsEncryptDirectory = this.letsEncryptDirectory;
+    var letsEncryptDirectory = this.letsEncryptDirectory!;
 
-    if (letsEncryptDirectory == null) {
-      throw StateError("Let's Encrypt directory not set!");
-    } else if (!letsEncryptDirectory.existsSync()) {
+    // Resolved (and created) by the constructor: missing only if removed
+    // after it.
+    if (!letsEncryptDirectory.existsSync()) {
       throw StateError(
         "Let's Encrypt directory doesn't exists: $letsEncryptDirectory",
       );
@@ -3572,7 +3586,7 @@ final class APIServerWorker extends _APIServerBase {
       var tokenKey = authentication.tokenKey;
 
       if (authentication.resumed ||
-          _needToSendHeaderXAccessToken(headers, tokenKey)) {
+          _needToSendHeaderXAccessToken(apiRequest, headers, tokenKey)) {
         headers.setMultiValue('X-Access-Token', tokenKey, ignoreCase: true);
       }
     }
@@ -3607,12 +3621,17 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   bool _needToSendHeaderXAccessToken(
+    APIRequest apiRequest,
     Map<String, Object> headers,
     String tokenKey,
   ) {
-    var headerAuthorization = headers.getFirstValue('authorization');
+    // The client already has the token: sent in the request's
+    // `Authorization` header.
+    var headerAuthorization = apiRequest.getHeader('authorization');
     var notSentByAuthentication =
         headerAuthorization == null || !headerAuthorization.contains(tokenKey);
+
+    // Already in the response headers (e.g. set by the route):
 
     var headerAccessToken = headers.getMultiValue(
       'x-access-token',

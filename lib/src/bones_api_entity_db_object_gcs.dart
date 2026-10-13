@@ -51,6 +51,10 @@ class DBObjectGCSAdapterContext
 /// A [DBObjectAdapter] that stores objects in Google Cloud Storage (GCS).
 ///
 /// - See https://cloud.google.com/storage
+///
+/// Doesn't enforce unique fields: GCS (an object storage) has no index over
+/// the objects' values, nor transactions over multiple objects (see
+/// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   static bool _boot = false;
 
@@ -473,14 +477,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<int, int>? preFinish,
   }) {
-    return executeTransactionOperation(
+    return _executeOperation(
       op,
-      (conn) => _doCountImpl(
-        op,
-        table,
-        matcher,
-        parameters ?? namedParameters,
-      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+      (conn) => _doCountImpl(op, table, matcher, parameters ?? namedParameters),
+      preFinish,
     );
   }
 
@@ -523,13 +523,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String table,
     List<I> ids,
   ) {
-    return executeTransactionOperation(
+    return _executeOperation<List<I>, List<I>>(
       op,
-      (conn) => _doExistIDsImpl(
-        op,
-        table,
-        ids,
-      ).resolveMapped((res) => _finishOperation(op, res, null)),
+      (conn) => _doExistIDsImpl(op, table, ids),
+      null,
     );
   }
 
@@ -558,13 +555,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String table,
     Object id, {
     PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
-  }) => executeTransactionOperation<R?>(
+  }) => _executeOperation<Map<String, dynamic>?, R?>(
     op,
-    (conn) => _doSelectByIDImpl<R>(
-      table,
-      id,
-      entityName,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) => _doSelectByIDImpl<R>(table, id, entityName),
+    preFinish,
   );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
@@ -584,7 +578,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<List<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectByIDsImpl<R>(
       table,
@@ -594,7 +588,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
@@ -630,7 +625,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectAllImpl<R>(
       table,
@@ -639,7 +634,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   Future<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
@@ -698,14 +694,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, R>(
     op,
-    (conn) => _doDeleteImpl<R>(
-      op,
-      table,
-      matcher,
-      parameters ?? namedParameters,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) =>
+        _doDeleteImpl<R>(op, table, matcher, parameters ?? namedParameters),
+    preFinish,
   );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
@@ -741,17 +734,17 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Map<String, dynamic> fields, {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
-  }) => executeTransactionOperation<dynamic>(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doInsertImpl<O>(
+  Future<Object> _doInsertImpl<O>(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
-    PreFinishDBOperation? preFinish,
   ) async {
     var entry = _normalizeEntityJSON(
       fields,
@@ -772,7 +765,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     await _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
   }
 
   @override
@@ -786,38 +779,49 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
     bool allowAutoInsert = false,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doUpdateImpl(
+  Future<Object> _doUpdateImpl(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
     Object id,
-    PreFinishDBOperation? preFinish,
   ) async {
     _log.info(
       '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
     );
 
-    var entry = _normalizeEntityJSON(
+    var changes = _normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
+
+    // A partial update (only the changed `fields`): merged into the stored
+    // object (if any: an auto-insert).
+    // Only a not found object is `null` (an auto-insert): a read error fails
+    // the update (merged with `null`, the other fields would be lost).
+    var stored = await _readObject(table, id, failOnError: true);
+
+    var entry = <String, dynamic>{...?stored, ...changes};
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
 
     await _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
   }
 
-  static final _jsonEncoder = dart_convert.JsonUtf8Encoder();
+  static final _jsonEncoder = dart_convert.JsonUtf8Encoder(
+    null,
+    DBObjectAdapter.toEncodableJson,
+  );
   static const _jsonDecoder = dart_convert.JsonDecoder();
   static const _utf8Decoder = dart_convert.Utf8Decoder();
 
@@ -908,7 +912,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return ok;
   }
 
-  Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
+  /// Reads the object [id] of [table], or `null` if not found.
+  /// - [failOnError]: if `true`, an error other than not found (e.g. a
+  ///   timeout or a 5xx response) is rethrown (otherwise logged, as not
+  ///   found).
+  Future<Map<String, dynamic>?> _readObject(
+    String table,
+    Object? id, {
+    bool failOnError = false,
+  }) async {
     if (!_isValidId(id)) return null;
 
     var cacheFile = await _resolveCacheObjectFile(table, id);
@@ -927,6 +939,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         var notFound = e is DetailedApiRequestError && e.status == 404;
         if (!notFound) {
           _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
+          if (failOnError) rethrow;
         }
         return null;
       }
@@ -1296,15 +1309,20 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
             );
           }
 
-          var valIter = value is Iterable ? value : [value];
+          if (value is EntityReferenceList) {
+            // Its IDs (from its entities, if only those are set):
+            value = value.isNull ? null : value.ids;
+          } else {
+            var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map(
-                (v) => fieldListEntityRepository.isOfEntityType(v)
-                    ? fieldListEntityRepository.getEntityID(v)
-                    : v,
-              )
-              .toList();
+            value = valIter
+                .map(
+                  (v) => fieldListEntityRepository.isOfEntityType(v)
+                      ? fieldListEntityRepository.getEntityID(v)
+                      : v,
+                )
+                .toList();
+          }
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
@@ -1364,13 +1382,21 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     TransactionOperation op,
     T res,
     PreFinishDBOperation<T, R>? preFinish,
-  ) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
+  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
+
+  /// Executes [f] in the transaction of [op], and finishes [op] (with
+  /// [preFinish]) after that execution, not inside it: a [preFinish] can
+  /// issue other operations in the same transaction (e.g. selecting the
+  /// sub-entities), executed after this one (inside it, they would wait for
+  /// it, that waits for them).
+  FutureOr<R> _executeOperation<T, R>(
+    TransactionOperation op,
+    FutureOr<T> Function(DBObjectGCSAdapterContext connection) f,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) => executeTransactionOperation<T>(
+    op,
+    f,
+  ).resolveMapped((res) => _finishOperation<T, R>(op, res, preFinish));
 
   FutureOr<R> executeTransactionOperation<R>(
     TransactionOperation op,

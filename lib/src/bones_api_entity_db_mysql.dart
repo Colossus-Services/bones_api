@@ -108,6 +108,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              acceptsTemporaryTableForReturning: true,
              acceptsInsertIgnore: true,
              createIndexIfNotExists: false,
+             // Nor `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (a syntax
+             // error, also in the latest versions):
+             alterTableAddColumnIfNotExists: false,
              // `DROP INDEX name ON table` (no `IF EXISTS`):
              dropIndexOnTable: true,
              // MySQL can't parse an `OFFSET` without a preceding `LIMIT`:
@@ -324,6 +327,22 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     return true;
   }
 
+  /// The columns of [table] (`SHOW COLUMNS`), or `null` if it doesn't exist
+  /// (as the other adapters: not an error).
+  Future<List<ResultRow>?> _showColumns(
+    DBMySqlConnectionWrapper connection,
+    String table,
+  ) async {
+    try {
+      var results = await connection.query("SHOW COLUMNS FROM `$table`");
+      return results.toList();
+    } on MySqlException catch (e) {
+      // `ER_NO_SUCH_TABLE`:
+      if (e.errorNumber == 1146) return null;
+      rethrow;
+    }
+  }
+
   @override
   Future<Map<String, Type>?> getTableFieldsTypesImpl(String table) async {
     var connection = await catchFromPool();
@@ -331,14 +350,11 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     try {
       _log.info('getTableFieldsTypesImpl> $table');
 
-      var sql = "SHOW COLUMNS FROM `$table`";
-      var results = await connection.query(sql);
-
-      var scheme = results.toList();
+      var scheme = await _showColumns(connection, table);
 
       await releaseIntoPool(connection);
 
-      if (scheme.isEmpty) return null;
+      if (scheme == null || scheme.isEmpty) return null;
 
       var fieldsTypes = Map<String, Type>.fromEntries(
         scheme.map((e) {
@@ -366,12 +382,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     try {
       //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
-      var sql = "SHOW COLUMNS FROM `$table`";
-      var results = await connection.query(sql);
+      var scheme = await _showColumns(connection, table);
 
-      var scheme = results.toList();
-
-      if (scheme.isEmpty) {
+      if (scheme == null || scheme.isEmpty) {
         await releaseIntoPool(connection);
         return null;
       }

@@ -719,15 +719,17 @@ void main() {
       expect(listJson, equals('[{"id":1,"name":"a"},{"id":2,"name":"b"}]'));
       expect(covIntHandler.encodeObjectListJson([]), equals('[]'));
 
-      // NOTE: `decodeObjectListJson` delegates to `decodeObjectJson`, which
-      // casts the decoded JSON (a `List`) to `O`, so it can't decode a list
-      // (reported as a lib bug). Accept both behaviors here:
-      try {
-        var list = covIntHandler.decodeObjectListJson(listJson);
-        expect(list.map((e) => e.values), equals([o1.values, o2.values]));
-      } on TypeError catch (e) {
-        expect('$e', contains('List'));
-      }
+      var list = covIntHandler.decodeObjectListJson(listJson);
+      expect(list, everyElement(isA<CovInt>()));
+      expect(list.map((e) => e.values), equals([o1.values, o2.values]));
+      expect(covIntHandler.decodeObjectListJson('[]'), isEmpty);
+
+      // A `jsonReviver` that already returns a `List<O>`: returned as is.
+      var revived = <CovInt>[o1, o2];
+      covIntHandler.jsonReviver = (k, v) =>
+          k == null && v is List ? revived : v;
+      expect(covIntHandler.decodeObjectListJson(listJson), same(revived));
+      covIntHandler.jsonReviver = null;
 
       var decoded = covIntHandler.decodeObjectJson('{"id":3,"name":"c"}');
       expect(decoded.values, equals({'id': 3, 'name': 'c'}));
@@ -895,23 +897,41 @@ void main() {
       expect(EntityHandler.equalsValuesBasic(ref, 1), isTrue);
       expect(EntityHandler.equalsValuesBasic(1, ref), isTrue);
 
-      // Non-entity objects without resolvable IDs: both IDs are `null`, so
-      // they are considered equal (by ID):
-      expect(EntityHandler.equalsValuesBasic(Uri(), Uri(path: 'x')), isTrue);
+      // Non-entity objects without resolvable IDs: not equal (a `null` ID
+      // doesn't match another `null` ID), unless `==`:
+      expect(EntityHandler.equalsValuesBasic(Uri(), Uri(path: 'x')), isFalse);
       expect(
         EntityHandler.equalsValuesBasic(
           Uri(),
           Uri(path: 'x'),
           entityHandler: covIntHandler,
         ),
+        isFalse,
+      );
+      expect(
+        EntityHandler.equalsValuesBasic(Uri(path: 'x'), Uri(path: 'x')),
         isTrue,
       );
+
+      // Entities without an ID (not stored): not equal, unless the same
+      // instance:
+      var n1 = CovInt({'name': 'a'});
+      var n2 = CovInt({'name': 'b'});
+      expect(EntityHandler.equalsValuesBasic(n1, n2), isFalse);
+      expect(EntityHandler.equalsValuesBasic(n1, n1), isTrue);
+      // An entity without an ID is not equal to one with an ID:
+      expect(EntityHandler.equalsValuesBasic(n1, a1), isFalse);
+      expect(EntityHandler.equalsValuesBasic(a1, n1), isFalse);
     });
 
     test('equalsValuesEntityMap / getEntityIDFrom', () {
       expect(EntityHandler.equalsValuesEntityMap({'id': 1}, {'id': 1}), isTrue);
       expect(EntityHandler.equalsValuesEntityMap({'id': 1}, 1), isTrue);
       expect(EntityHandler.equalsValuesEntityMap('a', {'ID': 'a'}), isTrue);
+      // No IDs (`null`): not equal.
+      expect(EntityHandler.equalsValuesEntityMap({'id': 1}, Uri()), isFalse);
+      expect(EntityHandler.equalsValuesEntityMap(Uri(), Uri()), isFalse);
+      expect(EntityHandler.equalsValuesEntityMap({'x': 1}, Uri()), isFalse);
 
       expect(EntityHandler.getEntityIDFrom(1), equals(1));
       expect(EntityHandler.getEntityIDFrom({'Id': 2}), equals(2));

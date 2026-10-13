@@ -70,6 +70,7 @@ class CovUniq extends CovEntity {
   Map<String, TypeInfo> get types => {
     'id': TypeInfo.tInt,
     'code': TypeInfo.tString,
+    'name': TypeInfo.tString,
   };
 
   @override
@@ -572,6 +573,220 @@ void main() {
       expect(await uniqRepo.count(), equals(3));
     });
 
+    // The unique fields are checked against the other entities (not the
+    // one being re-stored, the same instance or ID):
+    group('unique field: re-storing', () {
+      setUp(() async {
+        for (var o in (await uniqRepo.selectAll()).toList()) {
+          await uniqRepo.deleteEntity(o);
+        }
+      });
+
+      test('the same instance, unchanged', () async {
+        var o = CovUniq({'code': 'r1'});
+        var id = await uniqRepo.store(o);
+
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+      });
+
+      test('the same instance, with a new unique value', () async {
+        var o = CovUniq({'code': 'r2'});
+        var id = await uniqRepo.store(o);
+
+        o.values['code'] = 'r2b';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+        expect(uniqRepo.selectByID(id)!.values['code'], 'r2b');
+      });
+
+      test('another instance with the same ID (a copy)', () async {
+        var o = CovUniq({'code': 'r3', 'name': 'n3'});
+        var id = await uniqRepo.store(o);
+
+        // The same unique value, another field changed:
+        var copy = CovUniq({'id': id, 'code': 'r3', 'name': 'n3b'});
+        expect(await uniqRepo.store(copy), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+
+        // The copy replaces the stored entity:
+        var stored = uniqRepo.selectByID(id)!;
+        expect(stored, same(copy));
+        expect(stored.values['name'], equals('n3b'));
+
+        // A copy with a new unique value: the previous one is free again.
+        var copy2 = CovUniq({'id': id, 'code': 'r3c', 'name': 'n3c'});
+        expect(await uniqRepo.store(copy2), equals(id));
+        expect(uniqRepo.selectByID(id)!.values['code'], equals('r3c'));
+        await uniqRepo.store(CovUniq({'code': 'r3'}));
+        expect(await uniqRepo.count(), equals(2));
+      });
+
+      test('insert, multiple and partial updates', () async {
+        // Insert:
+        var o = CovUniq({'code': 'p1', 'name': 'n1'});
+        var id = await uniqRepo.store(o);
+        expect(id, isNotNull);
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p1',
+          'name': 'n1',
+        });
+
+        // A partial update (only `name`): the unique `code` kept (not a
+        // conflict with itself).
+        o.values['name'] = 'n2';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p1',
+          'name': 'n2',
+        });
+
+        // A partial update (only the unique `code`):
+        o.values['code'] = 'p2';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p2',
+          'name': 'n2',
+        });
+
+        // Both, and then unchanged (multiple updates):
+        o.values['code'] = 'p3';
+        o.values['name'] = 'n3';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p3',
+          'name': 'n3',
+        });
+
+        expect(await uniqRepo.count(), equals(1));
+
+        // The previous unique values are free:
+        await uniqRepo.store(CovUniq({'code': 'p1'}));
+        await uniqRepo.store(CovUniq({'code': 'p2'}));
+        expect(await uniqRepo.count(), equals(3));
+      });
+
+      test('an insert with a defined ID', () async {
+        var o = CovUniq({'id': 70, 'code': 'i1'});
+        expect(await uniqRepo.store(o), equals(70));
+        expect(await uniqRepo.count(), equals(1));
+        expect(uniqRepo.selectByID(70), same(o));
+
+        // The next IDs after it:
+        var id2 = await uniqRepo.store(CovUniq({'code': 'i2'}));
+        expect(id2, equals(71));
+
+        // A conflict with it:
+        expect(
+          () => uniqRepo.store(CovUniq({'id': 72, 'code': 'i1'})),
+          throwsA(isA<EntityFieldInvalid>()),
+        );
+        expect(uniqRepo.selectByID(72), isNull);
+      });
+
+      test('an updated copy keeps the iteration order (44)', () async {
+        var a = CovUniq({'code': 'o1'});
+        var b = CovUniq({'code': 'o2'});
+        var c = CovUniq({'code': 'o3'});
+        var idA = await uniqRepo.store(a);
+        var idB = await uniqRepo.store(b);
+        var idC = await uniqRepo.store(c);
+
+        List<Object?> codes() =>
+            uniqRepo.iterable().map((e) => e.values['code']).toList();
+
+        expect(codes(), equals(['o1', 'o2', 'o3']));
+
+        // An updated copy of the first: in the same position.
+        var copyA = CovUniq({'id': idA, 'code': 'o1b'});
+        await uniqRepo.store(copyA);
+        expect(codes(), equals(['o1b', 'o2', 'o3']));
+        expect(uniqRepo.selectByID(idA), same(copyA));
+
+        // The same instance updated: also in place.
+        b.values['code'] = 'o2b';
+        await uniqRepo.store(b);
+        expect(codes(), equals(['o1b', 'o2b', 'o3']));
+
+        expect(await uniqRepo.existsID(idC), isTrue);
+        expect(await uniqRepo.existsID(999), isFalse);
+        expect(await uniqRepo.existsID(null), isFalse);
+        expect(uniqRepo.getStoredByID(idB), same(b));
+        expect(uniqRepo.getStoredByID(999), isNull);
+        expect(uniqRepo.selectByID(null), isNull);
+      });
+
+      test('put/remove (also without an ID)', () async {
+        var noID = CovUniq({'code': 'n1'});
+        uniqRepo.put(noID);
+        expect(uniqRepo.iterable(), contains(noID));
+        expect(uniqRepo.length(), equals(1));
+
+        var withID = CovUniq({'id': 50, 'code': 'n2'});
+        uniqRepo.put(withID);
+        expect(uniqRepo.getStoredByID(50), same(withID));
+        expect(uniqRepo.length(), equals(2));
+
+        uniqRepo.remove(noID);
+        uniqRepo.remove(withID);
+        expect(uniqRepo.iterable(), isEmpty);
+
+        // Put without an ID, and stored later with one: once (not twice).
+        var late = CovUniq({'code': 'n4'});
+        uniqRepo.put(late);
+        late.values['id'] = 70;
+        expect(await uniqRepo.store(late), equals(70));
+        expect(
+          uniqRepo.iterable().where((e) => identical(e, late)),
+          hasLength(1),
+        );
+        expect(uniqRepo.length(), equals(1));
+        uniqRepo.remove(late);
+        expect(uniqRepo.iterable(), isEmpty);
+
+        // An ID changed after it was put: still removed.
+        var changed = CovUniq({'id': 60, 'code': 'n3'});
+        uniqRepo.put(changed);
+        changed.values['id'] = 61;
+        uniqRepo.remove(changed);
+        expect(uniqRepo.iterable(), isEmpty);
+      });
+
+      test('IDs are not reused (after a delete)', () async {
+        var id1 = await uniqRepo.store(CovUniq({'code': 'd1'}));
+        var id2 = await uniqRepo.store(CovUniq({'code': 'd2'}));
+        await uniqRepo.deleteByID(id1);
+
+        var id3 = await uniqRepo.store(CovUniq({'code': 'd3'}));
+        expect(id3, isNot(equals(id2)));
+        expect(id3, isNot(equals(id1)));
+        expect(await uniqRepo.count(), equals(2));
+        expect(uniqRepo.selectByID(id2)!.values['code'], equals('d2'));
+        expect(uniqRepo.selectByID(id3)!.values['code'], equals('d3'));
+      });
+
+      test('the value of another entity: still an error', () async {
+        await uniqRepo.store(CovUniq({'code': 'r4'}));
+        var o = CovUniq({'code': 'r5'});
+        await uniqRepo.store(o);
+
+        o.values['code'] = 'r4';
+        expect(
+          () => uniqRepo.store(o),
+          throwsA(
+            isA<EntityFieldInvalid>()
+                .having((e) => e.reason, 'reason', 'unique')
+                .having((e) => e.fieldName, 'fieldName', 'code'),
+          ),
+        );
+      });
+    });
+
     test('relationships', () async {
       var c1 = CovItem({'name': 'c1'});
       var c2 = CovItem({'name': 'c2'});
@@ -632,10 +847,10 @@ void main() {
       expect(id, isNotNull);
       // The single entity reference is stored:
       expect(c3.getID(), isNotNull);
-      // NOTE: `IterableEntityRepository.ensureReferencesStored` skips `List`
-      // fields (`isValidEntityType(List)` is `false`), so `c1`/`c2` are not
-      // stored here (reported as a lib bug). Accept both behaviors:
-      expect(await itemRepo.count(), anyOf(equals(1), equals(3)));
+      // And the entities of the `List` field:
+      expect(c1.getID(), isNotNull);
+      expect(c2.getID(), isNotNull);
+      expect(await itemRepo.count(), equals(3));
 
       // Already stored and unchanged:
       expect(await parentRepo.ensureStored(p), equals(id));

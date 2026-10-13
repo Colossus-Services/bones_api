@@ -354,6 +354,22 @@ void main() {
       expect(res.status, equals(200));
       expect(res.headers.value('x-access-token'), equals('TK123'));
 
+      // Sent by the client (request `Authorization`): not sent back.
+      var res1 = await _request(
+        '${apiServer.url}cov/auth',
+        headers: {'authorization': 'Bearer TK123'},
+      );
+      expect(res1.status, equals(200));
+      expect(res1.headers['x-access-token'], isNull);
+
+      // Another token in the request `Authorization`: sent.
+      var res1b = await _request(
+        '${apiServer.url}cov/auth',
+        headers: {'authorization': 'Bearer OTHER'},
+      );
+      expect(res1b.status, equals(200));
+      expect(res1b.headers.value('x-access-token'), equals('TK123'));
+
       // Already set by the route: not duplicated.
       var res2 = await _request('${apiServer.url}cov/auth?preset=true');
       expect(res2.status, equals(200));
@@ -596,6 +612,52 @@ void main() {
 
       apiRoot.close();
     });
+
+    test(
+      "Let's Encrypt directory removed after the worker's constructor",
+      () async {
+        var leDir = await Directory.systemTemp.createTemp('bones_api_cov_le2_');
+        var docRoot = await Directory.systemTemp.createTemp(
+          'bones_api_cov_le2_',
+        );
+        addTearDown(() async {
+          await docRoot.delete(recursive: true);
+          if (leDir.existsSync()) await leDir.delete(recursive: true);
+        });
+
+        var port = await resolveFreePort(6670);
+
+        var apiRoot = _CovHttpAPIRoot('cov-http-le2');
+        addTearDown(apiRoot.close);
+
+        // An `APIServer` creates its workers on `start` (each one resolving,
+        // and creating, the directory): only a worker started after the
+        // directory is removed reaches the check.
+        var worker = APIServerWorker(
+          0,
+          apiRoot,
+          name: 'LE',
+          version: '1.0',
+          address: 'localhost',
+          port: port,
+          securePort: port + 1,
+          letsEncrypt: true,
+          letsEncryptDirectory: leDir.path,
+          domains: {'cov-test.local': docRoot.path},
+        );
+
+        expect(worker.canUseLetsEncrypt, isTrue);
+
+        await leDir.delete(recursive: true);
+
+        var error = await worker.start().then<Object?>(
+          (ok) => ok,
+          onError: (e) => e,
+        );
+        expect(error, isA<StateError>());
+        expect('$error', contains("Let's Encrypt directory doesn't exists"));
+      },
+    );
 
     test('restricted CORS + log queue + properties', () async {
       var port = await resolveFreePort(6700);
@@ -841,9 +903,11 @@ void main() {
     test('totalWorkers: 2', () async {
       var port = await resolveFreePort(6400);
 
-      // Created at the root `Zone`, since the `APIRoot` is sent to the
-      // worker `Isolate` and a test `Zone` is not sendable:
-      var apiRoot = Zone.root.run(() => _CovHttpAPIRoot('cov-http-workers'));
+      // Created in the test's `Zone` (not `Zone.root`): the `APIRoot` sent to
+      // the worker `Isolate` holds no `Zone` (unsendable) before its
+      // initialization.
+      expect(identical(Zone.current, Zone.root), isFalse);
+      var apiRoot = _CovHttpAPIRoot('cov-http-workers');
 
       var apiServer = APIServer(
         apiRoot,
@@ -866,6 +930,37 @@ void main() {
       }
 
       expect(workers, everyElement(endsWith('/2')));
+
+      await apiServer.stop();
+      expect(apiServer.isStopped, isTrue);
+    });
+
+    test('totalWorkers: 2 (APIRoot initialized before start)', () async {
+      var port = await resolveFreePort(6500);
+
+      var apiRoot = _CovHttpAPIRoot('cov-http-workers-init');
+      await apiRoot.ensureInitialized();
+      var zoneField = apiRoot.currentAPIRequest;
+
+      var apiServer = APIServer(
+        apiRoot,
+        'localhost',
+        port,
+        totalWorkers: 2,
+        logToConsole: false,
+      );
+
+      // `prepareForIsolateCopy` (by `start`) makes it sendable:
+      expect(await apiServer.start(), isTrue);
+
+      for (var i = 0; i < 10; ++i) {
+        var res = await _request('${apiServer.url}cov/ok');
+        expect(res.status, equals(200));
+        expect(_bodyStr(res), equals('OK:GET'));
+      }
+
+      // The main `Isolate` keeps its `ZoneField`:
+      expect(apiRoot.currentAPIRequest, same(zoneField));
 
       await apiServer.stop();
       expect(apiServer.isStopped, isTrue);
@@ -901,6 +996,10 @@ void main() {
       expect(apiServer.cookieless, isTrue);
       expect(apiServer.apiRoot.apiConfig['foo'], equals('bar'));
 
+      // `stop`: the `APIRoot` is also closed (as on an unknown command):
+      expect(apiServer.apiRoot.isClosed, isTrue);
+      expect(APIRoot.getByName(apiServer.apiRoot.name), isNull);
+
       expect(logs.first, equals('** Resolving free port...'));
       expect(logs.join('\n'), contains('URL: http://localhost:$port/'));
       expect(logs.join('\n'), contains('API Server CMD: stop'));
@@ -926,9 +1025,13 @@ void main() {
 
       await expectLater(serverAsync, throwsUnsupportedError);
 
-      // The server is left running by `runTestAPIServer` on an invalid
-      // command, so release its `APIRoot`:
-      apiRoot?.close();
+      // `runTestAPIServer` stops the server and closes its `APIRoot`:
+      expect(apiRoot!.isClosed, isTrue);
+      expect(APIRoot.getByName('cov-http-test-server2'), isNull);
+
+      // The port is free again:
+      var server = await HttpServer.bind('localhost', port);
+      await server.close(force: true);
     });
 
     test('without channel', () async {

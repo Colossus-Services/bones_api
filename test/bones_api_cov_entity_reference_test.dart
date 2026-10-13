@@ -876,6 +876,25 @@ void main() {
 
       var o = await ref.get();
       expect(o!.name, equals('g7'));
+
+      // `getAt` fetches only the ID at `index`:
+      var atCalls = <List<Object?>>[];
+      var lAt = EntityReferenceList<_Thing>.fromIDs(
+        [1, 2],
+        entitiesFetcher: (ids, type) {
+          atCalls.add(ids);
+          return ids.map((id) => _Thing(id as int, 'h$id')).toList();
+        },
+      );
+
+      var e2 = await lAt.getAt(1);
+      expect(e2!.name, equals('h2'));
+      expect(
+        atCalls,
+        equals([
+          [2],
+        ]),
+      );
     });
 
     test('add / addAll / remove / removeByID', () {
@@ -1009,6 +1028,11 @@ void main() {
 
       var refEmpty = EntityReferenceList<_Thing>.asEmpty().toEntityReference();
       expect(refEmpty.isNull, isTrue);
+
+      var refEmpty2 = EntityReferenceList<_Thing>.fromEntities(
+        [],
+      ).toEntityReference();
+      expect(refEmpty2.isNull, isTrue);
     });
 
     test('== and hashCode', () {

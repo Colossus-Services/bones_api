@@ -43,6 +43,9 @@ class DBObjectDirectoryAdapterContext
 /// A [DBObjectAdapter] that stores objects in a [Directory].
 ///
 /// Simulates an Object Database adapter. Useful for development.
+///
+/// Doesn't enforce unique fields, as the other [DBObjectAdapter]s (see
+/// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectDirectoryAdapter
     extends DBObjectAdapter<DBObjectDirectoryAdapterContext> {
   static bool _boot = false;
@@ -366,14 +369,10 @@ class DBObjectDirectoryAdapter
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<int, int>? preFinish,
   }) {
-    return executeTransactionOperation(
+    return _executeOperation(
       op,
-      (conn) => _doCountImpl(
-        op,
-        table,
-        matcher,
-        parameters ?? namedParameters,
-      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+      (conn) => _doCountImpl(op, table, matcher, parameters ?? namedParameters),
+      preFinish,
     );
   }
 
@@ -424,13 +423,10 @@ class DBObjectDirectoryAdapter
     String table,
     List<I> ids,
   ) {
-    return executeTransactionOperation(
+    return _executeOperation<List<I>, List<I>>(
       op,
-      (conn) => _doExistIDsImpl(
-        op,
-        table,
-        ids,
-      ).resolveMapped((res) => _finishOperation(op, res, null)),
+      (conn) => _doExistIDsImpl(op, table, ids),
+      null,
     );
   }
 
@@ -457,13 +453,10 @@ class DBObjectDirectoryAdapter
     String table,
     Object id, {
     PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
-  }) => executeTransactionOperation<R?>(
+  }) => _executeOperation<Map<String, dynamic>?, R?>(
     op,
-    (conn) => _doSelectByIDImpl<R>(
-      table,
-      id,
-      entityName,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) => _doSelectByIDImpl<R>(table, id, entityName),
+    preFinish,
   );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
@@ -489,7 +482,7 @@ class DBObjectDirectoryAdapter
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<List<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectByIDsImpl<R>(
       table,
@@ -499,7 +492,8 @@ class DBObjectDirectoryAdapter
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
@@ -538,7 +532,7 @@ class DBObjectDirectoryAdapter
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectAllImpl<R>(
       table,
@@ -547,7 +541,8 @@ class DBObjectDirectoryAdapter
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
@@ -611,14 +606,11 @@ class DBObjectDirectoryAdapter
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, R>(
     op,
-    (conn) => _doDeleteImpl<R>(
-      op,
-      table,
-      matcher,
-      parameters ?? namedParameters,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) =>
+        _doDeleteImpl<R>(op, table, matcher, parameters ?? namedParameters),
+    preFinish,
   );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
@@ -661,17 +653,17 @@ class DBObjectDirectoryAdapter
     Map<String, dynamic> fields, {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
-  }) => executeTransactionOperation<dynamic>(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doInsertImpl<O>(
+  Object _doInsertImpl<O>(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
-    PreFinishDBOperation? preFinish,
   ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) {
@@ -697,7 +689,7 @@ class DBObjectDirectoryAdapter
 
     _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
   }
 
   @override
@@ -711,18 +703,18 @@ class DBObjectDirectoryAdapter
     String? idFieldName,
     PreFinishDBOperation? preFinish,
     bool allowAutoInsert = false,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doUpdateImpl(
+  Object _doUpdateImpl(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
     Object id,
-    PreFinishDBOperation? preFinish,
   ) {
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) {
@@ -733,18 +725,48 @@ class DBObjectDirectoryAdapter
       '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
     );
 
-    var entry = _normalizeEntityJSON(
+    var changes = _normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
+
+    // A partial update (only the changed `fields`): merged into the stored
+    // object (if any: an auto-insert).
+    var entry = <String, dynamic>{
+      ...?_readStoredObjectForUpdate(table, id),
+      ...changes,
+    };
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
 
     _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
+  }
+
+  /// The stored object to merge an update into: `null` if it doesn't exist,
+  /// or can't be parsed (e.g. a file truncated by a crash in the middle of a
+  /// write: the update rewrites it, as before the merge).
+  Map<String, dynamic>? _readStoredObjectForUpdate(String table, Object id) {
+    try {
+      return _readObjectSync(table, id);
+    } on FormatException catch (e) {
+      _log.warning(
+        "Can't parse the stored object `$table`#$id (rewritten by the "
+        "update): $e",
+      );
+      return null;
+    }
+  }
+
+  /// Reads synchronously (as [_saveObject] writes).
+  Map<String, dynamic>? _readObjectSync(String table, Object? id) {
+    var file = _resolveObjectFile(table, id);
+    if (!file.existsSync()) return null;
+    var enc = file.readAsStringSync();
+    return dart_convert.json.decode(enc) as Map<String, dynamic>;
   }
 
   /// Writes synchronously, and must stay synchronous.
@@ -757,7 +779,10 @@ class DBObjectDirectoryAdapter
   /// back as `null`, which `resolveAllNotNull` discards).
   void _saveObject(String table, Object? id, Map<String, dynamic> obj) {
     var file = _resolveObjectFile(table, id);
-    var enc = dart_convert.json.encode(obj);
+    var enc = dart_convert.json.encode(
+      obj,
+      toEncodable: DBObjectAdapter.toEncodableJson,
+    );
     file.writeAsStringSync(enc);
   }
 
@@ -877,15 +902,20 @@ class DBObjectDirectoryAdapter
             );
           }
 
-          var valIter = value is Iterable ? value : [value];
+          if (value is EntityReferenceList) {
+            // Its IDs (from its entities, if only those are set):
+            value = value.isNull ? null : value.ids;
+          } else {
+            var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map(
-                (v) => fieldListEntityRepository.isOfEntityType(v)
-                    ? fieldListEntityRepository.getEntityID(v)
-                    : v,
-              )
-              .toList();
+            value = valIter
+                .map(
+                  (v) => fieldListEntityRepository.isOfEntityType(v)
+                      ? fieldListEntityRepository.getEntityID(v)
+                      : v,
+                )
+                .toList();
+          }
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 
@@ -945,13 +975,21 @@ class DBObjectDirectoryAdapter
     TransactionOperation op,
     T res,
     PreFinishDBOperation<T, R>? preFinish,
-  ) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
+  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
+
+  /// Executes [f] in the transaction of [op], and finishes [op] (with
+  /// [preFinish]) after that execution, not inside it: a [preFinish] can
+  /// issue other operations in the same transaction (e.g. selecting the
+  /// sub-entities), executed after this one (inside it, they would wait for
+  /// it, that waits for them).
+  FutureOr<R> _executeOperation<T, R>(
+    TransactionOperation op,
+    FutureOr<T> Function(DBObjectDirectoryAdapterContext connection) f,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) => executeTransactionOperation<T>(
+    op,
+    f,
+  ).resolveMapped((res) => _finishOperation<T, R>(op, res, preFinish));
 
   FutureOr<R> executeTransactionOperation<R>(
     TransactionOperation op,

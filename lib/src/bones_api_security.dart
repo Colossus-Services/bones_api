@@ -459,7 +459,7 @@ abstract class APISecurity {
 
   void autoValidateAllTokens() {
     var now = DateTime.now();
-    var elapsedTime = _autoValidateAllTokensLastTime.difference(now);
+    var elapsedTime = now.difference(_autoValidateAllTokensLastTime);
 
     if (elapsedTime.inMinutes < 5) return;
     _autoValidateAllTokensLastTime = now;
@@ -1295,10 +1295,12 @@ class APITokenStore {
       }
     } else if (data is Map) {
       if (data is! UnmodifiableMapView) {
-        if (data is Map<String, Object?>) {
-          data = UnmodifiableMapView<String, Object?>(data);
-        } else if (data is Map<String, Object>) {
+        // The most specific first (a `Map<String, Object>` is also a
+        // `Map<String, Object?>`), to keep its type:
+        if (data is Map<String, Object>) {
           data = UnmodifiableMapView<String, Object>(data);
+        } else if (data is Map<String, Object?>) {
+          data = UnmodifiableMapView<String, Object?>(data);
         } else {
           data = UnmodifiableMapView(data);
         }

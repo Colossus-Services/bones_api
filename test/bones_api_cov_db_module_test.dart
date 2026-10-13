@@ -17,6 +17,7 @@ class _DBAPIRoot extends APIRoot {
   final List<EntityRepositoryProvider> providers;
   final APICredential? credential;
   final bool onlyOnDevelopment;
+  final int? defaultSelectLimit;
 
   _DBAPIRoot(
     String name,
@@ -24,15 +25,23 @@ class _DBAPIRoot extends APIRoot {
     bool development = true,
     this.credential,
     this.onlyOnDevelopment = true,
+    this.defaultSelectLimit,
   }) : super(name, '1.0', apiConfig: APIConfig({'development': development}));
 
   @override
   Set<APIModule> loadModules() => {
-    APIDBModule(
-      this,
-      credential: credential,
-      onlyOnDevelopment: onlyOnDevelopment,
-    ),
+    defaultSelectLimit != null
+        ? APIDBModule(
+            this,
+            credential: credential,
+            onlyOnDevelopment: onlyOnDevelopment,
+            defaultSelectLimit: defaultSelectLimit!,
+          )
+        : APIDBModule(
+            this,
+            credential: credential,
+            onlyOnDevelopment: onlyOnDevelopment,
+          ),
   };
 
   @override
@@ -174,7 +183,11 @@ void main() {
       expect(html, contains('<a href="../update/user/1">edit</a>'));
       expect(html, contains('<a href="../delete/user/1">del</a>'));
       expect(html, contains('<a href="/db/insert/user">&nbsp;+&nbsp;</a>'));
-      expect(html, contains('<a href="/db/select/user/json">JSON</a>'));
+      // The same page (the default `LIMIT`):
+      expect(
+        html,
+        contains('<a href="/db/select/user/json?LIMIT=1000">JSON</a>'),
+      );
       expect(html, contains('Select / User'));
 
       // The `id` column comes first:
@@ -196,7 +209,11 @@ void main() {
       expect(html, contains('New York'));
       expect(
         html,
-        contains('<a href="/db/select/address/json?state == "NY"">'),
+        // The query encoded (a valid `href`):
+        contains(
+          '<a href="/db/select/address/json?'
+          'state+%3D%3D+%22NY%22&LIMIT=1000">',
+        ),
       );
 
       var none = await get(
@@ -234,6 +251,104 @@ void main() {
       var response = await get('/db/select/nope');
       expect(response.isError, isTrue);
       expect(response.error, contains("Can't find table: nope"));
+    });
+
+    test('select/insert/update/delete without a table: not found', () async {
+      for (var route in ['select', 'insert', 'update', 'delete']) {
+        var response = await get('/db/$route');
+        expect(response.isNotFound, isTrue, reason: route);
+        expect(response.isError, isFalse, reason: route);
+      }
+    });
+
+    test('select: pagination (LIMIT, OFFSET, PAGE)', () async {
+      var module = apiRoot.getModule('db') as APIDBModule;
+      expect(module.defaultSelectLimit, equals(1000));
+
+      Future<List<int>> selectIDs(String query) async {
+        var response = await get('/db/select/store/json', query: query);
+        expect(response.isOK, isTrue, reason: query);
+        return (response.payload as List)
+            .map((e) => (e as Map)['id'] as int)
+            .toList();
+      }
+
+      // Under the default limit (1000): all.
+      expect(await selectIDs(''), equals([1, 2, 3]));
+
+      expect(await selectIDs('LIMIT=2'), equals([1, 2]));
+      expect(await selectIDs('LIMIT=2&OFFSET=2'), equals([3]));
+      expect(await selectIDs('LIMIT=2&PAGE=2'), equals([3]));
+      expect(await selectIDs('LIMIT=1&OFFSET=1'), equals([2]));
+      expect(await selectIDs('LIMIT=2&OFFSET=5'), isEmpty);
+      expect(await selectIDs('LIMIT=2&ORDER=desc'), equals([3, 2]));
+      // `LIMIT=0`: no limit.
+      expect(await selectIDs('LIMIT=0'), equals([1, 2, 3]));
+      // With a query:
+      expect(await selectIDs('id > 1&LIMIT=1'), equals([2]));
+
+      // An invalid page:
+      var invalid = await get('/db/select/store/json', query: 'PAGE=0');
+      expect(invalid.isError, isTrue);
+      expect(invalid.error, contains('Invalid pagination'));
+    });
+
+    test('select (HTML): pagination links', () async {
+      Future<String> selectHTML(String query) async {
+        var response = await get('/db/select/store', query: query);
+        expect(response.isOK, isTrue, reason: query);
+        return response.payload as String;
+      }
+
+      // The 1st page: next, no previous.
+      var page1 = await selectHTML('LIMIT=2');
+      expect(page1, contains('[1 - 2]'));
+      expect(
+        page1,
+        contains(
+          '<a href="/db/select/store?LIMIT=2&OFFSET=2">next &gt;&gt;</a>',
+        ),
+      );
+      expect(page1, isNot(contains('previous')));
+      expect(
+        page1,
+        contains('<a href="/db/select/store/json?LIMIT=2">JSON</a>'),
+      );
+
+      // The last page: previous, no next.
+      var page2 = await selectHTML('LIMIT=2&OFFSET=2');
+      expect(page2, contains('[3 - 3]'));
+      expect(
+        page2,
+        contains('<a href="/db/select/store?LIMIT=2">&lt;&lt; previous</a>'),
+      );
+      expect(page2, isNot(contains('next &gt;&gt;')));
+      expect(
+        page2,
+        contains('<a href="/db/select/store/json?LIMIT=2&OFFSET=2">JSON</a>'),
+      );
+
+      // The query and the other directives are kept in the links:
+      var page3 = await selectHTML('id > 0&EAGER=true&ORDER=desc&LIMIT=1');
+      expect(
+        page3,
+        contains(
+          '<a href="/db/select/store?id+%3E+0&EAGER=true&ORDER=descending'
+          '&LIMIT=1&OFFSET=1">next &gt;&gt;</a>',
+        ),
+      );
+
+      // Following the link (decoded by `select`): the next page.
+      var next = await get(
+        '/db/select/store/json',
+        query: 'id+%3E+0&EAGER=true&ORDER=descending&LIMIT=1&OFFSET=1',
+      );
+      expect((next.payload as List).map((e) => (e as Map)['id']), equals([2]));
+
+      // No limit (`LIMIT=0`): no pagination.
+      var all = await selectHTML('LIMIT=0');
+      expect(all, isNot(contains('next &gt;&gt;')));
+      expect(all, contains('<a href="/db/select/store/json?LIMIT=0">JSON</a>'));
     });
 
     test('insert: form', () async {
@@ -511,6 +626,42 @@ void main() {
         );
         expect(ok.isOK, isTrue);
         expect((ok.payload as Map)['Role'], equals('role'));
+      } finally {
+        apiRoot.close();
+      }
+    });
+
+    test('defaultSelectLimit', () async {
+      var apiRoot = _DBAPIRoot('db-cov-limit', [
+        provider,
+      ], defaultSelectLimit: 1);
+      await apiRoot.ensureInitialized();
+
+      try {
+        var module = apiRoot.getModule('db') as APIDBModule;
+        expect(module.defaultSelectLimit, equals(1));
+
+        await provider.roleAPIRepository.store(Role(RoleType.admin));
+        await provider.roleAPIRepository.store(Role(RoleType.guest));
+
+        Future<int> selectCount(String query) async {
+          var r = await apiRoot.call(
+            APIRequest(
+              APIRequestMethod.GET,
+              '/db/select/role/json',
+              requestedUri: Uri.parse(
+                'http://localhost/db/select/role/json?$query',
+              ),
+            ),
+          );
+          return (r.payload as List).length;
+        }
+
+        // The default limit:
+        expect(await selectCount(''), equals(1));
+        // A custom one (by the URL):
+        expect(await selectCount('LIMIT=2'), equals(2));
+        expect(await selectCount('LIMIT=0'), equals(2));
       } finally {
         apiRoot.close();
       }

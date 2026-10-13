@@ -272,7 +272,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       );
     }
 
-    var asyncInstantiators = <Future<A>>[];
+    // A `DBAdapterInstantiator` returns a `FutureOr<A?>`: an `async` one, a
+    // `Future<A?>` (a `Future<A>` is also a `Future<A?>`).
+    var asyncInstantiators = <Future<A?>>[];
 
     for (var e in instantiators) {
       var f = e.key;
@@ -290,7 +292,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         continue;
       } else if (ret is A) {
         return ret;
-      } else if (ret is Future<A>) {
+      } else if (ret is Future<A?>) {
         asyncInstantiators.add(ret);
       }
     }
@@ -299,9 +301,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         instantiators.map((e) => e.key).toList();
 
     if (asyncInstantiators.isNotEmpty) {
-      return asyncInstantiators.resolveAll().then((l) {
-        for (var e in l) {
-          return e;
+      return Future.wait(asyncInstantiators).then((l) {
+        // The first instantiated (an async instantiator can return `null`):
+        var adapter = l.nonNulls.firstOrNull;
+        if (adapter != null) {
+          return adapter;
         }
 
         var fs = functions();
@@ -576,6 +580,50 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     String table, {
     EntityHandler<O>? entityHandler,
   }) {}
+
+  /// Finishes the operation [op] with the result [res] of its transaction
+  /// execution: applies [preFinish] (if any) and calls `op.finish`.
+  ///
+  /// Called after the execution, not inside it: a [preFinish] can issue other
+  /// operations in the same transaction (e.g. selecting the sub-entities),
+  /// that are executed after it.
+  ///
+  /// An error in [preFinish] is notified to the transaction, as an error in
+  /// the execution ([Transaction.notifyExecutionError], with
+  /// [errorResolver]): the transaction is aborted, and the error rethrown.
+  /// (Otherwise `op` would never be finished: the transaction neither
+  /// committed nor aborted.)
+  FutureOr<R> finishOperation<T, R>(
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish, {
+    TransactionErrorResolver? errorResolver,
+  }) {
+    if (preFinish == null) {
+      return op.finish<R>(res as R);
+    }
+
+    FutureOr<R> onError(Object e, StackTrace s) =>
+        op.transaction.notifyExecutionError<R>(
+          e,
+          s,
+          errorResolver: errorResolver,
+          operation: op,
+        );
+
+    FutureOr<R> res2;
+    try {
+      res2 = preFinish(res);
+    } catch (e, s) {
+      return onError(e, s);
+    }
+
+    if (res2 is Future<R>) {
+      return res2.then((r) => op.finish<R>(r), onError: onError);
+    } else {
+      return op.finish<R>(res2);
+    }
+  }
 
   FutureOr<int> doCount(
     TransactionOperation op,
@@ -2557,7 +2605,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         preFinish: (id) {
           entityHandler.setID(o, id);
 
-          trackEntity(o);
+          trackEntity(o, stored: true);
           return id; // pre-finish
         },
       );
@@ -2613,7 +2661,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       idFieldName: idFieldsName,
       allowAutoInsert: allowAutoInsert,
       preFinish: (id) {
-        trackEntity(o);
+        trackEntity(o, stored: true);
         return id; // pre-finish
       },
     );
@@ -2917,8 +2965,6 @@ class DBAdapterException implements DBException, WithRuntimeTypeNameSafe {
       return o.toString();
     } else if (o is Function()) {
       return resolveToString(o());
-    } else if (o is TransactionOperation) {
-      return o.toString();
     } else {
       return o.toString();
     }

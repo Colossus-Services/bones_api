@@ -66,11 +66,7 @@ void main() {
   group('TransactionOperationType', () {
     test('name / isRead', () {
       for (var t in TransactionOperationType.values) {
-        // `selectRelationships` is missing from the `name` extension's
-        // `switch` (it throws): not asserted, to not pin that behavior.
-        if (t != TransactionOperationType.selectRelationships) {
-          expect(TransactionOperationTypeExtension(t).name, equals(t.name));
-        }
+        expect(TransactionOperationTypeExtension(t).name, equals(t.name));
       }
 
       expect(TransactionOperationType.select.isRead, isTrue);
@@ -510,13 +506,19 @@ void main() {
       expect(t.error, isA<_TestDBException>());
       expect(t.isAborted, isTrue);
 
-      // A 2nd error is an "extra" error (not rethrown):
-      var extra = await t.notifyExecutionError<Object>(
-        StateError('extra'),
-        StackTrace.current,
+      // A 2nd error is an "extra" error, also rethrown (not returned as the
+      // operation's result):
+      await expectLater(
+        Future.sync(
+          () => t.notifyExecutionError<String>(
+            StateError('extra'),
+            StackTrace.current,
+          ),
+        ),
+        throwsA(isA<StateError>().having((e) => e.message, 'message', 'extra')),
       );
-      expect(extra, isA<StateError>());
       expect(t.extraErrors, hasLength(1));
+      expect(t.error, isA<_TestDBException>());
 
       var s = t.toString();
       expect(s, contains('error: resolved->'));
