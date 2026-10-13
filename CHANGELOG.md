@@ -1,3 +1,15 @@
+## 1.20.2
+
+- CI time (the slowest job, Chrome, ~9.7 min; VM ~6 min):
+  - The VM tests run as 3 parallel jobs: `unit` (all but the Docker DB
+    tests, 4 test files at a time), `postgres` and `mysql`. Each uploads its
+    coverage; `codecov.yml` reports after the 3 uploads.
+  - `Time` round-trip tests (all 86.4M times, 32 and 64 bits): compared
+    directly, with an `expect` only on a mismatch (an `expect` per time was
+    ~5 min of the Chrome job). Still exhaustive.
+  - Chrome stays one test file at a time (in parallel it times out loading
+    test suites).
+
 ## 1.20.1
 
 - `Initializable` (review of the 1.20.0 resolver):
