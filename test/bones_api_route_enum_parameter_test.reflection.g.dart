@@ -33,6 +33,8 @@ Symbol? _getSymbol(String? key) {
   if (key == null) return null;
 
   switch (key) {
+    case r"allowInProgress":
+      return const Symbol(r"allowInProgress");
     case r"config":
       return const Symbol(r"config");
     case r"method":
@@ -278,6 +280,7 @@ class ExternalIntegrationModule$reflection
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
     'initializationStatus',
@@ -540,6 +543,21 @@ class ExternalIntegrationModule$reflection
           obj,
           false,
         );
+      case 'cyclicdependencies':
+        return FieldReflection<ExternalIntegrationModule, List<Initializable>>(
+          this,
+          Initializable,
+          const __TR<List<Initializable>>(List, <__TR>[
+            __TR<Initializable>(Initializable),
+          ]),
+          'cyclicDependencies',
+          false,
+          (o) =>
+              () => o!.cyclicDependencies,
+          null,
+          obj,
+          false,
+        );
       default:
         return null;
     }
@@ -565,6 +583,7 @@ class ExternalIntegrationModule$reflection
       'isInitialized': obj?.isInitialized,
       'isInitializing': obj?.isInitializing,
       'isAsyncInitialization': obj?.isAsyncInitialization,
+      'cyclicDependencies': obj?.cyclicDependencies,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -1063,7 +1082,15 @@ class ExternalIntegrationModule$reflection
           obj,
           null,
           null,
-          null,
+          const <String, __PR>{
+            'allowInProgress': __PR(
+              __TR.tBool,
+              'allowInProgress',
+              false,
+              false,
+              false,
+            ),
+          },
           null,
         );
       case 'executeinitialized':

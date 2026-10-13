@@ -35,6 +35,8 @@ Symbol? _getSymbol(String? key) {
   switch (key) {
     case r"addressLine1":
       return const Symbol(r"addressLine1");
+    case r"allowInProgress":
+      return const Symbol(r"allowInProgress");
     case r"city":
       return const Symbol(r"city");
     case r"config":
@@ -207,6 +209,7 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
     'initializationStatus',
@@ -490,6 +493,21 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
           obj,
           false,
         );
+      case 'cyclicdependencies':
+        return FieldReflection<ModuleUser, List<Initializable>>(
+          this,
+          Initializable,
+          const __TR<List<Initializable>>(List, <__TR>[
+            __TR<Initializable>(Initializable),
+          ]),
+          'cyclicDependencies',
+          false,
+          (o) =>
+              () => o!.cyclicDependencies,
+          null,
+          obj,
+          false,
+        );
       default:
         return null;
     }
@@ -517,6 +535,7 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
       'isInitialized': obj?.isInitialized,
       'isInitializing': obj?.isInitializing,
       'isAsyncInitialization': obj?.isAsyncInitialization,
+      'cyclicDependencies': obj?.cyclicDependencies,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -1114,7 +1133,15 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
           obj,
           null,
           null,
-          null,
+          const <String, __PR>{
+            'allowInProgress': __PR(
+              __TR.tBool,
+              'allowInProgress',
+              false,
+              false,
+              false,
+            ),
+          },
           null,
         );
       case 'executeinitialized':

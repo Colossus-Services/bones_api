@@ -376,6 +376,57 @@ Future<bool> runAdapterTests(
         await testConfigDB.stop();
       });
 
+      test('initialization: the providers, adapter and repositories', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+
+        void expectInitialized(Initializable o) {
+          var status = o.initializationStatus;
+          expect(o.isInitialized, isTrue, reason: '$status');
+          expect(o.isInitializing, isFalse, reason: '$status');
+          expect(status.failed, isFalse, reason: '$status');
+          expect(status.error, isNull, reason: '$status');
+        }
+
+        expectInitialized(entityRepositoryProvider);
+        expectInitialized(entityRepositoryProvider2);
+        expectInitialized(sqlAdapter);
+
+        var repositories = entityRepositoryProvider.allRepositories().values;
+        expect(repositories, isNotEmpty);
+        for (var r in repositories) {
+          expectInitialized(r);
+        }
+
+        // The cyclic dependencies (not waited in the cycle): also done.
+        for (var o in <Initializable>[
+          entityRepositoryProvider,
+          sqlAdapter,
+          ...repositories,
+        ]) {
+          for (var dep in o.cyclicDependencies) {
+            expectInitialized(dep);
+          }
+        }
+
+        // Already initialized: synchronous, the same attempt (no new one).
+        var id = entityRepositoryProvider.initializationStatus.id;
+        var result = entityRepositoryProvider.ensureInitialized();
+        expect(result, isA<InitializationResult>());
+        expect((result as InitializationResult).ok, isTrue);
+        expect(result.cyclic, isFalse);
+        expect(entityRepositoryProvider.initializationStatus.id, id);
+
+        // The provider's dependencies: its adapter and repositories.
+        expect(result.dependencies, contains(sqlAdapter));
+
+        // Checks and executions: synchronous, no error.
+        sqlAdapter.checkInitialized();
+        expect(sqlAdapter.executeInitialized(() => 123), 123);
+        for (var r in repositories) {
+          r.checkInitialized();
+        }
+      });
+
       test('generateFullCreateTableSQLs', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
         expect(sqlAdapter, isNotNull);
