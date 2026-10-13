@@ -114,16 +114,6 @@ void _runObjectAdapterTests(
       tearDown?.call();
     });
 
-    test('capability and dialect', () {
-      expect(adapter.dialectName, equals('object'));
-      expect(adapter.dialect, equals(const DBDialect('object')));
-      expect(adapter.capability.transactions, isTrue);
-      expect(adapter.capability.constraintSupport, isFalse);
-      expect(adapter.capability.info, contains('transactions: true'));
-      expect(adapter.capability.toString(), contains('DBAdapterCapability'));
-      expect(adapter.toString(), contains(adapter.runtimeType.toString()));
-    });
-
     /// Stores [fields] directly through the repository adapter (`doUpdate`),
     /// which normalizes the entity values to IDs.
     Future<Object?> putRaw<O extends Object>(
@@ -135,6 +125,16 @@ void _runObjectAdapterTests(
       var op = TransactionOperationUpdate(repo.name, false, adapter, o);
       return repo.repositoryAdapter.doUpdate(op, o, id, fields);
     }
+
+    test('capability and dialect', () {
+      expect(adapter.dialectName, equals('object'));
+      expect(adapter.dialect, equals(const DBDialect('object')));
+      expect(adapter.capability.transactions, isTrue);
+      expect(adapter.capability.constraintSupport, isFalse);
+      expect(adapter.capability.info, contains('transactions: true'));
+      expect(adapter.capability.toString(), contains('DBAdapterCapability'));
+      expect(adapter.toString(), contains(adapter.runtimeType.toString()));
+    });
 
     test('empty table', () async {
       // No `Store` stored yet:
@@ -193,8 +193,8 @@ void _runObjectAdapterTests(
       expect(await userInfoRepo.store(userInfo), equals(301));
       expect(await photoRepo.store(photo), equals('PHOTO-401'));
 
-      // `closedStores` as a `List` (an `EntityReferenceList` value is
-      // not unwrapped by the object adapters):
+      // `closedStores` as a `List` (an `EntityReferenceList` value: see the
+      // `EntityReferenceList field` test):
       expect(
         await putRaw(address, 201, {
           'id': 201,
@@ -679,6 +679,127 @@ void _runObjectAdapterTests(
       }
       expect(error2, isA<DBObjectAdapterException>());
       expect(error2.toString(), contains('Operation>>'));
+    });
+
+    // The last one: it stores entities used by the previous tests' counts.
+    test('EntityReferenceList field: stored as IDs (edge cases)', () async {
+      var storeRepo = provider.repo<Store>();
+      var addressRepo = provider.repo<Address>();
+
+      var s1 = Store('S1', 1, id: 811);
+      var s2 = Store('S2', 2, id: 812);
+      expect(await storeRepo.store(s1), equals(811));
+      expect(await storeRepo.store(s2), equals(812));
+
+      Future<Map<String, dynamic>> selectRawAddress(int id) async {
+        var op = TransactionOperationSelect(
+          addressRepo.name,
+          false,
+          adapter,
+          ConditionID(id),
+        );
+        var raw = await addressRepo.repositoryAdapter
+            .doSelectByID<Map<String, dynamic>>(op, id);
+        return raw!;
+      }
+
+      Future<Object?> storedClosedStores(
+        int id,
+        EntityReferenceList<Store> closedStores,
+      ) async {
+        var address = Address('NY', 'New York', 'Broadway', id, id: id);
+
+        Object? stored;
+        if (jsonOnly) {
+          // Without the `Decimal` fields (not JSON encodable by
+          // `DBObjectDirectoryAdapter`):
+          stored = await putRaw(address, id, {
+            'id': id,
+            'state': 'NY',
+            'city': 'New York',
+            'street': 'Broadway',
+            'number': id,
+            'stores': <Store>[],
+            'closedStores': closedStores,
+          });
+        } else {
+          address.closedStores = closedStores;
+          stored = await addressRepo.store(address);
+        }
+        expect(stored, equals(id));
+
+        return (await selectRawAddress(id))['closedStores'];
+      }
+
+      // With the entities (stored): their IDs.
+      expect(
+        await storedClosedStores(
+          221,
+          EntityReferenceList<Store>.fromEntities([s1, s2]),
+        ),
+        equals([811, 812]),
+      );
+
+      // With only the IDs (the order is kept):
+      expect(
+        await storedClosedStores(
+          222,
+          EntityReferenceList<Store>.fromIDs([812, 811]),
+        ),
+        equals([812, 811]),
+      );
+
+      // A single element:
+      expect(
+        await storedClosedStores(
+          223,
+          EntityReferenceList<Store>.fromEntities([s2]),
+        ),
+        equals([812]),
+      );
+
+      // Empty (from entities, from IDs, `asEmpty`): an empty list.
+      expect(
+        await storedClosedStores(
+          224,
+          EntityReferenceList<Store>.fromEntities([]),
+        ),
+        equals([]),
+      );
+      expect(
+        await storedClosedStores(225, EntityReferenceList<Store>.fromIDs([])),
+        equals([]),
+      );
+      expect(
+        await storedClosedStores(226, EntityReferenceList<Store>.asEmpty()),
+        equals([]),
+      );
+
+      // `null` (`asNull`): no value.
+      expect(
+        await storedClosedStores(227, EntityReferenceList<Store>.asNull()),
+        isNull,
+      );
+
+      // The `EntityReferenceList` itself is never stored (not even wrapped):
+      for (var id in [221, 222, 223, 224, 225, 226, 227]) {
+        var closedStores = (await selectRawAddress(id))['closedStores'];
+        expect(closedStores, isNot(isA<EntityReferenceList>()));
+        expect(closedStores ?? [], isNot(contains(isA<EntityReferenceList>())));
+      }
+
+      // `DBObjectDirectoryAdapter` can't resolve the sub-entities of an
+      // `Address` (a nested select in the same transaction never completes):
+      if (jsonOnly) return;
+
+      // Read back as an `EntityReferenceList` (previously: "Can't cast to
+      // List<Store> due to null elements"):
+      var a1 = await addressRepo.selectByID(221);
+      expect(a1!.closedStores.ids, equals([811, 812]));
+      expect(a1.closedStores.length, equals(2));
+
+      var a4 = await addressRepo.selectByID(224);
+      expect(a4!.closedStores.ids ?? [], isEmpty);
     });
   });
 }

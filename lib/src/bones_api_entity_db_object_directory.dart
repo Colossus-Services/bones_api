@@ -877,15 +877,20 @@ class DBObjectDirectoryAdapter
             );
           }
 
-          var valIter = value is Iterable ? value : [value];
+          if (value is EntityReferenceList) {
+            // Its IDs (from its entities, if only those are set):
+            value = value.isNull ? null : value.ids;
+          } else {
+            var valIter = value is Iterable ? value : [value];
 
-          value = valIter
-              .map(
-                (v) => fieldListEntityRepository.isOfEntityType(v)
-                    ? fieldListEntityRepository.getEntityID(v)
-                    : v,
-              )
-              .toList();
+            value = valIter
+                .map(
+                  (v) => fieldListEntityRepository.isOfEntityType(v)
+                      ? fieldListEntityRepository.getEntityID(v)
+                      : v,
+                )
+                .toList();
+          }
         } else if (fieldType.isListEntity) {
           var listEntityType = fieldType.listEntityType!;
 

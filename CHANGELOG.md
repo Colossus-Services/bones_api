@@ -75,6 +75,9 @@
   `ensureStored`) didn't store the entities of `List<Entity>` fields.
 - Fix: `EntityHandler.decodeObjectListJson` couldn't decode a list (cast to
   `O`): each element is now resolved as an entity.
+- Fix: `DBObjectMemoryAdapter`/`DBObjectDirectoryAdapter` stored an
+  `EntityReferenceList` field as the object itself (wrapped in a `List`),
+  not its IDs: the entity couldn't be read back.
 
 ## 1.21.1
 
