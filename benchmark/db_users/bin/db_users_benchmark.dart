@@ -33,6 +33,7 @@ Future<void> main(List<String> args) async {
   var runner = BenchRunner(
     duration: _parseDuration(opts.option('duration')!),
     warmup: _parseDuration(opts.option('warmup')!),
+    repeat: int.parse(opts.option('repeat')!),
   );
 
   var setup = await _DBSetup.create(db, opts);
@@ -66,6 +67,7 @@ Future<void> main(List<String> args) async {
       users: users,
       duration: runner.duration,
       warmup: runner.warmup,
+      repeat: runner.repeat,
       results: runner.results,
     );
 
@@ -128,6 +130,13 @@ ArgParser _buildArgParser() => ArgParser()
     'warmup',
     defaultsTo: '1s',
     help: 'Unmeasured time per operation before measuring.',
+  )
+  ..addOption(
+    'repeat',
+    defaultsTo: '1',
+    help:
+        'Measured rounds of `--duration` per operation; the median round is '
+        'reported, with the range of all of them.',
   )
   ..addMultiOption(
     'ops',
@@ -230,9 +239,26 @@ class _UsersBench {
     for (var i = 0; i < users; ++i) {
       var user = await _register('user$i@bench.test', i) as User;
       _userIds.add(user.id!);
+      _lastSeededAddressId = user.address.id!;
     }
 
     print('** Seeded $users users in ${chronometer.elapsedMilliseconds} ms.');
+  }
+
+  int _lastSeededAddressId = 0;
+
+  /// Removes the users (and their addresses) registered after [seed].
+  Future<void> _removeRegistered() async {
+    await _moduleUser.userRepository.deleteByQuery(
+      ' id > ? ',
+      parameters: [_userIds.last],
+    );
+
+    var addresses = AddressAPIRepository(api.entityRepositoryProvider);
+    await addresses.deleteByQuery(
+      ' id > ? ',
+      parameters: [_lastSeededAddressId],
+    );
   }
 
   Future<Object?> _register(String email, int i) => _call('/user/register', {
@@ -288,6 +314,9 @@ class _UsersBench {
         await runner.run<void>(
           'user/register',
           (i, _) => _register('new-$runID-$i@bench.test', i),
+          // Remove the registered users: otherwise each round (and `update`
+          // and `remove` after it) would run on a bigger table.
+          afterRound: _removeRegistered,
         );
       case 'update':
         await runner.run<void>(

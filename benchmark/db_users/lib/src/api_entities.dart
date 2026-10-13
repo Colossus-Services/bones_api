@@ -16,6 +16,8 @@ class Role {
 }
 
 @EnableReflection()
+// `user/byState` filters on it (`address.state == ?`).
+@EntityIndex(['state'])
 class Address {
   int? id;
 
@@ -75,7 +77,17 @@ class User {
   }) : passwordHash = hashPassword(passwordOrHash),
        creationTime = creationTime ?? DateTime.now();
 
-  User.create() : this('', '', '', Address.create(), <Role>[]);
+  /// The constructor used to load a [User] (its fields are set after it).
+  /// It doesn't go through [hashPassword]: that would hash an empty password
+  /// with SHA-256 for every user loaded.
+  User.create()
+    : email = '',
+      name = '',
+      passwordHash = '',
+      address = Address.create(),
+      roles = <Role>[],
+      enabled = true,
+      creationTime = DateTime.now();
 
   /// The same hashing `APICredential.checkPassword` uses, so a stored
   /// [passwordHash] can be checked against a login credential.

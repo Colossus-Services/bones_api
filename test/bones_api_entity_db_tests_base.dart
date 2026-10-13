@@ -3519,6 +3519,89 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('executedSQLsCount: statements per operation', () async {
+        final sqlAdapter = await entityRepositoryProvider.adapter;
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+
+        // How many statements (round trips) each operation sends. This pins
+        // the current behavior: an optimization that removes statements has
+        // to update it, and a regression that adds some fails here.
+        Future<(T, int)> counted<T>(FutureOr<T> Function() f) async {
+          var before = sqlAdapter.executedSQLsCount;
+          var r = await f();
+          return (r, sqlAdapter.executedSQLsCount - before);
+        }
+
+        var (userId, insertCount) = await counted(
+          () => userAPIRepository.store(
+            User(
+              'count1@$testDomain',
+              '123',
+              Address('CQ', 'Count City', 'Count Street', 1),
+              [Role(RoleType.guest), Role(RoleType.admin)],
+            ),
+          ),
+        );
+        // The address, plus a `DELETE` of the links of each of its 2 (empty)
+        // list fields; the 2 roles; the user, its 2 role links, and a
+        // `DELETE` of links to other roles. The 3 `DELETE`s can't match
+        // anything for a new entity.
+        expect(userId, isNotNull);
+        expect(insertCount, equals(9), reason: 'insert');
+
+        await userAPIRepository.store(
+          User(
+            'count2@$testDomain',
+            '123',
+            Address('CQ', 'Count City', 'Count Street', 2),
+            [Role(RoleType.guest)],
+          ),
+        );
+
+        // The user, its role links, its roles, its address and the links of
+        // the address's 2 list fields:
+        var (user, selectByIDCount) = await counted(
+          () => userAPIRepository.selectByID(userId),
+        );
+        expect(user!.roles, hasLength(2));
+        expect(selectByIDCount, equals(6), reason: 'selectByID');
+
+        // A JOIN condition, 2 users: the same 6, batched.
+        var (users, selectCount) = await counted(
+          () => userAPIRepository.selectByQuery(
+            ' address.state == ? ',
+            parameters: {'state': 'CQ'},
+          ),
+        );
+        expect(users, hasLength(2));
+        expect(selectCount, equals(6), reason: 'selectByQuery');
+
+        var (_, countCount) = await counted(() => userAPIRepository.length());
+        expect(countCount, equals(1), reason: 'length');
+
+        user.roles.removeWhere((r) => r.type == RoleType.admin);
+        var (_, updateCount) = await counted(
+          () => userAPIRepository.store(user),
+        );
+        // The kept role link (`INSERT ... ON CONFLICT DO NOTHING`) and a
+        // `DELETE` of the others; the user row itself didn't change.
+        expect(updateCount, equals(2), reason: 'update (roles)');
+
+        // The `DELETE ... RETURNING`, then the returned user is resolved:
+        // its role links and its address with its 2 list fields' links (the
+        // links are removed with the user, so no roles are selected). The
+        // memory adapter keeps the role links: the links and the roles.
+        var (deleted, deleteCount) = await counted(
+          () => userAPIRepository.deleteByID(userId),
+        );
+        expect(deleted, isNotNull);
+        expect(
+          deleteCount,
+          equals(sqlAdapter is DBSQLMemoryAdapter ? 3 : 5),
+          reason: 'deleteByID',
+        );
+      });
+
       test('Multi-level Query: Order.items.bonus.campaign == ?', () async {
         //////////
 

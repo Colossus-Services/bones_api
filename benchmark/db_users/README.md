@@ -82,6 +82,7 @@ the results). Point it at a dedicated database.
 | `--users` | `1000` | Users registered before measuring |
 | `--duration` | `3s` | Measured time per operation (`3s`, `500ms`) |
 | `--warmup` | `1s` | Unmeasured time per operation, before measuring |
+| `--repeat` | `1` | Measured rounds of `--duration` per operation: the median round is reported, with the range of all of them |
 | `--ops` | all | Comma-separated subset: `byId,byEmail,byState,list,count,login,register,update,remove` |
 | `--sqlite-path` | temp file | SQLite file to use (kept), or `:memory:` |
 | `--pg-host`, `--pg-port`, `--pg-user`, `--pg-password`, `--pg-database` | env `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`, then `localhost`, `5432`, `postgres`, `postgres`, `postgres` | PostgreSQL connection |
@@ -110,6 +111,14 @@ the p50/p95/p99 latencies; `ops/sec` is `1s / mean`.
   slower than SQLite. See [`../README.md`](../README.md#where-the-db-and-json-time-goes).
 - Throughput depends on the hardware and on what else the machine is doing.
   **Compare only runs from the same machine**, ideally idle and on power.
+- **PostgreSQL varies between rounds of the same code**, by more than most
+  changes being measured (e.g. `user/list` from ~300 to ~580 ops/sec).
+  Every call waits on the database several times, and while it waits the
+  OS lowers the CPU's clock or moves the thread to an efficiency core
+  (Apple Silicon; Docker Desktop's VM threads too), so even the
+  framework's CPU work between queries slows down. Use `--repeat 5` (or
+  more) and compare medians; the `rounds` range shows the spread. SQLite and
+  memory calls never wait, and don't vary this way.
 
 ## Recording a result
 

@@ -522,6 +522,20 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   final bool logSQL;
 
+  int _executedSQLsCount = 0;
+
+  /// The number of SQL statements this adapter has executed for entity and
+  /// relationship operations (selects, inserts, updates, deletes, counts),
+  /// since it was created.
+  ///
+  /// Each one is a round trip to the database. Transaction control
+  /// (`BEGIN`/`COMMIT`), table creation and checks aren't counted.
+  ///
+  /// It's cumulative and shared by concurrent operations: to measure an
+  /// operation, take the difference before and after it, with nothing else
+  /// running on this adapter.
+  int get executedSQLsCount => _executedSQLsCount;
+
   late final ConditionSQLEncoder _conditionSQLGenerator;
 
   DBSQLAdapter(
@@ -2123,16 +2137,26 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return 0;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('countSQL', op, sql);
+      _onTransactionOperationSQL('countSQL', op, sql);
       return doCountSQL(entityName, table, sql, op.transaction, connection);
     });
   }
 
-  void _logTransactionOperationSQL(
+  /// Called right before [sql] (an [SQL] or a `List<SQL>`) is executed:
+  /// counts it ([executedSQLsCount]) and logs it ([logSQL]).
+  void _onTransactionOperationSQL(
     String method,
     TransactionOperation op,
     Object sql,
   ) {
+    if (sql is SQL) {
+      if (!sql.isDummy) ++_executedSQLsCount;
+    } else if (sql is List<SQL>) {
+      for (var s in sql) {
+        if (!s.isDummy) ++_executedSQLsCount;
+      }
+    }
+
     if (logSQL && _log.handler.isLoggingDB) {
       String msg() {
         String s;
@@ -2224,7 +2248,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return [];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('existIDsSQL', op, sql);
+      _onTransactionOperationSQL('existIDsSQL', op, sql);
       return doExistIDsSQL(entityName, table, sql, op.transaction, connection);
     });
   }
@@ -2366,7 +2390,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return null;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('insertSQL', op, sql);
+      _onTransactionOperationSQL('insertSQL', op, sql);
       return doInsertSQL(entityName, table, sql, op.transaction, connection);
     });
   }
@@ -2507,7 +2531,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return id;
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('updateSQL', op, sql);
+      _onTransactionOperationSQL('updateSQL', op, sql);
       return doUpdateSQL(
         entityName,
         table,
@@ -2730,7 +2754,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     }
 
     return executeTransactionOperation(op, sqls.first, (connection) {
-      _logTransactionOperationSQL('insertRelationshipSQLs', op, sqls);
+      _onTransactionOperationSQL('insertRelationshipSQLs', op, sqls);
 
       var retInserts = sqls.map((sql) {
         var ret = doInsertRelationshipSQL(
@@ -2744,7 +2768,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         if (sql.hasPosSQL) {
           return sql.posSQL!
               .map((e) {
-                _logTransactionOperationSQL('insertRelationship[POS]', op, e);
+                _onTransactionOperationSQL('insertRelationship[POS]', op, e);
                 return doDeleteSQL(
                   entityName,
                   e.mainTable!,
@@ -2842,7 +2866,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('selectRelationshipSQL', op, sql);
+      _onTransactionOperationSQL('selectRelationshipSQL', op, sql);
 
       var ret = doSelectSQL(
         entityName,
@@ -2947,7 +2971,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('selectRelationshipsSQL', op, sql);
+      _onTransactionOperationSQL('selectRelationshipsSQL', op, sql);
 
       var ret = doSelectSQL(
         entityName,
@@ -3453,7 +3477,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('selectSQL', op, sql);
+      _onTransactionOperationSQL('selectSQL', op, sql);
       return doSelectSQL(entityName, table, sql, op.transaction, connection);
     });
   }
@@ -3581,7 +3605,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _logTransactionOperationSQL('deleteSQL', op, sql);
+      _onTransactionOperationSQL('deleteSQL', op, sql);
       return doDeleteSQL(entityName, table, sql, op.transaction, connection);
     });
   }
