@@ -34,6 +34,16 @@
   - CI: a new `test_vm (concurrency)` job (its 3 files at once); the workflow
     also runs on PRs to any branch (stacked PRs).
 
+- `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
+  trips) executed for entity and relationship operations. The shared DB
+  tests pin the statements of each operation (insert, `selectByID`,
+  `selectByQuery`, `length`, update, `deleteByID`) on every SQL adapter, so
+  an optimization or a regression changes them visibly.
+  - `benchmark/db_users`: `--repeat N` (the median of N rounds per
+    operation, with their range). The benchmark's `User.create()` no longer
+    hashes an empty password for every user loaded, and `Address.state` is
+    indexed (`user/byState`).
+
 - Fix: `APIRequest.isAuthenticated` was `true` only when the token was
   expired (it is now `true` only when it isn't).
 - Fix: `APISecurity.autoValidateAllTokens` never ran (the elapsed time was

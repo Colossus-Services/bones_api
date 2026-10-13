@@ -14,12 +14,25 @@ class BenchRunner {
   /// caches settle.
   final Duration warmup;
 
+  /// Rounds of [duration] measured per operation, back to back. The result
+  /// is the median round (by ops/sec), with the range of all of them.
+  ///
+  /// Throughput can vary between rounds by more than a change being
+  /// measured (e.g. CPU power states when calls wait on a database, see the
+  /// README): the median of several rounds is far more stable than one.
+  final int repeat;
+
   final List<BenchResult> _results = [];
 
   BenchRunner({
     this.duration = const Duration(seconds: 3),
     this.warmup = const Duration(seconds: 1),
-  });
+    this.repeat = 1,
+  }) {
+    if (repeat < 1) {
+      throw ArgumentError.value(repeat, 'repeat', 'must be >= 1');
+    }
+  }
 
   List<BenchResult> get results => List.unmodifiable(_results);
 
@@ -35,10 +48,14 @@ class BenchRunner {
   }) async {
     var i = await _loop(body, setup, warmup, 0, null);
 
-    var latencies = <int>[];
-    await _loop(body, setup, duration, i, latencies);
+    var rounds = <List<int>>[];
+    for (var r = 0; r < repeat; ++r) {
+      var latencies = <int>[];
+      i = await _loop(body, setup, duration, i, latencies);
+      rounds.add(latencies);
+    }
 
-    var result = BenchResult(name, latencies);
+    var result = BenchResult.median(name, rounds);
     _results.add(result);
     print(result);
     return result;
@@ -77,8 +94,45 @@ class BenchResult {
   /// Latency of each call, in microseconds, sorted.
   final List<int> latencies;
 
-  BenchResult(this.name, List<int> latencies)
-    : latencies = List.unmodifiable(latencies.toList()..sort());
+  /// The ops/sec of each measured round, sorted (one entry without
+  /// [BenchRunner.repeat]).
+  final List<double> roundsOpsPerSecond;
+
+  BenchResult(
+    this.name,
+    List<int> latencies, {
+    List<double>? roundsOpsPerSecond,
+  }) : latencies = List.unmodifiable(latencies.toList()..sort()),
+       roundsOpsPerSecond = List.unmodifiable(
+         (roundsOpsPerSecond ?? [_opsPerSecond(latencies)]).toList()..sort(),
+       );
+
+  /// The round with the median ops/sec of [rounds] (the lower middle one
+  /// for an even count), keeping every round's ops/sec.
+  factory BenchResult.median(String name, List<List<int>> rounds) {
+    var byOps = rounds.toList()
+      ..sort((a, b) => _opsPerSecond(a).compareTo(_opsPerSecond(b)));
+    var median = byOps[(byOps.length - 1) ~/ 2];
+    return BenchResult(
+      name,
+      median,
+      roundsOpsPerSecond: rounds.map(_opsPerSecond).toList(),
+    );
+  }
+
+  static double _opsPerSecond(List<int> latencies) {
+    if (latencies.isEmpty) return 0;
+    var mean = latencies.reduce((a, b) => a + b) / latencies.length;
+    return mean > 0 ? 1000000 / mean : 0;
+  }
+
+  int get rounds => roundsOpsPerSecond.length;
+
+  /// The ops/sec range of the rounds, e.g. `512–578` (empty for one round).
+  String get roundsRange => rounds > 1
+      ? '${roundsOpsPerSecond.first.toStringAsFixed(0)}'
+            '–${roundsOpsPerSecond.last.toStringAsFixed(0)}'
+      : '';
 
   int get operations => latencies.length;
 
@@ -109,11 +163,13 @@ class BenchResult {
     'p50Us': p50,
     'p95Us': p95,
     'p99Us': p99,
+    'roundsOpsPerSecond': roundsOpsPerSecond,
   };
 
   @override
   String toString() =>
       '-- $name: ${opsPerSecond.toStringAsFixed(0)} ops/sec '
       '(mean ${meanMicroseconds.toStringAsFixed(1)} us, p50 $p50 us, '
-      'p95 $p95 us, p99 $p99 us; $operations calls)';
+      'p95 $p95 us, p99 $p99 us; $operations calls'
+      '${rounds > 1 ? '; median of $rounds rounds: $roundsRange' : ''})';
 }

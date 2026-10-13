@@ -33,6 +33,7 @@ Future<void> main(List<String> args) async {
   var runner = BenchRunner(
     duration: _parseDuration(opts.option('duration')!),
     warmup: _parseDuration(opts.option('warmup')!),
+    repeat: int.parse(opts.option('repeat')!),
   );
 
   var setup = await _DBSetup.create(db, opts);
@@ -66,6 +67,7 @@ Future<void> main(List<String> args) async {
       users: users,
       duration: runner.duration,
       warmup: runner.warmup,
+      repeat: runner.repeat,
       results: runner.results,
     );
 
@@ -128,6 +130,13 @@ ArgParser _buildArgParser() => ArgParser()
     'warmup',
     defaultsTo: '1s',
     help: 'Unmeasured time per operation before measuring.',
+  )
+  ..addOption(
+    'repeat',
+    defaultsTo: '1',
+    help:
+        'Measured rounds of `--duration` per operation; the median round is '
+        'reported, with the range of all of them.',
   )
   ..addMultiOption(
     'ops',

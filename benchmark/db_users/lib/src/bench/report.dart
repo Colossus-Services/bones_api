@@ -19,6 +19,10 @@ class BenchReport {
   final int users;
   final Duration duration;
   final Duration warmup;
+
+  /// Measured rounds per operation; each result is the median round.
+  final int repeat;
+
   final List<BenchResult> results;
 
   BenchReport({
@@ -30,6 +34,7 @@ class BenchReport {
     required this.users,
     required this.duration,
     required this.warmup,
+    this.repeat = 1,
     required this.results,
     DateTime? date,
   }) : date = date ?? DateTime.now();
@@ -37,7 +42,8 @@ class BenchReport {
   String get _dateStr => date.toIso8601String().substring(0, 10);
 
   String get _durationStr =>
-      '${_seconds(duration)}s (warm-up ${_seconds(warmup)}s)';
+      '${_seconds(duration)}s (warm-up ${_seconds(warmup)}s)'
+      '${repeat > 1 ? ' × $repeat rounds, median shown' : ''}';
 
   static String _seconds(Duration d) {
     var s = d.inMilliseconds / 1000;
@@ -63,6 +69,9 @@ duration:  $_durationStr per operation''';
         '${cols[0].padRight(nameWidth)}'
         '${cols.skip(1).map((c) => c.padLeft(10)).join('  ')}';
 
+    var withRange = repeat > 1;
+    var columns = withRange ? 6 : 5;
+
     var s = StringBuffer()
       ..writeln(
         row([
@@ -72,9 +81,10 @@ duration:  $_durationStr per operation''';
           'P50(us)',
           'P95(us)',
           'P99(us)',
+          if (withRange) 'RANGE',
         ]),
       )
-      ..writeln('-' * (nameWidth + 5 * 12 - 2));
+      ..writeln('-' * (nameWidth + columns * 12 - 2));
 
     for (var r in results) {
       s.writeln(
@@ -85,6 +95,7 @@ duration:  $_durationStr per operation''';
           '${r.p50}',
           '${r.p95}',
           '${r.p99}',
+          if (withRange) r.roundsRange,
         ]),
       );
     }
@@ -113,17 +124,31 @@ duration:  $_durationStr per operation''';
       ..writeln(
         '- **Users:** $users; **duration:** $_durationStr per operation',
       )
-      ..writeln()
-      ..writeln(
-        '| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |',
-      )
-      ..writeln('|---|--:|--:|--:|--:|--:|');
+      ..writeln();
+
+    var withRange = repeat > 1;
+
+    if (withRange) {
+      s
+        ..writeln(
+          '| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) '
+          '| rounds (ops/sec) |',
+        )
+        ..writeln('|---|--:|--:|--:|--:|--:|--:|');
+    } else {
+      s
+        ..writeln(
+          '| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) |',
+        )
+        ..writeln('|---|--:|--:|--:|--:|--:|');
+    }
 
     for (var r in results) {
       s.writeln(
         '| `${r.name}` | ${r.opsPerSecond.toStringAsFixed(0)} '
         '| ${r.meanMicroseconds.toStringAsFixed(1)} '
-        '| ${r.p50} | ${r.p95} | ${r.p99} |',
+        '| ${r.p50} | ${r.p95} | ${r.p99} |'
+        '${withRange ? ' ${r.roundsRange} |' : ''}',
       );
     }
 
@@ -140,6 +165,7 @@ duration:  $_durationStr per operation''';
     'users': users,
     'durationMs': duration.inMilliseconds,
     'warmupMs': warmup.inMilliseconds,
+    'repeat': repeat,
     'results': results.map((r) => r.toJson()).toList(),
   };
 
