@@ -26,6 +26,15 @@
   lookups by it (one index less to update on every write). Existing tables
   keep it; `checkTables` doesn't require it (PostgreSQL resolves an index
   by its first column).
+- Optimization: `Transaction` no longer captures a `StackTrace` on every
+  commit (it only located an unexpected error): only with asserts enabled
+  (debug, tests). `user/count` of the users benchmark: +62% (memory), +32%
+  (SQLite).
+- Optimization: `SQL.sqlPositional` (SQLite) is computed once per SQL text
+  (with the default placeholder), not with a regular expression per
+  statement.
+- Optimization: `DBPostgreSQLAdapter` resolves the column names of a result
+  once for all its rows.
 
 ## 1.21.2
 
