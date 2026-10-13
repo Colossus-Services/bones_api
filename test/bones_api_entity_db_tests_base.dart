@@ -223,6 +223,51 @@ const String png1PixelBase64 =
 const String png1PixelSha256 =
     'b1442e85b03bdcaf66dc58c7abb98745dd2687d86350be9a298a1d9382ac849b';
 
+/// The suggested SQLs of a `checkDBTables` error (its `Suggestion of SQLs`),
+/// without the comments.
+List<String> _suggestedSQLs(String errorMessage) {
+  var idx = errorMessage.indexOf('Suggestion of SQLs');
+  if (idx < 0) return [];
+
+  return errorMessage
+      .substring(idx)
+      .split('\n')
+      .skip(1)
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty && !l.startsWith('--'))
+      .toList();
+}
+
+/// `checkDBTables` fails, and its suggested SQLs ([expectedSQLs] among them)
+/// fix it in this DB: it passes after running them.
+Future<void> _checkFixedBySuggestedSQLs(
+  DBSQLAdapter sqlAdapter,
+  APITestConfigDBSQL testConfigSQL, {
+  List<String> expectedSQLs = const [],
+}) async {
+  String? error;
+  try {
+    await sqlAdapter.checkDBTables(force: true);
+  } on StateError catch (e) {
+    error = e.message;
+  }
+
+  expect(error, isNotNull, reason: 'checkDBTables should fail');
+
+  var sqls = _suggestedSQLs(error!);
+  expect(sqls, isNotEmpty, reason: error);
+
+  for (var expected in expectedSQLs) {
+    expect(sqls.join('\n'), contains(expected), reason: error);
+  }
+
+  for (var sql in sqls) {
+    await testConfigSQL.runSQL(sql);
+  }
+
+  expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+}
+
 Future<bool> runAdapterTests(
   String dbName,
   APITestConfigDB testConfigDB,
@@ -786,6 +831,15 @@ Future<bool> runAdapterTests(
 
         await expectMissingStateCity();
 
+        // The suggested SQL (in the error) fixes it in this DB:
+        await _checkFixedBySuggestedSQLs(
+          sqlAdapter,
+          testConfigSQL,
+          expectedSQLs: ['${q}address__state_city__idx$q'],
+        );
+        await testConfigSQL.runSQL(dropIndexSQL('address__state_city__idx'));
+        await expectMissingStateCity();
+
         // A prefix (`state`) or other order (`city`, `state`): not the index.
         await testConfigSQL.runSQL(
           createIndexSQL('address_prefix_tmp_idx', ['state']),
@@ -991,6 +1045,25 @@ Future<bool> runAdapterTests(
 
         await expectMissingUnique();
 
+        // The suggested SQL (a constraint, as in the `CREATE TABLE`) fixes it
+        // in this DB:
+        var addConstraintSQL =
+            'ADD CONSTRAINT ${q}user__email_address__unique$q '
+            'UNIQUE (${q}email$q, ${q}address$q)';
+        await _checkFixedBySuggestedSQLs(
+          sqlAdapter,
+          testConfigSQL,
+          expectedSQLs: [addConstraintSQL],
+        );
+        await testConfigSQL.runSQL(
+          isMySQL
+              ? 'ALTER TABLE ${q}user$q DROP INDEX '
+                    '${q}user__email_address__unique$q'
+              : 'ALTER TABLE ${q}user$q DROP CONSTRAINT '
+                    '${q}user__email_address__unique$q',
+        );
+        await expectMissingUnique();
+
         // A non-unique index over the same columns: not it.
         await testConfigSQL.runSQL(
           'CREATE INDEX ${q}user_email_address_tmp_idx$q ON ${q}user$q '
@@ -1136,12 +1209,18 @@ Future<bool> runAdapterTests(
         expect(await sqlAdapter.checkDBTables(force: true), isTrue);
         await testConfigSQL.runSQL(dropIndexSQL('user_email_other_uq'));
 
-        // Restored (the `CREATE TABLE` name):
-        await testConfigSQL.runSQL(
-          'ALTER TABLE ${q}user$q ADD CONSTRAINT ${q}user__email__unique$q '
-          'UNIQUE (${q}email$q)',
+        // Restored by the suggested SQL (the `CREATE TABLE` name):
+        await _checkFixedBySuggestedSQLs(
+          sqlAdapter,
+          testConfigSQL,
+          expectedSQLs: [
+            'ADD CONSTRAINT ${q}user__email__unique$q UNIQUE (${q}email$q)',
+          ],
         );
-        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        sqlAdapter.disposeTableSchemeCache('user');
+        var schemeRestored = await sqlAdapter.getTableScheme('user');
+        expect(schemeRestored!.indexes!['user__email__unique'], ['email']);
       });
 
       test('TestEntityRepositoryProvider', () async {

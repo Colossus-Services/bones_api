@@ -238,5 +238,113 @@ void main() {
       var all2 = p2.sqlAdapter.allRepositories();
       expect(all2.keys, contains(Role));
     });
+
+    test('allRepositories: an adapter with a known provider', () {
+      var p1 = _LookupTestProvider(address: Address$reflection().entityHandler);
+      var p2 = _LookupTestProvider(role: Role$reflection().entityHandler);
+
+      expect(p1.sqlAdapter.allRepositories().keys, isNot(contains(Role)));
+
+      // Known to the adapter (and back: a cycle through the adapter):
+      p1.sqlAdapter.notifyKnownEntityRepositoryProvider(p2);
+      p2.notifyKnownEntityRepositoryProvider(p1.sqlAdapter);
+
+      expect(
+        p1.sqlAdapter.allRepositories().keys,
+        containsAll([Address, Role]),
+      );
+    });
+
+    test('a closed repository: not found', () {
+      var p = _LookupTestProvider(address: Address$reflection().entityHandler);
+
+      var repository = p.getEntityRepositoryByType(Address);
+      expect(repository, isNotNull);
+
+      repository!.close();
+
+      expect(p.getEntityRepositoryByType(Address), isNull);
+      expect(p.getEntityRepository(type: Address), isNull);
+      expect(p.getEntityRepository(name: 'address'), isNull);
+      expect(p.sqlAdapter.getEntityRepositoryByType(Address), isNull);
+    });
+
+    test('a list/set of providers', () {
+      var withAddress = _LookupTestProvider(
+        address: Address$reflection().entityHandler,
+      );
+      var withRole = _LookupTestProvider(role: Role$reflection().entityHandler);
+
+      var addressRepository = withAddress.getEntityRepositoryByType(Address);
+      var roleRepository = withRole.getEntityRepositoryByType(Role);
+
+      for (var providers in <Iterable<EntityRepositoryProvider>>[
+        [withAddress, withRole],
+        {withAddress, withRole},
+        // Neither a `List` nor a `Set`:
+        [withAddress, withRole].where((_) => true),
+      ]) {
+        expect(providers.getEntityRepository(type: Address), addressRepository);
+        expect(providers.getEntityRepository(name: 'role'), roleRepository);
+        expect(providers.getEntityRepositoryByType(Role), roleRepository);
+        expect(
+          providers.getEntityRepositoryByTypeInfo(TypeInfo.from(Address)),
+          addressRepository,
+        );
+        expect(providers.getEntityRepositoryByType(Store), isNull);
+      }
+
+      // Empty, one:
+      expect(
+        <EntityRepositoryProvider>[].getEntityRepositoryByType(Role),
+        isNull,
+      );
+      expect([withRole].getEntityRepositoryByType(Role), roleRepository);
+      expect([withRole].getEntityRepository(type: Role), roleRepository);
+    });
+
+    test('a list of providers: closed ones skipped (and removed)', () {
+      var p1 = _LookupTestProvider(address: Address$reflection().entityHandler);
+      var p2 = _LookupTestProvider(role: Role$reflection().entityHandler);
+      var p3 = _LookupTestProvider(role: Role$reflection().entityHandler);
+
+      p3.sqlAdapter.close();
+      p3.close();
+
+      var providers = <EntityRepositoryProvider>[p1, p2, p3];
+      expect(
+        providers.getEntityRepositoryByType(Role, removeClosedProviders: true),
+        p2.getEntityRepositoryByType(Role),
+      );
+      expect(providers, [p1, p2]);
+    });
+
+    test('ambiguous: resolved by the asking provider', () {
+      var p1 = _LookupTestProvider(address: Address$reflection().entityHandler);
+      var p2 = _LookupTestProvider(address: Address$reflection().entityHandler);
+
+      var r1 = p1.getEntityRepositoryByType(Address);
+      var r2 = p2.getEntityRepositoryByType(Address);
+      expect(r1, isNot(r2));
+
+      // Each provider: its own (not ambiguous).
+      expect(p1.getEntityRepositoryByType(Address), r1);
+      expect(p2.getEntityRepositoryByType(Address), r2);
+
+      // From the list: ambiguous...
+      expect(
+        () => [p1, p2].getEntityRepositoryByType(Address),
+        throwsA(isA<StateError>()),
+      );
+
+      // ... unless resolved by a provider: the one of `p1`'s adapter.
+      expect(
+        [p1.sqlAdapter, p2.sqlAdapter].getEntityRepositoryByType(
+          Address,
+          entityRepositoryProvider: p1.sqlAdapter,
+        ),
+        r1,
+      );
+    });
   });
 }

@@ -1,3 +1,23 @@
+## 1.19.3
+
+- `checkTables`:
+  - The `StateError` has the suggested SQLs to fix the tables (they were
+    only logged).
+  - A unique `@EntityIndex` isn't reported missing when the adapter's unique
+    indexes are unknown (`TableScheme.uniqueIndexes == null`, e.g. a custom
+    adapter): only the indexes known to be missing are.
+- Tests:
+  - `checkTables` against controlled table schemes (all present, unknown
+    indexes/unique indexes, a non-unique index for a unique one, order /
+    superset / subset, the primary key, name conflicts, names in use
+    elsewhere, legacy columns, not reported twice, field `unique` and its
+    fallback to the constraints), and the fix SQLs per dialect.
+  - Integration: the suggested SQLs, run in each DB, fix the tables (a
+    composite index, a composite and a field unique constraint).
+  - Memory adapter: composite unique values (`DateTime`, `null`, update).
+  - Lookups: closed repositories, lists/sets of providers, ambiguity,
+    `allRepositories` of an adapter.
+
 ## 1.19.2
 
 - `EntityRepositoryProvider` / `DBAdapter`: one generic lookup,
