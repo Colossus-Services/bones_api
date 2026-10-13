@@ -800,7 +800,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     // A partial update (only the changed `fields`): merged into the stored
     // object (if any: an auto-insert).
-    var entry = <String, dynamic>{...?await _readObject(table, id), ...changes};
+    // Only a not found object is `null` (an auto-insert): a read error fails
+    // the update (merged with `null`, the other fields would be lost).
+    var stored = await _readObject(table, id, failOnError: true);
+
+    var entry = <String, dynamic>{...?stored, ...changes};
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -904,7 +908,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     return ok;
   }
 
-  Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
+  /// Reads the object [id] of [table], or `null` if not found.
+  /// - [failOnError]: if `true`, an error other than not found (e.g. a
+  ///   timeout or a 5xx response) is rethrown (otherwise logged, as not
+  ///   found).
+  Future<Map<String, dynamic>?> _readObject(
+    String table,
+    Object? id, {
+    bool failOnError = false,
+  }) async {
     if (!_isValidId(id)) return null;
 
     var cacheFile = await _resolveCacheObjectFile(table, id);
@@ -923,6 +935,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
         var notFound = e is DetailedApiRequestError && e.status == 404;
         if (!notFound) {
           _log.severe("Error reading bucket[$bucketName] file: `$file`", e, s);
+          if (failOnError) rethrow;
         }
         return null;
       }

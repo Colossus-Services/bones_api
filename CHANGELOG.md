@@ -131,6 +131,13 @@
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)
   is now tested.
+- Fix: `DBObjectGCSAdapter`: a partial update with an error reading the
+  stored object (other than not found: e.g. a timeout or a 5xx response)
+  overwrote it with only the changed fields: now the update fails (the
+  stored object is kept). A select still handles a read error as not found.
+- Tests: `DBObjectGCSAdapter` (with an in-memory fake of the GCS JSON API):
+  insert, partial updates, updated copies, read errors, enum/`Decimal`
+  fields and deletes.
 - Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
   - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
     `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.
