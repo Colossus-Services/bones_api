@@ -108,6 +108,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              acceptsTemporaryTableForReturning: true,
              acceptsInsertIgnore: true,
              createIndexIfNotExists: false,
+             // `DROP INDEX name ON table` (no `IF EXISTS`):
+             dropIndexOnTable: true,
              // MySQL can't parse an `OFFSET` without a preceding `LIMIT`:
              offsetRequiresLimit: true,
              maxIdentifierLength: 64,

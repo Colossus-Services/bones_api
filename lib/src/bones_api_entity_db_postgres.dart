@@ -662,11 +662,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         relationship: relationship != null,
         idFieldName: idFieldName,
         fieldsTypes: fieldsTypes,
-        constraints: constraints,
+        constraints: constraints.constraints,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
         indexes: indexes?.indexes,
         uniqueIndexes: indexes?.unique,
+        checkConstraints: constraints.checks,
       );
 
       _log.info('$tableScheme');
@@ -774,33 +775,51 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     );
   }
 
-  Future<Set<TableConstraint>> _findConstraints(
+  /// The table's constraints, and its enum `CHECK` constraints by name
+  /// (`checks`: two over the same column aren't merged, as in
+  /// `constraints`). Of the table visible in the search path (as the
+  /// indexes).
+  Future<
+    ({
+      Set<TableConstraint> constraints,
+      Map<String, TableEnumConstraint> checks,
+    })
+  >
+  _findConstraints(
     PostgreSQLConnectionWrapper connection,
     String table,
     Map<String, Type> fieldsTypes,
   ) async {
     var sql =
         '''
-    SELECT 
+    SELECT
+      con.conname AS constraint_name,
       pg_get_constraintdef(con.oid) AS constraint_definition
     FROM pg_constraint con
       JOIN pg_class tbl ON con.conrelid = tbl.oid
     WHERE
-      tbl.relname = '$table';
+      tbl.relname = '$table'
+      AND pg_table_is_visible(tbl.oid);
     ''';
 
-    var columns = await connection.mappedResultsQuery(sql);
+    var rows = await connection.mappedResultsQuery(sql);
 
-    var constraintsDefinitions = columns
-        .map((m) => m['constraint_definition'].toString())
-        .toList();
+    var constraints = <TableConstraint>{};
+    var checks = <String, TableEnumConstraint>{};
 
-    var constraints = constraintsDefinitions
-        .map(_parseConstraint)
-        .nonNulls
-        .toSet();
+    for (var row in rows) {
+      var constraint = _parseConstraint(
+        row['constraint_definition'].toString(),
+      );
+      if (constraint == null) continue;
 
-    return constraints;
+      constraints.add(constraint);
+      if (constraint is TableEnumConstraint) {
+        checks[row['constraint_name'].toString()] = constraint;
+      }
+    }
+
+    return (constraints: constraints, checks: checks);
   }
 
   TableConstraint? _parseConstraint(String definition) {

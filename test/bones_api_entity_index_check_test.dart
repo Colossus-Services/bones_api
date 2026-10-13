@@ -4,6 +4,8 @@ library;
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 
+import 'bones_api_test_entities.dart';
+
 /// `checkTables` of `@EntityIndex`es (and `@EntityField.unique()`) against
 /// a controlled table scheme: [_SchemeAdapter] (a [DBSQLMemoryAdapter]
 /// whose `sales_day` scheme has the given indexes, columns and dialect).
@@ -96,6 +98,7 @@ const _mysql = SQLDialect(
   'MySQL',
   elementQuote: '`',
   createIndexIfNotExists: false,
+  dropIndexOnTable: true,
   maxIdentifierLength: 64,
 );
 
@@ -115,6 +118,7 @@ class _SchemeAdapter extends DBSQLMemoryAdapter {
   Map<String, List<String>>? indexes;
   Set<String>? uniqueIndexes;
   Set<TableConstraint>? constraints;
+  Map<String, TableEnumConstraint>? checkConstraints;
   Map<String, String> renameColumns;
 
   /// `findIndexesNamesInUse` (`null`: unknown, the default).
@@ -128,6 +132,7 @@ class _SchemeAdapter extends DBSQLMemoryAdapter {
     this.indexes,
     this.uniqueIndexes,
     this.constraints,
+    this.checkConstraints,
     this.renameColumns = const {},
     this.constraintSupport = false,
     super.parentRepositoryProvider,
@@ -174,6 +179,7 @@ class _SchemeAdapter extends DBSQLMemoryAdapter {
       relationship: scheme.relationship,
       indexes: indexes,
       uniqueIndexes: uniqueIndexes,
+      checkConstraints: checkConstraints,
     );
   }
 
@@ -202,6 +208,7 @@ class _CheckProvider extends EntityRepositoryProvider {
     Map<String, List<String>>? indexes,
     Set<String>? uniqueIndexes,
     Set<TableConstraint>? constraints,
+    Map<String, TableEnumConstraint>? checkConstraints,
     Map<String, String> renameColumns = const {},
     bool constraintSupport = false,
   }) {
@@ -210,6 +217,7 @@ class _CheckProvider extends EntityRepositoryProvider {
       indexes: indexes,
       uniqueIndexes: uniqueIndexes,
       constraints: constraints,
+      checkConstraints: checkConstraints,
       renameColumns: renameColumns,
       constraintSupport: constraintSupport,
       parentRepositoryProvider: this,
@@ -748,6 +756,301 @@ void main() {
       );
       expect(dup?.fieldName, 'establishment, day');
       expect(dup?.fieldsNames, ['establishment', 'day']);
+    });
+  });
+
+  group('checkTables: duplicated indexes and CHECK constraints', () {
+    TableScheme scheme({
+      Map<String, List<String>>? indexes,
+      Set<String>? uniqueIndexes,
+      Map<String, TableEnumConstraint>? checkConstraints,
+    }) => TableScheme(
+      'sales_day',
+      idFieldName: 'id',
+      fieldsTypes: const {
+        'id': int,
+        'establishment': int,
+        'day': String,
+        'type': String,
+      },
+      indexes: indexes,
+      uniqueIndexes: uniqueIndexes,
+      checkConstraints: checkConstraints,
+    );
+
+    _SchemeAdapter adapter(SQLDialect dialect) {
+      var a = _SchemeAdapter(dialect: dialect);
+      addTearDown(a.close);
+      return a;
+    }
+
+    test('TableScheme: same columns, in order, any case', () {
+      var s = scheme(
+        indexes: {
+          'b_idx': ['establishment', 'day'],
+          'a_idx': ['Establishment', 'DAY'],
+          'reversed': ['day', 'establishment'],
+          'prefix': ['establishment'],
+          'sales_day_pkey': ['id'],
+        },
+        checkConstraints: {
+          'c2': TableEnumConstraint('type', ['admin']),
+          'c1': TableEnumConstraint('TYPE', ['admin', 'guest']),
+          'other': TableEnumConstraint('day', ['x']),
+        },
+      );
+
+      expect(s.duplicatedIndexes, [
+        ['a_idx', 'b_idx'],
+      ]);
+      expect(s.duplicatedCheckConstraints, {
+        'type': ['c1', 'c2'],
+      });
+    });
+
+    test('TableScheme: unknown: null; none: empty', () {
+      var unknown = scheme();
+      expect(unknown.duplicatedIndexes, isNull);
+      expect(unknown.duplicatedCheckConstraints, isNull);
+
+      var none = scheme(
+        indexes: {
+          'sales_day_pkey': ['id'],
+        },
+        checkConstraints: {
+          'c': TableEnumConstraint('type', ['admin']),
+        },
+      );
+      expect(none.duplicatedIndexes, isEmpty);
+      expect(none.duplicatedCheckConstraints, isEmpty);
+    });
+
+    test('indexes: kept the primary key, a unique one, the default name; '
+        'per dialect SQL', () {
+      var s = scheme(
+        indexes: {
+          'sales_day_pkey': ['id'],
+          'id_copy': ['id'],
+          'sales_day__establishment_day__unique': ['establishment', 'day'],
+          'sales_day__establishment_day__idx': ['establishment', 'day'],
+          'zz_unique_copy': ['establishment', 'day'],
+          'sales_day__day__idx': ['day'],
+          'a_day': ['day'],
+        },
+        uniqueIndexes: {
+          'sales_day_pkey',
+          'sales_day__establishment_day__unique',
+          'zz_unique_copy',
+        },
+      );
+
+      var pg = adapter(_postgres).findTableDuplicates(s);
+      expect(pg.isNotEmpty, isTrue);
+      expect(pg.indexes, [
+        ['sales_day__day__idx', 'a_day'],
+        ['sales_day_pkey', 'id_copy'],
+        [
+          'sales_day__establishment_day__unique',
+          'zz_unique_copy',
+          'sales_day__establishment_day__idx',
+        ],
+      ]);
+      expect(pg.checkConstraints, isEmpty);
+      expect(
+        pg.dropSQLs,
+        containsAll([
+          'DROP INDEX IF EXISTS "a_day" ;',
+          'DROP INDEX IF EXISTS "id_copy" ;',
+          // A unique one: a constraint's or an index:
+          'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "zz_unique_copy" ;',
+          'DROP INDEX IF EXISTS "zz_unique_copy" ;',
+          'DROP INDEX IF EXISTS "sales_day__establishment_day__idx" ;',
+        ]),
+      );
+      // The kept ones aren't dropped:
+      for (var kept in [
+        'sales_day__day__idx',
+        'sales_day_pkey',
+        'sales_day__establishment_day__unique',
+      ]) {
+        expect(pg.dropSQLs.where((s) => s.contains('"$kept" ;')), isEmpty);
+      }
+
+      var mysql = adapter(_mysql).findTableDuplicates(s);
+      expect(mysql.indexes, pg.indexes);
+      expect(
+        mysql.dropSQLs,
+        containsAll([
+          'DROP INDEX `a_day` ON `sales_day` ;',
+          'DROP INDEX `zz_unique_copy` ON `sales_day` ;',
+        ]),
+      );
+      expect(mysql.dropSQLs.where((s) => s.contains('CONSTRAINT')), isEmpty);
+
+      var sqlite = adapter(_sqlite).findTableDuplicates(s);
+      expect(
+        sqlite.dropSQLs,
+        contains('DROP INDEX IF EXISTS "zz_unique_copy" ;'),
+      );
+      expect(sqlite.dropSQLs.where((s) => s.contains('CONSTRAINT')), isEmpty);
+    });
+
+    test(
+      'MySQL SERIAL: the PRIMARY key and its unique index: not reported',
+      () {
+        var s = scheme(
+          indexes: {
+            'PRIMARY': ['id'],
+            'id': ['id'],
+            'id_copy': ['id'],
+            'sales_day__day__idx': ['day'],
+          },
+          uniqueIndexes: {'PRIMARY', 'id'},
+        );
+
+        var d = adapter(_mysql).findTableDuplicates(s);
+        // Only `id_copy` (`id`: of `SERIAL`):
+        expect(d.indexes, [
+          ['PRIMARY', 'id_copy'],
+        ]);
+        expect(d.dropSQLs, contains('DROP INDEX `id_copy` ON `sales_day` ;'));
+        expect(d.dropSQLs.where((s) => s.contains('`id` ON')), isEmpty);
+
+        var onlySerial = scheme(
+          indexes: {
+            'PRIMARY': ['id'],
+            'id': ['id'],
+          },
+          uniqueIndexes: {'PRIMARY', 'id'},
+        );
+        expect(adapter(_mysql).findTableDuplicates(onlySerial).isEmpty, isTrue);
+      },
+    );
+
+    test('SQLite: a constraint\'s index (sqlite_autoindex) is kept', () {
+      var s = scheme(
+        indexes: {
+          'sqlite_autoindex_sales_day_1': ['day'],
+          'a_day_unique': ['day'],
+        },
+        uniqueIndexes: {'sqlite_autoindex_sales_day_1', 'a_day_unique'},
+      );
+
+      var d = adapter(_sqlite).findTableDuplicates(s);
+      expect(d.indexes, [
+        ['sqlite_autoindex_sales_day_1', 'a_day_unique'],
+      ]);
+      expect(d.dropSQLs, contains('DROP INDEX IF EXISTS "a_day_unique" ;'));
+    });
+
+    test('CHECKs: kept the one with the entity\'s values', () {
+      RoleType$reflection.staticInstance;
+
+      var s = scheme(
+        checkConstraints: {
+          'sales_day_type_check': TableEnumConstraint('type', [
+            'admin',
+            'guest',
+          ]),
+          'sales_day_type_check1': TableEnumConstraint('type', [
+            'admin',
+            'guest',
+            'unknown',
+          ]),
+          'old_type': TableEnumConstraint('type', ['admin']),
+        },
+      );
+
+      var d = adapter(
+        _postgres,
+      ).findTableDuplicates(s, entityHandler: Role$reflection().entityHandler);
+
+      expect(d.indexes, isEmpty);
+      expect(d.checkConstraints, {
+        'type': ['sales_day_type_check1', 'sales_day_type_check', 'old_type'],
+      });
+      expect(
+        d.dropSQLs,
+        containsAll([
+          'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "sales_day_type_check" ;  -- {admin, guest}',
+          'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "old_type" ;  -- {admin}',
+        ]),
+      );
+      expect(d.dropSQLs.where((s) => s.contains('review')), isEmpty);
+    });
+
+    test('CHECKs: no entity: the default name; none with the entity\'s '
+        'values: review', () {
+      RoleType$reflection.staticInstance;
+
+      var s = scheme(
+        checkConstraints: {
+          'old_type': TableEnumConstraint('type', ['admin']),
+          'sales_day_type_check': TableEnumConstraint('type', [
+            'admin',
+            'guest',
+          ]),
+        },
+      );
+
+      var noEntity = adapter(_postgres).findTableDuplicates(s);
+      expect(noEntity.checkConstraints, {
+        'type': ['sales_day_type_check', 'old_type'],
+      });
+      expect(noEntity.dropSQLs.where((s) => s.contains('review')), isEmpty);
+
+      var noMatch = adapter(
+        _postgres,
+      ).findTableDuplicates(s, entityHandler: Role$reflection().entityHandler);
+      expect(noMatch.checkConstraints, noEntity.checkConstraints);
+      expect(
+        noMatch.dropSQLs.where((s) => s.contains('review before dropping')),
+        hasLength(1),
+      );
+    });
+
+    test('checkTables: warned, not an error; kept in tablesDuplicates', () async {
+      var p = _CheckProvider(
+        const [],
+        dialect: _postgres,
+        indexes: {
+          ..._baseIndexes,
+          'code_copy': ['code'],
+        },
+        uniqueIndexes: _baseUnique,
+        checkConstraints: {
+          'sales_day_day_check': TableEnumConstraint('day', ['a']),
+          'day_check_2': TableEnumConstraint('day', ['a', 'b']),
+        },
+      );
+
+      var c = await _check(p.adapter);
+      expect(c.ok, isTrue, reason: c.error);
+
+      var d = p.adapter.tablesDuplicates['sales_day'];
+      expect(d, isNotNull);
+      expect(d!.indexes, [
+        ['sales_day__code__unique', 'code_copy'],
+      ]);
+      expect(d.checkConstraints, {
+        'day': ['sales_day_day_check', 'day_check_2'],
+      });
+      expect(d.dropSQLs, contains('DROP INDEX IF EXISTS "code_copy" ;'));
+      expect(
+        d.dropSQLs,
+        contains(
+          'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "day_check_2" ;  -- {a, b}',
+        ),
+      );
+
+      // Fixed: none on the next check.
+      p.adapter
+        ..indexes = {..._baseIndexes}
+        ..checkConstraints = null;
+
+      c = await _check(p.adapter);
+      expect(c.ok, isTrue, reason: c.error);
+      expect(p.adapter.tablesDuplicates, isEmpty);
     });
   });
 }

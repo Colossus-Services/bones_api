@@ -290,6 +290,51 @@ class TableScheme with FieldsFromMap {
   /// `PRIMARY KEY` constraints); `null` if unknown.
   final Set<String>? uniqueIndexes;
 
+  /// The table's enum `CHECK` constraints, by constraint name; `null` if
+  /// unknown (the adapter doesn't provide them). Unlike [constraints], two
+  /// over the same column aren't merged.
+  final Map<String, TableEnumConstraint>? checkConstraints;
+
+  /// The [indexes] over the same columns (in the same order, case
+  /// insensitive): each group's names sorted, the groups by their first
+  /// name. `null` if the [indexes] are unknown.
+  List<List<String>>? get duplicatedIndexes {
+    var indexes = this.indexes;
+    if (indexes == null) return null;
+
+    var byColumns = <String, List<String>>{};
+    for (var e in indexes.entries) {
+      var key = e.value.map((c) => c.toLowerCase()).join(',');
+      byColumns.putIfAbsent(key, () => <String>[]).add(e.key);
+    }
+
+    return byColumns.values
+        .where((names) => names.length > 1)
+        .map((names) => names..sort())
+        .sortedBy((names) => names.first);
+  }
+
+  /// The [checkConstraints] over the same column (case insensitive): by
+  /// column, the constraints names (sorted). `null` if the
+  /// [checkConstraints] are unknown.
+  Map<String, List<String>>? get duplicatedCheckConstraints {
+    var checkConstraints = this.checkConstraints;
+    if (checkConstraints == null) return null;
+
+    var byColumn = <String, List<String>>{};
+    for (var e in checkConstraints.entries) {
+      var column = e.value.field.toLowerCase();
+      byColumn.putIfAbsent(column, () => <String>[]).add(e.key);
+    }
+
+    return Map.fromEntries(
+      byColumn.entries
+          .where((e) => e.value.length > 1)
+          .map((e) => MapEntry(e.key, e.value..sort()))
+          .sortedBy((e) => e.key),
+    );
+  }
+
   /// Whether the table has an index over exactly [columns] (in this order,
   /// any name), a unique one if [unique]. `null` if the [indexes] (or the
   /// [uniqueIndexes]) are unknown.
@@ -332,7 +377,11 @@ class TableScheme with FieldsFromMap {
     this.relationship = false,
     Map<String, List<String>>? indexes,
     Iterable<String>? uniqueIndexes,
-  }) : indexes = indexes == null
+    Map<String, TableEnumConstraint>? checkConstraints,
+  }) : checkConstraints = checkConstraints == null
+           ? null
+           : Map<String, TableEnumConstraint>.unmodifiable(checkConstraints),
+       indexes = indexes == null
            ? null
            : Map<String, List<String>>.unmodifiable(
                indexes.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))),
