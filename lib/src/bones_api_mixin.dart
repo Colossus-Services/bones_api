@@ -476,8 +476,9 @@ mixin Pool<O extends Object> {
         return false;
       }
 
-      callCheckPool();
       _pool.addLast(recycled);
+      // After adding it: the excess includes the released element.
+      callCheckPool();
 
       while (_yields.isNotEmpty) {
         var yield = _yields.removeFirst();

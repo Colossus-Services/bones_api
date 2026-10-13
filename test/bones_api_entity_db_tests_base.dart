@@ -3271,10 +3271,26 @@ Future<bool> runAdapterTests(
           var user3 = User('user3@mail.com', '333', address3, [role3]);
           store3.owner = user3;
 
+          var openTransactions0 = Transaction.openInstances
+              .where((t) => !t.isFinished)
+              .length;
+          var rolesLength0 = await roleAPIRepository.length();
+
           await expectLater(
             () async => await userAPIRepository.store(user3),
             throwsA(isA<RecursiveRelationshipLoopError>()),
           );
+
+          // Its auto-commit transaction is aborted (not left open, holding
+          // its connection), and the role already inserted rolled back:
+          await Future.delayed(Duration(milliseconds: 50));
+          expect(
+            Transaction.openInstances.where((t) => !t.isFinished).length,
+            lessThanOrEqualTo(openTransactions0),
+          );
+          if (sqlAdapter.capability.transactionAbort) {
+            expect(await roleAPIRepository.length(), equals(rolesLength0));
+          }
         }
       });
 

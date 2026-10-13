@@ -106,6 +106,13 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   /// adapter uses a single handle, so it can never contend with itself.
   final int busyTimeout;
 
+  /// The end of the last queued transaction: the transactions of the single
+  /// handle run one at a time (see [_DBSQLiteConnectionWrapped.openTransaction]).
+  Future<void> _transactionsQueue = Future<void>.value();
+
+  /// The [Zone] key marking the execution of a transaction of this adapter.
+  final Object _transactionZoneKey = Object();
+
   /// The single native handle shared by every pooled connection wrapper.
   Database? _database;
 
@@ -1401,12 +1408,43 @@ class _DBSQLiteConnectionWrapped extends DBSQLiteConnectionWrapper {
   Future openTransaction(
     Future Function(DBSQLiteConnectionWrapper connectionTransaction) queryBlock,
   ) async {
+    var adapter = _adapter;
+    var zoneKey = adapter._transactionZoneKey;
+
+    // Opened inside a transaction of this adapter: nested (a `SAVEPOINT`).
+    if (Zone.current[zoneKey] == true) {
+      return _openTransactionImpl(queryBlock);
+    }
+
+    // Every wrapper shares one native handle, so concurrent transactions
+    // would interleave on it: a `COMMIT` would also release the `SAVEPOINT`
+    // of another one, and a `ROLLBACK` revert its writes. Run them one at a
+    // time (SQLite has a single writer anyway).
+    var previous = adapter._transactionsQueue;
+    var finished = Completer<void>();
+    adapter._transactionsQueue = finished.future;
+
+    await previous;
+
+    try {
+      return await runZoned(
+        () => _openTransactionImpl(queryBlock),
+        zoneValues: {zoneKey: true},
+      );
+    } finally {
+      finished.complete();
+    }
+  }
+
+  Future _openTransactionImpl(
+    Future Function(DBSQLiteConnectionWrapper connectionTransaction) queryBlock,
+  ) async {
     updateLastAccessTime();
 
-    // Every wrapper shares one native handle, so a plain `BEGIN` issued while
-    // another transaction is already open would fail with "cannot start a
-    // transaction within a transaction". `SAVEPOINT` nests, so use it whenever
-    // the handle is already in a transaction (`autocommit` is `false`).
+    // A plain `BEGIN` issued while the handle is already in a transaction
+    // would fail with "cannot start a transaction within a transaction".
+    // `SAVEPOINT` nests, so use it whenever the handle is already in a
+    // transaction (`autocommit` is `false`).
     var nested = !nativeConnection.autocommit;
     var savePoint = nested ? 'bones_api_sp_${++_savePointCount}' : null;
 

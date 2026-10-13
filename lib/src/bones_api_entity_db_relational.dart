@@ -668,7 +668,7 @@ class DBRelationalEntityRepository<O extends Object>
       parentOperation: parentOperation,
     );
 
-    try {
+    return _abortAutoCommitOnError(op, o, 'store', () {
       return ensureReferencesStored(
         o,
         transaction: op.transaction,
@@ -694,15 +694,54 @@ class DBRelationalEntityRepository<O extends Object>
           },
         );
       });
+    });
+  }
+
+  /// Runs [f] (the [op] of [o]): on an error (sync or async), logs it and
+  /// aborts the auto-commit transaction of [op]. An error raised here (not
+  /// by the DB: e.g. a [RecursiveRelationshipLoopError]) would otherwise
+  /// leave it open, with the operations already executed in it (holding its
+  /// connection, never committed or rolled back).
+  FutureOr<R> _abortAutoCommitOnError<R>(
+    TransactionOperation op,
+    O o,
+    String opName,
+    FutureOr<R> Function() f,
+  ) {
+    void onError(Object e, StackTrace s) {
+      _log.severe(
+        '$opName> o: $o ; transaction: ${op.transaction} ; op: $op',
+        e,
+        s,
+      );
+
+      var transaction = op.transaction;
+      if (transaction.autoCommit && !transaction.isFinished) {
+        // As `Transaction.execute` on an error: abort, then complete it
+        // (`commit` of an aborted transaction: rolled back).
+        // ignore: discarded_futures
+        transaction.abort(error: e, stackTrace: s);
+        // ignore: discarded_futures
+        transaction.commit();
+      }
+    }
+
+    FutureOr<R> ret;
+    try {
+      ret = f();
     } catch (e, s) {
-      var message =
-          'store> '
-          'o: $o ; '
-          'transaction: ${op.transaction} ; '
-          'op: $op';
-      _log.severe(message, e, s);
+      onError(e, s);
       rethrow;
     }
+
+    if (ret is Future<R>) {
+      return ret.catchError((Object e, StackTrace s) {
+        onError(e, s);
+        Error.throwWithStackTrace(e, s);
+      });
+    }
+
+    return ret;
   }
 
   FutureOr<dynamic> _update(
@@ -724,47 +763,52 @@ class DBRelationalEntityRepository<O extends Object>
       parentOperation: parentOperation,
     );
 
-    return ensureReferencesStored(o, transaction: op.transaction).resolveWith(
-      () {
-        var idFieldsName = entityHandler.idFieldName(o);
-        var id = entityHandler.getID(o);
-        var fields = entityHandler.getFields(o);
+    return _abortAutoCommitOnError(
+      op,
+      o,
+      'update',
+      () => ensureReferencesStored(o, transaction: op.transaction).resolveWith(
+        () {
+          var idFieldsName = entityHandler.idFieldName(o);
+          var id = entityHandler.getID(o);
+          var fields = entityHandler.getFields(o);
 
-        var changedFields = getEntityChangedFields(o);
-        if (changedFields != null) {
-          if (changedFields.isEmpty) {
-            return _ensureRelationshipsStored(
-              o,
-              op.transaction,
-              changedFields,
-            ).resolveWith(() {
-              trackEntity(o);
-              return op.finish(id);
-            });
+          var changedFields = getEntityChangedFields(o);
+          if (changedFields != null) {
+            if (changedFields.isEmpty) {
+              return _ensureRelationshipsStored(
+                o,
+                op.transaction,
+                changedFields,
+              ).resolveWith(() {
+                trackEntity(o);
+                return op.finish(id);
+              });
+            }
+
+            fields.removeWhere((key, value) => !changedFields.contains(key));
           }
 
-          fields.removeWhere((key, value) => !changedFields.contains(key));
-        }
-
-        return repositoryAdapter.doUpdate(
-          op,
-          o,
-          id,
-          fields,
-          idFieldName: idFieldsName,
-          allowAutoInsert: allowAutoInsert,
-          preFinish: (id) {
-            return _ensureRelationshipsStored(
-              o,
-              op.transaction,
-              changedFields,
-            ).resolveWith(() {
-              trackEntity(o, stored: true);
-              return id; // pre-finish
-            });
-          },
-        );
-      },
+          return repositoryAdapter.doUpdate(
+            op,
+            o,
+            id,
+            fields,
+            idFieldName: idFieldsName,
+            allowAutoInsert: allowAutoInsert,
+            preFinish: (id) {
+              return _ensureRelationshipsStored(
+                o,
+                op.transaction,
+                changedFields,
+              ).resolveWith(() {
+                trackEntity(o, stored: true);
+                return id; // pre-finish
+              });
+            },
+          );
+        },
+      ),
     );
   }
 
