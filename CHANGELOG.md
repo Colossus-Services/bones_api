@@ -1,3 +1,33 @@
+## 1.20.1
+
+- `Initializable` (review of the 1.20.0 resolver):
+  - `checkInitialized()`: back to the pre-1.20.0 default for an instance
+    initializing elsewhere: it returns (`allowInProgress` defaults to
+    `true`). `allowInProgress: false` throws (unless in a cycle with the
+    caller). A cycle it finds is recorded in the caller's
+    `cyclicDependencies`; when it throws for an async start, the caller isn't
+    left waiting for that instance.
+  - A call from a hook (whose future may be discarded, e.g. a constructor
+    starting a repository) is a wait only until the hook completes: it no
+    longer makes a later request from that instance look like a cycle.
+  - An explicit `parent` is a waiter too (with the calling hook): a cycle
+    through either is detected.
+  - A root caller joining an attempt already in progress (started by
+    another instance) makes it drain its dependencies' closure.
+  - A new attempt (e.g. a retry after a failure) starts with no
+    dependencies (not the failed attempt's).
+  - A result of another instance: its listed dependencies that aren't that
+    instance's own are waited for too.
+  - Initialized: the same result instance for every call (no copy of the
+    dependencies per call). The hooks' zones no longer retain completed
+    attempts.
+- `DBEntityRepository` / `DBSQLEntityRepository`: their dependencies are the
+  adapter and the repository adapter, not all the repositories (removing the
+  clique of every repository waiting for every other, still present in
+  1.20.0).
+- Tests: a regression test per fix (8 of them fail on 1.20.0), and the
+  repositories' dependencies on the real DB stack (integration).
+
 ## 1.20.0
 
 - `Initializable`: a new dependency resolver (the public API is unchanged,

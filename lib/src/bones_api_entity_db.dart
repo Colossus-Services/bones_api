@@ -1459,12 +1459,15 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
         () => repositoryAdapter.ensureInitialized(parent: this),
         parent: this,
       )
-      .resolveMapped((result) {
-        return InitializationResult.ok(
+      // Its dependencies: the adapter and its repository adapter (not their
+      // dependencies, e.g. all the repositories: already waited by the
+      // adapter, and a clique of every repository waiting for every other).
+      .resolveMapped(
+        (_) => InitializationResult.ok(
           this,
-          dependencies: [provider, repositoryAdapter, ...result.dependencies],
-        );
-      });
+          dependencies: [provider, repositoryAdapter],
+        ),
+      );
 
   DBDialect get dialect => repositoryAdapter.dialect;
 

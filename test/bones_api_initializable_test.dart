@@ -773,28 +773,108 @@ void main() {
       expect(a.isInitialized, isTrue);
     });
 
-    test('in progress, from outside: throws (or allowInProgress)', () async {
+    test(
+      'in progress, from outside: returns (allowInProgress: false: throws)',
+      () async {
+        var g = _Graph();
+        var a = g.node('A')..initGate = Completer();
+
+        var r = a.ensureInitialized();
+
+        // The default (as before 1.20.0): in progress is accepted.
+        a.checkInitialized();
+        a.checkInitialized(allowInProgress: true);
+
+        expect(
+          () => a.checkInitialized(allowInProgress: false),
+          throwsA(
+            isA<InitializationError>().having(
+              (e) => e.message,
+              'message',
+              contains('in progress'),
+            ),
+          ),
+        );
+
+        a.initGate!.complete();
+        await r;
+        a.checkInitialized(allowInProgress: false);
+      },
+    );
+
+    test('allowInProgress: false, in a cycle: returns, recorded', () async {
       var g = _Graph();
-      var a = g.node('A')..initGate = Completer();
+      var a = g.node('A');
+      var b = g.node('B')..initGate = Completer();
+      a.deps.add(b);
+      b.deps.add(a);
+
+      Object? error;
+      b.onInitialize = (n) {
+        try {
+          // `A` waits for `B`: a cycle (not an error).
+          a.checkInitialized(allowInProgress: false);
+        } catch (e) {
+          error = e;
+        }
+      };
 
       var r = a.ensureInitialized();
+      b.initGate!.complete();
+      expect((await r).ok, isTrue);
+      expect(error, isNull);
+      expect(b.cyclicDependencies, [a]);
+    });
 
-      expect(
-        () => a.checkInitialized(),
-        throwsA(
-          isA<InitializationError>().having(
-            (e) => e.message,
-            'message',
-            contains('in progress'),
-          ),
-        ),
-      );
+    test('a cycle found by checkInitialized: in cyclicDependencies', () async {
+      // `W`'s hook checks `X` (in progress, waiting for `W`), with no
+      // declared dependency: recorded in `W.cyclicDependencies`.
+      var g = _Graph();
+      var x = g.node('X')..initGate = Completer();
+      var w = g.node('W');
+      x.deps.add(w);
 
-      a.checkInitialized(allowInProgress: true);
+      w.onInitialize = (n) => x.checkInitialized();
 
-      a.initGate!.complete();
-      await r;
-      a.checkInitialized();
+      var r = x.ensureInitialized();
+      await pumpEventQueue();
+      expect(w.isInitialized, isTrue);
+      expect(w.cyclicDependencies, [x]);
+
+      x.initGate!.complete();
+      expect((await r).ok, isTrue);
+    });
+
+    test('async start throws: the caller is not left waiting for it', () async {
+      // `W`'s hook: `C.checkInitialized()` starts `C` (async) and throws.
+      // `W` doesn't wait for `C`: when `C` asks for `W`, it waits for it (no
+      // false cycle).
+      var g = _Graph();
+      var w = g.node('W')..initGate = Completer();
+      var c = g.node('C')..depsGate = Completer();
+      c.deps.add(w);
+
+      Object? error;
+      w.onInitialize = (n) {
+        try {
+          c.checkInitialized();
+        } catch (e) {
+          error = e;
+        }
+      };
+
+      var rw = w.ensureInitialized();
+      expect(error, isA<InitializationError>());
+
+      c.depsGate!.complete();
+      await pumpEventQueue();
+      expect(c.cyclicDependencies, isEmpty);
+      expect(c.isInitialized, isFalse);
+
+      w.initGate!.complete();
+      expect((await rw).ok, isTrue);
+      expect((await c.ensureInitialized()).ok, isTrue);
+      expect(c.cyclicDependencies, isEmpty);
     });
 
     test('from its own initialize(): OK', () {
@@ -1096,6 +1176,162 @@ void main() {
         },
       );
     }
+  });
+
+  group('Initializable: waits and attempts', () {
+    test('a discarded call from a hook: not a wait after the hook', () async {
+      // `W.initialize()` starts `C` and discards it (e.g. a constructor
+      // starting a repository), then `W` waits for a post-dependency. When
+      // `C` asks for `W` (after `W`'s hook completed), it waits for it: no
+      // false cycle.
+      var g = _Graph();
+      var p = g.node('P')..initGate = Completer();
+      var w = g.node('W');
+      var c = g.node('C')..depsGate = Completer();
+      w.postDeps.add(p);
+      c.deps.add(w);
+
+      w.onInitialize = (n) {
+        c.ensureInitialized(); // discarded
+      };
+
+      var rw = w.ensureInitialized();
+      await pumpEventQueue();
+      expect(w.initializationStatus.finalizing, isTrue);
+
+      c.depsGate!.complete();
+      await pumpEventQueue();
+      expect(c.cyclicDependencies, isEmpty);
+      expect(c.isInitialized, isFalse);
+
+      p.initGate!.complete();
+      expect((await rw).ok, isTrue);
+      expect((await c.ensureInitialized()).ok, isTrue);
+      expect(g.events.indexOf('done:W'), lessThan(g.events.indexOf('done:C')));
+    });
+
+    test('a root joining an attempt (started by a waiter) drains', () async {
+      // `D` waits for `W`; `W` doesn't wait for `D` (a cycle). `P`, started
+      // by `Q`'s hook (not a root), has `W` as a post-dependency: a root
+      // that joins `P` waits for `D` too (in `W`'s dependencies).
+      var g = _Graph();
+      var d = g.node('D')..initGate = Completer();
+      var w = g.node('W');
+      d.deps.add(w);
+      w.deps.add(d);
+
+      var rd = d.ensureInitialized();
+      await pumpEventQueue();
+      expect(w.isInitialized, isTrue);
+
+      var p = g.node('P')..initGate = Completer();
+      p.postDeps.add(w);
+      var q = g.node('Q');
+      q.onInitialize = (n) {
+        p.ensureInitialized(); // started by `Q` (discarded)
+      };
+      expect((q.ensureInitialized() as InitializationResult).ok, isTrue);
+      expect(p.isInitializing, isTrue);
+
+      // A root joins `P`:
+      var rp = p.ensureInitialized();
+      p.initGate!.complete();
+      await pumpEventQueue();
+
+      // `P` waits for `D` (in its closure, in progress):
+      expect(p.isInitialized, isFalse);
+
+      d.initGate!.complete();
+      expect((await rp).ok, isTrue);
+      expect((await rd).ok, isTrue);
+    });
+
+    test('a retry: its own dependencies (not the failed attempt\'s)', () async {
+      var g = _Graph();
+      var a = g.node('A')..failTimes = 1;
+      var x = g.node('X');
+      var y = g.node('Y');
+      var z = g.node('Z');
+      a.deps.addAll([x, y]);
+
+      var r1 = await a.ensureInitialized();
+      expect(r1.ok, isFalse);
+
+      a.deps
+        ..clear()
+        ..add(z);
+
+      var r2 = await a.ensureInitialized();
+      expect(r2.ok, isTrue);
+      expect(r2.dependencies, [z]);
+    });
+
+    test(
+      'a result of another instance: its extra dependencies waited',
+      () async {
+        // `RA.initialize()` returns a result of `X` with `Y` (not one of `X`'s
+        // dependencies): `RA` waits for `Y` too (not a root: no drain).
+        var g = _Graph();
+        var x = g.node('X');
+        var y = g.node('Y')..initGate = Completer();
+        var ra = g.node('RA');
+        ra.initializeOverride = (n) =>
+            InitializationResult.ok(x, dependencies: [y]);
+
+        var q = g.node('Q');
+        q.deps.add(ra);
+
+        var rq = q.ensureInitialized();
+        await pumpEventQueue();
+        expect(ra.isInitialized, isFalse);
+        expect(y.isInitializing, isTrue);
+
+        y.initGate!.complete();
+        expect((await rq).ok, isTrue);
+        expect(ra.isInitialized && x.isInitialized && y.isInitialized, isTrue);
+      },
+    );
+
+    test('an explicit parent also waits (with the hook)', () async {
+      // `A`'s hook asks for `Z` on behalf of `B` (`parent: B`, in
+      // progress). `Z` needs `B`: `B` waits for `Z` (declared), so `Z`
+      // doesn't wait for `B` (a cycle).
+      var g = _Graph();
+      var b = g.node('B')..initGate = Completer();
+      var a = g.node('A');
+      var z = g.node('Z');
+      z.deps.add(b);
+
+      var rb = b.ensureInitialized();
+      await pumpEventQueue();
+      expect(b.isInitializing, isTrue);
+
+      a.onInitialize = (n) {
+        z.ensureInitialized(parent: b); // discarded
+      };
+      expect((a.ensureInitialized() as InitializationResult).ok, isTrue);
+
+      expect(z.isInitialized, isTrue);
+      expect(z.cyclicDependencies, [b]);
+
+      b.initGate!.complete();
+      expect((await rb).ok, isTrue);
+    });
+
+    test('initialized: the same result instance (no copies)', () {
+      var g = _Graph();
+      var a = g.node('A');
+      var b = g.node('B');
+      a.deps.add(b);
+
+      var r1 = a.ensureInitialized();
+      var r2 = a.ensureInitialized();
+      var r3 = a.doInitialization();
+
+      expect(identical(r1, r2), isTrue);
+      expect(identical(r2, r3), isTrue);
+      expect((r1 as InitializationResult).dependencies, [b]);
+    });
   });
 }
 
