@@ -120,6 +120,10 @@
   a partial update (`store` of a tracked entity: only its changed fields)
   replaced the stored object with only those fields (the others lost): now
   merged into the stored object.
+- `APIServerWorker._startLetsEncrypt`: removed the unreachable `null`
+  directory check (only called with a directory: `canUseLetsEncrypt`); the
+  "directory doesn't exist" check (removed after the worker's constructor)
+  is now tested.
 - Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
   - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
     `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.

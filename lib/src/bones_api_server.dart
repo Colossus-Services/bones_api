@@ -3221,12 +3221,13 @@ final class APIServerWorker extends _APIServerBase {
     }
   }
 
+  /// Called only if [canUseLetsEncrypt] (with a [letsEncryptDirectory]).
   Future<void> _startLetsEncrypt() async {
-    var letsEncryptDirectory = this.letsEncryptDirectory;
+    var letsEncryptDirectory = this.letsEncryptDirectory!;
 
-    if (letsEncryptDirectory == null) {
-      throw StateError("Let's Encrypt directory not set!");
-    } else if (!letsEncryptDirectory.existsSync()) {
+    // Resolved (and created) by the constructor: missing only if removed
+    // after it.
+    if (!letsEncryptDirectory.existsSync()) {
       throw StateError(
         "Let's Encrypt directory doesn't exists: $letsEncryptDirectory",
       );

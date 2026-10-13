@@ -613,6 +613,52 @@ void main() {
       apiRoot.close();
     });
 
+    test(
+      "Let's Encrypt directory removed after the worker's constructor",
+      () async {
+        var leDir = await Directory.systemTemp.createTemp('bones_api_cov_le2_');
+        var docRoot = await Directory.systemTemp.createTemp(
+          'bones_api_cov_le2_',
+        );
+        addTearDown(() async {
+          await docRoot.delete(recursive: true);
+          if (leDir.existsSync()) await leDir.delete(recursive: true);
+        });
+
+        var port = await resolveFreePort(6670);
+
+        var apiRoot = _CovHttpAPIRoot('cov-http-le2');
+        addTearDown(apiRoot.close);
+
+        // An `APIServer` creates its workers on `start` (each one resolving,
+        // and creating, the directory): only a worker started after the
+        // directory is removed reaches the check.
+        var worker = APIServerWorker(
+          0,
+          apiRoot,
+          name: 'LE',
+          version: '1.0',
+          address: 'localhost',
+          port: port,
+          securePort: port + 1,
+          letsEncrypt: true,
+          letsEncryptDirectory: leDir.path,
+          domains: {'cov-test.local': docRoot.path},
+        );
+
+        expect(worker.canUseLetsEncrypt, isTrue);
+
+        await leDir.delete(recursive: true);
+
+        var error = await worker.start().then<Object?>(
+          (ok) => ok,
+          onError: (e) => e,
+        );
+        expect(error, isA<StateError>());
+        expect('$error', contains("Let's Encrypt directory doesn't exists"));
+      },
+    );
+
     test('restricted CORS + log queue + properties', () async {
       var port = await resolveFreePort(6700);
 
