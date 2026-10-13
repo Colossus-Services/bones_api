@@ -1009,6 +1009,152 @@ Future<bool> runAdapterTests(
         ]);
       });
 
+      test('duplicated indexes and CHECK constraints: warned', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var q = sqlAdapter.dialect.elementQuote;
+
+        if (testConfigDB is! APITestConfigDBSQL) {
+          _log.info("Not a `APITestConfigDBSQL`: skipping duplicates checks.");
+          return;
+        }
+
+        var testConfigSQL = testConfigDB;
+
+        var fullCreateTableSQLs = await sqlAdapter.generateFullCreateTableSQLs(
+          withDate: false,
+        );
+        sqlAdapter.disposeTableSchemeCache('address');
+        if (await sqlAdapter.getTableScheme('address') == null) {
+          await sqlAdapter.populateTables(fullCreateTableSQLs);
+        }
+
+        // A copy of `address__state_city__idx` (the same columns):
+        await testConfigSQL.runSQL(
+          'CREATE INDEX ${q}address_state_city_copy$q ON ${q}address$q '
+          '(${q}state$q, ${q}city$q)',
+        );
+
+        // The same columns, of another kind (`DESC`): not a duplicate.
+        await testConfigSQL.runSQL(
+          'CREATE INDEX ${q}address_state_city_desc$q ON ${q}address$q '
+          '(${q}state$q DESC, ${q}city$q)',
+        );
+
+        var isPostgres = sqlAdapter.dialect.name.toLowerCase().contains(
+          'postgres',
+        );
+
+        // An old enum `CHECK` never dropped (PostgreSQL; `NOT VALID`: the
+        // existing rows aren't checked). MySQL: a native `ENUM`; SQLite: no
+        // `ADD CONSTRAINT`.
+        if (isPostgres) {
+          await testConfigSQL.runSQL(
+            'ALTER TABLE ${q}role$q ADD CONSTRAINT ${q}role_type_old_check$q '
+            "CHECK (${q}type$q IN ('admin', 'guest')) NOT VALID",
+          );
+        }
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        sqlAdapter.disposeTableSchemeCache('role');
+
+        var addressScheme = await sqlAdapter.getTableScheme('address');
+        expect(
+          addressScheme!.duplicatedIndexes,
+          contains(
+            equals(['address__state_city__idx', 'address_state_city_copy']),
+          ),
+        );
+        expect(
+          addressScheme.duplicatedIndexes!.expand((g) => g),
+          isNot(contains('address_state_city_desc')),
+        );
+        expect(
+          addressScheme.indexes!.keys,
+          contains('address_state_city_desc'),
+        );
+
+        var isMySQL = sqlAdapter.dialect.name.toLowerCase().contains('mysql');
+
+        // The primary key's index (SQLite: the rowid, none):
+        expect(
+          addressScheme.primaryKeyIndex,
+          isPostgres
+              ? 'address_pkey'
+              : isMySQL
+              ? 'PRIMARY'
+              : isNull,
+        );
+
+        var roleScheme = await sqlAdapter.getTableScheme('role');
+        if (isPostgres) {
+          expect(roleScheme!.checkConstraints, isNotNull);
+          expect(
+            roleScheme.duplicatedCheckConstraints?['type'],
+            containsAll(['role_type_check', 'role_type_old_check']),
+          );
+
+          var roleDuplicates = sqlAdapter.findTableDuplicates(
+            roleScheme,
+            entityHandler: entityRepositoryProvider
+                .getEntityRepositoryByType(Role)!
+                .entityHandler,
+          );
+          // Kept: the one with the entity's values (admin, guest, unknown).
+          expect(
+            roleDuplicates.checkConstraints['type']?.first,
+            'role_type_check',
+          );
+        }
+
+        // Warned, not an error: also the old `CHECK` without the enum's
+        // `unknown` (the current one has all the values).
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+        var addressDuplicates = sqlAdapter.tablesDuplicates['address'];
+        expect(addressDuplicates, isNotNull);
+        expect(
+          addressDuplicates!.indexes,
+          contains(
+            equals(['address__state_city__idx', 'address_state_city_copy']),
+          ),
+        );
+        expect(sqlAdapter.tablesDuplicates.containsKey('role'), isPostgres);
+
+        // The suggested SQLs, run in the DB, drop the duplicates:
+        var dropSQLs = [
+          ...addressDuplicates.dropSQLs,
+          ...?sqlAdapter.tablesDuplicates['role']?.dropSQLs,
+        ].where((s) => !s.startsWith('--')).map((s) => s.split('  --').first);
+
+        for (var sql in dropSQLs) {
+          await testConfigSQL.runSQL(sql);
+        }
+
+        sqlAdapter.disposeTableSchemeCache('address');
+        sqlAdapter.disposeTableSchemeCache('role');
+
+        var addressScheme2 = await sqlAdapter.getTableScheme('address');
+        // None reported (MySQL `SERIAL`'s unique index, of the `CREATE
+        // TABLE`, is in the scheme's `duplicatedIndexes`, but not reported):
+        expect(sqlAdapter.findTableDuplicates(addressScheme2!).isEmpty, isTrue);
+        expect(addressScheme2.hasIndexOn(['state', 'city']), isTrue);
+        // The other kind wasn't dropped:
+        expect(
+          addressScheme2.indexes!.keys,
+          contains('address_state_city_desc'),
+        );
+        if (isPostgres) {
+          var roleScheme2 = await sqlAdapter.getTableScheme('role');
+          expect(roleScheme2!.duplicatedCheckConstraints, isEmpty);
+          expect(roleScheme2.checkConstraints!.keys, ['role_type_check']);
+        }
+
+        await testConfigSQL.runSQL(
+          sqlAdapter.generateDropIndexSQL('address', 'address_state_city_desc'),
+        );
+        sqlAdapter.disposeTableSchemeCache('address');
+      });
+
       test('EntityIndex unique: generated, introspected and checked', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
         var q = sqlAdapter.dialect.elementQuote;

@@ -290,6 +290,64 @@ class TableScheme with FieldsFromMap {
   /// `PRIMARY KEY` constraints); `null` if unknown.
   final Set<String>? uniqueIndexes;
 
+  /// The table's enum `CHECK` constraints, by constraint name; `null` if
+  /// unknown (the adapter doesn't provide them). Unlike [constraints], two
+  /// over the same column aren't merged.
+  final Map<String, TableEnumConstraint>? checkConstraints;
+
+  /// The name of the index of the primary key (of the [indexes]); `null` if
+  /// unknown or none.
+  final String? primaryKeyIndex;
+
+  /// How each of the [indexes] indexes its columns, by index name: an
+  /// adapter's description (e.g. the method, operator classes, order,
+  /// `INCLUDE` columns), only compared for equality. Indexes over the same
+  /// columns of different kinds (e.g. a btree and a GIN index) aren't
+  /// duplicates. `null` (or an index without one): unknown, a plain index.
+  final Map<String, String>? indexesKinds;
+
+  /// The [indexes] over the same columns (in the same order, case
+  /// insensitive) and of the same kind ([indexesKinds]): each group's names
+  /// sorted, the groups by their first name. `null` if the [indexes] are
+  /// unknown.
+  List<List<String>>? get duplicatedIndexes {
+    var indexes = this.indexes;
+    if (indexes == null) return null;
+
+    var byColumns = <String, List<String>>{};
+    for (var e in indexes.entries) {
+      var columns = e.value.map((c) => c.toLowerCase()).join(',');
+      var key = '$columns|${indexesKinds?[e.key] ?? ''}';
+      byColumns.putIfAbsent(key, () => <String>[]).add(e.key);
+    }
+
+    return byColumns.values
+        .where((names) => names.length > 1)
+        .map((names) => names..sort())
+        .sortedBy((names) => names.first);
+  }
+
+  /// The [checkConstraints] over the same column (case insensitive): by
+  /// column, the constraints names (sorted). `null` if the
+  /// [checkConstraints] are unknown.
+  Map<String, List<String>>? get duplicatedCheckConstraints {
+    var checkConstraints = this.checkConstraints;
+    if (checkConstraints == null) return null;
+
+    var byColumn = <String, List<String>>{};
+    for (var e in checkConstraints.entries) {
+      var column = e.value.field.toLowerCase();
+      byColumn.putIfAbsent(column, () => <String>[]).add(e.key);
+    }
+
+    return Map.fromEntries(
+      byColumn.entries
+          .where((e) => e.value.length > 1)
+          .map((e) => MapEntry(e.key, e.value..sort()))
+          .sortedBy((e) => e.key),
+    );
+  }
+
   /// Whether the table has an index over exactly [columns] (in this order,
   /// any name), a unique one if [unique]. `null` if the [indexes] (or the
   /// [uniqueIndexes]) are unknown.
@@ -332,7 +390,16 @@ class TableScheme with FieldsFromMap {
     this.relationship = false,
     Map<String, List<String>>? indexes,
     Iterable<String>? uniqueIndexes,
-  }) : indexes = indexes == null
+    Map<String, TableEnumConstraint>? checkConstraints,
+    this.primaryKeyIndex,
+    Map<String, String>? indexesKinds,
+  }) : checkConstraints = checkConstraints == null
+           ? null
+           : Map<String, TableEnumConstraint>.unmodifiable(checkConstraints),
+       indexesKinds = indexesKinds == null
+           ? null
+           : Map<String, String>.unmodifiable(indexesKinds),
+       indexes = indexes == null
            ? null
            : Map<String, List<String>>.unmodifiable(
                indexes.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))),

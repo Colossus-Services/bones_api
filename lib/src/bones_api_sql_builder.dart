@@ -123,6 +123,10 @@ class SQLDialect extends DBDialect {
   /// (`ALTER TABLE ... ADD CONSTRAINT`): not in SQLite.
   final bool alterTableAddConstraint;
 
+  /// Whether an index is dropped by its table (`DROP INDEX name ON table`,
+  /// without `IF EXISTS`): MySQL. Otherwise `DROP INDEX IF EXISTS name`.
+  final bool dropIndexOnTable;
+
   /// If `true` this dialect can't parse an `OFFSET` clause that is not preceded
   /// by a `LIMIT` clause (MySQL). See [offsetMaxLimitValue].
   final bool offsetRequiresLimit;
@@ -154,6 +158,7 @@ class SQLDialect extends DBDialect {
     this.foreignKeyCreatesImplicitIndex = true,
     this.createIndexIfNotExists = true,
     this.alterTableAddConstraint = true,
+    this.dropIndexOnTable = false,
     this.offsetRequiresLimit = false,
     this.offsetMaxLimitValue = '18446744073709551615',
     this.maxIdentifierLength,
@@ -222,6 +227,7 @@ class SQLDialect extends DBDialect {
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
         'alterTableAddConstraint: $alterTableAddConstraint, '
+        'dropIndexOnTable: $dropIndexOnTable, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
         'offsetMaxLimitValue: $offsetMaxLimitValue, '
         'maxIdentifierLength: $maxIdentifierLength'
@@ -1807,6 +1813,22 @@ abstract mixin class SQLGenerator {
         comment: comment,
       ),
     ], q: q);
+  }
+
+  /// Drops the index [name] of [table]: `DROP INDEX IF EXISTS name`, or
+  /// `DROP INDEX name ON table` ([SQLDialect.dropIndexOnTable]: MySQL).
+  String generateDropIndexSQL(String table, String name) {
+    var q = dialect.elementQuote;
+    return dialect.dropIndexOnTable
+        ? 'DROP INDEX $q$name$q ON $q$table$q ;'
+        : 'DROP INDEX IF EXISTS $q$name$q ;';
+  }
+
+  /// Drops the constraint [name] of [table]:
+  /// `ALTER TABLE table DROP CONSTRAINT IF EXISTS name`.
+  String generateDropConstraintSQL(String table, String name) {
+    var q = dialect.elementQuote;
+    return 'ALTER TABLE $q$table$q DROP CONSTRAINT IF EXISTS $q$name$q ;';
   }
 
   AlterTableSQL generateAddEnumConstraintAlterTableSQL(

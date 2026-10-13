@@ -606,6 +606,283 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// - [checkDBTables] is only called if `checkTables: true` is passed to the constructor.
   bool get checkedTables => _checkedTables;
 
+  final Map<String, TableDuplicates> _tablesDuplicates =
+      <String, TableDuplicates>{};
+
+  /// The tables with duplicated indexes or `CHECK` constraints found by the
+  /// last [checkDBTables], by table name. Only warned: never an error.
+  Map<String, TableDuplicates> get tablesDuplicates =>
+      Map<String, TableDuplicates>.unmodifiable(_tablesDuplicates);
+
+  /// The duplicated indexes (over the same columns, in the same order, of
+  /// the same kind: [TableScheme.indexesKinds]) and enum `CHECK` constraints
+  /// (over the same column) of [scheme]: each group with the one to keep
+  /// first, and the suggested SQLs to drop the others.
+  ///
+  /// - The index kept: the primary key ([TableScheme.primaryKeyIndex]; if
+  ///   unknown, by its name: `PRIMARY`, `<table>_pkey`) or a SQLite
+  ///   constraint's index (`sqlite_autoindex_*`: can't be dropped), else a
+  ///   unique one (the default name, `<table>__<columns>__unique`, first),
+  ///   else the default name (`<table>__<columns>__idx`), else the first by
+  ///   name.
+  /// - The `CHECK` kept: the one with exactly the values of
+  ///   [entityHandler]'s enum field, else one with all of them (and others),
+  ///   else a default name (PostgreSQL's `<table>_<column>_check`, or the
+  ///   `<table>_<column>__check` added by `checkTables`' suggestion), else
+  ///   the first by name.
+  TableDuplicates findTableDuplicates(
+    TableScheme scheme, {
+    EntityHandler? entityHandler,
+  }) {
+    var table = scheme.name;
+    var indexes = scheme.indexes ?? const <String, List<String>>{};
+    var uniqueIndexes = scheme.uniqueIndexes ?? const <String>{};
+    var primaryKeyIndex = scheme.primaryKeyIndex;
+
+    bool isPrimaryKey(String name) => primaryKeyIndex != null
+        ? name == primaryKeyIndex
+        : name == 'PRIMARY' || name == '${table}_pkey';
+
+    int indexRank(String name) {
+      // The primary key, or a constraint's index (SQLite: can't be dropped):
+      if (isPrimaryKey(name) || name.startsWith('sqlite_autoindex_')) {
+        return 0;
+      }
+      var unique = uniqueIndexes.contains(name);
+      var isDefaultName =
+          name ==
+          EntityIndex.defaultName(
+            table,
+            indexes[name] ?? const <String>[],
+            maxLength: dialect.maxIdentifierLength,
+            unique: unique,
+          );
+      if (unique) return isDefaultName ? 1 : 2;
+      return isDefaultName ? 3 : 4;
+    }
+
+    var dropSQLs = <String>[];
+
+    // MySQL `SERIAL` (`... AUTO_INCREMENT UNIQUE`): with `PRIMARY KEY`, the
+    // `PRIMARY` key and a unique index over its column, named as it. Of the
+    // generated `CREATE TABLE` itself: not reported.
+    bool isSerialUniqueIndex(List<String> group, String name) {
+      if (!group.any(isPrimaryKey) ||
+          isPrimaryKey(name) ||
+          !uniqueIndexes.contains(name)) {
+        return false;
+      }
+      var columns = indexes[name];
+      return columns != null && columns.length == 1 && columns[0] == name;
+    }
+
+    var duplicatedIndexes = <List<String>>[];
+    for (var group in scheme.duplicatedIndexes ?? const <List<String>>[]) {
+      var reported = group
+          .whereNot((name) => isSerialUniqueIndex(group, name))
+          .toList();
+      if (reported.length < 2) continue;
+
+      var names = _sortedByRank(reported, indexRank);
+      duplicatedIndexes.add(names);
+
+      dropSQLs.add(
+        '-- `$table` (${indexes[names.first]?.join(', ')}): '
+        'keeping `${names.first}`:',
+      );
+
+      for (var name in names.skip(1)) {
+        if (name.startsWith('sqlite_autoindex_')) {
+          dropSQLs.add("-- `$name`: a constraint's index: can't be dropped");
+          continue;
+        }
+
+        if (uniqueIndexes.contains(name)) {
+          dropSQLs.add(
+            "-- `$name` is unique: if a foreign key references it, the drop "
+            "fails (drop the foreign key first; `CASCADE` drops it too)",
+          );
+          // A constraint's index can only be dropped with the constraint:
+          if (!dialect.dropIndexOnTable && dialect.alterTableAddConstraint) {
+            dropSQLs.add(generateDropConstraintSQL(table, name));
+          }
+        }
+
+        dropSQLs.add(generateDropIndexSQL(table, name));
+      }
+    }
+
+    var checkConstraints =
+        scheme.checkConstraints ?? const <String, TableEnumConstraint>{};
+
+    var schemeToRepoMap = entityHandler == null
+        ? null
+        : _schemeToRepoFieldsMap(scheme, entityHandler);
+
+    var duplicatedChecks = <String, List<String>>{};
+    for (var e
+        in (scheme.duplicatedCheckConstraints ?? const <String, List<String>>{})
+            .entries) {
+      var column = e.key;
+
+      var entityValues = entityHandler == null
+          ? null
+          : _columnEnumValues(entityHandler, column, schemeToRepoMap!);
+
+      bool hasAllValues(String name) {
+        var values = checkConstraints[name]?.values;
+        return entityValues != null &&
+            values != null &&
+            values.containsAll(entityValues);
+      }
+
+      int checkRank(String name) {
+        if (hasAllValues(name)) {
+          var values = checkConstraints[name]!.values;
+          return values.length == entityValues!.length ? 0 : 1;
+        }
+        var lc = name.toLowerCase();
+        var prefix = '${table}_$column'.toLowerCase();
+        return lc == '${prefix}_check' || lc == '${prefix}__check' ? 2 : 3;
+      }
+
+      var names = _sortedByRank(e.value, checkRank);
+      duplicatedChecks[column] = names;
+
+      dropSQLs.add(
+        '-- `$table`.`$column`: keeping `${names.first}` '
+        '${checkConstraints[names.first]?.values}:',
+      );
+
+      if (entityValues != null && !hasAllValues(names.first)) {
+        dropSQLs.add(
+          "-- none has the entity's values $entityValues: review before "
+          "dropping",
+        );
+      }
+
+      for (var name in names.skip(1)) {
+        dropSQLs.add(
+          '${generateDropConstraintSQL(table, name)}  -- '
+          '${checkConstraints[name]?.values}',
+        );
+      }
+    }
+
+    return TableDuplicates(
+      table,
+      indexes: duplicatedIndexes,
+      checkConstraints: duplicatedChecks,
+      dropSQLs: dropSQLs,
+    );
+  }
+
+  /// [names] sorted by [rank], then by name.
+  static List<String> _sortedByRank(
+    Iterable<String> names,
+    int Function(String name) rank,
+  ) => names.sorted((a, b) {
+    var cmp = rank(a).compareTo(rank(b));
+    return cmp != 0 ? cmp : a.compareTo(b);
+  });
+
+  /// The hidden fields of [entityHandler] (`EntityField.hidden()`).
+  static List<String> _entityHiddenFields(EntityHandler entityHandler) =>
+      entityHandler
+          .fieldsNames()
+          .where((f) {
+            var annotations = entityHandler.getFieldEntityAnnotations(null, f);
+            return annotations != null &&
+                annotations.any((a) => a is EntityField && a.isHidden);
+          })
+          .toList(growable: false);
+
+  /// The table's columns of [scheme] to the (not hidden) fields of
+  /// [entityHandler] (`null`: not a field), as `checkTables` maps them.
+  static Map<String, String?> _schemeToRepoFieldsMap(
+    TableScheme scheme,
+    EntityHandler entityHandler, {
+    List<String>? hiddenFields,
+  }) {
+    hiddenFields ??= _entityHiddenFields(entityHandler);
+
+    var repoFieldsMap = entityHandler
+        .fieldsNames()
+        .whereNotIn(hiddenFields)
+        .map((f) => MapEntry(f, f))
+        .toMapFromEntries();
+
+    return scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
+  }
+
+  /// The values of the enum field of [entityHandler] of the table's
+  /// [column] (any case): the field mapped to it ([schemeToRepoMap], as
+  /// `checkTables` maps them), else the field resolved by name, else
+  /// [column]. `null` if it isn't an enum field.
+  static Set<String>? _columnEnumValues(
+    EntityHandler entityHandler,
+    String column,
+    Map<String, String?> schemeToRepoMap,
+  ) {
+    var columnLC = column.toLowerCase();
+    var mappedField =
+        schemeToRepoMap[column] ??
+        schemeToRepoMap.entries
+            .firstWhereOrNull((e) => e.key.toLowerCase() == columnLC)
+            ?.value;
+
+    var fieldName =
+        mappedField ??
+        entityHandler.resolveFiledName(
+          entityHandler.fieldsNames(),
+          column,
+          fieldsNamesIndexes: entityHandler.fieldsNamesIndexes(),
+          fieldsNamesLC: entityHandler.fieldsNamesLC(),
+          fieldsNamesSimple: entityHandler.fieldsNamesSimple(),
+        ) ??
+        column;
+
+    var fieldType = entityHandler.getFieldType(
+      null,
+      fieldName,
+      resolveFiledName: false,
+    );
+    if (fieldType == null) return null;
+
+    var enumReflection = ReflectionFactory().getRegisterEnumReflection(
+      fieldType.type,
+    );
+    return enumReflection?.valuesNames.toSet();
+  }
+
+  /// Warns (and keeps in [tablesDuplicates]) the duplicated indexes and
+  /// `CHECK` constraints of the [repositorySchemes]' tables.
+  void _warnTablesDuplicates(
+    Map<EntityRepository<Object>, TableScheme?> repositorySchemes,
+  ) {
+    _tablesDuplicates.clear();
+
+    for (var e in repositorySchemes.entries) {
+      var scheme = e.value;
+      if (scheme == null || _tablesDuplicates.containsKey(scheme.name)) {
+        continue;
+      }
+
+      var duplicates = findTableDuplicates(
+        scheme,
+        entityHandler: e.key.entityHandler,
+      );
+      if (duplicates.isEmpty) continue;
+
+      _tablesDuplicates[scheme.name] = duplicates;
+
+      _log.warning(
+        '$duplicates\n\nSuggestion of SQLs (`$dialectName`) to drop them '
+        '(keeping the first of each):\n\n  ${duplicates.dropSQLs.join('\n  ')}\n',
+      );
+    }
+  }
+
   /// The columns of the index (or unique constraint) [indexName] of [table],
   /// from its loaded scheme ([TableScheme.indexes]), e.g. to resolve a
   /// violated constraint's columns; `null` if unknown.
@@ -658,6 +935,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   FutureOr<bool> _checkDBTablesImpl(
     Map<EntityRepository<Object>, TableScheme?> repositorySchemes,
   ) {
+    _warnTablesDuplicates(repositorySchemes);
+
     var repositoriesChecks = repositorySchemes.entries
         .map((e) => _checkDBTableScheme(e.key, e.value))
         .toList();
@@ -876,15 +1155,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     final entityHandler = repository.entityHandler;
     var entityFields = entityHandler.fieldsNames();
 
-    var hiddenFields = entityFields
-        .map((f) {
-          var annotations = entityHandler.getFieldEntityAnnotations(null, f);
-          if (annotations == null) return null;
-          var hidden = annotations.any((a) => a is EntityField && a.isHidden);
-          return hidden ? f : null;
-        })
-        .nonNulls
-        .toList(growable: false);
+    var hiddenFields = _entityHiddenFields(entityHandler);
 
     if (hiddenFields.isNotEmpty) {
       _log.info(
@@ -894,15 +1165,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var repoFieldsNames = entityFields.whereNotIn(hiddenFields).toList();
 
-    var repoFieldsMap = repoFieldsNames
-        .map((f) => MapEntry(f, f))
-        .toMapFromEntries();
-
     var repoTable = getTableForEntityRepository(repository);
 
-    var schemeToRepoMap = scheme.getFieldsKeysInMap(
-      scheme.fieldsNames,
-      repoFieldsMap,
+    var schemeToRepoMap = _schemeToRepoFieldsMap(
+      scheme,
+      entityHandler,
+      hiddenFields: hiddenFields,
     );
 
     var schemesTypes = schemeToRepoMap.entries
@@ -1019,8 +1287,6 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var missingEnumValues = <String, List<String>>{};
 
     if (capability.constraintSupport) {
-      final reflectionFactory = ReflectionFactory();
-
       // REF CONSTRAINTS //
 
       var fieldEntityTypes = entityHandler
@@ -1158,40 +1424,33 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .whereNotIn(enumConstraintsFields)
           .toSet();
 
-      var entityFieldsNamesIndexes = entityHandler.fieldsNamesIndexes();
-      var entityFieldsNames = entityHandler.fieldsNames();
-      var entityFieldsNamesLC = entityHandler.fieldsNamesLC();
-      var entityFieldsNamesSimple = entityHandler.fieldsNamesSimple();
+      // A column's enum values are missing only if no `CHECK` over it has
+      // them all: with a duplicated `CHECK` (an old one never dropped), the
+      // current one has them, and the duplicate is warned
+      // (`findTableDuplicates`).
+      var columnsWithAllValues = <String>{};
+      var columnsMissingValues = <String, List<String>>{};
 
       for (var e in enumConstraints) {
-        var fieldName =
-            entityHandler.resolveFiledName(
-              entityFieldsNames,
-              e.field,
-              fieldsNamesIndexes: entityFieldsNamesIndexes,
-              fieldsNamesLC: entityFieldsNamesLC,
-              fieldsNamesSimple: entityFieldsNamesSimple,
-            ) ??
-            e.field;
-
-        var fieldType = entityHandler.getFieldType(
-          null,
-          fieldName,
-          resolveFiledName: false,
+        var valuesNames = _columnEnumValues(
+          entityHandler,
+          e.field,
+          schemeToRepoMap,
         );
-        if (fieldType == null) continue;
-
-        var enumReflection = reflectionFactory.getRegisterEnumReflection(
-          fieldType.type,
-        );
-        if (enumReflection == null) continue;
-
-        var valuesNames = enumReflection.valuesNames;
+        if (valuesNames == null) continue;
 
         var missingValues = valuesNames.whereNotIn(e.values).toList();
 
-        if (missingValues.isNotEmpty) {
-          missingEnumValues[e.field] = missingValues;
+        if (missingValues.isEmpty) {
+          columnsWithAllValues.add(e.field);
+        } else {
+          columnsMissingValues.putIfAbsent(e.field, () => missingValues);
+        }
+      }
+
+      for (var e in columnsMissingValues.entries) {
+        if (!columnsWithAllValues.contains(e.key)) {
+          missingEnumValues[e.key] = e.value;
         }
       }
     }
@@ -3720,6 +3979,46 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         allowAutoInsert: allowAutoInsert,
       ).resolveMapped((r) => _finishSQLOperation(sql, op, r, preFinish));
     });
+  }
+}
+
+/// The duplicated indexes and enum `CHECK` constraints of a table
+/// ([DBSQLAdapter.findTableDuplicates]). `checkTables` warns them: never an
+/// error.
+class TableDuplicates {
+  final String table;
+
+  /// The indexes over the same columns (in the same order): each group with
+  /// the one to keep first.
+  final List<List<String>> indexes;
+
+  /// The enum `CHECK` constraints over the same column: by column, the one
+  /// to keep first.
+  final Map<String, List<String>> checkConstraints;
+
+  /// The suggested SQLs (and comments) to drop the duplicates, keeping the
+  /// first of each group.
+  final List<String> dropSQLs;
+
+  TableDuplicates(
+    this.table, {
+    this.indexes = const [],
+    this.checkConstraints = const {},
+    this.dropSQLs = const [],
+  });
+
+  bool get isEmpty => indexes.isEmpty && checkConstraints.isEmpty;
+
+  bool get isNotEmpty => !isEmpty;
+
+  @override
+  String toString() {
+    var duplicates = [
+      if (indexes.isNotEmpty) 'duplicated indexes (same columns): $indexes',
+      if (checkConstraints.isNotEmpty)
+        'duplicated CHECK constraints (same column): $checkConstraints',
+    ];
+    return 'Table `$table`: ${duplicates.join('; ')}';
   }
 }
 

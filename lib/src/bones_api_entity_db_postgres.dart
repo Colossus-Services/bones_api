@@ -662,11 +662,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         relationship: relationship != null,
         idFieldName: idFieldName,
         fieldsTypes: fieldsTypes,
-        constraints: constraints,
+        constraints: constraints.constraints,
         fieldsReferencedTables: fieldsReferencedTables,
         relationshipTables: relationshipTables,
         indexes: indexes?.indexes,
         uniqueIndexes: indexes?.unique,
+        checkConstraints: constraints.checks,
+        primaryKeyIndex: indexes?.primary,
+        indexesKinds: indexes?.kinds,
       );
 
       _log.info('$tableScheme');
@@ -686,23 +689,50 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   /// expression indexes are ignored, and `INCLUDE` columns aren't key
   /// columns.
   ///
+  /// Also the primary key's index (`indisprimary`) and each index's kind
+  /// (`kinds`): its method, all its columns (also `INCLUDE`), operator
+  /// classes, collations, options (`DESC`, `NULLS FIRST`) and
+  /// `NULLS NOT DISTINCT`; an exclusion constraint's index is a kind of its
+  /// own (never a duplicate).
+  ///
   /// `null` (unknown) if the indexes can't be read: the table scheme is still
   /// loaded.
-  Future<({Map<String, List<String>> indexes, Set<String> unique})?>
+  Future<
+    ({
+      Map<String, List<String>> indexes,
+      Set<String> unique,
+      String? primary,
+      Map<String, String> kinds,
+    })?
+  >
   _findIndexes(PostgreSQLConnectionWrapper connection, String table) async {
-    // `indnkeyatts` (key columns, without `INCLUDE`) is from PostgreSQL 11:
-    // read through `to_jsonb` (not a column reference) to also work before
-    // it, when all the columns are key columns (`indnatts`).
+    // `indnkeyatts` (key columns, without `INCLUDE`) is from PostgreSQL 11,
+    // `indnullsnotdistinct` from 15: read through `to_jsonb` (not a column
+    // reference) to also work before them.
     var sql =
         '''
     SELECT
       i.relname AS index_name,
       a.attname AS column_name,
       k.n AS column_position,
-      ix.indisunique AS is_unique
+      ix.indisunique AS is_unique,
+      ix.indisprimary AS is_primary,
+      concat_ws('|',
+        am.amname,
+        ix.indkey::text,
+        ix.indclass::text,
+        ix.indcollation::text,
+        ix.indoption::text,
+        coalesce(to_jsonb(ix) ->> 'indnullsnotdistinct', 'false'),
+        CASE WHEN EXISTS (
+          SELECT 1 FROM pg_constraint c
+          WHERE c.conindid = ix.indexrelid AND c.contype = 'x'
+        ) THEN 'exclusion:' || i.relname END
+      ) AS index_kind
     FROM pg_index ix
       JOIN pg_class t ON t.oid = ix.indrelid
       JOIN pg_class i ON i.oid = ix.indexrelid
+      JOIN pg_am am ON am.oid = i.relam
       JOIN LATERAL unnest(ix.indkey::int2[]) WITH ORDINALITY AS k(attnum, n)
         ON true
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
@@ -727,14 +757,19 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     var indexes = <String, List<String>>{};
     var unique = <String>{};
+    String? primary;
+    var kinds = <String, String>{};
     for (var row in rows) {
       var indexName = row['index_name']?.toString();
       var columnName = row['column_name']?.toString();
       if (indexName == null || columnName == null) continue;
       (indexes[indexName] ??= []).add(columnName);
       if (row['is_unique'] == true) unique.add(indexName);
+      if (row['is_primary'] == true) primary = indexName;
+      var kind = row['index_kind']?.toString();
+      if (kind != null) kinds[indexName] = kind;
     }
-    return (indexes: indexes, unique: unique);
+    return (indexes: indexes, unique: unique, primary: primary, kinds: kinds);
   }
 
   /// Relation names are unique per schema (an index, a table, a sequence...):
@@ -774,33 +809,51 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     );
   }
 
-  Future<Set<TableConstraint>> _findConstraints(
+  /// The table's constraints, and its enum `CHECK` constraints by name
+  /// (`checks`: two over the same column aren't merged, as in
+  /// `constraints`). Of the table visible in the search path (as the
+  /// indexes).
+  Future<
+    ({
+      Set<TableConstraint> constraints,
+      Map<String, TableEnumConstraint> checks,
+    })
+  >
+  _findConstraints(
     PostgreSQLConnectionWrapper connection,
     String table,
     Map<String, Type> fieldsTypes,
   ) async {
     var sql =
         '''
-    SELECT 
+    SELECT
+      con.conname AS constraint_name,
       pg_get_constraintdef(con.oid) AS constraint_definition
     FROM pg_constraint con
       JOIN pg_class tbl ON con.conrelid = tbl.oid
     WHERE
-      tbl.relname = '$table';
+      tbl.relname = '$table'
+      AND pg_table_is_visible(tbl.oid);
     ''';
 
-    var columns = await connection.mappedResultsQuery(sql);
+    var rows = await connection.mappedResultsQuery(sql);
 
-    var constraintsDefinitions = columns
-        .map((m) => m['constraint_definition'].toString())
-        .toList();
+    var constraints = <TableConstraint>{};
+    var checks = <String, TableEnumConstraint>{};
 
-    var constraints = constraintsDefinitions
-        .map(_parseConstraint)
-        .nonNulls
-        .toSet();
+    for (var row in rows) {
+      var constraint = _parseConstraint(
+        row['constraint_definition'].toString(),
+      );
+      if (constraint == null) continue;
 
-    return constraints;
+      constraints.add(constraint);
+      if (constraint is TableEnumConstraint) {
+        checks[row['constraint_name'].toString()] = constraint;
+      }
+    }
+
+    return (constraints: constraints, checks: checks);
   }
 
   TableConstraint? _parseConstraint(String definition) {

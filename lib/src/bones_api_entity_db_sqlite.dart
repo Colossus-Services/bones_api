@@ -390,21 +390,34 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   /// of the unique ones (also the `sqlite_autoindex_*` of `UNIQUE`
   /// constraints). Only plain-column indexes: partial (`WHERE`) and
   /// expression indexes (a column without a name) are ignored entirely.
-  ({Map<String, List<String>> indexes, Set<String> unique}) _findIndexes(
-    DBSQLiteConnectionWrapper connection,
-    String table,
-  ) {
+  ///
+  /// Also the primary key's index (`origin = 'pk'`: none for an
+  /// `INTEGER PRIMARY KEY`, the rowid) and each index's kind (`kinds`): each
+  /// column's order (`DESC`) and collation.
+  ({
+    Map<String, List<String>> indexes,
+    Set<String> unique,
+    String? primary,
+    Map<String, String> kinds,
+  })
+  _findIndexes(DBSQLiteConnectionWrapper connection, String table) {
+    // `pragma_index_xinfo`: the key columns (`key = 1`) with their order and
+    // collation (`pragma_index_info` has neither).
     var rows = connection.select(
       'SELECT il.name AS index_name, il.partial AS partial, '
-      'il."unique" AS is_unique, '
-      'ii.name AS column_name, ii.seqno AS seqno '
-      'FROM pragma_index_list(?) AS il, pragma_index_info(il.name) AS ii '
+      'il."unique" AS is_unique, il.origin AS origin, '
+      'ii.name AS column_name, ii.seqno AS seqno, '
+      'ii."desc" AS is_desc, ii.coll AS coll '
+      'FROM pragma_index_list(?) AS il, pragma_index_xinfo(il.name) AS ii '
+      'WHERE ii.key = 1 '
       'ORDER BY il.name, ii.seqno',
       [table],
     );
 
     var indexes = <String, List<String>>{};
     var unique = <String>{};
+    String? primary;
+    var kinds = <String, List<String>>{};
     var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['index_name']?.toString();
@@ -419,10 +432,24 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
       (indexes[indexName] ??= []).add(columnName);
       var isUnique = row['is_unique'];
       if (isUnique is int && isUnique != 0) unique.add(indexName);
+      if (row['origin'] == 'pk') primary = indexName;
+      var isDesc = row['is_desc'];
+      (kinds[indexName] ??= []).add(
+        '${isDesc is int && isDesc != 0 ? 'desc' : 'asc'} ${row['coll']}',
+      );
     }
     ignored.forEach(indexes.remove);
     unique.removeAll(ignored);
-    return (indexes: indexes, unique: unique);
+    if (primary != null && ignored.contains(primary)) primary = null;
+
+    return (
+      indexes: indexes,
+      unique: unique,
+      primary: primary,
+      kinds: {
+        for (var name in indexes.keys) name: kinds[name]?.join(',') ?? '',
+      },
+    );
   }
 
   /// Names are unique per database (an index, a table, a view...).
@@ -500,6 +527,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
           relationshipTables: relationshipTables,
           indexes: indexes.indexes,
           uniqueIndexes: indexes.unique,
+          primaryKeyIndex: indexes.primary,
+          indexesKinds: indexes.kinds,
         );
 
         _log.info('$tableScheme');
