@@ -47,6 +47,13 @@
   order.
   - `OrderDirection.resolveOrderByID(orderByID, offset, [limit])`.
 
+- Fix: `DBObjectGCSAdapter`: parallel cache writes over the cache limits
+  (`cacheLimit`/`cacheFilesLimit`) started concurrent limit checks, which
+  listed and deleted the same files: the second delete threw a
+  `PathNotFoundException` in a future nobody awaited (an unhandled error).
+  The checks now run one at a time (a call during a check shares it), and a
+  cached file already removed counts as deleted.
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /

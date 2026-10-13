@@ -988,7 +988,31 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   int _checkCacheDirectoryLimitUntrackedTotal = 0;
   int _checkCacheDirectoryFilesLimitUntrackedTotal = 0;
 
-  Future<bool> _checkCacheDirectoryLimit({bool force = false}) async {
+  Future<bool>? _checkCacheDirectoryLimitInFlight;
+
+  /// Checks the cache directory limits, one check at a time: a call while a
+  /// check is running shares it (a forced one runs after it). Concurrent
+  /// checks (e.g. from parallel cache writes) listed the same files and
+  /// deleted the same ones, the second delete failing.
+  Future<bool> _checkCacheDirectoryLimit({bool force = false}) {
+    var inFlight = _checkCacheDirectoryLimitInFlight;
+    if (inFlight != null) {
+      return force
+          ? inFlight.then((_) => _checkCacheDirectoryLimit(force: true))
+          : inFlight;
+    }
+
+    var check = _checkCacheDirectoryLimitImpl(force: force);
+    _checkCacheDirectoryLimitInFlight = check;
+
+    return check.whenComplete(() {
+      if (identical(_checkCacheDirectoryLimitInFlight, check)) {
+        _checkCacheDirectoryLimitInFlight = null;
+      }
+    });
+  }
+
+  Future<bool> _checkCacheDirectoryLimitImpl({bool force = false}) async {
     var cacheLimit = this.cacheLimit ?? 0;
     var cacheFilesLimit = this.cacheFilesLimit ?? 0;
     if (cacheLimit <= 0 && cacheFilesLimit <= 0) return false;
@@ -1135,8 +1159,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     final removeInitTime = DateTime.now();
 
+    // A file already removed (e.g. by another process sharing the cache
+    // directory) is as good as deleted.
     var delResults = await del
-        .map((f) => f.deleteLimited())
+        .map(
+          (f) => f.deleteLimited().catchError(
+            (_) {},
+            test: (e) => e is PathNotFoundException,
+          ),
+        )
         .toList()
         .resolveAll();
 
