@@ -1381,14 +1381,22 @@ abstract mixin class SQLGenerator {
   /// The generated SQL dialect name.
   String get dialectName;
 
+  /// - [traversed]: internal, see
+  ///   [EntityRepositoryProvider.lookupEntityRepository].
   EntityRepository<O>? getEntityRepository<O extends Object>({
     O? obj,
     Type? type,
     String? name,
     String? tableName,
+    Set<EntityRepositoryProvider>? traversed,
   });
 
-  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type);
+  /// - [traversed]: internal, see
+  ///   [EntityRepositoryProvider.lookupEntityRepository].
+  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(
+    Type type, {
+    Set<EntityRepositoryProvider>? traversed,
+  });
 
   EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
     TypeInfo typeInfo,

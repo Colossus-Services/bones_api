@@ -932,34 +932,37 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   List<EntityRepository> get registeredEntityRepositories =>
       _entityRepositories.values.toList();
 
+  /// See [EntityRepositoryProvider.lookupEntityRepository] (the
+  /// [parentRepositoryProvider] asked first).
   @override
   EntityRepository<O>? getEntityRepository<O extends Object>({
     O? obj,
     Type? type,
     String? name,
     String? tableName,
-  }) {
-    if (isClosed) return null;
+    Set<EntityRepositoryProvider>? traversed,
+  }) => EntityRepositoryProvider.lookupEntityRepository<O>(
+    this,
+    knownProviders: _knownEntityRepositoryProviders,
+    parentProvider: parentRepositoryProvider,
+    type: type,
+    traversed: traversed,
+    local: () => _getLocalEntityRepository<O>(
+      obj: obj,
+      type: type,
+      name: name,
+      tableName: tableName,
+    ),
+    ask: (p, traversed) => p.getEntityRepository<O>(
+      obj: obj,
+      type: type,
+      name: name,
+      traversed: traversed,
+    ),
+  );
 
-    // Each provider asked once per lookup:
-    return EntityRepositoryProvider.traverseLookup(
-      this,
-      () =>
-          _getEntityRepositoryImpl<O>(
-            obj: obj,
-            type: type,
-            name: name,
-            tableName: tableName,
-          ) ??
-          EntityRepositoryProvider.globalProvider.getEntityRepository<O>(
-            obj: obj,
-            type: type,
-            name: name,
-          ),
-    );
-  }
-
-  EntityRepository<O>? _getEntityRepositoryImpl<O extends Object>({
+  /// This adapter's own repository (not the parent's or known providers').
+  EntityRepository<O>? _getLocalEntityRepository<O extends Object>({
     O? obj,
     Type? type,
     String? name,
@@ -1011,23 +1014,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       }
     }
 
-    var entityRepository = parentRepositoryProvider?.getEntityRepository<O>(
-      obj: obj,
-      type: type,
-      name: name,
-    );
-
-    if (entityRepository != null) {
-      return entityRepository;
-    }
-
-    return _knownEntityRepositoryProviders.getEntityRepository<O>(
-      obj: obj,
-      type: type,
-      name: name,
-      entityRepositoryProvider: this,
-      removeClosedProviders: true,
-    );
+    return null;
   }
 
   @override
@@ -1040,43 +1027,35 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     return getEntityRepositoryByType(entityType);
   }
 
+  /// See [EntityRepositoryProvider.lookupEntityRepository] (the
+  /// [parentRepositoryProvider] asked first).
   @override
-  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(Type type) {
-    if (isClosed) return null;
+  EntityRepository<O>? getEntityRepositoryByType<O extends Object>(
+    Type type, {
+    Set<EntityRepositoryProvider>? traversed,
+  }) => EntityRepositoryProvider.lookupEntityRepository<O>(
+    this,
+    knownProviders: _knownEntityRepositoryProviders,
+    parentProvider: parentRepositoryProvider,
+    type: type,
+    traversed: traversed,
+    local: () => _getLocalEntityRepositoryByType<O>(type),
+    ask: (p, traversed) =>
+        p.getEntityRepositoryByType<O>(type, traversed: traversed),
+  );
 
-    // Each provider asked once per lookup:
-    return EntityRepositoryProvider.traverseLookup(
-      this,
-      () =>
-          _getEntityRepositoryByTypeImpl<O>(type) ??
-          EntityRepositoryProvider.globalProvider.getEntityRepositoryByType<O>(
-            type,
-          ),
-    );
-  }
-
-  EntityRepository<O>? _getEntityRepositoryByTypeImpl<O extends Object>(
+  /// This adapter's own repository (not the parent's or known providers').
+  EntityRepository<O>? _getLocalEntityRepositoryByType<O extends Object>(
     Type type,
   ) {
-    if (!isClosed) {
-      var entityRepository = _entityRepositories[type];
-      if (entityRepository != null && !entityRepository.isClosed) {
-        return entityRepository as EntityRepository<O>;
-      }
+    if (isClosed) return null;
+
+    var entityRepository = _entityRepositories[type];
+    if (entityRepository != null && !entityRepository.isClosed) {
+      return entityRepository as EntityRepository<O>;
     }
 
-    var entityRepository = parentRepositoryProvider
-        ?.getEntityRepositoryByType<O>(type);
-
-    if (entityRepository != null) {
-      return entityRepository;
-    }
-
-    return _knownEntityRepositoryProviders.getEntityRepositoryByType<O>(
-      type,
-      entityRepositoryProvider: this,
-      removeClosedProviders: true,
-    );
+    return null;
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
