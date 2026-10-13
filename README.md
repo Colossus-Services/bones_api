@@ -486,8 +486,11 @@ The `select*` methods accept `limit`, `offset`, `page`, `orderByID` and
 - `orderByID` orders by the table's ID column, resolved automatically from the
   table scheme — no column name to spell out.
 - A non-null `offset` turns `orderByID` on by default, since an offset without
-  a stable order can return overlapping or missing rows across pages. Pass
-  `orderByID: false` to opt out.
+  a stable order can return overlapping or missing rows across pages. With a
+  SQL database a non-null `limit` does too: which rows an unordered `LIMIT`
+  returns is undefined (it can change with the query plan). The in-memory
+  adapters keep their rows in insertion order, so they order only for an
+  `offset`. Pass `orderByID: false` to opt out.
 - `orderDirection` is `OrderDirection.ascending` by default, and is ignored
   while the ordering is not active.
 - `page` is the 1-based ergonomic form of `offset`, using `limit` as the page

@@ -87,8 +87,18 @@ void main() {
       expect(sql.orderDirection, isNull);
     });
 
-    test('limit only (unchanged SQL)', () async {
-      expect((await selectSQL(limit: 2)).sql, equals('$from LIMIT 2'));
+    test('limit only: ordered by ID (the limited rows are defined)', () async {
+      expect(
+        (await selectSQL(limit: 2)).sql,
+        equals('$from ORDER BY ro.id ASC LIMIT 2'),
+      );
+    });
+
+    test('limit only, orderByID: false (opt out)', () async {
+      expect(
+        (await selectSQL(limit: 2, orderByID: false)).sql,
+        equals('$from LIMIT 2'),
+      );
     });
 
     test('limit of 0 emits no clause', () async {

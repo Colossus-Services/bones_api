@@ -38,9 +38,11 @@ enum OrderDirection {
   /// Resolves if a select operation should order by the table ID column.
   ///
   /// Returns [orderByID] when defined. Otherwise returns `true` if an [offset]
-  /// is defined, since a paginated select needs a stable order to be correct.
-  static bool resolveOrderByID(bool? orderByID, int? offset) =>
-      orderByID ?? (offset != null);
+  /// or a [limit] is defined: without an order, which rows a `LIMIT` (or a
+  /// page) returns is undefined (it may change between calls, e.g. with the
+  /// query plan), and pages may overlap or skip rows.
+  static bool resolveOrderByID(bool? orderByID, int? offset, [int? limit]) =>
+      orderByID ?? (offset != null || limit != null);
 
   /// Parses [o] to an [OrderDirection], or returns `null` if it can't
   /// be resolved.

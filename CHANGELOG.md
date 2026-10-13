@@ -36,6 +36,17 @@
 - Optimization: `DBPostgreSQLAdapter` resolves the column names of a result
   once for all its rows.
 
+- **Behavior change**: a SQL select with a `limit` (and no `orderByID`) is
+  now ordered by the ID column (`ORDER BY id ... LIMIT n`), as one with an
+  `offset` already was: which rows an unordered `LIMIT` returns is
+  undefined in SQL (it can change with the query plan), e.g. which row a
+  `selectFirstByQuery` returns. Pass `orderByID: false` to opt out. The
+  in-memory adapters (`DBSQLMemoryAdapter`, the object adapters,
+  `IterableEntityRepository`) keep their rows in insertion order and still
+  order only for an `offset`. A `limit` of `0` (no `LIMIT` clause) doesn't
+  order.
+  - `OrderDirection.resolveOrderByID(orderByID, offset, [limit])`.
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /

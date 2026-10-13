@@ -90,8 +90,15 @@ void main() {
       expect(OrderDirection.resolveOrderByID(null, 0), isTrue);
       expect(OrderDirection.resolveOrderByID(null, 10), isTrue);
 
+      // A `limit` too (the generated SQL passes it), so the limited rows are
+      // defined:
+      expect(OrderDirection.resolveOrderByID(null, null, 1), isTrue);
+      expect(OrderDirection.resolveOrderByID(null, null, 20), isTrue);
+      expect(OrderDirection.resolveOrderByID(null, null, null), isFalse);
+
       // An explicit value always wins:
       expect(OrderDirection.resolveOrderByID(false, 10), isFalse);
+      expect(OrderDirection.resolveOrderByID(false, null, 20), isFalse);
       expect(OrderDirection.resolveOrderByID(true, null), isTrue);
     });
   });
