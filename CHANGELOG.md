@@ -6,6 +6,34 @@
   changed).
   - dev: `build_runner: ^2.16.2` (`analyzer` 14, required by it).
 
+- Fix: `DBSQLiteAdapter`: concurrent transactions failed (`no such savepoint`)
+  or reverted each other's writes. Every pooled connection shares one native
+  handle, so they were nested as `SAVEPOINT`s of a single stack: a `COMMIT`
+  also released another transaction's savepoint, and a `ROLLBACK` reverted
+  its writes. They now run one at a time (SQLite has a single writer
+  anyway); a transaction opened inside another one still nests as a
+  `SAVEPOINT`.
+- Fix: `DBRelationalEntityRepository.store`/update: an error raised by the
+  repository, not by the DB (e.g. a `RecursiveRelationshipLoopError`), left
+  its auto-commit transaction open forever, with the operations already
+  executed in it never committed or rolled back (holding its connection;
+  with SQLite, every later transaction nested inside it). It's now aborted
+  (rolled back).
+- Fix: the connection pool (`Pool.releaseIntoPool`) checked its size before
+  adding the released connection, so it could keep `maxConnections + 1`
+  connections.
+- Tests: concurrency integration tests (`bones_api_concurrency_*_test.dart`,
+  tag `concurrency`): parallel inserts, reads, partial updates (also of the
+  same entity), entities with references, connection pool pressure and
+  unique conflicts; transactions committed, aborted (an error or `abort()`),
+  in parallel, with parallel operations inside, a failing operation, and no
+  dirty reads between concurrent transactions. On the SQL memory, SQLite,
+  PostgreSQL and MySQL adapters, and the object memory, directory and GCS
+  (fake) adapters, each with its documented limitations (e.g. no rollback or
+  unique fields on object storage).
+  - CI: a new `test_vm (concurrency)` job (its 3 files at once); the workflow
+    also runs on PRs to any branch (stacked PRs).
+
 - Fix: `APIRequest.isAuthenticated` was `true` only when the token was
   expired (it is now `true` only when it isn't).
 - Fix: `APISecurity.autoValidateAllTokens` never ran (the elapsed time was

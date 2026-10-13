@@ -23,6 +23,9 @@ tags:
   # Slow tests.
   slow:
     timeout: 180s
+  # Parallel reads/stores and transactions (`bones_api_concurrency_*_test`).
+  concurrency:
+    timeout: 180s
   # Tests that depends on `build` framework:
   build:
     timeout: 180s

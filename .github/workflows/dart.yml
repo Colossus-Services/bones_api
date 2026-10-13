@@ -3,8 +3,8 @@ name: Dart CI
 on:
   push:
     branches: [ master ]
+  # Any base branch: also a PR stacked on another PR's branch.
   pull_request:
-    branches: [ master ]
 
 jobs:
   build:
@@ -43,6 +43,11 @@ jobs:
   # The PostgreSQL/MySQL files run directly (a tag filter loads every test
   # file, and the DB files start Docker work while loading). The `docker`
   # job: the other files' `docker` tests (e.g. `bones_api_test_utils_test`).
+  #
+  # The `concurrency` job: parallel reads/stores and transactions on every
+  # adapter (`bones_api_concurrency_*_test.dart`), its 3 files at once (the
+  # in-process adapters, and the PostgreSQL and MySQL containers, started in
+  # parallel).
   test_vm:
     name: test_vm (${{ matrix.suite }})
     runs-on: ubuntu-latest
@@ -51,7 +56,7 @@ jobs:
       matrix:
         include:
           - suite: unit
-            args: -x docker -j 4
+            args: -x docker -x concurrency -j 4
           - suite: postgres
             args: test/bones_api_enitity_db_postgres_test.dart
           - suite: mysql
@@ -60,7 +65,9 @@ jobs:
             args: >-
               -t docker
               $(grep -lE "'docker'" test/*_test.dart
-              | grep -vE 'db_postgres_test|db_mysql_test')
+              | grep -vE 'db_postgres_test|db_mysql_test|_concurrency_')
+          - suite: concurrency
+            args: -j 3 test/bones_api_concurrency_*_test.dart
     steps:
       - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1.7.2
