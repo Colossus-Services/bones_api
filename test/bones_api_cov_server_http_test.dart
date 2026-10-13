@@ -841,9 +841,11 @@ void main() {
     test('totalWorkers: 2', () async {
       var port = await resolveFreePort(6400);
 
-      // Created at the root `Zone`, since the `APIRoot` is sent to the
-      // worker `Isolate` and a test `Zone` is not sendable:
-      var apiRoot = Zone.root.run(() => _CovHttpAPIRoot('cov-http-workers'));
+      // Created in the test's `Zone` (not `Zone.root`): the `APIRoot` sent to
+      // the worker `Isolate` holds no `Zone` (unsendable) before its
+      // initialization.
+      expect(identical(Zone.current, Zone.root), isFalse);
+      var apiRoot = _CovHttpAPIRoot('cov-http-workers');
 
       var apiServer = APIServer(
         apiRoot,
@@ -866,6 +868,37 @@ void main() {
       }
 
       expect(workers, everyElement(endsWith('/2')));
+
+      await apiServer.stop();
+      expect(apiServer.isStopped, isTrue);
+    });
+
+    test('totalWorkers: 2 (APIRoot initialized before start)', () async {
+      var port = await resolveFreePort(6500);
+
+      var apiRoot = _CovHttpAPIRoot('cov-http-workers-init');
+      await apiRoot.ensureInitialized();
+      var zoneField = apiRoot.currentAPIRequest;
+
+      var apiServer = APIServer(
+        apiRoot,
+        'localhost',
+        port,
+        totalWorkers: 2,
+        logToConsole: false,
+      );
+
+      // `prepareForIsolateCopy` (by `start`) makes it sendable:
+      expect(await apiServer.start(), isTrue);
+
+      for (var i = 0; i < 10; ++i) {
+        var res = await _request('${apiServer.url}cov/ok');
+        expect(res.status, equals(200));
+        expect(_bodyStr(res), equals('OK:GET'));
+      }
+
+      // The main `Isolate` keeps its `ZoneField`:
+      expect(apiRoot.currentAPIRequest, same(zoneField));
 
       await apiServer.stop();
       expect(apiServer.isStopped, isTrue);
@@ -926,9 +959,13 @@ void main() {
 
       await expectLater(serverAsync, throwsUnsupportedError);
 
-      // The server is left running by `runTestAPIServer` on an invalid
-      // command, so release its `APIRoot`:
-      apiRoot?.close();
+      // `runTestAPIServer` stops the server and closes its `APIRoot`:
+      expect(apiRoot!.isClosed, isTrue);
+      expect(APIRoot.getByName('cov-http-test-server2'), isNull);
+
+      // The port is free again:
+      var server = await HttpServer.bind('localhost', port);
+      await server.close(force: true);
     });
 
     test('without channel', () async {

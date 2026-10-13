@@ -29,6 +29,42 @@
 - Fix: `APIConfig.fromAsync` (`loadAPIConfigFromUri`) of an `http(s)` URL
   discarded the downloaded configuration (and requested the URL with a
   trailing `/`): now it's returned (`null`, or the default, if not found).
+- Fix: `APIServer` with `totalWorkers > 1` failed to spawn the workers
+  (`object is unsendable - _CustomZone`) when the `APIRoot` was created (or
+  initialized) in a `Zone` other than `Zone.root` (e.g. `runZoned`,
+  `runZonedGuarded`, a test): `APIRoot.currentAPIRequest` (a `ZoneField`,
+  holding its parent `Zone`) is now initialized per `Isolate`, by the
+  `APIRoot` initialization (or first `call`), not by the constructor.
+  - `APIRoot.prepareForIsolateCopy`: called by `APIServer` before spawning
+    the workers, keeps the `Isolate`'s internals out of the instance (the
+    same `currentAPIRequest` in this `Isolate`); a copy initializes its own.
+  - `APIRoot.getCurrentAPIRequest([contextZone])`: the current `APIRequest`,
+    `null` before the initialization (`currentAPIRequest` throws a
+    `StateError` before it).
+  - The `EntityRulesResolver` context provider of an `APIRoot` is registered
+    per `Isolate` (also by a copy with its modules already loaded).
+- Fix: `APIServerResponseCache` wrote a double comma (`,,`) in a cached
+  response's `server-timing` header.
+- Fix: `AlterTableSQL` with `ifNotExists` cut the column name of an entry
+  with leading spaces (`line.substring(11)` over the untrimmed line).
+- Fix: `APIConfig.getPath` threw a `RangeError` for a `List` index out of
+  range (now `null`).
+- Fix: `registerAsDbLogger` of a logger with a dotted (hierarchical) name:
+  its records weren't identified as DB logs (`LogRecord.loggerName` is the
+  full name).
+- Fix: `runTestAPIServer` left the server running (and its `APIRoot` open)
+  on an unknown channel command.
+- Fix: `checkTables` (SQLite) suggested SQLs that SQLite can't run:
+  - `SQLDialect.alterTableAddColumnIfNotExists` (`false` for SQLite): no
+    `ADD COLUMN IF NOT EXISTS`.
+  - Without `SQLDialect.alterTableAddConstraint`, a missing column's foreign
+    key is in the column (`REFERENCES`), and a `UNIQUE` one is a unique
+    index (no `ADD CONSTRAINT`).
+  - A repeated suggested SQL is listed once.
+- Fix: `checkTables` errors with only missing enum `CHECK` constraints or
+  values had no description (now `missingEnumConstraints` and
+  `missingEnumValues`); `missingCollectionReferenceColumns` also listed the
+  non-collection reference fields.
 
 ## 1.21.1
 

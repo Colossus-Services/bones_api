@@ -432,4 +432,53 @@ void main() {
     expect(await _checkError(p.adapter), isNull);
     expect(p.adapter.checkedTables, isTrue);
   });
+
+  for (var enumConstraint in [
+    null,
+    TableEnumConstraint('kind', ['admin']),
+  ]) {
+    var missing = enumConstraint == null ? 'enum CHECK' : 'enum values';
+
+    test('only the $missing missing: described in the error', () async {
+      var p = _Provider({
+        ..._baseSchemes,
+        'item': TableScheme(
+          'item',
+          idFieldName: 'id',
+          fieldsTypes: {
+            'id': int,
+            'code': String,
+            'title': String,
+            'kind': String,
+            'owner': int,
+          },
+          fieldsReferencedTables: {
+            'owner': TableFieldReference(
+              'item',
+              'owner',
+              int,
+              'owner',
+              'id',
+              int,
+              indexName: 'item__owner__idx',
+            ),
+          },
+          relationshipTables: [_itemTags(sourceIndex: 'i1', targetIndex: 'i2')],
+          constraints: [TableUniqueConstraint('code'), ?enumConstraint],
+        ),
+      });
+
+      var error = await _checkError(p.adapter);
+      expect(p.adapter.checkedTables, isFalse);
+
+      expect(
+        error,
+        contains(
+          enumConstraint == null
+              ? '  -- missingEnumConstraints: [RoleType kind]'
+              : '  -- missingEnumValues: [kind: guest, unknown]',
+        ),
+      );
+    });
+  }
 }

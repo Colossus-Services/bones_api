@@ -119,13 +119,13 @@ abstract class APIRoot with Initializable, Closable {
 
     if (lng == 1) {
       var apiRoot = _instances.values.first;
-      var apiRequest = apiRoot.currentAPIRequest.get(zone);
+      var apiRequest = apiRoot.getCurrentAPIRequest(zone);
       if (apiRequest != null) {
         return (apiRoot: apiRoot, apiRequest: apiRequest);
       }
     } else if (lng > 1) {
       for (var apiRoot in _instances.values) {
-        var apiRequest = apiRoot.currentAPIRequest.get(zone);
+        var apiRequest = apiRoot.getCurrentAPIRequest(zone);
         if (apiRequest != null) {
           return (apiRoot: apiRoot, apiRequest: apiRequest);
         }
@@ -355,7 +355,7 @@ abstract class APIRoot with Initializable, Closable {
   FutureOr<List<Initializable>> loadDependencies() => <Initializable>[];
 
   @override
-  FutureOr<InitializationResult> initialize() => _ensureModulesLoaded();
+  FutureOr<InitializationResult> initialize() => _ensureReady();
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
@@ -391,13 +391,13 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns the names of the modules of this API.
   Set<String> get modulesNames {
-    _ensureModulesLoadedSync('modulesNames');
+    _ensureReadySync('modulesNames');
     return _modules!.keys.toSet();
   }
 
   /// Returns the modules of this API.
   Set<APIModule> get modules {
-    _ensureModulesLoadedSync('modules');
+    _ensureReadySync('modules');
     return _modules!.values.toSet();
   }
 
@@ -406,8 +406,9 @@ abstract class APIRoot with Initializable, Closable {
 
   Future<InitializationResult>? _modulesLoading;
 
-  FutureOr<InitializationResult> _ensureModulesLoaded() {
+  FutureOr<InitializationResult> _ensureReady() {
     _setupInstance();
+    _initializeInternals();
 
     if (_modules != null) {
       return InitializationResult.ok(this, dependencies: _modules!.values);
@@ -417,8 +418,6 @@ abstract class APIRoot with Initializable, Closable {
     if (modulesLoading != null) {
       return modulesLoading;
     }
-
-    EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
 
     var ret = loadModules().resolveMapped((modules) {
       _modules ??= Map.fromEntries(modules.map((e) => MapEntry(e.name, e)));
@@ -433,9 +432,9 @@ abstract class APIRoot with Initializable, Closable {
     return ret;
   }
 
-  void _ensureModulesLoadedSync(String caller) {
+  void _ensureReadySync(String caller) {
     // ignore: discarded_futures
-    var ret = _ensureModulesLoaded();
+    var ret = _ensureReady();
     if (ret is Future) {
       _log.warning(
         "Accessing `$caller` before fully load modules! "
@@ -449,7 +448,7 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns a module with [name].
   APIModule? getModule(String name) {
-    _ensureModulesLoadedSync('getModule');
+    _ensureReadySync('getModule');
     var module = _modules![name];
     if (module != null) {
       module.ensureConfigured();
@@ -461,7 +460,7 @@ abstract class APIRoot with Initializable, Closable {
   ///
   /// Calls [resolveModule] to determine the module name.
   APIModule? getModuleByRequest(APIRequest request) {
-    _ensureModulesLoadedSync('getModuleByRequest');
+    _ensureReadySync('getModuleByRequest');
     var moduleName = resolveModule(request);
     return _modules![moduleName];
   }
@@ -604,7 +603,7 @@ abstract class APIRoot with Initializable, Closable {
       );
     }
 
-    var modulesLoadAsync = _ensureModulesLoaded();
+    var modulesLoadAsync = _ensureReady();
 
     if (modulesLoadAsync is Future<InitializationResult>) {
       return modulesLoadAsync.then((_) => _callZoned<T>(request, externalCall));
@@ -613,8 +612,69 @@ abstract class APIRoot with Initializable, Closable {
     }
   }
 
+  // Not initialized by the constructor: an `APIRoot` is sent to the
+  // `APIServerWorker` isolates (before its initialization), and a `ZoneField`
+  // holds its parent `Zone` (unsendable, except `Zone.root`). Each isolate
+  // initializes its own (see `_initializeInternals`).
+  ZoneField<APIRequest>? _currentAPIRequest;
+
+  // The `_currentAPIRequest` of each instance in this `Isolate`, moved out of
+  // the instance by `prepareForIsolateCopy` (a static is not copied).
+  static final Expando<ZoneField<APIRequest>> _isolateCurrentAPIRequest =
+      Expando<ZoneField<APIRequest>>();
+
+  ZoneField<APIRequest>? get _currentAPIRequestOrNull =>
+      _currentAPIRequest ?? _isolateCurrentAPIRequest[this];
+
   /// Returns the current [APIRequest] of the current [call].
-  final ZoneField<APIRequest> currentAPIRequest = ZoneField(Zone.current);
+  ///
+  /// Initialized (per `Isolate`) by this instance initialization: throws a
+  /// [StateError] before it. See [getCurrentAPIRequest].
+  ZoneField<APIRequest> get currentAPIRequest =>
+      _currentAPIRequestOrNull ??
+      (throw StateError("`APIRoot` not initialized: `$name`"));
+
+  /// Returns the [APIRequest] of the [contextZone] (or of the current [call]),
+  /// or `null` if none (also if this instance is not initialized yet).
+  APIRequest? getCurrentAPIRequest([Zone? contextZone]) =>
+      _currentAPIRequestOrNull?.get(contextZone);
+
+  /// Initializes the internals of the current `Isolate` (idempotent).
+  void _initializeInternals() {
+    if (_currentAPIRequest != null) return;
+
+    // The parent `Zone` of the `call`s: the `Zone` of the initialization.
+    _currentAPIRequest =
+        _isolateCurrentAPIRequest[this] ?? ZoneField(Zone.current);
+
+    // Registered per `Isolate` (also by a copy with the modules loaded):
+    EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
+  }
+
+  /// Prepares this instance to be sent to (copied into) other `Isolate`s,
+  /// like the auxiliary `APIServerWorker`s (called by the `APIServer` before
+  /// spawning them).
+  ///
+  /// The internal state of this `Isolate` (not sendable, like a [Zone]) is
+  /// moved out of this instance, and kept for this `Isolate` (the same
+  /// [currentAPIRequest]). A copy initializes its own when initialized (or
+  /// called) in its `Isolate`.
+  ///
+  /// Throws a [StateError] if the modules are being loaded (a [Future]).
+  void prepareForIsolateCopy() {
+    if (_modulesLoading != null) {
+      throw StateError(
+        "Can't prepare `APIRoot` `$name` for an `Isolate` copy while "
+        "loading its modules.",
+      );
+    }
+
+    var currentAPIRequest = _currentAPIRequest;
+    if (currentAPIRequest != null) {
+      _isolateCurrentAPIRequest[this] = currentAPIRequest;
+      _currentAPIRequest = null;
+    }
+  }
 
   static void _uncaughtAsynchronousError(
     Zone self,
@@ -905,17 +965,17 @@ abstract class APIRoot with Initializable, Closable {
 
 class _APIRootEntityRulesContextProvider implements EntityRulesContextProvider {
   final APIRoot apiRoot;
-  final ZoneField<APIRequest> currentAPIRequest;
 
-  _APIRootEntityRulesContextProvider(this.apiRoot)
-    : currentAPIRequest = apiRoot.currentAPIRequest;
+  _APIRootEntityRulesContextProvider(this.apiRoot);
 
   @override
   EntityResolutionRules? getContextEntityResolutionRules({
     Zone? contextZone,
     Object? contextIdentifier,
   }) {
-    var request = currentAPIRequest.get(contextZone) ?? currentAPIRequest.get();
+    var request =
+        apiRoot.getCurrentAPIRequest(contextZone) ??
+        apiRoot.getCurrentAPIRequest();
     if (request == null) return null;
 
     var routeHandler = request.routeHandler;

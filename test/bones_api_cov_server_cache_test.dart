@@ -479,7 +479,8 @@ void main() {
       // The previous entries are kept and the `API-Server-Response` entry is
       // replaced (not appended):
       var serverTiming = r2.headers['server-timing']!;
-      expect(serverTiming, startsWith('gzip;dur=1,'));
+      expect(serverTiming, startsWith('gzip;dur=1, API-Server-Response;dur='));
+      expect(serverTiming, isNot(contains(',,')));
       expect(
         'API-Server-Response;dur='.allMatches(serverTiming).length,
         equals(1),

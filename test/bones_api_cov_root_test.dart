@@ -1,6 +1,8 @@
 @TestOn('vm')
 library;
 
+import 'dart:isolate';
+
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 
@@ -553,6 +555,90 @@ void main() {
             ?.routeName,
         equals('about'),
       );
+    });
+  });
+
+  group('APIRoot currentAPIRequest', () {
+    test('initialized with the APIRoot (not by the constructor)', () async {
+      var root = _CovRoot('cov-root-current-request');
+      try {
+        // Not initialized: no `ZoneField` (and so no `Zone`) yet.
+        expect(root.getCurrentAPIRequest(), isNull);
+        expect(() => root.currentAPIRequest, throwsStateError);
+
+        expect(APIRoot.getByAPIRequestZone(Zone.current).apiRequest, isNull);
+
+        await root.ensureInitialized();
+
+        var zoneField = root.currentAPIRequest;
+        expect(root.getCurrentAPIRequest(), isNull);
+
+        // Idempotent: the same `ZoneField` after more calls.
+        var res = await root.call(APIRequest.get('/cov/zone'));
+        expect(res.payload, equals('cov-root-current-request|true'));
+        expect(root.currentAPIRequest, same(zoneField));
+
+        // Outside the `call`: no current request.
+        expect(root.getCurrentAPIRequest(), isNull);
+      } finally {
+        root.close();
+      }
+    });
+
+    test('prepareForIsolateCopy', () async {
+      var root = _CovRoot('cov-root-isolate-copy');
+      try {
+        // Initialized in the test's `Zone` (not sendable):
+        expect(identical(Zone.current, Zone.root), isFalse);
+        await root.ensureInitialized();
+        var zoneField = root.currentAPIRequest;
+
+        await expectLater(
+          Isolate.run(() => root.name),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.toString(),
+              'message',
+              contains('_CustomZone'),
+            ),
+          ),
+        );
+
+        root.prepareForIsolateCopy();
+
+        // Sendable now, and initialized again in the other `Isolate`:
+        var copyResult = await Isolate.run(() async {
+          // A new `Isolate`: no context provider registered yet.
+          var providers0 = EntityRulesResolver.cotextProviders.length;
+          var res = await root.call(APIRequest.get('/cov/zone'));
+          var providers1 = EntityRulesResolver.cotextProviders.length;
+          return '${root.isAuxiliaryInstance}|${res.payload}|'
+              '$providers0->$providers1';
+        });
+        expect(copyResult, equals('true|cov-root-isolate-copy|true|0->1'));
+
+        // This `Isolate` keeps the same `ZoneField`:
+        expect(root.currentAPIRequest, same(zoneField));
+        var res = await root.call(APIRequest.get('/cov/zone'));
+        expect(res.payload, equals('cov-root-isolate-copy|true'));
+        expect(root.currentAPIRequest, same(zoneField));
+      } finally {
+        root.close();
+      }
+    });
+
+    test('initialized by the first call', () async {
+      var root = _CovRoot('cov-root-current-request2');
+      try {
+        expect(root.getCurrentAPIRequest(), isNull);
+
+        var res = await root.call(APIRequest.get('/cov/zone'));
+        expect(res.payload, equals('cov-root-current-request2|true'));
+
+        expect(root.currentAPIRequest, isNotNull);
+      } finally {
+        root.close();
+      }
     });
   });
 

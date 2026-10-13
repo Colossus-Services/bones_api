@@ -1104,7 +1104,7 @@ void main() {
         'CREATE TABLE item (id INTEGER PRIMARY KEY AUTOINCREMENT, title VARCHAR)',
       );
 
-      var error = await _checkError(adapter);
+      var error = (await _checkError(adapter))!;
       expect(adapter.checkedTables, isFalse);
 
       expect(
@@ -1119,47 +1119,57 @@ void main() {
         contains('  -- missingColumns: [String code , RoleType kind]'),
       );
       expect(error, contains('  -- missingReferenceColumns: [_Owner owner]'));
+      // Only the collection (`List`) reference fields:
       expect(
         error,
-        contains(
-          '  -- missingCollectionReferenceColumns: '
-          '[_Owner owner , List<_Tag> tags]',
-        ),
+        contains('  -- missingCollectionReferenceColumns: [List<_Tag> tags]'),
       );
       expect(error, contains('  -- missingUniqueConstraints: [code]'));
 
+      // SQLite (no `ALTER TABLE ... ADD CONSTRAINT`, nor `ADD COLUMN IF NOT
+      // EXISTS`): the foreign key in the column (`REFERENCES`), a unique
+      // index for `UNIQUE` (once).
+      const suggestionTitle =
+          'Suggestion of SQLs (`SQLite`) to fix missing columns in tables:\n\n';
       expect(
         error,
         contains(
-          'Suggestion of SQLs (`SQLite`) to fix missing columns in tables:\n\n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "code" VARCHAR(20) ;\n'
-          '  ALTER TABLE "item"  ADD CONSTRAINT "item__code__unique" UNIQUE ("code") ;\n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "kind" VARCHAR '
+          '$suggestionTitle'
+          '  ALTER TABLE "item"  ADD COLUMN "code" VARCHAR(20) ;\n'
+          '  CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique" '
+          'ON "item" ("code") ;\n'
+          '  ALTER TABLE "item"  ADD COLUMN "kind" VARCHAR '
           "CHECK( \"kind\" IN ('admin','guest','unknown') ) ;\n"
           '  \n'
-          '  ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "owner" BIGINT ;\n'
+          '  ALTER TABLE "item"  ADD COLUMN "owner" BIGINT '
+          'REFERENCES "owner"("id") ;\n'
           '  CREATE INDEX IF NOT EXISTS "item__owner__idx" ON "item" ("owner") ;\n'
-          '  ALTER TABLE "item"  ADD CONSTRAINT "item__owner__fkey" '
-          'FOREIGN KEY ("owner") REFERENCES "owner"("id") ;\n'
-          '  \n'
-          '  CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique" '
-          'ON "item" ("code") ;\n',
+          '  \n',
         ),
       );
+      expect(error, isNot(contains('ADD CONSTRAINT')));
+      expect(error, isNot(contains('ADD COLUMN IF NOT EXISTS')));
+      expect(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "item__code__unique"'
+            .allMatches(error)
+            .length,
+        equals(1),
+      );
 
-      // Fixing the item table (SQLite: no `ADD CONSTRAINT`), and creating the
-      // relationship table: OK.
-      adapter.executeRawSQL('ALTER TABLE item ADD COLUMN code VARCHAR(20)');
-      adapter.executeRawSQL(
-        "ALTER TABLE item ADD COLUMN kind VARCHAR "
-        "CHECK( kind IN ('admin','guest','unknown') )",
-      );
-      adapter.executeRawSQL(
-        'ALTER TABLE item ADD COLUMN owner BIGINT REFERENCES owner(id)',
-      );
-      adapter.executeRawSQL(
-        'CREATE UNIQUE INDEX item__code__unique ON item (code)',
-      );
+      // Fixing the item table with the suggested SQLs (valid in SQLite), and
+      // creating the relationship table: OK.
+      var suggestedSQLs = error
+          .substring(error.indexOf(suggestionTitle) + suggestionTitle.length)
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      expect(suggestedSQLs, hasLength(5));
+
+      for (var sql in suggestedSQLs) {
+        adapter.executeRawSQL(sql);
+      }
+
       adapter.executeRawSQL(
         'CREATE TABLE item__tags__rel ('
         'item_id BIGINT NOT NULL REFERENCES item(id), '

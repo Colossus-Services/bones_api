@@ -281,6 +281,32 @@ void main() {
       expect(LoggerHandler.isDbLoggerName('cov_db_logger'), isFalse);
     });
 
+    test('registerAsDbLogger: a dotted (hierarchical) logger name', () async {
+      var prevHierarchical = logging.hierarchicalLoggingEnabled;
+      logging.hierarchicalLoggingEnabled = true;
+
+      var dbLogger = logging.Logger('cov_parent.cov_child_db');
+      try {
+        expect(dbLogger.name, equals('cov_child_db'));
+        expect(dbLogger.fullName, equals('cov_parent.cov_child_db'));
+
+        expect(dbLogger.registerAsDbLogger(), isTrue);
+
+        // Checked against `LogRecord.loggerName` (the full name):
+        logging.LogRecord? record;
+        var sub = dbLogger.onRecord.listen((r) => record = r);
+        dbLogger.info('x');
+        await sub.cancel();
+        expect(record!.loggerName, equals('cov_parent.cov_child_db'));
+        expect(LoggerHandler.isDbLoggerName(record!.loggerName), isTrue);
+      } finally {
+        expect(await dbLogger.unregisterAsDbLogger(), isTrue);
+        logging.hierarchicalLoggingEnabled = prevHierarchical;
+      }
+
+      expect(LoggerHandler.isDbLoggerName('cov_parent.cov_child_db'), isFalse);
+    });
+
     test('DBLog', () {
       expect(DBLog('x').toString(), equals('x'));
       expect(DBLog(() => 'y').toString(), equals('y'));

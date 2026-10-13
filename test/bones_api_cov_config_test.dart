@@ -71,6 +71,10 @@ void main() {
       expect(config.getPath<Map>('a', 'b', 'c', 0, 'd'), equals({'e': '12'}));
       expect(config.getPath<int>('a', 'b', 'c', 0, 'x'), isNull);
       expect(config.getPath<int>('a', 'b', 'x'), isNull);
+      // A `List` index out of range (or negative): `null`.
+      expect(config.getPath<Map>('a', 'b', 'c', 1), isNull);
+      expect(config.getPath<Map>('a', 'b', 'c', -1), isNull);
+      expect(config.getPath<int>('a', 'b', 'c', 5, 'd'), isNull);
       expect(
         config.getPath<Map>('a', 'b', 'c', 0),
         equals({

@@ -894,7 +894,10 @@ abstract class _CachedResponse
       if (serverTime != null) {
         var idx = serverTime.indexOf('API-Server-Response;');
         if (idx > 0) {
-          serverTime = serverTime.substring(0, idx).trim();
+          serverTime = serverTime
+              .substring(0, idx)
+              .replaceFirst(RegExp(r'[\s,]+$'), '')
+              .trim();
 
           if (serverTime.isNotEmpty) {
             serverTimeInfo = '$serverTime, $info';

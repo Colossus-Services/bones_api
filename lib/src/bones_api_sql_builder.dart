@@ -123,6 +123,10 @@ class SQLDialect extends DBDialect {
   /// (`ALTER TABLE ... ADD CONSTRAINT`): not in SQLite.
   final bool alterTableAddConstraint;
 
+  /// Whether the SQL dialect supports `IF NOT EXISTS` on
+  /// `ALTER TABLE ... ADD COLUMN`: not in SQLite.
+  final bool alterTableAddColumnIfNotExists;
+
   /// Whether an index is dropped by its table (`DROP INDEX name ON table`,
   /// without `IF EXISTS`): MySQL. Otherwise `DROP INDEX IF EXISTS name`.
   final bool dropIndexOnTable;
@@ -158,6 +162,7 @@ class SQLDialect extends DBDialect {
     this.foreignKeyCreatesImplicitIndex = true,
     this.createIndexIfNotExists = true,
     this.alterTableAddConstraint = true,
+    this.alterTableAddColumnIfNotExists = true,
     this.dropIndexOnTable = false,
     this.offsetRequiresLimit = false,
     this.offsetMaxLimitValue = '18446744073709551615',
@@ -227,6 +232,7 @@ class SQLDialect extends DBDialect {
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
         'alterTableAddConstraint: $alterTableAddConstraint, '
+        'alterTableAddColumnIfNotExists: $alterTableAddColumnIfNotExists, '
         'dropIndexOnTable: $dropIndexOnTable, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
         'offsetMaxLimitValue: $offsetMaxLimitValue, '
@@ -665,14 +671,17 @@ class AlterTableSQL extends TableSQL {
     for (var e in entries) {
       var line = e.sql;
 
-      if (ifNotExists) {
+      if (ifNotExists && dialect.alterTableAddColumnIfNotExists) {
         var lineTrimUC = line.trim().toUpperCase().replaceAll(
           RegExp(r'\s+'),
           ' ',
         );
         if (lineTrimUC.startsWith('ADD COLUMN ') &&
             !lineTrimUC.contains(' IF NOT EXISTS ')) {
-          line = 'ADD COLUMN IF NOT EXISTS ${line.substring(11)}';
+          line = line.trim().replaceFirst(
+            RegExp(r'^ADD\s+COLUMN\s+', caseSensitive: false),
+            'ADD COLUMN IF NOT EXISTS ',
+          );
         }
       }
 
@@ -1672,17 +1681,51 @@ abstract mixin class SQLGenerator {
       }
     }
 
+    // Without `ALTER TABLE ... ADD CONSTRAINT` (SQLite): the foreign key in
+    // the column (`REFERENCES`), and a unique index for `UNIQUE`.
+    var alterTableAddConstraint = dialect.alterTableAddConstraint;
+
+    var columnSQL = ' ADD COLUMN $q$columnName$q $fieldSQLType';
+    List<SQLColumn>? columnReferences;
+
+    if (entityType != null && !alterTableAddConstraint) {
+      var refTableName = entityType.key;
+      var refField = entityType.value.key.toLowerCase();
+      columnSQL += ' REFERENCES $q$refTableName$q($q$refField$q)';
+      columnReferences = [
+        SQLColumn(
+          table,
+          columnName,
+          referenceTable: refTableName,
+          referenceColumn: refField,
+        ),
+      ];
+    }
+
     var columnEntry = SQLEntry(
       'ADD',
-      ' ADD COLUMN $q$columnName$q $fieldSQLType',
+      columnSQL,
       comment: comment,
+      columns: columnReferences,
     );
 
     List<CreateIndexSQL>? indexes;
     List<AlterTableSQL>? constraints;
 
     if (entityFieldAnnotations != null && entityFieldAnnotations.isNotEmpty) {
-      if (entityFieldAnnotations.hasUnique) {
+      if (entityFieldAnnotations.hasUnique && !alterTableAddConstraint) {
+        var uniqueIndexName = '${table}__${columnName}__unique';
+        indexes = [
+          CreateIndexSQL.columns(
+            dialect,
+            table,
+            [columnName],
+            uniqueIndexName,
+            q: q,
+            unique: true,
+          ),
+        ];
+      } else if (entityFieldAnnotations.hasUnique) {
         var constrainUniqueName = '${table}__${columnName}__unique';
 
         var uniqueEntry = SQLEntry(
@@ -1714,25 +1757,28 @@ abstract mixin class SQLGenerator {
       var refTableName = ref.key;
       var refField = ref.value.key.toLowerCase();
 
-      var constrainName = '${table}__${columnName}__fkey';
+      // (Without `ADD CONSTRAINT`: in the column, above.)
+      if (alterTableAddConstraint) {
+        var constrainName = '${table}__${columnName}__fkey';
 
-      constraints ??= [];
+        constraints ??= [];
 
-      var constraintEntry = SQLEntry(
-        'CONSTRAINT',
-        ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
-        comment: '$fieldName @ $refTableName.$refField',
-        columns: [
-          SQLColumn(
-            table,
-            columnName,
-            referenceTable: refTableName,
-            referenceColumn: refField,
-          ),
-        ],
-      );
+        var constraintEntry = SQLEntry(
+          'CONSTRAINT',
+          ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
+          comment: '$fieldName @ $refTableName.$refField',
+          columns: [
+            SQLColumn(
+              table,
+              columnName,
+              referenceTable: refTableName,
+              referenceColumn: refField,
+            ),
+          ],
+        );
 
-      constraints.add(AlterTableSQL(dialect, table, [constraintEntry]));
+        constraints.add(AlterTableSQL(dialect, table, [constraintEntry]));
+      }
 
       if (!dialect.foreignKeyCreatesImplicitIndex) {
         var indexName = '${table}__${columnName}__idx';

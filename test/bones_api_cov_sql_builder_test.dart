@@ -323,7 +323,7 @@ void main() {
         alter.buildSQL(),
         equals(
           'ALTER TABLE "t" \n'
-          'ADD COLUMN IF NOT EXISTS  "x" INT,  -- int x\n'
+          'ADD COLUMN IF NOT EXISTS "x" INT,  -- int x\n'
           'ADD COLUMN IF NOT EXISTS "y" INT,\n'
           'ADD COLUMN IF NOT EXISTS "z" INT\n ;',
         ),
@@ -337,6 +337,15 @@ void main() {
       );
       expect(alter.referenceTables, equals(['r']));
       expect(alter.dependentTables, equals(['r']));
+
+      // Leading spaces and `COLUMN` in any case: the column name is kept.
+      var alter2 = AlterTableSQL(_pg, 't', [
+        SQLEntry('ADD', '   add  column "abc" INT'),
+      ]);
+      expect(
+        alter2.buildSQL(multiline: false),
+        equals('ALTER TABLE "t" ADD COLUMN IF NOT EXISTS "abc" INT ;'),
+      );
       expect(alter.toString(), equals('ALTER TABLE t {parent: p, refs: [r]}'));
       expect(
         AlterTableSQL(_pg, 'u', [SQLEntry('ADD', 'ADD x')]).toString(),
@@ -474,9 +483,7 @@ void main() {
             TypeInfo.tString,
           ),
         ),
-        equals(
-          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "title" VARCHAR ;',
-        ),
+        equals('ALTER TABLE "item" ADD COLUMN IF NOT EXISTS "title" VARCHAR ;'),
       );
 
       // Unique:
@@ -493,7 +500,7 @@ void main() {
           ),
         ),
         equals(
-          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "code" VARCHAR(20) ;\n'
+          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS "code" VARCHAR(20) ;\n'
           'ALTER TABLE "item"  ADD CONSTRAINT "item__code__unique" UNIQUE ("code") ;',
         ),
       );
@@ -509,7 +516,7 @@ void main() {
           ),
         ),
         equals(
-          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "title" VARCHAR ;\n'
+          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS "title" VARCHAR ;\n'
           'CREATE INDEX IF NOT EXISTS "item__title__idx" ON "item" ("title") ;',
         ),
       );
@@ -524,7 +531,7 @@ void main() {
           ),
         ),
         equals(
-          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "owner" BIGINT ;\n'
+          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS "owner" BIGINT ;\n'
           'CREATE INDEX IF NOT EXISTS "item__owner__idx" ON "item" ("owner") ;\n'
           'ALTER TABLE "item"  ADD CONSTRAINT "item__owner__fkey" FOREIGN KEY ("owner") REFERENCES "owner"("id") ;',
         ),
@@ -540,7 +547,7 @@ void main() {
           ),
         ),
         equals(
-          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS  "kind" '
+          'ALTER TABLE "item" ADD COLUMN IF NOT EXISTS "kind" '
           "ENUM('admin','guest','unknown') ;",
         ),
       );

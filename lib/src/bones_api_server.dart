@@ -1649,6 +1649,10 @@ class APIServer extends _APIServerBase {
     var totalAuxiliaryWorkers = totalWorkers - 1;
 
     if (totalAuxiliaryWorkers >= 1) {
+      // The `apiRoot` is sent to (copied into) the auxiliary workers'
+      // `Isolate`s:
+      apiRoot.prepareForIsolateCopy();
+
       auxiliaryWorkers = List.generate(
         totalAuxiliaryWorkers,
         (i) => _createWorker(i + 1),

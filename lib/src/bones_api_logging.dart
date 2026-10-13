@@ -98,7 +98,8 @@ extension LoggerExntesion on logging.Logger {
 
   bool registerAsDbLogger() {
     if (_dbLoggers.add(this)) {
-      _dbLoggersNames.add(name);
+      // The full name: the one of a `LogRecord.loggerName`.
+      _dbLoggersNames.add(fullName);
       _setupDbLogger(handler);
       return true;
     }
@@ -107,7 +108,7 @@ extension LoggerExntesion on logging.Logger {
 
   Future<bool> unregisterAsDbLogger() async {
     if (_dbLoggers.remove(this)) {
-      _dbLoggersNames.remove(name);
+      _dbLoggersNames.remove(fullName);
       await _cancelDbLogger();
       return true;
     }
@@ -347,7 +348,7 @@ abstract class LoggerHandler {
     var apiRoot = APIRoot.get();
 
     if (apiRoot != null) {
-      var apiRequest = apiRoot.currentAPIRequest.get(msg.zone);
+      var apiRequest = apiRoot.getCurrentAPIRequest(msg.zone);
       if (apiRequest != null) {
         apiRequestIDStr = '#${apiRequest.id}';
       }

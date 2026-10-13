@@ -147,6 +147,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              createIndexIfNotExists: true,
              // SQLite can't `ALTER TABLE ... ADD CONSTRAINT`:
              alterTableAddConstraint: false,
+             // Nor `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`:
+             alterTableAddColumnIfNotExists: false,
              // SQLite can't parse an `OFFSET` without a preceding `LIMIT`,
              // and uses `LIMIT -1` as "no limit":
              offsetRequiresLimit: true,
