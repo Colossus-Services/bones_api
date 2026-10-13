@@ -1,3 +1,17 @@
+## 1.21.1
+
+- Tests: line coverage raised from 70.3% to 95.1% (VM suite, including the
+  PostgreSQL/MySQL Docker tests), with new `test/bones_api_cov_*_test.dart`
+  files (all VM, no Docker):
+  - API root, modules, `APIDBModule` routes, `APIRootStarter`.
+  - `APIServer` (real HTTP servers on free ports: status branches, static
+    files, cache headers, workers), `APIServerResponseCache`, `HTMLDocument`.
+  - Entity handlers, repositories, `Transaction`, `EntityReference`/
+    `EntityReferenceList`, entity rules, JSON and collection utilities.
+  - DB adapters: object memory/directory, SQL memory, SQLite, `checkTables`,
+    SQL builders and condition encoders.
+  - Security, authentication, logging, config, platform and extensions.
+
 ## 1.21.0
 
 - `checkTables`: duplicated indexes and `CHECK` constraints in a table are
