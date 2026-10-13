@@ -52,8 +52,8 @@
 - Fix: `registerAsDbLogger` of a logger with a dotted (hierarchical) name:
   its records weren't identified as DB logs (`LogRecord.loggerName` is the
   full name).
-- Fix: `runTestAPIServer` left the server running (and its `APIRoot` open)
-  on an unknown channel command.
+- Fix: `runTestAPIServer` left the server running on an unknown channel
+  command (now stopped, also closing its `APIRoot`, as on `stop`).
 - Fix: `checkTables` (SQLite) suggested SQLs that SQLite can't run:
   - `SQLDialect.alterTableAddColumnIfNotExists` (`false` for SQLite): no
     `ADD COLUMN IF NOT EXISTS`.

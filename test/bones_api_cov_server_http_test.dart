@@ -996,6 +996,10 @@ void main() {
       expect(apiServer.cookieless, isTrue);
       expect(apiServer.apiRoot.apiConfig['foo'], equals('bar'));
 
+      // `stop`: the `APIRoot` is also closed (as on an unknown command):
+      expect(apiServer.apiRoot.isClosed, isTrue);
+      expect(APIRoot.getByName(apiServer.apiRoot.name), isNull);
+
       expect(logs.first, equals('** Resolving free port...'));
       expect(logs.join('\n'), contains('URL: http://localhost:$port/'));
       expect(logs.join('\n'), contains('API Server CMD: stop'));
