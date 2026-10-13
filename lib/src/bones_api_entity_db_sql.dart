@@ -170,8 +170,10 @@ class SQL implements SQLWrapper {
   /// The return offset of this select (`OFFSET`), or `null` for no offset.
   final int? offset;
 
-  /// If this select is ordered by the table ID column. `null` means unset,
-  /// resolved by [OrderDirection.resolveOrderByID] as `offset != null`.
+  /// If this select is ordered by the table ID column. `null` means unset:
+  /// the generated SQL orders by ID when there's an `OFFSET` or a `LIMIT`
+  /// (see [OrderDirection.resolveOrderByID]); `DBSQLMemoryAdapter` orders
+  /// only with an `OFFSET` (its rows are already in insertion order).
   final bool? orderByID;
 
   /// The [OrderDirection] of the ordering.
@@ -3141,7 +3143,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }) {
     var tail = '';
 
-    if (OrderDirection.resolveOrderByID(orderByID, offset)) {
+    // A `limit` of `0` is no `LIMIT` clause here: it doesn't need an order.
+    var effectiveLimit = limit != null && limit > 0 ? limit : null;
+
+    if (OrderDirection.resolveOrderByID(orderByID, offset, effectiveLimit)) {
       var tableFieldID = context.tableFieldID ?? 'id';
       tail += dialect.orderBySQL(
         tableAlias,

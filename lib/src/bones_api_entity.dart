@@ -3396,6 +3396,10 @@ int? resolveSelectOffset({int? page, int? offset, int? limit}) {
 /// Used by the [DBAdapter]s that can't delegate the ordering and the
 /// pagination to a DB engine, and by [IterableEntityRepository].
 ///
+/// Unlike the generated SQL, a [limit] alone doesn't activate the ordering:
+/// the elements are already in a stable (insertion) order, and sorting them
+/// all for a `selectFirst` (`limit: 1`) would cost `O(n log n)`.
+///
 /// [zeroLimitIsUnlimited] selects how a `limit` of `0` is interpreted, since
 /// the pre-existing call sites disagree: the generated SQL treats it as "no
 /// `LIMIT` clause" (`true`), while the in-memory selects treat it as an empty
@@ -3519,7 +3523,9 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   ///   automatically resolved from the table scheme
   ///   ([TableScheme.idFieldName]) or from [EntityHandler.idFieldName].
   ///   Defaults to `true` when [offset] is defined, since a paginated select
-  ///   needs a stable order to be correct. Pass `false` to opt out.
+  ///   needs a stable order to be correct, and, with a SQL database, also
+  ///   when [limit] is defined (which rows an unordered `LIMIT` returns is
+  ///   undefined). Pass `false` to opt out.
   /// - [orderDirection]: the [OrderDirection] of the ordering,
   ///   [OrderDirection.ascending] by default.
   ///   **Ignored while the ordering is not active** (see [orderByID]).
