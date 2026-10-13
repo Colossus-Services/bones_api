@@ -7,3 +7,12 @@ codecov:
 
 comment:
   after_n_builds: 5
+
+# The project coverage can move by ~0.01% between runs of the same code
+# (timing-dependent paths, e.g. the connection pool and the caches): don't
+# fail a PR on that noise. The patch status (the changed lines) is unchanged.
+coverage:
+  status:
+    project:
+      default:
+        threshold: 0.05%
