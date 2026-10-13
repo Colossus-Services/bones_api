@@ -473,14 +473,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<int, int>? preFinish,
   }) {
-    return executeTransactionOperation(
+    return _executeOperation(
       op,
-      (conn) => _doCountImpl(
-        op,
-        table,
-        matcher,
-        parameters ?? namedParameters,
-      ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+      (conn) => _doCountImpl(op, table, matcher, parameters ?? namedParameters),
+      preFinish,
     );
   }
 
@@ -523,13 +519,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String table,
     List<I> ids,
   ) {
-    return executeTransactionOperation(
+    return _executeOperation<List<I>, List<I>>(
       op,
-      (conn) => _doExistIDsImpl(
-        op,
-        table,
-        ids,
-      ).resolveMapped((res) => _finishOperation(op, res, null)),
+      (conn) => _doExistIDsImpl(op, table, ids),
+      null,
     );
   }
 
@@ -558,13 +551,10 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String table,
     Object id, {
     PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
-  }) => executeTransactionOperation<R?>(
+  }) => _executeOperation<Map<String, dynamic>?, R?>(
     op,
-    (conn) => _doSelectByIDImpl<R>(
-      table,
-      id,
-      entityName,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) => _doSelectByIDImpl<R>(table, id, entityName),
+    preFinish,
   );
 
   FutureOr<Map<String, dynamic>?> _doSelectByIDImpl<R>(
@@ -584,7 +574,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<List<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectByIDsImpl<R>(
       table,
@@ -594,7 +584,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   FutureOr<List<Map<String, dynamic>>> _doSelectByIDsImpl<R>(
@@ -630,7 +621,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => executeTransactionOperation<List<R>>(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectAllImpl<R>(
       table,
@@ -639,7 +630,8 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       offset: offset,
       orderByID: orderByID,
       orderDirection: orderDirection,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    ),
+    preFinish,
   );
 
   Future<List<Map<String, dynamic>>> _doSelectAllImpl<R>(
@@ -698,14 +690,11 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<Iterable<Map<String, dynamic>>, R>(
     op,
-    (conn) => _doDeleteImpl<R>(
-      op,
-      table,
-      matcher,
-      parameters ?? namedParameters,
-    ).resolveMapped((res) => _finishOperation(op, res, preFinish)),
+    (conn) =>
+        _doDeleteImpl<R>(op, table, matcher, parameters ?? namedParameters),
+    preFinish,
   );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
@@ -741,17 +730,17 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     Map<String, dynamic> fields, {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
-  }) => executeTransactionOperation<dynamic>(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doInsertImpl<O>(op, table, fields, entityName, preFinish),
+    (conn) => _doInsertImpl<O>(op, table, fields, entityName),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doInsertImpl<O>(
+  Future<Object> _doInsertImpl<O>(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
-    PreFinishDBOperation? preFinish,
   ) async {
     var entry = _normalizeEntityJSON(
       fields,
@@ -772,7 +761,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     await _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
   }
 
   @override
@@ -786,18 +775,18 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
     bool allowAutoInsert = false,
-  }) => executeTransactionOperation(
+  }) => _executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doUpdateImpl(op, table, fields, entityName, id, preFinish),
+    (conn) => _doUpdateImpl(op, table, fields, entityName, id),
+    preFinish,
   );
 
-  FutureOr<dynamic> _doUpdateImpl(
+  Future<Object> _doUpdateImpl(
     TransactionOperation op,
     String table,
     Map<String, dynamic> fields,
     String entityName,
     Object id,
-    PreFinishDBOperation? preFinish,
   ) async {
     _log.info(
       '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
@@ -814,10 +803,13 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
     await _saveObject(table, id, entry);
 
-    return _finishOperation(op, id, preFinish);
+    return id;
   }
 
-  static final _jsonEncoder = dart_convert.JsonUtf8Encoder();
+  static final _jsonEncoder = dart_convert.JsonUtf8Encoder(
+    null,
+    DBObjectAdapter.toEncodableJson,
+  );
   static const _jsonDecoder = dart_convert.JsonDecoder();
   static const _utf8Decoder = dart_convert.Utf8Decoder();
 
@@ -1371,6 +1363,20 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       return op.finish<R>(res as R);
     }
   }
+
+  /// Executes [f] in the transaction of [op], and finishes [op] (with
+  /// [preFinish]) after that execution, not inside it: a [preFinish] can
+  /// issue other operations in the same transaction (e.g. selecting the
+  /// sub-entities), executed after this one (inside it, they would wait for
+  /// it, that waits for them).
+  FutureOr<R> _executeOperation<T, R>(
+    TransactionOperation op,
+    FutureOr<T> Function(DBObjectGCSAdapterContext connection) f,
+    PreFinishDBOperation<T, R>? preFinish,
+  ) => executeTransactionOperation<T>(
+    op,
+    f,
+  ).resolveMapped((res) => _finishOperation<T, R>(op, res, preFinish));
 
   FutureOr<R> executeTransactionOperation<R>(
     TransactionOperation op,

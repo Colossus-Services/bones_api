@@ -78,6 +78,16 @@
 - Fix: `DBObjectMemoryAdapter`/`DBObjectDirectoryAdapter` stored an
   `EntityReferenceList` field as the object itself (wrapped in a `List`),
   not its IDs: the entity couldn't be read back.
+- Fix: `DBObjectDirectoryAdapter`/`DBObjectGCSAdapter` couldn't store a
+  `DateTime`, enum or `Decimal` field (not JSON encodable): now encoded as
+  `Json.toJson` (`DBObjectAdapter.toEncodableJson`), and parsed back by the
+  entity's handler.
+- Fix: `DBObjectDirectoryAdapter`/`DBObjectGCSAdapter`: selecting an entity
+  with sub-entities (e.g. a `User`, with its `Address` and `Role`s) never
+  completed: the sub-entities' selects (by the operation's `preFinish`), in
+  the same transaction, waited for the operation, that waited for them. The
+  object adapters (also `DBObjectMemoryAdapter`) now finish an operation
+  after its transaction execution (as the SQL adapters).
 
 ## 1.21.1
 

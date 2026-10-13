@@ -54,6 +54,11 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
     return parseBool(log);
   }
 
+  /// The `toEncodable` of the JSON encoding of a stored object: converts a
+  /// value that is not JSON encodable (e.g. a [DateTime], an enum or a
+  /// `Decimal`) as [Json.toJson] (parsed back by the entity's handler).
+  static Object? toEncodableJson(Object? o) => Json.toJson(o);
+
   final bool log;
 
   DBObjectAdapter(

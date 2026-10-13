@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_directory.dart';
 import 'package:bones_api/src/bones_api_entity_db_object.dart';
+import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
@@ -173,21 +174,8 @@ void _runObjectAdapterTests(
         id: 'PHOTO-401',
       );
 
-      if (jsonOnly) {
-        // Enum values aren't JSON encodable by `DBObjectDirectoryAdapter`:
-        expect(await putRaw(role, 101, {'id': 101, 'type': 'admin'}), 101);
-        expect(
-          await putRaw(role2, 102, {
-            'id': 102,
-            'type': 'guest',
-            'enabled': false,
-          }),
-          102,
-        );
-      } else {
-        expect(await roleRepo.store(role), equals(101));
-        expect(await roleRepo.store(role2), equals(102));
-      }
+      expect(await roleRepo.store(role), equals(101));
+      expect(await roleRepo.store(role2), equals(102));
 
       expect(await storeRepo.store(store), equals(801));
       expect(await userInfoRepo.store(userInfo), equals(301));
@@ -310,10 +298,9 @@ void _runObjectAdapterTests(
       expect(await userRepo.count(matcher: ConditionID(501)), equals(1));
       expect(await userRepo.count(matcher: ConditionID(999)), equals(0));
 
-      // `DBObjectDirectoryAdapter` can't resolve the sub-entities of
-      // `User`/`Address` (a nested select in the same transaction never
-      // completes), nor JSON encode a `DateTime`/enum field:
-      if (jsonOnly) return;
+      // Resolving the sub-entities (selected in the same transaction, after
+      // the `User`'s select: previously a deadlock in
+      // `DBObjectDirectoryAdapter`):
 
       var user1 = await userRepo.selectByID(
         501,
@@ -788,10 +775,6 @@ void _runObjectAdapterTests(
         expect(closedStores ?? [], isNot(contains(isA<EntityReferenceList>())));
       }
 
-      // `DBObjectDirectoryAdapter` can't resolve the sub-entities of an
-      // `Address` (a nested select in the same transaction never completes):
-      if (jsonOnly) return;
-
       // Read back as an `EntityReferenceList` (previously: "Can't cast to
       // List<Store> due to null elements"):
       var a1 = await addressRepo.selectByID(221);
@@ -800,6 +783,58 @@ void _runObjectAdapterTests(
 
       var a4 = await addressRepo.selectByID(224);
       expect(a4!.closedStores.ids ?? [], isEmpty);
+    });
+
+    test('store and select: DateTime, enum and Decimal fields', () async {
+      var roleRepo = provider.repo<Role>();
+      var addressRepo = provider.repo<Address>();
+      var userRepo = provider.repo<User>();
+
+      // Through the repositories (previously not JSON encodable by
+      // `DBObjectDirectoryAdapter`):
+      var role = Role(RoleType.unknown, id: 131, value: Decimal.parse('12.5'));
+      expect(await roleRepo.store(role), equals(131));
+
+      var address = Address(
+        'CA',
+        'LA',
+        'Sunset',
+        3,
+        id: 231,
+        latitude: Decimal.parse('34.098'),
+        longitude: Decimal.parse('-118.326'),
+      );
+      expect(await addressRepo.store(address), equals(231));
+
+      var creationTime = DateTime.utc(2024, 2, 3, 4, 5, 6, 7);
+      var user = User(
+        'dt@mail.com',
+        'pass',
+        address,
+        [role],
+        id: 531,
+        creationTime: creationTime,
+        wakeUpTime: Time(7, 30),
+      );
+      expect(await userRepo.store(user), equals(531));
+
+      // Read back with the same values:
+      var role2 = await roleRepo.selectByID(131);
+      expect(role2!.type, equals(RoleType.unknown));
+      expect(role2.value, equals(Decimal.parse('12.5')));
+
+      var address2 = await addressRepo.selectByID(231);
+      expect(address2!.latitude, equals(Decimal.parse('34.098')));
+      expect(address2.longitude, equals(Decimal.parse('-118.326')));
+
+      var user2 = await userRepo.selectByID(
+        531,
+        resolutionRules: EntityResolutionRules(allEager: true),
+      );
+      expect(user2!.creationTime, equals(creationTime));
+      expect(user2.wakeUpTime, equals(Time(7, 30)));
+      expect(user2.address.id, equals(231));
+      expect(user2.roles.map((r) => r.type), equals([RoleType.unknown]));
     });
   });
 }
