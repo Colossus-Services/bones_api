@@ -33,6 +33,8 @@ Symbol? _getSymbol(String? key) {
   if (key == null) return null;
 
   switch (key) {
+    case r"allowInProgress":
+      return const Symbol(r"allowInProgress");
     case r"config":
       return const Symbol(r"config");
     case r"method":
@@ -183,6 +185,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
     'initializationStatus',
@@ -437,6 +440,21 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           obj,
           false,
         );
+      case 'cyclicdependencies':
+        return FieldReflection<AboutModule, List<Initializable>>(
+          this,
+          Initializable,
+          const __TR<List<Initializable>>(List, <__TR>[
+            __TR<Initializable>(Initializable),
+          ]),
+          'cyclicDependencies',
+          false,
+          (o) =>
+              () => o!.cyclicDependencies,
+          null,
+          obj,
+          false,
+        );
       default:
         return null;
     }
@@ -462,6 +480,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
       'isInitialized': obj?.isInitialized,
       'isInitializing': obj?.isInitializing,
       'isAsyncInitialization': obj?.isAsyncInitialization,
+      'cyclicDependencies': obj?.cyclicDependencies,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -915,7 +934,15 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           obj,
           null,
           null,
-          null,
+          const <String, __PR>{
+            'allowInProgress': __PR(
+              __TR.tBool,
+              'allowInProgress',
+              false,
+              false,
+              false,
+            ),
+          },
           null,
         );
       case 'executeinitialized':
@@ -1093,6 +1120,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
     'initializationStatus',
@@ -1347,6 +1375,21 @@ class UserModule$reflection extends ClassReflection<UserModule>
           obj,
           false,
         );
+      case 'cyclicdependencies':
+        return FieldReflection<UserModule, List<Initializable>>(
+          this,
+          Initializable,
+          const __TR<List<Initializable>>(List, <__TR>[
+            __TR<Initializable>(Initializable),
+          ]),
+          'cyclicDependencies',
+          false,
+          (o) =>
+              () => o!.cyclicDependencies,
+          null,
+          obj,
+          false,
+        );
       default:
         return null;
     }
@@ -1372,6 +1415,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
       'isInitialized': obj?.isInitialized,
       'isInitializing': obj?.isInitializing,
       'isAsyncInitialization': obj?.isAsyncInitialization,
+      'cyclicDependencies': obj?.cyclicDependencies,
       if (withHashCode) 'hashCode': obj?.hashCode,
     };
   }
@@ -2113,7 +2157,15 @@ class UserModule$reflection extends ClassReflection<UserModule>
           obj,
           null,
           null,
-          null,
+          const <String, __PR>{
+            'allowInProgress': __PR(
+              __TR.tBool,
+              'allowInProgress',
+              false,
+              false,
+              false,
+            ),
+          },
           null,
         );
       case 'executeinitialized':
