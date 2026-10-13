@@ -1295,10 +1295,12 @@ class APITokenStore {
       }
     } else if (data is Map) {
       if (data is! UnmodifiableMapView) {
-        if (data is Map<String, Object?>) {
-          data = UnmodifiableMapView<String, Object?>(data);
-        } else if (data is Map<String, Object>) {
+        // The most specific first (a `Map<String, Object>` is also a
+        // `Map<String, Object?>`), to keep its type:
+        if (data is Map<String, Object>) {
           data = UnmodifiableMapView<String, Object>(data);
+        } else if (data is Map<String, Object?>) {
+          data = UnmodifiableMapView<String, Object?>(data);
         } else {
           data = UnmodifiableMapView(data);
         }

@@ -120,6 +120,13 @@
   a partial update (`store` of a tracked entity: only its changed fields)
   replaced the stored object with only those fields (the others lost): now
   merged into the stored object.
+- Fix: `APITokenStore.storeAPIToken`: a `Map<String, Object>` data became an
+  `UnmodifiableMapView<String, Object?>` (not a `Map<String, Object>`): its
+  check was after the `Map<String, Object?>` one (that also matches it).
+- Removed unreachable code: `LoggerHandler.resolveLogDestiny`'s 2-parameter
+  function branches (already `MessageLogger`s), `APIConfig`'s `%var%`
+  fallback (the group always matches) and a duplicated
+  `DBAdapterException.resolveToString` branch.
 - `APIServerWorker._startLetsEncrypt`: removed the unreachable `null`
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)

@@ -1,5 +1,7 @@
 @TestOn('vm')
 @Timeout(Duration(seconds: 60))
+import 'dart:collection';
+
 import 'package:bones_api/bones_api.dart';
 import 'package:shared_map/shared_map.dart';
 import 'package:test/test.dart';
@@ -464,6 +466,22 @@ void main() {
 
       var info2 = await store.storeAPIToken(t2, <String, Object?>{'a': 1}, []);
       expect(() => (info2!.data as Map)['b'] = 2, throwsUnsupportedError);
+      expect(info2!.data, isA<UnmodifiableMapView<String, Object?>>());
+
+      // A `Map<String, Object>` keeps its type (not a `Map<String, Object?>`
+      // view):
+      var store2 = APITokenStore(sharedStore: SharedStore.notShared());
+      var info2b = await store2.storeAPIToken(
+        APIToken('foo', token: 'TK2B'),
+        <String, Object>{'a': 1},
+        [],
+      );
+      expect(info2b!.data, isA<Map<String, Object>>());
+      expect(info2b.data, isA<UnmodifiableMapView<String, Object>>());
+      expect(
+        () => (info2b.data as Map<String, Object>)['b'] = 2,
+        throwsUnsupportedError,
+      );
 
       var info3 = await store.storeAPIToken(tExpired, {1, 2}, []);
       expect(() => (info3!.data as Set).add(3), throwsUnsupportedError);

@@ -87,6 +87,21 @@ void main() {
       ml2(logging.Level.INFO, 'b');
       expect(received, equals(['a', 'b']));
 
+      // Functions of 2 parameters (`Object` or `dynamic`): `MessageLogger`s.
+      var both = <Object?>[];
+      var mlObj = handler.resolveLogDestiny(
+        (Object l, Object m) => both.addAll([l, m]),
+      )!;
+      mlObj(logging.Level.INFO, 'o');
+      var mlDyn = handler.resolveLogDestiny(
+        (dynamic l, dynamic m) => both.addAll([l, m]),
+      )!;
+      mlDyn(logging.Level.WARNING, 'd');
+      expect(
+        both,
+        equals([logging.Level.INFO, 'o', logging.Level.WARNING, 'd']),
+      );
+
       var single = <Object>[];
       var ml3 = handler.resolveLogDestiny((Object m) => single.add(m))!;
       ml3(logging.Level.INFO, 'c');

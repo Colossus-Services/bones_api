@@ -112,10 +112,9 @@ class APIConfig {
       }
 
       var valueResolved = value.replaceAllMapped(_regexpValueVariable, (m) {
-        var k = m[1];
-        var v = k != null
-            ? _getVariable(k, !equalsIgnoreAsciiCase(k, key))
-            : m[0];
+        // The group 1 always matches (`%(\w+)%`):
+        var k = m[1]!;
+        var v = _getVariable(k, !equalsIgnoreAsciiCase(k, key));
         return v ?? '';
       });
 

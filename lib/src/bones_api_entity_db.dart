@@ -2921,8 +2921,6 @@ class DBAdapterException implements DBException, WithRuntimeTypeNameSafe {
       return o.toString();
     } else if (o is Function()) {
       return resolveToString(o());
-    } else if (o is TransactionOperation) {
-      return o.toString();
     } else {
       return o.toString();
     }

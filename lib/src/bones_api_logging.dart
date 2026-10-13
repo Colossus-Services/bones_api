@@ -523,16 +523,11 @@ abstract class LoggerHandler {
       }
     }
 
+    // (Also a `Function(Object, Object)` or `Function(dynamic, dynamic)`.)
     if (logDestiny is MessageLogger) return logDestiny;
 
     if (logDestiny == 'console' || logDestiny == 'stdout') {
       return printMessage;
-    }
-
-    if (logDestiny is Function(Object, Object)) {
-      return (l, m) => logDestiny(l, m);
-    } else if (logDestiny is Function(dynamic, dynamic)) {
-      return (l, m) => logDestiny(l, m);
     }
 
     if (logDestiny is Function(Object)) {
