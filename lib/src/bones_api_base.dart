@@ -243,6 +243,9 @@ abstract class APIRoot with Initializable, Closable {
        ),
        apiConfig =
            APIConfig.fromSync(apiConfig, apiConfigProvider) ?? APIConfig() {
+    // The parent `Zone` of the calls' zones: the `Zone` of the constructor.
+    _currentAPIRequests[this] = ZoneField(Zone.current);
+
     _setupInstance();
   }
 
@@ -612,67 +615,62 @@ abstract class APIRoot with Initializable, Closable {
     }
   }
 
-  // Not initialized by the constructor: an `APIRoot` is sent to the
-  // `APIServerWorker` isolates (before its initialization), and a `ZoneField`
-  // holds its parent `Zone` (unsendable, except `Zone.root`). Each isolate
-  // initializes its own (see `_initializeInternals`).
-  ZoneField<APIRequest>? _currentAPIRequest;
-
-  // The `_currentAPIRequest` of each instance in this `Isolate`, moved out of
-  // the instance by `prepareForIsolateCopy` (a static is not copied).
-  static final Expando<ZoneField<APIRequest>> _isolateCurrentAPIRequest =
+  // The `currentAPIRequest` of each instance, per `Isolate`: a static, not an
+  // instance field, so an `APIRoot` can be sent to (copied into) other
+  // isolates (e.g. the `APIServerWorker`s): a `ZoneField` holds its parent
+  // `Zone`, that is unsendable (except `Zone.root`). A copy is another
+  // instance: without an entry in the other isolate.
+  static final Expando<ZoneField<APIRequest>> _currentAPIRequests =
       Expando<ZoneField<APIRequest>>();
 
-  ZoneField<APIRequest>? get _currentAPIRequestOrNull =>
-      _currentAPIRequest ?? _isolateCurrentAPIRequest[this];
+  // The instances with the internals initialized in this `Isolate`.
+  static final Expando<bool> _initializedInternals = Expando<bool>();
 
   /// Returns the current [APIRequest] of the current [call].
   ///
-  /// Initialized (per `Isolate`) by this instance initialization: throws a
-  /// [StateError] before it. See [getCurrentAPIRequest].
+  /// Its parent [Zone] (of the calls' zones) is the [Zone] where this
+  /// instance was created, or, in another `Isolate` (a copy of it), where
+  /// [initializeIsolateCopy] was called (else where it's first used there).
   ZoneField<APIRequest> get currentAPIRequest =>
-      _currentAPIRequestOrNull ??
-      (throw StateError("`APIRoot` not initialized: `$name`"));
+      _currentAPIRequests[this] ??= ZoneField(Zone.current);
 
   /// Returns the [APIRequest] of the [contextZone] (or of the current [call]),
-  /// or `null` if none (also if this instance is not initialized yet).
+  /// or `null` if none.
   APIRequest? getCurrentAPIRequest([Zone? contextZone]) =>
-      _currentAPIRequestOrNull?.get(contextZone);
+      _currentAPIRequests[this]?.get(contextZone);
 
-  /// Initializes the internals of the current `Isolate` (idempotent).
+  /// Initializes the internals of this instance in the current `Isolate`
+  /// (idempotent; not for a closed instance).
   void _initializeInternals() {
-    if (_currentAPIRequest != null) return;
-
-    // The parent `Zone` of the `call`s: the `Zone` of the initialization.
-    _currentAPIRequest =
-        _isolateCurrentAPIRequest[this] ?? ZoneField(Zone.current);
+    if (_initializedInternals[this] == true || isClosed) return;
+    _initializedInternals[this] = true;
 
     // Registered per `Isolate` (also by a copy with the modules loaded):
     EntityRulesResolver.registerContextProvider(_entityRulesContextProvider);
   }
 
-  /// Prepares this instance to be sent to (copied into) other `Isolate`s,
-  /// like the auxiliary `APIServerWorker`s (called by the `APIServer` before
-  /// spawning them).
+  /// Initializes this instance in the current `Isolate`, when it's a copy
+  /// from another one (e.g. by an auxiliary `APIServerWorker`, before its
+  /// start): its [currentAPIRequest] (with the [Zone.current] as the parent
+  /// of the calls' zones) and its internals (idempotent).
+  void initializeIsolateCopy() {
+    _currentAPIRequests[this] ??= ZoneField(Zone.current);
+    _initializeInternals();
+  }
+
+  /// Checks that this instance can be sent to (copied into) other
+  /// `Isolate`s, like the auxiliary `APIServerWorker`s (called by the
+  /// `APIServer` before spawning them). A copy is initialized in its
+  /// `Isolate` by [initializeIsolateCopy].
   ///
-  /// The internal state of this `Isolate` (not sendable, like a [Zone]) is
-  /// moved out of this instance, and kept for this `Isolate` (the same
-  /// [currentAPIRequest]). A copy initializes its own when initialized (or
-  /// called) in its `Isolate`.
-  ///
-  /// Throws a [StateError] if the modules are being loaded (a [Future]).
+  /// Throws a [StateError] if the modules are being loaded (a [Future]: not
+  /// sendable).
   void prepareForIsolateCopy() {
     if (_modulesLoading != null) {
       throw StateError(
         "Can't prepare `APIRoot` `$name` for an `Isolate` copy while "
         "loading its modules.",
       );
-    }
-
-    var currentAPIRequest = _currentAPIRequest;
-    if (currentAPIRequest != null) {
-      _isolateCurrentAPIRequest[this] = currentAPIRequest;
-      _currentAPIRequest = null;
     }
   }
 

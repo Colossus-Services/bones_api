@@ -8527,6 +8527,9 @@ class SetEntityRepository<O extends Object>
       return;
     }
 
+    // (If put before without an ID: now by its ID, not twice.)
+    _entriesWithoutID.remove(o);
+
     _entries[id] = o;
 
     if (id is int && id > _lastID) {

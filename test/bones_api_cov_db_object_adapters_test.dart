@@ -1,6 +1,7 @@
 @TestOn('vm')
 @Tags(['entities'])
 @Timeout(Duration(seconds: 60))
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -1112,6 +1113,38 @@ void _runDirectoryAdapterSpecificTests() {
       try {
         tempDir.deleteSync(recursive: true);
       } catch (_) {}
+    });
+
+    test('update of a corrupt (truncated) stored file: rewritten', () async {
+      var provider = _ObjectEntitiesProvider(
+        (p) => DBObjectDirectoryAdapter(tempDir, parentRepositoryProvider: p),
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      var storeRepo = provider.repo<Store>();
+
+      var s = Store('c1', 1, id: 7);
+      expect(await storeRepo.store(s), equals(7));
+
+      // Truncated (e.g. a crash in the middle of a write):
+      var file = File('${tempDir.path}/store/7.json');
+      expect(file.existsSync(), isTrue);
+      file.writeAsStringSync('{"id": 7, "na');
+
+      // A partial update: can't merge with it, the file is rewritten.
+      s.name = 'c2';
+      expect(await storeRepo.store(s), equals(7));
+
+      var json = jsonDecode(file.readAsStringSync()) as Map;
+      expect(json['id'], equals(7));
+      expect(json['name'], equals('c2'));
+
+      // A full update (a copy) restores all the fields:
+      expect(await storeRepo.store(Store('c3', 3, id: 7)), equals(7));
+      var s2 = (await storeRepo.selectByID(7))!;
+      expect(s2.name, equals('c3'));
+      expect(s2.number, equals(3));
     });
 
     test('context', () {

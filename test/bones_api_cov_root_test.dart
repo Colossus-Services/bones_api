@@ -27,6 +27,11 @@ class _CovModule extends APIModule {
       );
     });
 
+    // A value of the call's `Zone` (inherited from its parent zone):
+    routes.get('zoneValue', (request) {
+      return APIResponse.ok('${Zone.current[#covZoneKey]}');
+    });
+
     routes.post(
       'secret',
       (request) => APIResponse.ok('secret'),
@@ -559,23 +564,28 @@ void main() {
   });
 
   group('APIRoot currentAPIRequest', () {
-    test('initialized with the APIRoot (not by the constructor)', () async {
-      var root = _CovRoot('cov-root-current-request');
+    test('created by the constructor (its Zone: the calls\' parent)', () async {
+      // Created in a `Zone` with a value:
+      var root = runZoned(
+        () => _CovRoot('cov-root-current-request'),
+        zoneValues: {#covZoneKey: 'creation-zone'},
+      );
       try {
-        // Not initialized: no `ZoneField` (and so no `Zone`) yet.
+        // Available before the initialization (not an error):
+        var zoneField = root.currentAPIRequest;
         expect(root.getCurrentAPIRequest(), isNull);
-        expect(() => root.currentAPIRequest, throwsStateError);
-
         expect(APIRoot.getByAPIRequestZone(Zone.current).apiRequest, isNull);
 
         await root.ensureInitialized();
+        expect(root.currentAPIRequest, same(zoneField));
 
-        var zoneField = root.currentAPIRequest;
-        expect(root.getCurrentAPIRequest(), isNull);
+        // Called outside that `Zone`: the call's zone inherits its value.
+        expect(Zone.current[#covZoneKey], isNull);
+        var res = await root.call(APIRequest.get('/cov/zoneValue'));
+        expect(res.payload, equals('creation-zone'));
 
-        // Idempotent: the same `ZoneField` after more calls.
-        var res = await root.call(APIRequest.get('/cov/zone'));
-        expect(res.payload, equals('cov-root-current-request|true'));
+        var res2 = await root.call(APIRequest.get('/cov/zone'));
+        expect(res2.payload, equals('cov-root-current-request|true'));
         expect(root.currentAPIRequest, same(zoneField));
 
         // Outside the `call`: no current request.
@@ -585,37 +595,49 @@ void main() {
       }
     });
 
-    test('prepareForIsolateCopy', () async {
+    test('an isolate copy: sendable, initialized in its isolate', () async {
       var root = _CovRoot('cov-root-isolate-copy');
       try {
-        // Initialized in the test's `Zone` (not sendable):
+        // Created and initialized in the test's `Zone` (not sendable): the
+        // instance holds no `Zone` (sendable without preparing it).
         expect(identical(Zone.current, Zone.root), isFalse);
         await root.ensureInitialized();
         var zoneField = root.currentAPIRequest;
 
-        await expectLater(
-          Isolate.run(() => root.name),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.toString(),
-              'message',
-              contains('_CustomZone'),
-            ),
-          ),
-        );
+        expect(await Isolate.run(() => root.name), 'cov-root-isolate-copy');
 
         root.prepareForIsolateCopy();
 
-        // Sendable now, and initialized again in the other `Isolate`:
         var copyResult = await Isolate.run(() async {
-          // A new `Isolate`: no context provider registered yet.
+          // A new `Isolate`: nothing initialized yet for the copy.
+          var noRequest = root.getCurrentAPIRequest();
           var providers0 = EntityRulesResolver.cotextProviders.length;
-          var res = await root.call(APIRequest.get('/cov/zone'));
+
+          // In the zone of this point (as an `APIServerWorker` start):
+          root.initializeIsolateCopy();
           var providers1 = EntityRulesResolver.cotextProviders.length;
-          return '${root.isAuxiliaryInstance}|${res.payload}|'
-              '$providers0->$providers1';
+
+          var field = root.currentAPIRequest;
+          root.initializeIsolateCopy(); // Idempotent.
+          var sameField = identical(root.currentAPIRequest, field);
+          var providers2 = EntityRulesResolver.cotextProviders.length;
+
+          var res = await root.call(APIRequest.get('/cov/zone'));
+          return '${root.isAuxiliaryInstance}|$noRequest|'
+              '$providers0->$providers1->$providers2|$sameField|${res.payload}';
         });
-        expect(copyResult, equals('true|cov-root-isolate-copy|true|0->1'));
+        expect(
+          copyResult,
+          equals('true|null|0->1->1|true|cov-root-isolate-copy|true'),
+        );
+
+        // A copy used without `initializeIsolateCopy`: created when used
+        // (not an error).
+        var copyResult2 = await Isolate.run(() async {
+          var res = await root.call(APIRequest.get('/cov/zone'));
+          return '${res.payload}|${EntityRulesResolver.cotextProviders.length}';
+        });
+        expect(copyResult2, equals('cov-root-isolate-copy|true|1'));
 
         // This `Isolate` keeps the same `ZoneField`:
         expect(root.currentAPIRequest, same(zoneField));
@@ -627,18 +649,26 @@ void main() {
       }
     });
 
-    test('initialized by the first call', () async {
-      var root = _CovRoot('cov-root-current-request2');
-      try {
-        expect(root.getCurrentAPIRequest(), isNull);
+    test('a closed APIRoot: its rules provider not registered again', () async {
+      var root = _CovRoot('cov-root-closed-provider');
 
-        var res = await root.call(APIRequest.get('/cov/zone'));
-        expect(res.payload, equals('cov-root-current-request2|true'));
+      await root.ensureInitialized();
+      var registered = EntityRulesResolver.cotextProviders.length;
 
-        expect(root.currentAPIRequest, isNotNull);
-      } finally {
-        root.close();
-      }
+      root.prepareForIsolateCopy();
+      root.close();
+      expect(
+        EntityRulesResolver.cotextProviders.length,
+        equals(registered - 1),
+      );
+
+      // Used after closed (e.g. its `modules`): not registered again.
+      root.modules;
+      root.initializeIsolateCopy();
+      expect(
+        EntityRulesResolver.cotextProviders.length,
+        equals(registered - 1),
+      );
     });
   });
 

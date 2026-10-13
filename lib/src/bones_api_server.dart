@@ -3054,6 +3054,10 @@ final class APIServerWorker extends _APIServerBase {
     final worker = params.worker;
     final mainWorkerPort = params.mainWorkerPort;
 
+    // The `apiRoot` is a copy: initialized in this `Isolate` (its calls'
+    // zones forked from this one, not from the first request's).
+    worker.apiRoot.initializeIsolateCopy();
+
     final workerDebugName = worker.workerDebugName;
 
     var resumePort = ReceivePort('$workerDebugName:resumePort');

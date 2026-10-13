@@ -733,7 +733,10 @@ class DBObjectDirectoryAdapter
 
     // A partial update (only the changed `fields`): merged into the stored
     // object (if any: an auto-insert).
-    var entry = <String, dynamic>{...?_readObjectSync(table, id), ...changes};
+    var entry = <String, dynamic>{
+      ...?_readStoredObjectForUpdate(table, id),
+      ...changes,
+    };
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -741,6 +744,21 @@ class DBObjectDirectoryAdapter
     _saveObject(table, id, entry);
 
     return id;
+  }
+
+  /// The stored object to merge an update into: `null` if it doesn't exist,
+  /// or can't be parsed (e.g. a file truncated by a crash in the middle of a
+  /// write: the update rewrites it, as before the merge).
+  Map<String, dynamic>? _readStoredObjectForUpdate(String table, Object id) {
+    try {
+      return _readObjectSync(table, id);
+    } on FormatException catch (e) {
+      _log.warning(
+        "Can't parse the stored object `$table`#$id (rewritten by the "
+        "update): $e",
+      );
+      return null;
+    }
   }
 
   /// Reads synchronously (as [_saveObject] writes).

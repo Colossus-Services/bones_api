@@ -736,6 +736,19 @@ void main() {
         uniqRepo.remove(withID);
         expect(uniqRepo.iterable(), isEmpty);
 
+        // Put without an ID, and stored later with one: once (not twice).
+        var late = CovUniq({'code': 'n4'});
+        uniqRepo.put(late);
+        late.values['id'] = 70;
+        expect(await uniqRepo.store(late), equals(70));
+        expect(
+          uniqRepo.iterable().where((e) => identical(e, late)),
+          hasLength(1),
+        );
+        expect(uniqRepo.length(), equals(1));
+        uniqRepo.remove(late);
+        expect(uniqRepo.iterable(), isEmpty);
+
         // An ID changed after it was put: still removed.
         var changed = CovUniq({'id': 60, 'code': 'n3'});
         uniqRepo.put(changed);

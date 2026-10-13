@@ -39,16 +39,21 @@
   (`object is unsendable - _CustomZone`) when the `APIRoot` was created (or
   initialized) in a `Zone` other than `Zone.root` (e.g. `runZoned`,
   `runZonedGuarded`, a test): `APIRoot.currentAPIRequest` (a `ZoneField`,
-  holding its parent `Zone`) is now initialized per `Isolate`, by the
-  `APIRoot` initialization (or first `call`), not by the constructor.
-  - `APIRoot.prepareForIsolateCopy`: called by `APIServer` before spawning
-    the workers, keeps the `Isolate`'s internals out of the instance (the
-    same `currentAPIRequest` in this `Isolate`); a copy initializes its own.
-  - `APIRoot.getCurrentAPIRequest([contextZone])`: the current `APIRequest`,
-    `null` before the initialization (`currentAPIRequest` throws a
-    `StateError` before it).
+  holding its parent `Zone`) is now kept per `Isolate` (a static `Expando`,
+  not an instance field): an `APIRoot` holds no `Zone`, and can be sent.
+  - In the creating `Isolate`: created by the constructor, as before (the
+    calls' zones forked from the constructor's `Zone`).
+  - `APIRoot.initializeIsolateCopy`: initializes a copy in its `Isolate`
+    (its `currentAPIRequest` forked from that `Isolate`'s `Zone`), called by
+    an auxiliary `APIServerWorker` before its start (otherwise created when
+    first used there).
+  - `APIRoot.prepareForIsolateCopy`: checks it can be copied (called by
+    `APIServer` before spawning the workers: not while loading the modules).
+  - `APIRoot.getCurrentAPIRequest([contextZone])`: the current `APIRequest`
+    (or `null`), without creating the `ZoneField`.
   - The `EntityRulesResolver` context provider of an `APIRoot` is registered
-    per `Isolate` (also by a copy with its modules already loaded).
+    once per `Isolate` (also by a copy with its modules already loaded), and
+    not again after `close`.
 - Fix: `APIServerResponseCache` wrote a double comma (`,,`) in a cached
   response's `server-timing` header.
 - Fix: `AlterTableSQL` with `ifNotExists` cut the column name of an entry
@@ -137,6 +142,9 @@
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)
   is now tested.
+- Fix: `DBObjectDirectoryAdapter`: a partial update of an object whose file
+  can't be parsed (e.g. truncated by a crash in the middle of a write) failed
+  (the merge read it): now the update rewrites it (logged).
 - `SetEntityRepository`: its entries by ID (a `LinkedHashMap`): `selectByID`,
   `existsID` and `store` look up the ID without a scan
   (`IterableEntityRepository.getStoredByID`), and an updated copy replaces
