@@ -1,5 +1,11 @@
 ## 1.21.2
 
+- `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
+  `decodeAsync<Map>` with nested JSON lists (previously lazily cast lists that
+  threw when read). Reflection code regenerated (only the builder version
+  changed).
+  - dev: `build_runner: ^2.16.2` (`analyzer` 14, required by it).
+
 - Fix: `APIRequest.isAuthenticated` was `true` only when the token was
   expired (it is now `true` only when it isn't).
 - Fix: `APISecurity.autoValidateAllTokens` never ran (the elapsed time was

@@ -192,6 +192,28 @@ void main() {
       expect(d2, equals({'b': 'x'}));
     });
 
+    // `reflection_factory` 2.11.0: the nested lists of an untyped `Map` are
+    // readable (previously lazily cast to `List<Map>`, throwing when read).
+    test('decode<Map> / decodeAsync<Map>: nested lists (38)', () async {
+      const json = '{"a": [1, "x", [2, 3], {"k": "v"}], "m": {"l": [4]}}';
+
+      void check(Map d) {
+        var a = d['a'] as List;
+        expect(a[0], equals(1));
+        expect(a[1], equals('x'));
+        expect(a[2], equals([2, 3]));
+        expect(a[3], equals({'k': 'v'}));
+        expect(((d['m'] as Map)['l'] as List).first, equals(4));
+
+        // Writable with any element:
+        a.add(5);
+        expect(a.last, equals(5));
+      }
+
+      check(Json.decode<Map>(json));
+      check(await Json.decodeAsync<Map>(Future.value(json)));
+    });
+
     test('defaultFieldNameResolver', () {
       expect(
         Json.defaultFieldNameResolver('country_code', {'COUNTRYCODE': 1}),
