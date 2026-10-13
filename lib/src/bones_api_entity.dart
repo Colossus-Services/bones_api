@@ -6691,7 +6691,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var transactionResult = this.transactionResult;
     if (transactionResult != null) {
       if (transactionResult is Future) {
-        var parentStackTrace = StackTrace.current;
+        var parentStackTrace = _debugStackTrace();
 
         var ret = transactionResult.then(
           (r) => _commitCompleteFinish<R>(r, parentStackTrace),
@@ -6704,7 +6704,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         return _commitCompleteFinish<R>(result);
       }
     } else {
-      var parentStackTrace = StackTrace.current;
+      var parentStackTrace = _debugStackTrace();
 
       var ret = _transactionCompleter.future.then(
         (r) => _commitCompleteFinish<R>(r, parentStackTrace),
@@ -6713,6 +6713,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       _transactionCompleter.complete(result);
       return ret;
     }
+  }
+
+  /// The current [StackTrace], only with asserts enabled (debug, tests). It
+  /// only locates the unexpected error of [_commitCompleteFinish], and
+  /// capturing it on every commit is expensive.
+  static StackTrace? _debugStackTrace() {
+    StackTrace? stackTrace;
+    assert(() {
+      stackTrace = StackTrace.current;
+      return true;
+    }());
+    return stackTrace;
   }
 
   R? _commitCompleteFinish<R>(Object? result, [StackTrace? parentStackTrace]) {

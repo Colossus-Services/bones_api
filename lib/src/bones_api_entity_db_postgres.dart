@@ -1703,9 +1703,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
       parameters: substitutionValues,
     );
 
-    var mappedResult = rs.map((e) => e.toResultsMap()).toList();
-
-    return mappedResult;
+    return rs.toResultsMaps();
   }
 
   Future<Result> query(
@@ -1827,18 +1825,26 @@ class DBPostgreSQLAdapterException extends DBSQLAdapterException {
   });
 }
 
-extension on ResultRow {
-  Map<String, dynamic> toResultsMap() {
-    final map = <String, dynamic>{};
+extension on Result {
+  /// Each row as a `Map` by column name (`[index]` for an unnamed column).
+  /// The names are resolved once for all the rows (they share the schema).
+  List<Map<String, dynamic>> toResultsMaps() {
+    if (isEmpty) return <Map<String, dynamic>>[];
 
-    for (final (i, col) in schema.columns.indexed) {
-      if (col.columnName case final String name) {
-        map[name] = this[i];
-      } else {
-        map['[$i]'] = this[i];
+    final columns = schema.columns;
+    final names = List<String>.generate(
+      columns.length,
+      (i) => columns[i].columnName ?? '[$i]',
+      growable: false,
+    );
+    final length = names.length;
+
+    return map((row) {
+      final values = <String, dynamic>{};
+      for (var i = 0; i < length; ++i) {
+        values[names[i]] = row[i];
       }
-    }
-
-    return map;
+      return values;
+    }).toList();
   }
 }

@@ -302,19 +302,49 @@ class SQL implements SQLWrapper {
       return;
     }
 
-    var sqlPositional = sql.replaceAllMapped(placeholderRegexp, (m) {
-      var k = m.group(1)!;
-      var v = parametersByPlaceholder[k];
-      keys.add(k);
-      values.add(v);
-      return '?';
-    });
+    // With the default placeholder, the positional SQL and its keys depend
+    // only on the SQL text: computed once per text (the same statements
+    // repeat), and only the values are resolved per instance.
+    var cacheable = identical(placeholderRegexp, _defaultPlaceholderRegexp);
+
+    var cached = cacheable ? _positionalCache[sql] : null;
+
+    String sqlPositional;
+    if (cached != null) {
+      sqlPositional = cached.$1;
+      keys = cached.$2;
+      for (var k in keys) {
+        values.add(parametersByPlaceholder[k]);
+      }
+    } else {
+      sqlPositional = sql.replaceAllMapped(placeholderRegexp, (m) {
+        var k = m.group(1)!;
+        var v = parametersByPlaceholder[k];
+        keys.add(k);
+        values.add(v);
+        return '?';
+      });
+
+      if (cacheable) {
+        if (_positionalCache.length >= _positionalCacheLimit) {
+          _positionalCache.clear();
+        }
+        _positionalCache[sql] = (sqlPositional, List.unmodifiable(keys));
+      }
+    }
 
     _sqlPositional ??= sqlPositional;
 
     _parametersKeysByPosition ??= keys;
     _parametersValuesByPosition ??= values;
   }
+
+  /// [sqlPositional] and [parametersKeysByPosition] by SQL text (default
+  /// placeholder only). Cleared when it reaches [_positionalCacheLimit]
+  /// (e.g. SQLs with inlined values, all different).
+  static final Map<String, (String, List<String>)> _positionalCache = {};
+
+  static const int _positionalCacheLimit = 2000;
 
   @override
   String toString() {
