@@ -15,7 +15,8 @@ changes on top of that commit.
 ## Progression
 
 ops/sec per operation (higher is better), one column per date, oldest
-first, from the entries below. A date with more than one run shows its
+first, from the entries below; in parentheses, the change from the
+previous date. A date with more than one run shows its
 last one (2026-10-03: the optimized runs at `98cc744 (modified)`; the
 first runs of that day are in their entries). When adding an entry, add
 its date's column here too.
@@ -24,43 +25,43 @@ its date's column here too.
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 25303 | 25688 |
-| `user/byEmail` | 1407 | 1526 |
-| `user/byState (join, limit 20)` | 1409 | 1454 |
-| `user/list (page of 20)` | 682 | 690 |
-| `user/count` | 193802 | 153540 |
-| `authenticate (login)` | 1393 | 1426 |
-| `user/register` | 2623 | 2611 |
-| `user/update` | 1881 | 1944 |
-| `user/remove` | 19969 | 21245 |
+| `user/byId` | 25303 | 25688 (+1.5%) |
+| `user/byEmail` | 1407 | 1526 (+8.5%) |
+| `user/byState (join, limit 20)` | 1409 | 1454 (+3.2%) |
+| `user/list (page of 20)` | 682 | 690 (+1.2%) |
+| `user/count` | 193802 | 153540 (-20.8%) |
+| `authenticate (login)` | 1393 | 1426 (+2.4%) |
+| `user/register` | 2623 | 2611 (-0.5%) |
+| `user/update` | 1881 | 1944 (+3.3%) |
+| `user/remove` | 19969 | 21245 (+6.4%) |
 
 ### `sqlite`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 17138 | 17403 |
-| `user/byEmail` | 16580 | 16535 |
-| `user/byState (join, limit 20)` | 2326 | 2348 |
-| `user/list (page of 20)` | 2405 | 2419 |
-| `user/count` | 121903 | 122422 |
-| `authenticate (login)` | 14764 | 14835 |
-| `user/register` | 7727 | 7690 |
-| `user/update` | 10302 | 10282 |
-| `user/remove` | 13036 | 13250 |
+| `user/byId` | 17138 | 17403 (+1.5%) |
+| `user/byEmail` | 16580 | 16535 (-0.3%) |
+| `user/byState (join, limit 20)` | 2326 | 2348 (+0.9%) |
+| `user/list (page of 20)` | 2405 | 2419 (+0.6%) |
+| `user/count` | 121903 | 122422 (+0.4%) |
+| `authenticate (login)` | 14764 | 14835 (+0.5%) |
+| `user/register` | 7727 | 7690 (-0.5%) |
+| `user/update` | 10302 | 10282 (-0.2%) |
+| `user/remove` | 13036 | 13250 (+1.6%) |
 
 ### `postgres`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 1453 | 1461 |
-| `user/byEmail` | 1518 | 1521 |
-| `user/byState (join, limit 20)` | 537 | 403 |
-| `user/list (page of 20)` | 490 | 302 |
-| `user/count` | 6167 | 6199 |
-| `authenticate (login)` | 1474 | 1482 |
-| `user/register` | 611 | 592 |
-| `user/update` | 713 | 713 |
-| `user/remove` | 803 | 882 |
+| `user/byId` | 1453 | 1461 (+0.6%) |
+| `user/byEmail` | 1518 | 1521 (+0.2%) |
+| `user/byState (join, limit 20)` | 537 | 403 (-25.0%) |
+| `user/list (page of 20)` | 490 | 302 (-38.4%) |
+| `user/count` | 6167 | 6199 (+0.5%) |
+| `authenticate (login)` | 1474 | 1482 (+0.5%) |
+| `user/register` | 611 | 592 (-3.1%) |
+| `user/update` | 713 | 713 (0.0%) |
+| `user/remove` | 803 | 882 (+9.8%) |
 
 PostgreSQL runs in Docker Desktop, where `byState` and `list` vary a lot
 between runs of the same code (see the entries' notes); the 2026-10-13 dip
