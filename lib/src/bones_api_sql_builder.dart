@@ -2348,14 +2348,16 @@ abstract mixin class SQLGenerator {
 
       var relIndexes = <CreateIndexSQL>[];
 
+      // The source column is the first column of the `UNIQUE (source,
+      // target)` constraint's index, which already serves lookups by it: only
+      // the target column needs its own index (another one on the source
+      // would just be updated on every write).
       if (!dialect.foreignKeyCreatesImplicitIndex) {
-        var indexName1 = '${relName}__${srcFieldName}__idx';
         var indexName2 = '${relName}__${dstFieldName}__idx';
 
-        relIndexes.addAll([
-          CreateIndexSQL(dialect, relName, srcFieldName, indexName1, q: q),
+        relIndexes.add(
           CreateIndexSQL(dialect, relName, dstFieldName, indexName2, q: q),
-        ]);
+        );
       }
 
       var relSQL = CreateTableSQL(
