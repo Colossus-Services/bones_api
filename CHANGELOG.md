@@ -2,34 +2,45 @@
 
 - `checkTables`: duplicated indexes and `CHECK` constraints in a table are
   warned (never an error), with suggested SQLs to drop them:
-  - Indexes over the same columns (in the same order, any names), also a
-    plain index over the columns of a unique/primary key one. Kept: the
-    primary key (or a SQLite `sqlite_autoindex_*`), else a unique one, else
-    the default name (`<table>__<columns>__idx`), else the first by name.
-    `DROP INDEX IF EXISTS` (MySQL: `DROP INDEX ... ON table`); a unique one
-    also `ALTER TABLE ... DROP CONSTRAINT IF EXISTS` (a constraint's index).
-    MySQL `SERIAL`'s unique index (with `PRIMARY KEY`, of the generated
+  - Indexes over the same columns (in the same order, any names) and of the
+    same kind (an index of another method, operator class, order or with
+    `INCLUDE` columns isn't a duplicate), also a plain index over the
+    columns of a unique/primary key one. Kept: the primary key (the
+    introspected one, whatever its name; or a SQLite `sqlite_autoindex_*`),
+    else a unique one (the default name, `<table>__<columns>__unique`,
+    first), else the default name (`<table>__<columns>__idx`), else the
+    first by name. `DROP INDEX IF EXISTS` (MySQL: `DROP INDEX ... ON
+    table`); a unique one also `ALTER TABLE ... DROP CONSTRAINT IF EXISTS`
+    (a constraint's index), noting that it fails if a foreign key references
+    it. MySQL `SERIAL`'s unique index (with `PRIMARY KEY`, of the generated
     `CREATE TABLE`) isn't reported.
   - Enum `CHECK` constraints over the same column (PostgreSQL), with the
     same values or not (an old enum `CHECK` never dropped still restricts
-    the writes). Kept: the one with the entity's enum values, else
-    `<table>_<column>_check`, else the first by name; if none has the
-    entity's values, the suggestion says to review it.
+    the writes). Kept: the one with exactly the entity's enum values, else
+    one with all of them (and others), else a default name
+    (`<table>_<column>_check`, or `<table>_<column>__check` of the
+    `checkTables` suggestion), else the first by name; if none has the
+    entity's values, the suggestion says to review it. The column's field
+    is the one `checkTables` maps to it.
+  - Missing enum values: only reported if no `CHECK` over the column has
+    all of them (an old duplicated `CHECK` is warned, not an error).
   - `DBSQLAdapter.tablesDuplicates` (of the last `checkDBTables`, by table)
     and `findTableDuplicates(scheme, entityHandler:)`: `TableDuplicates`
     (`indexes`, `checkConstraints`: each group with the one kept first;
     `dropSQLs`).
-  - `TableScheme.duplicatedIndexes`, `duplicatedCheckConstraints` and
+  - `TableScheme.duplicatedIndexes`, `duplicatedCheckConstraints`,
     `checkConstraints` (the enum `CHECK`s by name, not merged as in
-    `constraints`): introspected by the PostgreSQL adapter (`conname`; also
-    only the table visible in the search path, as the indexes); `null`
-    elsewhere.
+    `constraints`; PostgreSQL: `conname`, only the table visible in the
+    search path, as the indexes), `primaryKeyIndex` and `indexesKinds`
+    (introspected by the PostgreSQL, MySQL and SQLite adapters).
   - `SQLDialect.dropIndexOnTable` (MySQL);
     `SQLGenerator.generateDropIndexSQL` / `generateDropConstraintSQL`.
-  - Tests: per dialect, kept/dropped, the entity's values, `checkTables`
-    (warned, not an error); integration (SQLite, PostgreSQL, MySQL): the
-    duplicates introspected, and the suggested SQLs, run in each DB, drop
-    them.
+  - Tests: per dialect, kept/dropped, the primary key by any name, index
+    kinds, default names, foreign key notes, the entity's values (exactly,
+    all and others, mapped columns), `checkTables` (warned, not an error);
+    integration (SQLite, PostgreSQL, MySQL): the duplicates and the primary
+    key introspected, another kind (`DESC`) not reported, an old `CHECK`
+    not an error, and the suggested SQLs, run in each DB, drop them.
 
 ## 1.20.2
 

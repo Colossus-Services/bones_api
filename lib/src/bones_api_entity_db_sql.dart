@@ -614,16 +614,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   Map<String, TableDuplicates> get tablesDuplicates =>
       Map<String, TableDuplicates>.unmodifiable(_tablesDuplicates);
 
-  /// The duplicated indexes (over the same columns, in the same order) and
-  /// enum `CHECK` constraints (over the same column) of [scheme]: each group
-  /// with the one to keep first, and the suggested SQLs to drop the others.
+  /// The duplicated indexes (over the same columns, in the same order, of
+  /// the same kind: [TableScheme.indexesKinds]) and enum `CHECK` constraints
+  /// (over the same column) of [scheme]: each group with the one to keep
+  /// first, and the suggested SQLs to drop the others.
   ///
-  /// - The index kept: the primary key (or a SQLite constraint's index,
-  ///   `sqlite_autoindex_*`), else a unique one, else the one with the
-  ///   default name (`<table>__<columns>__idx`), else the first by name.
-  /// - The `CHECK` kept: the one with the values of [entityHandler]'s enum
-  ///   field, else the PostgreSQL default name (`<table>_<column>_check`),
-  ///   else the first by name.
+  /// - The index kept: the primary key ([TableScheme.primaryKeyIndex]; if
+  ///   unknown, by its name: `PRIMARY`, `<table>_pkey`) or a SQLite
+  ///   constraint's index (`sqlite_autoindex_*`: can't be dropped), else a
+  ///   unique one (the default name, `<table>__<columns>__unique`, first),
+  ///   else the default name (`<table>__<columns>__idx`), else the first by
+  ///   name.
+  /// - The `CHECK` kept: the one with exactly the values of
+  ///   [entityHandler]'s enum field, else one with all of them (and others),
+  ///   else a default name (PostgreSQL's `<table>_<column>_check`, or the
+  ///   `<table>_<column>__check` added by `checkTables`' suggestion), else
+  ///   the first by name.
   TableDuplicates findTableDuplicates(
     TableScheme scheme, {
     EntityHandler? entityHandler,
@@ -631,21 +637,28 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var table = scheme.name;
     var indexes = scheme.indexes ?? const <String, List<String>>{};
     var uniqueIndexes = scheme.uniqueIndexes ?? const <String>{};
+    var primaryKeyIndex = scheme.primaryKeyIndex;
+
+    bool isPrimaryKey(String name) => primaryKeyIndex != null
+        ? name == primaryKeyIndex
+        : name == 'PRIMARY' || name == '${table}_pkey';
 
     int indexRank(String name) {
       // The primary key, or a constraint's index (SQLite: can't be dropped):
-      if (name == 'PRIMARY' ||
-          name == '${table}_pkey' ||
-          name.startsWith('sqlite_autoindex_')) {
+      if (isPrimaryKey(name) || name.startsWith('sqlite_autoindex_')) {
         return 0;
       }
-      if (uniqueIndexes.contains(name)) return 1;
-      var defaultName = EntityIndex.defaultName(
-        table,
-        indexes[name] ?? const <String>[],
-        maxLength: dialect.maxIdentifierLength,
-      );
-      return name == defaultName ? 2 : 3;
+      var unique = uniqueIndexes.contains(name);
+      var isDefaultName =
+          name ==
+          EntityIndex.defaultName(
+            table,
+            indexes[name] ?? const <String>[],
+            maxLength: dialect.maxIdentifierLength,
+            unique: unique,
+          );
+      if (unique) return isDefaultName ? 1 : 2;
+      return isDefaultName ? 3 : 4;
     }
 
     var dropSQLs = <String>[];
@@ -654,7 +667,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     // `PRIMARY` key and a unique index over its column, named as it. Of the
     // generated `CREATE TABLE` itself: not reported.
     bool isSerialUniqueIndex(List<String> group, String name) {
-      if (!group.contains('PRIMARY') || !uniqueIndexes.contains(name)) {
+      if (!group.any(isPrimaryKey) ||
+          isPrimaryKey(name) ||
+          !uniqueIndexes.contains(name)) {
         return false;
       }
       var columns = indexes[name];
@@ -668,10 +683,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .toList();
       if (reported.length < 2) continue;
 
-      var names = reported.sorted((a, b) {
-        var cmp = indexRank(a).compareTo(indexRank(b));
-        return cmp != 0 ? cmp : a.compareTo(b);
-      });
+      var names = _sortedByRank(reported, indexRank);
       duplicatedIndexes.add(names);
 
       dropSQLs.add(
@@ -682,21 +694,30 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       for (var name in names.skip(1)) {
         if (name.startsWith('sqlite_autoindex_')) {
           dropSQLs.add("-- `$name`: a constraint's index: can't be dropped");
-        } else if (uniqueIndexes.contains(name) &&
-            !dialect.dropIndexOnTable &&
-            dialect.alterTableAddConstraint) {
-          // A constraint's index can only be dropped with the constraint:
-          dropSQLs.add("-- `$name` is unique (a constraint's or an index):");
-          dropSQLs.add(generateDropConstraintSQL(table, name));
-          dropSQLs.add(generateDropIndexSQL(table, name));
-        } else {
-          dropSQLs.add(generateDropIndexSQL(table, name));
+          continue;
         }
+
+        if (uniqueIndexes.contains(name)) {
+          dropSQLs.add(
+            "-- `$name` is unique: if a foreign key references it, the drop "
+            "fails (drop the foreign key first; `CASCADE` drops it too)",
+          );
+          // A constraint's index can only be dropped with the constraint:
+          if (!dialect.dropIndexOnTable && dialect.alterTableAddConstraint) {
+            dropSQLs.add(generateDropConstraintSQL(table, name));
+          }
+        }
+
+        dropSQLs.add(generateDropIndexSQL(table, name));
       }
     }
 
     var checkConstraints =
         scheme.checkConstraints ?? const <String, TableEnumConstraint>{};
+
+    var schemeToRepoMap = entityHandler == null
+        ? null
+        : _schemeToRepoFieldsMap(scheme, entityHandler);
 
     var duplicatedChecks = <String, List<String>>{};
     for (var e
@@ -706,26 +727,26 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var entityValues = entityHandler == null
           ? null
-          : _entityEnumValues(entityHandler, column);
+          : _columnEnumValues(entityHandler, column, schemeToRepoMap!);
 
-      bool matchesEntity(String name) {
+      bool hasAllValues(String name) {
         var values = checkConstraints[name]?.values;
         return entityValues != null &&
             values != null &&
-            SetEquality<String>().equals(values, entityValues);
+            values.containsAll(entityValues);
       }
 
       int checkRank(String name) {
-        if (matchesEntity(name)) return 0;
-        return name.toLowerCase() == '${table}_${column}_check'.toLowerCase()
-            ? 1
-            : 2;
+        if (hasAllValues(name)) {
+          var values = checkConstraints[name]!.values;
+          return values.length == entityValues!.length ? 0 : 1;
+        }
+        var lc = name.toLowerCase();
+        var prefix = '${table}_$column'.toLowerCase();
+        return lc == '${prefix}_check' || lc == '${prefix}__check' ? 2 : 3;
       }
 
-      var names = e.value.sorted((a, b) {
-        var cmp = checkRank(a).compareTo(checkRank(b));
-        return cmp != 0 ? cmp : a.compareTo(b);
-      });
+      var names = _sortedByRank(e.value, checkRank);
       duplicatedChecks[column] = names;
 
       dropSQLs.add(
@@ -733,7 +754,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         '${checkConstraints[names.first]?.values}:',
       );
 
-      if (entityValues != null && !matchesEntity(names.first)) {
+      if (entityValues != null && !hasAllValues(names.first)) {
         dropSQLs.add(
           "-- none has the entity's values $entityValues: review before "
           "dropping",
@@ -756,17 +777,70 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     );
   }
 
-  /// The values of the enum field of [entityHandler] mapped to [column];
-  /// `null` if it isn't an enum field.
-  Set<String>? _entityEnumValues(EntityHandler entityHandler, String column) {
-    var fieldName = entityHandler.resolveFiledName(
-      entityHandler.fieldsNames(),
-      column,
-      fieldsNamesIndexes: entityHandler.fieldsNamesIndexes(),
-      fieldsNamesLC: entityHandler.fieldsNamesLC(),
-      fieldsNamesSimple: entityHandler.fieldsNamesSimple(),
-    );
-    if (fieldName == null) return null;
+  /// [names] sorted by [rank], then by name.
+  static List<String> _sortedByRank(
+    Iterable<String> names,
+    int Function(String name) rank,
+  ) => names.sorted((a, b) {
+    var cmp = rank(a).compareTo(rank(b));
+    return cmp != 0 ? cmp : a.compareTo(b);
+  });
+
+  /// The hidden fields of [entityHandler] (`EntityField.hidden()`).
+  static List<String> _entityHiddenFields(EntityHandler entityHandler) =>
+      entityHandler
+          .fieldsNames()
+          .where((f) {
+            var annotations = entityHandler.getFieldEntityAnnotations(null, f);
+            return annotations != null &&
+                annotations.any((a) => a is EntityField && a.isHidden);
+          })
+          .toList(growable: false);
+
+  /// The table's columns of [scheme] to the (not hidden) fields of
+  /// [entityHandler] (`null`: not a field), as `checkTables` maps them.
+  static Map<String, String?> _schemeToRepoFieldsMap(
+    TableScheme scheme,
+    EntityHandler entityHandler, {
+    List<String>? hiddenFields,
+  }) {
+    hiddenFields ??= _entityHiddenFields(entityHandler);
+
+    var repoFieldsMap = entityHandler
+        .fieldsNames()
+        .whereNotIn(hiddenFields)
+        .map((f) => MapEntry(f, f))
+        .toMapFromEntries();
+
+    return scheme.getFieldsKeysInMap(scheme.fieldsNames, repoFieldsMap);
+  }
+
+  /// The values of the enum field of [entityHandler] of the table's
+  /// [column] (any case): the field mapped to it ([schemeToRepoMap], as
+  /// `checkTables` maps them), else the field resolved by name, else
+  /// [column]. `null` if it isn't an enum field.
+  static Set<String>? _columnEnumValues(
+    EntityHandler entityHandler,
+    String column,
+    Map<String, String?> schemeToRepoMap,
+  ) {
+    var columnLC = column.toLowerCase();
+    var mappedField =
+        schemeToRepoMap[column] ??
+        schemeToRepoMap.entries
+            .firstWhereOrNull((e) => e.key.toLowerCase() == columnLC)
+            ?.value;
+
+    var fieldName =
+        mappedField ??
+        entityHandler.resolveFiledName(
+          entityHandler.fieldsNames(),
+          column,
+          fieldsNamesIndexes: entityHandler.fieldsNamesIndexes(),
+          fieldsNamesLC: entityHandler.fieldsNamesLC(),
+          fieldsNamesSimple: entityHandler.fieldsNamesSimple(),
+        ) ??
+        column;
 
     var fieldType = entityHandler.getFieldType(
       null,
@@ -1081,15 +1155,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     final entityHandler = repository.entityHandler;
     var entityFields = entityHandler.fieldsNames();
 
-    var hiddenFields = entityFields
-        .map((f) {
-          var annotations = entityHandler.getFieldEntityAnnotations(null, f);
-          if (annotations == null) return null;
-          var hidden = annotations.any((a) => a is EntityField && a.isHidden);
-          return hidden ? f : null;
-        })
-        .nonNulls
-        .toList(growable: false);
+    var hiddenFields = _entityHiddenFields(entityHandler);
 
     if (hiddenFields.isNotEmpty) {
       _log.info(
@@ -1099,15 +1165,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     var repoFieldsNames = entityFields.whereNotIn(hiddenFields).toList();
 
-    var repoFieldsMap = repoFieldsNames
-        .map((f) => MapEntry(f, f))
-        .toMapFromEntries();
-
     var repoTable = getTableForEntityRepository(repository);
 
-    var schemeToRepoMap = scheme.getFieldsKeysInMap(
-      scheme.fieldsNames,
-      repoFieldsMap,
+    var schemeToRepoMap = _schemeToRepoFieldsMap(
+      scheme,
+      entityHandler,
+      hiddenFields: hiddenFields,
     );
 
     var schemesTypes = schemeToRepoMap.entries
@@ -1224,8 +1287,6 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var missingEnumValues = <String, List<String>>{};
 
     if (capability.constraintSupport) {
-      final reflectionFactory = ReflectionFactory();
-
       // REF CONSTRAINTS //
 
       var fieldEntityTypes = entityHandler
@@ -1363,40 +1424,33 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           .whereNotIn(enumConstraintsFields)
           .toSet();
 
-      var entityFieldsNamesIndexes = entityHandler.fieldsNamesIndexes();
-      var entityFieldsNames = entityHandler.fieldsNames();
-      var entityFieldsNamesLC = entityHandler.fieldsNamesLC();
-      var entityFieldsNamesSimple = entityHandler.fieldsNamesSimple();
+      // A column's enum values are missing only if no `CHECK` over it has
+      // them all: with a duplicated `CHECK` (an old one never dropped), the
+      // current one has them, and the duplicate is warned
+      // (`findTableDuplicates`).
+      var columnsWithAllValues = <String>{};
+      var columnsMissingValues = <String, List<String>>{};
 
       for (var e in enumConstraints) {
-        var fieldName =
-            entityHandler.resolveFiledName(
-              entityFieldsNames,
-              e.field,
-              fieldsNamesIndexes: entityFieldsNamesIndexes,
-              fieldsNamesLC: entityFieldsNamesLC,
-              fieldsNamesSimple: entityFieldsNamesSimple,
-            ) ??
-            e.field;
-
-        var fieldType = entityHandler.getFieldType(
-          null,
-          fieldName,
-          resolveFiledName: false,
+        var valuesNames = _columnEnumValues(
+          entityHandler,
+          e.field,
+          schemeToRepoMap,
         );
-        if (fieldType == null) continue;
-
-        var enumReflection = reflectionFactory.getRegisterEnumReflection(
-          fieldType.type,
-        );
-        if (enumReflection == null) continue;
-
-        var valuesNames = enumReflection.valuesNames;
+        if (valuesNames == null) continue;
 
         var missingValues = valuesNames.whereNotIn(e.values).toList();
 
-        if (missingValues.isNotEmpty) {
-          missingEnumValues[e.field] = missingValues;
+        if (missingValues.isEmpty) {
+          columnsWithAllValues.add(e.field);
+        } else {
+          columnsMissingValues.putIfAbsent(e.field, () => missingValues);
+        }
+      }
+
+      for (var e in columnsMissingValues.entries) {
+        if (!columnsWithAllValues.contains(e.key)) {
+          missingEnumValues[e.key] = e.value;
         }
       }
     }

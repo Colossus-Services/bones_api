@@ -295,16 +295,29 @@ class TableScheme with FieldsFromMap {
   /// over the same column aren't merged.
   final Map<String, TableEnumConstraint>? checkConstraints;
 
+  /// The name of the index of the primary key (of the [indexes]); `null` if
+  /// unknown or none.
+  final String? primaryKeyIndex;
+
+  /// How each of the [indexes] indexes its columns, by index name: an
+  /// adapter's description (e.g. the method, operator classes, order,
+  /// `INCLUDE` columns), only compared for equality. Indexes over the same
+  /// columns of different kinds (e.g. a btree and a GIN index) aren't
+  /// duplicates. `null` (or an index without one): unknown, a plain index.
+  final Map<String, String>? indexesKinds;
+
   /// The [indexes] over the same columns (in the same order, case
-  /// insensitive): each group's names sorted, the groups by their first
-  /// name. `null` if the [indexes] are unknown.
+  /// insensitive) and of the same kind ([indexesKinds]): each group's names
+  /// sorted, the groups by their first name. `null` if the [indexes] are
+  /// unknown.
   List<List<String>>? get duplicatedIndexes {
     var indexes = this.indexes;
     if (indexes == null) return null;
 
     var byColumns = <String, List<String>>{};
     for (var e in indexes.entries) {
-      var key = e.value.map((c) => c.toLowerCase()).join(',');
+      var columns = e.value.map((c) => c.toLowerCase()).join(',');
+      var key = '$columns|${indexesKinds?[e.key] ?? ''}';
       byColumns.putIfAbsent(key, () => <String>[]).add(e.key);
     }
 
@@ -378,9 +391,14 @@ class TableScheme with FieldsFromMap {
     Map<String, List<String>>? indexes,
     Iterable<String>? uniqueIndexes,
     Map<String, TableEnumConstraint>? checkConstraints,
+    this.primaryKeyIndex,
+    Map<String, String>? indexesKinds,
   }) : checkConstraints = checkConstraints == null
            ? null
            : Map<String, TableEnumConstraint>.unmodifiable(checkConstraints),
+       indexesKinds = indexesKinds == null
+           ? null
+           : Map<String, String>.unmodifiable(indexesKinds),
        indexes = indexes == null
            ? null
            : Map<String, List<String>>.unmodifiable(

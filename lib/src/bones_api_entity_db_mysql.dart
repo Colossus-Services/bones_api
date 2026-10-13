@@ -414,6 +414,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         relationshipTables: relationshipTables,
         indexes: indexes.indexes,
         uniqueIndexes: indexes.unique,
+        primaryKeyIndex: indexes.primary,
+        indexesKinds: indexes.kinds,
       );
 
       _log.info('$tableScheme');
@@ -626,7 +628,18 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   /// `PRIMARY` key). Only plain-column indexes: functional indexes (a key
   /// part without a column) and prefix indexes (a key part over a column's
   /// prefix, `Sub_part`) are ignored entirely.
-  Future<({Map<String, List<String>> indexes, Set<String> unique})>
+  ///
+  /// Also the primary key's index (`PRIMARY`) and each index's kind
+  /// (`kinds`): its type (`BTREE`, `FULLTEXT`, `SPATIAL`, `HASH`) and each
+  /// column's order (`Collation`: `A`/`D`).
+  Future<
+    ({
+      Map<String, List<String>> indexes,
+      Set<String> unique,
+      String? primary,
+      Map<String, String> kinds,
+    })
+  >
   _findIndexes(DBMySqlConnectionWrapper connection, String table) async {
     var results = await connection.query('SHOW INDEX FROM `$table`');
 
@@ -641,6 +654,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var indexes = <String, List<String>>{};
     var unique = <String>{};
+    var types = <String, String>{};
+    var orders = <String, List<String>>{};
     var ignored = <String>{};
     for (var row in rows) {
       var indexName = row['Key_name']?.toString();
@@ -656,10 +671,23 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       }
       (indexes[indexName] ??= []).add(columnName);
       if ('${row['Non_unique']}' == '0') unique.add(indexName);
+      types[indexName] = '${row['Index_type'] ?? ''}'.toUpperCase();
+      (orders[indexName] ??= []).add('${row['Collation'] ?? ''}');
     }
     ignored.forEach(indexes.remove);
     unique.removeAll(ignored);
-    return (indexes: indexes, unique: unique);
+
+    var kinds = <String, String>{
+      for (var name in indexes.keys)
+        name: '${types[name]}|${orders[name]?.join(',')}',
+    };
+
+    return (
+      indexes: indexes,
+      unique: unique,
+      primary: indexes.containsKey('PRIMARY') ? 'PRIMARY' : null,
+      kinds: kinds,
+    );
   }
 
   /// Index names are unique per table: the ones of [table] (also the

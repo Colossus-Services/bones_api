@@ -761,11 +761,14 @@ void main() {
 
   group('checkTables: duplicated indexes and CHECK constraints', () {
     TableScheme scheme({
+      String table = 'sales_day',
       Map<String, List<String>>? indexes,
       Set<String>? uniqueIndexes,
       Map<String, TableEnumConstraint>? checkConstraints,
+      String? primaryKeyIndex,
+      Map<String, String>? indexesKinds,
     }) => TableScheme(
-      'sales_day',
+      table,
       idFieldName: 'id',
       fieldsTypes: const {
         'id': int,
@@ -776,6 +779,8 @@ void main() {
       indexes: indexes,
       uniqueIndexes: uniqueIndexes,
       checkConstraints: checkConstraints,
+      primaryKeyIndex: primaryKeyIndex,
+      indexesKinds: indexesKinds,
     );
 
     _SchemeAdapter adapter(SQLDialect dialect) {
@@ -926,6 +931,166 @@ void main() {
         expect(adapter(_mysql).findTableDuplicates(onlySerial).isEmpty, isTrue);
       },
     );
+
+    test('the primary key: by primaryKeyIndex, whatever its name', () {
+      // A renamed table (`order` -> `orders`) keeps `order_pkey`:
+      var s = scheme(
+        table: 'orders',
+        indexes: {
+          'order_pkey': ['id'],
+          'a_orders_id_uq': ['id'],
+        },
+        uniqueIndexes: {'order_pkey', 'a_orders_id_uq'},
+        primaryKeyIndex: 'order_pkey',
+      );
+
+      var d = adapter(_postgres).findTableDuplicates(s);
+      expect(d.indexes, [
+        ['order_pkey', 'a_orders_id_uq'],
+      ]);
+      expect(d.dropSQLs.where((s) => s.contains('"order_pkey"')), isEmpty);
+      expect(
+        d.dropSQLs,
+        contains(
+          'ALTER TABLE "orders" DROP CONSTRAINT IF EXISTS "a_orders_id_uq" ;',
+        ),
+      );
+    });
+
+    test('index kinds: other kinds over the same columns aren\'t '
+        'duplicates', () {
+      var s = scheme(
+        indexes: {
+          'tags_btree': ['day'],
+          'tags_gin': ['day'],
+          'tags_gin_2': ['day'],
+          'day_include': ['day'],
+        },
+        indexesKinds: {
+          'tags_btree': 'btree|3',
+          'tags_gin': 'gin|3',
+          'tags_gin_2': 'gin|3',
+          'day_include': 'btree|3 4',
+        },
+      );
+
+      // Only the 2 GIN indexes (the same kind):
+      expect(s.duplicatedIndexes, [
+        ['tags_gin', 'tags_gin_2'],
+      ]);
+      expect(adapter(_postgres).findTableDuplicates(s).indexes, [
+        ['tags_gin', 'tags_gin_2'],
+      ]);
+    });
+
+    test('unique: the default name (`__unique`) kept', () {
+      var s = scheme(
+        indexes: {
+          'aa_manual_uq': ['establishment', 'day'],
+          'sales_day__establishment_day__unique': ['establishment', 'day'],
+        },
+        uniqueIndexes: {'aa_manual_uq', 'sales_day__establishment_day__unique'},
+      );
+
+      var d = adapter(_postgres).findTableDuplicates(s);
+      expect(d.indexes, [
+        ['sales_day__establishment_day__unique', 'aa_manual_uq'],
+      ]);
+    });
+
+    test('unique: a foreign key may depend on it: noted', () {
+      var s = scheme(
+        indexes: {
+          'sales_day__establishment_day__unique': ['establishment', 'day'],
+          'zz_copy_uq': ['establishment', 'day'],
+          'zz_copy_idx': ['establishment', 'day'],
+        },
+        uniqueIndexes: {'sales_day__establishment_day__unique', 'zz_copy_uq'},
+      );
+
+      var dropSQLs = adapter(_postgres).findTableDuplicates(s).dropSQLs;
+      var fkNotes = dropSQLs.where((s) => s.contains('foreign key')).toList();
+      // Only the unique one (`zz_copy_uq`), before its drop:
+      expect(fkNotes, hasLength(1));
+      expect(fkNotes.single, contains('`zz_copy_uq`'));
+      expect(
+        dropSQLs.indexOf(fkNotes.single),
+        lessThan(
+          dropSQLs.indexOf(
+            'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "zz_copy_uq" ;',
+          ),
+        ),
+      );
+    });
+
+    test('CHECKs: all the entity\'s values (and others) kept over the '
+        'default name', () {
+      RoleType$reflection.staticInstance;
+
+      var s = scheme(
+        checkConstraints: {
+          'sales_day_type_check': TableEnumConstraint('type', ['admin']),
+          'zz_type_check': TableEnumConstraint('type', [
+            'admin',
+            'guest',
+            'unknown',
+            'legacy',
+          ]),
+        },
+      );
+
+      var d = adapter(
+        _postgres,
+      ).findTableDuplicates(s, entityHandler: Role$reflection().entityHandler);
+      expect(d.checkConstraints, {
+        'type': ['zz_type_check', 'sales_day_type_check'],
+      });
+      expect(d.dropSQLs.where((s) => s.contains('review')), isEmpty);
+    });
+
+    test('CHECKs: the default names (also `__check`) kept over others', () {
+      var s = scheme(
+        checkConstraints: {
+          'aa_type': TableEnumConstraint('type', ['admin']),
+          'sales_day_type__check': TableEnumConstraint('type', [
+            'admin',
+            'guest',
+          ]),
+        },
+      );
+
+      var d = adapter(_postgres).findTableDuplicates(s);
+      expect(d.checkConstraints, {
+        'type': ['sales_day_type__check', 'aa_type'],
+      });
+    });
+
+    test('CHECKs: the column mapped to the entity\'s field, any case', () {
+      RoleType$reflection.staticInstance;
+
+      var s = TableScheme(
+        'role',
+        idFieldName: 'id',
+        fieldsTypes: const {'id': int, 'Type': String},
+        checkConstraints: {
+          'role_type_check': TableEnumConstraint('Type', ['admin']),
+          'zz_current': TableEnumConstraint('Type', [
+            'admin',
+            'guest',
+            'unknown',
+          ]),
+        },
+      );
+
+      var d = adapter(
+        _postgres,
+      ).findTableDuplicates(s, entityHandler: Role$reflection().entityHandler);
+      // The entity's values (`type`): `zz_current`, not the default name.
+      expect(d.checkConstraints.values.single, [
+        'zz_current',
+        'role_type_check',
+      ]);
+    });
 
     test('SQLite: a constraint\'s index (sqlite_autoindex) is kept', () {
       var s = scheme(

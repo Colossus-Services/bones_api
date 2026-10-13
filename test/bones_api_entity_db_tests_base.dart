@@ -1034,6 +1034,12 @@ Future<bool> runAdapterTests(
           '(${q}state$q, ${q}city$q)',
         );
 
+        // The same columns, of another kind (`DESC`): not a duplicate.
+        await testConfigSQL.runSQL(
+          'CREATE INDEX ${q}address_state_city_desc$q ON ${q}address$q '
+          '(${q}state$q DESC, ${q}city$q)',
+        );
+
         var isPostgres = sqlAdapter.dialect.name.toLowerCase().contains(
           'postgres',
         );
@@ -1058,6 +1064,26 @@ Future<bool> runAdapterTests(
             equals(['address__state_city__idx', 'address_state_city_copy']),
           ),
         );
+        expect(
+          addressScheme.duplicatedIndexes!.expand((g) => g),
+          isNot(contains('address_state_city_desc')),
+        );
+        expect(
+          addressScheme.indexes!.keys,
+          contains('address_state_city_desc'),
+        );
+
+        var isMySQL = sqlAdapter.dialect.name.toLowerCase().contains('mysql');
+
+        // The primary key's index (SQLite: the rowid, none):
+        expect(
+          addressScheme.primaryKeyIndex,
+          isPostgres
+              ? 'address_pkey'
+              : isMySQL
+              ? 'PRIMARY'
+              : isNull,
+        );
 
         var roleScheme = await sqlAdapter.getTableScheme('role');
         if (isPostgres) {
@@ -1080,12 +1106,9 @@ Future<bool> runAdapterTests(
           );
         }
 
-        // Warned, not an error (whatever else the check finds):
-        try {
-          await sqlAdapter.checkDBTables(force: true);
-        } on StateError catch (e) {
-          _log.info('checkDBTables (not about duplicates): $e');
-        }
+        // Warned, not an error: also the old `CHECK` without the enum's
+        // `unknown` (the current one has all the values).
+        expect(await sqlAdapter.checkDBTables(force: true), isTrue);
 
         var addressDuplicates = sqlAdapter.tablesDuplicates['address'];
         expect(addressDuplicates, isNotNull);
@@ -1115,11 +1138,21 @@ Future<bool> runAdapterTests(
         // TABLE`, is in the scheme's `duplicatedIndexes`, but not reported):
         expect(sqlAdapter.findTableDuplicates(addressScheme2!).isEmpty, isTrue);
         expect(addressScheme2.hasIndexOn(['state', 'city']), isTrue);
+        // The other kind wasn't dropped:
+        expect(
+          addressScheme2.indexes!.keys,
+          contains('address_state_city_desc'),
+        );
         if (isPostgres) {
           var roleScheme2 = await sqlAdapter.getTableScheme('role');
           expect(roleScheme2!.duplicatedCheckConstraints, isEmpty);
           expect(roleScheme2.checkConstraints!.keys, ['role_type_check']);
         }
+
+        await testConfigSQL.runSQL(
+          sqlAdapter.generateDropIndexSQL('address', 'address_state_city_desc'),
+        );
+        sqlAdapter.disposeTableSchemeCache('address');
       });
 
       test('EntityIndex unique: generated, introspected and checked', () async {
