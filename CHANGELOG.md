@@ -1,3 +1,36 @@
+## 1.21.0
+
+- `checkTables`: duplicated indexes and `CHECK` constraints in a table are
+  warned (never an error), with suggested SQLs to drop them:
+  - Indexes over the same columns (in the same order, any names), also a
+    plain index over the columns of a unique/primary key one. Kept: the
+    primary key (or a SQLite `sqlite_autoindex_*`), else a unique one, else
+    the default name (`<table>__<columns>__idx`), else the first by name.
+    `DROP INDEX IF EXISTS` (MySQL: `DROP INDEX ... ON table`); a unique one
+    also `ALTER TABLE ... DROP CONSTRAINT IF EXISTS` (a constraint's index).
+    MySQL `SERIAL`'s unique index (with `PRIMARY KEY`, of the generated
+    `CREATE TABLE`) isn't reported.
+  - Enum `CHECK` constraints over the same column (PostgreSQL), with the
+    same values or not (an old enum `CHECK` never dropped still restricts
+    the writes). Kept: the one with the entity's enum values, else
+    `<table>_<column>_check`, else the first by name; if none has the
+    entity's values, the suggestion says to review it.
+  - `DBSQLAdapter.tablesDuplicates` (of the last `checkDBTables`, by table)
+    and `findTableDuplicates(scheme, entityHandler:)`: `TableDuplicates`
+    (`indexes`, `checkConstraints`: each group with the one kept first;
+    `dropSQLs`).
+  - `TableScheme.duplicatedIndexes`, `duplicatedCheckConstraints` and
+    `checkConstraints` (the enum `CHECK`s by name, not merged as in
+    `constraints`): introspected by the PostgreSQL adapter (`conname`; also
+    only the table visible in the search path, as the indexes); `null`
+    elsewhere.
+  - `SQLDialect.dropIndexOnTable` (MySQL);
+    `SQLGenerator.generateDropIndexSQL` / `generateDropConstraintSQL`.
+  - Tests: per dialect, kept/dropped, the entity's values, `checkTables`
+    (warned, not an error); integration (SQLite, PostgreSQL, MySQL): the
+    duplicates introspected, and the suggested SQLs, run in each DB, drop
+    them.
+
 ## 1.20.2
 
 - CI time (the slowest job, Chrome, ~9.7 min; VM ~6 min):
@@ -89,36 +122,6 @@
   and callers, errors and retries, `checkInitialized`/`executeInitialized`,
   merged results, zones/waiter attribution, a DB-shaped graph), and the
   initialization of the real providers/adapters/repositories (integration).
-- `checkTables`: duplicated indexes and `CHECK` constraints in a table are
-  warned (never an error), with suggested SQLs to drop them:
-  - Indexes over the same columns (in the same order, any names), also a
-    plain index over the columns of a unique/primary key one. Kept: the
-    primary key (or a SQLite `sqlite_autoindex_*`), else a unique one, else
-    the default name (`<table>__<columns>__idx`), else the first by name.
-    `DROP INDEX IF EXISTS` (MySQL: `DROP INDEX ... ON table`); a unique one
-    also `ALTER TABLE ... DROP CONSTRAINT IF EXISTS` (a constraint's index).
-    MySQL `SERIAL`'s unique index (with `PRIMARY KEY`, of the generated
-    `CREATE TABLE`) isn't reported.
-  - Enum `CHECK` constraints over the same column (PostgreSQL), with the
-    same values or not (an old enum `CHECK` never dropped still restricts
-    the writes). Kept: the one with the entity's enum values, else
-    `<table>_<column>_check`, else the first by name; if none has the
-    entity's values, the suggestion says to review it.
-  - `DBSQLAdapter.tablesDuplicates` (of the last `checkDBTables`, by table)
-    and `findTableDuplicates(scheme, entityHandler:)`: `TableDuplicates`
-    (`indexes`, `checkConstraints`: each group with the one kept first;
-    `dropSQLs`).
-  - `TableScheme.duplicatedIndexes`, `duplicatedCheckConstraints` and
-    `checkConstraints` (the enum `CHECK`s by name, not merged as in
-    `constraints`): introspected by the PostgreSQL adapter (`conname`; also
-    only the table visible in the search path, as the indexes); `null`
-    elsewhere.
-  - `SQLDialect.dropIndexOnTable` (MySQL);
-    `SQLGenerator.generateDropIndexSQL` / `generateDropConstraintSQL`.
-  - Tests: per dialect, kept/dropped, the entity's values, `checkTables`
-    (warned, not an error); integration (SQLite, PostgreSQL, MySQL): the
-    duplicates introspected, and the suggested SQLs, run in each DB, drop
-    them.
 
 ## 1.19.3
 
