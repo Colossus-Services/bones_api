@@ -3443,6 +3443,36 @@ Future<bool> runAdapterTests(
         expect(await usersWithAdmin(), contains(userId));
       });
 
+      test('setRelationship: replaces the relationship', () async {
+        final userAPIRepository = entityRepositoryProvider.userAPIRepository;
+        final userRepository =
+            userAPIRepository.entityRepository
+                as DBRelationalEntityRepository<User>;
+
+        var userId = await userAPIRepository.store(
+          User(
+            'set-relationship@mail.com',
+            '123',
+            Address('SR', 'Set City', 'Set Street', 1),
+            [Role(RoleType.guest), Role(RoleType.admin)],
+          ),
+        );
+
+        var user = (await userAPIRepository.selectByID(userId))!;
+        expect(user.roles, hasLength(2));
+
+        var admin = user.roles.firstWhere((r) => r.type == RoleType.admin);
+
+        // Directly (not through `store`): only the admin role is kept.
+        expect(
+          await userRepository.setRelationship(user, 'roles', [admin]),
+          isTrue,
+        );
+
+        var user2 = (await userAPIRepository.selectByID(userId))!;
+        expect(user2.roles.map((r) => r.id), equals([admin.id]));
+      });
+
       test('selectRelationships with a repeated entity', () async {
         final userAPIRepository = entityRepositoryProvider.userAPIRepository;
         final userRepository =
@@ -3542,12 +3572,16 @@ Future<bool> runAdapterTests(
             ),
           ),
         );
-        // The address, plus a `DELETE` of the links of each of its 2 (empty)
-        // list fields; the 2 roles; the user, its 2 role links, and a
-        // `DELETE` of links to other roles. The 3 `DELETE`s can't match
-        // anything for a new entity.
+        // The address, the 2 roles, the user and its 2 role links. Without
+        // `generatedIDsHaveNoRelationships`, also a `DELETE` of the other
+        // links of each list field: 2 of the address (empty fields) and 1 of
+        // the user.
         expect(userId, isNotNull);
-        expect(insertCount, equals(9), reason: 'insert');
+        expect(
+          insertCount,
+          equals(sqlAdapter.generatedIDsHaveNoRelationships ? 6 : 9),
+          reason: 'insert',
+        );
 
         await userAPIRepository.store(
           User(

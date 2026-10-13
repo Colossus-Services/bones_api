@@ -73,6 +73,11 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   final String? _password;
   final PasswordProvider? _passwordProvider;
 
+  /// `true`: generated IDs come from `AUTO_INCREMENT`, never reused (its
+  /// counter is persisted since MySQL 8.0).
+  @override
+  bool get generatedIDsHaveNoRelationships => true;
+
   DBMySQLAdapter(
     this.databaseName,
     this.username, {

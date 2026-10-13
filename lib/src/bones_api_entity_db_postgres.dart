@@ -90,6 +90,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   final bool readsOutsideTransaction;
 
+  /// `true`: generated IDs come from a sequence (`SERIAL`/`IDENTITY`), never
+  /// reused.
+  @override
+  bool get generatedIDsHaveNoRelationships => true;
+
   DBPostgreSQLAdapter(
     this.databaseName,
     this.username, {
