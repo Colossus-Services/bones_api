@@ -219,6 +219,20 @@ void main() {
       expect(t2.username, equals('bar'));
       expect(t2.token, equals('TKy'));
       expect(t2.refreshToken, equals('RTKy'));
+      // No `duration`: the default one.
+      expect(t2.duration, equals(Duration(hours: 3)));
+
+      // `toJson`/`fromJson` round trip keeps the `duration`:
+      var t1 = APIToken(
+        'foo',
+        token: 'TKj',
+        issueTime: DateTime.utc(2020, 1, 2, 3, 4, 5),
+        duration: Duration(minutes: 90),
+      );
+      var t1b = APIToken.fromJson(t1.toJson());
+      expect(t1b.duration, equals(Duration(minutes: 90)));
+      expect(t1b.issueTime, equals(t1.issueTime));
+      expect(t1b.expireTime, equals(t1.expireTime));
 
       expect(
         () => APIToken.fromCredential(APICredential('foo')),

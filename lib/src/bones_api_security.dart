@@ -459,7 +459,7 @@ abstract class APISecurity {
 
   void autoValidateAllTokens() {
     var now = DateTime.now();
-    var elapsedTime = _autoValidateAllTokensLastTime.difference(now);
+    var elapsedTime = now.difference(_autoValidateAllTokensLastTime);
 
     if (elapsedTime.inMinutes < 5) return;
     _autoValidateAllTokensLastTime = now;

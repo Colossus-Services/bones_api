@@ -418,6 +418,20 @@ void main() {
     test('isAuthenticated', () {
       var r = APIRequest.get('/a');
       expect(r.isAuthenticated, isFalse);
+
+      r.authentication = APIAuthentication(
+        APIToken('foo', duration: Duration(hours: 1)),
+      );
+      expect(r.isAuthenticated, isTrue);
+
+      r.authentication = APIAuthentication(
+        APIToken(
+          'foo',
+          issueTime: DateTime.now().subtract(Duration(hours: 2)),
+          duration: Duration(hours: 1),
+        ),
+      );
+      expect(r.isAuthenticated, isFalse);
     });
 
     test('elapsedTime', () {

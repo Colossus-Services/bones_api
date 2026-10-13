@@ -48,7 +48,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.21.1';
+  static const String VERSION = '1.21.2';
 
   static bool _boot = false;
 
@@ -1632,7 +1632,7 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Returns `true` if this request is authenticated and the token is not expired.
   bool get isAuthenticated =>
-      authentication != null && authentication!.isExpired();
+      authentication != null && !authentication!.isExpired();
 
   final String? scheme;
 

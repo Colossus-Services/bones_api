@@ -1,3 +1,13 @@
+## 1.21.2
+
+- Fix: `APIRequest.isAuthenticated` was `true` only when the token was
+  expired (it is now `true` only when it isn't).
+- Fix: `APISecurity.autoValidateAllTokens` never ran (the elapsed time was
+  computed backwards, always ≤ 0): the expired tokens are now validated
+  (removed) at most every 5 minutes, as intended.
+- Fix: `APIToken.fromJson` parsed the `duration` from `issueTime`; it now
+  reads `duration` (seconds), defaulting to 3 hours when absent.
+
 ## 1.21.1
 
 - Tests: line coverage raised from 70.3% to 95.1% (VM suite, including the

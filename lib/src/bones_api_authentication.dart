@@ -526,7 +526,9 @@ class APIToken implements Comparable<APIToken> {
     json['username'],
     token: json['token'],
     issueTime: TypeParser.parseDateTime(json['issueTime']),
-    duration: Duration(seconds: TypeParser.parseInt(json['issueTime'], 0)!),
+    duration: json['duration'] != null
+        ? Duration(seconds: TypeParser.parseInt(json['duration'], 0)!)
+        : null,
     refreshToken: json['refreshToken'],
   );
 
