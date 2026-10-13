@@ -1,3 +1,20 @@
+## 1.19.2
+
+- `EntityRepositoryProvider` / `DBAdapter`: one generic lookup,
+  `EntityRepositoryProvider.lookupEntityRepository` (replacing
+  `traverseLookup`): the own repositories, then the parent provider, the
+  known providers (several candidates resolved) and the global provider.
+  `getEntityRepository` / `getEntityRepositoryByType` only say how to search
+  locally and how to ask another provider.
+  - No static state: the providers already asked are passed down the lookup
+    (`traversed`, a new optional named parameter, internal), so a lookup
+    started inside another one (e.g. by a provider's initialization) is
+    independent of it.
+  - A hit in the provider's own repositories allocates nothing.
+- Tests: the providers asked per lookup counted (not timed), a hit not going
+  past the own repositories, a nested lookup, a self lookup while
+  initializing.
+
 ## 1.19.1
 
 - `EntityRepositoryProvider` / `DBAdapter`: an `EntityRepository` lookup
