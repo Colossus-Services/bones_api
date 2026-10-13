@@ -837,6 +837,78 @@ void _runObjectAdapterTests(
       expect(user2.roles.map((r) => r.type), equals([RoleType.unknown]));
     });
 
+    test('store: insert, multiple and partial updates', () async {
+      var storeRepo = provider.repo<Store>();
+
+      // The stored entry (not an instance tracked/cached by the repository),
+      // its data fields:
+      Future<Map<String, dynamic>?> stored(int id) async {
+        var op = TransactionOperationSelect(
+          storeRepo.name,
+          false,
+          adapter,
+          ConditionID(id),
+        );
+        var entry = await storeRepo.repositoryAdapter
+            .doSelectByID<Map<String, dynamic>>(op, id);
+        if (entry == null) return null;
+        return {
+          for (var k in ['id', 'name', 'number'])
+            if (entry.containsKey(k)) k: entry[k],
+        };
+      }
+
+      // Insert:
+      var s = Store('st1', 10, id: 851);
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1', 'number': 10}),
+      );
+
+      // A partial update (only `name` changed): `number` kept.
+      s.name = 'st1b';
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1b', 'number': 10}),
+      );
+
+      // Another partial update (only `number`): `name` kept.
+      s.number = 11;
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1b', 'number': 11}),
+      );
+
+      // Both fields:
+      s.name = 'st1c';
+      s.number = 12;
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1c', 'number': 12}),
+      );
+
+      // Unchanged:
+      expect(await storeRepo.store(s), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1c', 'number': 12}),
+      );
+
+      // Another instance with the same ID (an updated copy):
+      var copy = Store('st1d', 13, id: 851);
+      expect(await storeRepo.store(copy), equals(851));
+      expect(
+        await stored(851),
+        equals({'id': 851, 'name': 'st1d', 'number': 13}),
+      );
+
+      expect(await storeRepo.count(matcher: ConditionID(851)), equals(1));
+    });
+
     test('onStore (DBEntityRepository)', () async {
       var storeRepo = provider.repo<Store>();
 

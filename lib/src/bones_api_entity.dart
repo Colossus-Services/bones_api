@@ -8048,9 +8048,23 @@ abstract class IterableEntityRepository<O extends Object>
       var oId = getID(o, entityHandler: entityHandler);
 
       if (oId == null) {
+        // An insert:
         oId = nextID();
         setID(o, oId, entityHandler: entityHandler);
         put(o);
+      } else {
+        // An update (or an insert with a defined ID):
+        var stored = iterable().firstWhereOrNull(
+          (e) => getID(e, entityHandler: entityHandler) == oId,
+        );
+
+        if (stored == null) {
+          put(o);
+        } else if (!identical(stored, o)) {
+          // Another instance (e.g. an updated copy): replaces the stored one.
+          remove(stored);
+          put(o);
+        }
       }
 
       op.finish(oId);
@@ -8481,8 +8495,11 @@ class SetEntityRepository<O extends Object>
   @override
   Iterable<O> iterable() => _entries;
 
+  // The greatest `int` ID put (an ID is never reused, also after a remove).
+  int _lastID = 0;
+
   @override
-  int nextID() => _entries.length + 1;
+  int nextID() => _lastID + 1;
 
   @override
   int length({Transaction? transaction}) => _entries.length;
@@ -8490,6 +8507,11 @@ class SetEntityRepository<O extends Object>
   @override
   void put(O o) {
     _entries.add(o);
+
+    var id = entityHandler.getID(o);
+    if (id is int && id > _lastID) {
+      _lastID = id;
+    }
   }
 
   @override

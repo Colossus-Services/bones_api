@@ -70,6 +70,7 @@ class CovUniq extends CovEntity {
   Map<String, TypeInfo> get types => {
     'id': TypeInfo.tInt,
     'code': TypeInfo.tString,
+    'name': TypeInfo.tString,
   };
 
   @override
@@ -600,12 +601,105 @@ void main() {
       });
 
       test('another instance with the same ID (a copy)', () async {
-        var o = CovUniq({'code': 'r3'});
+        var o = CovUniq({'code': 'r3', 'name': 'n3'});
         var id = await uniqRepo.store(o);
 
-        var copy = CovUniq({'id': id, 'code': 'r3'});
+        // The same unique value, another field changed:
+        var copy = CovUniq({'id': id, 'code': 'r3', 'name': 'n3b'});
         expect(await uniqRepo.store(copy), equals(id));
         expect(await uniqRepo.count(), equals(1));
+
+        // The copy replaces the stored entity:
+        var stored = uniqRepo.selectByID(id)!;
+        expect(stored, same(copy));
+        expect(stored.values['name'], equals('n3b'));
+
+        // A copy with a new unique value: the previous one is free again.
+        var copy2 = CovUniq({'id': id, 'code': 'r3c', 'name': 'n3c'});
+        expect(await uniqRepo.store(copy2), equals(id));
+        expect(uniqRepo.selectByID(id)!.values['code'], equals('r3c'));
+        await uniqRepo.store(CovUniq({'code': 'r3'}));
+        expect(await uniqRepo.count(), equals(2));
+      });
+
+      test('insert, multiple and partial updates', () async {
+        // Insert:
+        var o = CovUniq({'code': 'p1', 'name': 'n1'});
+        var id = await uniqRepo.store(o);
+        expect(id, isNotNull);
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p1',
+          'name': 'n1',
+        });
+
+        // A partial update (only `name`): the unique `code` kept (not a
+        // conflict with itself).
+        o.values['name'] = 'n2';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p1',
+          'name': 'n2',
+        });
+
+        // A partial update (only the unique `code`):
+        o.values['code'] = 'p2';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p2',
+          'name': 'n2',
+        });
+
+        // Both, and then unchanged (multiple updates):
+        o.values['code'] = 'p3';
+        o.values['name'] = 'n3';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.store(o), equals(id));
+        expect(uniqRepo.selectByID(id)!.values, {
+          'id': id,
+          'code': 'p3',
+          'name': 'n3',
+        });
+
+        expect(await uniqRepo.count(), equals(1));
+
+        // The previous unique values are free:
+        await uniqRepo.store(CovUniq({'code': 'p1'}));
+        await uniqRepo.store(CovUniq({'code': 'p2'}));
+        expect(await uniqRepo.count(), equals(3));
+      });
+
+      test('an insert with a defined ID', () async {
+        var o = CovUniq({'id': 70, 'code': 'i1'});
+        expect(await uniqRepo.store(o), equals(70));
+        expect(await uniqRepo.count(), equals(1));
+        expect(uniqRepo.selectByID(70), same(o));
+
+        // The next IDs after it:
+        var id2 = await uniqRepo.store(CovUniq({'code': 'i2'}));
+        expect(id2, equals(71));
+
+        // A conflict with it:
+        expect(
+          () => uniqRepo.store(CovUniq({'id': 72, 'code': 'i1'})),
+          throwsA(isA<EntityFieldInvalid>()),
+        );
+        expect(uniqRepo.selectByID(72), isNull);
+      });
+
+      test('IDs are not reused (after a delete)', () async {
+        var id1 = await uniqRepo.store(CovUniq({'code': 'd1'}));
+        var id2 = await uniqRepo.store(CovUniq({'code': 'd2'}));
+        await uniqRepo.deleteByID(id1);
+
+        var id3 = await uniqRepo.store(CovUniq({'code': 'd3'}));
+        expect(id3, isNot(equals(id2)));
+        expect(id3, isNot(equals(id1)));
+        expect(await uniqRepo.count(), equals(2));
+        expect(uniqRepo.selectByID(id2)!.values['code'], equals('d2'));
+        expect(uniqRepo.selectByID(id3)!.values['code'], equals('d3'));
       });
 
       test('the value of another entity: still an error', () async {

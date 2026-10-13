@@ -765,11 +765,15 @@ class DBObjectMemoryAdapter
 
     var map = _getTableMap(table, true)!;
 
-    var entry = _normalizeEntityJSON(
+    var changes = _normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
+
+    // A partial update (only the changed `fields`): merged into the stored
+    // entry (if any: an auto-insert).
+    var entry = <String, dynamic>{...?map[id], ...changes};
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;

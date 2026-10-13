@@ -140,6 +140,89 @@ void main() {
         await sub.cancel();
       });
 
+      test(
+        'unique field (`email`): insert, multiple and partial updates',
+        () async {
+          var repo = provider.userAPIRepository;
+
+          var user = User(
+            'uq@cov.com',
+            'pw1',
+            Address('TX', 'Austin', 'Main', 3),
+            // No new `Role` (the other tests count them):
+            [],
+            level: 1,
+            creationTime: DateTime.utc(2022, 1, 1),
+          );
+
+          // Insert:
+          var id = await repo.store(user);
+
+          Future<User> selectStored() async {
+            var u = (await repo.selectByID(id))!;
+            expect(u, isNot(same(user)));
+            return u;
+          }
+
+          expect((await selectStored()).email, equals('uq@cov.com'));
+
+          // A partial update (not the unique field): not a conflict with
+          // itself.
+          user.level = 2;
+          expect(await repo.store(user), equals(id));
+          var u1 = await selectStored();
+          expect(u1.level, equals(2));
+          expect(u1.email, equals('uq@cov.com'));
+          expect(u1.password, equals('pw1'));
+
+          // A partial update (the unique field):
+          user.email = 'uq2@cov.com';
+          expect(await repo.store(user), equals(id));
+          var u2 = await selectStored();
+          expect(u2.email, equals('uq2@cov.com'));
+          expect(u2.level, equals(2));
+
+          // Multiple updates (unchanged and changed):
+          expect(await repo.store(user), equals(id));
+          user.password = 'pw2';
+          expect(await repo.store(user), equals(id));
+          var u3 = await selectStored();
+          expect(u3.password, equals('pw2'));
+          expect(u3.email, equals('uq2@cov.com'));
+          expect(u3.level, equals(2));
+
+          // The email of another user: a conflict.
+          user.email = 'joe@cov.com';
+          await expectLater(
+            () async => await repo.store(user),
+            throwsA(
+              isA<EntityFieldInvalid>()
+                  .having((e) => e.reason, 'reason', 'unique')
+                  .having((e) => e.fieldName, 'fieldName', 'email'),
+            ),
+          );
+          expect((await selectStored()).email, equals('uq2@cov.com'));
+
+          // A new user with an email in use: a conflict.
+          await expectLater(
+            () async => await repo.store(
+              User('uq2@cov.com', 'x', Address('A', 'B', 'C', 4), []),
+            ),
+            throwsA(isA<EntityFieldInvalid>()),
+          );
+
+          // The previous email is free again:
+          var other = User('uq@cov.com', 'x', Address('A', 'B', 'C', 5), []);
+          var otherId = await repo.store(other);
+          expect(otherId, isNot(equals(id)));
+
+          // Cleanup (the other tests count the users):
+          user.email = 'uq2@cov.com';
+          await repo.deleteByID(otherId);
+          await repo.deleteByID(id);
+        },
+      );
+
       test('countByQuery / selectIDsBy / existIDs', () async {
         var repo = provider.userAPIRepository;
 

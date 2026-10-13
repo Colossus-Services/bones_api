@@ -722,11 +722,15 @@ class DBObjectDirectoryAdapter
       '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
     );
 
-    var entry = _normalizeEntityJSON(
+    var changes = _normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
+
+    // A partial update (only the changed `fields`): merged into the stored
+    // object (if any: an auto-insert).
+    var entry = <String, dynamic>{...?_readObjectSync(table, id), ...changes};
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
@@ -734,6 +738,14 @@ class DBObjectDirectoryAdapter
     _saveObject(table, id, entry);
 
     return id;
+  }
+
+  /// Reads synchronously (as [_saveObject] writes).
+  Map<String, dynamic>? _readObjectSync(String table, Object? id) {
+    var file = _resolveObjectFile(table, id);
+    if (!file.existsSync()) return null;
+    var enc = file.readAsStringSync();
+    return dart_convert.json.decode(enc) as Map<String, dynamic>;
   }
 
   /// Writes synchronously, and must stay synchronous.

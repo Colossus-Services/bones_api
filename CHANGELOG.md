@@ -110,6 +110,16 @@
   an entity with a unique field (`@EntityField.unique()`) threw
   `EntityFieldInvalid(unique)` against itself: the unique values are now
   checked against the other entities (not the same instance or ID).
+- Fix: `SetEntityRepository` (`IterableEntityRepository.store`): an entity
+  with an ID (an update, or an insert with a defined ID) was only "stored"
+  if it was the same instance already stored: an entity with a new ID wasn't
+  stored, and another instance with the same ID (an updated copy) didn't
+  replace the stored one. `SetEntityRepository.nextID` (`length + 1`) could
+  reuse an ID after a remove: now the greatest ID + 1.
+- Fix: `DBObjectMemoryAdapter`/`DBObjectDirectoryAdapter`/`DBObjectGCSAdapter`:
+  a partial update (`store` of a tracked entity: only its changed fields)
+  replaced the stored object with only those fields (the others lost): now
+  merged into the stored object.
 - Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
   - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
     `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.

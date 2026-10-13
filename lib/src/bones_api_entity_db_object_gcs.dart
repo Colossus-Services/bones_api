@@ -792,11 +792,15 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
       '[transaction:${op.transactionId}] doUpdate> UPDATE INTO $table OBJECT `$id`',
     );
 
-    var entry = _normalizeEntityJSON(
+    var changes = _normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
+
+    // A partial update (only the changed `fields`): merged into the stored
+    // object (if any: an auto-insert).
+    var entry = <String, dynamic>{...?await _readObject(table, id), ...changes};
 
     var idField = _getTableIDFieldName(table);
     entry[idField] = id;
