@@ -106,6 +106,10 @@
 - Fix: `DBAdapter.instantiateAdaptor` ignored an `async` instantiator
   (returning a `Future<A?>`, as declared by `DBAdapterInstantiator`), and
   didn't skip an async `null`.
+- Fix: `IterableEntityRepository` (e.g. `SetEntityRepository`): re-storing
+  an entity with a unique field (`@EntityField.unique()`) threw
+  `EntityFieldInvalid(unique)` against itself: the unique values are now
+  checked against the other entities (not the same instance or ID).
 - Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
   - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
     `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.

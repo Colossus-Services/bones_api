@@ -8079,7 +8079,7 @@ abstract class IterableEntityRepository<O extends Object>
       var value = getField(o, field);
       if (value == null) continue;
 
-      if (_containsEntryWithFieldValue(field, value)) {
+      if (_containsOtherEntryWithFieldValue(o, field, value)) {
         throw EntityFieldInvalid(
           "unique",
           value,
@@ -8091,11 +8091,19 @@ abstract class IterableEntityRepository<O extends Object>
     }
   }
 
-  bool _containsEntryWithFieldValue(String field, value) =>
-      iterable().any((elem) {
-        var elemValue = getField(elem, field);
-        return elemValue == value;
-      });
+  /// Whether an entry other than [o] (not the same instance, nor with the
+  /// same ID: a re-stored entity) has the [field] [value].
+  bool _containsOtherEntryWithFieldValue(O o, String field, Object value) {
+    var id = entityHandler.getID(o);
+
+    return iterable().any((elem) {
+      if (identical(elem, o)) return false;
+      if (id != null && entityHandler.getID(elem) == id) return false;
+
+      var elemValue = getField(elem, field);
+      return elemValue == value;
+    });
+  }
 
   @override
   FutureOr<List<dynamic>> storeAll(Iterable<O> os, {Transaction? transaction}) {

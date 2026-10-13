@@ -572,13 +572,9 @@ void main() {
       expect(await uniqRepo.count(), equals(3));
     });
 
-    group('unique field: re-storing (32)', () {
-      // TODO: remove when fixed: the entity itself is also checked.
-      const skip32 =
-          'lib bug: `IterableEntityRepository.checkEntityFields` checks the '
-          'unique fields against all the stored entities, including the one '
-          'being re-stored (an `EntityFieldInvalid(unique)` with itself)';
-
+    // The unique fields are checked against the other entities (not the
+    // one being re-stored, the same instance or ID):
+    group('unique field: re-storing', () {
       setUp(() async {
         for (var o in (await uniqRepo.selectAll()).toList()) {
           await uniqRepo.deleteEntity(o);
@@ -591,7 +587,7 @@ void main() {
 
         expect(await uniqRepo.store(o), equals(id));
         expect(await uniqRepo.count(), equals(1));
-      }, skip: skip32);
+      });
 
       test('the same instance, with a new unique value', () async {
         var o = CovUniq({'code': 'r2'});
@@ -601,7 +597,7 @@ void main() {
         expect(await uniqRepo.store(o), equals(id));
         expect(await uniqRepo.count(), equals(1));
         expect(uniqRepo.selectByID(id)!.values['code'], 'r2b');
-      }, skip: skip32);
+      });
 
       test('another instance with the same ID (a copy)', () async {
         var o = CovUniq({'code': 'r3'});
@@ -610,7 +606,7 @@ void main() {
         var copy = CovUniq({'id': id, 'code': 'r3'});
         expect(await uniqRepo.store(copy), equals(id));
         expect(await uniqRepo.count(), equals(1));
-      }, skip: skip32);
+      });
 
       test('the value of another entity: still an error', () async {
         await uniqRepo.store(CovUniq({'code': 'r4'}));
