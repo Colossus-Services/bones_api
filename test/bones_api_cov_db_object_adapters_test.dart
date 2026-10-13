@@ -6,11 +6,13 @@ import 'dart:typed_data';
 
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_directory.dart';
+import 'package:bones_api/bones_api_db_gcp.dart';
 import 'package:bones_api/src/bones_api_entity_db_object.dart';
 import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
+import 'bones_api_test_fake_gcs.dart';
 
 typedef _AdapterCreator =
     DBAdapter Function(EntityRepositoryProvider parentRepositoryProvider);
@@ -84,6 +86,49 @@ Future<void> main() async {
     tearDown: () {
       try {
         tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    },
+  );
+
+  // `DBObjectGCSAdapter`, with an in-memory fake of the GCS JSON API:
+  _runObjectAdapterTests(
+    'DBObjectGCSAdapter',
+    () {
+      var gcs = FakeGCS('cov-shared');
+      return (p) => DBObjectGCSAdapter(
+        gcs.client,
+        'cov-project',
+        gcs.bucket,
+        parentRepositoryProvider: p,
+      );
+    },
+    rollbackOnAbort: false,
+    jsonOnly: true,
+  );
+
+  // With a local cache of the objects:
+  late Directory gcsCacheDir;
+
+  _runObjectAdapterTests(
+    'DBObjectGCSAdapter (cache)',
+    () {
+      gcsCacheDir = Directory.systemTemp.createTempSync('bones_api_cov_gcs_');
+      var gcs = FakeGCS('cov-shared-cache');
+      return (p) => DBObjectGCSAdapter(
+        gcs.client,
+        'cov-project',
+        gcs.bucket,
+        cacheDirectory: gcsCacheDir,
+        cacheLimit: 1024 * 1024,
+        cacheFilesLimit: 1000,
+        parentRepositoryProvider: p,
+      );
+    },
+    rollbackOnAbort: false,
+    jsonOnly: true,
+    tearDown: () {
+      try {
+        gcsCacheDir.deleteSync(recursive: true);
       } catch (_) {}
     },
   );
@@ -585,7 +630,8 @@ void _runObjectAdapterTests(
       await provider.repo<UserInfo>().store(UserInfo('i', id: 6001));
 
       var info = adapter.information(extended: true);
-      expect(info['tables'], isNotNull);
+      // The tables (memory, directory), or the bucket (GCS):
+      expect(info['tables'] ?? info['bucket'], isNotNull);
 
       var repoInfo = provider.repo<UserInfo>().information(extended: true);
       expect(repoInfo['dialect'], equals('object'));

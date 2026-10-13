@@ -4,164 +4,30 @@
 library;
 
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_entity_db_object_gcs.dart';
-import 'package:crclib/catalog.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:statistics/statistics.dart' show Decimal;
 import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
-
-/// An in-memory fake of the Google Cloud Storage JSON API (the requests of
-/// `package:gcloud`), for a [DBObjectGCSAdapter].
-class _FakeGCS {
-  final String bucket;
-
-  _FakeGCS(this.bucket);
-
-  /// The stored objects, by name.
-  final Map<String, Uint8List> objects = {};
-
-  /// The object names whose media read fails (a 5xx response).
-  final Set<String> failingReads = {};
-
-  final List<String> requests = [];
-
-  late final MockClient client = MockClient(_handle);
-
-  Future<http.Response> _handle(http.Request request) async {
-    var url = request.url;
-    requests.add('${request.method} ${url.path}?${url.query}');
-
-    var path = url.path;
-    var objectsPrefix = '/storage/v1/b/$bucket/o';
-    var downloadPrefix = '/download$objectsPrefix';
-    var uploadPrefix = '/upload$objectsPrefix';
-
-    if (request.method == 'POST' && path == uploadPrefix) {
-      return _upload(request);
-    }
-
-    if (path.startsWith(downloadPrefix) || path.startsWith(objectsPrefix)) {
-      var rest = path.startsWith(downloadPrefix)
-          ? path.substring(downloadPrefix.length)
-          : path.substring(objectsPrefix.length);
-
-      if (rest.isEmpty || rest == '/') {
-        return _list(url.queryParameters['prefix'] ?? '');
-      }
-
-      var name = Uri.decodeComponent(rest.substring(1));
-
-      if (request.method == 'DELETE') {
-        var removed = objects.remove(name);
-        return removed == null ? _notFound() : http.Response('', 204);
-      }
-
-      var media =
-          url.queryParameters['alt'] == 'media' ||
-          path.startsWith(downloadPrefix);
-
-      if (media && failingReads.contains(name)) {
-        return _json({
-          'error': {'code': 503, 'message': 'Service Unavailable'},
-        }, status: 503);
-      }
-
-      var data = objects[name];
-      if (data == null) return _notFound();
-
-      return media
-          ? http.Response.bytes(
-              data,
-              200,
-              headers: {
-                'content-type': 'application/json',
-                'content-length': '${data.length}',
-              },
-            )
-          : _json(_objectInfo(name, data));
-    }
-
-    return http.Response('Unexpected request: ${request.url}', 400);
-  }
-
-  http.Response _upload(http.Request request) {
-    var contentType = request.headers['content-type'] ?? '';
-    var boundary = RegExp(
-      r'boundary="?([^";]+)"?',
-    ).firstMatch(contentType)![1]!;
-
-    var body = latin1.decode(request.bodyBytes);
-    var parts = body
-        .split('--$boundary')
-        .map((p) => p.trim())
-        .where((p) => p.isNotEmpty && p != '--')
-        .toList();
-
-    String partBody(String part) {
-      var idx = part.indexOf('\r\n\r\n');
-      return part.substring(idx + 4).trim();
-    }
-
-    var metadata = json.decode(partBody(parts[0])) as Map<String, dynamic>;
-    var name = metadata['name'] as String;
-
-    var mediaPart = parts[1];
-    var mediaBody = partBody(mediaPart);
-    var bytes = mediaPart.toLowerCase().contains('base64')
-        ? base64.decode(mediaBody.replaceAll(RegExp(r'\s'), ''))
-        : latin1.encode(mediaBody);
-
-    objects[name] = Uint8List.fromList(bytes);
-
-    return _json(_objectInfo(name, objects[name]!));
-  }
-
-  http.Response _list(String prefix) => _json({
-    'kind': 'storage#objects',
-    'items': [
-      for (var e in objects.entries)
-        if (e.key.startsWith(prefix)) _objectInfo(e.key, e.value),
-    ],
-  });
-
-  Map<String, dynamic> _objectInfo(String name, Uint8List data) {
-    var crc = Crc32C().convert(data).toBigInt().toInt();
-    var crcBytes = Uint8List(4)..buffer.asByteData().setUint32(0, crc);
-    return {
-      'kind': 'storage#object',
-      'bucket': bucket,
-      'name': name,
-      'size': '${data.length}',
-      'crc32c': base64.encode(crcBytes),
-      'md5Hash': base64.encode(Uint8List(16)),
-      'contentType': 'application/json',
-      'generation': '1',
-      'metageneration': '1',
-      'updated': DateTime.utc(2020).toIso8601String(),
-    };
-  }
-
-  http.Response _notFound() => _json({
-    'error': {'code': 404, 'message': 'Not Found'},
-  }, status: 404);
-
-  http.Response _json(Object o, {int status = 200}) => http.Response(
-    json.encode(o),
-    status,
-    headers: {'content-type': 'application/json'},
-  );
-}
+import 'bones_api_test_fake_gcs.dart';
 
 class _GCSProvider extends DBEntityRepositoryProvider<DBObjectGCSAdapter> {
-  final _FakeGCS gcs;
+  final FakeGCS gcs;
+  final Directory? cacheDirectory;
+  final bool cacheDevelopment;
+  final int? cacheLimit;
+  final int? cacheFilesLimit;
 
-  _GCSProvider(this.gcs);
+  _GCSProvider(
+    this.gcs, {
+    this.cacheDirectory,
+    this.cacheDevelopment = false,
+    this.cacheLimit,
+    this.cacheFilesLimit,
+  });
 
   @override
   Map<String, dynamic> get adapterConfig => {};
@@ -171,6 +37,10 @@ class _GCSProvider extends DBEntityRepositoryProvider<DBObjectGCSAdapter> {
     gcs.client,
     'cov-project',
     gcs.bucket,
+    cacheDirectory: cacheDirectory,
+    cacheDevelopment: cacheDevelopment,
+    cacheLimit: cacheLimit,
+    cacheFilesLimit: cacheFilesLimit,
     parentRepositoryProvider: this,
   );
 
@@ -195,11 +65,11 @@ class _GCSProvider extends DBEntityRepositoryProvider<DBObjectGCSAdapter> {
 
 void main() {
   group('DBObjectGCSAdapter (fake GCS)', () {
-    late _FakeGCS gcs;
+    late FakeGCS gcs;
     late _GCSProvider provider;
 
     setUp(() async {
-      gcs = _FakeGCS('cov-bucket');
+      gcs = FakeGCS('cov-bucket');
       provider = _GCSProvider(gcs);
       await provider.ensureInitialized();
     });
@@ -323,6 +193,134 @@ void main() {
       expect(del?.name, equals('d1'));
       expect(gcs.objects.containsKey('store/904.json'), isFalse);
       expect(await storeRepo.deleteByID(904), isNull);
+    });
+  });
+
+  group('DBObjectGCSAdapter cache', () {
+    late Directory tmpDir;
+
+    setUp(() => tmpDir = Directory.systemTemp.createTempSync('bones_api_gcs_'));
+    tearDown(() {
+      if (tmpDir.existsSync()) tmpDir.deleteSync(recursive: true);
+    });
+
+    List<File> cacheFiles(Directory dir) => dir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.json'))
+        .toList();
+
+    test('cacheDevelopment: the cache directory auto-created', () async {
+      var gcs = FakeGCS('cov-dev');
+      var cacheDir = Directory('${tmpDir.path}/not-yet/cache');
+      expect(cacheDir.existsSync(), isFalse);
+
+      var provider = _GCSProvider(
+        gcs,
+        cacheDirectory: cacheDir,
+        cacheDevelopment: true,
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      expect(await provider.storeRepo.store(Store('c1', 1, id: 1)), 1);
+
+      // Created, and the object cached in it:
+      expect(cacheDir.existsSync(), isTrue);
+      expect(cacheFiles(cacheDir), hasLength(1));
+
+      // Read from the cache (not the bucket):
+      gcs.failingReads.add('store/1.json');
+      expect((await provider.storeRepo.selectByID(1))!.name, equals('c1'));
+    });
+
+    test('the files limit: the oldest cached files removed', () async {
+      var gcs = FakeGCS('cov-limit');
+
+      var provider = _GCSProvider(
+        gcs,
+        cacheDirectory: tmpDir,
+        cacheFilesLimit: 3,
+        cacheLimit: 1024 * 1024,
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      for (var i = 1; i <= 8; ++i) {
+        expect(await provider.storeRepo.store(Store('s$i', i, id: i)), i);
+      }
+
+      // The limit check is asynchronous (on a store): wait for it.
+      for (var i = 0; i < 50 && cacheFiles(tmpDir).length > 3; ++i) {
+        await Future.delayed(Duration(milliseconds: 20));
+      }
+      expect(cacheFiles(tmpDir).length, lessThanOrEqualTo(3));
+
+      // All in the bucket, and readable (also the ones not cached):
+      expect(gcs.objects.length, equals(8));
+      for (var i = 1; i <= 8; ++i) {
+        expect((await provider.storeRepo.selectByID(i))!.name, equals('s$i'));
+      }
+    });
+  });
+
+  group('DBObjectGCSAdapter.fromConfig', () {
+    Future<Object?> fromConfigError(Map<String, dynamic> config) async {
+      try {
+        await DBObjectGCSAdapter.fromConfig(config);
+        return null;
+      } catch (e) {
+        return e;
+      }
+    }
+
+    test('required: credential, project and bucket', () async {
+      expect(
+        '${await fromConfigError({})}',
+        contains('Config without `credential`'),
+      );
+      expect(
+        '${await fromConfigError({'credential': {}})}',
+        contains('Config without `project`'),
+      );
+      expect(
+        '${await fromConfigError({'credential': {}, 'project': 'p'})}',
+        contains('Config without `bucket`'),
+      );
+    });
+
+    test('cache and populate options (an invalid credential)', () async {
+      // The options are parsed before the client is created: an invalid
+      // credential (not a service account) fails without network access.
+      for (var limit in ['2k', '3m', '1g', '100', '0', 'x']) {
+        var error = await fromConfigError({
+          'credential': {'type': 'not_a_service_account'},
+          'project': 'p',
+          'bucket': 'b',
+          'cache': {
+            'path': '/tmp/bones_api_gcs_config_test',
+            'limit': limit,
+            'filesLimit': '10',
+            'development': true,
+          },
+          'populate': {
+            'generateTables': true,
+            'tables': [],
+            'source': null,
+            'variables': {},
+          },
+        });
+        expect(error, isNotNull, reason: limit);
+        expect(error, isNot(isA<StateError>()), reason: limit);
+      }
+
+      var error = await fromConfigError({
+        'credential': {'type': 'not_a_service_account'},
+        'project': 'p',
+        'bucket': 'b',
+        'cache': {'files-limit': '0', 'limit': ''},
+      });
+      expect(error, isNotNull);
     });
   });
 }

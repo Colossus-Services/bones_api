@@ -159,7 +159,12 @@
   stored object is kept). A select still handles a read error as not found.
 - Tests: `DBObjectGCSAdapter` (with an in-memory fake of the GCS JSON API):
   insert, partial updates, updated copies, read errors, enum/`Decimal`
-  fields and deletes.
+  fields, deletes, the local cache (limits, `cacheDevelopment`) and
+  `fromConfig`; also the shared object adapters tests (without and with a
+  cache).
+- Fix: `DBObjectGCSAdapter` stored an `EntityReferenceList` field as the
+  object itself (wrapped in a `List`), not its IDs (as fixed for the memory
+  and directory adapters).
 - Fix: `checkTables` (MySQL) suggested SQLs that MySQL can't run:
   - `ADD COLUMN IF NOT EXISTS` (a syntax error, also in the latest MySQL):
     `SQLDialect.alterTableAddColumnIfNotExists` is `false` for MySQL.
