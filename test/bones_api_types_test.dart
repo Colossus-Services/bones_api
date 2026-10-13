@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 
@@ -298,36 +300,33 @@ void main() {
       );
     });
 
-    test('(all combinations 32-bits)', () async {
-      for (var h = 0; h <= 23; ++h) {
-        for (var m = 0; m <= 59; ++m) {
-          for (var s = 0; s <= 59; ++s) {
-            for (var ms = 0; ms <= 999; ++ms) {
-              expect(
-                Time.fromBytes(Time(h, m, s, ms).toBytes32()),
-                equals(Time(h, m, s, ms)),
-              );
-            }
-          }
-        }
-      }
+    test('(all combinations 32-bits)', () {
+      _expectAllTimesRoundTrip((t) => t.toBytes32());
     });
 
-    test('(all combinations 64-bits)', () async {
-      for (var h = 0; h <= 23; ++h) {
-        for (var m = 0; m <= 59; ++m) {
-          for (var s = 0; s <= 59; ++s) {
-            for (var ms = 0; ms <= 999; ++ms) {
-              expect(
-                Time.fromBytes(Time(h, m, s, ms).toBytes64()),
-                equals(Time(h, m, s, ms)),
-              );
-            }
+    test('(all combinations 64-bits)', () {
+      _expectAllTimesRoundTrip((t) => t.toBytes64());
+    });
+  });
+}
+
+/// Every [Time] (to the millisecond: 86.4M) encoded by [toBytes] decodes to
+/// itself. Compared directly (an `expect` per time is most of the cost,
+/// especially compiled to JS); `expect` only on the first mismatch.
+void _expectAllTimesRoundTrip(Uint8List Function(Time t) toBytes) {
+  for (var h = 0; h <= 23; ++h) {
+    for (var m = 0; m <= 59; ++m) {
+      for (var s = 0; s <= 59; ++s) {
+        for (var ms = 0; ms <= 999; ++ms) {
+          var t = Time(h, m, s, ms);
+          var decoded = Time.fromBytes(toBytes(t));
+          if (decoded != t) {
+            expect(decoded, equals(t));
           }
         }
       }
-    });
-  });
+    }
+  }
 }
 
 void _testTimeLessThan(Time t1, Time t2, bool expectEquals) {

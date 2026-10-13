@@ -35,8 +35,32 @@ jobs:
       - name: dart pub publish --dry-run
         run: dart pub publish --dry-run
 
+  # The VM tests in parallel jobs: the Docker DB tests (the slowest, each
+  # with its container) apart from the rest, which runs 4 files at a time
+  # (`dart_test.yaml` has `concurrency: 1` for local runs with the DBs).
+  # Each job uploads its coverage (merged by Codecov: see `codecov.yml`).
+  #
+  # The PostgreSQL/MySQL files run directly (a tag filter loads every test
+  # file, and the DB files start Docker work while loading). The `docker`
+  # job: the other files' `docker` tests (e.g. `bones_api_test_utils_test`).
   test_vm:
+    name: test_vm (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: unit
+            args: -x docker -j 4
+          - suite: postgres
+            args: test/bones_api_enitity_db_postgres_test.dart
+          - suite: mysql
+            args: test/bones_api_entity_db_mysql_test.dart
+          - suite: docker
+            args: >-
+              -t docker
+              $(grep -lE "'docker'" test/*_test.dart
+              | grep -vE 'db_postgres_test|db_mysql_test')
     steps:
       - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1.7.2
@@ -48,8 +72,8 @@ jobs:
         run: dart pub get
       - name: Upgrade dependencies
         run: dart pub upgrade
-      - name: Run tests (VM) +coverage
-        run: dart test --coverage=./coverage --platform vm
+      - name: Run tests (VM, ${{ matrix.suite }}) +coverage
+        run: dart test --coverage=./coverage --platform vm ${{ matrix.args }}
       - name: Generate coverage report
         run: |
           dart pub global activate coverage
@@ -67,8 +91,17 @@ jobs:
           verbose: true
 
 
+  # The Chrome tests split by test file across parallel jobs (each file is
+  # compiled to JS, most of the time). In a job, one file at a time: in
+  # parallel, Chrome times out loading suites. (Not `--total-shards`: it
+  # splits the tests of every file, so each job would compile all of them.)
   test_chrome:
+    name: test_chrome (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1.7.2
@@ -80,5 +113,10 @@ jobs:
         run: dart pub get
       - name: Upgrade dependencies
         run: dart pub upgrade
-      - name: Run tests (Chrome)
-        run: dart test --platform chrome
+      - name: Run tests (Chrome, shard ${{ matrix.shard }}/3)
+        run: |
+          # The test files that run on Chrome (not `@TestOn('vm')`), every
+          # 3rd one from this shard's index:
+          files=$(grep -L "@TestOn('vm')" test/*_test.dart | sort | awk 'NR % 3 == ${{ matrix.shard }}')
+          echo "$files"
+          dart test --platform chrome $files
