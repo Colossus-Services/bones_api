@@ -714,7 +714,16 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     var fieldsTypes = this.fieldsTypes(o);
 
-    var resolved = fields.entries.forEachAsync((e) {
+    // The values are resolved in the fields order, written straight into the
+    // result (no intermediate entries or maps): a value that resolves
+    // asynchronously is kept as a `Future` and awaited with the others at
+    // the end (all of them started first, as before). Without one, the
+    // result is returned synchronously.
+    final resolved = <String, Object?>{};
+    List<String>? futureKeys;
+    List<Future<Object?>>? futures;
+
+    for (var e in fields.entries) {
       var f = e.key;
       var v = e.value;
       var t = fieldsTypes[f];
@@ -762,12 +771,24 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         }
       }
 
-      return MapEntry(f, v2);
-    });
+      if (v2 is Future) {
+        (futureKeys ??= <String>[]).add(f);
+        (futures ??= <Future<Object?>>[]).add(v2);
+        resolved[f] = null; // Keeps the key in the fields order.
+      } else {
+        resolved[f] = v2;
+      }
+    }
 
-    return resolved.resolveMapped(
-      (l) => l.toMapFromEntries().resolveAllValuesNullable(),
-    );
+    if (futures == null) return resolved;
+
+    final keys = futureKeys!;
+    return Future.wait<Object?>(futures).then((values) {
+      for (var i = 0; i < keys.length; ++i) {
+        resolved[keys[i]] = values[i];
+      }
+      return resolved;
+    });
   }
 
   FutureOr<Object?> resolveFieldValue(
@@ -789,6 +810,58 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     resolutionRules: resolutionRules,
   );
 
+  _FieldsMapLayout? _fieldsMapLayout;
+
+  /// The same as [getFieldsValuesFromMap] (the values of [fieldsNames] in
+  /// [map], by a case insensitive key match), but the key of each field is
+  /// resolved once per layout of [map] (its keys, in order) and reused while
+  /// the maps have the same keys: e.g. the rows of a select.
+  Map<String, Object?> _getFieldsValuesFromMapByLayout(
+    List<String> fieldsNames,
+    Map<String, Object?> map,
+    List<String>? returnMapUsedKeys,
+  ) {
+    var layout = _fieldsMapLayout;
+    if (layout == null || !layout.matches(fieldsNames, map)) {
+      var mapLC = <String, String>{};
+      var mapSimple = <String, String>{};
+      var fieldsNamesIndexes = this.fieldsNamesIndexes();
+      var fieldsNamesLC = this.fieldsNamesLC();
+      var fieldsNamesSimple = this.fieldsNamesSimple();
+
+      var keys = List<String?>.generate(fieldsNames.length, (i) {
+        var f = fieldsNames[i];
+        var idx = fieldsNamesIndexes[f]!;
+        return getFieldKeyInMap(
+          f,
+          map,
+          fieldLC: fieldsNamesLC[idx],
+          fieldSimple: fieldsNamesSimple[idx],
+          mapLC: mapLC,
+          mapSimple: mapSimple,
+        );
+      }, growable: false);
+
+      layout = _fieldsMapLayout = _FieldsMapLayout(
+        fieldsNames,
+        map.keys.toList(growable: false),
+        keys,
+      );
+    }
+
+    var values = <String, Object?>{};
+    var keys = layout.keysByField;
+
+    for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      if (key == null) continue;
+      returnMapUsedKeys?.add(key);
+      values[fieldsNames[i]] = map[key];
+    }
+
+    return values;
+  }
+
   FutureOr<Map<String, Object?>> resolveFieldsNamesAndValues(
     Map<String, dynamic> fields, {
     EntityProvider? entityProvider,
@@ -800,13 +873,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   }) {
     var fieldsNames = this.fieldsNames();
 
-    var fieldsValues = getFieldsValuesFromMap(
+    var fieldsValues = _getFieldsValuesFromMapByLayout(
       fieldsNames,
       fields,
-      fieldsNamesIndexes: fieldsNamesIndexes(),
-      fieldsNamesLC: fieldsNamesLC(),
-      fieldsNamesSimple: fieldsNamesSimple(),
-      returnMapUsedKeys: returnFieldsUsedKeys,
+      returnFieldsUsedKeys,
     );
 
     return resolveFieldsValues(
@@ -875,6 +945,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     } else if (type.equalsType(_typeInfoTime)) {
       return Time.from(value) as T?;
     } else if (type.equalsType(_typeInfoDateTime)) {
+      if (value is String) {
+        var dateTime = parseDateTimeISOUTCFast(value);
+        if (dateTime != null) return dateTime as T?;
+      }
       return TypeParser.parseDateTime(value) as T?;
     } else if (type.equalsType(_typeInfoDecimal)) {
       return Decimal.from(value) as T?;
@@ -883,10 +957,14 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
 
     {
-      var valueType = TypeInfo.from(value);
-      if (type.equalsTypeOrEntityType(valueType) && value is T) {
-        var tType = TypeInfo.fromType(T);
-        if (!tType.isAnyType && type.equalsType(tType) && !type.hasArguments) {
+      // A [value] already of the requested type [T] (a specific one, equal
+      // to [type]) is returned as is. The conditions that don't depend on
+      // [value] are checked first: they're usually false (e.g. a field
+      // resolved as `Object?`), and `TypeInfo.from(value)` is not cheap.
+      var tType = TypeInfo.fromType(T);
+      if (!tType.isAnyType && !type.hasArguments && type.equalsType(tType)) {
+        var valueType = TypeInfo.from(value);
+        if (type.equalsTypeOrEntityType(valueType) && value is T) {
           return value as T;
         }
       }
@@ -3344,6 +3422,86 @@ int compareEntityIDs(Object? id1, Object? id2) {
   }
 
   return 0;
+}
+
+/// Parses the ISO-8601 UTC format of `DateTime.toUtc().toIso8601String()`
+/// (how `DBSQLiteAdapter` stores a `DateTime`), without a regular
+/// expression: `YYYY-MM-DD(T| )HH:MM:SS[.f]Z`, with 1 to 6 fraction digits.
+///
+/// Returns the same as `DateTime.parse` (a UTC `DateTime`) for that format,
+/// or `null` for anything else (to be parsed the usual way).
+DateTime? parseDateTimeISOUTCFast(String s) {
+  final n = s.length;
+  // `YYYY-MM-DDTHH:MM:SSZ` (20) to `YYYY-MM-DDTHH:MM:SS.ffffffZ` (27):
+  if (n < 20 || n > 27 || s.codeUnitAt(n - 1) != 0x5A /* Z */ ) return null;
+
+  int digits(int start, int length) {
+    var v = 0;
+    for (var i = start; i < start + length; ++i) {
+      var d = s.codeUnitAt(i) - 0x30;
+      if (d < 0 || d > 9) return -1;
+      v = v * 10 + d;
+    }
+    return v;
+  }
+
+  if (s.codeUnitAt(4) != 0x2D /* - */ || s.codeUnitAt(7) != 0x2D) return null;
+  final sep = s.codeUnitAt(10);
+  if (sep != 0x54 /* T */ && sep != 0x20 /* space */ ) return null;
+  if (s.codeUnitAt(13) != 0x3A /* : */ || s.codeUnitAt(16) != 0x3A) {
+    return null;
+  }
+
+  final year = digits(0, 4);
+  final month = digits(5, 2);
+  final day = digits(8, 2);
+  final hour = digits(11, 2);
+  final minute = digits(14, 2);
+  final second = digits(17, 2);
+  if (year < 0 || month < 0 || day < 0 || hour < 0 || minute < 0) return null;
+  if (second < 0) return null;
+
+  var microsecond = 0;
+  if (n > 20) {
+    // `.` and 1 to 6 digits before the `Z`:
+    if (s.codeUnitAt(19) != 0x2E /* . */ || n < 22) return null;
+    final count = n - 21;
+    var fraction = digits(20, count);
+    if (fraction < 0) return null;
+    for (var i = count; i < 6; ++i) {
+      fraction *= 10;
+    }
+    microsecond = fraction;
+  }
+
+  return DateTime.utc(year, month, day, hour, minute, second, 0, microsecond);
+}
+
+/// The key of each field of [fieldsNames] in the maps with [mapKeys] (in
+/// that order): see `EntityHandler._getFieldsValuesFromMapByLayout`.
+class _FieldsMapLayout {
+  final List<String> fieldsNames;
+  final List<String> mapKeys;
+
+  /// The map key of each field (aligned with [fieldsNames]), or `null`.
+  final List<String?> keysByField;
+
+  _FieldsMapLayout(this.fieldsNames, this.mapKeys, this.keysByField);
+
+  /// Whether [map] has the same keys, in the same order (the key matching
+  /// depends on the order when two keys match a field the same way).
+  bool matches(List<String> fieldsNames, Map<String, Object?> map) {
+    if (!identical(this.fieldsNames, fieldsNames)) return false;
+
+    var mapKeys = this.mapKeys;
+    if (map.length != mapKeys.length) return false;
+
+    var i = 0;
+    for (var k in map.keys) {
+      if (k != mapKeys[i++]) return false;
+    }
+    return true;
+  }
 }
 
 /// Resolves the effective `offset` of a `select*` operation from a 1-based
