@@ -897,23 +897,41 @@ void main() {
       expect(EntityHandler.equalsValuesBasic(ref, 1), isTrue);
       expect(EntityHandler.equalsValuesBasic(1, ref), isTrue);
 
-      // Non-entity objects without resolvable IDs: both IDs are `null`, so
-      // they are considered equal (by ID):
-      expect(EntityHandler.equalsValuesBasic(Uri(), Uri(path: 'x')), isTrue);
+      // Non-entity objects without resolvable IDs: not equal (a `null` ID
+      // doesn't match another `null` ID), unless `==`:
+      expect(EntityHandler.equalsValuesBasic(Uri(), Uri(path: 'x')), isFalse);
       expect(
         EntityHandler.equalsValuesBasic(
           Uri(),
           Uri(path: 'x'),
           entityHandler: covIntHandler,
         ),
+        isFalse,
+      );
+      expect(
+        EntityHandler.equalsValuesBasic(Uri(path: 'x'), Uri(path: 'x')),
         isTrue,
       );
+
+      // Entities without an ID (not stored): not equal, unless the same
+      // instance:
+      var n1 = CovInt({'name': 'a'});
+      var n2 = CovInt({'name': 'b'});
+      expect(EntityHandler.equalsValuesBasic(n1, n2), isFalse);
+      expect(EntityHandler.equalsValuesBasic(n1, n1), isTrue);
+      // An entity without an ID is not equal to one with an ID:
+      expect(EntityHandler.equalsValuesBasic(n1, a1), isFalse);
+      expect(EntityHandler.equalsValuesBasic(a1, n1), isFalse);
     });
 
     test('equalsValuesEntityMap / getEntityIDFrom', () {
       expect(EntityHandler.equalsValuesEntityMap({'id': 1}, {'id': 1}), isTrue);
       expect(EntityHandler.equalsValuesEntityMap({'id': 1}, 1), isTrue);
       expect(EntityHandler.equalsValuesEntityMap('a', {'ID': 'a'}), isTrue);
+      // No IDs (`null`): not equal.
+      expect(EntityHandler.equalsValuesEntityMap({'id': 1}, Uri()), isFalse);
+      expect(EntityHandler.equalsValuesEntityMap(Uri(), Uri()), isFalse);
+      expect(EntityHandler.equalsValuesEntityMap({'x': 1}, Uri()), isFalse);
 
       expect(EntityHandler.getEntityIDFrom(1), equals(1));
       expect(EntityHandler.getEntityIDFrom({'Id': 2}), equals(2));

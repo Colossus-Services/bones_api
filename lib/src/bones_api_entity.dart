@@ -2211,23 +2211,27 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       if (entityHandler2 != null) {
         if (entityHandler1 != entityHandler2) return false;
         var id2 = entityHandler2.getID(value2);
-        return id1 == id2;
+        return _equalsIDs(id1, id2);
       } else {
         var id2 = entityHandler1.resolveID(value2);
-        return id1 == id2;
+        return _equalsIDs(id1, id2);
       }
     } else if (entityHandler2 != null) {
       var id1 = entityHandler2.resolveID(value1);
       var id2 = entityHandler2.getID(value2);
-      return id1 == id2;
+      return _equalsIDs(id1, id2);
     } else if (entityHandler != null) {
       var id1 = entityHandler.resolveID(value1);
       var id2 = entityHandler.resolveID(value2);
-      return id1 == id2;
+      return _equalsIDs(id1, id2);
     }
 
     return equalsValuesEntityMap(value1, value2, entityHandler: entityHandler);
   }
+
+  /// Equals by ID: a `null` ID (no ID, or not resolved) is never equal (the
+  /// values were not `==` already). See [equalsValuesEntity].
+  static bool _equalsIDs(Object? id1, Object? id2) => id1 != null && id1 == id2;
 
   static bool equalsValuesEntityMap(
     Object value1,
@@ -2241,7 +2245,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     var id1 = getEntityIDFrom(value1, entityHandler: entityHandler);
     var id2 = getEntityIDFrom(value2, entityHandler: entityHandler);
 
-    return id1 == id2;
+    return _equalsIDs(id1, id2);
   }
 
   static Object? getEntityIDFrom(Object o, {EntityHandler? entityHandler}) {

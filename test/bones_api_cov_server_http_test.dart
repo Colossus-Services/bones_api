@@ -354,6 +354,22 @@ void main() {
       expect(res.status, equals(200));
       expect(res.headers.value('x-access-token'), equals('TK123'));
 
+      // Sent by the client (request `Authorization`): not sent back.
+      var res1 = await _request(
+        '${apiServer.url}cov/auth',
+        headers: {'authorization': 'Bearer TK123'},
+      );
+      expect(res1.status, equals(200));
+      expect(res1.headers['x-access-token'], isNull);
+
+      // Another token in the request `Authorization`: sent.
+      var res1b = await _request(
+        '${apiServer.url}cov/auth',
+        headers: {'authorization': 'Bearer OTHER'},
+      );
+      expect(res1b.status, equals(200));
+      expect(res1b.headers.value('x-access-token'), equals('TK123'));
+
       // Already set by the route: not duplicated.
       var res2 = await _request('${apiServer.url}cov/auth?preset=true');
       expect(res2.status, equals(200));

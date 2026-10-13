@@ -572,6 +572,63 @@ void main() {
       expect(await uniqRepo.count(), equals(3));
     });
 
+    group('unique field: re-storing (32)', () {
+      // TODO: remove when fixed: the entity itself is also checked.
+      const skip32 =
+          'lib bug: `IterableEntityRepository.checkEntityFields` checks the '
+          'unique fields against all the stored entities, including the one '
+          'being re-stored (an `EntityFieldInvalid(unique)` with itself)';
+
+      setUp(() async {
+        for (var o in (await uniqRepo.selectAll()).toList()) {
+          await uniqRepo.deleteEntity(o);
+        }
+      });
+
+      test('the same instance, unchanged', () async {
+        var o = CovUniq({'code': 'r1'});
+        var id = await uniqRepo.store(o);
+
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+      }, skip: skip32);
+
+      test('the same instance, with a new unique value', () async {
+        var o = CovUniq({'code': 'r2'});
+        var id = await uniqRepo.store(o);
+
+        o.values['code'] = 'r2b';
+        expect(await uniqRepo.store(o), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+        expect(uniqRepo.selectByID(id)!.values['code'], 'r2b');
+      }, skip: skip32);
+
+      test('another instance with the same ID (a copy)', () async {
+        var o = CovUniq({'code': 'r3'});
+        var id = await uniqRepo.store(o);
+
+        var copy = CovUniq({'id': id, 'code': 'r3'});
+        expect(await uniqRepo.store(copy), equals(id));
+        expect(await uniqRepo.count(), equals(1));
+      }, skip: skip32);
+
+      test('the value of another entity: still an error', () async {
+        await uniqRepo.store(CovUniq({'code': 'r4'}));
+        var o = CovUniq({'code': 'r5'});
+        await uniqRepo.store(o);
+
+        o.values['code'] = 'r4';
+        expect(
+          () => uniqRepo.store(o),
+          throwsA(
+            isA<EntityFieldInvalid>()
+                .having((e) => e.reason, 'reason', 'unique')
+                .having((e) => e.fieldName, 'fieldName', 'code'),
+          ),
+        );
+      });
+    });
+
     test('relationships', () async {
       var c1 = CovItem({'name': 'c1'});
       var c2 = CovItem({'name': 'c2'});

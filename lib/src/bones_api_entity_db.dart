@@ -272,7 +272,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
       );
     }
 
-    var asyncInstantiators = <Future<A>>[];
+    // A `DBAdapterInstantiator` returns a `FutureOr<A?>`: an `async` one, a
+    // `Future<A?>` (a `Future<A>` is also a `Future<A?>`).
+    var asyncInstantiators = <Future<A?>>[];
 
     for (var e in instantiators) {
       var f = e.key;
@@ -290,7 +292,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         continue;
       } else if (ret is A) {
         return ret;
-      } else if (ret is Future<A>) {
+      } else if (ret is Future<A?>) {
         asyncInstantiators.add(ret);
       }
     }
@@ -299,9 +301,11 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
         instantiators.map((e) => e.key).toList();
 
     if (asyncInstantiators.isNotEmpty) {
-      return asyncInstantiators.resolveAll().then((l) {
-        for (var e in l) {
-          return e;
+      return Future.wait(asyncInstantiators).then((l) {
+        // The first instantiated (an async instantiator can return `null`):
+        var adapter = l.nonNulls.firstOrNull;
+        if (adapter != null) {
+          return adapter;
         }
 
         var fs = functions();

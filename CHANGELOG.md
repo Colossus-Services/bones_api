@@ -94,6 +94,18 @@
 - Fix: `APIDBModule`: `select`, `insert`, `update` and `delete` without a
   table (e.g. `/db/select`) threw a `RangeError` (an error response), now
   `notFound`.
+- Fix: `EntityHandler.equalsValuesBasic`/`equalsValuesEntity`/
+  `equalsValuesEntityMap`: values without an ID (or a resolvable one) were
+  equal (`null == null`), e.g. two unrelated non-entity objects, or two
+  entities not stored yet: a `null` ID now never matches (as
+  `EntityHandler.equalsValues`).
+- Fix: `APIServer` always sent the `X-Access-Token` header back, also when
+  the client sent the token (the `Authorization` header was checked in the
+  response headers, not in the request's).
+- Fix: `APIAuthentication.isExpired(now:)` ignored `now`.
+- Fix: `DBAdapter.instantiateAdaptor` ignored an `async` instantiator
+  (returning a `Future<A?>`, as declared by `DBAdapterInstantiator`), and
+  didn't skip an async `null`.
 - `APIDBModule.select`: paginated by default:
   - `defaultSelectLimit` (default: `1000`): the `LIMIT` of a request
     without one (`LIMIT=<n>` in the URL query: a custom one; `LIMIT=0`: no

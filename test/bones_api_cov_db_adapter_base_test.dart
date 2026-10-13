@@ -229,6 +229,56 @@ void main() {
       adapter.close();
     });
 
+    test('instantiateAdaptor: async instantiators (`Future<A?>`)', () async {
+      // `async`: returns a `Future<DBAdapter<Object>?>` (not a
+      // `Future<DBAdapter<Object>>`).
+      Future<DBAdapter<Object>?> asyncInstantiator(
+        Map<String, dynamic> config, {
+        int? minConnections,
+        int? maxConnections,
+        EntityRepositoryProvider? parentRepositoryProvider,
+        String? workingPath,
+      }) async => DBObjectMemoryAdapter();
+
+      Future<DBAdapter<Object>?> asyncNullInstantiator(
+        Map<String, dynamic> config, {
+        int? minConnections,
+        int? maxConnections,
+        EntityRepositoryProvider? parentRepositoryProvider,
+        String? workingPath,
+      }) async => null;
+
+      var adapter =
+          await DBAdapter.instantiateAdaptor<Object, DBAdapter<Object>>([
+            MapEntry(asyncInstantiator, {}),
+          ], {});
+      expect(adapter, isA<DBObjectMemoryAdapter>());
+      adapter.close();
+
+      // An async `null` is skipped:
+      var adapter2 =
+          await DBAdapter.instantiateAdaptor<Object, DBAdapter<Object>>([
+            MapEntry(asyncNullInstantiator, {}),
+            MapEntry(asyncInstantiator, {}),
+          ], {});
+      expect(adapter2, isA<DBObjectMemoryAdapter>());
+      adapter2.close();
+
+      // Only async `null`s: an error.
+      await expectLater(
+        DBAdapter.instantiateAdaptor<Object, DBAdapter<Object>>([
+          MapEntry(asyncNullInstantiator, {}),
+        ], {}),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains("Can't async instantiate"),
+          ),
+        ),
+      );
+    });
+
     test('DBRelationalAdapter.fromConfig', () async {
       var adapter = await DBRelationalAdapter.fromConfig({'sql.memory': {}});
       expect(adapter, isA<DBSQLMemoryAdapter>());

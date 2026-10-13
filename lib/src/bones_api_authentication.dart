@@ -292,7 +292,7 @@ class APIAuthentication {
   APICredential get credential =>
       _credential ?? APICredential(username, token: tokenKey);
 
-  bool isExpired({DateTime? now}) => token.isExpired();
+  bool isExpired({DateTime? now}) => token.isExpired(now: now);
 
   List<APIPermission> enabledPermissions({DateTime? now}) {
     now ??= DateTime.now();

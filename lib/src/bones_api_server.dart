@@ -3576,7 +3576,7 @@ final class APIServerWorker extends _APIServerBase {
       var tokenKey = authentication.tokenKey;
 
       if (authentication.resumed ||
-          _needToSendHeaderXAccessToken(headers, tokenKey)) {
+          _needToSendHeaderXAccessToken(apiRequest, headers, tokenKey)) {
         headers.setMultiValue('X-Access-Token', tokenKey, ignoreCase: true);
       }
     }
@@ -3611,12 +3611,17 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   bool _needToSendHeaderXAccessToken(
+    APIRequest apiRequest,
     Map<String, Object> headers,
     String tokenKey,
   ) {
-    var headerAuthorization = headers.getFirstValue('authorization');
+    // The client already has the token: sent in the request's
+    // `Authorization` header.
+    var headerAuthorization = apiRequest.getHeader('authorization');
     var notSentByAuthentication =
         headerAuthorization == null || !headerAuthorization.contains(tokenKey);
+
+    // Already in the response headers (e.g. set by the route):
 
     var headerAccessToken = headers.getMultiValue(
       'x-access-token',

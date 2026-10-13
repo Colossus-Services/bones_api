@@ -169,6 +169,12 @@ void main() {
       expect(auth.tokenKey, equals('TKabc'));
       expect(auth.isExpired(), isTrue);
 
+      // `isExpired(now:)`: the token issued at 2020-01-01 00:00 for 1h.
+      expect(auth.isExpired(now: DateTime(2020, 1, 1, 0, 30)), isFalse);
+      expect(auth.isExpired(now: DateTime(2020, 1, 1, 1, 0)), isFalse);
+      expect(auth.isExpired(now: DateTime(2020, 1, 1, 1, 0, 1)), isTrue);
+      expect(auth.isExpired(now: DateTime(2019, 12, 31)), isFalse);
+
       var cred = auth.credential;
       expect(cred.username, equals('foo'));
       expect(cred.token, equals('TKabc'));
