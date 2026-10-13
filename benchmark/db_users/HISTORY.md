@@ -25,48 +25,140 @@ its date's column here too.
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 25303 | 25688 (+1.5%) |
-| `user/byEmail` | 1407 | 1526 (+8.5%) |
-| `user/byState (join, limit 20)` | 1409 | 1454 (+3.2%) |
-| `user/list (page of 20)` | 682 | 690 (+1.2%) |
-| `user/count` | 193802 | 153540 (-20.8%) |
-| `authenticate (login)` | 1393 | 1426 (+2.4%) |
-| `user/register` | 2623 | 2611 (-0.5%) |
-| `user/update` | 1881 | 1944 (+3.3%) |
-| `user/remove` | 19969 | 21245 (+6.4%) |
+| `user/byId` | 25303 | 25288 (-0.1%) |
+| `user/byEmail` | 1407 | 1533 (+9.0%) |
+| `user/byState (join, limit 20)` | 1409 | 1469 (+4.3%) |
+| `user/list (page of 20)` | 682 | 693 (+1.6%) |
+| `user/count` | 193802 | 195230 (+0.7%) |
+| `authenticate (login)` | 1393 | 1459 (+4.7%) |
+| `user/register` | 2623 | 3438 † |
+| `user/update` | 1881 | 4928 † |
+| `user/remove` | 19969 | 11401 † |
 
 ### `sqlite`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
 | `user/byId` | 17138 | 17403 (+1.5%) |
-| `user/byEmail` | 16580 | 16535 (-0.3%) |
-| `user/byState (join, limit 20)` | 2326 | 2348 (+0.9%) |
-| `user/list (page of 20)` | 2405 | 2419 (+0.6%) |
-| `user/count` | 121903 | 122422 (+0.4%) |
-| `authenticate (login)` | 14764 | 14835 (+0.5%) |
-| `user/register` | 7727 | 7690 (-0.5%) |
-| `user/update` | 10302 | 10282 (-0.2%) |
-| `user/remove` | 13036 | 13250 (+1.6%) |
+| `user/byEmail` | 16580 | 16611 (+0.2%) |
+| `user/byState (join, limit 20)` | 2326 | 2456 (+5.6%) |
+| `user/list (page of 20)` | 2405 | 2517 (+4.7%) |
+| `user/count` | 121903 | 122401 (+0.4%) |
+| `authenticate (login)` | 14764 | 14983 (+1.5%) |
+| `user/register` | 7727 | 7168 (-7.2%) |
+| `user/update` | 10302 | 10363 (+0.6%) |
+| `user/remove` | 13036 | 12300 (-5.6%) |
 
 ### `postgres`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 1453 | 1461 (+0.6%) |
-| `user/byEmail` | 1518 | 1521 (+0.2%) |
-| `user/byState (join, limit 20)` | 537 | 403 (-25.0%) |
-| `user/list (page of 20)` | 490 | 302 (-38.4%) |
-| `user/count` | 6167 | 6199 (+0.5%) |
-| `authenticate (login)` | 1474 | 1482 (+0.5%) |
-| `user/register` | 611 | 592 (-3.1%) |
-| `user/update` | 713 | 713 (0.0%) |
-| `user/remove` | 803 | 882 (+9.8%) |
+| `user/byId` | 1453 | 1575 (+8.4%) |
+| `user/byEmail` | 1518 | 1528 (+0.7%) |
+| `user/byState (join, limit 20)` | 537 | 571 (+6.3%) |
+| `user/list (page of 20)` | 490 | 477 (-2.7%) |
+| `user/count` | 6167 | 6060 (-1.7%) |
+| `authenticate (login)` | 1474 | 1490 (+1.1%) |
+| `user/register` | 611 | 589 (-3.6%) |
+| `user/update` | 713 | 761 (+6.7%) |
+| `user/remove` | 803 | 843 (+5.0%) |
 
-PostgreSQL runs in Docker Desktop, where `byState` and `list` vary a lot
-between runs of the same code (see the entries' notes); the 2026-10-13 dip
-is that variance, not a regression. `memory`'s `count` (~5 us per call)
-also varies between runs.
+2026-10-13 shows its last runs: the baseline at `afe1fd5`, the median of 5
+rounds per operation (`--repeat 5`; see its entries). PostgreSQL runs in
+Docker Desktop, where `byState` and `list` vary a lot between runs of the
+same code (see the entries' notes): compare medians of several rounds.
+
+† Not comparable with earlier dates: the users that `register` inserted
+used to stay, so the tables grew during a run (by thousands of users with
+`--repeat`), and `update` and `remove` ran on that bigger table. Since
+`afe1fd5` they're removed after each round: every round, and the
+operations after it, run on the seeded 1000 users. The memory adapter
+scans tables, so its numbers depend the most on the table size.
+
+---
+
+### 2026-10-13 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`afe1fd5`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 1575 | 634.9 | 629 | 683 | 728 | 1450–1583 |
+| `user/byEmail` | 1528 | 654.6 | 645 | 706 | 764 | 1518–1555 |
+| `user/byState (join, limit 20)` | 571 | 1749.8 | 1735 | 2322 | 2664 | 442–644 |
+| `user/list (page of 20)` | 477 | 2094.7 | 2108 | 2597 | 3071 | 417–665 |
+| `user/count` | 6060 | 165.0 | 163 | 179 | 203 | 6001–6081 |
+| `authenticate (login)` | 1490 | 671.1 | 664 | 726 | 785 | 1443–1498 |
+| `user/register` | 589 | 1697.1 | 1636 | 2067 | 2249 | 575–595 |
+| `user/update` | 761 | 1314.5 | 1306 | 1395 | 1537 | 730–762 |
+| `user/remove` | 843 | 1186.2 | 1180 | 1256 | 1323 | 843–845 |
+
+The baseline for the optimization phases (Phase 0: `executedSQLsCount`,
+`--repeat`, the per-round cleanup of `register`), with the median of 5
+rounds. The rounds show the spread of this setup: `byState` and `list`
+range from ~420 to ~660 ops/sec within one run, while the single-row
+operations stay within a few percent. Their medians are back in the range
+of the 2026-10-03 entries (the 2026-10-13 release run's single round was a
+low one).
+
+### 2026-10-13 — `sqlite` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`afe1fd5`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** sqlite (temporary file)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 17403 | 57.5 | 55 | 65 | 113 | 17248–17538 |
+| `user/byEmail` | 16611 | 60.2 | 58 | 67 | 114 | 15867–16703 |
+| `user/byState (join, limit 20)` | 2456 | 407.2 | 395 | 463 | 496 | 2431–2472 |
+| `user/list (page of 20)` | 2517 | 397.3 | 388 | 448 | 476 | 2495–2520 |
+| `user/count` | 122401 | 8.2 | 8 | 8 | 10 | 116824–122789 |
+| `authenticate (login)` | 14983 | 66.7 | 64 | 74 | 133 | 14673–15073 |
+| `user/register` | 7168 | 139.5 | 120 | 155 | 1131 | 7119–7281 |
+| `user/update` | 10363 | 96.5 | 92 | 105 | 148 | 10298–10402 |
+| `user/remove` | 12300 | 81.3 | 72 | 82 | 150 | 12195–12491 |
+
+Same code as the `postgres` entry above. The index on `address.state` (new
+in the benchmark's entities) makes `byState` ~5% faster, and costs ~5% on
+the writes that insert an address (`register`, and the untimed
+registration before each `remove`): measured by alternating runs with and
+without it (`register` ~7430 vs ~7050 ops/sec, `remove` ~13175 vs
+~12175), and the same without the per-round cleanup (it isn't the cause).
+
+### 2026-10-13 — `memory` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.2 (`afe1fd5`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** memory (DBSQLMemoryAdapter)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 25288 | 39.5 | 38 | 45 | 94 | 24516–25369 |
+| `user/byEmail` | 1533 | 652.2 | 657 | 1200 | 1262 | 1118–1545 |
+| `user/byState (join, limit 20)` | 1469 | 680.5 | 665 | 748 | 778 | 1415–1474 |
+| `user/list (page of 20)` | 693 | 1442.2 | 1430 | 1521 | 1709 | 686–701 |
+| `user/count` | 195230 | 5.1 | 5 | 5 | 6 | 194973–195665 |
+| `authenticate (login)` | 1459 | 685.3 | 715 | 1204 | 1277 | 1440–1564 |
+| `user/register` | 3438 | 290.9 | 282 | 426 | 553 | 3430–3626 |
+| `user/update` | 4928 | 202.9 | 204 | 239 | 257 | 4867–4978 |
+| `user/remove` | 11401 | 87.7 | 89 | 104 | 113 | 11346–12117 |
+
+Same code as the `postgres` entry above. `register`, `update` and `remove`
+now run on the seeded 1000 users (see † in the progression): a run of
+`0e0109a`, before the per-round cleanup, had `register` from 942 to 2675
+ops/sec across its 5 rounds as the tables grew, and `update` at 884.
 
 ---
 

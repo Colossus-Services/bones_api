@@ -1,3 +1,17 @@
+## 1.21.3
+
+- `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
+  trips) executed for entity and relationship operations. The shared DB
+  tests pin the statements of each operation (insert, `selectByID`,
+  `selectByQuery`, `length`, update, `deleteByID`) on every SQL adapter, so
+  an optimization or a regression changes them visibly.
+  - `benchmark/db_users`: `--repeat N` (the median of N rounds per
+    operation, with their range). The users registered by each `register`
+    round are removed after it, so every round (and `update`/`remove` after
+    it) runs on the same table sizes. The benchmark's `User.create()` no
+    longer hashes an empty password for every user loaded, and
+    `Address.state` is indexed (`user/byState`).
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
@@ -33,16 +47,6 @@
   unique fields on object storage).
   - CI: a new `test_vm (concurrency)` job (its 3 files at once); the workflow
     also runs on PRs to any branch (stacked PRs).
-
-- `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
-  trips) executed for entity and relationship operations. The shared DB
-  tests pin the statements of each operation (insert, `selectByID`,
-  `selectByQuery`, `length`, update, `deleteByID`) on every SQL adapter, so
-  an optimization or a regression changes them visibly.
-  - `benchmark/db_users`: `--repeat N` (the median of N rounds per
-    operation, with their range). The benchmark's `User.create()` no longer
-    hashes an empty password for every user loaded, and `Address.state` is
-    indexed (`user/byState`).
 
 - Fix: `APIRequest.isAuthenticated` was `true` only when the token was
   expired (it is now `true` only when it isn't).
