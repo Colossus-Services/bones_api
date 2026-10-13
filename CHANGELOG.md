@@ -39,16 +39,17 @@
   (`object is unsendable - _CustomZone`) when the `APIRoot` was created (or
   initialized) in a `Zone` other than `Zone.root` (e.g. `runZoned`,
   `runZonedGuarded`, a test): `APIRoot.currentAPIRequest` (a `ZoneField`,
-  holding its parent `Zone`) is now kept per `Isolate` (a static `Expando`,
-  not an instance field): an `APIRoot` holds no `Zone`, and can be sent.
-  - In the creating `Isolate`: created by the constructor, as before (the
-    calls' zones forked from the constructor's `Zone`).
+  holding its parent `Zone`) is moved out of the instance while it's copied.
+  - `APIRoot.prepareForIsolateCopy` / `finishIsolateCopy`: called by
+    `APIServer` before and after spawning the workers. In between, the
+    `ZoneField` of this `Isolate` is kept out of the instance (in a static
+    `Expando`: not copied), and still used by this `Isolate`. Otherwise it's
+    an instance field (the fast path), created by the constructor, as before
+    (the calls' zones forked from the constructor's `Zone`).
   - `APIRoot.initializeIsolateCopy`: initializes a copy in its `Isolate`
     (its `currentAPIRequest` forked from that `Isolate`'s `Zone`), called by
     an auxiliary `APIServerWorker` before its start (otherwise created when
     first used there).
-  - `APIRoot.prepareForIsolateCopy`: checks it can be copied (called by
-    `APIServer` before spawning the workers: not while loading the modules).
   - `APIRoot.getCurrentAPIRequest([contextZone])`: the current `APIRequest`
     (or `null`), without creating the `ZoneField`.
   - The `EntityRulesResolver` context provider of an `APIRoot` is registered

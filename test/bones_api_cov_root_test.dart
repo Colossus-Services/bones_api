@@ -598,15 +598,26 @@ void main() {
     test('an isolate copy: sendable, initialized in its isolate', () async {
       var root = _CovRoot('cov-root-isolate-copy');
       try {
-        // Created and initialized in the test's `Zone` (not sendable): the
-        // instance holds no `Zone` (sendable without preparing it).
+        // Created and initialized in the test's `Zone` (not sendable): its
+        // `currentAPIRequest` (a field: the fast path) holds it.
         expect(identical(Zone.current, Zone.root), isFalse);
         await root.ensureInitialized();
         var zoneField = root.currentAPIRequest;
 
-        expect(await Isolate.run(() => root.name), 'cov-root-isolate-copy');
+        Matcher unsendable() => throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.toString(),
+            'message',
+            contains('_CustomZone'),
+          ),
+        );
 
+        await expectLater(Isolate.run(() => root.name), unsendable());
+
+        // Prepared: sendable (and the same `ZoneField` in this `Isolate`).
         root.prepareForIsolateCopy();
+        expect(root.currentAPIRequest, same(zoneField));
+        expect(await Isolate.run(() => root.name), 'cov-root-isolate-copy');
 
         var copyResult = await Isolate.run(() async {
           // A new `Isolate`: nothing initialized yet for the copy.
@@ -639,11 +650,22 @@ void main() {
         });
         expect(copyResult2, equals('cov-root-isolate-copy|true|1'));
 
-        // This `Isolate` keeps the same `ZoneField`:
+        // This `Isolate` keeps the same `ZoneField` (also while copied):
         expect(root.currentAPIRequest, same(zoneField));
         var res = await root.call(APIRequest.get('/cov/zone'));
         expect(res.payload, equals('cov-root-isolate-copy|true'));
         expect(root.currentAPIRequest, same(zoneField));
+
+        // Still sendable (not put back in the instance by its use):
+        expect(await Isolate.run(() => root.name), 'cov-root-isolate-copy');
+
+        // Finished: back in the instance (the fast path), not sendable.
+        root.finishIsolateCopy();
+        expect(root.currentAPIRequest, same(zoneField));
+        await expectLater(Isolate.run(() => root.name), unsendable());
+
+        var res2 = await root.call(APIRequest.get('/cov/zone'));
+        expect(res2.payload, equals('cov-root-isolate-copy|true'));
       } finally {
         root.close();
       }

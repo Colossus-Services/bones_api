@@ -1670,10 +1670,15 @@ class APIServer extends _APIServerBase {
     if (totalAuxiliaryWorkers >= 1) {
       _log.info("Spawning $totalAuxiliaryWorkers parallel workers...");
 
-      workersSpawns = await _auxiliaryWorkers
-          .map((e) => MapEntry(e, e.spawnIsolate()))
-          .toMapFromEntries()
-          .resolveAllValues();
+      try {
+        workersSpawns = await _auxiliaryWorkers
+            .map((e) => MapEntry(e, e.spawnIsolate()))
+            .toMapFromEntries()
+            .resolveAllValues();
+      } finally {
+        // Copied: the `apiRoot` internals back in the instance.
+        apiRoot.finishIsolateCopy();
+      }
 
       _log.info("Spawned $totalAuxiliaryWorkers parallel workers.");
     }
