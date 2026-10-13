@@ -51,8 +51,10 @@
   (`cacheLimit`/`cacheFilesLimit`) started concurrent limit checks, which
   listed and deleted the same files: the second delete threw a
   `PathNotFoundException` in a future nobody awaited (an unhandled error).
-  The checks now run one at a time (a call during a check shares it), and a
-  cached file already removed counts as deleted.
+  The checks now run one at a time: a call during a check queues one more
+  check after it (shared by the calls until then), since the running one
+  may have listed the files before that call's write. A cached file already
+  removed counts as deleted.
 
 ## 1.21.2
 

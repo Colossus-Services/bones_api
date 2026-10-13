@@ -989,22 +989,40 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   int _checkCacheDirectoryFilesLimitUntrackedTotal = 0;
 
   Future<bool>? _checkCacheDirectoryLimitInFlight;
+  Future<bool>? _checkCacheDirectoryLimitQueued;
+  bool _checkCacheDirectoryLimitQueuedForce = false;
 
-  /// Checks the cache directory limits, one check at a time: a call while a
-  /// check is running shares it (a forced one runs after it). Concurrent
+  /// Checks the cache directory limits, one check at a time. Concurrent
   /// checks (e.g. from parallel cache writes) listed the same files and
   /// deleted the same ones, the second delete failing.
+  ///
+  /// A call while a check is running queues one more check after it: the
+  /// running one may have listed the files before this call's cache write.
+  /// The calls until then share that queued check (forced if any of them
+  /// is).
   Future<bool> _checkCacheDirectoryLimit({bool force = false}) {
     var inFlight = _checkCacheDirectoryLimitInFlight;
-    if (inFlight != null) {
-      return force
-          ? inFlight.then((_) => _checkCacheDirectoryLimit(force: true))
-          : inFlight;
+    if (inFlight == null) {
+      return _startCheckCacheDirectoryLimit(force);
     }
 
+    if (force) _checkCacheDirectoryLimitQueuedForce = true;
+
+    return _checkCacheDirectoryLimitQueued ??= inFlight
+        .catchError((_) => false)
+        .then((_) {
+          var queuedForce = _checkCacheDirectoryLimitQueuedForce;
+          _checkCacheDirectoryLimitQueued = null;
+          _checkCacheDirectoryLimitQueuedForce = false;
+          return _checkCacheDirectoryLimit(force: queuedForce);
+        });
+  }
+
+  Future<bool> _startCheckCacheDirectoryLimit(bool force) {
     var check = _checkCacheDirectoryLimitImpl(force: force);
     _checkCacheDirectoryLimitInFlight = check;
 
+    // Registered before any queued check's listener: it runs first.
     return check.whenComplete(() {
       if (identical(_checkCacheDirectoryLimitInFlight, check)) {
         _checkCacheDirectoryLimitInFlight = null;
