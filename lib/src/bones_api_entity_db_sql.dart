@@ -832,15 +832,21 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         alterTablesSQLs.removeAt(0);
       }
 
-      if (alterTablesSQLs.isNotEmpty) {
-        _log.info(
-          'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n',
-        );
+      var suggestion = alterTablesSQLs.isEmpty
+          ? ''
+          : 'Suggestion of SQLs (`$dialectName`) to fix missing columns in tables:\n\n  ${alterTablesSQLs.join('\n  ')}\n';
+
+      if (suggestion.isNotEmpty) {
+        _log.info(suggestion);
       }
 
       var allErrors = repositoriesChecksErrors.join('\n');
 
-      throw StateError('Error checking DB tables:\n\n$allErrors');
+      // Also the suggested SQLs (not only logged):
+      throw StateError(
+        'Error checking DB tables:\n\n$allErrors'
+        '${suggestion.isNotEmpty ? '\n$suggestion' : ''}',
+      );
     }
 
     _log.info('All tables OK @ $this');
@@ -1200,9 +1206,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
                 schemeTableName,
                 fieldColumn: (f) => repoToSchemeMap[f],
               )
+              // Only the ones known to be missing (`false`): `null` is unknown
+              // (e.g. a unique one with unknown `uniqueIndexes`).
               .where(
                 (sql) =>
-                    scheme.hasIndexOn(sql.columns, unique: sql.unique) != true,
+                    scheme.hasIndexOn(sql.columns, unique: sql.unique) == false,
               )
               .toList();
 
