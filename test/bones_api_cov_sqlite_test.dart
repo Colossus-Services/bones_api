@@ -353,20 +353,20 @@ void main() {
       expect(DBSQLAdapter.parseConfigLogSQL({'log': 'no'}), isFalse);
     });
 
-    test(
-      'parseConfigLogSQL: `log: {sql: true}`',
-      () {
-        expect(
-          DBSQLAdapter.parseConfigLogSQL({
-            'log': {'sql': true},
-          }),
-          isTrue,
-        );
-      },
-      skip:
-          'lib bug: `parseConfigLogSQL` parses the `log` Map instead of its '
-          '`sql` value (`parseBool(log)`), returning `false`',
-    );
+    test('parseConfigLogSQL: `log: {sql: ...}`', () {
+      expect(
+        DBSQLAdapter.parseConfigLogSQL({
+          'log': {'sql': true},
+        }),
+        isTrue,
+      );
+      expect(
+        DBSQLAdapter.parseConfigLogSQL({
+          'log': {'sql': false},
+        }),
+        isFalse,
+      );
+    });
 
     test('parseConfigDBGenerateTablesAndCheckTables', () {
       expect(
@@ -635,18 +635,17 @@ void main() {
       );
     });
 
-    test(
-      'removeSQLsComments: a block comment',
-      () {
-        expect(
-          DBSQLAdapter.removeSQLsComments('CREATE TABLE a (id INT) ; /* x */'),
-          equals('CREATE TABLE a (id INT) ; '),
-        );
-      },
-      skip:
-          'lib bug: `removeSQLsComments` replaces `/* ... */` with `m[1]` of '
-          'a RegExp without groups: RangeError',
-    );
+    test('removeSQLsComments: block comments', () {
+      expect(
+        DBSQLAdapter.removeSQLsComments('CREATE TABLE a (id INT) ; /* x */'),
+        equals('CREATE TABLE a (id INT) ;  '),
+      );
+      // Replaced by a space: tokens around it aren't joined.
+      expect(
+        DBSQLAdapter.removeSQLsComments('SELECT/* a\n b */1'),
+        equals('SELECT 1'),
+      );
+    });
   });
 
   group('DBSQLiteAdapter entities', () {

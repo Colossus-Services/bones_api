@@ -562,7 +562,7 @@ class APIRouteBuilder<M extends APIModule> {
     } else if (provider is Iterable) {
       var addedAny = false;
       for (var e in provider) {
-        var added = from(e, requestMethod);
+        var added = from(requestMethod, e);
         addedAny |= added;
       }
       return addedAny;

@@ -463,7 +463,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (log is Map) {
       var logSql = log.getIgnoreCase('sql');
       if (logSql != null) {
-        return parseBool(log);
+        return parseBool(logSql);
       }
     }
     if (log != null) {
@@ -1828,7 +1828,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   static String removeSQLsComments(String sqls) {
     sqls = sqls.replaceAllMapped(
       RegExp(r'/\*.*?\*/', dotAll: true),
-      (m) => m[1]!,
+      (m) => ' ',
     );
 
     while (true) {

@@ -344,8 +344,13 @@ class APIConfig {
       var uri = resolveStringUri(o);
 
       if (uri != null) {
-        return APIConfig.fromUri(uri, allowAsync: allowAsync) ??
-            _fromImpl(def, allowAsync: allowAsync);
+        var config = APIConfig.fromUri(uri, allowAsync: allowAsync);
+        if (config is Future<APIConfig?>) {
+          return config.then(
+            (config) => config ?? _fromImpl(def, allowAsync: allowAsync),
+          );
+        }
+        return config ?? _fromImpl(def, allowAsync: allowAsync);
       } else {
         return APIConfig.fromContent(o) ??
             _fromImpl(def, allowAsync: allowAsync);

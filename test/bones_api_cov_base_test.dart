@@ -32,6 +32,10 @@ void main() {
         parseAPIRequestMethod('OPTIONS'),
         equals(APIRequestMethod.OPTIONS),
       );
+      expect(
+        parseAPIRequestMethod('options'),
+        equals(APIRequestMethod.OPTIONS),
+      );
       expect(parseAPIRequestMethod('head'), equals(APIRequestMethod.HEAD));
       expect(parseAPIRequestMethod('HEAD'), equals(APIRequestMethod.HEAD));
       expect(parseAPIRequestMethod('foo'), isNull);
@@ -202,6 +206,9 @@ void main() {
       expect(r.pathPartLast, equals('c'));
       expect(r.pathPartAt(1), equals('b'));
       expect(r.pathPartAt(3), isNull);
+      expect(r.pathPartAt(-1), equals('c'));
+      expect(r.pathPartAt(-3), equals('a'));
+      expect(r.pathPartAt(-4), isNull);
       expect(r.pathPart(0), equals('a'));
       expect(r.pathPart(5), equals(''));
       expect(r.pathPart(0, reversed: true), equals('c'));
@@ -292,6 +299,7 @@ void main() {
       expect(r.getHeaderFirstOf('n', 'n', 'n', 'n', 'n', 'n'), isNull);
 
       // Case-insensitive fallback:
+      expect(r.getHeaderFirstOf('x-a'), equals('a'));
       expect(r.getHeaderFirstOf('n', 'x-b'), equals('b'));
       expect(r.getHeaderFirstOf('n', 'n', 'x-c'), equals('c'));
       expect(r.getHeaderFirstOf('n', 'n', 'n', 'x-d'), equals('d'));

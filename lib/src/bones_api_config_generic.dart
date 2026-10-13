@@ -10,8 +10,8 @@ FutureOr<APIConfig?> loadAPIConfigFromUri(Uri o, {bool allowAsync = true}) {
       var url = o.toString();
       var ext = APIConfig.resolveFileExtension(url);
 
-      var ret = HttpClient(url).get('');
-      ret.then((response) {
+      return HttpClient(url).requestURL(HttpMethod.GET, url).then((response) {
+        if (!response.isOK) return null;
         var content = response.bodyAsString;
         return content == null || content.isEmpty
             ? null

@@ -378,6 +378,7 @@ abstract class APIRepository<O extends Object> with Initializable {
     parameters: parameters,
     positionalParameters: positionalParameters,
     namedParameters: namedParameters,
+    transaction: transaction,
   );
 
   FutureOr<Iterable> deleteEntityCascade(O o, {Transaction? transaction}) =>

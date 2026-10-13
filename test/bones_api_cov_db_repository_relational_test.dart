@@ -186,6 +186,30 @@ void main() {
         expect(await repo.tryDeleteByID(o2.id), isNull);
       });
 
+      test('delete (with transaction)', () async {
+        var repo = provider.userInfoAPIRepository;
+
+        var o = UserInfo('del-t');
+        await repo.store(o);
+
+        // Not `executing`: only reached if passed through.
+        var t = Transaction(autoCommit: true);
+
+        var del = await repo.delete(
+          Condition.parse('info == ?'),
+          positionalParameters: ['del-t'],
+          transaction: t,
+        );
+        expect(del.map((e) => e.info), equals(['del-t']));
+
+        // The delete is an operation of the given transaction:
+        expect(
+          t.operations.whereType<TransactionOperationDelete>(),
+          isNotEmpty,
+        );
+        expect(await repo.existsID(o.id), isFalse);
+      });
+
       test('storeAllFromJson', () async {
         var repo = provider.userInfoAPIRepository;
 

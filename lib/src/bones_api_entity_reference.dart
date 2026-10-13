@@ -2398,7 +2398,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
     if (id == null) return null;
 
     if (entitiesFetcher != null) {
-      return entitiesFetcher([ids], type).resolveMapped((l) => l?.firstOrNull);
+      return entitiesFetcher([id], type).resolveMapped((l) => l?.firstOrNull);
     }
 
     if (entityProvider == null) return null;
@@ -2679,7 +2679,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         );
       } else if (length == 0) {
         ids = null;
-        entities == null;
+        entities = null;
       }
     }
 

@@ -66,11 +66,7 @@ void main() {
   group('TransactionOperationType', () {
     test('name / isRead', () {
       for (var t in TransactionOperationType.values) {
-        // `selectRelationships` is missing from the `name` extension's
-        // `switch` (it throws): not asserted, to not pin that behavior.
-        if (t != TransactionOperationType.selectRelationships) {
-          expect(TransactionOperationTypeExtension(t).name, equals(t.name));
-        }
+        expect(TransactionOperationTypeExtension(t).name, equals(t.name));
       }
 
       expect(TransactionOperationType.select.isRead, isTrue);

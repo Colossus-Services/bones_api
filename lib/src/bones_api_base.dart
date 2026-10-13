@@ -1349,7 +1349,7 @@ APIRequestMethod? parseAPIRequestMethod(String? method) {
     case 'patch':
     case 'PATCH':
       return APIRequestMethod.PATCH;
-    case 'optionS':
+    case 'options':
     case 'OPTIONS':
       return APIRequestMethod.OPTIONS;
     case 'head':
@@ -1929,7 +1929,7 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// Returns the [path] part at [index] in [pathParts].
   /// - Negative [index] will return in reversed index order.
   String? pathPartAt(int index) {
-    var idx = index >= 0 ? index : _pathParts.length - index;
+    var idx = index >= 0 ? index : _pathParts.length + index;
     return idx >= 0 && idx < _pathParts.length ? _pathParts[idx] : null;
   }
 
@@ -2117,7 +2117,7 @@ class APIRequest extends APIMetricSet with APIPayload {
     if (val != null) return val;
 
     for (var k in headers.keys) {
-      if (equalsIgnoreAsciiCase(k, key1)) return parameters[k];
+      if (equalsIgnoreAsciiCase(k, key1)) return headers[k];
 
       if (key2 != null && equalsIgnoreAsciiCase(k, key2)) {
         return headers[k];

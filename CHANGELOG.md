@@ -7,6 +7,28 @@
   (removed) at most every 5 minutes, as intended.
 - Fix: `APIToken.fromJson` parsed the `duration` from `issueTime`; it now
   reads `duration` (seconds), defaulting to 3 hours when absent.
+- Fix: `APIRequest.pathPartAt` with a negative index (from the end) always
+  returned `null`.
+- Fix: `parseAPIRequestMethod('options')` returned `null` (a `'optionS'`
+  typo).
+- Fix: `APIRequest.getHeaderFirstOf`: the case-insensitive match of the
+  first key returned a parameter instead of the header.
+- Fix: `APIRouteBuilder.from` with an `Iterable` of providers threw a
+  `TypeError` (swapped arguments).
+- Fix: `DBSQLAdapter.parseConfigLogSQL` with `log: {sql: ...}` parsed the
+  `log` `Map` (always `false`) instead of its `sql` value.
+- Fix: `DBSQLAdapter.removeSQLsComments` threw a `RangeError` on any
+  `/* ... */` comment (now replaced by a space).
+- Fix: `EntityReferenceList.toEntityReference` threw a `RangeError` on an
+  empty list with entities; `EntityReferenceList.getAt` with an
+  `entitiesFetcher` fetched all the IDs (as a nested list) instead of the one
+  at `index`.
+- Fix: `TransactionOperationTypeExtension.name` threw for
+  `selectRelationships`.
+- Fix: `APIRepository.delete` ignored its `transaction`.
+- Fix: `APIConfig.fromAsync` (`loadAPIConfigFromUri`) of an `http(s)` URL
+  discarded the downloaded configuration (and requested the URL with a
+  trailing `/`): now it's returned (`null`, or the default, if not found).
 
 ## 1.21.1
 

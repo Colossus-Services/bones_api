@@ -7725,12 +7725,12 @@ extension TransactionOperationTypeExtension on TransactionOperationType {
         return 'constrainRelationship';
       case TransactionOperationType.selectRelationship:
         return 'selectRelationship';
+      case TransactionOperationType.selectRelationships:
+        return 'selectRelationships';
       case TransactionOperationType.update:
         return 'update';
       case TransactionOperationType.delete:
         return 'delete';
-      default:
-        throw ArgumentError("Unknown: $this");
     }
   }
 

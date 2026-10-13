@@ -536,6 +536,23 @@ void main() {
       expect(module.routes.from(null, null), isFalse);
       expect(module.routes.from(null, 123), isFalse);
       expect(module.routes.from(null, []), isFalse);
+      expect(module.routes.from(null, [123, null]), isFalse);
+
+      // An `Iterable` of providers:
+      var about = AboutModule(root);
+      expect(
+        module.routes.from(APIRequestMethod.PATCH, [
+          about.reflection.method('about'),
+          123,
+        ]),
+        isTrue,
+      );
+      expect(
+        module
+            .getRouteHandlerByRequest(APIRequest.patch('/cov/about'))
+            ?.routeName,
+        equals('about'),
+      );
     });
   });
 
