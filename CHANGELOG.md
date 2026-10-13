@@ -131,6 +131,14 @@
   directory check (only called with a directory: `canUseLetsEncrypt`); the
   "directory doesn't exist" check (removed after the worker's constructor)
   is now tested.
+- Fix: an error in an operation's `preFinish` (run after its transaction
+  execution: e.g. building the entities of a select, or storing the
+  relationships of an insert) didn't abort the transaction: the operation
+  was never finished, and the transaction never committed nor aborted
+  (in an auto-commit transaction, a SQL adapter's connection held). Now
+  `DBAdapter.finishOperation` (used by all the adapters) notifies it to the
+  transaction (`notifyExecutionError`): aborted, and the error (resolved by
+  the adapter) rethrown.
 - Docs: the `DBObjectAdapter`s (memory, directory, GCS) don't enforce unique
   fields (`@EntityField.unique()`, `@EntityIndex(unique: true)`): object
   storages (e.g. GCS, S3) are not designed for that (no index over the

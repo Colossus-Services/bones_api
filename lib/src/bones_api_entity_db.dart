@@ -581,6 +581,50 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     EntityHandler<O>? entityHandler,
   }) {}
 
+  /// Finishes the operation [op] with the result [res] of its transaction
+  /// execution: applies [preFinish] (if any) and calls `op.finish`.
+  ///
+  /// Called after the execution, not inside it: a [preFinish] can issue other
+  /// operations in the same transaction (e.g. selecting the sub-entities),
+  /// that are executed after it.
+  ///
+  /// An error in [preFinish] is notified to the transaction, as an error in
+  /// the execution ([Transaction.notifyExecutionError], with
+  /// [errorResolver]): the transaction is aborted, and the error rethrown.
+  /// (Otherwise `op` would never be finished: the transaction neither
+  /// committed nor aborted.)
+  FutureOr<R> finishOperation<T, R>(
+    TransactionOperation op,
+    T res,
+    PreFinishDBOperation<T, R>? preFinish, {
+    TransactionErrorResolver? errorResolver,
+  }) {
+    if (preFinish == null) {
+      return op.finish<R>(res as R);
+    }
+
+    FutureOr<R> onError(Object e, StackTrace s) =>
+        op.transaction.notifyExecutionError<R>(
+          e,
+          s,
+          errorResolver: errorResolver,
+          operation: op,
+        );
+
+    FutureOr<R> res2;
+    try {
+      res2 = preFinish(res);
+    } catch (e, s) {
+      return onError(e, s);
+    }
+
+    if (res2 is Future<R>) {
+      return res2.then((r) => op.finish<R>(r), onError: onError);
+    } else {
+      return op.finish<R>(res2);
+    }
+  }
+
   FutureOr<int> doCount(
     TransactionOperation op,
     String entityName,

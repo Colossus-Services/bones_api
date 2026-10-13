@@ -1377,13 +1377,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
     TransactionOperation op,
     T res,
     PreFinishDBOperation<T, R>? preFinish,
-  ) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
+  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
 
   /// Executes [f] in the transaction of [op], and finishes [op] (with
   /// [preFinish]) after that execution, not inside it: a [preFinish] can

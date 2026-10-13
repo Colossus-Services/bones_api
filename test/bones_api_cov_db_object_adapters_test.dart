@@ -909,6 +909,43 @@ void _runObjectAdapterTests(
       expect(await storeRepo.count(matcher: ConditionID(851)), equals(1));
     });
 
+    test('a preFinish error aborts the transaction (41)', () async {
+      var storeRepo = provider.repo<Store>();
+      expect(await storeRepo.store(Store('pf', 1, id: 861)), equals(861));
+
+      // An auto-commit transaction (as a repository call without one):
+      var t = Transaction(autoCommit: true);
+
+      var op = TransactionOperationSelect(
+        storeRepo.name,
+        false,
+        adapter,
+        ConditionID(861),
+        transaction: t,
+      );
+
+      Object? error;
+      try {
+        await storeRepo.repositoryAdapter.doSelectByID<Store>(
+          op,
+          861,
+          preFinish: (r) => throw StateError('preFinish error'),
+        );
+      } catch (e) {
+        error = e;
+      }
+
+      // The error reaches the caller (resolved by the adapter):
+      expect(error, isA<DBObjectAdapterException>());
+      expect('$error', contains('preFinish error'));
+
+      // And the transaction is aborted (previously: never finished, neither
+      // committed nor aborted):
+      expect(t.isAborted, isTrue);
+      expect(t.error, same(error));
+      expect(t.isOpen, isFalse);
+    });
+
     test('onStore (DBEntityRepository)', () async {
       var storeRepo = provider.repo<Store>();
 

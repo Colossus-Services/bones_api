@@ -223,6 +223,40 @@ void main() {
         },
       );
 
+      test('a preFinish error aborts the transaction (41)', () async {
+        var repo =
+            provider.userInfoAPIRepository.entityRepository
+                as DBSQLEntityRepository<UserInfo>;
+
+        var id = await repo.store(UserInfo('pf-info'));
+
+        var t = Transaction(autoCommit: true);
+        var op = TransactionOperationSelect(
+          repo.name,
+          false,
+          sqlAdapter,
+          ConditionID(id),
+          transaction: t,
+        );
+
+        Object? error;
+        try {
+          await repo.repositoryAdapter.doSelectByID<UserInfo>(
+            op,
+            id,
+            preFinish: (r) => throw StateError('preFinish error'),
+          );
+        } catch (e) {
+          error = e;
+        }
+
+        expect('$error', contains('preFinish error'));
+        expect(t.isAborted, isTrue);
+        expect(t.isOpen, isFalse);
+
+        await repo.deleteByID(id);
+      });
+
       test('countByQuery / selectIDsBy / existIDs', () async {
         var repo = provider.userAPIRepository;
 

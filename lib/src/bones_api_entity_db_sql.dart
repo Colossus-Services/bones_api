@@ -3630,13 +3630,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     TransactionOperation op,
     T res,
     PreFinishDBOperation<T, R>? preFinish,
-  ) {
-    if (preFinish != null) {
-      return preFinish(res).resolveMapped((res2) => op.finish(res2));
-    } else {
-      return op.finish<R>(res as R);
-    }
-  }
+  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
 
   FutureOr<R> _finishSQLOperation<T, R>(
     Object sql,
