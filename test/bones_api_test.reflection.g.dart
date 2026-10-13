@@ -1020,7 +1020,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
               'allowInProgress',
               false,
               false,
-              false,
+              true,
             ),
           },
           null,

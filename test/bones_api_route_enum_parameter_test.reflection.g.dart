@@ -1088,7 +1088,7 @@ class ExternalIntegrationModule$reflection
               'allowInProgress',
               false,
               false,
-              false,
+              true,
             ),
           },
           null,
