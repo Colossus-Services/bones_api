@@ -103,7 +103,9 @@
   `100` per connection). On by default; db config `preparedStatements: false`
   disables them (e.g. behind PgBouncer in transaction pooling mode before
   1.21). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
-  stale counters.
+  stale counters. An invalid `preparedStatementsCacheSize` (`< 1`) passed to
+  an adapter's constructor throws an `ArgumentError` there (a config value
+  falls back to the default).
   - `DBPostgreSQLAdapter`: per connection. A SQL text is prepared when it
     repeats (preparing costs a round trip; a statement run once doesn't pay
     it), and only outside a transaction (it would be prepared on the
@@ -111,7 +113,9 @@
     also inside the connection's transactions. A stale one (`0A000`: a
     schema change altered its result columns; `26000`) is replaced, and the
     statement run again unprepared (outside a transaction: inside one the
-    error aborted it).
+    error aborted it). A cached statement runs only while its session is
+    open: on the session of a finished transaction it fails, as an
+    unprepared one does, instead of running outside that transaction.
   - `DBSQLiteAdapter`: per database handle, on the first use (no round
     trip); SQLite recompiles a prepared statement after a schema change.
     Released before the handle is closed.

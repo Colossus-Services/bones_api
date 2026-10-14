@@ -210,6 +210,13 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
        ) {
     boot();
 
+    if (preparedStatements) {
+      PreparedStatementsCache.checkMaxSize(
+        preparedStatementsCacheSize,
+        'preparedStatementsCacheSize',
+      );
+    }
+
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 

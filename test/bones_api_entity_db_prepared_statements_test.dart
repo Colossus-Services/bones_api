@@ -2,6 +2,7 @@
 library;
 
 import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/bones_api_db_postgre.dart';
 import 'package:bones_api/bones_api_db_sqlite.dart';
 import 'package:test/test.dart';
 
@@ -165,6 +166,43 @@ void main() {
       expect(sqlite2.preparedStatements, isTrue);
       expect(sqlite2.preparedStatementsCacheSize, equals(7));
       expect(sqlite2.preparedStatementsInfo, isNotNull);
+    });
+
+    test('adapters: an invalid cache size, rejected when constructed', () {
+      // PostgreSQL: not when its first connection opens (left open).
+      expect(
+        () => DBPostgreSQLAdapter(
+          'db',
+          'user',
+          password: 'pass',
+          preparedStatementsCacheSize: 0,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DBSQLiteAdapter(':memory:', preparedStatementsCacheSize: 0),
+        throwsArgumentError,
+      );
+
+      // Not used when disabled:
+      expect(
+        DBPostgreSQLAdapter(
+          'db',
+          'user',
+          password: 'pass',
+          preparedStatements: false,
+          preparedStatementsCacheSize: 0,
+        ).preparedStatementsInfo,
+        isNull,
+      );
+      expect(
+        DBSQLiteAdapter(
+          ':memory:',
+          preparedStatements: false,
+          preparedStatementsCacheSize: 0,
+        ).preparedStatementsInfo,
+        isNull,
+      );
     });
   });
 }
