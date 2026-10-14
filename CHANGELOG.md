@@ -20,6 +20,12 @@
   insert. An insert of a user with an address (2 relationship fields) and
   2 roles: from 9 statements to 6.
   - `TransactionOperationStoreRelationship.newEntity`.
+  - The relationship tables bones_api generates delete a deleted entity's
+    rows (`ON DELETE CASCADE`). A relationship table without it, on a
+    database that can reuse an ID (MySQL before 8.0 resets `AUTO_INCREMENT`
+    on restart; a reset PostgreSQL sequence), could give a new entity a
+    deleted one's relationship rows: override
+    `generatedIDsHaveNoRelationships` as `false` then.
 - Optimization: generated relationship tables no longer get an index on the
   source column (`<table>__<source>__idx`): it's the first column of their
   `UNIQUE (source, target)` constraint's index, which already serves
@@ -107,11 +113,13 @@
     without as 1. Splitting a list into batches is never faster than
     values (PostgreSQL: a round trip per batch).
 
-- Prepared statements, reused by SQL text (`PreparedStatementsCache`; the
-  least recently used released over `preparedStatementsCacheSize`, default
-  `100` per connection). On by default; db config `preparedStatements: false`
-  disables them (e.g. behind PgBouncer in transaction pooling mode before
-  1.21). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
+- **Behavior change**: prepared statements, reused by SQL text
+  (`PreparedStatementsCache`; the least recently used released over
+  `preparedStatementsCacheSize`, default `100` per connection). On by
+  default; db config `preparedStatements: false` disables them. **Behind
+  PgBouncer in transaction pooling mode before 1.21, disable them**: a
+  prepared statement's name can then refer, on a shared server connection,
+  to another client's statement, which runs instead (silently). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
   stale counters. An invalid `preparedStatementsCacheSize` (`< 1`) passed to
   an adapter's constructor throws an `ArgumentError` there (a config value
   falls back to the default).

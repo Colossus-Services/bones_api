@@ -100,8 +100,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   /// `true`): a SQL text is prepared when it repeats (preparing costs a round
   /// trip), outside a transaction, and its prepared statement is reused,
   /// also inside the transactions of that connection. Config
-  /// `preparedStatements: false` disables it (e.g. behind PgBouncer in
-  /// transaction pooling mode before 1.21).
+  /// `preparedStatements: false` disables it.
+  ///
+  /// Disable it behind PgBouncer in transaction pooling mode before 1.21:
+  /// the statements of a client are named `s/0`, `s/1`..., so on a server
+  /// connection shared by clients a name can refer to another client's
+  /// statement, which then runs instead (silently).
   final bool preparedStatements;
 
   /// The maximum number of prepared statements per connection (the least
