@@ -401,7 +401,9 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
     var statement = cache.get(sql);
     if (statement == null) {
-      statement = db.prepare(sql, persistent: true);
+      // `checkNoTail`: rejects a SQL with more than one statement (as
+      // `db.select` does), instead of preparing only the first one.
+      statement = db.prepare(sql, persistent: true, checkNoTail: true);
       cache.put(sql, statement);
     }
 

@@ -168,6 +168,28 @@ void main() {
       expect(sqlite2.preparedStatementsInfo, isNotNull);
     });
 
+    test('SQLite: a SQL with a second statement is rejected', () async {
+      for (var preparedStatements in [true, false]) {
+        var adapter = DBSQLiteAdapter(
+          ':memory:',
+          preparedStatements: preparedStatements,
+        );
+        var conn = await adapter.catchFromPool();
+        try {
+          expect(conn.select('SELECT 1 AS "a"').first['a'], equals(1));
+          // Not only its first statement:
+          expect(
+            () => conn.select('SELECT 1 AS "a" ; SELECT 2 AS "a"'),
+            throwsA(isA<ArgumentError>()),
+            reason: 'preparedStatements: $preparedStatements',
+          );
+        } finally {
+          await adapter.releaseIntoPool(conn);
+          adapter.close();
+        }
+      }
+    });
+
     test('adapters: an invalid cache size, rejected when constructed', () {
       // PostgreSQL: not when its first connection opens (left open).
       expect(

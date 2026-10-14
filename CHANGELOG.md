@@ -127,7 +127,8 @@
     unprepared one does, instead of running outside that transaction.
   - `DBSQLiteAdapter`: per database handle, on the first use (no round
     trip); SQLite recompiles a prepared statement after a schema change.
-    Released before the handle is closed.
+    Released before the handle is closed. A SQL with more than one
+    statement is still rejected (`checkNoTail`), not run up to its first.
   - `DBMySQLAdapter`: none (`mysql1` doesn't reuse prepared statements).
   - Users benchmark vs the previous changes: SQLite single-user reads
     +17–19%, writes +13–15%, `list`/`byState` +4–5%; PostgreSQL reads
