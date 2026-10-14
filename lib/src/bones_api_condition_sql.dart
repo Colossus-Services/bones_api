@@ -43,7 +43,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idValue);
       var q = sqlElementQuote;
-      var tableKey = '$q$tableAlias$q.$q$idKey$q';
+      // The column, not `idKey` (renamed if a query parameter is `id`):
+      var tableKey = '$q$tableAlias$q.${q}id$q';
 
       return encodeConditionValuesWithOperator(
         context,
@@ -70,7 +71,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
         var idKey = context.addEncodingParameter(idFieldName, c.idValue);
         var q = sqlElementQuote;
-        var tableKey = '$q$tableAlias$q.$q$idKey$q';
+        var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
         return encodeConditionValuesWithOperator(
           context,
@@ -97,7 +98,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
     if (schemeProvider == null) {
       var idKey = context.addEncodingParameter('id', c.idsValues);
       var q = sqlElementQuote;
-      var tableKey = '$q$tableAlias$q.$q$idKey$q';
+      // The column, not `idKey` (renamed if a query parameter is `id`):
+      var tableKey = '$q$tableAlias$q.${q}id$q';
 
       return encodeConditionValuesWithOperator(
         context,
@@ -122,9 +124,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
         var idFieldName = tableScheme.idFieldName ?? 'id';
         var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
 
-        var idKey = context.addEncodingParameter(idFieldName, c.idsValues);
+        context.addEncodingParameter(idFieldName, c.idsValues);
         var q = sqlElementQuote;
-        var tableKey = '$q$tableAlias$q.$q$idKey$q';
+        var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
         return encodeConditionValuesWithOperator(
           context,

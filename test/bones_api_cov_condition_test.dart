@@ -1261,6 +1261,22 @@ void main() {
       var sql2 = await _encoder().encode(ConditionIdIN(['a', 'b']), 'item');
       expect(sql2.outputString, equals('( "it"."code" IN ( \'a\' , \'b\' ) )'));
 
+      // A query parameter named `id` renames the encoding parameter
+      // (`param_id`): the column is still the ID column.
+      var sql3 = await _encoder().encode(
+        ConditionID(5),
+        'user',
+        namedParameters: {'id': 9},
+      );
+      expect(sql3.outputString, equals('( "us"."id" = 5 )'));
+
+      var sql4 = await _encoder().encode(
+        ConditionIdIN([5, 6]),
+        'user',
+        namedParameters: {'id': 9},
+      );
+      expect(sql4.outputString, equals('( "us"."id" IN ( 5 , 6 ) )'));
+
       expect(
         () async => await _encoder().encode(ConditionID(1), 'nope'),
         throwsStateError,

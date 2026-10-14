@@ -72,6 +72,15 @@
     (20 users per call) +31%, single-user reads +11–12%; memory `byId`
     +12%.
 
+- Fix: `DBMySQLAdapter`: a `NULL` column of a select with parameters (e.g.
+  `selectByQuery(' name == ? ')`) was read as absent, so the entity field
+  got its default (e.g. `0`) instead of `null`: `mysql1` leaves it out of a
+  row's `fields` in its binary protocol (a statement with parameters). The
+  rows are now read from their `values`.
+- Fix: `ConditionSQLEncoder.encodeIDCondition`/`encodeIDConditionIN` built
+  the ID column from the encoding parameter key, which is renamed (e.g.
+  `"param_id"`) when the query has a parameter named like the ID column.
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
