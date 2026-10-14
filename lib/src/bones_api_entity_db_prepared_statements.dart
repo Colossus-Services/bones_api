@@ -62,6 +62,7 @@ class PreparedStatementsCache<S extends Object> {
   /// Throws an [ArgumentError] if [maxSize] is not a valid [maxSize] (`>= 1`):
   /// for an adapter to reject it when constructed, before opening a
   /// connection for its cache.
+  @pragma('vm:prefer-inline')
   static void checkMaxSize(int maxSize, [String name = 'maxSize']) {
     if (maxSize < 1) {
       throw ArgumentError.value(maxSize, name, 'must be >= 1');
