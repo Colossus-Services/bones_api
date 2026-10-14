@@ -1,3 +1,25 @@
+## 1.23.0
+
+- `reflection_factory`: `^2.11.0` → `^2.12.0`, with reflection regenerated:
+  its generated constructor `invoker`s call constructors directly instead
+  of through `Function.apply`.
+  - Until `reflection_factory` 2.12.0 is released, `pubspec.yaml` (and
+    `benchmark/db_users`) override it with its PR branch
+    (gmpassos/reflection_factory#57), so both packages are validated
+    together. Remove the overrides before releasing.
+
+- Optimization: `ClassReflectionEntityHandler.instantiateFromMapImpl`
+  resolves the values up front, with the same
+  `Json.defaultFieldValueResolver` (by each field's type), and calls
+  `createInstanceFromMap(valuesResolved: true)`: constructors are called
+  straight from the map, without `reflection_factory`'s `MethodInvocation`
+  building. The resolver path is used as before when the map has a key that
+  isn't a field (e.g. a constructor parameter with another name), when a
+  constructor parameter named as a field has another type than the field,
+  or when a value doesn't resolve synchronously (or resolves to `null`).
+  - Users benchmark (SQLite), alternated with 1.22.0: `user/list` +17–20%,
+    `user/byState` +12–18%, `user/byId` +12–15%.
+
 ## 1.22.0
 
 - `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
