@@ -54,7 +54,8 @@
   The checks now run one at a time: a call during a check queues one more
   check after it (shared by the calls until then), since the running one
   may have listed the files before that call's write. A cached file already
-  removed counts as deleted.
+  removed counts as deleted, and an error of a check (nobody awaits it: e.g.
+  the cache directory removed) is logged, not left as an unhandled error.
 
 - Optimization: turning rows (or any `Map`) into entities
   (`EntityHandler.createFromMap`), for every adapter:
@@ -71,6 +72,15 @@
   - Users benchmark vs 1.21.3's previous changes: SQLite `list`/`byState`
     (20 users per call) +31%, single-user reads +11–12%; memory `byId`
     +12%.
+
+- Fix: `DBMySQLAdapter`: a `NULL` column of a select with parameters (e.g.
+  `selectByQuery(' name == ? ')`) was read as absent, so the entity field
+  got its default (e.g. `0`) instead of `null`: `mysql1` leaves it out of a
+  row's `fields` in its binary protocol (a statement with parameters). The
+  rows are now read from their `values`.
+- Fix: `ConditionSQLEncoder.encodeIDCondition`/`encodeIDConditionIN` built
+  the ID column from the encoding parameter key, which is renamed (e.g.
+  `"param_id"`) when the query has a parameter named like the ID column.
 
 ## 1.21.2
 

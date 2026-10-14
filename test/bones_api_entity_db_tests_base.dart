@@ -796,6 +796,19 @@ Future<bool> runAdapterTests(
             'number': null,
           });
 
+          // The `null` also through a query with a parameter (MySQL: a
+          // statement with parameters left `NULL` columns out of its rows):
+          var byName = await storeAPIRepository.selectByQuery(
+            ' name == ? ',
+            parameters: {'name': 'pu-3'},
+          );
+          expect(
+            byName.map((e) => [e.id, e.number]),
+            equals([
+              [id, null],
+            ]),
+          );
+
           // Another instance with the same ID (an updated copy):
           var copy = Store('pu-4', 14, id: id as int);
           expect(await storeAPIRepository.store(copy), equals(id));

@@ -263,6 +263,39 @@ void main() {
       }
     });
 
+    test('the files limit: a pending check after the cache directory is '
+        'removed (logged, not an unhandled error)', () async {
+      var gcs = FakeGCS('cov-limit-removed');
+      var cacheDir = Directory('${tmpDir.path}/cache')..createSync();
+
+      var provider = _GCSProvider(
+        gcs,
+        cacheDirectory: cacheDir,
+        cacheFilesLimit: 2,
+        cacheLimit: 1024 * 1024,
+      );
+      await provider.ensureInitialized();
+      addTearDown(provider.close);
+
+      // Over the limit: checks run (and are queued) after the stores.
+      for (var round = 0; round < 3; ++round) {
+        await Future.wait([
+          for (var i = 1; i <= 6; ++i)
+            Future.sync(
+              () => provider.storeRepo.store(
+                Store('r$round-$i', i, id: round * 10 + i),
+              ),
+            ),
+        ]);
+      }
+
+      // Removed while checks may still be pending:
+      cacheDir.deleteSync(recursive: true);
+      await Future.delayed(Duration(milliseconds: 300));
+
+      expect(gcs.objects.length, equals(18));
+    });
+
     test('the files limit: parallel stores (one check at a time)', () async {
       var gcs = FakeGCS('cov-limit-parallel');
 

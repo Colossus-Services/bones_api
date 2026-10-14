@@ -1019,7 +1019,16 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   Future<bool> _startCheckCacheDirectoryLimit(bool force) {
-    var check = _checkCacheDirectoryLimitImpl(force: force);
+    // Nobody awaits a check (it runs alongside the cache writes): an error
+    // (e.g. the cache directory removed, the adapter closed) is logged, not
+    // left as an unhandled error.
+    var check = _checkCacheDirectoryLimitImpl(force: force).catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      _log.warning('[CACHE] Limit check failed', error, stackTrace);
+      return false;
+    });
     _checkCacheDirectoryLimitInFlight = check;
 
     // Registered before any queued check's listener: it runs first.

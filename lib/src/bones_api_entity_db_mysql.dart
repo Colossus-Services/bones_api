@@ -947,12 +947,28 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         .resolveMapped(_resultsToEntitiesMaps);
   }
 
+  /// Each row as a `Map` by column name, built from its `values` (not its
+  /// `fields`): `mysql1` leaves a `NULL` column out of a row's `fields` when
+  /// the statement has parameters (its binary protocol), so the entity would
+  /// get the field's default instead of `null`.
   List<Map<String, dynamic>> _resultsToEntitiesMaps(Results? results) {
     if (results == null) return <Map<String, dynamic>>[];
-    return results
-        .map((e) => e.fields)
-        .whereType<Map<String, dynamic>>()
-        .toList();
+
+    final columns = results.fields;
+    final names = List<String>.generate(
+      columns.length,
+      (i) => columns[i].name ?? '[$i]',
+      growable: false,
+    );
+
+    return results.map((row) {
+      final values = row.values ?? const <Object?>[];
+      final map = <String, dynamic>{};
+      for (var i = 0; i < names.length; ++i) {
+        map[names[i]] = i < values.length ? values[i] : null;
+      }
+      return map;
+    }).toList();
   }
 
   @override
