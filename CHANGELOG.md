@@ -94,9 +94,18 @@
   - `SQLDialect.intParameterTypeSuffix` (PostgreSQL: `:int8`): an integer
     ID parameter is typed, so an ID beyond the column's type matches
     nothing (as a literal did) instead of failing ("out of range").
-  - `SQLDialect.idsAsParameters`: `false` for MySQL, which keeps the IDs
-    written as values: `mysql1` runs a statement with parameters as
-    prepare + execute (2 round trips, not reused), one without as 1.
+  - `SQLDialect.maxIDsAsParameters`: an `IN` list padded beyond it is
+    written as values. A parameter is only faster when its statement is
+    reused, which a long list's length seldom is, and a statement's
+    parameters are limited (SQLite: 32766; PostgreSQL: 65535; e.g. a
+    `selectByIDs` of 40000 IDs). Measured selecting N rows by ID (reused
+    parameters vs values): PostgreSQL `512` (parameters 16–29% faster up
+    to ~400 IDs, about even at ~640–768, values faster from ~1024); SQLite
+    `1024` (the same cost per ID, ~10–15% less when reused); MySQL `0`, which
+    keeps the IDs written as values: `mysql1` runs a statement with
+    parameters as prepare + execute (2 round trips, not reused), one
+    without as 1. Splitting a list into batches is never faster than
+    values (PostgreSQL: a round trip per batch).
 
 - Prepared statements, reused by SQL text (`PreparedStatementsCache`; the
   least recently used released over `preparedStatementsCacheSize`, default

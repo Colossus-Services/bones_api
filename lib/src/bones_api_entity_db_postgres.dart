@@ -159,6 +159,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              foreignKeyCreatesImplicitIndex: false,
              maxIdentifierLength: 63,
              intParameterTypeSuffix: ':int8',
+             // Parameters are faster up to ~512 IDs (if the statement is
+             // reused); from ~1024, values are (by 10–40%).
+             maxIDsAsParameters: 512,
            ),
            transactions: true,
            transactionAbort: true,

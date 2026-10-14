@@ -197,6 +197,10 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              // and uses `LIMIT -1` as "no limit":
              offsetRequiresLimit: true,
              offsetMaxLimitValue: '-1',
+             // Parameters cost the same per ID as values, and a reused
+             // statement saves its compilation (~10–15%); beyond ~1024 IDs,
+             // a (padded) length seldom repeats (at most 32766 parameters):
+             maxIDsAsParameters: 1024,
            ),
            transactions: true,
            transactionAbort: true,

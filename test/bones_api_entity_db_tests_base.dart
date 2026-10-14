@@ -909,6 +909,38 @@ Future<bool> runAdapterTests(
         }
       });
 
+      test('selectByIDs: a list over the parameters limit', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+
+        // Independent of the other tests (e.g. run alone).
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+
+        final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
+
+        var id = await storeAPIRepository.store(Store('ids-1', 1)) as int;
+
+        try {
+          // Beyond the parameters of a statement (SQLite: 32766; PostgreSQL:
+          // 65535): written as values (`SQLDialect.maxIDsAsParameters`).
+          var ids = [id, for (var i = 1; i < 70000; ++i) id + 1000000 + i];
+
+          var sel = await storeAPIRepository.selectByIDs(ids);
+          expect(sel.nonNulls.map((e) => e.id), equals([id]));
+
+          // Within the limit: as parameters.
+          var sel2 = await storeAPIRepository.selectByIDs(ids.sublist(0, 300));
+          expect(sel2.nonNulls.map((e) => e.id), equals([id]));
+        } finally {
+          // The other tests count the stores.
+          await storeAPIRepository.deleteByID(id);
+        }
+      });
+
       // The tests of this adapter only (see `adapterTests`):
       for (var e in (adapterTests ?? const {}).entries) {
         test(

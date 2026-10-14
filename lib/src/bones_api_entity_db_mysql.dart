@@ -123,7 +123,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              maxIdentifierLength: 64,
              // `mysql1` can't reuse prepared statements, and a statement with
              // parameters costs 2 round trips: IDs written as values.
-             idsAsParameters: false,
+             maxIDsAsParameters: 0,
            ),
            transactions: true,
            transactionAbort: true,

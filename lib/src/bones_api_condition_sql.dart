@@ -14,14 +14,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
   /// See `SQLDialect.intParameterTypeSuffix`.
   final String? intParameterTypeSuffix;
 
-  /// See `SQLDialect.idsAsParameters`.
-  final bool idsAsParameters;
+  /// See `SQLDialect.maxIDsAsParameters`.
+  final int maxIDsAsParameters;
 
   ConditionSQLEncoder(
     SchemeProvider super.schemeProvider, {
     required this.sqlElementQuote,
     this.intParameterTypeSuffix,
-    this.idsAsParameters = true,
+    this.maxIDsAsParameters = 512,
   });
 
   @override
@@ -115,9 +115,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
   /// it matches) to a few sizes ([idsListPaddedLength]), so its text is also
   /// the same for lists of similar lengths.
   ///
-  /// Without [idsAsParameters] (MySQL), and for a `null` ID, an empty list,
-  /// or a [ConditionParameter] (`#ID == ?`: already a parameter of the
-  /// query), the IDs are encoded as before (written as values).
+  /// With [maxIDsAsParameters] `0` (MySQL), for a list padded beyond
+  /// [maxIDsAsParameters], and for a `null` ID, an empty list, or a
+  /// [ConditionParameter] (`#ID == ?`: already a parameter of the query), the
+  /// IDs are encoded as before (written as values).
   FutureOr<EncodingContext> encodeIDValues(
     EncodingContext context,
     Type idType,
@@ -126,11 +127,13 @@ class ConditionSQLEncoder extends ConditionEncoder {
     Object? idValue,
     bool isList,
   ) {
-    if (!idsAsParameters ||
+    if (maxIDsAsParameters < 1 ||
         idValue == null ||
         idValue is ConditionParameter ||
         (idValue is Iterable &&
-            (idValue.isEmpty || idValue.any((e) => e is ConditionParameter)))) {
+            (idValue.isEmpty ||
+                idsListPaddedLength(idValue.length) > maxIDsAsParameters ||
+                idValue.any((e) => e is ConditionParameter)))) {
       return encodeConditionValuesWithOperator(
         context,
         idType,

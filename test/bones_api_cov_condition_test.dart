@@ -1310,17 +1310,37 @@ void main() {
       expect(sql5.outputString, equals('( "us"."id" = @id__p )'));
       expect(sql5.parametersPlaceholders, equals({'id__p': 5}));
 
-      // Without `idsAsParameters` (MySQL): written as values, as before.
+      // With `maxIDsAsParameters: 0` (MySQL): written as values, as before.
       var literal = ConditionSQLEncoder(
         _schemes(),
         sqlElementQuote: '"',
-        idsAsParameters: false,
+        maxIDsAsParameters: 0,
       );
       var sql7 = await literal.encode(ConditionID(10), 'item');
       expect(sql7.outputString, equals('( "it"."code" = \'10\' )'));
       expect(sql7.parametersPlaceholders, isEmpty);
       var sql8 = await literal.encode(ConditionIdIN([5, 6, 7]), 'user');
       expect(sql8.outputString, equals('( "us"."id" IN ( 5 , 6 , 7 ) )'));
+
+      // A list padded beyond `maxIDsAsParameters`: written as values.
+      var max4 = ConditionSQLEncoder(
+        _schemes(),
+        sqlElementQuote: '"',
+        maxIDsAsParameters: 4,
+      );
+      var sql9 = await max4.encode(ConditionIdIN([1, 2, 3, 4]), 'user');
+      expect(sql9.parametersPlaceholders.length, equals(4));
+      var sql10 = await max4.encode(ConditionIdIN([1, 2, 3, 4, 5]), 'user');
+      expect(
+        sql10.outputString,
+        equals('( "us"."id" IN ( 1 , 2 , 3 , 4 , 5 ) )'),
+      );
+      expect(sql10.parametersPlaceholders, isEmpty);
+      // A single ID: still a parameter.
+      expect(
+        (await max4.encode(ConditionID(10), 'user')).parametersPlaceholders,
+        equals({'id__p': 10}),
+      );
 
       expect(ConditionSQLEncoder.idsListPaddedLength(0), equals(1));
       expect(ConditionSQLEncoder.idsListPaddedLength(1), equals(1));
