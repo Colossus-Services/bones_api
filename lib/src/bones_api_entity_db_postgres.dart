@@ -100,8 +100,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   /// `true`): a SQL text is prepared when it repeats (preparing costs a round
   /// trip), outside a transaction, and its prepared statement is reused,
   /// also inside the transactions of that connection. Config
-  /// `preparedStatements: false` disables it (e.g. behind PgBouncer in
-  /// transaction pooling mode before 1.21).
+  /// `preparedStatements: false` disables it.
+  ///
+  /// Disable it behind PgBouncer in transaction pooling mode before 1.21:
+  /// the statements of a client are named `s/0`, `s/1`..., so on a server
+  /// connection shared by clients a name can refer to another client's
+  /// statement, which then runs instead (silently).
   final bool preparedStatements;
 
   /// The maximum number of prepared statements per connection (the least
@@ -159,6 +163,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              foreignKeyCreatesImplicitIndex: false,
              maxIdentifierLength: 63,
              intParameterTypeSuffix: ':int8',
+             // Parameters are faster up to ~512 IDs (if the statement is
+             // reused); from ~1024, values are (by 10–40%).
+             maxIDsAsParameters: 512,
            ),
            transactions: true,
            transactionAbort: true,
@@ -172,6 +179,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
     if (_password == null && _passwordProvider == null) {
       throw ArgumentError("No `password` or `passwordProvider` ");
+    }
+
+    // Here, not when the first connection opens (it would be left open).
+    if (preparedStatements) {
+      PreparedStatementsCache.checkMaxSize(
+        preparedStatementsCacheSize,
+        'preparedStatementsCacheSize',
+      );
     }
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
@@ -1757,7 +1772,13 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     bool ignoreRows = false,
   }) async {
     var cache = statementsCache;
-    if (cache != null) {
+    // Only while this session is open: a prepared statement runs in the
+    // connection's active transaction, or else on the connection itself,
+    // without checking its session. Run on the session of a transaction
+    // already finished (e.g. an execution queued before an abort), it would
+    // run outside that transaction (autocommit, or another caller's
+    // transaction). The execution below rejects it ("not open").
+    if (cache != null && nativeConnection.isOpen) {
       var statement = cache.get(sql);
       if (statement != null) {
         try {

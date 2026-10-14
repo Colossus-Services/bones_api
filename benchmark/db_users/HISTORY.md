@@ -23,45 +23,56 @@ its date's column here too.
 
 ### `memory`
 
-| Operation | 2026-10-03 | 2026-10-13 |
-|---|--:|--:|
-| `user/byId` | 25303 | 30312 (+19.8%) |
-| `user/byEmail` | 1407 | 1449 (+3.0%) |
-| `user/byState (join, limit 20)` | 1409 | 1594 (+13.1%) |
-| `user/list (page of 20)` | 682 | 720 (+5.6%) |
-| `user/count` | 193802 | 320214 (+65.2%) |
-| `authenticate (login)` | 1393 | 1459 (+4.7%) |
-| `user/register` | 2623 | 3514 † |
-| `user/update` | 1881 | 5215 † |
-| `user/remove` | 19969 | 12506 † |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
+|---|--:|--:|--:|
+| `user/byId` | 25303 | 30312 (+19.8%) | 30937 (+2.1%) |
+| `user/byEmail` | 1407 | 1449 (+3.0%) | 1437 (-0.8%) |
+| `user/byState (join, limit 20)` | 1409 | 1594 (+13.1%) | 1601 (+0.4%) |
+| `user/list (page of 20)` | 682 | 720 (+5.6%) | 719 (-0.1%) |
+| `user/count` | 193802 | 320214 (+65.2%) | 320629 (+0.1%) |
+| `authenticate (login)` | 1393 | 1459 (+4.7%) | 1491 (+2.2%) |
+| `user/register` | 2623 | 3514 † | 3525 (+0.3%) |
+| `user/update` | 1881 | 5215 † | 5190 (-0.5%) |
+| `user/remove` | 19969 | 12506 † | 12476 (-0.2%) |
 
 ### `sqlite`
 
-| Operation | 2026-10-03 | 2026-10-13 |
-|---|--:|--:|
-| `user/byId` | 17138 | 21220 (+23.8%) |
-| `user/byEmail` | 16580 | 20528 (+23.8%) |
-| `user/byState (join, limit 20)` | 2326 | 3184 (+36.9%) |
-| `user/list (page of 20)` | 2405 | 3352 (+39.4%) |
-| `user/count` | 121903 | 162445 (+33.3%) |
-| `authenticate (login)` | 14764 | 18140 (+22.9%) |
-| `user/register` | 7727 | 8284 (+7.2%) |
-| `user/update` | 10302 | 11665 (+13.2%) |
-| `user/remove` | 13036 | 14247 (+9.3%) |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
+|---|--:|--:|--:|
+| `user/byId` | 17138 | 21220 (+23.8%) | 24721 (+16.5%) |
+| `user/byEmail` | 16580 | 20528 (+23.8%) | 24067 (+17.2%) |
+| `user/byState (join, limit 20)` | 2326 | 3184 (+36.9%) | 3283 (+3.1%) |
+| `user/list (page of 20)` | 2405 | 3352 (+39.4%) | 3433 (+2.4%) |
+| `user/count` | 121903 | 162445 (+33.3%) | 195377 (+20.3%) |
+| `authenticate (login)` | 14764 | 18140 (+22.9%) | 20985 (+15.7%) |
+| `user/register` | 7727 | 8284 (+7.2%) | 9719 (+17.3%) |
+| `user/update` | 10302 | 11665 (+13.2%) | 13774 (+18.1%) |
+| `user/remove` | 13036 | 14247 (+9.3%) | 16953 (+19.0%) |
 
 ### `postgres`
 
-| Operation | 2026-10-03 | 2026-10-13 |
-|---|--:|--:|
-| `user/byId` | 1453 | 1436 (-1.2%) |
-| `user/byEmail` | 1518 | 1414 (-6.9%) |
-| `user/byState (join, limit 20)` | 537 | 733 (+36.5%) |
-| `user/list (page of 20)` | 490 | 810 (+65.3%) |
-| `user/count` | 6167 | 5424 (-12.0%) |
-| `authenticate (login)` | 1474 | 1350 (-8.4%) |
-| `user/register` | 611 | 629 (+2.9%) |
-| `user/update` | 713 | 684 (-4.1%) |
-| `user/remove` | 803 | 762 (-5.1%) |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
+|---|--:|--:|--:|
+| `user/byId` | 1453 | 1436 (-1.2%) | 1795 (+25.0%) |
+| `user/byEmail` | 1518 | 1414 (-6.9%) | 1823 (+28.9%) |
+| `user/byState (join, limit 20)` | 537 | 733 (+36.5%) | 887 (+21.0%) |
+| `user/list (page of 20)` | 490 | 810 (+65.3%) | 888 (+9.6%) |
+| `user/count` | 6167 | 5424 (-12.0%) | 6693 (+23.4%) |
+| `authenticate (login)` | 1474 | 1350 (-8.4%) | 1724 (+27.7%) |
+| `user/register` | 611 | 629 (+2.9%) | 718 (+14.1%) |
+| `user/update` | 713 | 684 (-4.1%) | 850 (+24.3%) |
+| `user/remove` | 803 | 762 (-5.1%) | 890 (+16.8%) |
+
+2026-10-14: 1.22.0 at `a508d8f`, the median of 5 rounds (`--repeat 5`),
+on AC power with the machine idle. Since 2026-10-13: the IDs of ID
+conditions as parameters (Phase 4), prepared statements (SQLite and
+PostgreSQL), the fixes of its review, and inline pragmas. On PostgreSQL the
+change from 2026-10-13 also carries that date's Docker drift (see below):
+alternating `master`, Phase 4 and prepared statements on one container
+measured reads +8–12% and writes about the same, so take its single-row
+and write numbers here as an upper bound. SQLite gained the most from
+prepared statements (a statement compiled once per SQL text): reads
++16–17%, writes +17–19%; memory, which uses no SQL, is unchanged.
 
 2026-10-13 shows its last runs: Phase 3a at `7c9ba77`, the median of 5
 rounds per operation (`--repeat 5`; see its entries, and the Phase 0
@@ -79,6 +90,88 @@ operations after it, run on the seeded 1000 users. The memory adapter
 scans tables, so its numbers depend the most on the table size.
 
 ---
+
+### 2026-10-14 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.22.0 (`a508d8f`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 1795 | 557.1 | 553 | 593 | 634 | 1689–1842 |
+| `user/byEmail` | 1823 | 548.6 | 545 | 584 | 623 | 1792–1827 |
+| `user/byState (join, limit 20)` | 887 | 1128.0 | 1120 | 1216 | 1273 | 883–902 |
+| `user/list (page of 20)` | 888 | 1126.0 | 1125 | 1199 | 1251 | 859–921 |
+| `user/count` | 6693 | 149.4 | 148 | 161 | 177 | 6655–6698 |
+| `authenticate (login)` | 1724 | 580.2 | 574 | 622 | 697 | 1685–1741 |
+| `user/register` | 718 | 1392.0 | 1343 | 1751 | 1815 | 696–725 |
+| `user/update` | 850 | 1176.7 | 1195 | 1252 | 1314 | 781–898 |
+| `user/remove` | 890 | 1123.2 | 1121 | 1164 | 1209 | 884–926 |
+
+1.22.0, on AC power with the machine idle (`--docker`, `--repeat 5`).
+Prepared statements are reused per connection, prepared when a SQL repeats
+outside a transaction; the IDs of ID conditions are parameters, so a
+`byId` reuses one statement for any ID. Alternating the versions on one
+container (see #180): prepared statements made reads +8–12% vs `master`,
+writes about the same (they run in transactions, where nothing new is
+prepared). The change from the 2026-10-13 entry is larger, as that run
+drifted (its note).
+
+### 2026-10-14 — `sqlite` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.22.0 (`a508d8f`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** sqlite (temporary file)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 24721 | 40.5 | 39 | 46 | 89 | 24709–24784 |
+| `user/byEmail` | 24067 | 41.6 | 40 | 47 | 90 | 24038–24085 |
+| `user/byState (join, limit 20)` | 3283 | 304.6 | 295 | 357 | 377 | 3255–3288 |
+| `user/list (page of 20)` | 3433 | 291.3 | 283 | 345 | 361 | 3429–3437 |
+| `user/count` | 195377 | 5.1 | 5 | 5 | 6 | 195242–195435 |
+| `authenticate (login)` | 20985 | 47.7 | 46 | 53 | 107 | 20951–21006 |
+| `user/register` | 9719 | 102.9 | 86 | 111 | 938 | 9471–9872 |
+| `user/update` | 13774 | 72.6 | 69 | 78 | 98 | 13755–13818 |
+| `user/remove` | 16953 | 59.0 | 52 | 56 | 105 | 16645–17053 |
+
+1.22.0. Prepared statements: each SQL text compiled once (on its first
+use) and reused, so every operation that runs SQL gained, reads and writes
+alike. Alternating with `master` (see #180): single-user reads +17–19%,
+writes +13–15%, `list`/`byState` +4–5% (building 20 entities takes most of
+their time). The inline pragmas added ~3% to `byState`.
+
+### 2026-10-14 — `memory` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.22.0 (`a508d8f`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** memory (DBSQLMemoryAdapter)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 30937 | 32.3 | 31 | 37 | 85 | 30825–30975 |
+| `user/byEmail` | 1437 | 695.7 | 713 | 1229 | 1305 | 1153–1562 |
+| `user/byState (join, limit 20)` | 1601 | 624.5 | 611 | 689 | 704 | 1565–1604 |
+| `user/list (page of 20)` | 719 | 1391.4 | 1378 | 1446 | 1466 | 717–720 |
+| `user/count` | 320629 | 3.1 | 3 | 3 | 4 | 320434–321296 |
+| `authenticate (login)` | 1491 | 670.8 | 676 | 1223 | 1292 | 1428–1518 |
+| `user/register` | 3525 | 283.7 | 279 | 413 | 448 | 3494–3691 |
+| `user/update` | 5190 | 192.7 | 191 | 228 | 249 | 5181–5208 |
+| `user/remove` | 12476 | 80.2 | 81 | 97 | 105 | 12100–12820 |
+
+1.22.0. The memory adapter runs no SQL, so the SQL changes since
+2026-10-13 (ID parameters, prepared statements) don't apply to it: within
+about 2% of that date.
 
 ### 2026-10-13 — `postgres` — Mac17,3 (Apple M5)
 

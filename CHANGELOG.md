@@ -1,4 +1,4 @@
-## 1.21.3
+## 1.22.0
 
 - `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
   trips) executed for entity and relationship operations. The shared DB
@@ -20,6 +20,12 @@
   insert. An insert of a user with an address (2 relationship fields) and
   2 roles: from 9 statements to 6.
   - `TransactionOperationStoreRelationship.newEntity`.
+  - The relationship tables bones_api generates delete a deleted entity's
+    rows (`ON DELETE CASCADE`). A relationship table without it, on a
+    database that can reuse an ID (MySQL before 8.0 resets `AUTO_INCREMENT`
+    on restart; a reset PostgreSQL sequence), could give a new entity a
+    deleted one's relationship rows: override
+    `generatedIDsHaveNoRelationships` as `false` then.
 - Optimization: generated relationship tables no longer get an index on the
   source column (`<table>__<source>__idx`): it's the first column of their
   `UNIQUE (source, target)` constraint's index, which already serves
@@ -35,6 +41,13 @@
   statement.
 - Optimization: `DBPostgreSQLAdapter` resolves the column names of a result
   once for all its rows.
+- Optimization: `@pragma('vm:prefer-inline')` on small functions of hot
+  paths that a CPU profile showed not inlined: `ZoneField.get` (the
+  executing `Transaction`), the row layout match of `createFromMap`, the
+  digits of `parseDateTimeISOUTCFast` (a top-level function, not a closure)
+  and the common values (`null`, `num`, `String`, `bool`) of the tracking
+  copy of an entity's fields. Users benchmark: `byState` (a join, 20 users)
+  +3% (SQLite), +1% (memory); the others within their variation.
 
 - **Behavior change**: a SQL select with a `limit` (and no `orderByID`) is
   now ordered by the ID column (`ORDER BY id ... LIMIT n`), as one with an
@@ -69,7 +82,7 @@
     conditions that don't depend on the value are checked first.
   - `parseDateTimeISOUTCFast`: the `DateTime`s `DBSQLiteAdapter` stores
     (`toUtc().toIso8601String()`) are parsed without a regular expression.
-  - Users benchmark vs 1.21.3's previous changes: SQLite `list`/`byState`
+  - Users benchmark vs 1.22.0's previous changes: SQLite `list`/`byState`
     (20 users per call) +31%, single-user reads +11–12%; memory `byId`
     +12%.
 
@@ -89,21 +102,34 @@
   ... `256`, then multiples of `256` (`ConditionSQLEncoder.idsListPaddedLength`),
   so its text is the same for lists of similar lengths. An ID that is
   already a parameter of the query (`#ID == ?`) keeps it. Not faster by
-  itself (users benchmark: within −7% and +1%): the groundwork for reusing
-  statements (prepared statements per connection).
+  itself (users benchmark: within −1.5% and +0.6%): the groundwork for
+  reusing statements (prepared statements per connection).
   - `SQLDialect.intParameterTypeSuffix` (PostgreSQL: `:int8`): an integer
     ID parameter is typed, so an ID beyond the column's type matches
     nothing (as a literal did) instead of failing ("out of range").
-  - `SQLDialect.idsAsParameters`: `false` for MySQL, which keeps the IDs
-    written as values: `mysql1` runs a statement with parameters as
-    prepare + execute (2 round trips, not reused), one without as 1.
+  - `SQLDialect.maxIDsAsParameters`: an `IN` list padded beyond it is
+    written as values. A parameter is only faster when its statement is
+    reused, which a long list's length seldom is, and a statement's
+    parameters are limited (SQLite: 32766; PostgreSQL: 65535; e.g. a
+    `selectByIDs` of 40000 IDs). Measured selecting N rows by ID (reused
+    parameters vs values): PostgreSQL `512` (parameters 16–29% faster up
+    to ~400 IDs, about even at ~640–768, values faster from ~1024); SQLite
+    `1024` (the same cost per ID, ~10–15% less when reused); MySQL `0`, which
+    keeps the IDs written as values: `mysql1` runs a statement with
+    parameters as prepare + execute (2 round trips, not reused), one
+    without as 1. Splitting a list into batches is never faster than
+    values (PostgreSQL: a round trip per batch).
 
-- Prepared statements, reused by SQL text (`PreparedStatementsCache`; the
-  least recently used released over `preparedStatementsCacheSize`, default
-  `100` per connection). On by default; db config `preparedStatements: false`
-  disables them (e.g. behind PgBouncer in transaction pooling mode before
-  1.21). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
-  stale counters.
+- **Behavior change**: prepared statements, reused by SQL text
+  (`PreparedStatementsCache`; the least recently used released over
+  `preparedStatementsCacheSize`, default `100` per connection). On by
+  default; db config `preparedStatements: false` disables them. **Behind
+  PgBouncer in transaction pooling mode before 1.21, disable them**: a
+  prepared statement's name can then refer, on a shared server connection,
+  to another client's statement, which runs instead (silently). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
+  stale counters. An invalid `preparedStatementsCacheSize` (`< 1`) passed to
+  an adapter's constructor throws an `ArgumentError` there (a config value
+  falls back to the default).
   - `DBPostgreSQLAdapter`: per connection. A SQL text is prepared when it
     repeats (preparing costs a round trip; a statement run once doesn't pay
     it), and only outside a transaction (it would be prepared on the
@@ -111,11 +137,17 @@
     also inside the connection's transactions. A stale one (`0A000`: a
     schema change altered its result columns; `26000`) is replaced, and the
     statement run again unprepared (outside a transaction: inside one the
-    error aborted it).
+    error aborted it). A cached statement runs only while its session is
+    open: on the session of a finished transaction it fails, as an
+    unprepared one does, instead of running outside that transaction.
   - `DBSQLiteAdapter`: per database handle, on the first use (no round
     trip); SQLite recompiles a prepared statement after a schema change.
-    Released before the handle is closed.
+    Released before the handle is closed. A SQL with more than one
+    statement is still rejected (`checkNoTail`), not run up to its first.
   - `DBMySQLAdapter`: none (`mysql1` doesn't reuse prepared statements).
+  - Users benchmark vs the previous changes: SQLite single-user reads
+    +17–19%, writes +13–15%, `list`/`byState` +4–5%; PostgreSQL reads
+    +8–12%, writes about the same.
 
 ## 1.21.2
 

@@ -197,6 +197,10 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              // and uses `LIMIT -1` as "no limit":
              offsetRequiresLimit: true,
              offsetMaxLimitValue: '-1',
+             // Parameters cost the same per ID as values, and a reused
+             // statement saves its compilation (~10–15%); beyond ~1024 IDs,
+             // a (padded) length seldom repeats (at most 32766 parameters):
+             maxIDsAsParameters: 1024,
            ),
            transactions: true,
            transactionAbort: true,
@@ -209,6 +213,13 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
          ),
        ) {
     boot();
+
+    if (preparedStatements) {
+      PreparedStatementsCache.checkMaxSize(
+        preparedStatementsCacheSize,
+        'preparedStatementsCacheSize',
+      );
+    }
 
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
@@ -390,7 +401,9 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
     var statement = cache.get(sql);
     if (statement == null) {
-      statement = db.prepare(sql, persistent: true);
+      // `checkNoTail`: rejects a SQL with more than one statement (as
+      // `db.select` does), instead of preparing only the first one.
+      statement = db.prepare(sql, persistent: true, checkNoTail: true);
       cache.put(sql, statement);
     }
 

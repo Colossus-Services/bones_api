@@ -2,6 +2,7 @@
 library;
 
 import 'package:bones_api/bones_api.dart';
+import 'package:bones_api/bones_api_db_postgre.dart';
 import 'package:bones_api/bones_api_db_sqlite.dart';
 import 'package:test/test.dart';
 
@@ -165,6 +166,65 @@ void main() {
       expect(sqlite2.preparedStatements, isTrue);
       expect(sqlite2.preparedStatementsCacheSize, equals(7));
       expect(sqlite2.preparedStatementsInfo, isNotNull);
+    });
+
+    test('SQLite: a SQL with a second statement is rejected', () async {
+      for (var preparedStatements in [true, false]) {
+        var adapter = DBSQLiteAdapter(
+          ':memory:',
+          preparedStatements: preparedStatements,
+        );
+        var conn = await adapter.catchFromPool();
+        try {
+          expect(conn.select('SELECT 1 AS "a"').first['a'], equals(1));
+          // Not only its first statement:
+          expect(
+            () => conn.select('SELECT 1 AS "a" ; SELECT 2 AS "a"'),
+            throwsA(isA<ArgumentError>()),
+            reason: 'preparedStatements: $preparedStatements',
+          );
+        } finally {
+          await adapter.releaseIntoPool(conn);
+          adapter.close();
+        }
+      }
+    });
+
+    test('adapters: an invalid cache size, rejected when constructed', () {
+      // PostgreSQL: not when its first connection opens (left open).
+      expect(
+        () => DBPostgreSQLAdapter(
+          'db',
+          'user',
+          password: 'pass',
+          preparedStatementsCacheSize: 0,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DBSQLiteAdapter(':memory:', preparedStatementsCacheSize: 0),
+        throwsArgumentError,
+      );
+
+      // Not used when disabled:
+      expect(
+        DBPostgreSQLAdapter(
+          'db',
+          'user',
+          password: 'pass',
+          preparedStatements: false,
+          preparedStatementsCacheSize: 0,
+        ).preparedStatementsInfo,
+        isNull,
+      );
+      expect(
+        DBSQLiteAdapter(
+          ':memory:',
+          preparedStatements: false,
+          preparedStatementsCacheSize: 0,
+        ).preparedStatementsInfo,
+        isNull,
+      );
     });
   });
 }
