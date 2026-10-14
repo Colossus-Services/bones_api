@@ -98,6 +98,25 @@
     written as values: `mysql1` runs a statement with parameters as
     prepare + execute (2 round trips, not reused), one without as 1.
 
+- Prepared statements, reused by SQL text (`PreparedStatementsCache`; the
+  least recently used released over `preparedStatementsCacheSize`, default
+  `100` per connection). On by default; db config `preparedStatements: false`
+  disables them (e.g. behind PgBouncer in transaction pooling mode before
+  1.21). `DBSQLAdapter.preparedStatementsInfo`: hits, prepared, evicted and
+  stale counters.
+  - `DBPostgreSQLAdapter`: per connection. A SQL text is prepared when it
+    repeats (preparing costs a round trip; a statement run once doesn't pay
+    it), and only outside a transaction (it would be prepared on the
+    transaction's session, ending with it); a prepared statement is reused
+    also inside the connection's transactions. A stale one (`0A000`: a
+    schema change altered its result columns; `26000`) is replaced, and the
+    statement run again unprepared (outside a transaction: inside one the
+    error aborted it).
+  - `DBSQLiteAdapter`: per database handle, on the first use (no round
+    trip); SQLite recompiles a prepared statement after a schema change.
+    Released before the handle is closed.
+  - `DBMySQLAdapter`: none (`mysql1` doesn't reuse prepared statements).
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
