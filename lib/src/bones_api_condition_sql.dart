@@ -14,10 +14,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
   /// See `SQLDialect.intParameterTypeSuffix`.
   final String? intParameterTypeSuffix;
 
+  /// See `SQLDialect.idsAsParameters`.
+  final bool idsAsParameters;
+
   ConditionSQLEncoder(
     SchemeProvider super.schemeProvider, {
     required this.sqlElementQuote,
     this.intParameterTypeSuffix,
+    this.idsAsParameters = true,
   });
 
   @override
@@ -111,8 +115,9 @@ class ConditionSQLEncoder extends ConditionEncoder {
   /// it matches) to a few sizes ([idsListPaddedLength]), so its text is also
   /// the same for lists of similar lengths.
   ///
-  /// A `null` ID, an empty list, or a [ConditionParameter] (`#ID == ?`: already
-  /// a parameter of the query) keeps the previous encoding.
+  /// Without [idsAsParameters] (MySQL), and for a `null` ID, an empty list,
+  /// or a [ConditionParameter] (`#ID == ?`: already a parameter of the
+  /// query), the IDs are encoded as before (written as values).
   FutureOr<EncodingContext> encodeIDValues(
     EncodingContext context,
     Type idType,
@@ -121,7 +126,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
     Object? idValue,
     bool isList,
   ) {
-    if (idValue == null ||
+    if (!idsAsParameters ||
+        idValue == null ||
         idValue is ConditionParameter ||
         (idValue is Iterable &&
             (idValue.isEmpty || idValue.any((e) => e is ConditionParameter)))) {

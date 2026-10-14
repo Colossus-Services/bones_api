@@ -1310,6 +1310,18 @@ void main() {
       expect(sql5.outputString, equals('( "us"."id" = @id__p )'));
       expect(sql5.parametersPlaceholders, equals({'id__p': 5}));
 
+      // Without `idsAsParameters` (MySQL): written as values, as before.
+      var literal = ConditionSQLEncoder(
+        _schemes(),
+        sqlElementQuote: '"',
+        idsAsParameters: false,
+      );
+      var sql7 = await literal.encode(ConditionID(10), 'item');
+      expect(sql7.outputString, equals('( "it"."code" = \'10\' )'));
+      expect(sql7.parametersPlaceholders, isEmpty);
+      var sql8 = await literal.encode(ConditionIdIN([5, 6, 7]), 'user');
+      expect(sql8.outputString, equals('( "us"."id" IN ( 5 , 6 , 7 ) )'));
+
       expect(ConditionSQLEncoder.idsListPaddedLength(0), equals(1));
       expect(ConditionSQLEncoder.idsListPaddedLength(1), equals(1));
       expect(ConditionSQLEncoder.idsListPaddedLength(2), equals(2));

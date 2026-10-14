@@ -154,6 +154,13 @@ class SQLDialect extends DBDialect {
   /// matching nothing. `null`: none.
   final String? intParameterTypeSuffix;
 
+  /// Whether the IDs of an ID condition are written as parameters
+  /// (placeholders), so the statement text is the same for any ID and can be
+  /// reused (prepared statements). `false` (MySQL): written as values,
+  /// since `mysql1` runs a statement with parameters as prepare + execute
+  /// (2 round trips, not reused) and one without as 1.
+  final bool idsAsParameters;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -174,6 +181,7 @@ class SQLDialect extends DBDialect {
     this.offsetMaxLimitValue = '18446744073709551615',
     this.maxIdentifierLength,
     this.intParameterTypeSuffix,
+    this.idsAsParameters = true,
   });
 
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause

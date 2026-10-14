@@ -602,6 +602,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       this,
       sqlElementQuote: dialect.elementQuote,
       intParameterTypeSuffix: dialect.intParameterTypeSuffix,
+      idsAsParameters: dialect.idsAsParameters,
     );
   }
 

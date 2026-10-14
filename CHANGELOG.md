@@ -94,6 +94,9 @@
   - `SQLDialect.intParameterTypeSuffix` (PostgreSQL: `:int8`): an integer
     ID parameter is typed, so an ID beyond the column's type matches
     nothing (as a literal did) instead of failing ("out of range").
+  - `SQLDialect.idsAsParameters`: `false` for MySQL, which keeps the IDs
+    written as values: `mysql1` runs a statement with parameters as
+    prepare + execute (2 round trips, not reused), one without as 1.
 
 ## 1.21.2
 

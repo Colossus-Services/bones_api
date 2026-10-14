@@ -121,6 +121,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              // MySQL can't parse an `OFFSET` without a preceding `LIMIT`:
              offsetRequiresLimit: true,
              maxIdentifierLength: 64,
+             // `mysql1` can't reuse prepared statements, and a statement with
+             // parameters costs 2 round trips: IDs written as values.
+             idsAsParameters: false,
            ),
            transactions: true,
            transactionAbort: true,
