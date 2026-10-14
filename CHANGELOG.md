@@ -56,6 +56,22 @@
   may have listed the files before that call's write. A cached file already
   removed counts as deleted.
 
+- Optimization: turning rows (or any `Map`) into entities
+  (`EntityHandler.createFromMap`), for every adapter:
+  - `resolveFieldsValues` resolves the values into one map, synchronously
+    when none of them is a `Future` (no `forEachAsync`, entries and
+    intermediate maps per row).
+  - The key of each field in a row is matched once per row layout (its
+    keys, in order) and reused for the next rows with the same keys,
+    instead of per row (with 2 lookup maps built per row).
+  - `resolveValueByType` no longer builds a `TypeInfo` of every value: the
+    conditions that don't depend on the value are checked first.
+  - `parseDateTimeISOUTCFast`: the `DateTime`s `DBSQLiteAdapter` stores
+    (`toUtc().toIso8601String()`) are parsed without a regular expression.
+  - Users benchmark vs 1.21.3's previous changes: SQLite `list`/`byState`
+    (20 users per call) +31%, single-user reads +11–12%; memory `byId`
+    +12%.
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
