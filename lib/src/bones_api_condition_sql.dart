@@ -39,51 +39,34 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var tableName = context.tableNameOrEntityName;
     var tableAlias = context.resolveEntityAlias(tableName);
 
-    var schemeProvider = this.schemeProvider;
-    if (schemeProvider == null) {
-      var idKey = context.addEncodingParameter('id', c.idValue);
+    // Never `null`: required by the constructor.
+    var tableSchemeRet = schemeProvider!.getTableScheme(tableName);
+
+    return tableSchemeRet.resolveMapped((tableScheme) {
+      if (tableScheme == null) {
+        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
+      }
+
+      var idFieldName = tableScheme.idFieldName ?? 'id';
+      var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
+
+      var idKey = context.addEncodingParameter(idFieldName, c.idValue);
       var q = sqlElementQuote;
-      // The column, not `idKey` (renamed if a query parameter is `id`):
-      var tableKey = '$q$tableAlias$q.${q}id$q';
+      // The column, not `idKey` (renamed if a query parameter has its name):
+      var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
       return encodeConditionValuesWithOperator(
         context,
-        int,
+        idType,
         idKey,
         tableKey,
         '=',
         c.idValue,
         false,
       );
-    } else {
-      var tableSchemeRet = schemeProvider.getTableScheme(tableName);
-
-      return tableSchemeRet.resolveMapped((tableScheme) {
-        if (tableScheme == null) {
-          var errorMsg =
-              "Can't find `TableScheme` for entity/table: $tableName";
-          _log.severe(errorMsg);
-          throw StateError(errorMsg);
-        }
-
-        var idFieldName = tableScheme.idFieldName ?? 'id';
-        var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
-
-        var idKey = context.addEncodingParameter(idFieldName, c.idValue);
-        var q = sqlElementQuote;
-        var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
-
-        return encodeConditionValuesWithOperator(
-          context,
-          idType,
-          idKey,
-          tableKey,
-          '=',
-          c.idValue,
-          false,
-        );
-      });
-    }
+    });
   }
 
   @override
@@ -94,51 +77,35 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var tableName = context.tableNameOrEntityName;
     var tableAlias = context.resolveEntityAlias(tableName);
 
-    var schemeProvider = this.schemeProvider;
-    if (schemeProvider == null) {
-      var idKey = context.addEncodingParameter('id', c.idsValues);
+    // Never `null`: required by the constructor.
+    var tableSchemeRet = schemeProvider!.getTableScheme(tableName);
+
+    return tableSchemeRet.resolveMapped((tableScheme) {
+      if (tableScheme == null) {
+        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
+        _log.severe(errorMsg);
+        throw StateError(errorMsg);
+      }
+
+      var idFieldName = tableScheme.idFieldName ?? 'id';
+      var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
+
+      context.addEncodingParameter(idFieldName, c.idsValues);
       var q = sqlElementQuote;
-      // The column, not `idKey` (renamed if a query parameter is `id`):
-      var tableKey = '$q$tableAlias$q.${q}id$q';
+      // The column, not the encoding parameter key (renamed if a query
+      // parameter has its name):
+      var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
       return encodeConditionValuesWithOperator(
         context,
-        int,
-        idKey,
+        idType,
+        idFieldName,
         tableKey,
         'IN',
         c.idsValues,
         true,
       );
-    } else {
-      var tableSchemeRet = schemeProvider.getTableScheme(tableName);
-
-      return tableSchemeRet.resolveMapped((tableScheme) {
-        if (tableScheme == null) {
-          var errorMsg =
-              "Can't find `TableScheme` for entity/table: $tableName";
-          _log.severe(errorMsg);
-          throw StateError(errorMsg);
-        }
-
-        var idFieldName = tableScheme.idFieldName ?? 'id';
-        var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
-
-        context.addEncodingParameter(idFieldName, c.idsValues);
-        var q = sqlElementQuote;
-        var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
-
-        return encodeConditionValuesWithOperator(
-          context,
-          idType,
-          idFieldName,
-          tableKey,
-          'IN',
-          c.idsValues,
-          true,
-        );
-      });
-    }
+    });
   }
 
   @override
