@@ -76,4 +76,59 @@ Future<bool> _runTest(
   generateTables: generateTables,
   checkTables: checkTables,
   populateSource: populateSource,
+  adapterTests: {
+    'prepared statements: not run on a finished transaction':
+        _testPreparedStatementOnFinishedTransaction,
+  },
 );
+
+/// A cached prepared statement run on the connection wrapper of a transaction
+/// already finished (e.g. an execution queued before an abort) must fail, as
+/// an unprepared one does, and not run outside that transaction.
+Future<void> _testPreparedStatementOnFinishedTransaction(
+  DBSQLAdapter sqlAdapter,
+) async {
+  var adapter = sqlAdapter as DBPostgreSQLAdapter;
+  var conn = await adapter.catchFromPool();
+
+  const insert =
+      'INSERT INTO "store" ("name", "number") VALUES (@name, @number)';
+
+  try {
+    var cache = conn.statementsCache;
+    if (cache == null) return;
+
+    // Prepared on the connection (when it repeats):
+    for (var i = 0; i < 2; ++i) {
+      await conn.execute(
+        insert,
+        substitutionValues: {'name': 'ps-tx-$i', 'number': i},
+      );
+    }
+    expect(cache.contains(insert), isTrue);
+
+    PostgreSQLConnectionTransactionWrapper? txConn;
+    await conn.openTransaction((tx) async => txConn = tx);
+
+    await expectLater(
+      txConn!.execute(
+        insert,
+        substitutionValues: {'name': 'ps-tx-late', 'number': 9},
+      ),
+      throwsA(predicate((e) => '$e'.contains('not open'))),
+    );
+
+    var rows = await conn.mappedResultsQuery(
+      'SELECT count(*) AS "n" FROM "store" WHERE "name" = @name',
+      substitutionValues: {'name': 'ps-tx-late'},
+    );
+    expect(rows.first['n'], equals(0));
+  } finally {
+    // The other tests count the stores:
+    await conn.execute(
+      'DELETE FROM "store" WHERE "name" LIKE @name',
+      substitutionValues: {'name': 'ps-tx-%'},
+    );
+    await adapter.releaseIntoPool(conn);
+  }
+}

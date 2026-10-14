@@ -279,6 +279,7 @@ Future<bool> runAdapterTests(
   required bool checkTables,
   required bool generateTables,
   required bool populateSource,
+  Map<String, Future<void> Function(DBSQLAdapter sqlAdapter)>? adapterTests,
 }) async {
   _log.handler.logToConsole();
   LoggerHandler.disableLogQueue();
@@ -907,6 +908,14 @@ Future<bool> runAdapterTests(
           if (id2 != null) await storeAPIRepository.deleteByID(id2);
         }
       });
+
+      // The tests of this adapter only (see `adapterTests`):
+      for (var e in (adapterTests ?? const {}).entries) {
+        test(
+          e.key,
+          () async => e.value(await entityRepositoryProvider.adapter),
+        );
+      }
 
       test('EntityIndex: generated, introspected and checked', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;

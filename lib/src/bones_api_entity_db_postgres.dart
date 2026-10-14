@@ -174,6 +174,14 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       throw ArgumentError("No `password` or `passwordProvider` ");
     }
 
+    // Here, not when the first connection opens (it would be left open).
+    if (preparedStatements) {
+      PreparedStatementsCache.checkMaxSize(
+        preparedStatementsCacheSize,
+        'preparedStatementsCacheSize',
+      );
+    }
+
     parentRepositoryProvider?.notifyKnownEntityRepositoryProvider(this);
   }
 
@@ -1757,7 +1765,13 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     bool ignoreRows = false,
   }) async {
     var cache = statementsCache;
-    if (cache != null) {
+    // Only while this session is open: a prepared statement runs in the
+    // connection's active transaction, or else on the connection itself,
+    // without checking its session. Run on the session of a transaction
+    // already finished (e.g. an execution queued before an abort), it would
+    // run outside that transaction (autocommit, or another caller's
+    // transaction). The execution below rejects it ("not open").
+    if (cache != null && nativeConnection.isOpen) {
       var statement = cache.get(sql);
       if (statement != null) {
         try {
