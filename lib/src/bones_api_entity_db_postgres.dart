@@ -135,6 +135,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              acceptsVarcharWithoutMaximumSize: true,
              foreignKeyCreatesImplicitIndex: false,
              maxIdentifierLength: 63,
+             intParameterTypeSuffix: ':int8',
            ),
            transactions: true,
            transactionAbort: true,
