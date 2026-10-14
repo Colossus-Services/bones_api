@@ -601,6 +601,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     _conditionSQLGenerator = ConditionSQLEncoder(
       this,
       sqlElementQuote: dialect.elementQuote,
+      intParameterTypeSuffix: dialect.intParameterTypeSuffix,
     );
   }
 

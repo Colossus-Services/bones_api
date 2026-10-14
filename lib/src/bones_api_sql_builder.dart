@@ -148,6 +148,12 @@ class SQLDialect extends DBDialect {
   /// `null`: no limit.
   final int? maxIdentifierLength;
 
+  /// A suffix typing the placeholder of an integer parameter, e.g. `:int8`
+  /// in PostgreSQL (`@id:int8`): an untyped parameter takes the column's type
+  /// (`integer`), and then a larger value fails ("out of range") instead of
+  /// matching nothing. `null`: none.
+  final String? intParameterTypeSuffix;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -167,6 +173,7 @@ class SQLDialect extends DBDialect {
     this.offsetRequiresLimit = false,
     this.offsetMaxLimitValue = '18446744073709551615',
     this.maxIdentifierLength,
+    this.intParameterTypeSuffix,
   });
 
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause

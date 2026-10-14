@@ -1255,27 +1255,80 @@ void main() {
     });
 
     test('ID conditions', () async {
+      // The IDs are parameters (the statement text is the same for any ID),
+      // resolved to the ID type (`code` is a `String`):
       var sql = await _encoder().encode(ConditionID(10), 'item');
-      expect(sql.outputString, equals('( "it"."code" = \'10\' )'));
+      expect(sql.outputString, equals('( "it"."code" = @id__p )'));
+      expect(sql.parametersPlaceholders, equals({'id__p': '10'}));
 
       var sql2 = await _encoder().encode(ConditionIdIN(['a', 'b']), 'item');
-      expect(sql2.outputString, equals('( "it"."code" IN ( \'a\' , \'b\' ) )'));
+      expect(
+        sql2.outputString,
+        equals('( "it"."code" IN ( @id__p__0 , @id__p__1 ) )'),
+      );
+      expect(
+        sql2.parametersPlaceholders,
+        equals({'id__p__0': 'a', 'id__p__1': 'b'}),
+      );
+
+      // Padded to 4, repeating the last ID (the same rows):
+      var sql3 = await _encoder().encode(
+        ConditionIdIN(['a', 'b', 'c']),
+        'item',
+      );
+      expect(
+        sql3.outputString,
+        equals(
+          '( "it"."code" IN ( @id__p__0 , @id__p__1 , @id__p__2 , @id__p__3 ) )',
+        ),
+      );
+      expect(
+        sql3.parametersPlaceholders,
+        equals({
+          'id__p__0': 'a',
+          'id__p__1': 'b',
+          'id__p__2': 'c',
+          'id__p__3': 'c',
+        }),
+      );
+
+      // An ID that is already a parameter of the query keeps it:
+      var sql4 = await _encoder().encode(
+        Condition.parse(' #ID == ? '),
+        'item',
+        positionalParameters: ['x'],
+      );
+      expect(sql4.outputString, isNot(contains('id__p')));
 
       // A query parameter named `id` renames the encoding parameter
       // (`param_id`): the column is still the ID column.
-      var sql3 = await _encoder().encode(
+      var sql5 = await _encoder().encode(
         ConditionID(5),
         'user',
         namedParameters: {'id': 9},
       );
-      expect(sql3.outputString, equals('( "us"."id" = 5 )'));
+      expect(sql5.outputString, equals('( "us"."id" = @id__p )'));
+      expect(sql5.parametersPlaceholders, equals({'id__p': 5}));
 
-      var sql4 = await _encoder().encode(
+      expect(ConditionSQLEncoder.idsListPaddedLength(0), equals(1));
+      expect(ConditionSQLEncoder.idsListPaddedLength(1), equals(1));
+      expect(ConditionSQLEncoder.idsListPaddedLength(2), equals(2));
+      expect(ConditionSQLEncoder.idsListPaddedLength(3), equals(4));
+      expect(ConditionSQLEncoder.idsListPaddedLength(20), equals(32));
+      expect(ConditionSQLEncoder.idsListPaddedLength(256), equals(256));
+      expect(ConditionSQLEncoder.idsListPaddedLength(257), equals(512));
+      expect(ConditionSQLEncoder.idsListPaddedLength(600), equals(768));
+
+      // The same for an `IN` list:
+      var sql6 = await _encoder().encode(
         ConditionIdIN([5, 6]),
         'user',
         namedParameters: {'id': 9},
       );
-      expect(sql4.outputString, equals('( "us"."id" IN ( 5 , 6 ) )'));
+      expect(
+        sql6.outputString,
+        equals('( "us"."id" IN ( @id__p__0 , @id__p__1 ) )'),
+      );
 
       expect(
         () async => await _encoder().encode(ConditionID(1), 'nope'),

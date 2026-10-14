@@ -11,9 +11,13 @@ final _log = logging.Logger('ConditionSQLEncoder');
 class ConditionSQLEncoder extends ConditionEncoder {
   final String sqlElementQuote;
 
+  /// See `SQLDialect.intParameterTypeSuffix`.
+  final String? intParameterTypeSuffix;
+
   ConditionSQLEncoder(
     SchemeProvider super.schemeProvider, {
     required this.sqlElementQuote,
+    this.intParameterTypeSuffix,
   });
 
   @override
@@ -57,15 +61,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
       // The column, not `idKey` (renamed if a query parameter has its name):
       var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
-      return encodeConditionValuesWithOperator(
-        context,
-        idType,
-        idKey,
-        tableKey,
-        '=',
-        c.idValue,
-        false,
-      );
+      return encodeIDValues(context, idType, idKey, tableKey, c.idValue, false);
     });
   }
 
@@ -90,22 +86,123 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var idFieldName = tableScheme.idFieldName ?? 'id';
       var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
 
-      context.addEncodingParameter(idFieldName, c.idsValues);
+      var idKey = context.addEncodingParameter(idFieldName, c.idsValues);
       var q = sqlElementQuote;
-      // The column, not the encoding parameter key (renamed if a query
-      // parameter has its name):
+      // The column, not `idKey` (renamed if a query parameter has its name):
       var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
 
-      return encodeConditionValuesWithOperator(
+      return encodeIDValues(
         context,
         idType,
-        idFieldName,
+        idKey,
         tableKey,
-        'IN',
         c.idsValues,
         true,
       );
     });
+  }
+
+  /// Writes the comparison of the ID column ([tableKey]) with [idValue] (`=`)
+  /// or with the [idValue] list (`IN`), as parameters (placeholders) rather
+  /// than values written into the SQL: the statement text is the same for
+  /// any ID, so it can be reused (prepared statements, SQL caches).
+  ///
+  /// An `IN` list is padded (repeating its last ID, which doesn't change what
+  /// it matches) to a few sizes ([idsListPaddedLength]), so its text is also
+  /// the same for lists of similar lengths.
+  ///
+  /// A `null` ID, an empty list, or a [ConditionParameter] (`#ID == ?`: already
+  /// a parameter of the query) keeps the previous encoding.
+  FutureOr<EncodingContext> encodeIDValues(
+    EncodingContext context,
+    Type idType,
+    String idKey,
+    String tableKey,
+    Object? idValue,
+    bool isList,
+  ) {
+    if (idValue == null ||
+        idValue is ConditionParameter ||
+        (idValue is Iterable &&
+            (idValue.isEmpty || idValue.any((e) => e is ConditionParameter)))) {
+      return encodeConditionValuesWithOperator(
+        context,
+        idType,
+        idKey,
+        tableKey,
+        isList ? 'IN' : '=',
+        idValue,
+        isList,
+      );
+    }
+
+    var resolvedRet = resolveValueToType(idValue, idType, valueAsList: isList);
+
+    return resolvedRet.resolveMapped((resolved) {
+      var parameterKey = _newIDParameterKey(context);
+      var placeholders = context.parametersPlaceholders;
+
+      context.write(' ');
+      context.write(tableKey);
+
+      var intSuffix = intParameterTypeSuffix;
+
+      void writePlaceholder(String key, Object? value) {
+        context.write(parameterPlaceholder(key));
+        if (intSuffix != null && value is int) context.write(intSuffix);
+      }
+
+      if (!isList) {
+        placeholders[parameterKey] = resolved;
+        context.write(' = ');
+        writePlaceholder(parameterKey, resolved);
+        context.write(' ');
+        return context;
+      }
+
+      var ids = resolved is Iterable ? resolved.toList() : [resolved];
+      var length = idsListPaddedLength(ids.length);
+      var last = ids.last;
+
+      context.write(' IN ( ');
+      for (var i = 0; i < length; ++i) {
+        var k = parameterPlaceholderIndexKey(parameterKey, i);
+        var v = i < ids.length ? ids[i] : last;
+        placeholders[k] = v;
+        if (i > 0) context.write(' , ');
+        writePlaceholder(k, v);
+      }
+      context.write(' ) ');
+
+      return context;
+    });
+  }
+
+  /// The length an `IN` list of IDs is padded to: `1`, `2`, `4`, `8` ... up to
+  /// `256`, then multiples of `256`.
+  static int idsListPaddedLength(int length) {
+    if (length <= 1) return 1;
+    if (length > 256) return ((length + 255) ~/ 256) * 256;
+    var n = 2;
+    while (n < length) {
+      n <<= 1;
+    }
+    return n;
+  }
+
+  /// A parameter key for an ID not used by the [context]'s parameters.
+  String _newIDParameterKey(EncodingContext context) {
+    var placeholders = context.parametersPlaceholders;
+    var namedParameters = context.namedParameters;
+
+    for (var i = 0; ; ++i) {
+      var k = i == 0 ? 'id__p' : 'id__p$i';
+      if (!placeholders.containsKey(k) &&
+          !placeholders.containsKey(parameterPlaceholderIndexKey(k, 0)) &&
+          (namedParameters == null || !namedParameters.containsKey(k))) {
+        return k;
+      }
+    }
   }
 
   @override

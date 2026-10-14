@@ -82,6 +82,19 @@
   the ID column from the encoding parameter key, which is renamed (e.g.
   `"param_id"`) when the query has a parameter named like the ID column.
 
+- SQL: the IDs of an ID condition (`#ID == x`, `selectByID`, `selectByIDs`
+  and the selects of references) are now parameters (placeholders), not
+  values written into the statement: its text is the same for any ID. An
+  `IN` list of IDs is padded (repeating its last ID) to `1`, `2`, `4`, `8`
+  ... `256`, then multiples of `256` (`ConditionSQLEncoder.idsListPaddedLength`),
+  so its text is the same for lists of similar lengths. An ID that is
+  already a parameter of the query (`#ID == ?`) keeps it. Not faster by
+  itself (users benchmark: within −7% and +1%): the groundwork for reusing
+  statements (prepared statements per connection).
+  - `SQLDialect.intParameterTypeSuffix` (PostgreSQL: `:int8`): an integer
+    ID parameter is typed, so an ID beyond the column's type matches
+    nothing (as a literal did) instead of failing ("out of range").
+
 ## 1.21.2
 
 - `reflection_factory: ^2.11.0` (requires Dart 3.13.2+): `Json.decode<Map>` /
