@@ -1,4 +1,4 @@
-## 1.21.3
+## 1.22.0
 
 - `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round
   trips) executed for entity and relationship operations. The shared DB
@@ -69,7 +69,7 @@
     conditions that don't depend on the value are checked first.
   - `parseDateTimeISOUTCFast`: the `DateTime`s `DBSQLiteAdapter` stores
     (`toUtc().toIso8601String()`) are parsed without a regular expression.
-  - Users benchmark vs 1.21.3's previous changes: SQLite `list`/`byState`
+  - Users benchmark vs 1.22.0's previous changes: SQLite `list`/`byState`
     (20 users per call) +31%, single-user reads +11–12%; memory `byId`
     +12%.
 
@@ -89,8 +89,8 @@
   ... `256`, then multiples of `256` (`ConditionSQLEncoder.idsListPaddedLength`),
   so its text is the same for lists of similar lengths. An ID that is
   already a parameter of the query (`#ID == ?`) keeps it. Not faster by
-  itself (users benchmark: within −7% and +1%): the groundwork for reusing
-  statements (prepared statements per connection).
+  itself (users benchmark: within −1.5% and +0.6%): the groundwork for
+  reusing statements (prepared statements per connection).
   - `SQLDialect.intParameterTypeSuffix` (PostgreSQL: `:int8`): an integer
     ID parameter is typed, so an ID beyond the column's type matches
     nothing (as a literal did) instead of failing ("out of range").
@@ -116,6 +116,9 @@
     trip); SQLite recompiles a prepared statement after a schema change.
     Released before the handle is closed.
   - `DBMySQLAdapter`: none (`mysql1` doesn't reuse prepared statements).
+  - Users benchmark vs the previous changes: SQLite single-user reads
+    +17–19%, writes +13–15%, `list`/`byState` +4–5%; PostgreSQL reads
+    +8–12%, writes about the same.
 
 ## 1.21.2
 
