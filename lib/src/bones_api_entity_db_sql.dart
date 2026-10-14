@@ -12,6 +12,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_memory.dart';
+import 'bones_api_entity_db_prepared_statements.dart';
 import 'bones_api_entity_db_relational.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
@@ -504,6 +505,45 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
     return null;
   }
+
+  /// The default size of an adapter's prepared statements cache (per
+  /// connection). See [parseConfigPreparedStatements].
+  static const int defaultPreparedStatementsCacheSize = 100;
+
+  /// Parses the prepared statements options of a db [config]:
+  /// - `preparedStatements` (default `true`): `false` disables them (e.g.
+  ///   behind a pooler that doesn't support named statements, like PgBouncer
+  ///   in transaction pooling mode before 1.21).
+  /// - `preparedStatementsCacheSize` (default
+  ///   [defaultPreparedStatementsCacheSize]): the maximum number of cached
+  ///   statements per connection.
+  static ({bool enabled, int cacheSize}) parseConfigPreparedStatements(
+    Map<String, dynamic>? config,
+  ) {
+    var enabled =
+        config?.getMultiKeyAsBool(const [
+          'preparedStatements',
+          'prepared_statements',
+          'prepared-statements',
+        ]) ??
+        true;
+
+    var cacheSize =
+        config?.getMultiKeyAsInt(const [
+          'preparedStatementsCacheSize',
+          'prepared_statements_cache_size',
+          'prepared-statements-cache-size',
+        ]) ??
+        defaultPreparedStatementsCacheSize;
+
+    if (cacheSize < 1) cacheSize = defaultPreparedStatementsCacheSize;
+
+    return (enabled: enabled, cacheSize: cacheSize);
+  }
+
+  /// The counters of this adapter's prepared statements (all of its
+  /// connections), or `null` if it doesn't use them (or they're disabled).
+  PreparedStatementsInfo? get preparedStatementsInfo => null;
 
   static ({bool generateTables, bool checkTables})
   parseConfigDBGenerateTablesAndCheckTables(Map<String, dynamic>? config) {

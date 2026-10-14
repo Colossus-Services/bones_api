@@ -825,6 +825,89 @@ Future<bool> runAdapterTests(
         expect(await storeAPIRepository.selectByID(id), isNull);
       });
 
+      test('prepared statements: reused, in transactions and after a '
+          'schema change', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        var info = sqlAdapter.preparedStatementsInfo;
+        if (info == null) {
+          _log.info("No prepared statements: skipping.");
+          return;
+        }
+
+        var isPostgres = sqlAdapter.dialect.name == 'PostgreSQL';
+        var q = sqlAdapter.dialect.elementQuote;
+
+        // Independent of the other tests (e.g. run alone): the tables are
+        // created if not yet.
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+
+        final storeAPIRepository = entityRepositoryProvider.storeAPIRepository;
+
+        var id = await storeAPIRepository.store(Store('ps-1', 1));
+        Object? id2;
+
+        try {
+          // Repeated: prepared (PostgreSQL: when it repeats; maybe already by
+          // a previous test), then reused.
+          var hits0 = info.hits;
+          for (var i = 0; i < 4; ++i) {
+            expect((await storeAPIRepository.selectByID(id))!.name, 'ps-1');
+          }
+          expect(info.prepared, greaterThan(0));
+          expect(info.hits, greaterThanOrEqualTo(hits0 + 2));
+
+          // Inside a transaction (with a write, so the reads are in it too):
+          // the cached statements are used, and (PostgreSQL) none is
+          // prepared on the transaction's session.
+          var prepared1 = info.prepared;
+          var hits1 = info.hits;
+          await Transaction().execute(() async {
+            id2 = await storeAPIRepository.store(Store('ps-2', 2));
+            expect((await storeAPIRepository.selectByID(id))!.name, 'ps-1');
+          });
+          expect(info.hits, greaterThan(hits1));
+          if (isPostgres) {
+            expect(info.prepared, equals(prepared1));
+          }
+
+          // A schema change by another session, changing the columns of
+          // `SELECT *`: still selected (PostgreSQL: the stale statement is
+          // replaced; SQLite recompiles it).
+          if (testConfigDB is APITestConfigDBSQL) {
+            var testConfigSQL = testConfigDB;
+            var stale0 = info.stale;
+
+            await testConfigSQL.runSQL(
+              'ALTER TABLE ${q}store$q ADD COLUMN ${q}ps_extra$q INT',
+            );
+            try {
+              expect((await storeAPIRepository.selectByID(id))!.name, 'ps-1');
+              expect((await storeAPIRepository.selectByID(id))!.name, 'ps-1');
+            } finally {
+              await testConfigSQL.runSQL(
+                'ALTER TABLE ${q}store$q DROP COLUMN ${q}ps_extra$q',
+              );
+              sqlAdapter.disposeTableSchemeCache('store');
+            }
+
+            expect((await storeAPIRepository.selectByID(id))!.name, 'ps-1');
+
+            if (isPostgres) {
+              expect(info.stale, greaterThan(stale0));
+            }
+          }
+        } finally {
+          // The other tests count the stores.
+          await storeAPIRepository.deleteByID(id);
+          if (id2 != null) await storeAPIRepository.deleteByID(id2);
+        }
+      });
+
       test('EntityIndex: generated, introspected and checked', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
         var q = sqlAdapter.dialect.elementQuote;
