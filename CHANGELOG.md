@@ -41,6 +41,13 @@
   statement.
 - Optimization: `DBPostgreSQLAdapter` resolves the column names of a result
   once for all its rows.
+- Optimization: `@pragma('vm:prefer-inline')` on small functions of hot
+  paths that a CPU profile showed not inlined: `ZoneField.get` (the
+  executing `Transaction`), the row layout match of `createFromMap`, the
+  digits of `parseDateTimeISOUTCFast` (a top-level function, not a closure)
+  and the common values (`null`, `num`, `String`, `bool`) of the tracking
+  copy of an entity's fields. Users benchmark: `byState` (a join, 20 users)
+  +3% (SQLite), +1% (memory); the others within their variation.
 
 - **Behavior change**: a SQL select with a `limit` (and no `orderByID`) is
   now ordered by the ID column (`ORDER BY id ... LIMIT n`), as one with an

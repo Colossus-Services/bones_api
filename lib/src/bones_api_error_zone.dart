@@ -166,6 +166,7 @@ class ZoneField<T extends Object> {
 
   /// Gets the value associated with the [contextZone].
   /// - If [contextZone] is not provided it will get from [ZoneField.contextZone].
+  @pragma('vm:prefer-inline')
   T? get([Zone? contextZone]) {
     contextZone ??= this.contextZone;
     var t = _values[contextZone];

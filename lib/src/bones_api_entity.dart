@@ -3435,16 +3435,6 @@ DateTime? parseDateTimeISOUTCFast(String s) {
   // `YYYY-MM-DDTHH:MM:SSZ` (20) to `YYYY-MM-DDTHH:MM:SS.ffffffZ` (27):
   if (n < 20 || n > 27 || s.codeUnitAt(n - 1) != 0x5A /* Z */ ) return null;
 
-  int digits(int start, int length) {
-    var v = 0;
-    for (var i = start; i < start + length; ++i) {
-      var d = s.codeUnitAt(i) - 0x30;
-      if (d < 0 || d > 9) return -1;
-      v = v * 10 + d;
-    }
-    return v;
-  }
-
   if (s.codeUnitAt(4) != 0x2D /* - */ || s.codeUnitAt(7) != 0x2D) return null;
   final sep = s.codeUnitAt(10);
   if (sep != 0x54 /* T */ && sep != 0x20 /* space */ ) return null;
@@ -3452,12 +3442,12 @@ DateTime? parseDateTimeISOUTCFast(String s) {
     return null;
   }
 
-  final year = digits(0, 4);
-  final month = digits(5, 2);
-  final day = digits(8, 2);
-  final hour = digits(11, 2);
-  final minute = digits(14, 2);
-  final second = digits(17, 2);
+  final year = _parseDigits(s, 0, 4);
+  final month = _parseDigits(s, 5, 2);
+  final day = _parseDigits(s, 8, 2);
+  final hour = _parseDigits(s, 11, 2);
+  final minute = _parseDigits(s, 14, 2);
+  final second = _parseDigits(s, 17, 2);
   if (year < 0 || month < 0 || day < 0 || hour < 0 || minute < 0) return null;
   if (second < 0) return null;
 
@@ -3466,7 +3456,7 @@ DateTime? parseDateTimeISOUTCFast(String s) {
     // `.` and 1 to 6 digits before the `Z`:
     if (s.codeUnitAt(19) != 0x2E /* . */ || n < 22) return null;
     final count = n - 21;
-    var fraction = digits(20, count);
+    var fraction = _parseDigits(s, 20, count);
     if (fraction < 0) return null;
     for (var i = count; i < 6; ++i) {
       fraction *= 10;
@@ -3475,6 +3465,19 @@ DateTime? parseDateTimeISOUTCFast(String s) {
   }
 
   return DateTime.utc(year, month, day, hour, minute, second, 0, microsecond);
+}
+
+/// The decimal value of the [length] digits of [s] at [start], or `-1` if
+/// one of them isn't a digit.
+@pragma('vm:prefer-inline')
+int _parseDigits(String s, int start, int length) {
+  var v = 0;
+  for (var i = start; i < start + length; ++i) {
+    var d = s.codeUnitAt(i) - 0x30;
+    if (d < 0 || d > 9) return -1;
+    v = v * 10 + d;
+  }
+  return v;
 }
 
 /// The key of each field of [fieldsNames] in the maps with [mapKeys] (in
@@ -3490,6 +3493,7 @@ class _FieldsMapLayout {
 
   /// Whether [map] has the same keys, in the same order (the key matching
   /// depends on the order when two keys match a field the same way).
+  @pragma('vm:prefer-inline')
   bool matches(List<String> fieldsNames, Map<String, Object?> map) {
     if (!identical(this.fieldsNames, fieldsNames)) return false;
 
@@ -5511,15 +5515,17 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     return fieldsCp;
   }
 
+  /// The common values (`null`, [num], [String], [bool]) inline, the others
+  /// by [_trackingValueCopyOther].
+  @pragma('vm:prefer-inline')
   Object? _trackingValueCopy(Object? o) {
-    if (o == null) return null;
-    if (o is num ||
-        o is String ||
-        o is bool ||
-        o is DynamicNumber ||
-        o is DateTime ||
-        o is Time ||
-        o is Enum) {
+    if (o == null || o is num || o is String || o is bool) return o;
+    return _trackingValueCopyOther(o);
+  }
+
+  @pragma('vm:never-inline')
+  Object? _trackingValueCopyOther(Object o) {
+    if (o is DynamicNumber || o is DateTime || o is Time || o is Enum) {
       return o;
     }
 
