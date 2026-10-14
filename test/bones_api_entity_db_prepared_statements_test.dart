@@ -1,3 +1,6 @@
+@TestOn('vm')
+library;
+
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_sqlite.dart';
 import 'package:test/test.dart';
