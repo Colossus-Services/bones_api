@@ -872,6 +872,25 @@ void main() {
         [tag1, tag2],
       );
       expect(relSQLs, hasLength(2));
+      // The last one also deletes the entity's other relationship rows:
+      expect(relSQLs.first.posSQL, isNull);
+      expect(relSQLs.last.posSQL!.single.sql, startsWith('DELETE FROM'));
+
+      // A just inserted entity (`newEntity`, on the adapters with
+      // `generatedIDsHaveNoRelationships`): it has none, so no `DELETE`.
+      var relSQLsNew = await adapter.generateInsertRelationshipSQLs(
+        Transaction(),
+        'item',
+        'item',
+        'tags',
+        id,
+        'tag',
+        [tag1, tag2],
+        newEntity: true,
+      );
+      expect(relSQLsNew.map((e) => e.sql), equals(relSQLs.map((e) => e.sql)));
+      expect(relSQLsNew.map((e) => e.posSQL), everyElement(isNull));
+
       expect(
         await ra.insertRelationshipSQLs(_op('item', ra), relSQLs, id, 'tag', [
           tag1,

@@ -79,8 +79,62 @@ Future<bool> _runTest(
   adapterTests: {
     'prepared statements: not run on a finished transaction':
         _testPreparedStatementOnFinishedTransaction,
+    'prepared statements: stale inside a transaction':
+        _testStalePreparedStatementInTransaction,
   },
 );
+
+/// A cached prepared statement made stale by a schema change (`0A000`: its
+/// result columns changed), run inside a transaction: the error has aborted
+/// the transaction, so it's rethrown (not retried), and the statement is
+/// evicted (the next run, outside, prepares it again).
+Future<void> _testStalePreparedStatementInTransaction(
+  DBSQLAdapter sqlAdapter,
+) async {
+  var adapter = sqlAdapter as DBPostgreSQLAdapter;
+  var info = adapter.preparedStatementsInfo;
+  var conn = await adapter.catchFromPool();
+
+  const select = 'SELECT * FROM "store" WHERE "id" = @id:int8';
+  var altered = false;
+
+  try {
+    var cache = conn.statementsCache;
+    if (cache == null || info == null) return;
+
+    // Prepared on the connection (when it repeats):
+    for (var i = 0; i < 2; ++i) {
+      await conn.query(select, substitutionValues: {'id': 1});
+    }
+    expect(cache.contains(select), isTrue);
+
+    // `SELECT *` gets another column:
+    await conn.execute('ALTER TABLE "store" ADD COLUMN "ps_tx_extra" INT');
+    altered = true;
+
+    var stale0 = info.stale;
+
+    await expectLater(
+      conn.openTransaction(
+        (tx) => tx.query(select, substitutionValues: {'id': 1}),
+      ),
+      throwsA(predicate((e) => '$e'.contains('0A000'))),
+    );
+
+    expect(info.stale, equals(stale0 + 1));
+    expect(cache.contains(select), isFalse);
+
+    // Outside a transaction, the connection is usable and the SQL runs again:
+    var rs = await conn.query(select, substitutionValues: {'id': 1});
+    expect(rs.schema.columns.map((c) => c.columnName), contains('ps_tx_extra'));
+  } finally {
+    if (altered) {
+      await conn.execute('ALTER TABLE "store" DROP COLUMN "ps_tx_extra"');
+      adapter.disposeTableSchemeCache('store');
+    }
+    await adapter.releaseIntoPool(conn);
+  }
+}
 
 /// A cached prepared statement run on the connection wrapper of a transaction
 /// already finished (e.g. an execution queued before an abort) must fail, as

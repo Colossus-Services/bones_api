@@ -164,4 +164,68 @@ void main() {
       () => check(addressEntityHandler..inspectObject(Address.empty())),
     );
   });
+
+  group('createFromMap: a field resolved asynchronously (a Future)', () {
+    void check(EntityHandler<Store> handler) {
+      test('the other fields kept, in order', () async {
+        var provider = _AsyncUsersProvider();
+
+        // `owner` by ID, eager: from a provider answering with a `Future`.
+        var ret = handler.createFromMap(
+          {'id': 1, 'name': 'store-1', 'number': 2, 'owner': 5},
+          entityProvider: provider,
+          resolutionRules: EntityResolutionRules(eagerEntityTypes: [User]),
+        );
+        expect(ret, isA<Future>());
+
+        var s = await ret;
+        expect(s.id, equals(1));
+        expect(s.name, equals('store-1'));
+        expect(s.number, equals(2));
+        expect(s.owner?.id, equals(5));
+        expect(s.owner?.email, equals('user-5@test.com'));
+        expect(provider.requested, equals([5]));
+
+        // Without one (no owner): resolved synchronously.
+        var s2 = handler.createFromMap({
+          'id': 2,
+          'name': 'store-2',
+          'number': 3,
+        });
+        expect(s2, isNot(isA<Future>()));
+        expect((s2 as Store).name, equals('store-2'));
+      });
+    }
+
+    // Only by reflection: the generic handler takes the fields types from an
+    // inspected instance, and `Store.empty()`'s `owner` is `null` (no type).
+    group('reflection', () => check(Store$reflection().entityHandler));
+  });
+}
+
+/// Provides `User`s by ID asynchronously.
+class _AsyncUsersProvider implements EntityProvider {
+  final List<Object?> requested = [];
+
+  @override
+  FutureOr<O?> getEntityByID<O>(
+    dynamic id, {
+    Type? type,
+    bool sync = false,
+    EntityResolutionRules? resolutionRules,
+  }) {
+    requested.add(id);
+    return Future.delayed(
+      Duration.zero,
+      () =>
+          User(
+                'user-$id@test.com',
+                'pass',
+                Address('NY', 'New York', 'Main St', 1),
+                [],
+                id: id as int,
+              )
+              as O,
+    );
+  }
 }
