@@ -9,6 +9,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_prepared_statements.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_initializable.dart';
@@ -95,6 +96,25 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   bool get generatedIDsHaveNoRelationships => true;
 
+  /// Whether the statements are prepared and reused per connection (default
+  /// `true`): a SQL text is prepared when it repeats (preparing costs a round
+  /// trip), outside a transaction, and its prepared statement is reused,
+  /// also inside the transactions of that connection. Config
+  /// `preparedStatements: false` disables it (e.g. behind PgBouncer in
+  /// transaction pooling mode before 1.21).
+  final bool preparedStatements;
+
+  /// The maximum number of prepared statements per connection (the least
+  /// recently used ones are released).
+  final int preparedStatementsCacheSize;
+
+  final PreparedStatementsInfo _preparedStatementsInfo =
+      PreparedStatementsInfo();
+
+  @override
+  PreparedStatementsInfo? get preparedStatementsInfo =>
+      preparedStatements ? _preparedStatementsInfo : null;
+
   DBPostgreSQLAdapter(
     this.databaseName,
     this.username, {
@@ -105,6 +125,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     int minConnections = 1,
     int maxConnections = 3,
     this.readsOutsideTransaction = true,
+    this.preparedStatements = true,
+    this.preparedStatementsCacheSize =
+        DBSQLAdapter.defaultPreparedStatementsCacheSize,
     super.generateTables,
     super.checkTables,
     super.populateTables,
@@ -214,6 +237,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ]) ??
         true;
 
+    var preparedStatements = DBSQLAdapter.parseConfigPreparedStatements(config);
+
     var connectivityStr = (config?['connectivity'] ?? '')
         .toString()
         .toLowerCase()
@@ -235,6 +260,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       minConnections: minConnections,
       maxConnections: maxConnections,
       readsOutsideTransaction: readsOutsideTransaction,
+      preparedStatements: preparedStatements.enabled,
+      preparedStatementsCacheSize: preparedStatements.cacheSize,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
@@ -445,11 +472,28 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       endpoint.port,
       endpoint.database,
       secure ?? false,
+      statementsCache: preparedStatements
+          ? PreparedStatementsCache<Statement>(
+              maxSize: preparedStatementsCacheSize,
+              // Preparing costs a round trip: only a statement that repeats.
+              prepareOnSighting: 2,
+              info: _preparedStatementsInfo,
+              onEvict: _disposeStatement,
+            )
+          : null,
     );
 
     _connectionFinalizer.attach(connWrapper, connection);
 
     return connWrapper;
+  }
+
+  /// Releases an evicted prepared statement (`Close`): not awaited, and
+  /// ignoring errors (e.g. its connection closed meanwhile, which releases
+  /// it anyway).
+  static void _disposeStatement(Statement statement) {
+    // ignore: discarded_futures
+    statement.dispose().catchError((_) {});
   }
 
   var _lastConnectSSLSupported = true;
@@ -1679,19 +1723,78 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
   final String database;
   final bool secure;
 
+  /// The prepared statements of this connection (`null`: disabled). See
+  /// [DBPostgreSQLAdapter.preparedStatements].
+  final PreparedStatementsCache<Statement>? statementsCache;
+
   PostgreSQLConnectionWrapper(
     super.nativeConnection,
     this.username,
     this.host,
     this.port,
     this.database,
-    this.secure,
-  );
+    this.secure, {
+    this.statementsCache,
+  });
 
   @override
   String get connectionURL {
     return "postgresql://$username@$host:$port/$database${secure ? '?sslmode=require' : ''}";
   }
+
+  /// Whether a statement can be prepared (and cached) here: not inside a
+  /// transaction, where it would be prepared on the transaction's session
+  /// and end with it. A statement prepared on the connection is still used
+  /// inside its transactions (the driver runs it in the active one).
+  bool get _canPrepare => true;
+
+  /// Runs [sql]: with its cached prepared statement, preparing it when it
+  /// repeats (see [PreparedStatementsCache.shouldPrepare]), or as an unnamed
+  /// statement (parsed for this run only).
+  Future<Result> _run(
+    String sql,
+    Map<String, dynamic>? parameters, {
+    bool ignoreRows = false,
+  }) async {
+    var cache = statementsCache;
+    if (cache != null) {
+      var statement = cache.get(sql);
+      if (statement != null) {
+        try {
+          return await statement.run(parameters);
+        } on ServerException catch (e) {
+          if (!_isStaleStatementError(e)) rethrow;
+          cache.removeStale(sql);
+          // Inside a transaction the error aborted it: nothing to retry.
+          if (!_canPrepare) rethrow;
+        }
+      } else if (_canPrepare && cache.shouldPrepare(sql)) {
+        Statement? prepared;
+        try {
+          prepared = await nativeConnection.prepare(Sql.named(sql));
+        } catch (_) {
+          // Not cached: the execution below reports the error.
+        }
+
+        if (prepared != null) {
+          cache.put(sql, prepared);
+          return prepared.run(parameters);
+        }
+      }
+    }
+
+    return nativeConnection.execute(
+      Sql.named(sql),
+      parameters: parameters,
+      ignoreRows: ignoreRows,
+    );
+  }
+
+  /// A prepared statement that can't run anymore: a schema change altered
+  /// its result columns (`0A000`, "cached plan must not change result
+  /// type"), or it doesn't exist in the session (`26000`).
+  static bool _isStaleStatementError(ServerException e) =>
+      e.code == '0A000' || e.code == '26000';
 
   Future<List<Map<String, dynamic>>> mappedResultsQuery(
     String sql, {
@@ -1699,10 +1802,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
   }) async {
     updateLastAccessTime();
 
-    var rs = await nativeConnection.execute(
-      Sql.named(sql),
-      parameters: substitutionValues,
-    );
+    var rs = await _run(sql, substitutionValues);
 
     return rs.toResultsMaps();
   }
@@ -1712,10 +1812,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     Map<String, dynamic>? substitutionValues,
   }) async {
     updateLastAccessTime();
-    return nativeConnection.execute(
-      Sql.named(sql),
-      parameters: substitutionValues,
-    );
+    return _run(sql, substitutionValues);
   }
 
   Future<int> execute(
@@ -1723,11 +1820,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     Map<String, dynamic>? substitutionValues,
   }) async {
     updateLastAccessTime();
-    var rs = await nativeConnection.execute(
-      Sql.named(sql),
-      parameters: substitutionValues,
-      ignoreRows: true,
-    );
+    var rs = await _run(sql, substitutionValues, ignoreRows: true);
     return rs.affectedRows;
   }
 
@@ -1749,6 +1842,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
           port,
           database,
           secure,
+          statementsCache: statementsCache,
         ),
       ),
     );
@@ -1787,8 +1881,14 @@ class PostgreSQLConnectionTransactionWrapper
     super.host,
     super.port,
     super.database,
-    super.secure,
-  );
+    super.secure, {
+    super.statementsCache,
+  });
+
+  /// Uses the connection's prepared statements, but doesn't prepare (they
+  /// would be prepared on this transaction's session, and end with it).
+  @override
+  bool get _canPrepare => false;
 
   @override
   Future openTransaction(

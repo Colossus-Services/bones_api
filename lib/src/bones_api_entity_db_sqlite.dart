@@ -10,6 +10,7 @@ import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
+import 'bones_api_entity_db_prepared_statements.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_initializable.dart';
 import 'bones_api_logging.dart';
@@ -116,11 +117,47 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   /// The single native handle shared by every pooled connection wrapper.
   Database? _database;
 
+  /// Whether the entity statements are prepared and reused (default `true`;
+  /// config `preparedStatements: false` disables it): compiled once per SQL
+  /// text instead of on every run. SQLite recompiles a prepared statement
+  /// itself after a schema change.
+  final bool preparedStatements;
+
+  /// The maximum number of prepared statements (the least recently used ones
+  /// are released).
+  final int preparedStatementsCacheSize;
+
+  final PreparedStatementsInfo _preparedStatementsInfo =
+      PreparedStatementsInfo();
+
+  @override
+  PreparedStatementsInfo? get preparedStatementsInfo =>
+      preparedStatements ? _preparedStatementsInfo : null;
+
+  /// The prepared statements of the shared handle ([_database]).
+  late final PreparedStatementsCache<PreparedStatement>? _statementsCache =
+      preparedStatements
+      ? PreparedStatementsCache<PreparedStatement>(
+          maxSize: preparedStatementsCacheSize,
+          // Preparing costs no round trip: on the first use.
+          prepareOnSighting: 1,
+          info: _preparedStatementsInfo,
+          onEvict: (statement) {
+            try {
+              statement.close();
+            } catch (_) {}
+          },
+        )
+      : null;
+
   DBSQLiteAdapter(
     String databasePath, {
     int? busyTimeout,
     int minConnections = 1,
     int maxConnections = 3,
+    this.preparedStatements = true,
+    this.preparedStatementsCacheSize =
+        DBSQLAdapter.defaultPreparedStatementsCacheSize,
     super.generateTables,
     super.checkTables,
     super.populateTables,
@@ -228,9 +265,13 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
     var logSql = DBSQLAdapter.parseConfigLogSQL(config) ?? false;
 
+    var preparedStatements = DBSQLAdapter.parseConfigPreparedStatements(config);
+
     return DBSQLiteAdapter(
       path,
       busyTimeout: busyTimeout,
+      preparedStatements: preparedStatements.enabled,
+      preparedStatementsCacheSize: preparedStatements.cacheSize,
       generateTables: generateTables,
       checkTables: checkTables,
       populateTables: populateTables,
@@ -330,12 +371,30 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     var db = _database;
     if (db != null) {
       _database = null;
+      // Its prepared statements first (a handle with unfinalized statements
+      // isn't fully closed).
+      _statementsCache?.clear();
       try {
         db.close();
       } catch (_) {}
     }
 
     return true;
+  }
+
+  /// Runs [sql] (an entity statement) with its prepared statement, compiled
+  /// on its first use and then reused (see [preparedStatements]).
+  ResultSet _selectPrepared(Database db, String sql, List<Object?> parameters) {
+    var cache = _statementsCache;
+    if (cache == null) return db.select(sql, parameters);
+
+    var statement = cache.get(sql);
+    if (statement == null) {
+      statement = db.prepare(sql, persistent: true);
+      cache.put(sql, statement);
+    }
+
+    return statement.select(parameters);
   }
 
   @override
@@ -1381,7 +1440,8 @@ class _DBSQLiteConnectionWrapped extends DBSQLiteConnectionWrapper {
   @override
   ResultSet select(String sql, [List<Object?>? parameters]) {
     updateLastAccessTime();
-    return nativeConnection.select(
+    return _adapter._selectPrepared(
+      nativeConnection,
       sql,
       DBSQLiteAdapter._normalizeParameters(parameters),
     );
