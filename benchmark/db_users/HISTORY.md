@@ -25,48 +25,51 @@ its date's column here too.
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 25303 | 25288 (-0.1%) |
-| `user/byEmail` | 1407 | 1533 (+9.0%) |
-| `user/byState (join, limit 20)` | 1409 | 1469 (+4.3%) |
-| `user/list (page of 20)` | 682 | 693 (+1.6%) |
-| `user/count` | 193802 | 195230 (+0.7%) |
+| `user/byId` | 25303 | 30312 (+19.8%) |
+| `user/byEmail` | 1407 | 1449 (+3.0%) |
+| `user/byState (join, limit 20)` | 1409 | 1594 (+13.1%) |
+| `user/list (page of 20)` | 682 | 720 (+5.6%) |
+| `user/count` | 193802 | 320214 (+65.2%) |
 | `authenticate (login)` | 1393 | 1459 (+4.7%) |
-| `user/register` | 2623 | 3438 † |
-| `user/update` | 1881 | 4928 † |
-| `user/remove` | 19969 | 11401 † |
+| `user/register` | 2623 | 3514 † |
+| `user/update` | 1881 | 5215 † |
+| `user/remove` | 19969 | 12506 † |
 
 ### `sqlite`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 17138 | 17403 (+1.5%) |
-| `user/byEmail` | 16580 | 16611 (+0.2%) |
-| `user/byState (join, limit 20)` | 2326 | 2456 (+5.6%) |
-| `user/list (page of 20)` | 2405 | 2517 (+4.7%) |
-| `user/count` | 121903 | 122401 (+0.4%) |
-| `authenticate (login)` | 14764 | 14983 (+1.5%) |
-| `user/register` | 7727 | 7168 (-7.2%) |
-| `user/update` | 10302 | 10363 (+0.6%) |
-| `user/remove` | 13036 | 12300 (-5.6%) |
+| `user/byId` | 17138 | 21220 (+23.8%) |
+| `user/byEmail` | 16580 | 20528 (+23.8%) |
+| `user/byState (join, limit 20)` | 2326 | 3184 (+36.9%) |
+| `user/list (page of 20)` | 2405 | 3352 (+39.4%) |
+| `user/count` | 121903 | 162445 (+33.3%) |
+| `authenticate (login)` | 14764 | 18140 (+22.9%) |
+| `user/register` | 7727 | 8284 (+7.2%) |
+| `user/update` | 10302 | 11665 (+13.2%) |
+| `user/remove` | 13036 | 14247 (+9.3%) |
 
 ### `postgres`
 
 | Operation | 2026-10-03 | 2026-10-13 |
 |---|--:|--:|
-| `user/byId` | 1453 | 1575 (+8.4%) |
-| `user/byEmail` | 1518 | 1528 (+0.7%) |
-| `user/byState (join, limit 20)` | 537 | 571 (+6.3%) |
-| `user/list (page of 20)` | 490 | 477 (-2.7%) |
-| `user/count` | 6167 | 6060 (-1.7%) |
-| `authenticate (login)` | 1474 | 1490 (+1.1%) |
-| `user/register` | 611 | 589 (-3.6%) |
-| `user/update` | 713 | 761 (+6.7%) |
-| `user/remove` | 803 | 843 (+5.0%) |
+| `user/byId` | 1453 | 1436 (-1.2%) |
+| `user/byEmail` | 1518 | 1414 (-6.9%) |
+| `user/byState (join, limit 20)` | 537 | 733 (+36.5%) |
+| `user/list (page of 20)` | 490 | 810 (+65.3%) |
+| `user/count` | 6167 | 5424 (-12.0%) |
+| `authenticate (login)` | 1474 | 1350 (-8.4%) |
+| `user/register` | 611 | 629 (+2.9%) |
+| `user/update` | 713 | 684 (-4.1%) |
+| `user/remove` | 803 | 762 (-5.1%) |
 
-2026-10-13 shows its last runs: the baseline at `afe1fd5`, the median of 5
-rounds per operation (`--repeat 5`; see its entries). PostgreSQL runs in
-Docker Desktop, where `byState` and `list` vary a lot between runs of the
-same code (see the entries' notes): compare medians of several rounds.
+2026-10-13 shows its last runs: Phase 3a at `7c9ba77`, the median of 5
+rounds per operation (`--repeat 5`; see its entries, and the Phase 0
+baseline at `afe1fd5` below them). PostgreSQL runs in Docker Desktop, where
+results vary a lot between runs of the same code (see the entries'
+notes): compare medians of several rounds, ideally alternating the
+versions on one container. Its single-row operations here are within that
+noise (`count`, which builds no entity, too).
 
 † Not comparable with earlier dates: the users that `register` inserted
 used to stay, so the tables grew during a run (by thousands of users with
@@ -74,6 +77,95 @@ used to stay, so the tables grew during a run (by thousands of users with
 `afe1fd5` they're removed after each round: every round, and the
 operations after it, run on the seeded 1000 users. The memory adapter
 scans tables, so its numbers depend the most on the table size.
+
+---
+
+### 2026-10-13 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.3 (`7c9ba77`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 1436 | 696.3 | 694 | 748 | 802 | 1318–1470 |
+| `user/byEmail` | 1414 | 707.2 | 704 | 758 | 838 | 1128–1439 |
+| `user/byState (join, limit 20)` | 733 | 1364.2 | 1357 | 1441 | 1512 | 656–742 |
+| `user/list (page of 20)` | 810 | 1234.5 | 1235 | 1307 | 1354 | 755–822 |
+| `user/count` | 5424 | 184.4 | 182 | 199 | 224 | 5295–5503 |
+| `authenticate (login)` | 1350 | 740.7 | 736 | 793 | 838 | 1343–1388 |
+| `user/register` | 629 | 1590.4 | 1543 | 2013 | 2145 | 607–634 |
+| `user/update` | 684 | 1462.3 | 1442 | 1570 | 1635 | 643–696 |
+| `user/remove` | 762 | 1312.5 | 1302 | 1385 | 1431 | 758–782 |
+
+Phase 3a, the entity mapping (see the `sqlite` entry below). Since the
+baseline (`afe1fd5`): Phase 1 (fewer write statements, no `StackTrace` per
+commit), Phase 2 (a `LIMIT` ordered by ID) and Phase 3a. `list` and
+`byState`, which build 20 users per call, gained the most, and steadily:
+alternating runs with `master` (Phase 2) on one container gave `list`
+826 vs 418 and 637 vs 448 ops/sec. The single-row operations varied by
+±15–20% in both directions between those alternating runs, `count` (no
+entity built) included: this machine drifted during the session, so they
+are noise here, not a change.
+
+### 2026-10-13 — `sqlite` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.3 (`7c9ba77`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** sqlite (temporary file)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 21220 | 47.1 | 45 | 54 | 97 | 21137–21257 |
+| `user/byEmail` | 20528 | 48.7 | 47 | 54 | 99 | 20481–20538 |
+| `user/byState (join, limit 20)` | 3184 | 314.1 | 304 | 367 | 386 | 3156–3192 |
+| `user/list (page of 20)` | 3352 | 298.3 | 291 | 353 | 367 | 3329–3354 |
+| `user/count` | 162445 | 6.2 | 6 | 6 | 7 | 162245–162751 |
+| `authenticate (login)` | 18140 | 55.1 | 53 | 61 | 118 | 18073–18167 |
+| `user/register` | 8284 | 120.7 | 102 | 131 | 1009 | 8209–8665 |
+| `user/update` | 11665 | 85.7 | 83 | 93 | 107 | 11614–11686 |
+| `user/remove` | 14247 | 70.2 | 62 | 68 | 113 | 13861–14552 |
+
+Phase 3a: turning rows into entities. The values of a row are resolved
+into one map (no intermediate entries, maps and futures), the column of
+each field is matched once per row layout (not per row), a value isn't
+inspected (`TypeInfo.from`) when it can't be returned as is, and the
+`DateTime`s SQLite stores are parsed without a regular expression. Run
+alternately with `master` (Phase 2: `byId` 18976, `byEmail` 18348,
+`byState` 2431, `list` 2567, `login` 16358): the reads +11–12% and the
+20-user reads +31%, with no overlap of the rounds.
+
+### 2026-10-13 — `memory` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.21.3 (`7c9ba77`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** memory (DBSQLMemoryAdapter)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 30312 | 33.0 | 31 | 38 | 84 | 30049–30544 |
+| `user/byEmail` | 1449 | 690.1 | 716 | 1223 | 1282 | 1192–1570 |
+| `user/byState (join, limit 20)` | 1594 | 627.5 | 614 | 692 | 705 | 1555–1598 |
+| `user/list (page of 20)` | 720 | 1388.6 | 1376 | 1444 | 1455 | 719–721 |
+| `user/count` | 320214 | 3.1 | 3 | 3 | 4 | 319926–320745 |
+| `authenticate (login)` | 1459 | 685.4 | 713 | 1218 | 1288 | 1435–1543 |
+| `user/register` | 3514 | 284.6 | 280 | 413 | 449 | 3494–3704 |
+| `user/update` | 5215 | 191.8 | 189 | 229 | 250 | 5208–5242 |
+| `user/remove` | 12506 | 80.0 | 81 | 97 | 104 | 12072–12838 |
+
+Same code as the `postgres` entry above. Run alternately with `master`
+(Phase 2): `byId` +12%, `byState` +8%, `list` +4%. The memory adapter's
+time is mostly its table scans (`byEmail`, `login`, `list`), not the
+entity mapping.
 
 ---
 
