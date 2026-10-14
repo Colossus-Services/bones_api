@@ -54,7 +54,8 @@
   The checks now run one at a time: a call during a check queues one more
   check after it (shared by the calls until then), since the running one
   may have listed the files before that call's write. A cached file already
-  removed counts as deleted.
+  removed counts as deleted, and an error of a check (nobody awaits it: e.g.
+  the cache directory removed) is logged, not left as an unhandled error.
 
 - Optimization: turning rows (or any `Map`) into entities
   (`EntityHandler.createFromMap`), for every adapter:
