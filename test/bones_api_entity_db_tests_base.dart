@@ -932,9 +932,25 @@ Future<bool> runAdapterTests(
           var sel = await storeAPIRepository.selectByIDs(ids);
           expect(sel.nonNulls.map((e) => e.id), equals([id]));
 
-          // Within the limit: as parameters.
-          var sel2 = await storeAPIRepository.selectByIDs(ids.sublist(0, 300));
-          expect(sel2.nonNulls.map((e) => e.id), equals([id]));
+          // `existIDs` (also an `IN` of the IDs):
+          expect(await storeAPIRepository.existIDs(ids), equals([id]));
+
+          // Within the limit (as parameters), at it, and just beyond it (as
+          // values):
+          var max = sqlAdapter.dialect.maxIDsAsParameters;
+          for (var n in {300, if (max > 1) max, max + 1}) {
+            var sel2 = await storeAPIRepository.selectByIDs(ids.sublist(0, n));
+            expect(
+              sel2.nonNulls.map((e) => e.id),
+              equals([id]),
+              reason: '$n IDs',
+            );
+            expect(
+              await storeAPIRepository.existIDs(ids.sublist(0, n)),
+              equals([id]),
+              reason: '$n IDs',
+            );
+          }
         } finally {
           // The other tests count the stores.
           await storeAPIRepository.deleteByID(id);
