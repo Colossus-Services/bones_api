@@ -16,10 +16,16 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_extension_io.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_types.dart';
 
 final _log = logging.Logger('DBObjectDirectoryAdapter')..registerAsDbLogger();
+
+/// Limits the concurrent object file reads: a `selectAll` (or `selectByIDs`)
+/// reads all its objects in parallel, and concurrent selects of large tables
+/// would open thousands of files at once (`Too many open files`).
+final FileLimited _fileLimited = FileLimited(name: 'DBObjectDirectoryAdapter');
 
 class DBObjectDirectoryAdapterContext
     implements Comparable<DBObjectDirectoryAdapterContext> {
@@ -789,7 +795,7 @@ class DBObjectDirectoryAdapter
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
     var file = _resolveObjectFile(table, id);
     if (!file.existsSync()) return null;
-    var enc = await file.readAsString();
+    var enc = await _fileLimited.readAsString(file);
     var obj = dart_convert.json.decode(enc) as Map<String, dynamic>;
     return obj;
   }

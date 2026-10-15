@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -143,6 +144,19 @@ class FileLimited {
     await _semaphore.acquire();
     try {
       return await file.readAsBytes();
+    } finally {
+      _semaphore.release();
+    }
+  }
+
+  /// Reads [file] as a [String] with controlled concurrency.
+  ///
+  /// Works like [File.readAsString], but enforces the semaphore limit to avoid
+  /// file handle exhaustion when reading many files in parallel.
+  Future<String> readAsString(File file, {Encoding encoding = utf8}) async {
+    await _semaphore.acquire();
+    try {
+      return await file.readAsString(encoding: encoding);
     } finally {
       _semaphore.release();
     }

@@ -1,5 +1,6 @@
 @TestOn('vm')
 @Timeout(Duration(seconds: 60))
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bones_api/bones_api_server.dart';
@@ -75,6 +76,29 @@ void main() {
         throwsA(isA<FileSystemException>()),
       );
       // The semaphore is released after an error:
+      expect(await fl.exists(file), isFalse);
+    });
+
+    test('readAsString', () async {
+      var fl = FileLimited(semaphoreLimit: 1);
+      var file = File('${tmpDir.path}/limited.txt');
+      file.writeAsStringSync('olá');
+
+      expect(await fl.readAsString(file), equals('olá'));
+      expect(await fl.readAsString(file, encoding: latin1), equals('olÃ¡'));
+
+      // Concurrent calls above the limit (one at a time):
+      var reads = await Future.wait(
+        List.generate(5, (_) => fl.readAsString(file)),
+      );
+      expect(reads, everyElement(equals('olá')));
+
+      file.deleteSync();
+      await expectLater(
+        fl.readAsString(file),
+        throwsA(isA<FileSystemException>()),
+      );
+      // The semaphore (limit 1) is released after an error:
       expect(await fl.exists(file), isFalse);
     });
   });

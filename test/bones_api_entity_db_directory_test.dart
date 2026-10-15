@@ -27,6 +27,53 @@ Future<void> main() async {
   await _runTest(false, true);
 
   _runStoreVisibilityTest();
+  _runOpenFilesTest();
+}
+
+/// REGRESSION: `DBObjectDirectoryAdapter` read all the objects of a
+/// `selectAll` in parallel (an async `readAsString` per object file), so
+/// concurrent selects of a large table opened thousands of files at once
+/// (measured: 24000), failing with `Too many open files` (`errno = 24`) under
+/// the macOS default limit (256). The reads are now limited by a
+/// `FileLimited` semaphore.
+///
+/// Runs `bones_api_entity_db_directory_open_files.dart` in a process limited
+/// to 256 open files (`ulimit -n 256`): the number of open files can't be
+/// reliably measured from inside the process (on macOS, `/dev/fd` lists at
+/// most 128 entries).
+void _runOpenFilesTest() {
+  group('DBObjectDirectoryAdapter', () {
+    test(
+      'concurrent `selectAll`s within 256 open files',
+      () async {
+        var tempDir = Directory.systemTemp.createTempSync(
+          'bones_api_tests_object_dir_open_files',
+        );
+        addTearDown(() {
+          try {
+            tempDir.deleteSync(recursive: true);
+          } catch (_) {}
+        });
+
+        var dart = Platform.resolvedExecutable;
+        var script = 'test/bones_api_entity_db_directory_open_files.dart';
+
+        var result = await Process.run('/bin/sh', [
+          '-c',
+          'ulimit -n 256 && exec "$dart" run $script "${tempDir.path}"',
+        ]);
+
+        expect(
+          result.exitCode,
+          equals(0),
+          reason: 'stdout: ${result.stdout}\nstderr: ${result.stderr}',
+        );
+        expect('${result.stdout}', contains('OK:'));
+      },
+      testOn: '!windows',
+      timeout: Timeout(Duration(minutes: 2)),
+    );
+  });
 }
 
 /// REGRESSION: `DBObjectDirectoryAdapter._saveObject` used to be `async`, and
