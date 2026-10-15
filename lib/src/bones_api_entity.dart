@@ -2465,63 +2465,131 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     EntityResolutionRules? resolutionRules,
     JsonDecoder? jsonDecoder,
   }) {
-    entityCache ??= JsonEntityCacheSimple();
-    jsonDecoder ??= Json.defaultDecoder;
+    final entityCacheResolved = entityCache ?? JsonEntityCacheSimple();
+    final jsonDecoderResolved = jsonDecoder ?? Json.defaultDecoder;
 
     var returnFieldsUsedKeys = <String>[];
 
-    return resolveFieldsNamesAndValues(
+    var resolvedFields = resolveFieldsNamesAndValues(
       fields,
       entityProvider: entityProvider,
-      entityCache: entityCache,
+      entityCache: entityCacheResolved,
       entityHandlerProvider: entityHandlerProvider,
       entityRepositoryProvider: entityRepositoryProvider,
       returnFieldsUsedKeys: returnFieldsUsedKeys,
       resolutionRules: resolutionRules,
-    ).resolveMapped((resolvedFields) {
-      try {
-        // Add unresolved fields, to allow non field parameters,
-        // constructors with parameters different from class field name.
-        for (var f in fields.keys) {
-          if (!returnFieldsUsedKeys.contains(f)) {
-            resolvedFields[f] = fields[f];
-          }
-        }
+    );
 
-        return instantiateFromMapImpl(
-          resolvedFields,
-          jsonDecoder: jsonDecoder,
-        ).resolveMapped((o) {
-          if (o != null) {
-            entityCache!.cacheEntity(o, getID);
-            return o;
-          } else {
-            return _createFromMapDefaultImpl(
-              resolvedFields,
-              entityProvider,
-              entityCache!,
-              resolutionRules,
-            );
-          }
-        });
-      } catch (e, s) {
-        if (e is! UnresolvedParameterError) {
-          _log.warning(
-            "Error creating `$type` from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
-            e,
-            s,
-          );
-        }
-
-        return _createFromMapDefaultImpl(
+    // The steps below are called directly when the values are resolved
+    // synchronously (the usual case), as `resolveMapped` would call them,
+    // without allocating a closure per entity:
+    if (resolvedFields is Future<Map<String, Object?>>) {
+      return resolvedFields.then(
+        (resolvedFields) => _createFromResolvedFields(
           fields,
+          resolvedFields,
+          returnFieldsUsedKeys,
+          jsonDecoderResolved,
           entityProvider,
-          entityCache!,
+          entityCacheResolved,
           resolutionRules,
+        ),
+      );
+    }
+
+    return _createFromResolvedFields(
+      fields,
+      resolvedFields,
+      returnFieldsUsedKeys,
+      jsonDecoderResolved,
+      entityProvider,
+      entityCacheResolved,
+      resolutionRules,
+    );
+  }
+
+  /// [createFromMap] after its fields values are resolved ([resolvedFields]).
+  FutureOr<O> _createFromResolvedFields(
+    Map<String, dynamic> fields,
+    Map<String, Object?> resolvedFields,
+    List<String> returnFieldsUsedKeys,
+    JsonDecoder jsonDecoder,
+    EntityProvider? entityProvider,
+    EntityCache entityCache,
+    EntityResolutionRules? resolutionRules,
+  ) {
+    try {
+      // Add unresolved fields, to allow non field parameters,
+      // constructors with parameters different from class field name.
+      for (var f in fields.keys) {
+        if (!returnFieldsUsedKeys.contains(f)) {
+          resolvedFields[f] = fields[f];
+        }
+      }
+
+      var o = instantiateFromMapImpl(resolvedFields, jsonDecoder: jsonDecoder);
+
+      if (o is Future<O?>) {
+        return o.then(
+          (o) => _createdFromMap(
+            o,
+            resolvedFields,
+            entityProvider,
+            entityCache,
+            resolutionRules,
+          ),
         );
       }
-    });
+
+      return _createdFromMap(
+        o,
+        resolvedFields,
+        entityProvider,
+        entityCache,
+        resolutionRules,
+      );
+    } catch (e, s) {
+      if (e is! UnresolvedParameterError) {
+        _log.warning(
+          "Error creating `$type` from `Map` using `instantiatorFromMap`. Trying instantiation with default constructor...",
+          e,
+          s,
+        );
+      }
+
+      return _createFromMapDefaultImpl(
+        fields,
+        entityProvider,
+        entityCache,
+        resolutionRules,
+      );
+    }
   }
+
+  /// [createFromMap] with the instance [o] created from [resolvedFields]:
+  /// caches it, or creates it with the default constructor when `null`.
+  FutureOr<O> _createdFromMap(
+    O? o,
+    Map<String, Object?> resolvedFields,
+    EntityProvider? entityProvider,
+    EntityCache entityCache,
+    EntityResolutionRules? resolutionRules,
+  ) {
+    if (o != null) {
+      entityCache.cacheEntity(o, _getIDFunction);
+      return o;
+    } else {
+      return _createFromMapDefaultImpl(
+        resolvedFields,
+        entityProvider,
+        entityCache,
+        resolutionRules,
+      );
+    }
+  }
+
+  /// [getID] torn off once (an `idGetter` for [EntityCache.cacheEntity]).
+  late final Object? Function(O o) _getIDFunction = getID;
 
   FutureOr<O> _createFromMapDefaultImpl(
     Map<String, dynamic> fields,
@@ -3070,6 +3138,21 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   V? getField<V>(O o, String key) => reflection.getField<V?>(key, o);
+
+  /// The ID field (see [idFieldName]), without an object.
+  FieldReflection<O, dynamic>? _idField;
+
+  /// The same value as `getField(o, idFieldName(o))`, read through the ID
+  /// field kept in [_idField]: an entity is cached by its ID each time one is
+  /// decoded or loaded.
+  @override
+  V? getID<V>(O o) {
+    var idField = _idField ??= reflection.getStaticInstance().field(
+      idFieldName(o),
+    );
+    if (idField == null) return super.getID<V>(o);
+    return idField.getFor(o) as V?;
+  }
 
   @override
   Map<String, dynamic> getFields(O o) =>

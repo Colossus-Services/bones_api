@@ -133,6 +133,58 @@ dart run bin/db_users_benchmark.dart --db=sqlite --markdown \
 The entry records the date, the `bones_api` version and commit, the machine
 (CPU, cores, RAM, OS, Dart) and the DB (with the PostgreSQL server version).
 
+## JSON decoding (client side)
+
+`bin/json_decode_benchmark.dart` measures the other end: decoding a response
+of `user/list` (a JSON list of users, each with its address and 2 roles,
+encoded as `APIServer` encodes it) into entities, as a client does. It has
+no `dart:io` dependency, so it also runs compiled to JavaScript and Wasm,
+which is what a browser runs:
+
+```bash
+# VM:
+dart run bin/json_decode_benchmark.dart [--sizes=1,20,100,1000] [--measure=2000]
+
+# JavaScript, with the dart2js release defaults (`webdev build --release`):
+dart compile js --minify bin/json_decode_benchmark.dart -o build/bench.js
+node build/bench.js
+
+# Wasm:
+dart compile wasm -O2 --minify bin/json_decode_benchmark.dart -o build/bench.wasm
+```
+
+Compiled to JavaScript, `node` doesn't pass the options to `main`: it runs
+the defaults. The Wasm module is run in `node` with a small loader that
+calls `compile` and `instantiate` of the generated `.mjs`, then
+`invokeMain(...args)`.
+
+Each payload size is measured in layers, to attribute the cost:
+
+| Benchmark | Measures |
+|---|---|
+| `dart:convert decode` | The JSON text to maps only |
+| `fromMap (hand-written)` | Maps to entities by hand: the floor |
+| `User$reflection.fromJson` | Maps to entities through `reflection_factory` |
+| `Json.fromJsonList<User>` | Maps to entities through `Json` (entity handlers and an entity cache) |
+| `Json.decode<List<User>>` | The JSON text to entities |
+| `proxy: decodeJson + resolveResponse` | What a generated `APIModuleProxy` method does with a response body (without the request) |
+
+Before measuring, it checks that every decoder gives back the users that
+were encoded.
+
+1000 users through the proxy, µs per user (Apple M5, Node 26, Dart 3.13.5):
+
+| | 1.23.1 | 1.24.0 |
+|---|--:|--:|
+| JavaScript (dart2js `-O1 --minify`) | 27.4 | 11.8 |
+| Wasm (dart2wasm `-O2 --minify`) | 6.5 | 3.7 |
+| VM | 7.5 | 3.9 |
+
+Compiled to JavaScript, about a third of what's left is implicit type checks
+(parameters, casts): the same code compiled with `-O3`
+(`--omit-implicit-checks`) decodes in 7.2 µs per user instead of 11.4. Parsing
+the JSON text itself is ~5% of it (the browser's `JSON.parse`).
+
 ## Development
 
 The entities and modules use `reflection_factory`. After changing them,

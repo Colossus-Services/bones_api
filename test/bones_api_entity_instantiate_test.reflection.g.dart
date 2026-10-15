@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.12.2
+// BUILDER: reflection_factory/2.13.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -24,7 +24,7 @@ typedef __PR = ParameterReflection;
 T __argOr$<T>(Object? a, T d) => ConstructorReflection.argOrDefault<T>(a, d);
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.12.2');
+  static final Version _version = Version.parse('2.13.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -61,6 +61,8 @@ Symbol? _getSymbol(String? key) {
       return const Symbol(r"startTime");
     case r"tags":
       return const Symbol(r"tags");
+    case r"uses":
+      return const Symbol(r"uses");
     case r"value":
       return const Symbol(r"value");
     default:
@@ -74,6 +76,12 @@ Counter Counter$fromJson(Map<String, Object?> map) =>
 // ignore: non_constant_identifier_names
 Counter Counter$fromJsonEncoded(String jsonEncoded) =>
     Counter$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
+Coupon Coupon$fromJson(Map<String, Object?> map) =>
+    Coupon$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+Coupon Coupon$fromJsonEncoded(String jsonEncoded) =>
+    Coupon$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 // ignore: non_constant_identifier_names
 Invoice Invoice$fromJson(Map<String, Object?> map) =>
     Invoice$reflection.staticInstance.fromJson(map);
@@ -105,11 +113,23 @@ Project Project$fromJson(Map<String, Object?> map) =>
 Project Project$fromJsonEncoded(String jsonEncoded) =>
     Project$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 // ignore: non_constant_identifier_names
+Seat Seat$fromJson(Map<String, Object?> map) =>
+    Seat$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+Seat Seat$fromJsonEncoded(String jsonEncoded) =>
+    Seat$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
 Settings Settings$fromJson(Map<String, Object?> map) =>
     Settings$reflection.staticInstance.fromJson(map);
 // ignore: non_constant_identifier_names
 Settings Settings$fromJsonEncoded(String jsonEncoded) =>
     Settings$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
+// ignore: non_constant_identifier_names
+Tag Tag$fromJson(Map<String, Object?> map) =>
+    Tag$reflection.staticInstance.fromJson(map);
+// ignore: non_constant_identifier_names
+Tag Tag$fromJsonEncoded(String jsonEncoded) =>
+    Tag$reflection.staticInstance.fromJsonEncoded(jsonEncoded);
 // ignore: non_constant_identifier_names
 Task Task$fromJson(Map<String, Object?> map) =>
     Task$reflection.staticInstance.fromJson(map);
@@ -400,6 +420,247 @@ class Counter$reflection extends ClassReflection<Counter>
   @override
   StaticMethodReflection<Counter, R>? staticMethod<R>(String methodName) =>
       null;
+}
+
+class Coupon$reflection extends ClassReflection<Coupon> with __ReflectionMixin {
+  static final Expando<Coupon$reflection> _objectReflections = Expando();
+
+  factory Coupon$reflection([Coupon? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Coupon$reflection._(object);
+  }
+
+  Coupon$reflection._([Coupon? object]) : super(Coupon, r'Coupon', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.10.0');
+
+  @override
+  Coupon$reflection withObject([Coupon? obj]) =>
+      Coupon$reflection(obj)..setupInternalsWith(this);
+
+  static Coupon$reflection? _withoutObjectInstance;
+  @override
+  Coupon$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static Coupon$reflection get staticInstance =>
+      _withoutObjectInstance ??= Coupon$reflection._();
+
+  @override
+  Coupon$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Coupon$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => false;
+  @override
+  Coupon? createInstanceWithDefaultConstructor() => null;
+
+  @override
+  bool get hasEmptyConstructor => false;
+  @override
+  Coupon? createInstanceWithEmptyConstructor() => null;
+  @override
+  bool get hasNoRequiredArgsConstructor => false;
+  @override
+  Coupon? createInstanceWithNoRequiredArgsConstructor() => null;
+
+  static const List<String> _constructorsNames = const <String>[''];
+
+  @override
+  List<String> get constructorsNames => _constructorsNames;
+
+  static final Map<String, ConstructorReflection<Coupon>> _constructors = {};
+
+  @override
+  ConstructorReflection<Coupon>? constructor(String constructorName) {
+    var c = _constructors[constructorName];
+    if (c != null) return c;
+    c = _constructorImpl(constructorName);
+    if (c == null) return null;
+    _constructors[constructorName] = c;
+    return c;
+  }
+
+  ConstructorReflection<Coupon>? _constructorImpl(String constructorName) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case '':
+        return ConstructorReflection<Coupon>(
+          this,
+          Coupon,
+          '',
+          () => Coupon.new,
+          const <__PR>[__PR(__TR.tString, 'key', false, true)],
+          null,
+          const <String, __PR>{
+            'uses': __PR(__TR.tInt, 'uses', false, false, 0),
+          },
+          null,
+          invoker: (a) => Coupon(a[0] as String, uses: __argOr$<int>(a[1], 0)),
+        );
+      default:
+        return null;
+    }
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
+
+  @override
+  bool get hasMethodToJson => false;
+
+  @override
+  Object? callMethodToJson([Coupon? obj]) => null;
+
+  static const List<String> _fieldsNames = const <String>['key', 'uses'];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+
+  static final Map<String, FieldReflection<Coupon, dynamic>> _fieldsNoObject =
+      {};
+
+  final Map<String, FieldReflection<Coupon, dynamic>> _fieldsObject = {};
+
+  @override
+  FieldReflection<Coupon, T>? field<T>(String fieldName, [Coupon? obj]) {
+    if (obj == null) {
+      if (object != null) {
+        return _fieldObjectImpl<T>(fieldName);
+      } else {
+        return _fieldNoObjectImpl<T>(fieldName);
+      }
+    } else if (identical(obj, object)) {
+      return _fieldObjectImpl<T>(fieldName);
+    }
+    return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
+  }
+
+  FieldReflection<Coupon, T>? _fieldNoObjectImpl<T>(String fieldName) {
+    final f = _fieldsNoObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Coupon, T>;
+    }
+    final f2 = _fieldImpl(fieldName, null);
+    if (f2 == null) return null;
+    _fieldsNoObject[fieldName] = f2;
+    return f2 as FieldReflection<Coupon, T>;
+  }
+
+  FieldReflection<Coupon, T>? _fieldObjectImpl<T>(String fieldName) {
+    final f = _fieldsObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Coupon, T>;
+    }
+    var f2 = _fieldNoObjectImpl<T>(fieldName);
+    if (f2 == null) return null;
+    f2 = f2.withObject(object!);
+    _fieldsObject[fieldName] = f2;
+    return f2;
+  }
+
+  FieldReflection<Coupon, dynamic>? _fieldImpl(String fieldName, Coupon? obj) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'key':
+        return FieldReflection<Coupon, String>(
+          this,
+          Coupon,
+          __TR.tString,
+          'key',
+          false,
+          (o) =>
+              () => o!.key,
+          (o) =>
+              (v) => o!.key = v,
+          obj,
+          false,
+        );
+      case 'uses':
+        return FieldReflection<Coupon, int>(
+          this,
+          Coupon,
+          __TR.tInt,
+          'uses',
+          false,
+          (o) =>
+              () => o!.uses,
+          (o) =>
+              (v) => o!.uses = v,
+          obj,
+          false,
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(
+    Coupon? obj, {
+    bool withHashCode = false,
+  }) {
+    obj ??= object;
+    return <String, dynamic>{
+      'key': obj?.key,
+      'uses': obj?.uses,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  static const List<String> _staticFieldsNames = const <String>[];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  @override
+  StaticFieldReflection<Coupon, T>? staticField<T>(String fieldName) => null;
+
+  static const List<String> _methodsNames = const <String>[];
+
+  @override
+  List<String> get methodsNames => _methodsNames;
+
+  @override
+  MethodReflection<Coupon, R>? method<R>(String methodName, [Coupon? obj]) =>
+      null;
+  static const List<String> _staticMethodsNames = const <String>[];
+
+  @override
+  List<String> get staticMethodsNames => _staticMethodsNames;
+
+  @override
+  StaticMethodReflection<Coupon, R>? staticMethod<R>(String methodName) => null;
 }
 
 class Invoice$reflection extends ClassReflection<Invoice>
@@ -1933,6 +2194,243 @@ class Project$reflection extends ClassReflection<Project>
       null;
 }
 
+class Seat$reflection extends ClassReflection<Seat> with __ReflectionMixin {
+  static final Expando<Seat$reflection> _objectReflections = Expando();
+
+  factory Seat$reflection([Seat? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Seat$reflection._(object);
+  }
+
+  Seat$reflection._([Seat? object]) : super(Seat, r'Seat', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.10.0');
+
+  @override
+  Seat$reflection withObject([Seat? obj]) =>
+      Seat$reflection(obj)..setupInternalsWith(this);
+
+  static Seat$reflection? _withoutObjectInstance;
+  @override
+  Seat$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static Seat$reflection get staticInstance =>
+      _withoutObjectInstance ??= Seat$reflection._();
+
+  @override
+  Seat$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Seat$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => false;
+  @override
+  Seat? createInstanceWithDefaultConstructor() => null;
+
+  @override
+  bool get hasEmptyConstructor => false;
+  @override
+  Seat? createInstanceWithEmptyConstructor() => null;
+  @override
+  bool get hasNoRequiredArgsConstructor => false;
+  @override
+  Seat? createInstanceWithNoRequiredArgsConstructor() => null;
+
+  static const List<String> _constructorsNames = const <String>[''];
+
+  @override
+  List<String> get constructorsNames => _constructorsNames;
+
+  static final Map<String, ConstructorReflection<Seat>> _constructors = {};
+
+  @override
+  ConstructorReflection<Seat>? constructor(String constructorName) {
+    var c = _constructors[constructorName];
+    if (c != null) return c;
+    c = _constructorImpl(constructorName);
+    if (c == null) return null;
+    _constructors[constructorName] = c;
+    return c;
+  }
+
+  ConstructorReflection<Seat>? _constructorImpl(String constructorName) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case '':
+        return ConstructorReflection<Seat>(
+          this,
+          Seat,
+          '',
+          () => Seat.new,
+          const <__PR>[
+            __PR(__TR.tInt, 'number', false, true),
+            __PR(__TR.tString, 'label', false, true),
+          ],
+          null,
+          null,
+          null,
+          invoker: (a) => Seat(a[0] as int, a[1] as String),
+        );
+      default:
+        return null;
+    }
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
+
+  @override
+  bool get hasMethodToJson => false;
+
+  @override
+  Object? callMethodToJson([Seat? obj]) => null;
+
+  static const List<String> _fieldsNames = const <String>['label', 'number'];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+
+  static final Map<String, FieldReflection<Seat, dynamic>> _fieldsNoObject = {};
+
+  final Map<String, FieldReflection<Seat, dynamic>> _fieldsObject = {};
+
+  @override
+  FieldReflection<Seat, T>? field<T>(String fieldName, [Seat? obj]) {
+    if (obj == null) {
+      if (object != null) {
+        return _fieldObjectImpl<T>(fieldName);
+      } else {
+        return _fieldNoObjectImpl<T>(fieldName);
+      }
+    } else if (identical(obj, object)) {
+      return _fieldObjectImpl<T>(fieldName);
+    }
+    return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
+  }
+
+  FieldReflection<Seat, T>? _fieldNoObjectImpl<T>(String fieldName) {
+    final f = _fieldsNoObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Seat, T>;
+    }
+    final f2 = _fieldImpl(fieldName, null);
+    if (f2 == null) return null;
+    _fieldsNoObject[fieldName] = f2;
+    return f2 as FieldReflection<Seat, T>;
+  }
+
+  FieldReflection<Seat, T>? _fieldObjectImpl<T>(String fieldName) {
+    final f = _fieldsObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Seat, T>;
+    }
+    var f2 = _fieldNoObjectImpl<T>(fieldName);
+    if (f2 == null) return null;
+    f2 = f2.withObject(object!);
+    _fieldsObject[fieldName] = f2;
+    return f2;
+  }
+
+  FieldReflection<Seat, dynamic>? _fieldImpl(String fieldName, Seat? obj) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'number':
+        return FieldReflection<Seat, int>(
+          this,
+          Seat,
+          __TR.tInt,
+          'number',
+          false,
+          (o) =>
+              () => o!.number,
+          (o) =>
+              (v) => o!.number = v,
+          obj,
+          false,
+        );
+      case 'label':
+        return FieldReflection<Seat, String>(
+          this,
+          Seat,
+          __TR.tString,
+          'label',
+          false,
+          (o) =>
+              () => o!.label,
+          (o) =>
+              (v) => o!.label = v,
+          obj,
+          false,
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(Seat? obj, {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'number': obj?.number,
+      'label': obj?.label,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  static const List<String> _staticFieldsNames = const <String>[];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  @override
+  StaticFieldReflection<Seat, T>? staticField<T>(String fieldName) => null;
+
+  static const List<String> _methodsNames = const <String>[];
+
+  @override
+  List<String> get methodsNames => _methodsNames;
+
+  @override
+  MethodReflection<Seat, R>? method<R>(String methodName, [Seat? obj]) => null;
+  static const List<String> _staticMethodsNames = const <String>[];
+
+  @override
+  List<String> get staticMethodsNames => _staticMethodsNames;
+
+  @override
+  StaticMethodReflection<Seat, R>? staticMethod<R>(String methodName) => null;
+}
+
 class Settings$reflection extends ClassReflection<Settings>
     with __ReflectionMixin {
   static final Expando<Settings$reflection> _objectReflections = Expando();
@@ -2241,6 +2739,243 @@ class Settings$reflection extends ClassReflection<Settings>
   @override
   StaticMethodReflection<Settings, R>? staticMethod<R>(String methodName) =>
       null;
+}
+
+class Tag$reflection extends ClassReflection<Tag> with __ReflectionMixin {
+  static final Expando<Tag$reflection> _objectReflections = Expando();
+
+  factory Tag$reflection([Tag? object]) {
+    if (object == null) return staticInstance;
+    return _objectReflections[object] ??= Tag$reflection._(object);
+  }
+
+  Tag$reflection._([Tag? object]) : super(Tag, r'Tag', object);
+
+  static bool _registered = false;
+  @override
+  void register() {
+    if (!_registered) {
+      _registered = true;
+      super.register();
+      _registerSiblingsReflection();
+    }
+  }
+
+  @override
+  Version get languageVersion => Version.parse('3.10.0');
+
+  @override
+  Tag$reflection withObject([Tag? obj]) =>
+      Tag$reflection(obj)..setupInternalsWith(this);
+
+  static Tag$reflection? _withoutObjectInstance;
+  @override
+  Tag$reflection withoutObjectInstance() => staticInstance;
+
+  @override
+  Symbol? getSymbol(String? key) => _getSymbol(key);
+
+  static Tag$reflection get staticInstance =>
+      _withoutObjectInstance ??= Tag$reflection._();
+
+  @override
+  Tag$reflection getStaticInstance() => staticInstance;
+
+  static bool _boot = false;
+  static void boot() {
+    if (_boot) return;
+    _boot = true;
+    Tag$reflection.staticInstance;
+  }
+
+  @override
+  bool get hasDefaultConstructor => false;
+  @override
+  Tag? createInstanceWithDefaultConstructor() => null;
+
+  @override
+  bool get hasEmptyConstructor => false;
+  @override
+  Tag? createInstanceWithEmptyConstructor() => null;
+  @override
+  bool get hasNoRequiredArgsConstructor => false;
+  @override
+  Tag? createInstanceWithNoRequiredArgsConstructor() => null;
+
+  static const List<String> _constructorsNames = const <String>[''];
+
+  @override
+  List<String> get constructorsNames => _constructorsNames;
+
+  static final Map<String, ConstructorReflection<Tag>> _constructors = {};
+
+  @override
+  ConstructorReflection<Tag>? constructor(String constructorName) {
+    var c = _constructors[constructorName];
+    if (c != null) return c;
+    c = _constructorImpl(constructorName);
+    if (c == null) return null;
+    _constructors[constructorName] = c;
+    return c;
+  }
+
+  ConstructorReflection<Tag>? _constructorImpl(String constructorName) {
+    var lc = constructorName.trim().toLowerCase();
+
+    switch (lc) {
+      case '':
+        return ConstructorReflection<Tag>(
+          this,
+          Tag,
+          '',
+          () => Tag.new,
+          const <__PR>[
+            __PR(__TR.tString, 'name', false, true),
+            __PR(__TR.tString, 'color', false, true),
+          ],
+          null,
+          null,
+          null,
+          invoker: (a) => Tag(a[0] as String, a[1] as String),
+        );
+      default:
+        return null;
+    }
+  }
+
+  static const List<Object> _classAnnotations = <Object>[];
+
+  @override
+  List<Object> get classAnnotations => _classAnnotations;
+
+  static const List<Type> _supperTypes = const <Type>[];
+
+  @override
+  List<Type> get supperTypes => _supperTypes;
+
+  @override
+  bool get hasMethodToJson => false;
+
+  @override
+  Object? callMethodToJson([Tag? obj]) => null;
+
+  static const List<String> _fieldsNames = const <String>['color', 'name'];
+
+  @override
+  List<String> get fieldsNames => _fieldsNames;
+
+  static final Map<String, FieldReflection<Tag, dynamic>> _fieldsNoObject = {};
+
+  final Map<String, FieldReflection<Tag, dynamic>> _fieldsObject = {};
+
+  @override
+  FieldReflection<Tag, T>? field<T>(String fieldName, [Tag? obj]) {
+    if (obj == null) {
+      if (object != null) {
+        return _fieldObjectImpl<T>(fieldName);
+      } else {
+        return _fieldNoObjectImpl<T>(fieldName);
+      }
+    } else if (identical(obj, object)) {
+      return _fieldObjectImpl<T>(fieldName);
+    }
+    return _fieldNoObjectImpl<T>(fieldName)?.withObject(obj);
+  }
+
+  FieldReflection<Tag, T>? _fieldNoObjectImpl<T>(String fieldName) {
+    final f = _fieldsNoObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Tag, T>;
+    }
+    final f2 = _fieldImpl(fieldName, null);
+    if (f2 == null) return null;
+    _fieldsNoObject[fieldName] = f2;
+    return f2 as FieldReflection<Tag, T>;
+  }
+
+  FieldReflection<Tag, T>? _fieldObjectImpl<T>(String fieldName) {
+    final f = _fieldsObject[fieldName];
+    if (f != null) {
+      return f as FieldReflection<Tag, T>;
+    }
+    var f2 = _fieldNoObjectImpl<T>(fieldName);
+    if (f2 == null) return null;
+    f2 = f2.withObject(object!);
+    _fieldsObject[fieldName] = f2;
+    return f2;
+  }
+
+  FieldReflection<Tag, dynamic>? _fieldImpl(String fieldName, Tag? obj) {
+    obj ??= object;
+
+    var lc = fieldName.trim().toLowerCase();
+
+    switch (lc) {
+      case 'name':
+        return FieldReflection<Tag, String>(
+          this,
+          Tag,
+          __TR.tString,
+          'name',
+          false,
+          (o) =>
+              () => o!.name,
+          (o) =>
+              (v) => o!.name = v,
+          obj,
+          false,
+        );
+      case 'color':
+        return FieldReflection<Tag, String>(
+          this,
+          Tag,
+          __TR.tString,
+          'color',
+          false,
+          (o) =>
+              () => o!.color,
+          (o) =>
+              (v) => o!.color = v,
+          obj,
+          false,
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Map<String, dynamic> getFieldsValues(Tag? obj, {bool withHashCode = false}) {
+    obj ??= object;
+    return <String, dynamic>{
+      'name': obj?.name,
+      'color': obj?.color,
+      if (withHashCode) 'hashCode': obj?.hashCode,
+    };
+  }
+
+  static const List<String> _staticFieldsNames = const <String>[];
+
+  @override
+  List<String> get staticFieldsNames => _staticFieldsNames;
+
+  @override
+  StaticFieldReflection<Tag, T>? staticField<T>(String fieldName) => null;
+
+  static const List<String> _methodsNames = const <String>[];
+
+  @override
+  List<String> get methodsNames => _methodsNames;
+
+  @override
+  MethodReflection<Tag, R>? method<R>(String methodName, [Tag? obj]) => null;
+  static const List<String> _staticMethodsNames = const <String>[];
+
+  @override
+  List<String> get staticMethodsNames => _staticMethodsNames;
+
+  @override
+  StaticMethodReflection<Tag, R>? staticMethod<R>(String methodName) => null;
 }
 
 class Task$reflection extends ClassReflection<Task> with __ReflectionMixin {
@@ -3156,6 +3891,32 @@ extension Counter$reflectionExtension on Counter {
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
+extension Coupon$reflectionExtension on Coupon {
+  /// Returns a [ClassReflection] for type [Coupon]. (Generated by [ReflectionFactory])
+  ClassReflection<Coupon> get reflection => Coupon$reflection(this);
+
+  /// Returns a JSON for type [Coupon]. (Generated by [ReflectionFactory])
+  Object? toJson({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJson(null, null, duplicatedEntitiesAsID);
+
+  /// Returns a JSON [Map] for type [Coupon]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns an encoded JSON [String] for type [Coupon]. (Generated by [ReflectionFactory])
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
+
+  /// Returns a JSON for type [Coupon] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
 extension Invoice$reflectionExtension on Invoice {
   /// Returns a [ClassReflection] for type [Invoice]. (Generated by [ReflectionFactory])
   ClassReflection<Invoice> get reflection => Invoice$reflection(this);
@@ -3286,6 +4047,32 @@ extension Project$reflectionExtension on Project {
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
 
+extension Seat$reflectionExtension on Seat {
+  /// Returns a [ClassReflection] for type [Seat]. (Generated by [ReflectionFactory])
+  ClassReflection<Seat> get reflection => Seat$reflection(this);
+
+  /// Returns a JSON for type [Seat]. (Generated by [ReflectionFactory])
+  Object? toJson({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJson(null, null, duplicatedEntitiesAsID);
+
+  /// Returns a JSON [Map] for type [Seat]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns an encoded JSON [String] for type [Seat]. (Generated by [ReflectionFactory])
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
+
+  /// Returns a JSON for type [Seat] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
 extension Settings$reflectionExtension on Settings {
   /// Returns a [ClassReflection] for type [Settings]. (Generated by [ReflectionFactory])
   ClassReflection<Settings> get reflection => Settings$reflection(this);
@@ -3308,6 +4095,32 @@ extension Settings$reflectionExtension on Settings {
   );
 
   /// Returns a JSON for type [Settings] using the class fields. (Generated by [ReflectionFactory])
+  Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
+      .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+}
+
+extension Tag$reflectionExtension on Tag {
+  /// Returns a [ClassReflection] for type [Tag]. (Generated by [ReflectionFactory])
+  ClassReflection<Tag> get reflection => Tag$reflection(this);
+
+  /// Returns a JSON for type [Tag]. (Generated by [ReflectionFactory])
+  Object? toJson({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJson(null, null, duplicatedEntitiesAsID);
+
+  /// Returns a JSON [Map] for type [Tag]. (Generated by [ReflectionFactory])
+  Map<String, dynamic>? toJsonMap({bool duplicatedEntitiesAsID = false}) =>
+      reflection.toJsonMap(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
+
+  /// Returns an encoded JSON [String] for type [Tag]. (Generated by [ReflectionFactory])
+  String toJsonEncoded({
+    bool pretty = false,
+    bool duplicatedEntitiesAsID = false,
+  }) => reflection.toJsonEncoded(
+    pretty: pretty,
+    duplicatedEntitiesAsID: duplicatedEntitiesAsID,
+  );
+
+  /// Returns a JSON for type [Tag] using the class fields. (Generated by [ReflectionFactory])
   Object? toJsonFromFields({bool duplicatedEntitiesAsID = false}) => reflection
       .toJsonFromFields(duplicatedEntitiesAsID: duplicatedEntitiesAsID);
 }
@@ -3410,12 +4223,15 @@ extension Ticket$reflectionExtension on Ticket {
 
 List<Reflection> _listSiblingsReflection() => <Reflection>[
   Counter$reflection(),
+  Coupon$reflection(),
   Invoice$reflection(),
   Label$reflection(),
   Note$reflection(),
   Profile$reflection(),
   Project$reflection(),
+  Seat$reflection(),
   Settings$reflection(),
+  Tag$reflection(),
   Task$reflection(),
   TaskState$reflection(),
   TaskStep$reflection(),

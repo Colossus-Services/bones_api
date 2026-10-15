@@ -768,12 +768,25 @@ class Json {
     JsonDecoder jsonDecoder,
     EntityHandlerProvider? entityHandlerProvider,
   ) {
-    if (type.isListEntity && value is Iterable) {
+    if (value is Iterable && type.isListEntity) {
       return _iterableCaster(value, type, jsonDecoder, entityHandlerProvider);
     } else {
       if (value == null) {
         return null;
-      } else if (type.type == value.runtimeType) {
+      }
+
+      // The most common JSON values already have their field type: returned
+      // as `type.type == value.runtimeType` below returns them, without
+      // `runtimeType` (costly when compiled to JavaScript).
+      if (value is String) {
+        if (type.isStringType) return value;
+      } else if (value is bool) {
+        if (type.isBoolType) return value;
+      } else if (value is int) {
+        if (type.isIntType) return value;
+      }
+
+      if (type.type == value.runtimeType) {
         return value;
       } else if (type.isStringType) {
         return TypeParser.parseString(value);

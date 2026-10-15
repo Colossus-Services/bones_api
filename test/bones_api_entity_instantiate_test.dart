@@ -3,6 +3,7 @@ library;
 
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_sqlite.dart';
+import 'package:mercury_client/mercury_client.dart';
 import 'package:statistics/statistics.dart';
 import 'package:test/test.dart';
 
@@ -139,6 +140,34 @@ class Counter extends Counted<int> {
   int? id;
 
   Counter(super.values, {super.value, this.id});
+}
+
+/// The ID field is `key` (a `String`): see `idFieldName`.
+@EnableReflection()
+class Coupon {
+  String key;
+  int uses;
+
+  Coupon(this.key, {this.uses = 0});
+}
+
+/// No field named as an ID: its numeric field is the ID (`number`).
+@EnableReflection()
+class Seat {
+  int number;
+  String label;
+
+  Seat(this.number, this.label);
+}
+
+/// No ID candidate (non-nullable `String`s, none named as an ID): its
+/// `idFieldName` is `id`, a field it doesn't have.
+@EnableReflection()
+class Tag {
+  String name;
+  String color;
+
+  Tag(this.name, this.color);
 }
 
 /// No constructor with parameters: `create()` + setters.
@@ -909,6 +938,375 @@ void main() {
           equals(firstList),
         );
       }
+    });
+  });
+
+  group('JSON decoding, as a module proxy', () {
+    final due = DateTime.utc(2026, 1, 2, 3, 4, 5);
+
+    // No request is made: only the response handling.
+    final proxy = APIModuleProxyHttpCaller(HttpClient('http://localhost/'));
+
+    // The return types a generated proxy passes:
+    const tasksType = TypeReflection<Future<List<Task>>>(Future, [
+      TypeReflection<List<Task>>(List, [TypeReflection<Task>(Task)]),
+    ]);
+    const taskType = TypeReflection<Future<Task>>(Future, [
+      TypeReflection<Task>(Task),
+    ]);
+    const profilesType = TypeReflection<Future<List<Profile>>>(Future, [
+      TypeReflection<List<Profile>>(List, [TypeReflection<Profile>(Profile)]),
+    ]);
+
+    setUpAll(() {
+      Task$reflection();
+      TaskStep$reflection();
+      Profile$reflection();
+    });
+
+    String encode(Object? o) =>
+        Json.encode(o, toEncodable: ReflectionFactory.toJsonEncodable);
+
+    List<Task?> decodeTasks(String json) =>
+        (proxy.resolveResponse(tasksType, proxy.decodeJson(json)) as List)
+            .cast<Task?>();
+
+    List<Task> tasks(int n) => List.generate(n, (i) {
+      // Steps shared by ID between tasks, and tasks without steps:
+      var steps = [
+        for (var s = 0; s < i % 4; ++s) TaskStep('step${(i + s) % 5}', id: s),
+      ];
+      return Task(
+        'task $i',
+        i.isEven ? TaskState.open : TaskState.closed,
+        due.add(Duration(hours: i)),
+        steps,
+        id: i + 1,
+        score: i % 3 == 0 ? 0 : i * 0.5,
+      );
+    });
+
+    test('a list of entities: the same entities', () {
+      var original = tasks(25);
+      var json = encode(original);
+
+      // Twice: the second with the shapes cached.
+      for (var round = 0; round < 2; ++round) {
+        var decoded = decodeTasks(json);
+
+        expect(decoded, isA<List<Task?>>());
+        expect(decoded.length, equals(original.length));
+        expect(Json.toJson(decoded), equals(Json.toJson(original)));
+
+        for (var t in decoded) {
+          expect(t!.steps, isA<List<TaskStep>>());
+          expect(t.due, isA<DateTime>());
+          expect(t.score, isA<double>());
+        }
+      }
+    });
+
+    test('keys in other orders, absent optional keys, nulls', () {
+      var d = due.toIso8601String();
+      var json =
+          '''[
+        {"title": "a", "state": "open", "due": "$d", "steps": []},
+        {"steps": [{"name": "x", "id": 1}], "due": "$d", "state": "closed",
+         "title": "b", "id": 2, "score": 1.5},
+        {"id": 3, "title": "c", "state": "open", "due": "$d", "steps": [],
+         "score": null},
+        {"title": "e", "state": "closed", "due": "$d",
+         "steps": [{"id": 4, "name": "y"}, {"name": "z"}], "score": 2}
+      ]''';
+
+      for (var round = 0; round < 2; ++round) {
+        var decoded = decodeTasks(json);
+
+        expect(
+          decoded
+              .map(
+                (t) => t == null
+                    ? null
+                    : (
+                        t.id,
+                        t.title,
+                        t.state,
+                        t.score,
+                        t.steps.map((s) => '${s.id}:${s.name}').join(','),
+                      ),
+              )
+              .toList(),
+          equals([
+            (null, 'a', TaskState.open, 0.0, ''),
+            (2, 'b', TaskState.closed, 1.5, '1:x'),
+            // A `null` for a parameter with a default takes the default:
+            (3, 'c', TaskState.open, 0.0, ''),
+            (null, 'e', TaskState.closed, 2.0, '4:y,null:z'),
+          ]),
+        );
+
+        for (var t in decoded.nonNulls) {
+          expect(t.due.isAtSameMomentAs(due), isTrue);
+        }
+      }
+    });
+
+    test('unparsable values, and a null element of a List<Task>', () {
+      var d = due.toIso8601String();
+
+      // An unparsable value for a parameter with a default: the default.
+      var decoded = decodeTasks(
+        '[{"title": "a", "state": "open", "due": "$d", "steps": [], '
+        '"score": "high"}]',
+      );
+      expect(decoded.single!.score, equals(0.0));
+
+      // A value of another JSON type, parsed:
+      decoded = decodeTasks(
+        '[{"title": 1, "state": "closed", "due": "$d", "steps": [], '
+        '"score": "2.5", "id": "7"}]',
+      );
+      expect(decoded.single!.title, equals('1'));
+      expect(decoded.single!.score, equals(2.5));
+      expect(decoded.single!.id, equals(7));
+
+      // A `List<Task>` can't have a `null` (as in 1.23.1):
+      expect(
+        () => decodeTasks(
+          '[{"title": "a", "state": "open", "due": "$d", '
+          '"steps": []}, null]',
+        ),
+        throwsA(isA<TypeError>()),
+      );
+    });
+
+    test('a single entity, an empty list and a null', () {
+      var t = tasks(3)[2];
+
+      var decoded =
+          proxy.resolveResponse(taskType, proxy.decodeJson(encode(t))) as Task;
+      expect(Json.toJson(decoded), equals(Json.toJson(t)));
+
+      expect(proxy.resolveResponse(tasksType, proxy.decodeJson('[]')), isEmpty);
+      expect(proxy.resolveResponse(tasksType, null), isNull);
+    });
+
+    test('create() + setters: absent, null and present values', () {
+      var json = '''[
+        {"id": 1, "name": "a"},
+        {"id": 2, "name": "b", "bio": null, "verified": true},
+        {"name": "c", "bio": "c bio", "balance": "1.25"},
+        {"id": 4, "name": "d"}
+      ]''';
+
+      for (var round = 0; round < 2; ++round) {
+        var decoded =
+            (proxy.resolveResponse(profilesType, proxy.decodeJson(json))
+                    as List)
+                .cast<Profile>();
+
+        expect(
+          decoded
+              .map((p) => (p.id, p.name, p.bio, p.verified, p.balance))
+              .toList(),
+          equals([
+            (1, 'a', 'initial', false, null),
+            // A `null` sets a nullable field to `null`:
+            (2, 'b', null, true, null),
+            (null, 'c', 'c bio', false, Decimal.parse('1.25')),
+            (4, 'd', 'initial', false, null),
+          ]),
+        );
+      }
+    });
+  });
+
+  group('ClassReflectionEntityHandler.getID', () {
+    test('the value of getField(o, idFieldName(o))', () {
+      void expectID<O>(ClassReflectionEntityHandler<O> handler, O o, id) {
+        expect(handler.getID(o), equals(id), reason: '$O');
+        expect(
+          handler.getID(o),
+          equals(handler.getField(o, handler.idFieldName(o))),
+          reason: '$O',
+        );
+
+        // As an `idGetter` of an entity cache:
+        if (id != null) {
+          var cache = JsonEntityCacheSimple()..cacheEntity(o, handler.getID);
+          expect(cache.getCachedEntityByID(id, type: O), same(o));
+        }
+      }
+
+      var steps = TaskStep$reflection().entityHandler;
+      expect(steps.idFieldName(), equals('id'));
+      expectID(steps, TaskStep('a', id: 7), 7);
+      expectID(steps, TaskStep('b'), null);
+
+      var coupons = Coupon$reflection().entityHandler;
+      expect(coupons.idFieldName(), equals('key'));
+      expectID(coupons, Coupon('X1', uses: 3), 'X1');
+
+      var seats = Seat$reflection().entityHandler;
+      expect(seats.idFieldName(), equals('number'));
+      expectID(seats, Seat(12, 'A'), 12);
+      expectID(seats, Seat(13, 'B'), 13);
+
+      var profiles = Profile$reflection().entityHandler;
+      expectID(profiles, Profile()..id = 5, 5);
+
+      // An `idFieldName` that isn't a field: no ID.
+      var tags = Tag$reflection().entityHandler;
+      expect(tags.idFieldName(), equals('id'));
+      expectID(tags, Tag('n', 'c'), null);
+    });
+  });
+
+  group('EntityHandler.createFromMap', () {
+    test('synchronous: the entity, cached by its ID', () {
+      var handler = TaskStep$reflection().entityHandler;
+      var cache = JsonEntityCacheSimple();
+
+      var step = handler.createFromMap({
+        'id': 1,
+        'name': 'a',
+      }, entityCache: cache);
+      expect(step, isA<TaskStep>());
+      expect((step as TaskStep).name, equals('a'));
+      expect(cache.getCachedEntityByID(1, type: TaskStep), same(step));
+
+      // Without an ID: not cached.
+      var step2 = handler.createFromMapSync({'name': 'b'}, entityCache: cache);
+      expect(step2.id, isNull);
+      expect(cache.cachedEntitiesLength, equals(1));
+    });
+
+    test('a key that is a constructor parameter, not a field', () {
+      var ticket = Ticket$reflection().entityHandler.createFromMapSync({
+        'titleText': 't',
+        'id': 3,
+      });
+      expect(ticket.title, equals('t'));
+      expect(ticket.id, equals(3));
+    });
+
+    test('values resolved asynchronously (from a DB)', () async {
+      var provider = _TaskProvider(sqlite: false);
+      await provider.ensureInitialized();
+      await provider.adapter.ensureInitialized();
+
+      try {
+        var s1 = TaskStep('s1');
+        var s2 = TaskStep('s2');
+        await provider.stepRepository.storeAll([s1, s2]);
+
+        var handler = Project$reflection().entityHandler;
+
+        var map = {
+          'name': 'p',
+          'mainStep': s1.id,
+          'steps': [s1.id, s2.id],
+        };
+
+        var created = handler.createFromMap(
+          map,
+          entityRepositoryProvider: provider,
+        );
+
+        var project = await created;
+        expect(project.name, equals('p'));
+        expect(project.mainStep.id, equals(s1.id));
+        expect(project.steps.ids, equals([s1.id, s2.id]));
+      } finally {
+        provider.dispose();
+      }
+    });
+
+    test('unresolved and invalid values', () {
+      // `uses` can't be parsed as an `int`: unresolved, it's omitted, and
+      // takes its default.
+      var coupons = Coupon$reflection().entityHandler;
+      var coupon = coupons.createFromMapSync({'key': 'k', 'uses': 'many'});
+      expect(coupon.key, equals('k'));
+      expect(coupon.uses, equals(0));
+
+      // `Profile` falls back on its default constructor (`create()` +
+      // setters), which ignores a value it can't set:
+      var profile = Profile$reflection().entityHandler.createFromMapSync({
+        'id': 1,
+        'name': 'p',
+        'verified': 'not a bool',
+      });
+      expect(profile.id, equals(1));
+      expect(profile.name, equals('p'));
+    });
+  });
+
+  group('Json.defaultFieldValueResolver', () {
+    test('values already of the field type, and parsed values', () {
+      Object? resolve(TypeReflection type, Object? value) =>
+          Json.defaultFieldValueResolver(
+            'f',
+            value,
+            type,
+            Json.defaultDecoder,
+            null,
+          );
+
+      final cases = <(TypeReflection, Object?, Object?)>[
+        (TypeReflection.tString, 'a', 'a'),
+        (TypeReflection.tString, '', ''),
+        (TypeReflection.tString, 1, '1'),
+        (TypeReflection.tString, true, 'true'),
+        (TypeReflection.tInt, 1, 1),
+        (TypeReflection.tInt, -1, -1),
+        (TypeReflection.tInt, '2', 2),
+        (TypeReflection.tInt, 2.0, 2),
+        (TypeReflection.tDouble, 2, 2.0),
+        (TypeReflection.tDouble, 2.5, 2.5),
+        (TypeReflection.tDouble, '1.5', 1.5),
+        (TypeReflection.tNum, 3, 3),
+        (TypeReflection.tNum, 3.5, 3.5),
+        (TypeReflection.tBool, true, true),
+        (TypeReflection.tBool, false, false),
+        (TypeReflection.tBool, 'true', true),
+        (TypeReflection.tBool, 'false', false),
+        (TypeReflection.tBool, 1, true),
+        (TypeReflection.tObject, 'x', 'x'),
+        (TypeReflection.tObject, 7, 7),
+        (TypeReflection.tDynamic, 'y', 'y'),
+        (TypeReflection.tDynamic, false, false),
+        (TypeReflection.tString, null, null),
+        (TypeReflection.tInt, null, null),
+      ];
+
+      for (var (type, value, expected) in cases) {
+        var resolved = resolve(type, value);
+        var reason = '$type: ${value.runtimeType} $value';
+        expect(resolved, equals(expected), reason: reason);
+        expect(
+          resolved.runtimeType,
+          equals(expected.runtimeType),
+          reason: reason,
+        );
+      }
+    });
+
+    test('a value of the field type is returned as it is', () {
+      var s = 'value';
+      expect(
+        identical(
+          Json.defaultFieldValueResolver(
+            'f',
+            s,
+            TypeReflection.tString,
+            Json.defaultDecoder,
+            null,
+          ),
+          s,
+        ),
+        isTrue,
+      );
     });
   });
 
