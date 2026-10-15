@@ -541,6 +541,67 @@ x-.png = b.png
         aliases.cachedResolutionsLength,
         lessThanOrEqualTo(StaticFilesAliases.maxCacheEntries),
       );
+      // Only the oldest entries are evicted (not a full clear):
+      expect(
+        aliases.cachedDirectoriesLength,
+        greaterThan(StaticFilesAliases.maxCacheEntries ~/ 2),
+      );
+      expect(
+        aliases.cachedResolutionsLength,
+        greaterThan(StaticFilesAliases.maxCacheEntries ~/ 2),
+      );
+    });
+
+    test('the caches are bounded: directories with `.aliases`', () {
+      var total = StaticFilesAliases.maxCacheEntries + 10;
+      for (var i = 0; i < total; ++i) {
+        _write(root, 'd$i/.aliases', 'x.png = y.png\n');
+      }
+      _write(root, 'd0/y.png', 'Y');
+      var aliases = StaticFilesAliases(root);
+
+      for (var i = 0; i < total; ++i) {
+        expect(resolve(aliases, 'd$i/x.png'), i == 0 ? 'd0/y.png' : isNull);
+      }
+
+      expect(
+        aliases.cachedDirectoriesLength,
+        lessThanOrEqualTo(StaticFilesAliases.maxCacheEntries),
+      );
+      expect(resolve(aliases, 'd0/x.png'), 'd0/y.png');
+    });
+
+    test('missing directories are cached until `checkInterval`', () {
+      var aliases = StaticFilesAliases(root, checkInterval: Duration(hours: 1));
+
+      expect(resolve(aliases, 'late/x.png'), isNull);
+
+      _write(root, 'late/y.png', 'Y');
+      _write(root, 'late/.aliases', 'x.png = y.png\n');
+
+      // `late` is still known as missing:
+      expect(resolve(aliases, 'late/x.png'), isNull);
+      expect(aliases.cachedDirectoriesLength, 1);
+
+      aliases.clearCache();
+      expect(resolve(aliases, 'late/x.png'), 'late/y.png');
+    });
+
+    test('a directory removed after being cached', () {
+      _write(root, 'gone/y.png', 'Y');
+      _write(root, 'gone/.aliases', 'x.png = y.png\n');
+      var aliases = newAliases();
+
+      expect(resolve(aliases, 'gone/x.png'), 'gone/y.png');
+
+      Directory(pack_path.join(root.path, 'gone')).deleteSync(recursive: true);
+      expect(resolve(aliases, 'gone/x.png'), isNull);
+      expect(aliases.cachedResolutionsLength, 0);
+
+      // Re-created: no longer missing (`checkInterval` zero).
+      _write(root, 'gone/y.png', 'Y');
+      _write(root, 'gone/.aliases', 'x.png = y.png\n');
+      expect(resolve(aliases, 'gone/x.png'), 'gone/y.png');
     });
 
     test('random paths are not cached', () {
@@ -1031,6 +1092,201 @@ garbage line
       var res2 = await _request(url(''));
       expect(res2.status, 200);
       expect(_bodyStr(res2), contains('ROOT'));
+    });
+  });
+
+  group('APIServer + .aliases: same pipeline as a physical file', () {
+    late Directory docRoot;
+    late APIServer apiServer;
+
+    setUpAll(() async {
+      docRoot = await Directory.systemTemp.createTemp('bones_api_aliases_mw_');
+
+      _write(docRoot, 'site/pages/page.html', '<html>${'PAGE ' * 300}</html>');
+      _write(docRoot, 'site/pages/page2.html', '<html>PAGE2</html>');
+      _write(docRoot, 'styles/main/app.css', 'body { color: red; }');
+      _write(docRoot, 'big/data.txt', 'BIG DATA ' * 500);
+      _write(docRoot, 'img/food.png', 'FOOD-PNG');
+      _write(docRoot, '.aliases', '''
+page.html = site/pages/page.html
+page2.html = site/pages/page2.html
+app.css = styles/main/app.css
+data.txt = big/data.txt
+food.png = img/food.png
+''');
+
+      var port = await resolveFreePort(6800);
+
+      apiServer = APIServer(
+        _AliasesAPIRoot('aliases-pipeline'),
+        'localhost',
+        port,
+        documentRoot: docRoot.path,
+        cookieless: true,
+        logToConsole: false,
+        cacheStaticFilesResponses: true,
+        longLivedStaticFilesCached: [RegExp(r'\.css$')],
+        longLivedStaticFilesCacheControl: 'max-age=7777',
+        staticFilesCacheControl: 'max-age=11',
+        crossOrigin: APICrossOriginConfig(
+          staticFiles: APICrossOriginPolicies(
+            embedderPolicy: 'require-corp',
+            resourcePolicy: 'same-site',
+          ),
+        ),
+      );
+
+      await apiServer.start();
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+      await docRoot.delete(recursive: true);
+    });
+
+    String url(String path) => '${apiServer.url}$path';
+
+    /// The headers set by the static files pipeline (not request dependent).
+    const pipelineHeaders = [
+      'content-type',
+      'content-length',
+      'content-encoding',
+      'last-modified',
+      'accept-ranges',
+      'cache-control',
+      'server',
+      'cross-origin-resource-policy',
+      'cross-origin-opener-policy',
+      'cross-origin-embedder-policy',
+      APIServer.headerXCookielessServer,
+    ];
+
+    Map<String, String?> headersOf(_Res res) => {
+      for (var h in pipelineHeaders) h: res.headers.value(h),
+    };
+
+    test('HTML: headers, cross-origin policies and response cache', () async {
+      // Via the alias first: a fresh (un-cached) response.
+      var aliased = await _request(url('page.html'));
+      expect(aliased.status, 200);
+      expect(_bodyStr(aliased), startsWith('<html>PAGE'));
+      expect(aliased.headers.value('x-api-server-cache'), isNull);
+
+      expect(aliased.headers.contentType?.mimeType, 'text/html');
+      expect(aliased.headers.value('cache-control'), 'max-age=11');
+      expect(aliased.headers.value('server'), isNotEmpty);
+      expect(
+        aliased.headers.value('cross-origin-embedder-policy'),
+        'require-corp',
+      );
+      expect(
+        aliased.headers.value('cross-origin-opener-policy'),
+        APICrossOriginPolicies.defaultOpenerPolicy,
+      );
+      expect(
+        aliased.headers.value('cross-origin-resource-policy'),
+        'same-site',
+      );
+      expect(
+        aliased.headers.value(APIServer.headerXCookielessServer),
+        APIServer.headerXCookielessServerValue,
+      );
+      expect(aliased.headers.value('set-cookie'), isNull);
+
+      // The physical path: the same cached response (the cache key is the
+      // physical path), with the same pipeline headers.
+      var physical = await _request(url('site/pages/page.html'));
+      expect(physical.status, 200);
+      expect(physical.body, aliased.body);
+      expect(physical.headers.value('x-api-server-cache'), isNotNull);
+      expect(headersOf(physical), headersOf(aliased));
+
+      // The alias again: also served from the cache.
+      var aliased2 = await _request(url('page.html'));
+      expect(aliased2.status, 200);
+      expect(aliased2.body, aliased.body);
+      expect(aliased2.headers.value('x-api-server-cache'), isNotNull);
+      expect(headersOf(aliased2), headersOf(aliased));
+    });
+
+    test('physical first, then alias: cached', () async {
+      var physical = await _request(url('site/pages/page2.html'));
+      expect(physical.status, 200);
+      expect(physical.headers.value('x-api-server-cache'), isNull);
+
+      var aliased = await _request(url('page2.html'));
+      expect(aliased.status, 200);
+      expect(_bodyStr(aliased), '<html>PAGE2</html>');
+      expect(aliased.headers.value('x-api-server-cache'), isNotNull);
+      expect(headersOf(aliased), headersOf(physical));
+    });
+
+    test('long-lived Cache-Control (physical path rules)', () async {
+      var aliased = await _request(url('app.css'));
+      expect(aliased.status, 200);
+      expect(aliased.headers.contentType?.mimeType, 'text/css');
+      expect(aliased.headers.value('cache-control'), 'max-age=7777');
+      // Not an HTML document: no COOP/COEP, only CORP.
+      expect(aliased.headers.value('cross-origin-opener-policy'), isNull);
+      expect(
+        aliased.headers.value('cross-origin-resource-policy'),
+        'same-site',
+      );
+
+      var physical = await _request(url('styles/main/app.css'));
+      expect(headersOf(physical), headersOf(aliased));
+    });
+
+    test('gzip', () async {
+      var gzipHeaders = {'accept-encoding': 'gzip'};
+
+      var aliased = await _request(url('data.txt'), headers: gzipHeaders);
+      expect(aliased.status, 200);
+      expect(aliased.headers.value('content-encoding'), 'gzip');
+      expect(aliased.body.length, lessThan(500 * 9));
+      expect(_bodyStr(aliased), 'BIG DATA ' * 500);
+
+      var physical = await _request(url('big/data.txt'), headers: gzipHeaders);
+      expect(physical.headers.value('content-encoding'), 'gzip');
+      expect(_bodyStr(physical), _bodyStr(aliased));
+      expect(headersOf(physical), headersOf(aliased));
+
+      // Without gzip (`HttpClient` sends `accept-encoding: gzip` by default):
+      var identity = {'accept-encoding': 'identity'};
+      var aliasedPlain = await _request(url('data.txt'), headers: identity);
+      expect(aliasedPlain.headers.value('content-encoding'), isNull);
+      expect(_bodyStr(aliasedPlain), 'BIG DATA ' * 500);
+
+      var physicalPlain = await _request(
+        url('big/data.txt'),
+        headers: identity,
+      );
+      expect(headersOf(physicalPlain), headersOf(aliasedPlain));
+    });
+
+    test('conditional request: 304 (cached) via the alias', () async {
+      var aliased = await _request(url('food.png'));
+      expect(aliased.status, 200);
+      expect(aliased.headers.contentType?.mimeType, 'image/png');
+
+      var lastModified = aliased.headers.value(HttpHeaders.lastModifiedHeader);
+      expect(lastModified, isNotNull);
+
+      for (var path in ['food.png', 'img/food.png']) {
+        var res = await _request(
+          url(path),
+          headers: {HttpHeaders.ifModifiedSinceHeader: lastModified!},
+        );
+        expect(res.status, 304, reason: path);
+        expect(res.body, isEmpty, reason: path);
+      }
+
+      // The second 304 is served by the response cache:
+      var res = await _request(
+        url('food.png'),
+        headers: {HttpHeaders.ifModifiedSinceHeader: lastModified!},
+      );
+      expect(res.headers.value('x-api-server-cache'), isNotNull);
     });
   });
 

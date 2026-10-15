@@ -291,12 +291,20 @@ just-a-name                       # no '='
 
 `.aliases` files and resolved paths are cached in memory and re-checked at
 most every 10 seconds, so edits (including a new physical file shadowing an
-alias) apply within that interval. Only existing directories are cached (each
-one costs a `.aliases` stat every 10 seconds), and the walk stops at the first
-missing directory of the request path. A path to which no alias applies is
-never stat'ed by the aliases resolution. The caches are bounded (4096 entries
-each). The response cache and `Cache-Control` rules
-(`long-lived-static-files-cached`) apply to the physical (target) path.
+alias) apply within that interval. Each directory costs a `.aliases` stat
+every 10 seconds, and the walk stops at the first missing directory of the
+request path (missing directories are cached apart, so repeated probes of
+missing paths don't touch the file system). A path to which no alias applies
+is never stat'ed by the aliases resolution, and a pattern is only matched
+when its literal prefix/suffix (e.g. `.png`) match. The caches are bounded
+(4096 entries each, evicting the oldest entries; directories with a
+`.aliases` are kept).
+
+An aliased file goes through the same pipeline as its physical path: the
+response cache (shared: the cache key is the physical path), gzip, and the
+static files headers (`Cache-Control`, cross-origin policies, cookieless).
+The `Cache-Control` rules (`long-lived-static-files-cached`) apply to the
+physical (target) path.
 
 ## Hot Reload
 

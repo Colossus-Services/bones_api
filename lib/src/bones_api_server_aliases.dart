@@ -51,6 +51,12 @@ class AliasEntry {
   /// or an [int] capture index.
   final List<Object>? _targetParts;
 
+  /// A pattern's leading and trailing literals and minimum match length:
+  /// a cheap pre-check before the glob matching (`*.png` → suffix `.png`).
+  final String _literalPrefix;
+  final String _literalSuffix;
+  final int _minLength;
+
   AliasEntry._(
     this.kind,
     this.line,
@@ -61,11 +67,31 @@ class AliasEntry {
     List<Object>? patternTokens,
     List<Object>? targetParts,
   }) : _patternTokens = patternTokens,
-       _targetParts = targetParts;
+       _targetParts = targetParts,
+       _literalPrefix = _tokenLiteral(patternTokens?.firstOrNull),
+       _literalSuffix = _tokenLiteral(patternTokens?.lastOrNull),
+       _minLength = _patternMinLength(patternTokens);
+
+  static String _tokenLiteral(Object? token) => token is String ? token : '';
+
+  static int _patternMinLength(List<Object>? tokens) {
+    if (tokens == null) return 0;
+    var length = 0;
+    for (var t in tokens) {
+      if (t is String) {
+        length += t.length;
+      } else if (t == _Wildcard.question) {
+        length += 1;
+      }
+    }
+    return length;
+  }
 
   /// Returns the target segments for the [remaining] request path segments
   /// (relative to the `.aliases` directory), or `null` if it doesn't match.
-  List<String>? match(List<String> remaining) {
+  ///
+  /// [remainingPath] is `remaining.join('/')`, when already computed.
+  List<String>? match(List<String> remaining, [String? remainingPath]) {
     switch (kind) {
       case AliasKind.file:
         return _equalsSegments(remaining, virtualSegments)
@@ -83,13 +109,17 @@ class AliasEntry {
       case AliasKind.overlay:
         return [...targetSegments, ...remaining];
       case AliasKind.pattern:
-        return _matchPattern(remaining);
+        return _matchPattern(remaining, remainingPath ?? remaining.join('/'));
     }
   }
 
-  List<String>? _matchPattern(List<String> remaining) {
-    var path = remaining.join('/');
-    if (path.length > AliasesTable.maxPatternMatchLength) return null;
+  List<String>? _matchPattern(List<String> remaining, String path) {
+    if (path.length > AliasesTable.maxPatternMatchLength ||
+        path.length < _minLength ||
+        !path.startsWith(_literalPrefix) ||
+        !path.endsWith(_literalSuffix)) {
+      return null;
+    }
 
     var captures = _matchGlob(_patternTokens!, path);
     if (captures == null) return null;
@@ -260,8 +290,15 @@ class AliasesTable {
   Iterable<({AliasEntry entry, List<String> target})> matches(
     List<String> remaining,
   ) sync* {
-    var file = _files[remaining.join('/')];
-    if (file != null) yield (entry: file, target: file.targetSegments);
+    // Joined once, and only if a file alias or a pattern needs it:
+    var path = _files.isNotEmpty || _patterns.isNotEmpty
+        ? remaining.join('/')
+        : '';
+
+    if (_files.isNotEmpty) {
+      var file = _files[path];
+      if (file != null) yield (entry: file, target: file.targetSegments);
+    }
 
     for (var e in _directories) {
       var t = e.match(remaining);
@@ -269,7 +306,7 @@ class AliasesTable {
     }
 
     for (var e in _patterns) {
-      var t = e.match(remaining);
+      var t = e.match(remaining, path);
       if (t != null) yield (entry: e, target: t);
     }
 
@@ -569,16 +606,30 @@ class StaticFileAliasResolution {
   String toString() => '$path${isDirectory ? '/' : ''}';
 }
 
+/// A monotonic clock (immune to system clock changes, cheaper than
+/// `DateTime.now()`), in microseconds.
+final Stopwatch _clock = Stopwatch()..start();
+
 class _CachedTable {
   final AliasesTable? table;
   final DateTime? modified;
   final int? size;
-  DateTime checkTime;
+
+  /// The [_clock] time of the last check.
+  int checkTime;
 
   _CachedTable(this.table, this.modified, this.size, this.checkTime);
 }
 
 class _ResolveState {
+  /// The [_clock] time of the resolution (read once per request).
+  final int now;
+
+  /// The request path (joined segments).
+  final String path;
+
+  _ResolveState(this.now, this.path);
+
   /// The remaining candidates to check (see [StaticFilesAliases.maxResolutionAttempts]).
   int attempts = StaticFilesAliases.maxResolutionAttempts;
 
@@ -591,7 +642,9 @@ class _ResolveState {
 
 class _CachedResolution {
   final StaticFileAliasResolution? resolution;
-  final DateTime time;
+
+  /// The [_clock] time of the resolution.
+  final int time;
 
   _CachedResolution(this.resolution, this.time);
 }
@@ -658,10 +711,31 @@ class StaticFilesAliases {
     this.decorateResponse,
   }) : rootDirectory = Directory(
          pack_path.normalize(rootDirectory.absolute.path),
-       );
+       ),
+       _checkIntervalMicros = checkInterval.inMicroseconds;
 
+  final int _checkIntervalMicros;
+
+  // Insertion ordered (`LinkedHashMap`): when full, the oldest entry is
+  // evicted (see [_evictOldest]).
   final Map<String, _CachedTable> _tables = {};
   final Map<String, _CachedResolution> _resolutions = {};
+
+  /// Directories that don't exist ([_clock] time of the check), apart from
+  /// [_tables]: a burst of random paths only evicts other missing ones.
+  final Map<String, int> _missingDirectories = {};
+
+  /// Evicts the oldest quarter of a full [cache], instead of clearing it: a
+  /// burst of new entries (e.g. random paths) can't drop all the others.
+  /// Evicting in batches keeps it amortized `O(1)` (removing one by one
+  /// makes `keys.first` skip the removed slots of the `LinkedHashMap`).
+  static void _evictOldest(Map<String, Object> cache) {
+    if (cache.length < maxCacheEntries) return;
+    var oldest = cache.keys.take(maxCacheEntries ~/ 4).toList();
+    for (var key in oldest) {
+      cache.remove(key);
+    }
+  }
 
   /// The number of cached directories (only existing ones are cached).
   int get cachedDirectoriesLength => _tables.length;
@@ -673,6 +747,7 @@ class StaticFilesAliases {
   void clearCache() {
     _tables.clear();
     _resolutions.clear();
+    _missingDirectories.clear();
   }
 
   /// The `shelf` [Middleware]: blocks `.aliases` requests and rewrites
@@ -760,16 +835,16 @@ class StaticFilesAliases {
     if (!segments.every(AliasesTable._isValidSegment)) return null;
 
     var key = segments.join('/');
-    var now = DateTime.now();
+    var now = _clock.elapsedMicroseconds;
 
     StaticFileAliasResolution? resolution;
 
     var cached = _resolutions[key];
-    if (cached != null && now.difference(cached.time) < checkInterval) {
+    if (cached != null && now - cached.time < _checkIntervalMicros) {
       resolution = cached.resolution;
     } else {
-      var state = _ResolveState();
-      resolution = _resolveAliases(segments, 0, {key}, const {}, state);
+      var state = _ResolveState(now, key);
+      resolution = _resolveAliases(segments, 0, null, null, state);
 
       if (!state.sawCandidate) {
         // No alias applies: nothing worth caching.
@@ -777,7 +852,9 @@ class StaticFilesAliases {
         return null;
       }
 
-      if (_resolutions.length >= maxCacheEntries) _resolutions.clear();
+      // Re-inserted at the end (the newest), evicting the oldest if full:
+      _resolutions.remove(key);
+      _evictOldest(_resolutions);
       _resolutions[key] = _CachedResolution(resolution, now);
     }
 
@@ -793,25 +870,26 @@ class StaticFilesAliases {
   /// the deepest first.
   ///
   /// [chainPaths] and [chainEntries] are the paths and entries of the
-  /// current chain: a path is never visited twice (a cycle) and an entry is
-  /// never applied twice (an overlay or a self-matching pattern would nest
-  /// its target forever: `sections/sections/...`).
+  /// current chain (`null` at the request path, besides `state.path`): a
+  /// path is never visited twice (a cycle) and an entry is never applied
+  /// twice (an overlay or a self-matching pattern would nest its target
+  /// forever: `sections/sections/...`).
   StaticFileAliasResolution? _resolveAliases(
     List<String> segments,
     int depth,
-    Set<String> chainPaths,
-    Set<AliasEntry> chainEntries,
+    Set<String>? chainPaths,
+    Set<AliasEntry>? chainEntries,
     _ResolveState state,
   ) {
     if (depth >= maxResolutionDepth) return null;
 
-    var tables = _tablesAlong(segments);
+    var tables = _tablesAlong(segments, state.now);
 
     for (var (i, table) in tables.reversed) {
       var dir = segments.sublist(0, i);
 
       for (var m in table.matches(segments.sublist(i))) {
-        if (chainEntries.contains(m.entry)) continue;
+        if (chainEntries != null && chainEntries.contains(m.entry)) continue;
 
         if (!state.sawCandidate) {
           state.sawCandidate = true;
@@ -826,7 +904,10 @@ class StaticFilesAliases {
         if (candidate.length > maxSegments) continue;
 
         var candidateKey = candidate.join('/');
-        if (chainPaths.contains(candidateKey)) continue;
+        if (candidateKey == state.path ||
+            (chainPaths != null && chainPaths.contains(candidateKey))) {
+          continue;
+        }
 
         if (--state.attempts < 0) return null;
 
@@ -840,8 +921,8 @@ class StaticFilesAliases {
         var resolved = _resolveAliases(
           candidate,
           depth + 1,
-          {...chainPaths, candidateKey},
-          {...chainEntries, m.entry},
+          {...?chainPaths, candidateKey},
+          {...?chainEntries, m.entry},
           state,
         );
         if (resolved != null) return resolved;
@@ -855,15 +936,26 @@ class StaticFilesAliases {
   /// The `.aliases` tables (with their directory depth) of the directories
   /// of [segments], from the root, stopping at the first directory that
   /// doesn't exist (an alias can't be defined below it).
-  List<(int, AliasesTable)> _tablesAlong(List<String> segments) {
-    var tables = <(int, AliasesTable)>[];
+  List<(int, AliasesTable)> _tablesAlong(List<String> segments, int now) {
+    List<(int, AliasesTable)>? tables;
+
+    // The directory key (`a/b`) is built incrementally:
+    var key = '';
     for (var i = 0; i < segments.length; ++i) {
-      var dir = _directory(segments, i);
+      if (i == 1) {
+        key = segments[0];
+      } else if (i > 1) {
+        key = '$key/${segments[i - 1]}';
+      }
+
+      var dir = _directory(key, segments, i, now);
       if (dir == null) break;
+
       var table = dir.table;
-      if (table != null) tables.add((i, table));
+      if (table != null) (tables ??= []).add((i, table));
     }
-    return tables;
+
+    return tables ?? const [];
   }
 
   String _pathOf(List<String> segments) =>
@@ -878,23 +970,36 @@ class StaticFilesAliases {
     return FileSystemEntity.typeSync(path);
   }
 
-  /// The cached directory of the first [length] [segments], or `null` if it
-  /// doesn't exist. Only existing directories are cached, so random request
-  /// paths can't fill the cache.
-  _CachedTable? _directory(List<String> segments, int length) {
-    var dirSegments = segments.sublist(0, length);
-    var key = dirSegments.join('/');
-    var now = DateTime.now();
-
+  /// The cached directory [key] (the first [length] [segments]), or `null`
+  /// if it doesn't exist. Only existing directories are cached, so random
+  /// request paths can't fill the cache.
+  _CachedTable? _directory(
+    String key,
+    List<String> segments,
+    int length,
+    int now,
+  ) {
     var cached = _tables[key];
-    if (cached != null && now.difference(cached.checkTime) < checkInterval) {
+    if (cached != null && now - cached.checkTime < _checkIntervalMicros) {
       return cached;
     }
 
-    if (length > 0 && _typeOf(dirSegments) != FileSystemEntityType.directory) {
-      if (_tables.remove(key)?.table != null) _resolutions.clear();
+    var missingTime = _missingDirectories[key];
+    if (missingTime != null && now - missingTime < _checkIntervalMicros) {
       return null;
     }
+
+    var dirSegments = segments.sublist(0, length);
+
+    if (length > 0 && _typeOf(dirSegments) != FileSystemEntityType.directory) {
+      if (_tables.remove(key)?.table != null) _resolutions.clear();
+      _missingDirectories.remove(key);
+      _evictOldest(_missingDirectories);
+      _missingDirectories[key] = now;
+      return null;
+    }
+
+    _missingDirectories.remove(key);
 
     var file = File(_pathOf([...dirSegments, fileName]));
     var stat = file.statSync();
@@ -921,12 +1026,37 @@ class StaticFilesAliases {
   }
 
   _CachedTable _putTable(String key, _CachedTable cached) {
-    if (_tables.length >= maxCacheEntries) {
-      _tables.clear();
-      _resolutions.clear();
-    }
+    _tables.remove(key);
+    _evictTables();
     _tables[key] = cached;
     return cached;
+  }
+
+  /// Evicts the oldest quarter of the directories without a `.aliases`
+  /// (cheap to re-check). The directories with a `.aliases` are kept: they
+  /// are few, and the resolutions depend on them (loading a `.aliases`
+  /// invalidates all the resolutions). If they fill the cache, it's cleared.
+  void _evictTables() {
+    if (_tables.length < maxCacheEntries) return;
+
+    var target = maxCacheEntries ~/ 4;
+    var evict = <String>[];
+    for (var e in _tables.entries) {
+      if (e.value.table == null) {
+        evict.add(e.key);
+        if (evict.length >= target) break;
+      }
+    }
+
+    if (evict.length < target) {
+      _tables.clear();
+      _resolutions.clear();
+      return;
+    }
+
+    for (var key in evict) {
+      _tables.remove(key);
+    }
   }
 
   String? _rootResolved;
