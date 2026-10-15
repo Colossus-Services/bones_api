@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.12.0
+// BUILDER: reflection_factory/2.12.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -21,8 +21,10 @@ typedef __TR<T> = TypeReflection<T>;
 typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
+T __argOr$<T>(Object? a, T d) => ConstructorReflection.argOrDefault<T>(a, d);
+
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.12.0');
+  static final Version _version = Version.parse('2.12.2');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -177,12 +179,8 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
           },
           null,
           invoker: (a) => Bonus(
-            campaign: identical(a[0], ConstructorReflection.absentArgument)
-                ? null
-                : a[0] as Object?,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
+            campaign: __argOr$<Object?>(a[0], null),
+            id: __argOr$<int?>(a[1], null),
           ),
         );
       case 'empty':
@@ -705,12 +703,8 @@ class Campaign$reflection extends ClassReflection<Campaign>
           null,
           invoker: (a) => Campaign(
             a[0] as String,
-            config: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as Object?,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            config: __argOr$<Object?>(a[1], null),
+            id: __argOr$<int?>(a[2], null),
           ),
         );
       case 'empty':
@@ -1265,12 +1259,8 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
           },
           null,
           invoker: (a) => CampaignConfig(
-            id: identical(a[0], ConstructorReflection.absentArgument)
-                ? null
-                : a[0] as int?,
-            open: identical(a[1], ConstructorReflection.absentArgument)
-                ? false
-                : a[1] as bool,
+            id: __argOr$<int?>(a[0], null),
+            open: __argOr$<bool>(a[1], false),
           ),
         );
       case 'empty':
@@ -1812,12 +1802,8 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
           null,
           invoker: (a) => Item(
             a[0] as String,
-            bonus: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as Object?,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            bonus: __argOr$<Object?>(a[1], null),
+            id: __argOr$<int?>(a[2], null),
           ),
         );
       case 'empty':
@@ -2356,12 +2342,8 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
           null,
           invoker: (a) => Order(
             a[0] as String,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-            items: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as List<Item>?,
+            id: __argOr$<int?>(a[1], null),
+            items: __argOr$<List<Item>?>(a[2], null),
           ),
         );
       case 'empty':

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.12.0
+// BUILDER: reflection_factory/2.12.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -21,8 +21,10 @@ typedef __TR<T> = TypeReflection<T>;
 typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
+T __argOr$<T>(Object? a, T d) => ConstructorReflection.argOrDefault<T>(a, d);
+
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.12.0');
+  static final Version _version = Version.parse('2.12.2');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -228,12 +230,8 @@ class Counter$reflection extends ClassReflection<Counter>
           null,
           invoker: (a) => Counter(
             a[0] as List<int>,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-            value: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            id: __argOr$<int?>(a[1], null),
+            value: __argOr$<int?>(a[2], null),
           ),
         );
       default:
@@ -503,9 +501,7 @@ class Invoice$reflection extends ClassReflection<Invoice>
           invoker: (a) => Invoice(
             a[0] as String,
             a[1] as Decimal,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            id: __argOr$<int?>(a[2], null),
           ),
         );
       case 'empty':
@@ -785,12 +781,8 @@ class Label$reflection extends ClassReflection<Label> with __ReflectionMixin {
           null,
           invoker: (a) => Label(
             a[0] as String,
-            color: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as String?,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            color: __argOr$<String?>(a[1], null),
+            id: __argOr$<int?>(a[2], null),
           ),
         );
       default:
@@ -1055,12 +1047,8 @@ class Note$reflection extends ClassReflection<Note> with __ReflectionMixin {
           null,
           invoker: (a) => Note(
             a[0] as String,
-            created: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as Object?,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
+            created: __argOr$<Object?>(a[1], null),
+            id: __argOr$<int?>(a[2], null),
           ),
         );
       default:
@@ -1667,24 +1655,12 @@ class Project$reflection extends ClassReflection<Project>
             a[0] as String,
             a[1] as EntityReference<TaskStep>,
             a[2] as EntityReferenceList<TaskStep>,
-            active: identical(a[3], ConstructorReflection.absentArgument)
-                ? true
-                : a[3] as bool,
-            budget: identical(a[4], ConstructorReflection.absentArgument)
-                ? null
-                : a[4] as Decimal?,
-            createdAt: identical(a[5], ConstructorReflection.absentArgument)
-                ? null
-                : a[5] as DateTime?,
-            id: identical(a[6], ConstructorReflection.absentArgument)
-                ? null
-                : a[6] as int?,
-            reviewStep: identical(a[7], ConstructorReflection.absentArgument)
-                ? null
-                : a[7] as EntityReference<TaskStep>?,
-            startTime: identical(a[8], ConstructorReflection.absentArgument)
-                ? null
-                : a[8] as Time?,
+            active: __argOr$<bool>(a[3], true),
+            budget: __argOr$<Decimal?>(a[4], null),
+            createdAt: __argOr$<DateTime?>(a[5], null),
+            id: __argOr$<int?>(a[6], null),
+            reviewStep: __argOr$<EntityReference<TaskStep>?>(a[7], null),
+            startTime: __argOr$<Time?>(a[8], null),
           ),
         );
       default:
@@ -2058,21 +2034,11 @@ class Settings$reflection extends ClassReflection<Settings>
           },
           null,
           invoker: (a) => Settings(
-            flags: identical(a[0], ConstructorReflection.absentArgument)
-                ? null
-                : a[0] as Set<String>?,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-            meta: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as Map<String, dynamic>?,
-            ranks: identical(a[3], ConstructorReflection.absentArgument)
-                ? null
-                : a[3] as List<int>?,
-            tags: identical(a[4], ConstructorReflection.absentArgument)
-                ? const []
-                : a[4] as List<String>,
+            flags: __argOr$<Set<String>?>(a[0], null),
+            id: __argOr$<int?>(a[1], null),
+            meta: __argOr$<Map<String, dynamic>?>(a[2], null),
+            ranks: __argOr$<List<int>?>(a[3], null),
+            tags: __argOr$<List<String>>(a[4], const []),
           ),
         );
       default:
@@ -2387,12 +2353,8 @@ class Task$reflection extends ClassReflection<Task> with __ReflectionMixin {
             a[1] as TaskState,
             a[2] as DateTime,
             a[3] as List<TaskStep>,
-            id: identical(a[4], ConstructorReflection.absentArgument)
-                ? null
-                : a[4] as int?,
-            score: identical(a[5], ConstructorReflection.absentArgument)
-                ? 0
-                : a[5] as double,
+            id: __argOr$<int?>(a[4], null),
+            score: __argOr$<double>(a[5], 0),
           ),
         );
       default:
@@ -2774,12 +2736,8 @@ class TaskStep$reflection extends ClassReflection<TaskStep>
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
-          invoker: (a) => TaskStep(
-            a[0] as String,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-          ),
+          invoker: (a) =>
+              TaskStep(a[0] as String, id: __argOr$<int?>(a[1], null)),
         );
       default:
         return null;
@@ -3024,12 +2982,8 @@ class Ticket$reflection extends ClassReflection<Ticket> with __ReflectionMixin {
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
-          invoker: (a) => Ticket(
-            a[0] as String,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-          ),
+          invoker: (a) =>
+              Ticket(a[0] as String, id: __argOr$<int?>(a[1], null)),
         );
       default:
         return null;

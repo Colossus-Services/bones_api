@@ -1,3 +1,9 @@
+## 1.23.1
+
+- `reflection_factory`: `^2.12.0` → `^2.12.2`, with reflection regenerated
+  (2.12.1: fixes a build-time regression of 2.12.0; 2.12.2: faster
+  `ClassProxy` generation).
+
 ## 1.23.0
 
 - `reflection_factory`: `^2.11.0` → `^2.12.0`, with reflection regenerated:

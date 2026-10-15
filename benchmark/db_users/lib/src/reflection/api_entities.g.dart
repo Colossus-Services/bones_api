@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.12.0
+// BUILDER: reflection_factory/2.12.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -21,8 +21,10 @@ typedef __TR<T> = TypeReflection<T>;
 typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
+T __argOr$<T>(Object? a, T d) => ConstructorReflection.argOrDefault<T>(a, d);
+
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.12.0');
+  static final Version _version = Version.parse('2.12.2');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -168,9 +170,7 @@ class Address$reflection extends ClassReflection<Address>
             a[2] as String,
             a[3] as String,
             a[4] as String,
-            id: identical(a[5], ConstructorReflection.absentArgument)
-                ? null
-                : a[5] as int?,
+            id: __argOr$<int?>(a[5], null),
           ),
         );
       case 'create':
@@ -496,12 +496,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
-          invoker: (a) => Role(
-            a[0] as String,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-          ),
+          invoker: (a) => Role(a[0] as String, id: __argOr$<int?>(a[1], null)),
         );
       case 'create':
         return ConstructorReflection<Role>(
@@ -774,15 +769,9 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             a[2] as String,
             a[3] as Address,
             a[4] as List<Role>,
-            creationTime: identical(a[5], ConstructorReflection.absentArgument)
-                ? null
-                : a[5] as DateTime?,
-            enabled: identical(a[6], ConstructorReflection.absentArgument)
-                ? true
-                : a[6] as bool,
-            id: identical(a[7], ConstructorReflection.absentArgument)
-                ? null
-                : a[7] as int?,
+            creationTime: __argOr$<DateTime?>(a[5], null),
+            enabled: __argOr$<bool>(a[6], true),
+            id: __argOr$<int?>(a[7], null),
           ),
         );
       case 'create':
