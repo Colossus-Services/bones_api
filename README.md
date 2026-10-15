@@ -186,6 +186,109 @@ To create an API project file tree:
   $> bones_api create -o /path_to/workspace/foo_api -p project_name_dir=foo_api -p "project_name=Foo API" -p "project_description=API for Foo stuffs." -p homepage=http://foo.com
 ```
 
+## Static files: `.aliases`
+
+A directory served as static files (`--document-root` or `--domain`) can
+define virtual paths for its files and subdirectories with a `.aliases` file.
+
+```text
+icons/
+  .aliases
+  sections/
+    food.png
+    drinks.png
+```
+
+`icons/.aliases`:
+
+```text
+# Serve icons/sections/* also as icons/*
+./ = sections/
+```
+
+Now `/icons/food.png` serves `icons/sections/food.png`, and
+`/icons/sections/food.png` keeps working.
+
+### Format
+
+One mapping per line, `<virtual> = <target>`, both relative to the directory
+of the `.aliases` file (written literally, not URL-encoded). Blank lines are
+ignored, and `#` starts a comment (at the line start or after a space).
+
+```text
+# File alias (exact path) and rename:
+food.png = sections/food.png
+beer.png = sections/drinks.png
+
+# Directory alias (both sides end with '/'):
+#   /icons/menu/<anything> → icons/sections/<anything>
+menu/ = sections/
+v2/   = brand/2024/
+# An exact file alias beats the directory alias above:
+v2/favicon.ico = brand/legacy/favicon.ico
+
+# Pattern alias (by extension or path pattern):
+#   `*` any characters in a segment, `?` one character,
+#   `**/` zero or more whole segments.
+*.png = sections/*.png
+*.webp = sections/                  # same as `*.webp = sections/*.webp`
+**/*.svg = vector/**/*.svg
+img-??.jpg = photos/img-??.jpg
+v*/logo.png = brand/v*/logo.png
+
+# Overlay: any unresolved path here is looked up in `sections/`:
+./ = sections/
+```
+
+A pattern target either repeats the pattern wildcards, in the same order
+(the first ones can be used and the last ones dropped: `*-*.gif = x/*.gif`), or
+is a directory (ending with `/`), to which the matched path is appended.
+
+Invalid lines are skipped (with a logged warning) and the other lines still
+apply:
+
+```text
+secret.txt = ../../etc/passwd     # '..' not allowed
+/abs.png = sections/food.png      # absolute path
+x.png = sections/                 # file → directory mismatch
+.aliases = sections/food.png      # '.aliases' is reserved
+just-a-name                       # no '='
+```
+
+### Resolution and precedence
+
+1. A request for an existing physical file or directory is served as before:
+   the physical path always wins over an alias.
+2. Otherwise, the `.aliases` of each directory of the request path is
+   checked, the closest (deepest) first, and in each one: the exact file alias,
+   then directory aliases (longest prefix first), then patterns (file order),
+   then the overlay `./`. The first target that exists is served.
+3. A target can be a virtual path itself (aliases chain up to 8 levels);
+   cycles (`a.png = b.png` + `b.png = a.png`) are detected and ignored.
+4. Without an existing target the response is the usual `404`.
+5. A virtual directory requested without a trailing `/` is redirected (`301`)
+   to the *virtual* path with `/`, then its `index.html` is served.
+
+### Security
+
+- A `.aliases` file is never served (`404`), in any letter case or encoding.
+- `..`, absolute paths and `\` are rejected in `.aliases`: a target can only
+  point into the `.aliases` directory or its subdirectories.
+- Request paths with `.`, `..` or encoded separators are never aliased.
+- Symlinks behave as for any static file: a target resolving outside the
+  document root responds `404`. A `.aliases` symlink to outside the root is
+  ignored.
+- A malformed `.aliases` (bad lines, invalid UTF-8, larger than 64KB) never
+  breaks the server: invalid content is skipped and logged.
+
+### Caching
+
+`.aliases` files and resolved paths are cached in memory and re-checked at
+most every 10 seconds, so edits (including a new physical file shadowing an
+alias) apply within that interval. Paths without any `.aliases` along them
+don't touch the file system. The response cache and `Cache-Control` rules
+(`long-lived-static-files-cached`) apply to the physical (target) path.
+
 ## Hot Reload
 
 `APIServer` supports Hot Reload when the Dart VM is running with `--enable-vm-service`:

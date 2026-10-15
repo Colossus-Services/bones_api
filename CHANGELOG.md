@@ -1,3 +1,21 @@
+## 1.25.0
+
+Static files: virtual file and directory aliases, defined by `.aliases` files
+inside the served directory tree (see the README section
+"Static files: `.aliases`").
+
+- `StaticFilesAliases`: a middleware in front of the static files handler.
+  It rewrites a request without a physical file to its alias target: exact
+  file alias, directory prefix, pattern (`*`, `?`, `**/`) or overlay (`./`).
+  - The physical path always wins, so existing paths are served as before.
+  - Aliases can chain (max 8 levels), and cycles are ignored.
+  - Targets can't escape the `.aliases` directory (`..` and absolute paths
+    are rejected), and symlinks follow the existing root containment.
+  - `.aliases` files and resolutions are cached and re-checked every 10s.
+    Paths without any `.aliases` along them don't touch the file system.
+- `.aliases` files are never served: they respond `404`. Before, a
+  `.aliases` file in a served directory was served like any other file.
+
 ## 1.24.0
 
 Faster entity decoding from JSON, e.g. a module proxy decoding a response
