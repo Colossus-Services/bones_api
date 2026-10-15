@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.12.0
+// BUILDER: reflection_factory/2.12.2
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -21,8 +21,10 @@ typedef __TR<T> = TypeReflection<T>;
 typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
+T __argOr$<T>(Object? a, T d) => ConstructorReflection.argOrDefault<T>(a, d);
+
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.12.0');
+  static final Version _version = Version.parse('2.12.2');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -233,12 +235,8 @@ class Account$reflection extends ClassReflection<Account>
             'userInfo': __PR(__TR.tObject, 'userInfo', true, false),
           },
           null,
-          invoker: (a) => Account(
-            a[0] as User,
-            userInfo: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as Object?,
-          ),
+          invoker: (a) =>
+              Account(a[0] as User, userInfo: __argOr$<Object?>(a[1], null)),
         );
       case 'empty':
         return ConstructorReflection<Account>(
@@ -784,21 +782,11 @@ class Address$reflection extends ClassReflection<Address>
             a[1] as String,
             a[2] as String,
             a[3] as int,
-            closedStores: identical(a[4], ConstructorReflection.absentArgument)
-                ? null
-                : a[4] as Object?,
-            id: identical(a[5], ConstructorReflection.absentArgument)
-                ? null
-                : a[5] as int?,
-            latitude: identical(a[6], ConstructorReflection.absentArgument)
-                ? null
-                : a[6] as Object?,
-            longitude: identical(a[7], ConstructorReflection.absentArgument)
-                ? null
-                : a[7] as Object?,
-            stores: identical(a[8], ConstructorReflection.absentArgument)
-                ? null
-                : a[8] as List<Store>?,
+            closedStores: __argOr$<Object?>(a[4], null),
+            id: __argOr$<int?>(a[5], null),
+            latitude: __argOr$<Object?>(a[6], null),
+            longitude: __argOr$<Object?>(a[7], null),
+            stores: __argOr$<List<Store>?>(a[8], null),
           ),
         );
       case 'empty':
@@ -1460,9 +1448,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           null,
           invoker: (a) => Photo.fromData(
             a[0] as Uint8List,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as String?,
+            id: __argOr$<String?>(a[1], null),
           ),
         );
       case 'from':
@@ -1475,12 +1461,8 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
           null,
           const <String, __PR>{'id': __PR(__TR.tString, 'id', true, false)},
           null,
-          invoker: (a) => Photo.from(
-            a[0] as Object,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as String?,
-          ),
+          invoker: (a) =>
+              Photo.from(a[0] as Object, id: __argOr$<String?>(a[1], null)),
         );
       case 'empty':
         return ConstructorReflection<Photo>(
@@ -2065,15 +2047,9 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           null,
           invoker: (a) => Role(
             a[0] as RoleType,
-            enabled: identical(a[1], ConstructorReflection.absentArgument)
-                ? true
-                : a[1] as bool,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
-            value: identical(a[3], ConstructorReflection.absentArgument)
-                ? null
-                : a[3] as Decimal?,
+            enabled: __argOr$<bool>(a[1], true),
+            id: __argOr$<int?>(a[2], null),
+            value: __argOr$<Decimal?>(a[3], null),
           ),
         );
       case 'empty':
@@ -2713,12 +2689,8 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
           invoker: (a) => Store(
             a[0] as String,
             a[1] as int?,
-            id: identical(a[2], ConstructorReflection.absentArgument)
-                ? null
-                : a[2] as int?,
-            owner: identical(a[3], ConstructorReflection.absentArgument)
-                ? null
-                : a[3] as User?,
+            id: __argOr$<int?>(a[2], null),
+            owner: __argOr$<User?>(a[3], null),
           ),
         );
       case 'empty':
@@ -3309,24 +3281,12 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             a[1] as String,
             a[2] as Address,
             a[3] as List<Role>,
-            creationTime: identical(a[4], ConstructorReflection.absentArgument)
-                ? null
-                : a[4] as DateTime?,
-            id: identical(a[5], ConstructorReflection.absentArgument)
-                ? null
-                : a[5] as int?,
-            level: identical(a[6], ConstructorReflection.absentArgument)
-                ? null
-                : a[6] as int?,
-            photo: identical(a[7], ConstructorReflection.absentArgument)
-                ? null
-                : a[7] as Object?,
-            userInfo: identical(a[8], ConstructorReflection.absentArgument)
-                ? null
-                : a[8] as Object?,
-            wakeUpTime: identical(a[9], ConstructorReflection.absentArgument)
-                ? null
-                : a[9] as Time?,
+            creationTime: __argOr$<DateTime?>(a[4], null),
+            id: __argOr$<int?>(a[5], null),
+            level: __argOr$<int?>(a[6], null),
+            photo: __argOr$<Object?>(a[7], null),
+            userInfo: __argOr$<Object?>(a[8], null),
+            wakeUpTime: __argOr$<Time?>(a[9], null),
           ),
         );
       case 'empty':
@@ -4014,12 +3974,8 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
-          invoker: (a) => UserInfo(
-            a[0] as String,
-            id: identical(a[1], ConstructorReflection.absentArgument)
-                ? null
-                : a[1] as int?,
-          ),
+          invoker: (a) =>
+              UserInfo(a[0] as String, id: __argOr$<int?>(a[1], null)),
         );
       case 'empty':
         return ConstructorReflection<UserInfo>(
