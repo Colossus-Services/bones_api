@@ -1,3 +1,12 @@
+## 1.24.1
+
+- Fix: `DBObjectDirectoryAdapter`: `selectAll` and `selectByIDs` read all
+  their object files in parallel, so concurrent selects of a large table
+  opened thousands of files at once (not a leak, but an unbounded burst),
+  failing with `Too many open files` (`errno = 24`) under a low limit (macOS
+  default: 256). The reads are now limited by a `FileLimited` semaphore (50).
+- `FileLimited.readAsString`: like `File.readAsString`, under the semaphore.
+
 ## 1.24.0
 
 Faster entity decoding from JSON, e.g. a module proxy decoding a response
