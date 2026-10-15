@@ -3,10 +3,6 @@
 - `reflection_factory`: `^2.11.0` → `^2.12.0`, with reflection regenerated:
   its generated constructor `invoker`s call constructors directly instead
   of through `Function.apply`.
-  - Until `reflection_factory` 2.12.0 is released, `pubspec.yaml` (and
-    `benchmark/db_users`) override it with its PR branch
-    (gmpassos/reflection_factory#57), so both packages are validated
-    together. Remove the overrides before releasing.
 
 - Optimization: `ClassReflectionEntityHandler.instantiateFromMapImpl`
   resolves the values up front, with the same

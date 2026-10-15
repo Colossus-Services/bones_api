@@ -18,11 +18,3 @@ dev_dependencies:
   build_verify: ^3.1.1
   lints: ^5.1.1
   test: ^1.31.1
-
-# reflection_factory 2.12.0 isn't published yet: validated against its PR
-# (gmpassos/reflection_factory#57). Remove before releasing.
-dependency_overrides:
-  reflection_factory:
-    git:
-      url: https://github.com/gmpassos/reflection_factory.git
-      ref: perf/create-instance-from-map
