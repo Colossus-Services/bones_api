@@ -1,5 +1,6 @@
 import 'dart:convert' as dart_convert;
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
@@ -16,10 +17,14 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
 import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
+import 'bones_api_extension_io.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_types.dart';
 
 final _log = logging.Logger('DBObjectDirectoryAdapter')..registerAsDbLogger();
+
+/// See [DBObjectDirectoryAdapter.fileLimited].
+final FileLimited _fileLimited = FileLimited(name: 'DBObjectDirectoryAdapter');
 
 class DBObjectDirectoryAdapterContext
     implements Comparable<DBObjectDirectoryAdapterContext> {
@@ -48,6 +53,15 @@ class DBObjectDirectoryAdapterContext
 /// [DBObjectAdapter]: "Unique fields are not enforced").
 class DBObjectDirectoryAdapter
     extends DBObjectAdapter<DBObjectDirectoryAdapterContext> {
+  /// Limits the concurrent object file reads of all the
+  /// [DBObjectDirectoryAdapter]s (default: [FileLimited.defaultSemaphoreLimit]),
+  /// so concurrent selects of large tables can't open thousands of files at
+  /// once (`Too many open files`). Also the batch size of a select's reads.
+  ///
+  /// Tune it with [FileLimited.setSemaphoreLimit] (e.g. for a low limit of
+  /// open files shared with other components).
+  static FileLimited get fileLimited => _fileLimited;
+
   static bool _boot = false;
 
   static void boot() {
@@ -508,9 +522,7 @@ class DBObjectDirectoryAdapter
     var tableDir = _resolveTableDirectory(table);
     if (!tableDir.existsSync()) return [];
 
-    var entries = await ids
-        .map((id) => _readObject(table, id))
-        .resolveAllNotNull();
+    var entries = await _readObjects(table, ids);
 
     return _applyOrderAndPagination(
       table,
@@ -558,11 +570,12 @@ class DBObjectDirectoryAdapter
 
     var files = _listTableFiles(tableDir);
 
-    var entries = files.map((f) {
+    var ids = files.map((f) {
       var fileName = pack_path.split(f.path).last;
-      var id = pack_path.withoutExtension(fileName);
-      return _readObject(table, id);
-    }).resolveAllNotNull();
+      return pack_path.withoutExtension(fileName);
+    });
+
+    var entries = _readObjects(table, ids);
 
     return entries.resolveMapped(
       (entries) => _applyOrderAndPagination(
@@ -625,13 +638,19 @@ class DBObjectDirectoryAdapter
     if (matcher is ConditionID) {
       var id = matcher.resolveIDValue(parameters: parameters);
 
-      var objFile = _resolveObjectFile(table, id);
-      if (!objFile.existsSync()) return [];
+      // Synchronous (as `store`), not queued behind the reads of concurrent
+      // selects. A concurrent delete of the same object can remove the file
+      // at any point: then nothing is deleted here.
+      var entry = _readObjectSync(table, id);
+      if (entry == null) return [];
 
-      var entry = await _readObject(table, id);
-      objFile.deleteSync();
+      try {
+        _resolveObjectFile(table, id).deleteSync();
+      } on PathNotFoundException {
+        return [];
+      }
 
-      return entry != null ? [entry] : [];
+      return [entry];
     }
 
     throw UnsupportedError("Relationship delete not supported for: $matcher");
@@ -761,11 +780,16 @@ class DBObjectDirectoryAdapter
     }
   }
 
-  /// Reads synchronously (as [_saveObject] writes).
+  /// Reads synchronously (as [_saveObject] writes). Returns `null` if the
+  /// object doesn't exist.
   Map<String, dynamic>? _readObjectSync(String table, Object? id) {
     var file = _resolveObjectFile(table, id);
-    if (!file.existsSync()) return null;
-    var enc = file.readAsStringSync();
+    String enc;
+    try {
+      enc = file.readAsStringSync();
+    } on PathNotFoundException {
+      return null;
+    }
     return dart_convert.json.decode(enc) as Map<String, dynamic>;
   }
 
@@ -786,12 +810,40 @@ class DBObjectDirectoryAdapter
     file.writeAsStringSync(enc);
   }
 
+  /// Reads an object under [fileLimited]. Returns `null` if the object
+  /// doesn't exist, including when it's deleted while the read waits for the
+  /// semaphore (no `existsSync` before it: the file is just opened).
   Future<Map<String, dynamic>?> _readObject(String table, Object? id) async {
     var file = _resolveObjectFile(table, id);
-    if (!file.existsSync()) return null;
-    var enc = await file.readAsString();
+    String enc;
+    try {
+      enc = await _fileLimited.readAsString(file);
+    } on PathNotFoundException {
+      return null;
+    }
     var obj = dart_convert.json.decode(enc) as Map<String, dynamic>;
     return obj;
+  }
+
+  /// Reads the objects of [ids] (the existing ones, in order) in batches of
+  /// the [fileLimited] limit: concurrent selects queue at most a batch of
+  /// reads each (not one read per object).
+  Future<List<Map<String, dynamic>>> _readObjects(
+    String table,
+    Iterable<Object?> ids,
+  ) async {
+    var idsList = ids.toList();
+    var batchSize = _fileLimited.getSemaphoreLimit();
+
+    var entries = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < idsList.length; i += batchSize) {
+      var batch = idsList.sublist(i, math.min(i + batchSize, idsList.length));
+      var objs = await Future.wait(batch.map((id) => _readObject(table, id)));
+      entries.addAll(objs.nonNulls);
+    }
+
+    return entries;
   }
 
   File _resolveObjectFile(String table, Object? id) {
