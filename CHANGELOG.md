@@ -20,6 +20,15 @@
   - Users benchmark (SQLite), alternated with 1.22.0: `user/list` +17–20%,
     `user/byState` +12–18%, `user/byId` +12–15%.
 
+- Fix: `Json.defaultFieldValueResolver` resolves:
+  - An `EntityReferenceList<T>` field or parameter from a list of IDs,
+    entities or entities maps (as an `EntityReferenceList<T>`). It gave a
+    `List`, so instantiating with such a value failed.
+  - A `Set<T>` field or parameter from a list or a set (as a `Set<T>`, with
+    its elements resolved as a `List<T>`). It gave a `List`.
+  - `TypeInfo.toEntityReferenceList`: also from entities in an untyped
+    `List` (e.g. `List<dynamic>`).
+
 ## 1.22.0
 
 - `DBSQLAdapter.executedSQLsCount`: the number of SQL statements (round

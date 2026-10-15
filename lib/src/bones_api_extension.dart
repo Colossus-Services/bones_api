@@ -1056,6 +1056,18 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
           entitiesFetcher: entitiesFetcher,
           entityCache: entityCache,
         );
+      } else if (o.every((Object? e) => e == null || e is E)) {
+        // Entities in an untyped `List` (e.g. `List<dynamic>`):
+        return EntityReferenceList<E>.fromEntities(
+          o.cast<E?>(),
+          type: type,
+          typeName: typeName,
+          entityHandler: entityHandler,
+          entityHandlerProvider: entityHandlerProvider,
+          entityProvider: entityProvider,
+          entitiesFetcher: entitiesFetcher,
+          entityCache: entityCache,
+        );
       } else {
         throw StateError(
           "Can't resolve `EntityReferenceList` values: (${o.runtimeTypeNameUnsafe} -> ${o.map((e) => (e as Object?).runtimeTypeNameUnsafe)}) $o",

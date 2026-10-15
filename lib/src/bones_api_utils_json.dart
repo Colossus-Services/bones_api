@@ -789,11 +789,23 @@ class Json {
         if (type.arguments0?.type == value.type) {
           return value;
         }
-      } else if (type.isEntityReferenceListType &&
-          value is EntityReferenceList) {
-        if (type.arguments0?.type == value.type) {
-          return value;
+      } else if (type.isEntityReferenceListType) {
+        if (value is EntityReferenceList) {
+          if (type.arguments0?.type == value.type) {
+            return value;
+          }
+        } else if (type.typeInfo.isValidEntityReferenceListType) {
+          // IDs, entities or entities maps: `JsonDecoder.fromJson` decodes a
+          // `List` as a `List`, not with the `EntityReferenceList` decoder.
+          return _toEntityReferenceList(
+            value,
+            type,
+            jsonDecoder,
+            entityHandlerProvider,
+          );
         }
+      } else if (type.isSetType && value is Iterable) {
+        return _setCaster(value, type, jsonDecoder);
       }
 
       return jsonDecoder.fromJson(
@@ -802,6 +814,46 @@ class Json {
         autoResetEntityCache: false,
       );
     }
+  }
+
+  /// Resolves [value] (IDs, entities or entities maps) as an
+  /// [EntityReferenceList] of [type] (`EntityReferenceList<T>`), as the
+  /// [EntityReferenceList] type decoder does.
+  static EntityReferenceList _toEntityReferenceList(
+    Object value,
+    TypeReflection type,
+    JsonDecoder jsonDecoder,
+    EntityHandlerProvider? entityHandlerProvider,
+  ) {
+    var entityCache = jsonDecoder.entityCache;
+    return type.typeInfo.arguments0!.toEntityReferenceList(
+      value,
+      entityHandlerProvider: entityHandlerProvider,
+      entityProvider: entityCache.asEntityProvider,
+      entityCache: entityCache,
+    );
+  }
+
+  /// Resolves [value] as a [Set] of [type] (`Set<T>`): its elements are
+  /// resolved as a `List<T>` (`JsonDecoder.fromJson` decodes a `Set` type
+  /// as a `List`).
+  static Object? _setCaster(
+    Iterable value,
+    TypeReflection type,
+    JsonDecoder jsonDecoder,
+  ) {
+    var elementType = type.typeInfo.argumentType(0);
+    if (elementType == null) return value.toSet();
+
+    var list = jsonDecoder.fromJson(
+      value is List ? value : value.toList(),
+      typeInfo: elementType.toListType(),
+      autoResetEntityCache: false,
+    );
+
+    if (list is! Iterable) return list;
+
+    return type.typeInfo.castSet(list.toSet());
   }
 
   static Object? _iterableCaster(

@@ -489,38 +489,43 @@ void main() {
         expect(outcome, isA<Map>(), reason: '$map');
       }
 
+      // Plain lists for an `EntityReferenceList` parameter (as in JSON):
+      // resolved as an `EntityReferenceList` by
+      // `Json.defaultFieldValueResolver`.
+      for (var (steps, ids) in <(Object, List<Object?>)>[
+        ([10, 11], [10, 11]),
+        (
+          [
+            {'id': 10, 'name': 's'},
+          ],
+          [10],
+        ),
+        (<TaskStep>[step, step2], [10, 11]),
+        (<dynamic>[step], [10]),
+        ([10, null], [10, null]),
+        ([], []),
+      ]) {
+        var map = {'name': 'p', 'mainStep': 10, 'steps': steps};
+        var outcome = _expectSameAsWithResolvers(handler, map);
+        expect(outcome, isA<Map>(), reason: '$map');
+
+        var p = handler.instantiateFromMapImpl(map) as Project;
+        expect(p.steps, isA<EntityReferenceList<TaskStep>>());
+        expect(p.steps.ids, equals(ids), reason: '$map');
+      }
+
       // Not instantiable, on both paths:
       for (var map in <Map<String, dynamic>>[
         // A `null` or absent non-nullable reference:
         {'name': 'p', 'mainStep': null, 'steps': stepsOf([])},
         {'name': 'p', 'steps': stepsOf([])},
-        // Plain lists for an `EntityReferenceList` parameter
-        // (`Json.defaultFieldValueResolver` gives a `List`, not an
-        // `EntityReferenceList`):
-        {
-          'name': 'p',
-          'mainStep': 10,
-          'steps': [10, 11],
-        },
-        {
-          'name': 'p',
-          'mainStep': 10,
-          'steps': [
-            {'id': 10, 'name': 's'},
-          ],
-        },
-        {
-          'name': 'p',
-          'mainStep': 10,
-          'steps': <TaskStep>[step],
-        },
-        {
-          'name': 'p',
-          'mainStep': 10,
-          'steps': [10, null],
-        },
-        {'name': 'p', 'mainStep': 10, 'steps': []},
         {'name': 'p', 'mainStep': 10, 'steps': null},
+        // Values that aren't IDs, entities or entities maps:
+        {
+          'name': 'p',
+          'mainStep': 10,
+          'steps': [true],
+        },
       ]) {
         var outcome = _expectSameAsWithResolvers(handler, map);
         expect(outcome, isNot(isA<Map>()), reason: '$map');
@@ -639,14 +644,25 @@ void main() {
         expect(outcome, isA<Map>(), reason: '$map');
       }
 
-      // Instantiated or not, the same outcome (`Json.defaultFieldValueResolver`
-      // doesn't give a `Set` for a `Set` field, from a list or a set):
+      // A `Set` field, from a JSON list or a set:
+      for (var flags in <Object>[
+        ['x', 'y', 'x'],
+        <String>{'x', 'y'},
+        <dynamic>{'x', 'y'},
+      ]) {
+        var map = {'flags': flags};
+        var outcome = _expectSameAsWithResolvers(handler, map);
+        expect(outcome, isA<Map>(), reason: '$map');
+
+        var s = handler.instantiateFromMapImpl(map) as Settings;
+        expect(s.flags, isA<Set<String>>());
+        expect(s.flags, equals({'x', 'y'}));
+      }
+
+      // Instantiated or not, the same outcome:
       for (var map in <Map<String, dynamic>>[
         {
-          'flags': ['x', 'x'],
-        },
-        {
-          'flags': <String>{'x'},
+          'flags': [1],
         },
         {
           'ranks': ['1', 2],
@@ -667,6 +683,58 @@ void main() {
       expect(s.tags, equals(['a']));
       expect(s.ranks, isA<List<int>>());
       expect(s.flags, isNull);
+    });
+
+    test('Json.defaultFieldValueResolver: EntityReferenceList and Set', () {
+      Object? resolve(TypeReflection type, Object? value) =>
+          Json.defaultFieldValueResolver(
+            'f',
+            value,
+            type,
+            Json.defaultDecoder,
+            null,
+          );
+
+      var stepsType = Project$reflection().field('steps')!.type;
+      var flagsType = Settings$reflection().field('flags')!.type;
+
+      var step = TaskStep('s', id: 21);
+
+      for (var (value, ids) in <(Object, List<Object?>)>[
+        ([21, 22], [21, 22]),
+        (<Object?>[21, null], [21, null]),
+        (
+          [
+            {'id': 21, 'name': 's'},
+          ],
+          [21],
+        ),
+        (<TaskStep>[step], [21]),
+        (<dynamic>[step], [21]),
+        ([], []),
+      ]) {
+        var r = resolve(stepsType, value);
+        expect(r, isA<EntityReferenceList<TaskStep>>(), reason: '$value');
+        expect((r as EntityReferenceList).ids, equals(ids), reason: '$value');
+      }
+
+      // An `EntityReferenceList` of the type is kept:
+      var refs = EntityReferenceList<TaskStep>.fromIDs([1]);
+      expect(resolve(stepsType, refs), same(refs));
+
+      expect(resolve(stepsType, null), isNull);
+
+      for (var value in <Object>[
+        ['a', 'b', 'a'],
+        <String>{'a', 'b'},
+        <Object>['a', 'b'],
+      ]) {
+        var r = resolve(flagsType, value);
+        expect(r, isA<Set<String>>(), reason: '$value');
+        expect(r, equals({'a', 'b'}));
+      }
+
+      expect(resolve(flagsType, null), isNull);
     });
 
     test('a JSON name alias', () {
