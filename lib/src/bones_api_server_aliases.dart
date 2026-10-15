@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:collection/collection.dart' show mergeSort;
 import 'package:logging/logging.dart' as logging;
 import 'package:path/path.dart' as pack_path;
 import 'package:shelf/shelf.dart';
@@ -43,10 +44,11 @@ class AliasEntry {
   /// a substitution target).
   final List<String> targetSegments;
 
-  final RegExp? _regExp;
+  /// The tokens of a [AliasKind.pattern]: [String] literals and [_Wildcard]s.
+  final List<Object>? _patternTokens;
 
   /// The substitution target of a [AliasKind.pattern]: a [String] literal
-  /// or an [int] capture group.
+  /// or an [int] capture index.
   final List<Object>? _targetParts;
 
   AliasEntry._(
@@ -56,9 +58,9 @@ class AliasEntry {
     this.targetPath, {
     this.virtualSegments = const [],
     this.targetSegments = const [],
-    RegExp? regExp,
+    List<Object>? patternTokens,
     List<Object>? targetParts,
-  }) : _regExp = regExp,
+  }) : _patternTokens = patternTokens,
        _targetParts = targetParts;
 
   /// Returns the target segments for the [remaining] request path segments
@@ -87,8 +89,10 @@ class AliasEntry {
 
   List<String>? _matchPattern(List<String> remaining) {
     var path = remaining.join('/');
-    var m = _regExp!.firstMatch(path);
-    if (m == null) return null;
+    if (path.length > AliasesTable.maxPatternMatchLength) return null;
+
+    var captures = _matchGlob(_patternTokens!, path);
+    if (captures == null) return null;
 
     var targetParts = _targetParts;
     if (targetParts == null) {
@@ -98,7 +102,7 @@ class AliasEntry {
     var s = StringBuffer();
     for (var p in targetParts) {
       if (p is int) {
-        s.write(m.group(p) ?? '');
+        s.write(captures[p]);
       } else {
         s.write(p);
       }
@@ -108,6 +112,78 @@ class AliasEntry {
     // A capture can be empty (`*` matches nothing), producing an invalid path:
     if (!segments.every(AliasesTable._isValidSegment)) return null;
     return segments;
+  }
+
+  /// Matches [s] against the pattern [tokens], returning the wildcards
+  /// captures (in order), or `null` if it doesn't match.
+  ///
+  /// Wildcards are greedy (longest match first), like a `RegExp`, but the
+  /// failed `(token, position)` states are memoized, so the matching is
+  /// polynomial (no catastrophic backtracking).
+  static List<String>? _matchGlob(List<Object> tokens, String s) {
+    var wildcardsIndexes = <int>[];
+    for (var i = 0; i < tokens.length; ++i) {
+      if (tokens[i] is _Wildcard) wildcardsIndexes.add(i);
+    }
+
+    var captures = List<String>.filled(tokens.length, '');
+    var failed = <int>{};
+    var width = s.length + 1;
+
+    bool go(int i, int p) {
+      if (i == tokens.length) return p == s.length;
+
+      var key = i * width + p;
+      if (failed.contains(key)) return false;
+
+      var t = tokens[i];
+      var ok = false;
+
+      if (t is String) {
+        ok = s.startsWith(t, p) && go(i + 1, p + t.length);
+      } else if (t == _Wildcard.question) {
+        if (p < s.length &&
+            s.codeUnitAt(p) != 0x2F /* / */ &&
+            go(i + 1, p + 1)) {
+          captures[i] = s.substring(p, p + 1);
+          ok = true;
+        }
+      } else if (t == _Wildcard.star) {
+        var end = s.indexOf('/', p);
+        if (end < 0) end = s.length;
+        for (var e = end; e >= p; --e) {
+          if (go(i + 1, e)) {
+            captures[i] = s.substring(p, e);
+            ok = true;
+            break;
+          }
+        }
+      } else {
+        // `**/`: zero or more whole segments, each followed by `/`:
+        var ends = <int>[p];
+        var e = p;
+        while (true) {
+          var slash = s.indexOf('/', e);
+          if (slash < 0 || slash == e) break;
+          e = slash + 1;
+          ends.add(e);
+        }
+        for (var e in ends.reversed) {
+          if (go(i + 1, e)) {
+            captures[i] = s.substring(p, e);
+            ok = true;
+            break;
+          }
+        }
+      }
+
+      if (!ok) failed.add(key);
+      return ok;
+    }
+
+    if (!go(0, 0)) return null;
+
+    return [for (var i in wildcardsIndexes) captures[i]];
   }
 
   static bool _equalsSegments(List<String> a, List<String> b) {
@@ -134,6 +210,10 @@ class AliasesTable {
   /// The maximum number of wildcards of a pattern.
   static const int maxPatternWildcards = 8;
 
+  /// Request paths (relative to the `.aliases` directory) longer than this
+  /// are not matched against patterns.
+  static const int maxPatternMatchLength = 1024;
+
   /// All the valid entries, in file order.
   final List<AliasEntry> entries;
 
@@ -156,14 +236,13 @@ class AliasesTable {
 
   static List<AliasEntry> _sortedByPrefixLength(Iterable<AliasEntry> entries) {
     var list = entries.toList();
-    var indexed = list.asMap().entries.toList()
-      ..sort((a, b) {
-        var c = b.value.virtualSegments.length.compareTo(
-          a.value.virtualSegments.length,
-        );
-        return c != 0 ? c : a.key.compareTo(b.key);
-      });
-    return indexed.map((e) => e.value).toList();
+    // `mergeSort` is stable: the same length keeps the file order.
+    mergeSort<AliasEntry>(
+      list,
+      compare: (a, b) =>
+          b.virtualSegments.length.compareTo(a.virtualSegments.length),
+    );
+    return list;
   }
 
   bool get isEmpty => entries.isEmpty;
@@ -174,22 +253,30 @@ class AliasesTable {
   /// (relative to the `.aliases` directory), in precedence order:
   /// exact file alias, longest directory prefix, patterns (file order),
   /// overlay.
-  Iterable<List<String>> candidates(List<String> remaining) sync* {
+  Iterable<List<String>> candidates(List<String> remaining) =>
+      matches(remaining).map((m) => m.target);
+
+  /// Same as [candidates], with the matching [AliasEntry].
+  Iterable<({AliasEntry entry, List<String> target})> matches(
+    List<String> remaining,
+  ) sync* {
     var file = _files[remaining.join('/')];
-    if (file != null) yield file.targetSegments;
+    if (file != null) yield (entry: file, target: file.targetSegments);
 
     for (var e in _directories) {
       var t = e.match(remaining);
-      if (t != null) yield t;
+      if (t != null) yield (entry: e, target: t);
     }
 
     for (var e in _patterns) {
       var t = e.match(remaining);
-      if (t != null) yield t;
+      if (t != null) yield (entry: e, target: t);
     }
 
     var overlay = _overlay;
-    if (overlay != null) yield overlay.match(remaining)!;
+    if (overlay != null) {
+      yield (entry: overlay, target: overlay.match(remaining)!);
+    }
   }
 
   /// Parses a `.aliases` [content]. Invalid lines are skipped and reported
@@ -315,10 +402,6 @@ class AliasesTable {
       throw FormatException("too many wildcards (max: $maxPatternWildcards)");
     }
 
-    var regExp = RegExp(
-      '^${vTokens.map((t) => t is _Wildcard ? t.regExp : RegExp.escape(t as String)).join()}\$',
-    );
-
     if (!_hasWildcard(t)) {
       if (!t.endsWith('/')) {
         throw FormatException(
@@ -332,7 +415,7 @@ class AliasesTable {
         v,
         t,
         targetSegments: _segments(t),
-        regExp: regExp,
+        patternTokens: vTokens,
       );
     }
 
@@ -359,10 +442,10 @@ class AliasesTable {
     }
 
     var targetParts = <Object>[];
-    var group = 0;
+    var capture = 0;
     for (var tk in tTokens) {
       if (tk is _Wildcard) {
-        targetParts.add(++group);
+        targetParts.add(capture++);
       } else {
         targetParts.add(tk);
       }
@@ -373,7 +456,7 @@ class AliasesTable {
       lineNumber,
       v,
       t,
-      regExp: regExp,
+      patternTokens: vTokens,
       targetParts: targetParts,
     );
   }
@@ -461,17 +544,13 @@ class AliasesTable {
 
 enum _Wildcard {
   /// `*`: any characters inside a segment.
-  star(r'([^/]*)'),
+  star,
 
   /// `?`: one character inside a segment.
-  question(r'([^/])'),
+  question,
 
   /// `**/`: zero or more whole segments (the capture keeps the trailing `/`).
-  anySegments(r'((?:[^/]+/)*)');
-
-  final String regExp;
-
-  const _Wildcard(this.regExp);
+  anySegments,
 }
 
 /// The result of [StaticFilesAliases.resolve].
@@ -497,6 +576,17 @@ class _CachedTable {
   DateTime checkTime;
 
   _CachedTable(this.table, this.modified, this.size, this.checkTime);
+}
+
+class _ResolveState {
+  /// The remaining candidates to check (see [StaticFilesAliases.maxResolutionAttempts]).
+  int attempts = StaticFilesAliases.maxResolutionAttempts;
+
+  /// `true` once any alias applies to the request path.
+  bool sawCandidate = false;
+
+  /// `true` if the request path exists physically (served unchanged).
+  bool aborted = false;
 }
 
 class _CachedResolution {
@@ -559,7 +649,7 @@ class StaticFilesAliases {
   /// The interval to re-check a `.aliases` file and a resolved path.
   final Duration checkInterval;
 
-  /// Applied to the responses created by this instance (`404` and `301`).
+  /// Applied to the responses created by this instance (`404` and `302`).
   final Response Function(Request request, Response response)? decorateResponse;
 
   StaticFilesAliases(
@@ -572,6 +662,12 @@ class StaticFilesAliases {
 
   final Map<String, _CachedTable> _tables = {};
   final Map<String, _CachedResolution> _resolutions = {};
+
+  /// The number of cached directories (only existing ones are cached).
+  int get cachedDirectoriesLength => _tables.length;
+
+  /// The number of cached resolutions (only paths with an applicable alias).
+  int get cachedResolutionsLength => _resolutions.length;
 
   /// Clears the cached `.aliases` tables and resolutions.
   void clearCache() {
@@ -601,11 +697,12 @@ class StaticFilesAliases {
 
         if (resolution == null) return innerHandler(request);
 
+        // A `302` (not a cached `301`): an alias can change at any time.
         if (resolution.isDirectory && !trailingSlash) {
           var uri = request.requestedUri;
           return _decorate(
             request,
-            Response.movedPermanently(uri.replace(path: '${uri.path}/')),
+            Response.found(uri.replace(path: '${uri.path}/')),
           );
         }
 
@@ -671,12 +768,14 @@ class StaticFilesAliases {
     if (cached != null && now.difference(cached.time) < checkInterval) {
       resolution = cached.resolution;
     } else {
-      if (!_hasCandidates(segments)) {
+      var state = _ResolveState();
+      resolution = _resolveAliases(segments, 0, {key}, const {}, state);
+
+      if (!state.sawCandidate) {
+        // No alias applies: nothing worth caching.
         _resolutions.remove(key);
         return null;
       }
-
-      resolution = _resolveTop(segments);
 
       if (_resolutions.length >= maxCacheEntries) _resolutions.clear();
       _resolutions[key] = _CachedResolution(resolution, now);
@@ -690,43 +789,46 @@ class StaticFilesAliases {
     return resolution;
   }
 
-  bool _hasCandidates(List<String> segments) {
-    for (var i = segments.length - 1; i >= 0; --i) {
-      var table = _tableFor(segments.sublist(0, i));
-      if (table != null && table.candidates(segments.sublist(i)).isNotEmpty) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  StaticFileAliasResolution? _resolveTop(List<String> segments) {
-    // The physical path always wins:
-    if (_typeOf(segments) != FileSystemEntityType.notFound) return null;
-
-    var visited = <String>{segments.join('/')};
-    var attempts = [maxResolutionAttempts];
-    return _resolveAliases(segments, 0, visited, attempts);
-  }
-
+  /// Resolves [segments] through the `.aliases` of its existing directories,
+  /// the deepest first.
+  ///
+  /// [chainPaths] and [chainEntries] are the paths and entries of the
+  /// current chain: a path is never visited twice (a cycle) and an entry is
+  /// never applied twice (an overlay or a self-matching pattern would nest
+  /// its target forever: `sections/sections/...`).
   StaticFileAliasResolution? _resolveAliases(
     List<String> segments,
     int depth,
-    Set<String> visited,
-    List<int> attempts,
+    Set<String> chainPaths,
+    Set<AliasEntry> chainEntries,
+    _ResolveState state,
   ) {
     if (depth >= maxResolutionDepth) return null;
 
-    for (var i = segments.length - 1; i >= 0; --i) {
-      var dir = segments.sublist(0, i);
-      var table = _tableFor(dir);
-      if (table == null) continue;
+    var tables = _tablesAlong(segments);
 
-      for (var target in table.candidates(segments.sublist(i))) {
-        var candidate = [...dir, ...target];
+    for (var (i, table) in tables.reversed) {
+      var dir = segments.sublist(0, i);
+
+      for (var m in table.matches(segments.sublist(i))) {
+        if (chainEntries.contains(m.entry)) continue;
+
+        if (!state.sawCandidate) {
+          state.sawCandidate = true;
+          // The physical path always wins (only checked when an alias applies):
+          if (_typeOf(segments) != FileSystemEntityType.notFound) {
+            state.aborted = true;
+            return null;
+          }
+        }
+
+        var candidate = [...dir, ...m.target];
         if (candidate.length > maxSegments) continue;
-        if (!visited.add(candidate.join('/'))) continue;
-        if (--attempts[0] < 0) return null;
+
+        var candidateKey = candidate.join('/');
+        if (chainPaths.contains(candidateKey)) continue;
+
+        if (--state.attempts < 0) return null;
 
         var type = _typeOf(candidate);
         if (type == FileSystemEntityType.file) {
@@ -735,12 +837,33 @@ class StaticFilesAliases {
           return StaticFileAliasResolution(candidate, isDirectory: true);
         }
 
-        var resolved = _resolveAliases(candidate, depth + 1, visited, attempts);
+        var resolved = _resolveAliases(
+          candidate,
+          depth + 1,
+          {...chainPaths, candidateKey},
+          {...chainEntries, m.entry},
+          state,
+        );
         if (resolved != null) return resolved;
+        if (state.aborted || state.attempts < 0) return null;
       }
     }
 
     return null;
+  }
+
+  /// The `.aliases` tables (with their directory depth) of the directories
+  /// of [segments], from the root, stopping at the first directory that
+  /// doesn't exist (an alias can't be defined below it).
+  List<(int, AliasesTable)> _tablesAlong(List<String> segments) {
+    var tables = <(int, AliasesTable)>[];
+    for (var i = 0; i < segments.length; ++i) {
+      var dir = _directory(segments, i);
+      if (dir == null) break;
+      var table = dir.table;
+      if (table != null) tables.add((i, table));
+    }
+    return tables;
   }
 
   String _pathOf(List<String> segments) =>
@@ -755,19 +878,30 @@ class StaticFilesAliases {
     return FileSystemEntity.typeSync(path);
   }
 
-  AliasesTable? _tableFor(List<String> dirSegments) {
+  /// The cached directory of the first [length] [segments], or `null` if it
+  /// doesn't exist. Only existing directories are cached, so random request
+  /// paths can't fill the cache.
+  _CachedTable? _directory(List<String> segments, int length) {
+    var dirSegments = segments.sublist(0, length);
     var key = dirSegments.join('/');
     var now = DateTime.now();
 
     var cached = _tables[key];
     if (cached != null && now.difference(cached.checkTime) < checkInterval) {
-      return cached.table;
+      return cached;
+    }
+
+    if (length > 0 && _typeOf(dirSegments) != FileSystemEntityType.directory) {
+      if (_tables.remove(key)?.table != null) _resolutions.clear();
+      return null;
     }
 
     var file = File(_pathOf([...dirSegments, fileName]));
     var stat = file.statSync();
 
     if (stat.type != FileSystemEntityType.file) {
+      // A removed `.aliases`: previous resolutions may be stale.
+      if (cached?.table != null) _resolutions.clear();
       return _putTable(key, _CachedTable(null, null, null, now));
     }
 
@@ -775,23 +909,24 @@ class StaticFilesAliases {
         cached.modified == stat.modified &&
         cached.size == stat.size) {
       cached.checkTime = now;
-      return cached.table;
+      return cached;
     }
 
     var table = _loadTable(file, stat);
 
-    if (cached != null) {
-      // A `.aliases` changed: previous resolutions may be stale.
-      _resolutions.clear();
-    }
+    // A new or changed `.aliases`: previous resolutions may be stale.
+    _resolutions.clear();
 
     return _putTable(key, _CachedTable(table, stat.modified, stat.size, now));
   }
 
-  AliasesTable? _putTable(String key, _CachedTable cached) {
-    if (_tables.length >= maxCacheEntries) _tables.clear();
+  _CachedTable _putTable(String key, _CachedTable cached) {
+    if (_tables.length >= maxCacheEntries) {
+      _tables.clear();
+      _resolutions.clear();
+    }
     _tables[key] = cached;
-    return cached.table;
+    return cached;
   }
 
   String? _rootResolved;

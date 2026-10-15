@@ -69,12 +69,17 @@ String _bodyStr(_Res res) {
 }
 
 /// Sends a raw HTTP request line, to keep the [path] exactly as written
-/// (no client side normalization). Returns the status code.
-Future<int> _rawStatus(int port, String path) async {
+/// (no client side normalization). Returns the status code and the body.
+Future<({int status, String body})> _raw(
+  int port,
+  String path, {
+  String? host,
+}) async {
   var socket = await Socket.connect('localhost', port);
   try {
     socket.write(
-      'GET $path HTTP/1.1\r\nHost: localhost:$port\r\nConnection: close\r\n\r\n',
+      'GET $path HTTP/1.1\r\nHost: ${host ?? 'localhost:$port'}\r\n'
+      'Connection: close\r\n\r\n',
     );
     await socket.flush();
     var response = await utf8.decoder
@@ -82,11 +87,18 @@ Future<int> _rawStatus(int port, String path) async {
         .join()
         .timeout(Duration(seconds: 10));
     var statusLine = response.split('\r\n').first;
-    return int.parse(statusLine.split(' ')[1]);
+    var idx = response.indexOf('\r\n\r\n');
+    return (
+      status: int.parse(statusLine.split(' ')[1]),
+      body: idx >= 0 ? response.substring(idx + 4) : '',
+    );
   } finally {
     socket.destroy();
   }
 }
+
+Future<int> _rawStatus(int port, String path) async =>
+    (await _raw(port, path)).status;
 
 void main() {
   group('AliasesTable.parse', () {
@@ -116,6 +128,24 @@ a#b.png = sections/a#b.png
       expect(table.entries[4].virtualSegments, ['a#b.png']);
       expect(table.entries[4].targetSegments, ['sections', 'a#b.png']);
       expect(table.entries[0].toString(), contains('file'));
+    });
+
+    test('AliasEntry.match', () {
+      var table = _parse('''
+v2/favicon.ico = brand/favicon.ico
+menu/ = sections/
+./ = all/
+''');
+      var file = table.entries[0];
+      expect(file.match(['v2', 'favicon.ico']), ['brand', 'favicon.ico']);
+      expect(file.match(['v2', 'other.ico']), isNull);
+      expect(file.match(['favicon.ico']), isNull);
+
+      var dir = table.entries[1];
+      expect(dir.match(['menu', 'a', 'b.png']), ['sections', 'a', 'b.png']);
+      expect(dir.match(['menux', 'b.png']), isNull);
+
+      expect(table.entries[2].match(['x.png']), ['all', 'x.png']);
     });
 
     test('empty content', () {
@@ -184,10 +214,12 @@ a**b/c.png = x/
 *.png = x.png
 ${'a' * 300}*.png = x/
 ${'*' * 9}.png = x/
+${'?' * 9}.png = x/
 ''', invalid);
 
       expect(table.isEmpty, isTrue);
-      expect(invalid, hasLength(11));
+      expect(invalid, hasLength(12));
+      expect(invalid.last, contains('too many wildcards'));
     });
   });
 
@@ -269,6 +301,51 @@ a*.png = first/
       expect(_candidates(table, 'ab.png'), [
         ['first', 'ab.png'],
         ['second', 'ab.png'],
+      ]);
+    });
+
+    test('patterns: greedy captures', () {
+      var table = _parse('''
+*-*.gif = x/*-*.gif
+**/*.svg = v/**/*.svg
+''');
+      // Like a `RegExp`, the first `*` takes the longest match:
+      expect(_candidates(table, 'a-b-c.gif'), [
+        ['x', 'a-b-c.gif'],
+      ]);
+      expect(_candidates(table, 'a/b/c.svg'), [
+        ['v', 'a', 'b', 'c.svg'],
+      ]);
+
+      var table2 = _parse('*-*.gif = x/*.gif');
+      expect(_candidates(table2, 'a-b-c.gif'), [
+        ['x', 'a-b.gif'],
+      ]);
+    });
+
+    test('patterns: no catastrophic backtracking', () {
+      var table = _parse('''
+**/**/**/**/**/**/**/*.png = x/
+*a*a*a*a*a*a*a*b = y/
+''');
+      expect(table.entries, hasLength(2));
+
+      var deepPath = [for (var i = 0; i < 63; ++i) 's$i', 'z.jpg'].join('/');
+      var longSegment = 'a' * 1000;
+
+      var sw = Stopwatch()..start();
+      expect(_candidates(table, deepPath), isEmpty);
+      expect(_candidates(table, longSegment), isEmpty);
+      // Over the max match length, never matched:
+      expect(_candidates(table, '${'a' * 2000}b'), isEmpty);
+      expect(sw.elapsed, lessThan(Duration(seconds: 5)));
+
+      // Still matching:
+      expect(_candidates(table, 'a/b/c.png'), [
+        ['x', 'a', 'b', 'c.png'],
+      ]);
+      expect(_candidates(table, 'aaaaaaaab'), [
+        ['y', 'aaaaaaaab'],
       ]);
     });
 
@@ -400,6 +477,112 @@ y/ = x/
 
       expect(resolve(aliases, 'icons/a.png'), isNull);
       expect(resolve(aliases, 'icons/x/food.png'), isNull);
+    });
+
+    test('an entry is applied once per chain (no nested overlay)', () {
+      _write(root, 'icons/sections/sections/deep.png', 'DEEP');
+      _write(root, 'icons/vector/vector/x.svg', 'SVG');
+      _write(root, 'icons/.aliases', '''
+./ = sections/
+**/*.svg = vector/**/*.svg
+''');
+      var aliases = newAliases();
+
+      // Only `icons/sections/sections/deep.png` exists: reaching it from
+      // `icons/deep.png` would need the overlay applied twice.
+      expect(resolve(aliases, 'icons/deep.png'), isNull);
+      expect(
+        resolve(aliases, 'icons/sections/deep.png'),
+        'icons/sections/sections/deep.png',
+      );
+      expect(resolve(aliases, 'icons/sections/missing.png'), isNull);
+
+      expect(resolve(aliases, 'icons/x.svg'), isNull);
+      expect(
+        resolve(aliases, 'icons/vector/x.svg'),
+        'icons/vector/vector/x.svg',
+      );
+    });
+
+    test('a chain through several entries and nested `.aliases`', () {
+      _write(root, 'icons/.aliases', '''
+a*.png = x-*.png
+x-.png = b.png
+./ = sections/
+''');
+      _write(root, 'icons/sections/.aliases', 'b.png = food.png\n');
+      var aliases = newAliases();
+
+      // a.png → x-.png → b.png → sections/b.png → sections/food.png
+      expect(resolve(aliases, 'icons/a.png'), 'icons/sections/food.png');
+      expect(resolve(aliases, 'icons/b.png'), 'icons/sections/food.png');
+      expect(resolve(aliases, 'icons/x-.png'), 'icons/sections/food.png');
+    });
+
+    test('the caches are bounded', () {
+      var total = StaticFilesAliases.maxCacheEntries + 10;
+      for (var i = 0; i < total; ++i) {
+        Directory(pack_path.join(root.path, 'd$i')).createSync();
+      }
+      // An overlay applies to every path: each one is a cached resolution.
+      _write(root, '.aliases', './ = icons/\n');
+      var aliases = StaticFilesAliases(root);
+
+      for (var i = 0; i < total; ++i) {
+        expect(resolve(aliases, 'd$i/x.png'), isNull);
+      }
+      expect(resolve(aliases, 'sections/food.png'), 'icons/sections/food.png');
+
+      expect(
+        aliases.cachedDirectoriesLength,
+        lessThanOrEqualTo(StaticFilesAliases.maxCacheEntries),
+      );
+      expect(
+        aliases.cachedResolutionsLength,
+        lessThanOrEqualTo(StaticFilesAliases.maxCacheEntries),
+      );
+    });
+
+    test('random paths are not cached', () {
+      _write(root, 'icons/.aliases', './ = sections/\n');
+      var aliases = StaticFilesAliases(root);
+
+      for (var i = 0; i < 50; ++i) {
+        expect(resolve(aliases, 'r$i/s$i/t$i/x.png'), isNull);
+      }
+      // Only the root (an existing directory) is cached:
+      expect(aliases.cachedDirectoriesLength, 1);
+      expect(aliases.cachedResolutionsLength, 0);
+
+      expect(resolve(aliases, 'icons/food.png'), 'icons/sections/food.png');
+      expect(aliases.cachedDirectoriesLength, 2);
+      expect(aliases.cachedResolutionsLength, 1);
+
+      // A physical file under an overlay: cached as unchanged.
+      expect(resolve(aliases, 'icons/sections/food.png'), isNull);
+      expect(aliases.cachedResolutionsLength, 2);
+      // No applicable alias: nothing cached.
+      expect(resolve(aliases, 'other/x.png'), isNull);
+      expect(aliases.cachedResolutionsLength, 2);
+    });
+
+    test('a removed `.aliases` invalidates the cached resolutions', () async {
+      _write(root, 'icons/.aliases', 'a.png = sections/food.png\n');
+      var aliases = StaticFilesAliases(
+        root,
+        checkInterval: Duration(milliseconds: 200),
+      );
+
+      expect(resolve(aliases, 'icons/a.png'), 'icons/sections/food.png');
+      expect(aliases.cachedResolutionsLength, 1);
+
+      File(pack_path.join(root.path, 'icons', '.aliases')).deleteSync();
+      await Future.delayed(Duration(milliseconds: 250));
+
+      // Any request re-checking `icons/.aliases` drops all resolutions:
+      expect(resolve(aliases, 'icons/b.png'), isNull);
+      expect(aliases.cachedResolutionsLength, 0);
+      expect(resolve(aliases, 'icons/a.png'), isNull);
     });
 
     test('depth limit', () {
@@ -588,7 +771,7 @@ y/ = x/
       expect(inner!.url.path, 'icons/sections/food.png');
     });
 
-    test('unchanged request, `.aliases` 404, directory 301', () async {
+    test('unchanged request, `.aliases` 404, directory 302', () async {
       var decorated = 0;
       Request? inner;
       var handler =
@@ -613,11 +796,11 @@ y/ = x/
       expect(r404.statusCode, 404);
       expect(r404.headers['x-decorated'], 'yes');
 
-      var r301 = await handler(
+      var r302 = await handler(
         Request('GET', Uri.parse('http://localhost/icons/menu?q=1')),
       );
-      expect(r301.statusCode, 301);
-      expect(r301.headers['location'], 'http://localhost/icons/menu/?q=1');
+      expect(r302.statusCode, 302);
+      expect(r302.headers['location'], 'http://localhost/icons/menu/?q=1');
       expect(decorated, 2);
 
       await handler(Request('GET', Uri.parse('http://localhost/icons/menu/')));
@@ -664,6 +847,9 @@ garbage line
 ../x = y
 ''');
 
+      _write(docRoot, '.aliases', 'logo.svg = icons/vector/a/b/logo.svg\n');
+      _write(docRoot, 'icons/sections/.aliases', 'special.png = food.png\n');
+
       Link(
         pack_path.join(docRoot.path, 'icons', 'sections', 'secret.txt'),
       ).createSync(pack_path.join(outside.path, 'secret.txt'));
@@ -689,6 +875,48 @@ garbage line
     });
 
     String url(String path) => '${apiServer.url}$path';
+
+    test('root and nested `.aliases`', () async {
+      var res = await _request(url('logo.svg'));
+      expect(res.status, 200);
+      expect(_bodyStr(res), '<svg>LOGO</svg>');
+
+      // `icons/sections/.aliases` (closest), also through the overlay:
+      for (var path in ['icons/sections/special.png', 'icons/special.png']) {
+        var res2 = await _request(url(path));
+        expect(res2.status, 200, reason: path);
+        expect(_bodyStr(res2), 'FOOD-PNG', reason: path);
+      }
+
+      // The overlay is not nested (`sections/sections/...`):
+      expect((await _request(url('icons/sections/none.png'))).status, 404);
+    });
+
+    test('HEAD and conditional requests', () async {
+      var client = HttpClient();
+      try {
+        var req = await client.openUrl(
+          'HEAD',
+          Uri.parse(url('icons/food.png')),
+        );
+        var res = await req.close();
+        var body = await res.expand((e) => e).toList();
+        expect(res.statusCode, 200);
+        expect(body, isEmpty);
+
+        var lastModified = res.headers.value(HttpHeaders.lastModifiedHeader);
+        expect(lastModified, isNotNull);
+
+        var res304 = await _request(
+          url('icons/food.png'),
+          headers: {HttpHeaders.ifModifiedSinceHeader: lastModified!},
+        );
+        expect(res304.status, 304);
+        expect(res304.body, isEmpty);
+      } finally {
+        client.close(force: true);
+      }
+    });
 
     test('overlay alias and physical path', () async {
       var res = await _request(url('icons/food.png'));
@@ -740,9 +968,9 @@ garbage line
       expect(_bodyStr(res), 'PHYSICAL');
     });
 
-    test('directory alias: 301 to the virtual path, then index.html', () async {
+    test('directory alias: 302 to the virtual path, then index.html', () async {
       var res = await _request(url('icons/menu?x=1'));
-      expect(res.status, 301);
+      expect(res.status, 302);
       expect(Uri.parse(res.headers.value('location')!).path, '/icons/menu/');
       expect(Uri.parse(res.headers.value('location')!).query, 'x=1');
 
@@ -803,6 +1031,54 @@ garbage line
       var res2 = await _request(url(''));
       expect(res2.status, 200);
       expect(_bodyStr(res2), contains('ROOT'));
+    });
+  });
+
+  group('APIServer + .aliases + domains', () {
+    late Directory rootA;
+    late Directory rootB;
+    late APIServer apiServer;
+    late int port;
+
+    setUpAll(() async {
+      rootA = await Directory.systemTemp.createTemp('bones_api_aliases_a_');
+      rootB = await Directory.systemTemp.createTemp('bones_api_aliases_b_');
+
+      _write(rootA, 'img/a.png', 'A-PNG');
+      _write(rootA, '.aliases', 'logo.png = img/a.png\n');
+      _write(rootB, 'img/b.png', 'B-PNG');
+      _write(rootB, '.aliases', 'logo.png = img/b.png\n');
+
+      port = await resolveFreePort(6750);
+
+      apiServer = APIServer(
+        _AliasesAPIRoot('aliases-domains'),
+        'localhost',
+        port,
+        domains: {'a.local': rootA.path, 'b.local': rootB.path},
+        logToConsole: false,
+      );
+
+      await apiServer.start();
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+      await rootA.delete(recursive: true);
+      await rootB.delete(recursive: true);
+    });
+
+    test('each domain root has its own `.aliases`', () async {
+      var a = await _raw(port, '/logo.png', host: 'a.local');
+      expect(a.status, 200);
+      expect(a.body, 'A-PNG');
+
+      var b = await _raw(port, '/logo.png', host: 'b.local');
+      expect(b.status, 200);
+      expect(b.body, 'B-PNG');
+
+      expect((await _raw(port, '/.aliases', host: 'a.local')).status, 404);
+      expect((await _raw(port, '/img/b.png', host: 'a.local')).status, 404);
     });
   });
 }

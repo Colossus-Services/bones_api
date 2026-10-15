@@ -243,6 +243,9 @@ v*/logo.png = brand/v*/logo.png
 A pattern target either repeats the pattern wildcards, in the same order
 (the first ones can be used and the last ones dropped: `*-*.gif = x/*.gif`), or
 is a directory (ending with `/`), to which the matched path is appended.
+Wildcards are greedy: with `*-*.gif = x/*.gif`, `a-b-c.gif` → `x/a-b.gif`.
+Patterns have at most 8 wildcards and 256 characters, and are only matched
+against paths up to 1024 characters.
 
 Invalid lines are skipped (with a logged warning) and the other lines still
 apply:
@@ -263,11 +266,14 @@ just-a-name                       # no '='
    checked, the closest (deepest) first, and in each one: the exact file alias,
    then directory aliases (longest prefix first), then patterns (file order),
    then the overlay `./`. The first target that exists is served.
-3. A target can be a virtual path itself (aliases chain up to 8 levels);
-   cycles (`a.png = b.png` + `b.png = a.png`) are detected and ignored.
+3. A target can be a virtual path itself (aliases chain up to 8 levels).
+   Each alias entry is applied at most once in a chain, so an overlay or a
+   self-matching pattern never nests (`sections/sections/...`), and cycles
+   (`a.png = b.png` + `b.png = a.png`) are detected and ignored.
 4. Without an existing target the response is the usual `404`.
-5. A virtual directory requested without a trailing `/` is redirected (`301`)
-   to the *virtual* path with `/`, then its `index.html` is served.
+5. A virtual directory requested without a trailing `/` is redirected (`302`,
+   since an alias can change) to the *virtual* path with `/`, then its
+   `index.html` is served.
 
 ### Security
 
@@ -285,8 +291,11 @@ just-a-name                       # no '='
 
 `.aliases` files and resolved paths are cached in memory and re-checked at
 most every 10 seconds, so edits (including a new physical file shadowing an
-alias) apply within that interval. Paths without any `.aliases` along them
-don't touch the file system. The response cache and `Cache-Control` rules
+alias) apply within that interval. Only existing directories are cached (each
+one costs a `.aliases` stat every 10 seconds), and the walk stops at the first
+missing directory of the request path. A path to which no alias applies is
+never stat'ed by the aliases resolution. The caches are bounded (4096 entries
+each). The response cache and `Cache-Control` rules
 (`long-lived-static-files-cached`) apply to the physical (target) path.
 
 ## Hot Reload
