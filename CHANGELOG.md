@@ -4,8 +4,19 @@
   their object files in parallel, so concurrent selects of a large table
   opened thousands of files at once (not a leak, but an unbounded burst),
   failing with `Too many open files` (`errno = 24`) under a low limit (macOS
-  default: 256). The reads are now limited by a `FileLimited` semaphore (50).
+  default: 256). The reads are now limited by a `FileLimited` semaphore (50),
+  in batches of that limit per select.
+  - `DBObjectDirectoryAdapter.fileLimited`: the shared semaphore, tunable with
+    `setSemaphoreLimit` (`FileLimited` is also exported by
+    `bones_api_db_directory.dart`).
+  - An object deleted while a select waits to read it is skipped (no
+    `existsSync` check before the read: a missing file reads as `null`),
+    and concurrent deletes of the same object delete it once (the others
+    delete nothing, without an exception).
 - `FileLimited.readAsString`: like `File.readAsString`, under the semaphore.
+- Fix: `FileLimited`: an operation in flight while `setSemaphoreLimit`
+  replaced the semaphore released the new one (raising it above its limit);
+  it now releases the semaphore it acquired.
 
 ## 1.24.0
 

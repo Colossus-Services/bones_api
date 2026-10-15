@@ -136,31 +136,34 @@ class FileLimited {
     _semaphoreLimit = limit;
   }
 
+  /// Runs [operation] holding a permit of the current semaphore.
+  ///
+  /// The permit is released to the semaphore it was acquired from: if
+  /// [setSemaphoreLimit] replaces the semaphore meanwhile, releasing to the
+  /// new one would raise its count above its limit. (The operations in flight
+  /// on the previous semaphore finish under it.)
+  Future<T> _run<T>(Future<T> Function() operation) async {
+    var semaphore = _semaphore;
+    await semaphore.acquire();
+    try {
+      return await operation();
+    } finally {
+      semaphore.release();
+    }
+  }
+
   /// Reads all bytes from [file] with controlled concurrency.
   ///
   /// Works like [File.readAsBytes], but enforces the semaphore limit to avoid
   /// file handle exhaustion or disk saturation under parallel load.
-  Future<Uint8List> readAsBytes(File file) async {
-    await _semaphore.acquire();
-    try {
-      return await file.readAsBytes();
-    } finally {
-      _semaphore.release();
-    }
-  }
+  Future<Uint8List> readAsBytes(File file) => _run(() => file.readAsBytes());
 
   /// Reads [file] as a [String] with controlled concurrency.
   ///
   /// Works like [File.readAsString], but enforces the semaphore limit to avoid
   /// file handle exhaustion when reading many files in parallel.
-  Future<String> readAsString(File file, {Encoding encoding = utf8}) async {
-    await _semaphore.acquire();
-    try {
-      return await file.readAsString(encoding: encoding);
-    } finally {
-      _semaphore.release();
-    }
-  }
+  Future<String> readAsString(File file, {Encoding encoding = utf8}) =>
+      _run(() => file.readAsString(encoding: encoding));
 
   /// Writes [bytes] to [file] with controlled concurrency.
   ///
@@ -171,53 +174,26 @@ class FileLimited {
     List<int> bytes, {
     FileMode mode = FileMode.write,
     bool flush = false,
-  }) async {
-    await _semaphore.acquire();
-    try {
-      return await file.writeAsBytes(bytes, mode: mode, flush: flush);
-    } finally {
-      _semaphore.release();
-    }
-  }
+  }) => _run(() => file.writeAsBytes(bytes, mode: mode, flush: flush));
 
   /// Retrieves metadata for [file] with concurrency control.
   ///
   /// Wraps [File.stat] and is useful when scanning many files in parallel.
-  Future<FileStat> stat(File file) async {
-    await _semaphore.acquire();
-    try {
-      return await file.stat();
-    } finally {
-      _semaphore.release();
-    }
-  }
+  Future<FileStat> stat(File file) => _run(() => file.stat());
 
   /// Deletes [file] under the current concurrency limit.
   ///
   /// Useful when removing many files at once to avoid overwhelming the file
   /// system. Wraps [File.delete].
-  Future<void> delete(File file, {bool recursive = false}) async {
-    await _semaphore.acquire();
-    try {
-      await file.delete(recursive: recursive);
-    } finally {
-      _semaphore.release();
-    }
-  }
+  Future<void> delete(File file, {bool recursive = false}) =>
+      _run(() => file.delete(recursive: recursive));
 
   /// Checks whether the given [file] exists, using the current concurrency limit.
   ///
   /// Wraps [File.exists] to prevent excessive parallel file system queries,
   /// which can trigger filesystem throttling or `Too many open files` errors
   /// when scanning large directory trees.
-  Future<bool> exists(File file) async {
-    await _semaphore.acquire();
-    try {
-      return await file.exists();
-    } finally {
-      _semaphore.release();
-    }
-  }
+  Future<bool> exists(File file) => _run(() => file.exists());
 
   @override
   String toString() =>

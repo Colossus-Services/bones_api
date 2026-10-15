@@ -3,7 +3,9 @@
 // fails with `Too many open files` (`errno = 24`) if the
 // `DBObjectDirectoryAdapter` reads don't limit their concurrency.
 //
-// Usage: dart run test/bones_api_entity_db_directory_open_files.dart <dir>
+// Usage:
+//   dart --packages=.dart_tool/package_config.json \
+//     test/bones_api_entity_db_directory_open_files.dart <dir>
 
 import 'dart:io';
 import 'dart:typed_data';

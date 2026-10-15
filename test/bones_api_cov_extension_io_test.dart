@@ -101,6 +101,29 @@ void main() {
       // The semaphore (limit 1) is released after an error:
       expect(await fl.exists(file), isFalse);
     });
+
+    test('setSemaphoreLimit with operations in flight', () async {
+      var fl = FileLimited(semaphoreLimit: 1);
+      var file = File('${tmpDir.path}/limited-swap.txt');
+      file.writeAsStringSync('swap');
+
+      // In flight (and queued) on the first semaphore:
+      var before = List.generate(4, (_) => fl.readAsString(file));
+
+      fl.setSemaphoreLimit(2);
+      var after = List.generate(4, (_) => fl.readAsString(file));
+
+      // Each operation releases the semaphore it acquired: all complete, and
+      // the new semaphore keeps working (no over/under-released permits).
+      expect(await Future.wait(before), everyElement(equals('swap')));
+      expect(await Future.wait(after), everyElement(equals('swap')));
+
+      fl.setSemaphoreLimit(1);
+      expect(
+        await Future.wait(List.generate(3, (_) => fl.exists(file))),
+        everyElement(isTrue),
+      );
+    });
   });
 
   group('FileLimitExtension (coverage)', () {
