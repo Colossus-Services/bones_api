@@ -1,3 +1,30 @@
+## 1.25.0
+
+Static files: virtual file and directory aliases, defined by `.aliases` files
+inside the served directory tree (see the README section
+"Static files: `.aliases`").
+
+- `StaticFilesAliases`: a middleware in front of the static files handler.
+  It rewrites a request without a physical file to its alias target: exact
+  file alias, directory prefix, pattern (`*`, `?`, `**/`) or overlay (`./`).
+  - The physical path always wins, so existing paths are served as before.
+  - Aliases can chain (max 8 levels, each entry once per chain), and cycles
+    are ignored.
+  - Patterns are matched without backtracking blow-ups (memoized, no
+    `RegExp`).
+  - Targets can't escape the `.aliases` directory (`..` and absolute paths
+    are rejected), and symlinks follow the existing root containment.
+  - A virtual directory without a trailing `/` is redirected with a `302`.
+  - `.aliases` files (of existing directories), missing directories and
+    resolutions are cached and re-checked every 10s, in bounded caches
+    (evicting the oldest entries). A cached resolution costs ~130ns, and a
+    path without any applicable alias ~300ns.
+  - An aliased file goes through the same pipeline as a physical file
+    (response cache, gzip, `Cache-Control`, cross-origin and cookieless
+    headers), sharing the physical path's cached response.
+- `.aliases` files are never served: they respond `404`. Before, a
+  `.aliases` file in a served directory was served like any other file.
+
 ## 1.24.1
 
 - Fix: `DBObjectDirectoryAdapter`: `selectAll` and `selectByIDs` read all

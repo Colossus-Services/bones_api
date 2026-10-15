@@ -25,6 +25,7 @@ import 'bones_api_entity_db.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_hotreload.dart';
 import 'bones_api_logging.dart';
+import 'bones_api_server_aliases.dart';
 import 'bones_api_server_cache.dart';
 import 'bones_api_session.dart';
 import 'bones_api_types.dart';
@@ -2798,7 +2799,15 @@ final class APIServerWorker extends _APIServerBase {
   Handler _createDirectoryHandler(Directory rootDirectory) {
     rootDirectory = Directory(pack_path.normalize(rootDirectory.absolute.path));
 
-    var pipeline = const Pipeline();
+    // Outermost: blocks `.aliases` requests and rewrites aliased paths
+    // to their physical path, so the cache and headers see the real file.
+    var aliases = StaticFilesAliases(
+      rootDirectory,
+      decorateResponse: (request, response) =>
+          _configureStaticFilesHeaders(rootDirectory, request, response),
+    );
+
+    var pipeline = const Pipeline().addMiddleware(aliases.middleware);
 
     var gzipCompressionLevel = 4;
 
