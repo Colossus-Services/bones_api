@@ -1,3 +1,27 @@
+## 1.24.0
+
+Faster entity decoding from JSON, e.g. a module proxy decoding a response
+with many entities in the browser. The decoded entities are the same.
+
+- `reflection_factory`: `^2.12.2` → `^2.13.0`, with reflection regenerated:
+  constructors called directly with resolved values, map shapes reused, and
+  JSON objects no longer copied before decoding.
+- `Json.defaultFieldValueResolver`: a `String`, `bool` or `int` value of a
+  field of that type is returned without `runtimeType` (costly compiled to
+  JavaScript), and `isListEntity` is only checked for an `Iterable`.
+- `EntityHandler.createFromMap`: when the values are resolved synchronously,
+  the instantiation steps are called directly, without a closure per entity.
+- `ClassReflectionEntityHandler.getID`: reads the ID field kept once,
+  instead of looking it up by name for each entity.
+- Benchmark: `benchmark/db_users/bin/json_decode_benchmark.dart`, decoding
+  a JSON list of users (each with an address and 2 roles) as a response of
+  `user/list`, by layers and as a module proxy does (`decodeJson` +
+  `resolveResponse`). It runs on the VM, and compiled to JavaScript and Wasm.
+  A list of 1000 users through the proxy, µs per user:
+  - JavaScript (dart2js `-O1 --minify`): 27.4 → 11.8 (−57%).
+  - Wasm (dart2wasm `-O2 --minify`): 6.5 → 3.7 (−42%).
+  - VM: 7.5 → 3.9 (−48%).
+
 ## 1.23.1
 
 - `reflection_factory`: `^2.12.0` → `^2.12.2`, with reflection regenerated
