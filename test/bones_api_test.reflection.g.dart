@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.11.0
+// BUILDER: reflection_factory/2.12.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.11.0');
+  static final Version _version = Version.parse('2.12.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -156,6 +156,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           null,
           null,
           null,
+          invoker: (a) => MyInfoModule(a[0] as APIRoot),
         );
       default:
         return null;

@@ -1,6 +1,6 @@
 //
 // GENERATED CODE - DO NOT MODIFY BY HAND!
-// BUILDER: reflection_factory/2.11.0
+// BUILDER: reflection_factory/2.12.0
 // BUILD COMMAND: dart run build_runner build
 //
 
@@ -22,7 +22,7 @@ typedef __TI<T> = TypeInfo<T>;
 typedef __PR = ParameterReflection;
 
 mixin __ReflectionMixin {
-  static final Version _version = Version.parse('2.11.0');
+  static final Version _version = Version.parse('2.12.0');
 
   Version get reflectionFactoryVersion => _version;
 
@@ -162,6 +162,16 @@ class Address$reflection extends ClassReflection<Address>
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
+          invoker: (a) => Address(
+            a[0] as String,
+            a[1] as String,
+            a[2] as String,
+            a[3] as String,
+            a[4] as String,
+            id: identical(a[5], ConstructorReflection.absentArgument)
+                ? null
+                : a[5] as int?,
+          ),
         );
       case 'create':
         return ConstructorReflection<Address>(
@@ -173,6 +183,7 @@ class Address$reflection extends ClassReflection<Address>
           null,
           null,
           null,
+          invoker: (a) => Address.create(),
         );
       default:
         return null;
@@ -485,6 +496,12 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           null,
           const <String, __PR>{'id': __PR(__TR.tInt, 'id', true, false)},
           null,
+          invoker: (a) => Role(
+            a[0] as String,
+            id: identical(a[1], ConstructorReflection.absentArgument)
+                ? null
+                : a[1] as int?,
+          ),
         );
       case 'create':
         return ConstructorReflection<Role>(
@@ -496,6 +513,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
           null,
           null,
           null,
+          invoker: (a) => Role.create(),
         );
       default:
         return null;
@@ -750,6 +768,22 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
             'id': __PR(__TR.tInt, 'id', true, false),
           },
           null,
+          invoker: (a) => User(
+            a[0] as String,
+            a[1] as String,
+            a[2] as String,
+            a[3] as Address,
+            a[4] as List<Role>,
+            creationTime: identical(a[5], ConstructorReflection.absentArgument)
+                ? null
+                : a[5] as DateTime?,
+            enabled: identical(a[6], ConstructorReflection.absentArgument)
+                ? true
+                : a[6] as bool,
+            id: identical(a[7], ConstructorReflection.absentArgument)
+                ? null
+                : a[7] as int?,
+          ),
         );
       case 'create':
         return ConstructorReflection<User>(
@@ -761,6 +795,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
           null,
           null,
           null,
+          invoker: (a) => User.create(),
         );
       default:
         return null;

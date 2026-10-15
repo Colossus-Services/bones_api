@@ -3318,12 +3318,107 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }) {
     jsonDecoder ??= Json.defaultDecoder;
 
+    var resolvedFields = _resolveFieldsValuesForInstantiation(
+      fields,
+      jsonDecoder,
+    );
+
+    if (resolvedFields != null) {
+      // The values are resolved here, as the `fieldValueResolver` below
+      // would resolve them, so the constructors are called directly
+      // (`reflection_factory` 2.12.0+).
+      return reflection.createInstanceFromMap(
+        resolvedFields,
+        fieldNameResolver: Json.defaultFieldNameResolver,
+        valuesResolved: true,
+      );
+    }
+
     return reflection.createInstanceFromMap(
       fields,
       fieldNameResolver: Json.defaultFieldNameResolver,
       fieldValueResolver: (f, v, t) =>
           Json.defaultFieldValueResolver(f, v, t, jsonDecoder!, provider),
     );
+  }
+
+  /// The [TypeReflection] of each field, when [_resolveFieldsValuesForInstantiation]
+  /// can resolve the values of this entity's fields up front; otherwise `null`.
+  late final Map<String, TypeReflection>? _fieldsTypesForInstantiation =
+      _computeFieldsTypesForInstantiation();
+
+  Map<String, TypeReflection>? _computeFieldsTypesForInstantiation() {
+    final reflection = this.reflection;
+
+    final fieldsTypes = <String, TypeReflection>{
+      for (var f in reflection.fieldsNames) f: reflection.field(f)!.type,
+    };
+
+    // A `fieldValueResolver` resolves a constructor parameter by its own
+    // type. Resolving a value by its field type up front is the same only
+    // if every parameter named as a field has the field's type:
+    for (var c in reflection.allConstructors()) {
+      for (var p in c.allParameters) {
+        var fieldType = fieldsTypes[p.name];
+        if (fieldType != null && p.type.typeInfo != fieldType.typeInfo) {
+          return null;
+        }
+      }
+    }
+
+    return Map<String, TypeReflection>.unmodifiable(fieldsTypes);
+  }
+
+  /// Returns [fields] with each value resolved by
+  /// [Json.defaultFieldValueResolver] for its field type, as
+  /// `createInstanceFromMap` resolves it with that `fieldValueResolver`.
+  ///
+  /// Returns `null` (resolved by `createInstanceFromMap`) when that can't be
+  /// done up front:
+  /// - A constructor parameter named as a field has another type.
+  /// - A key isn't a field (e.g. a constructor parameter with another name).
+  /// - A value isn't resolved synchronously, or resolves to `null` or to a
+  ///   list of entities with `null`s (unresolved, which
+  ///   `createInstanceFromMap` handles).
+  Map<String, dynamic>? _resolveFieldsValuesForInstantiation(
+    Map<String, dynamic> fields,
+    JsonDecoder jsonDecoder,
+  ) {
+    final fieldsTypes = _fieldsTypesForInstantiation;
+    if (fieldsTypes == null) return null;
+
+    for (var k in fields.keys) {
+      if (!fieldsTypes.containsKey(k)) return null;
+    }
+
+    Map<String, dynamic>? resolved;
+
+    for (var e in fields.entries) {
+      var value = e.value;
+      if (value == null) continue;
+
+      var key = e.key;
+      var type = fieldsTypes[key]!;
+
+      var value2 = Json.defaultFieldValueResolver(
+        key,
+        value,
+        type,
+        jsonDecoder,
+        provider,
+      );
+
+      if (value2 == null || value2 is Future) return null;
+      if (value2 is List && type.isListEntity && value2.contains(null)) {
+        return null;
+      }
+
+      if (!identical(value2, value)) {
+        (resolved ??= Map<String, dynamic>.of(fields))[key] = value2;
+      }
+    }
+
+    return resolved ?? fields;
   }
 
   @override
