@@ -64,14 +64,6 @@ dev_dependencies:
   coverage: ^1.15.0
   vm_service: ^15.2.0
 
-# reflection_factory 2.13.0 isn't published yet: validated against its PR
-# branch. Remove before releasing.
-dependency_overrides:
-  reflection_factory:
-    git:
-      url: https://github.com/gmpassos/reflection_factory.git
-      ref: perf/json-decode-revived-args
-
 #dependency_overrides:
 #  shared_map:
 #    path: ../shared_map
