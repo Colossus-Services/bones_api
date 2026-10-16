@@ -613,6 +613,9 @@ class APIRouteBuilder<M extends APIModule> {
 
     var returnsAPIResponse = apiMethod.returnsAPIResponse;
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
+    // A method receiving an `APIRequest` plus optional/named parameters is
+    // not a raw handler: its other parameters must be resolved from the request.
+    var isRawAPIRequestHandler = apiMethod.isRawAPIRequestHandler;
 
     var methodRules = apiMethod.annotations.whereType<APIRouteRule>().toList();
     var classRules = classReflection.classAnnotations
@@ -646,7 +649,7 @@ class APIRouteBuilder<M extends APIModule> {
 
       APIRouteHandler routeHandler;
 
-      if (receivesAPIRequest) {
+      if (isRawAPIRequestHandler) {
         var paramName = apiMethod.normalParametersNames.first;
         var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
@@ -672,11 +675,7 @@ class APIRouteBuilder<M extends APIModule> {
                 config,
               );
       } else {
-        var parameters = Map<String, TypeInfo>.fromEntries(
-          apiMethod.allParameters.map(
-            (p) => MapEntry(p.name, TypeInfo.from(p)),
-          ),
-        );
+        var parameters = _allParametersTypeInfo(apiMethod);
 
         routeHandler = returnTypeInfo.hasArguments
             ? returnTypeInfo.callCastedArgumentA(
@@ -704,7 +703,7 @@ class APIRouteBuilder<M extends APIModule> {
       addRouteHandler(routeHandler);
 
       return true;
-    } else if (receivesAPIRequest) {
+    } else if (isRawAPIRequestHandler) {
       var paramName = apiMethod.normalParametersNames.first;
       var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
@@ -721,10 +720,32 @@ class APIRouteBuilder<M extends APIModule> {
       addRouteHandler(routeHandler);
 
       return true;
+    } else if (receivesAPIRequest) {
+      var parameters = _allParametersTypeInfo(apiMethod);
+
+      var routeHandler = _APIRouteHandlerAPIMethodAPIRequestReflection(
+        module,
+        requestMethod,
+        apiMethod.name,
+        apiMethod,
+        parameters,
+        rules,
+        config,
+      );
+
+      addRouteHandler(routeHandler);
+
+      return true;
     }
 
     return false;
   }
+
+  static Map<String, TypeInfo> _allParametersTypeInfo(
+    MethodReflection apiMethod,
+  ) => Map<String, TypeInfo>.fromEntries(
+    apiMethod.allParameters.map((p) => MapEntry(p.name, TypeInfo.from(p))),
+  );
 
   static final TypeInfo _typeInfoDecimal = TypeInfo.fromType(Decimal);
   static final TypeInfo _typeInfoDynamicInt = TypeInfo.fromType(DynamicInt);
@@ -1704,6 +1725,44 @@ class _APIRouteHandlerAPIMethodAPIRequest extends APIRouteHandler {
   String toString() => '_APIRouteHandlerAPIMethodAPIRequest@$apiMethod';
 }
 
+/// A method that receives an [APIRequest] (not returning an [APIResponse]),
+/// with additional optional/named parameters resolved from the request.
+/// See [MethodReflectionExtension.isRawAPIRequestHandler].
+class _APIRouteHandlerAPIMethodAPIRequestReflection extends APIRouteHandler {
+  final MethodReflection apiMethod;
+
+  _APIRouteHandlerAPIMethodAPIRequestReflection(
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    this.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
+
+  @override
+  FutureOr<APIResponse> callImpl(APIRequest request) {
+    var methodInvocation =
+        _APIRouteHandlerAPIMethodReflection._resolveMethodInvocation(
+          apiMethod,
+          request,
+        );
+
+    Object? ret = methodInvocation.invoke(apiMethod.method);
+
+    if (ret is Future) {
+      return ret.then((r) => APIResponse.from(r));
+    } else {
+      return APIResponse.from(ret);
+    }
+  }
+
+  @override
+  String toString() =>
+      '_APIRouteHandlerAPIMethodAPIRequestReflection@$apiMethod';
+}
+
 abstract class _APIRouteHandlerAPIMethodAPIResponse<T>
     extends APIRouteHandler<T?> {
   final MethodReflection apiMethod;
@@ -1789,7 +1848,7 @@ class _APIRouteHandlerAPIMethodReflection<T>
     return castAPIResponse(ret);
   }
 
-  MethodInvocation _resolveMethodInvocation(
+  static MethodInvocation _resolveMethodInvocation(
     MethodReflection method,
     APIRequest request,
   ) {
@@ -1802,7 +1861,10 @@ class _APIRouteHandlerAPIMethodReflection<T>
     return methodInvocation;
   }
 
-  bool _isPayloadParametersMap(MethodReflection method, APIRequest request) {
+  static bool _isPayloadParametersMap(
+    MethodReflection method,
+    APIRequest request,
+  ) {
     var payload = request.payload;
     if (payload is! Map) return false;
 
