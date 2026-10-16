@@ -1,4 +1,4 @@
-## 1.25.1
+## 1.26.0
 
 - Fix: a route method with an `APIRequest` as its only positional parameter
   was always registered as a raw handler, invoked with the `APIRequest` only.
@@ -7,11 +7,20 @@
   - A raw handler is now only a method whose sole parameter is the
     `APIRequest` (see `MethodReflectionExtension.isRawAPIRequestHandler`).
   - A method with an `APIRequest` plus optional or named parameters is routed
-    like any other API method: its parameters are resolved from the request,
-    with the `APIRequest` injected.
+    like any other API method: its parameters are resolved from the request
+    (parameters, JSON payload, path parts), with the `APIRequest` injected.
+    The injected `APIRequest` doesn't consume a path part.
   - Raw handlers without other parameters work as before.
   - Workarounds (such as an extra unused `APICredential` positional
     parameter) are no longer needed, and still work.
+  - **Behavior change**: the optional/named parameters of such methods are
+    now set from client-controlled request values. Before, the router always
+    left them at their defaults. Review any such parameter that was meant to
+    be set only by server-side callers.
+- Reflected routes: a JSON payload is only treated as a parameters map by the
+  method's non-injected parameter names (a payload key matching an
+  `APIRequest`, `APICredential` or `APIAuthentication` parameter name is no
+  longer counted as a parameter key).
 
 ## 1.25.0
 

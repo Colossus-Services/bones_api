@@ -190,9 +190,37 @@ void main() {
     });
 
     test('`APIRequest` + named parameters: JSON payload', () async {
-      // `withCredential` has no route rule (`EstablishmentRule` only reads
-      // the request parameters, not the payload):
       var response = await apiRoot.call(
+        APIRequest.post(
+          '/raw/withNamed',
+          payload: {'establishmentId': 10, 'otherId': 30},
+          payloadMimeType: 'json',
+        ),
+      );
+
+      expect(response.error, isNull, reason: '${response.error}');
+      expect(
+        response.payload,
+        equals({
+          'path': '/raw/withNamed',
+          'establishmentId': 10,
+          'otherId': 30,
+          'label': 'def',
+        }),
+      );
+
+      // Rejected by `EstablishmentRule` (reading the payload):
+      response = await apiRoot.call(
+        APIRequest.post(
+          '/raw/withNamed',
+          payload: {'establishmentId': 11},
+          payloadMimeType: 'json',
+        ),
+      );
+
+      expect(response.status, equals(APIResponseStatus.UNAUTHORIZED));
+
+      response = await apiRoot.call(
         APIRequest.post(
           '/raw/withCredential',
           payload: {'establishmentId': 30},
@@ -222,6 +250,34 @@ void main() {
 
       expect(response.error, isNull, reason: '${response.error}');
       expect(response.payload, equals({'path': '/raw/withOptional', 'id': 7}));
+    });
+
+    test('`APIRequest` + optional positional parameter: path part', () async {
+      // The injected `APIRequest` doesn't consume a path part:
+      var response = await apiRoot.call(APIRequest.get('/raw/withOptional/7'));
+
+      expect(response.error, isNull, reason: '${response.error}');
+      expect(
+        response.payload,
+        equals({'path': '/raw/withOptional/7', 'id': 7}),
+      );
+    });
+
+    test('`APIRequest` + named parameters: payload key `request`', () async {
+      // `request` is an injected parameter, not a payload parameter key:
+      var response = await apiRoot.call(
+        APIRequest.post(
+          '/raw/withNamedNoResponse',
+          payload: {'request': 'x', 'id': 9},
+          payloadMimeType: 'json',
+        ),
+      );
+
+      expect(response.error, isNull, reason: '${response.error}');
+      expect(
+        response.payload,
+        equals({'path': '/raw/withNamedNoResponse', 'id': null}),
+      );
     });
 
     test(
