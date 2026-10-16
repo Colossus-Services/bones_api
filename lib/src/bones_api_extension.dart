@@ -179,6 +179,18 @@ extension MethodReflectionExtension<O, R> on MethodReflection<O, R> {
   bool get receivesAPIRequest =>
       equalsNormalParametersTypes([APIRequest], equivalency: true);
 
+  /// Returns `true` if this reflected method is a raw [APIRequest] handler:
+  /// it [receivesAPIRequest] and has no other parameters (no optional or named
+  /// parameters), so it's invoked with the [APIRequest] only.
+  ///
+  /// A method that [receivesAPIRequest] and also declares optional or named
+  /// parameters is NOT a raw handler: its parameters are resolved from the
+  /// request, like any other API method (with the [APIRequest] injected).
+  bool get isRawAPIRequestHandler =>
+      receivesAPIRequest &&
+      optionalParameters.isEmpty &&
+      namedParameters.isEmpty;
+
   /// Returns `true` if this reflected method returns an [APIResponse].
   bool get returnsAPIResponse {
     var returnType = this.returnType;

@@ -613,6 +613,9 @@ class APIRouteBuilder<M extends APIModule> {
 
     var returnsAPIResponse = apiMethod.returnsAPIResponse;
     var receivesAPIRequest = apiMethod.receivesAPIRequest;
+    // A method receiving an `APIRequest` plus optional/named parameters is
+    // not a raw handler: its other parameters must be resolved from the request.
+    var isRawAPIRequestHandler = apiMethod.isRawAPIRequestHandler;
 
     var methodRules = apiMethod.annotations.whereType<APIRouteRule>().toList();
     var classRules = classReflection.classAnnotations
@@ -646,7 +649,7 @@ class APIRouteBuilder<M extends APIModule> {
 
       APIRouteHandler routeHandler;
 
-      if (receivesAPIRequest) {
+      if (isRawAPIRequestHandler) {
         var paramName = apiMethod.normalParametersNames.first;
         var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
@@ -672,11 +675,7 @@ class APIRouteBuilder<M extends APIModule> {
                 config,
               );
       } else {
-        var parameters = Map<String, TypeInfo>.fromEntries(
-          apiMethod.allParameters.map(
-            (p) => MapEntry(p.name, TypeInfo.from(p)),
-          ),
-        );
+        var parameters = _allParametersTypeInfo(apiMethod);
 
         routeHandler = returnTypeInfo.hasArguments
             ? returnTypeInfo.callCastedArgumentA(
@@ -704,7 +703,7 @@ class APIRouteBuilder<M extends APIModule> {
       addRouteHandler(routeHandler);
 
       return true;
-    } else if (receivesAPIRequest) {
+    } else if (isRawAPIRequestHandler) {
       var paramName = apiMethod.normalParametersNames.first;
       var parameters = <String, TypeInfo>{paramName: APIRequest.typeInfo};
 
@@ -721,10 +720,32 @@ class APIRouteBuilder<M extends APIModule> {
       addRouteHandler(routeHandler);
 
       return true;
+    } else if (receivesAPIRequest) {
+      var parameters = _allParametersTypeInfo(apiMethod);
+
+      var routeHandler = _APIRouteHandlerAPIMethodAPIRequestReflection(
+        module,
+        requestMethod,
+        apiMethod.name,
+        apiMethod,
+        parameters,
+        rules,
+        config,
+      );
+
+      addRouteHandler(routeHandler);
+
+      return true;
     }
 
     return false;
   }
+
+  static Map<String, TypeInfo> _allParametersTypeInfo(
+    MethodReflection apiMethod,
+  ) => Map<String, TypeInfo>.fromEntries(
+    apiMethod.allParameters.map((p) => MapEntry(p.name, TypeInfo.from(p))),
+  );
 
   static final TypeInfo _typeInfoDecimal = TypeInfo.fromType(Decimal);
   static final TypeInfo _typeInfoDynamicInt = TypeInfo.fromType(DynamicInt);
@@ -1689,9 +1710,12 @@ class _APIRouteHandlerAPIMethodAPIRequest extends APIRouteHandler {
     super.config,
   ) : super();
 
+  /// Invokes [apiMethod] with the [request] only (raw handler).
+  Object? invokeMethod(APIRequest request) => apiMethod.invoke([request]);
+
   @override
   FutureOr<APIResponse> callImpl(APIRequest request) {
-    Object? ret = apiMethod.invoke([request]);
+    Object? ret = invokeMethod(request);
 
     if (ret is Future) {
       return ret.then((r) => APIResponse.from(r));
@@ -1702,6 +1726,37 @@ class _APIRouteHandlerAPIMethodAPIRequest extends APIRouteHandler {
 
   @override
   String toString() => '_APIRouteHandlerAPIMethodAPIRequest@$apiMethod';
+}
+
+/// A method that receives an [APIRequest] (not returning an [APIResponse]),
+/// with additional optional/named parameters resolved from the request.
+/// See [MethodReflectionExtension.isRawAPIRequestHandler].
+class _APIRouteHandlerAPIMethodAPIRequestReflection
+    extends _APIRouteHandlerAPIMethodAPIRequest {
+  _APIRouteHandlerAPIMethodAPIRequestReflection(
+    super.module,
+    super.requestMethod,
+    super.routeName,
+    super.apiMethod,
+    super.parameters,
+    super.rules,
+    super.config,
+  ) : super();
+
+  @override
+  Object? invokeMethod(APIRequest request) {
+    var methodInvocation =
+        _APIRouteHandlerAPIMethodReflection._resolveMethodInvocation(
+          apiMethod,
+          request,
+        );
+
+    return methodInvocation.invoke(apiMethod.method);
+  }
+
+  @override
+  String toString() =>
+      '_APIRouteHandlerAPIMethodAPIRequestReflection@$apiMethod';
 }
 
 abstract class _APIRouteHandlerAPIMethodAPIResponse<T>
@@ -1789,24 +1844,48 @@ class _APIRouteHandlerAPIMethodReflection<T>
     return castAPIResponse(ret);
   }
 
-  MethodInvocation _resolveMethodInvocation(
+  static MethodInvocation _resolveMethodInvocation(
     MethodReflection method,
     APIRequest request,
   ) {
     final payloadIsParametersMap = _isPayloadParametersMap(method, request);
 
+    // A method with the `APIRequest` as its only normal parameter (followed by
+    // optional/named parameters) shouldn't map the injected `APIRequest` to a
+    // path part: the next parameter is the first path part after the route.
+    // (Only for this case, to not shift the path parts of other methods.)
+    final pathPartOffset = method.receivesAPIRequest ? 1 : 0;
+
     var methodInvocation = method.methodInvocation(
-      (p, i) => _resolveRequestParameter(request, p, i, payloadIsParametersMap),
+      (p, i) => _resolveRequestParameter(
+        request,
+        p,
+        i != null ? i - pathPartOffset : null,
+        payloadIsParametersMap,
+      ),
     );
 
     return methodInvocation;
   }
 
-  bool _isPayloadParametersMap(MethodReflection method, APIRequest request) {
+  static bool _isInjectedParameter(TypeInfo typeInfo) =>
+      typeInfo.isOf(APIRequest) ||
+      typeInfo.isOf(APICredential) ||
+      typeInfo.isOf(APIAuthentication);
+
+  static bool _isPayloadParametersMap(
+    MethodReflection method,
+    APIRequest request,
+  ) {
     var payload = request.payload;
     if (payload is! Map) return false;
 
-    var allParametersNames = method.allParametersNames;
+    // Injected parameters (`APIRequest`, `APICredential`, `APIAuthentication`)
+    // are never resolved from the payload:
+    var allParametersNames = method.allParameters
+        .where((p) => !_isInjectedParameter(p.type.typeInfo))
+        .map((p) => p.name)
+        .toList();
 
     if (payload.isEmpty && allParametersNames.isNotEmpty) return false;
 
@@ -1827,6 +1906,7 @@ class _APIRouteHandlerAPIMethodReflection<T>
     var parameterTypeInfo = parameter.type.typeInfo;
 
     if (parameterTypeInfo.isOf(APIRequest)) {
+      // See `_isInjectedParameter`.
       return request;
     } else if (parameterTypeInfo.isOf(APICredential)) {
       return request.credential;
