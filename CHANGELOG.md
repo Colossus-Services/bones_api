@@ -2,8 +2,9 @@
 
 - Fix: a route method with an `APIRequest` as its only positional parameter
   was always registered as a raw handler, invoked with the `APIRequest` only.
-  Its optional and named parameters were silently not passed (`null` or the
-  default value), with no error or warning.
+  Its optional and named parameters were never passed: optional ones were
+  silently `null` (or their default value), with no error or warning, and a
+  required named parameter failed every call (`NoSuchMethodError`).
   - A raw handler is now only a method whose sole parameter is the
     `APIRequest` (see `MethodReflectionExtension.isRawAPIRequestHandler`).
   - A method with an `APIRequest` plus optional or named parameters is routed
