@@ -339,7 +339,28 @@ Future<APIResponse<int>> syncOrders({String? continuation}) async {
 }
 ```
 
-or by overriding `APIRoot.loadCronJobs()` (returning `APICronJob`s).
+The schedule can also be given by its fields (each a cron field, default
+`*`), with all the options of the job:
+
+```dart
+@APICron.at(
+  minute: '30',
+  hour: '23',
+  dayOfWeek: 'MON-FRI',
+  timeZone: 'Europe/Paris',
+  timeout: Duration(minutes: 2),
+  retry: APICronRetry(attempts: 5, initialDelay: Duration(minutes: 1)),
+)
+Future<APIResponse<int>> updateRates(APIRequest request) async { ... }
+```
+
+Both `@APICron(...)` and `@APICron.at(...)` accept `name` (default
+`<module>.<route>`), `timeZone`, `parameters`, `enabled`, `maxCalls`,
+`attempts`, `timeout`, `maxLateness`, `leaseDuration` and `retry`; the
+`cron.jobs.<name>` config overrides them.
+
+Jobs can also be declared by overriding `APIRoot.loadCronJobs()` (returning
+`APICronJob`s).
 
 - **Calls:** through `APIRoot.call`, with an internal system authentication
   (`APIAuthentication.system`, passes `APIRouteAuthenticatedRule`), the

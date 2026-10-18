@@ -266,15 +266,22 @@ class APICronJob {
 /// Schedules an API route method to be called by the [APICronScheduler]
 /// (see [APICronJob]).
 ///
+/// With a cron expression ([APICron.new]) or by its fields ([APICron.at]):
+///
 /// ```dart
 /// @APICron('30 23 * * *', timeZone: 'Europe/Paris')
-/// Future<APIResponse<int>> updateRates({String? continuation}) async { ... }
+/// Future<APIResponse<int>> updateRates(APIRequest request) async { ... }
+///
+/// @APICron.at(minute: '30', hour: '23', timeZone: 'Europe/Paris')
+/// Future<APIResponse<int>> updateRates2(APIRequest request) async { ... }
 /// ```
 ///
 /// The job name defaults to `<module>.<route>` and can be overridden (or
-/// disabled) by the `cron.jobs.<name>` config.
+/// disabled) by the `cron.jobs.<name>` config, which also overrides the
+/// options of the annotation.
 @Target({TargetKind.method})
 class APICron {
+  /// The cron expression (see [CronExpression]).
   final String schedule;
 
   /// The job name. Default: `<module>.<route>`.
@@ -289,9 +296,25 @@ class APICron {
   /// The maximum calls of a run. Default: `100`.
   final int? maxCalls;
 
-  /// The maximum attempts of each call. Default: `3`.
+  /// The maximum attempts of each call (overrides the attempts of [retry]).
+  /// Default: `3`.
   final int? attempts;
 
+  /// See [APICronJob.timeout]. Default: 5 minutes.
+  final Duration? timeout;
+
+  /// See [APICronJob.maxLateness]. Default: 1 day.
+  final Duration? maxLateness;
+
+  /// See [APICronJob.leaseDuration]. Default: 5 minutes.
+  final Duration? leaseDuration;
+
+  /// The retry policy. Default: [APICronRetry.defaultRetry].
+  final APICronRetry? retry;
+
+  /// A job on the cron expression [schedule] (5 fields:
+  /// `minute hour day-of-month month day-of-week`, or a macro like
+  /// `@daily`).
   const APICron(
     this.schedule, {
     this.name,
@@ -300,7 +323,49 @@ class APICron {
     this.enabled = true,
     this.maxCalls,
     this.attempts,
+    this.timeout,
+    this.maxLateness,
+    this.leaseDuration,
+    this.retry,
   });
+
+  /// A job on the schedule of the cron fields [minute], [hour],
+  /// [dayOfMonth], [month] and [dayOfWeek] (each a cron field: `*`, a value,
+  /// a list, a range or a step; default `*`).
+  ///
+  /// ```dart
+  /// @APICron.at(minute: '*/15', hour: '9-18', dayOfWeek: 'MON-FRI')
+  /// ```
+  const APICron.at({
+    String minute = '*',
+    String hour = '*',
+    String dayOfMonth = '*',
+    String month = '*',
+    String dayOfWeek = '*',
+    this.name,
+    this.timeZone,
+    this.parameters,
+    this.enabled = true,
+    this.maxCalls,
+    this.attempts,
+    this.timeout,
+    this.maxLateness,
+    this.leaseDuration,
+    this.retry,
+  }) : schedule = '$minute $hour $dayOfMonth $month $dayOfWeek';
+
+  /// The retry policy of the job: [retry], with [attempts] if given.
+  APICronRetry get jobRetry {
+    var retry = this.retry ?? APICronRetry.defaultRetry;
+    var attempts = this.attempts;
+    if (attempts == null || attempts == retry.attempts) return retry;
+    return APICronRetry(
+      attempts: attempts,
+      initialDelay: retry.initialDelay,
+      multiplier: retry.multiplier,
+      maxDelay: retry.maxDelay,
+    );
+  }
 
   /// The [APICronJob] of the route [routeName] of the module [moduleName].
   APICronJob toJob(
@@ -316,9 +381,10 @@ class APICron {
     parameters: parameters,
     enabled: enabled,
     maxCalls: maxCalls ?? 100,
-    retry: attempts != null
-        ? APICronRetry(attempts: attempts!)
-        : APICronRetry.defaultRetry,
+    timeout: timeout ?? const Duration(minutes: 5),
+    maxLateness: maxLateness ?? const Duration(days: 1),
+    leaseDuration: leaseDuration ?? const Duration(minutes: 5),
+    retry: jobRetry,
   );
 
   @override

@@ -543,6 +543,7 @@ class CronReflectedModule$reflection
     'refresh',
     'report',
     'resolveRoute',
+    'workHours',
   ];
 
   @override
@@ -656,6 +657,41 @@ class CronReflectedModule$reflection
               '0 1 * * *',
               name: 'daily-report',
               parameters: {'kind': 'daily'},
+              timeout: Duration(minutes: 2),
+              maxLateness: Duration(hours: 6),
+              leaseDuration: Duration(minutes: 10),
+              retry: APICronRetry(
+                attempts: 4,
+                initialDelay: Duration(minutes: 1),
+              ),
+            ),
+          ],
+        );
+      case 'workhours':
+        return MethodReflection<CronReflectedModule, APIResponse<String>>(
+          this,
+          CronReflectedModule,
+          'workHours',
+          const __TR<APIResponse<String>>(APIResponse, <__TR>[__TR.tString]),
+          false,
+          (o) => o!.workHours,
+          obj,
+          const <__PR>[
+            __PR(__TR<APIRequest>(APIRequest), 'request', false, true),
+          ],
+          null,
+          null,
+          const [
+            APICron.at(
+              minute: '*/15',
+              hour: '9-18',
+              dayOfWeek: 'MON-FRI',
+              timeZone: 'America/Sao_Paulo',
+              attempts: 2,
+              retry: APICronRetry(
+                attempts: 5,
+                initialDelay: Duration(seconds: 10),
+              ),
             ),
           ],
         );

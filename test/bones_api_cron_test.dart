@@ -131,10 +131,31 @@ class CronReflectedModule extends APIModule {
     return APIResponse.ok('refreshed');
   }
 
-  @APICron('0 1 * * *', name: 'daily-report', parameters: {'kind': 'daily'})
+  @APICron(
+    '0 1 * * *',
+    name: 'daily-report',
+    parameters: {'kind': 'daily'},
+    timeout: Duration(minutes: 2),
+    maxLateness: Duration(hours: 6),
+    leaseDuration: Duration(minutes: 10),
+    retry: APICronRetry(attempts: 4, initialDelay: Duration(minutes: 1)),
+  )
   APIResponse<String> report(APIRequest request) {
     _calls.requests.add(request);
     return APIResponse.ok('report ${request.getParameter('kind')}');
+  }
+
+  @APICron.at(
+    minute: '*/15',
+    hour: '9-18',
+    dayOfWeek: 'MON-FRI',
+    timeZone: 'America/Sao_Paulo',
+    attempts: 2,
+    retry: APICronRetry(attempts: 5, initialDelay: Duration(seconds: 10)),
+  )
+  APIResponse<String> workHours(APIRequest request) {
+    _calls.requests.add(request);
+    return APIResponse.ok('work');
   }
 
   APIResponse<String> notScheduled(APIRequest request) => APIResponse.ok('no');
@@ -715,18 +736,72 @@ void main() {
       var module = api.getModule('reflected')!;
 
       var jobs = {for (var j in module.cronJobs) j.name: j};
-      expect(jobs.keys.toSet(), {'reflected.refresh', 'daily-report'});
+      expect(jobs.keys.toSet(), {
+        'reflected.refresh',
+        'daily-report',
+        'reflected.workHours',
+      });
 
       var refresh = jobs['reflected.refresh']!;
       expect(refresh.path, '/reflected/refresh');
       expect(refresh.timeZone, 'Europe/Paris');
       expect(refresh.maxCalls, 7);
+      // The defaults:
+      expect(refresh.timeout, const Duration(minutes: 5));
+      expect(refresh.maxLateness, const Duration(days: 1));
+      expect(refresh.leaseDuration, const Duration(minutes: 5));
+      expect(refresh.retry.attempts, 3);
 
+      // The default constructor with the new options:
       var report = jobs['daily-report']!;
       expect(report.path, '/reflected/report');
       expect(report.parameters, {'kind': 'daily'});
+      expect(report.timeout, const Duration(minutes: 2));
+      expect(report.maxLateness, const Duration(hours: 6));
+      expect(report.leaseDuration, const Duration(minutes: 10));
+      expect(report.retry.attempts, 4);
+      expect(report.retry.initialDelay, const Duration(minutes: 1));
+
+      // `APICron.at`: the schedule by fields; `attempts` over `retry`:
+      var workHours = jobs['reflected.workHours']!;
+      expect(workHours.path, '/reflected/workHours');
+      expect(workHours.schedule.expression, '*/15 9-18 * * MON-FRI');
+      expect(workHours.timeZone, 'America/Sao_Paulo');
+      expect(workHours.retry.attempts, 2);
+      expect(workHours.retry.initialDelay, const Duration(seconds: 10));
 
       api.close();
+    });
+
+    test('APICron.at: fields and defaults', () {
+      expect(const APICron.at().schedule, '* * * * *');
+      expect(
+        const APICron.at(minute: '0', hour: '3', dayOfMonth: '1').schedule,
+        '0 3 1 * *',
+      );
+      expect(
+        const APICron.at(month: 'JAN', dayOfWeek: '0').schedule,
+        '* * * JAN 0',
+      );
+
+      // An invalid field: rejected when the job is built (the routes are
+      // configured):
+      expect(
+        () => const APICron.at(minute: '61').toJob('m', 'r'),
+        throwsFormatException,
+      );
+
+      var retry = const APICronRetry(attempts: 5);
+      expect(
+        identical(const APICron('@daily').jobRetry, APICronRetry.defaultRetry),
+        isTrue,
+      );
+      expect(
+        identical(APICron('@daily', retry: retry).jobRetry, retry),
+        isTrue,
+      );
+      expect(APICron('@daily', retry: retry, attempts: 1).jobRetry.attempts, 1);
+      expect(const APICron('@daily', attempts: 7).jobRetry.attempts, 7);
     });
   });
 
@@ -1389,6 +1464,7 @@ void main() {
       expect(scheduler.jobs.keys.toSet(), {
         'reflected.refresh',
         'daily-report',
+        'reflected.workHours',
         'from-code',
         'from-config',
       });

@@ -8,6 +8,11 @@ section "Cron: scheduled routes".
   - Declared by `@APICron` on a reflected route method, by
     `APIRoot.loadCronJobs()`, or by the `cron.jobs` config (which can also
     override or disable a job of the code by name).
+  - `@APICron('30 23 * * *', ...)` takes a cron expression, and
+    `@APICron.at(minute: '30', hour: '23', ...)` the schedule by its fields
+    (`minute`, `hour`, `dayOfMonth`, `month`, `dayOfWeek`; default `*`).
+    Both accept `name`, `timeZone`, `parameters`, `enabled`, `maxCalls`,
+    `attempts`, `timeout`, `maxLateness`, `leaseDuration` and `retry`.
   - Called through `APIRoot.call`, with an internal system authentication
     (`APIAuthentication.system`, passes `APIRouteAuthenticatedRule`), the
     requester source `internal` and the headers `X-Cron-Job`,
