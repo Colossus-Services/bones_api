@@ -1,18 +1,29 @@
-import 'package:timezone/data/latest.dart' as tz_data;
+// The full database (with the links/aliases, like `GMT` or `Europe/Oslo`,
+// not in the `timezone` default one: `data/latest.dart`).
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-bool _timeZonesInitialized = false;
+bool _fullDatabaseLoaded = false;
 
-/// Initializes the time zones database (once), needed by [CronExpression]
-/// with a time zone other than `UTC`.
-void initializeCronTimeZones() {
-  if (_timeZonesInitialized) return;
-  _timeZonesInitialized = true;
+void _loadFullDatabase() {
+  if (_fullDatabaseLoaded) return;
+  _fullDatabaseLoaded = true;
   tz_data.initializeTimeZones();
+}
+
+/// Ensures a time zones database is loaded, needed by [CronExpression] with
+/// a time zone other than `UTC`: the full one if none is loaded yet. A
+/// database already loaded (e.g. by the application) is kept.
+void initializeCronTimeZones() {
+  if (tz.timeZoneDatabase.locations.isEmpty) _loadFullDatabase();
 }
 
 /// Returns the [tz.Location] of [timeZone] (an IANA name, like
 /// `Europe/Paris`). `null`, empty or `UTC`: [tz.UTC].
+///
+/// A name not in the database loaded (e.g. an alias, not in the `timezone`
+/// default database) loads the full database (a superset: the names already
+/// resolved, here or by the application, keep resolving) and is tried again.
 ///
 /// Throws an [ArgumentError] for an unknown time zone.
 tz.Location resolveCronTimeZone(String? timeZone) {
@@ -28,7 +39,11 @@ tz.Location resolveCronTimeZone(String? timeZone) {
 
   try {
     return tz.getLocation(timeZone);
-  } catch (e) {
+  } on tz.LocationNotFoundException {
+    if (!_fullDatabaseLoaded) {
+      _loadFullDatabase();
+      return resolveCronTimeZone(timeZone);
+    }
     throw ArgumentError.value(timeZone, 'timeZone', 'Unknown time zone');
   }
 }

@@ -1,3 +1,15 @@
+## 1.27.1
+
+- Cron time zones: the full `timezone` database is used
+  (`data/latest_all.dart`). The default one (`data/latest.dart`, loaded
+  until now) has no links/aliases, so a job with `GMT`, `Europe/Oslo` or
+  `Atlantic/Reykjavik` was rejected as an unknown time zone.
+  - A database already loaded by the application is kept (it was replaced
+    by the smaller default one, breaking the application's lookups of the
+    names missing from it). A name not found in it loads the full database
+    (a superset: the names already resolved keep resolving) and is tried
+    again.
+
 ## 1.27.0
 
 Cron: scheduled calls of API routes (`APICronScheduler`), see the README
