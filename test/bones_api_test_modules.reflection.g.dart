@@ -186,6 +186,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -317,6 +318,21 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<AboutModule, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -473,6 +489,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -498,6 +515,7 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
   static const List<String> _methodsNames = const <String>[
     'about',
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -598,6 +616,20 @@ class AboutModule$reflection extends ClassReflection<AboutModule>
           (o) => o!.about,
           obj,
           null,
+          null,
+          null,
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<AboutModule, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
           null,
           null,
           null,
@@ -1122,6 +1154,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -1253,6 +1286,21 @@ class UserModule$reflection extends ClassReflection<UserModule>
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<UserModule, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -1409,6 +1457,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -1433,6 +1482,7 @@ class UserModule$reflection extends ClassReflection<UserModule>
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -1822,6 +1872,20 @@ class UserModule$reflection extends ClassReflection<UserModule>
           (o) => o!.asyncError,
           obj,
           const <__PR>[__PR(__TR.tString, 'message', false, true)],
+          null,
+          null,
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<UserModule, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
           null,
           null,
           null,

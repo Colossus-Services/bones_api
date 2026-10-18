@@ -306,6 +306,84 @@ static files headers (`Cache-Control`, cross-origin policies, cookieless).
 The `Cache-Control` rules (`long-lived-static-files-cached`) apply to the
 physical (target) path.
 
+## Cron: scheduled routes
+
+The `APICronScheduler` calls API routes on cron schedules (5 fields:
+`minute hour day-of-month month day-of-week`, or `@daily`, `@hourly`...), in
+an IANA time zone. Enable it in the API config:
+
+```yaml
+cron:
+  enabled: true
+  check_interval: 30s   # how often the due jobs are checked
+  history_days: 90      # run history kept (0: forever)
+  jobs:
+    rates:              # a job by config (or overriding a job of the code)
+      path: /currency/updateRates
+      schedule: "30 23 * * *"
+      time_zone: Europe/Paris
+      max_calls: 50
+      retry: {attempts: 5, initial_delay: 1m}
+```
+
+Jobs can also be declared in code, on a reflected route method:
+
+```dart
+@APICron('*/15 * * * *', timeZone: 'Europe/Paris')
+Future<APIResponse<int>> syncOrders({String? continuation}) async {
+  var page = await loadPage(after: continuation);
+  var response = APIResponse.ok(page.length);
+  // More work to do: called again with `continuation`.
+  response.continuation = page.nextCursor;
+  return response;
+}
+```
+
+or by overriding `APIRoot.loadCronJobs()` (returning `APICronJob`s).
+
+- **Calls:** through `APIRoot.call`, with an internal system authentication
+  (`APIAuthentication.system`, passes `APIRouteAuthenticatedRule`), the
+  requester source `internal` and the headers `X-Cron-Job`,
+  `X-Cron-Scheduled-At`, `X-Cron-Run` and `X-Cron-Attempt`.
+- **Continuation:** while the response has the header `X-Continuation`
+  (`APIResponse.continuation`), the route is called again with the parameter
+  `continuation`, up to `max_calls` calls per run.
+- **Retries:** an `ERROR` response, a thrown error or a timeout is retried
+  with exponential backoff (default: 3 attempts, 30s then 2m), honoring
+  `Retry-After`. `UNAUTHORIZED`, `BAD_REQUEST` and `NOT_FOUND` are not
+  retried.
+- **Once per occurrence, never in parallel:** each occurrence is claimed in
+  the `APICronStore` and the job holds a lock (with a lease, renewed while
+  running) during its run, also with several instances of the API. A run
+  interrupted by a stopped instance is resumed by another one after the lease
+  expires, from its last continuation token.
+- **Missed occurrences** (servers down): the latest one runs once if not
+  older than `max_lateness` (default `1d`); older ones are recorded as
+  `skipped`.
+- **Logs:** the logger `APICron` (start, calls, retries, skipped occurrences,
+  lock take-overs, results), and the run history (`selectRuns`).
+
+With more than one instance of the API, use the database store: add its
+repositories to the API repositories, and `APIRoot.loadCronStore()` will use
+it (otherwise an in-memory store is used: one instance only):
+
+```dart
+@override
+List<EntityRepository<Object>> buildRepositories(DBAdapter adapter) => [
+  ...myRepositories(adapter),
+  ...APICronStoreDB.buildRepositories(adapter as DBSQLAdapter),
+];
+```
+
+Its tables, created by the adapter `generateTables` (and verified by
+`checkTables`):
+
+- `api_cron_job_run`: `id`, `job`, `scheduled_at`, `status`, `owner`,
+  `attempts`, `calls`, `continuation`, `started_at`, `finished_at`,
+  `duration_ms`, `last_error`; unique (`job`, `scheduled_at`).
+- `api_cron_job_lock`: `id`, `job` (unique), `owner`, `lease_until`,
+  `acquired_at`.
+
 ## Hot Reload
 
 `APIServer` supports Hot Reload when the Dart VM is running with `--enable-vm-service`:

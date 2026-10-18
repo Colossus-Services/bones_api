@@ -1,3 +1,46 @@
+## 1.27.0
+
+Cron: scheduled calls of API routes (`APICronScheduler`), see the README
+section "Cron: scheduled routes".
+
+- `APICronJob`: a route called on a 5 fields cron expression
+  (`CronExpression`), in an IANA time zone (daylight saving aware).
+  - Declared by `@APICron` on a reflected route method, by
+    `APIRoot.loadCronJobs()`, or by the `cron.jobs` config (which can also
+    override or disable a job of the code by name).
+  - Called through `APIRoot.call`, with an internal system authentication
+    (`APIAuthentication.system`, passes `APIRouteAuthenticatedRule`), the
+    requester source `internal` and the headers `X-Cron-Job`,
+    `X-Cron-Scheduled-At`, `X-Cron-Run` and `X-Cron-Attempt`.
+  - Continuation: while the response has the header `X-Continuation`
+    (`APIResponse.continuation`), the route is called again with the
+    parameter `continuation`, up to `maxCalls` per run.
+  - Retries (`APICronRetry`): exponential backoff (default 3 attempts: 30s,
+    2m), honoring `Retry-After`. `UNAUTHORIZED`, `BAD_REQUEST` and
+    `NOT_FOUND` are not retried. Per call `timeout`.
+- `APICronScheduler`: started by `APIRoot.initialize` when the config
+  `cron.enabled` is `true` (not in auxiliary worker isolates: one per
+  process), stopped by `APIRoot.close`.
+  - Each occurrence runs once: its run is claimed in the `APICronStore`
+    (unique job + scheduled time), also among several instances.
+  - A job never runs in parallel: a lock with a lease, renewed while running.
+    A run interrupted (its instance stopped) is resumed by another instance
+    after the lease expires, from its last continuation token.
+  - Missed occurrences (servers down): the latest runs once if not older
+    than `maxLateness` (default 1 day); older ones are recorded as skipped.
+  - `runNow(job)`, `selectRuns(job)`, and history pruning (`history_days`,
+    default 90).
+  - Logged by the logger `APICron`.
+- `APICronStore`: `APICronStoreMemory` (single instance) and
+  `APICronStoreDB` (tables `api_cron_job_run` and `api_cron_job_lock`; add
+  `APICronStoreDB.buildRepositories(adapter)` to the repositories of the
+  API). `APIRoot.loadCronStore()` uses the DB store when its repositories
+  are registered.
+- `APIModule.cronJobs` and `addCronJob`. Note: modules with generated
+  reflection (`routes.anyFrom(reflection)`) need the reflection code
+  regenerated (`build_runner`) to include the new `cronJobs` field.
+- New dependency: `timezone`.
+
 ## 1.26.0
 
 - Fix: a route method with an `APIRequest` as its only positional parameter

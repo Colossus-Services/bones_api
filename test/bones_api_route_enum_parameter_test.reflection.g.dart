@@ -281,6 +281,7 @@ class ExternalIntegrationModule$reflection
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -417,6 +418,21 @@ class ExternalIntegrationModule$reflection
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<ExternalIntegrationModule, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -576,6 +592,7 @@ class ExternalIntegrationModule$reflection
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -601,6 +618,7 @@ class ExternalIntegrationModule$reflection
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -722,6 +740,20 @@ class ExternalIntegrationModule$reflection
             __PR(__TR<Currency>(Currency), 'chargedCurrency', true, true),
             __PR(__TR.tDouble, 'chargedPrice', true, true),
           ],
+          null,
+          null,
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<ExternalIntegrationModule, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
           null,
           null,
           null,

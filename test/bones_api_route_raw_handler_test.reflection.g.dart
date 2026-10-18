@@ -193,6 +193,7 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -327,6 +328,21 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<RawHandlerModule, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -483,6 +499,7 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -508,6 +525,7 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -747,6 +765,20 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
           const <String, __PR>{
             'establishmentId': __PR(__TR.tInt, 'establishmentId', false, true),
           },
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<RawHandlerModule, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
+          null,
+          null,
           null,
         );
       case 'ensureconfigured':
