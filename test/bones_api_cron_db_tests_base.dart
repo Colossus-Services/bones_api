@@ -18,7 +18,9 @@ class CronDBProvider
   @override
   FutureOr<DBSQLAdapter> buildAdapter() => adapterCreator(this);
 
-  List<EntityRepository<Object>>? _repositories;
+  /// SQL repositories (no cast: see [APICronStoreDB.buildRepositories]),
+  /// returned as the generic list of the override.
+  List<DBSQLEntityRepository>? _repositories;
 
   @override
   List<EntityRepository<Object>> buildRepositories(DBAdapter adapter) =>
@@ -116,6 +118,15 @@ void runCronStoreDBTests(
 
     // Each test with its own job names (the tables are shared):
     setUp(() => job = 'job${++jobCount}');
+
+    test('buildRepositories: the SQL repositories of the cron tables', () {
+      var repositories = provider._repositories!;
+      expect(repositories.map((r) => r.tableName), [
+        APICronStoreDB.runsTable,
+        APICronStoreDB.locksTable,
+      ]);
+      expect(repositories.map((r) => r.type), [APICronJobRun, APICronJobLock]);
+    });
 
     test('tryResolve: the registered repositories', () async {
       var resolved = APICronStoreDB.tryResolve()!;
