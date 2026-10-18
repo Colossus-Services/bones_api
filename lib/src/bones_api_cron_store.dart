@@ -5,6 +5,7 @@ import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db_sql.dart';
 import 'bones_api_entity_sql.dart';
+import 'bones_api_types.dart';
 import 'bones_api_utils_json.dart';
 
 /// The status of an [APICronJobRun].
@@ -86,6 +87,12 @@ abstract class _APICronEntity extends Entity {
 
   set id(int? id) => setField('id', id);
 
+  void _copyFrom(_APICronEntity other) {
+    _values
+      ..clear()
+      ..addAll(other._values);
+  }
+
   @override
   Map<String, dynamic> toJson() => {
     for (var e in _values.entries)
@@ -127,6 +134,9 @@ class APICronJobRun extends _APICronEntity {
   };
 
   APICronJobRun.empty();
+
+  /// A copy of this run (its fields).
+  APICronJobRun copy() => APICronJobRun.empty().._copyFrom(this);
 
   APICronJobRun(
     String job,
@@ -233,6 +243,9 @@ class APICronJobLock extends _APICronEntity {
 
   APICronJobLock.empty();
 
+  /// A copy of this lock (its fields).
+  APICronJobLock copy() => APICronJobLock.empty().._copyFrom(this);
+
   APICronJobLock(
     String job,
     String owner,
@@ -302,8 +315,12 @@ abstract class APICronStore {
   /// already has a run (another instance claimed it).
   FutureOr<APICronJobRun?> claimRun(APICronJobRun run);
 
-  /// Updates the stored [run].
-  FutureOr<bool> updateRun(APICronJobRun run);
+  /// Updates the stored [run], only if the stored one is still
+  /// [APICronRunStatus.running] and owned by [previousOwner] (default: the
+  /// [APICronJobRun.owner] of [run]; another owner when taking an
+  /// interrupted run over). `false` otherwise: the run was taken over by
+  /// another instance, finished or deleted, and must not be overwritten.
+  FutureOr<bool> updateRun(APICronJobRun run, {String? previousOwner});
 
   /// The runs of [job] with status [APICronRunStatus.running].
   FutureOr<List<APICronJobRun>> selectRunningRuns(String job);
@@ -311,7 +328,8 @@ abstract class APICronStore {
   /// The latest runs of [job] (latest first), at most [limit].
   FutureOr<List<APICronJobRun>> selectRuns(String job, {int limit = 20});
 
-  /// Deletes the runs of [job] scheduled before [before]. Returns the count.
+  /// Deletes the finished runs of [job] scheduled before [before] (never a
+  /// [APICronRunStatus.running] one: it may be resumed). Returns the count.
   FutureOr<int> deleteRunsBefore(String job, DateTime before);
 
   /// The lock of [job], if any.
@@ -344,6 +362,9 @@ String _runKey(String job, DateTime scheduledAt) =>
 
 /// An in-memory [APICronStore]: for a single instance (and tests). Not
 /// shared between processes.
+///
+/// It keeps copies of the runs and locks, like a database: a run or lock
+/// returned is not changed by another scheduler using the same store.
 class APICronStoreMemory extends APICronStore {
   final Map<String, APICronJobRun> _runs = {};
   final Map<String, APICronJobLock> _locks = {};
@@ -353,7 +374,7 @@ class APICronStoreMemory extends APICronStore {
 
   @override
   APICronJobRun? getRun(String job, DateTime scheduledAt) =>
-      _runs[_runKey(job, scheduledAt)];
+      _runs[_runKey(job, scheduledAt)]?.copy();
 
   @override
   APICronJobRun? lastRun(String job) {
@@ -362,7 +383,7 @@ class APICronStoreMemory extends APICronStore {
       if (r.job != job) continue;
       if (last == null || r.scheduledAt.isAfter(last.scheduledAt)) last = r;
     }
-    return last;
+    return last?.copy();
   }
 
   @override
@@ -370,35 +391,45 @@ class APICronStoreMemory extends APICronStore {
     var key = _runKey(run.job, run.scheduledAt);
     if (_runs.containsKey(key)) return null;
     run.id ??= ++_runsIds;
-    _runs[key] = run;
+    _runs[key] = run.copy();
     return run;
   }
 
   @override
-  bool updateRun(APICronJobRun run) {
+  bool updateRun(APICronJobRun run, {String? previousOwner}) {
     var key = _runKey(run.job, run.scheduledAt);
-    if (!_runs.containsKey(key)) return false;
-    _runs[key] = run;
+    var stored = _runs[key];
+    if (stored == null ||
+        stored.id != run.id ||
+        stored.status != APICronRunStatus.running ||
+        stored.owner != (previousOwner ?? run.owner)) {
+      return false;
+    }
+    _runs[key] = run.copy();
     return true;
   }
 
   @override
   List<APICronJobRun> selectRunningRuns(String job) => _runs.values
       .where((r) => r.job == job && r.status == APICronRunStatus.running)
+      .map((r) => r.copy())
       .toList();
 
   @override
   List<APICronJobRun> selectRuns(String job, {int limit = 20}) {
     var runs = _runs.values.where((r) => r.job == job).toList()
       ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
-    return runs.take(limit).toList();
+    return runs.take(limit).map((r) => r.copy()).toList();
   }
 
   @override
   int deleteRunsBefore(String job, DateTime before) {
     var keys = _runs.entries
         .where(
-          (e) => e.value.job == job && e.value.scheduledAt.isBefore(before),
+          (e) =>
+              e.value.job == job &&
+              e.value.status != APICronRunStatus.running &&
+              e.value.scheduledAt.isBefore(before),
         )
         .map((e) => e.key)
         .toList();
@@ -409,7 +440,7 @@ class APICronStoreMemory extends APICronStore {
   }
 
   @override
-  APICronJobLock? getLock(String job) => _locks[job];
+  APICronJobLock? getLock(String job) => _locks[job]?.copy();
 
   @override
   APICronJobLock? acquireLock(
@@ -427,19 +458,23 @@ class APICronStoreMemory extends APICronStore {
 
     if (lock != null && lock.owner == owner) {
       lock.leaseUntil = now.add(lease);
-      return lock;
+      return lock.copy();
     }
 
     lock = APICronJobLock(job, owner, now.add(lease), acquiredAt: now)
       ..id = ++_locksIds;
     _locks[job] = lock;
-    return lock;
+    return lock.copy();
   }
 
   @override
   bool renewLock(APICronJobLock lock, Duration lease, {DateTime? now}) {
     var current = _locks[lock.job];
-    if (current == null || current.id != lock.id) return false;
+    if (current == null ||
+        current.id != lock.id ||
+        current.owner != lock.owner) {
+      return false;
+    }
     now ??= DateTime.now().toUtc();
     current.leaseUntil = now.add(lease);
     lock.leaseUntil = current.leaseUntil;
@@ -449,7 +484,11 @@ class APICronStoreMemory extends APICronStore {
   @override
   bool releaseLock(APICronJobLock lock) {
     var current = _locks[lock.job];
-    if (current == null || current.id != lock.id) return false;
+    if (current == null ||
+        current.id != lock.id ||
+        current.owner != lock.owner) {
+      return false;
+    }
     _locks.remove(lock.job);
     return true;
   }
@@ -515,18 +554,27 @@ class APICronStoreDB extends APICronStore {
         parameters: [job, scheduledAt.toUtc()],
       );
 
+  /// The latest inserted runs of [job] (by ID, descending), at most [limit]:
+  /// the runs are inserted in scheduled order, so they are the latest ones
+  /// (without loading the whole history).
+  FutureOr<List<APICronJobRun>> _latestRuns(String job, int limit) =>
+      runsRepository
+          .selectByQuery(
+            ' job == ? ',
+            parameters: [job],
+            limit: limit,
+            orderByID: true,
+            orderDirection: OrderDirection.descending,
+          )
+          .resolveMapped(
+            (l) =>
+                l.toList()
+                  ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt)),
+          );
+
   @override
-  FutureOr<APICronJobRun?> lastRun(String job) => runsRepository
-      .selectByQuery(' job == ? ', parameters: [job])
-      .resolveMapped((runs) {
-        APICronJobRun? last;
-        for (var r in runs) {
-          if (last == null || r.scheduledAt.isAfter(last.scheduledAt)) {
-            last = r;
-          }
-        }
-        return last;
-      });
+  FutureOr<APICronJobRun?> lastRun(String job) =>
+      _latestRuns(job, 10).resolveMapped((runs) => runs.firstOrNull);
 
   @override
   Future<APICronJobRun?> claimRun(APICronJobRun run) async {
@@ -539,11 +587,23 @@ class APICronStoreDB extends APICronStore {
     }
   }
 
+  /// Note: the check and the update are not atomic (the repositories update
+  /// by ID), but the run is updated only by the instance holding the job
+  /// lock: the check protects against an instance that lost it.
   @override
-  Future<bool> updateRun(APICronJobRun run) async {
-    if (run.id == null) return false;
-    var id = await runsRepository.store(run);
-    return id != null;
+  Future<bool> updateRun(APICronJobRun run, {String? previousOwner}) async {
+    var id = run.id;
+    if (id == null) return false;
+
+    var stored = await runsRepository.selectByID(id);
+    if (stored == null ||
+        stored.status != APICronRunStatus.running ||
+        stored.owner != (previousOwner ?? run.owner)) {
+      return false;
+    }
+
+    await runsRepository.store(run);
+    return true;
   }
 
   @override
@@ -556,19 +616,13 @@ class APICronStoreDB extends APICronStore {
 
   @override
   FutureOr<List<APICronJobRun>> selectRuns(String job, {int limit = 20}) =>
-      runsRepository
-          .selectByQuery(' job == ? ', parameters: [job])
-          .resolveMapped((l) {
-            var runs = l.toList()
-              ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
-            return runs.take(limit).toList();
-          });
+      _latestRuns(job, limit);
 
   @override
   FutureOr<int> deleteRunsBefore(String job, DateTime before) => runsRepository
       .deleteByQuery(
-        ' job == ? && scheduledAt < ? ',
-        parameters: [job, before.toUtc()],
+        ' job == ? && scheduledAt < ? && status != ? ',
+        parameters: [job, before.toUtc(), APICronRunStatus.running.name],
       )
       .resolveMapped((l) => l.length);
 
@@ -589,9 +643,7 @@ class APICronStoreDB extends APICronStore {
 
     if (lock != null) {
       if (lock.owner == owner) {
-        lock.leaseUntil = now.add(lease);
-        await locksRepository.store(lock);
-        return lock;
+        return await renewLock(lock, lease, now: now) ? lock : null;
       }
 
       if (!lock.isExpired(now)) return null;
@@ -625,11 +677,24 @@ class APICronStoreDB extends APICronStore {
     if (id == null) return false;
 
     var current = await locksRepository.selectByID(id);
-    if (current == null || current.owner != lock.owner) return false;
+    if (current == null ||
+        current.owner != lock.owner ||
+        current.job != lock.job) {
+      return false;
+    }
 
     now ??= DateTime.now().toUtc();
     current.leaseUntil = now.add(lease);
     await locksRepository.store(current);
+
+    // A `store` of a row deleted meanwhile (taken over by another instance)
+    // inserts it again (the repositories auto-insert on update): checks that
+    // the row is still the lock of this owner, otherwise removes it.
+    var after = await locksRepository.selectByID(id);
+    if (after == null || after.owner != lock.owner || after.job != lock.job) {
+      if (after != null) await locksRepository.deleteByID(id);
+      return false;
+    }
 
     lock.leaseUntil = current.leaseUntil;
     return true;
@@ -639,6 +704,14 @@ class APICronStoreDB extends APICronStore {
   Future<bool> releaseLock(APICronJobLock lock) async {
     var id = lock.id;
     if (id == null) return false;
+
+    var current = await locksRepository.selectByID(id);
+    if (current == null ||
+        current.owner != lock.owner ||
+        current.job != lock.job) {
+      return false;
+    }
+
     var deleted = await locksRepository.deleteByID(id);
     return deleted != null;
   }

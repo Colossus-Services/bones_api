@@ -51,6 +51,23 @@ class _JobsModule extends APIModule {
       return response;
     });
 
+    // As `pages`, but the first call waits for `_calls.block`:
+    routes.any('pages2', (request) async {
+      _calls.requests.add(request);
+      var done = int.tryParse('${request.getParameter('continuation')}') ?? 0;
+      if (done == 0) await _calls.block?.future;
+      var page = done + 1;
+      var response = APIResponse.ok('page $page');
+      if (page < 3) response.continuation = '$page';
+      return response;
+    });
+
+    routes.any('longToken', (request) {
+      _calls.requests.add(request);
+      return APIResponse.ok('more')
+        ..continuation = 'x' * (APICronJobRun.maxContinuationLength + 1);
+    });
+
     routes.any('infinite', (request) {
       _calls.requests.add(request);
       return APIResponse.ok('more')..continuation = 'x';
@@ -161,9 +178,23 @@ class _TestStore extends APICronStoreMemory {
 
   int renewals = 0;
 
+  /// [updateRun] throws after this many calls.
+  int? failUpdateAfter;
+
+  int updates = 0;
+
   @override
   APICronJobRun? getRun(String job, DateTime scheduledAt) =>
       hideRuns ? null : super.getRun(job, scheduledAt);
+
+  @override
+  bool updateRun(APICronJobRun run, {String? previousOwner}) {
+    var failAfter = failUpdateAfter;
+    if (failAfter != null && ++updates > failAfter) {
+      throw StateError('update failed');
+    }
+    return super.updateRun(run, previousOwner: previousOwner);
+  }
 
   @override
   List<APICronJobRun> selectRunningRuns(String job) {
@@ -873,18 +904,50 @@ void main() {
       expect(_calls.of('throws'), hasLength(2));
     });
 
-    test('timeout', () async {
-      _calls.slowDelay = const Duration(milliseconds: 300);
+    test('timeout: the slow call is waited for, never overlapped', () async {
+      _calls.slowDelay = const Duration(milliseconds: 150);
       var run = (await scheduler([
-        job(
-          'slow',
-          timeout: const Duration(milliseconds: 20),
-          retry: APICronRetry.none,
-        ),
+        job('slow', timeout: const Duration(milliseconds: 20)),
       ]).tick()).single;
-      expect(run.status, APICronRunStatus.failed);
-      expect(run.lastError, contains('Timeout'));
+
+      // Not retried while running (no parallel calls), and its result used:
+      expect(run.status, APICronRunStatus.succeeded);
+      expect(run.attempts, 1);
+      expect(_calls.of('slow'), hasLength(1));
+      expect(sleeps, isEmpty);
     });
+
+    test('Retry-After is capped by maxDelay', () async {
+      _calls.flakyFailures = 1;
+      _calls.retryAfter = '86400';
+      await scheduler([job('flaky')]).tick();
+      expect(sleeps, [const APICronRetry().maxDelay]);
+    });
+
+    test('a continuation token too long fails the run', () async {
+      var run = (await scheduler([job('longToken')]).tick()).single;
+      expect(run.status, APICronRunStatus.failed);
+      expect(run.lastError, contains('too long'));
+      expect(_calls.of('longToken'), hasLength(1));
+
+      // Finished (not resumed again and again):
+      now = now.add(const Duration(minutes: 1));
+      expect(await scheduler([job('longToken')]).tick(), isEmpty);
+      expect(_calls.of('longToken'), hasLength(1));
+    });
+
+    test(
+      'a store error while running fails the run (not left running)',
+      () async {
+        var testStore = _TestStore()..failUpdateAfter = 1;
+        var run = (await scheduler([
+          job('pages'),
+        ], store2: testStore).tick()).single;
+        expect(run.status, APICronRunStatus.failed);
+        expect(run.lastError, contains('update failed'));
+        expect(_calls.of('pages'), hasLength(1));
+      },
+    );
 
     test('internal system authentication and headers', () async {
       var run = (await scheduler([job('auth')]).tick()).single;
@@ -1072,6 +1135,111 @@ void main() {
       var run = (await running).single;
       expect(run.status, APICronRunStatus.running, reason: 'Not finished');
       expect(store.getLock('blocked')!.owner, 'thief', reason: 'Not released');
+
+      // Nothing written after the lock was lost (the call result included):
+      var stored = store.getRun('blocked', _utc(2026, 10, 18, 10))!;
+      expect(stored.status, APICronRunStatus.running);
+      expect(stored.calls, 0);
+      expect(stored.owner, 'owner-1');
+    });
+
+    test('lock considered lost when its lease runs out unrenewed', () async {
+      var testStore = _TestStore()..failRenew = true;
+      _calls.block = Completer<void>();
+
+      var s = scheduler([
+        job('blocked', leaseDuration: const Duration(milliseconds: 60)),
+      ], store2: testStore);
+      var running = s.tick();
+      await _waitUntil(() => _calls.of('blocked').isNotEmpty);
+
+      // The renewals fail and the clock passes the lease:
+      now = now.add(const Duration(seconds: 1));
+      await _waitUntil(() => testStore.renewals >= 2);
+      _calls.block!.complete();
+
+      var run = (await running).single;
+      expect(run.status, APICronRunStatus.running, reason: 'Left running');
+      expect(testStore.getRun('blocked', _utc(2026, 10, 18, 10))!.calls, 0);
+    });
+
+    test('updateRun: only by the owner, only while running', () {
+      var t = _utc(2026, 10, 18, 10);
+      var run = store.claimRun(APICronJobRun('j', t, owner: 'a'))!;
+
+      var byB = store.getRun('j', t)!..owner = 'b';
+      expect(store.updateRun(byB), isFalse, reason: 'Owned by a');
+      expect(
+        store.updateRun(byB, previousOwner: 'a'),
+        isTrue,
+        reason: 'Take over',
+      );
+
+      expect(store.updateRun(run), isFalse, reason: 'a lost it');
+
+      byB.status = APICronRunStatus.succeeded;
+      expect(store.updateRun(byB), isTrue);
+      expect(
+        store.updateRun(byB..status = APICronRunStatus.running),
+        isFalse,
+        reason: 'Finished: never back to running',
+      );
+      expect(store.getRun('j', t)!.status, APICronRunStatus.succeeded);
+    });
+
+    test('pruning never deletes a running run', () {
+      store.claimRun(APICronJobRun('j', _utc(2026, 1, 1)));
+      store.claimRun(
+        APICronJobRun('j', _utc(2026, 1, 2), status: APICronRunStatus.failed),
+      );
+      expect(store.deleteRunsBefore('j', _utc(2026, 6, 1)), 1);
+      expect(store.selectRuns('j').single.status, APICronRunStatus.running);
+    });
+
+    test(
+      'stop: the running job stops after its call, resumed elsewhere',
+      () async {
+        _calls.block = Completer<void>();
+
+        var s = APICronScheduler(
+          api,
+          [job('pages2', schedule: '0 10 * * *')],
+          store: store,
+          owner: 'stopping',
+          checkInterval: const Duration(hours: 1),
+          clock: () => now,
+          sleep: (d) async {},
+          historyDays: 0,
+        );
+        s.start();
+        await _waitUntil(() => _calls.of('pages2').isNotEmpty);
+
+        s.stop();
+        _calls.block!.complete();
+        await s.waitRunning();
+
+        var stored = store.getRun('pages2', _utc(2026, 10, 18, 10))!;
+        expect(stored.status, APICronRunStatus.running);
+        expect(stored.calls, 0, reason: 'The call result not written');
+        expect(store.getLock('pages2'), isNull, reason: 'Released');
+
+        // Another instance resumes it:
+        var other = scheduler([job('pages2')], owner: 'other');
+        var resumed = (await other.tick()).single;
+        expect(resumed.status, APICronRunStatus.succeeded);
+        expect(resumed.owner, 'other');
+      },
+    );
+
+    test('runNow at second 0: not the scheduled occurrence slot', () async {
+      now = _utc(2026, 10, 18, 10, 0, 0);
+      var s = scheduler([job('ok')]);
+      var manual = (await s.runNow('ok'))!;
+      expect(manual.scheduledAt, _utc(2026, 10, 18, 10, 0, 1));
+
+      var scheduled = (await s.tick()).single;
+      expect(scheduled.scheduledAt, _utc(2026, 10, 18, 10));
+      expect(_calls.of('ok'), hasLength(2));
     });
 
     test('lock renewal errors are only logged', () async {
@@ -1182,6 +1350,7 @@ void main() {
         },
       );
       await api.ensureInitialized();
+      await api.cronSchedulerReady;
       expect(api.cronScheduler!.store, isA<APICronStoreMemory>());
       expect(
         identical(await api.startCronScheduler(), api.cronScheduler),
@@ -1212,7 +1381,8 @@ void main() {
 
       await api.ensureInitialized();
 
-      var scheduler = api.cronScheduler!;
+      var scheduler = (await api.cronSchedulerReady)!;
+      expect(identical(scheduler, api.cronScheduler), isTrue);
       expect(scheduler.isStarted, isTrue);
       expect(identical(scheduler.store, store), isTrue);
       expect(scheduler.checkInterval, const Duration(hours: 1));
@@ -1249,8 +1419,75 @@ void main() {
       );
       await api.ensureInitialized();
       expect(api.isInitialized, isTrue);
+      expect(await api.cronSchedulerReady, isNull);
       expect(api.cronScheduler, isNull);
       api.close();
     });
+
+    test('jobs run only after the modules are initialized', () async {
+      var api = _SlowAPIRoot();
+
+      await api.ensureInitialized();
+      expect(api.slowModule.ready, isTrue);
+
+      var scheduler = (await api.cronSchedulerReady)!;
+      await _waitUntil(() => api.slowModule.calls.isNotEmpty);
+
+      // The route was called once its module was ready:
+      expect(api.slowModule.calls, [true]);
+
+      api.close();
+      await scheduler.waitRunning();
+    });
   });
+}
+
+/// A module with a slow initialization (e.g. loading its repositories).
+class _SlowModule extends APIModule {
+  _SlowModule(APIRoot apiRoot) : super(apiRoot, 'slow');
+
+  bool ready = false;
+
+  /// For each call: was the module ready?
+  final List<bool> calls = [];
+
+  @override
+  FutureOr<InitializationResult> initialize() async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    ready = true;
+    return super.initialize();
+  }
+
+  @override
+  void configure() {
+    routes.any('check', (request) {
+      calls.add(ready);
+      return APIResponse.ok(ready);
+    });
+  }
+}
+
+class _SlowAPIRoot extends APIRoot {
+  _SlowAPIRoot()
+    : super(
+        'cron-slow-test',
+        '1.0',
+        apiConfig: {
+          'cron': {
+            'enabled': true,
+            'check_interval': '1h',
+            'jobs': {
+              'check': {'path': '/slow/check', 'schedule': '* * * * *'},
+            },
+          },
+        },
+      );
+
+  late final _SlowModule slowModule = _SlowModule(this);
+
+  @override
+  Set<APIModule> loadModules() => {slowModule};
+
+  @override
+  FutureOr<APICronStore> loadCronStore() => APICronStoreMemory();
 }

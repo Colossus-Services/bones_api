@@ -159,10 +159,26 @@ void runCronStoreDBTests(
         {t1, t2},
       );
 
+      // A running run is never pruned:
+      expect(await store.deleteRunsBefore(job, t2), 0);
+
+      var r1 = (await store.getRun(job, t1))!
+        ..status = APICronRunStatus.succeeded;
+      expect(await store.updateRun(r1), isTrue);
+
       expect(await store.deleteRunsBefore(job, t2), 1);
       expect(
         (await store.selectRuns(job)).map((r) => r.scheduledAt),
         equals([t3, t2]),
+      );
+
+      // Only by its owner, and never back to running once finished:
+      var r2 = (await store.getRun(job, t2))!..owner = 'other';
+      expect(await store.updateRun(r2), isFalse);
+      expect(await store.updateRun(r2, previousOwner: 'o'), isTrue);
+      expect(
+        await store.updateRun(stored..status = APICronRunStatus.running),
+        isFalse,
       );
 
       expect(

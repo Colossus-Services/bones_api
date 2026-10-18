@@ -16,16 +16,26 @@ section "Cron: scheduled routes".
     (`APIResponse.continuation`), the route is called again with the
     parameter `continuation`, up to `maxCalls` per run.
   - Retries (`APICronRetry`): exponential backoff (default 3 attempts: 30s,
-    2m), honoring `Retry-After`. `UNAUTHORIZED`, `BAD_REQUEST` and
-    `NOT_FOUND` are not retried. Per call `timeout`.
-- `APICronScheduler`: started by `APIRoot.initialize` when the config
-  `cron.enabled` is `true` (not in auxiliary worker isolates: one per
-  process), stopped by `APIRoot.close`.
+    2m), honoring `Retry-After` (capped by `maxDelay`). `UNAUTHORIZED`,
+    `BAD_REQUEST` and `NOT_FOUND` are not retried.
+  - `timeout`: a slower call is logged, but waited for (a route can't be
+    cancelled): never retried or overlapped while running.
+- `APICronScheduler`: started when the config `cron.enabled` is `true`, once
+  `APIRoot` and its modules are fully initialized (`cronSchedulerReady`);
+  not in auxiliary worker isolates (one per process). Stopped by
+  `APIRoot.close`: a running job stops after its current call (left
+  resumable, its lock released; see `waitRunning`).
   - Each occurrence runs once: its run is claimed in the `APICronStore`
     (unique job + scheduled time), also among several instances.
-  - A job never runs in parallel: a lock with a lease, renewed while running.
-    A run interrupted (its instance stopped) is resumed by another instance
-    after the lease expires, from its last continuation token.
+  - A job never runs in parallel: a lock with a lease, renewed while running
+    (and considered lost if the lease runs out unrenewed). A run interrupted
+    (its instance stopped) is resumed by another instance after the lease
+    expires, from its last continuation token. A run is only written by its
+    owner while running: an instance that lost the lock writes nothing.
+  - A run that fails by an error (or a continuation token over 4096
+    characters) is marked failed, never left running.
+  - The leases use each instance's clock: keep the servers' clocks
+    synchronized (NTP).
   - Missed occurrences (servers down): the latest runs once if not older
     than `maxLateness` (default 1 day); older ones are recorded as skipped.
   - `runNow(job)`, `selectRuns(job)`, and history pruning (`history_days`,
@@ -35,7 +45,8 @@ section "Cron: scheduled routes".
   `APICronStoreDB` (tables `api_cron_job_run` and `api_cron_job_lock`; add
   `APICronStoreDB.buildRepositories(adapter)` to the repositories of the
   API). `APIRoot.loadCronStore()` uses the DB store when its repositories
-  are registered.
+  are registered (otherwise the in-memory store, with a warning: single
+  instance only).
 - `APIModule.cronJobs` and `addCronJob`. Note: modules with generated
   reflection (`routes.anyFrom(reflection)`) need the reflection code
   regenerated (`build_runner`) to include the new `cronJobs` field.

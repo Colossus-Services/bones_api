@@ -348,15 +348,20 @@ or by overriding `APIRoot.loadCronJobs()` (returning `APICronJob`s).
 - **Continuation:** while the response has the header `X-Continuation`
   (`APIResponse.continuation`), the route is called again with the parameter
   `continuation`, up to `max_calls` calls per run.
-- **Retries:** an `ERROR` response, a thrown error or a timeout is retried
-  with exponential backoff (default: 3 attempts, 30s then 2m), honoring
-  `Retry-After`. `UNAUTHORIZED`, `BAD_REQUEST` and `NOT_FOUND` are not
-  retried.
+- **Retries:** an `ERROR` response or a thrown error is retried with
+  exponential backoff (default: 3 attempts, 30s then 2m), honoring
+  `Retry-After` (capped by `max_delay`). `UNAUTHORIZED`, `BAD_REQUEST` and
+  `NOT_FOUND` are not retried. A call slower than `timeout` is logged, but
+  waited for (a route can't be cancelled): it's never overlapped by a retry.
 - **Once per occurrence, never in parallel:** each occurrence is claimed in
   the `APICronStore` and the job holds a lock (with a lease, renewed while
   running) during its run, also with several instances of the API. A run
   interrupted by a stopped instance is resumed by another one after the lease
-  expires, from its last continuation token.
+  expires, from its last continuation token. The leases use each instance's
+  clock: keep the servers' clocks synchronized (NTP).
+- **Start and stop:** the scheduler starts once the API and its modules are
+  initialized (`APIRoot.cronSchedulerReady`), and `APIRoot.close` stops it: a
+  running job stops after its current call, left to be resumed.
 - **Missed occurrences** (servers down): the latest one runs once if not
   older than `max_lateness` (default `1d`); older ones are recorded as
   `skipped`.

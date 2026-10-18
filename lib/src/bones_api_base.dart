@@ -360,9 +360,43 @@ abstract class APIRoot with Initializable, Closable {
   @override
   FutureOr<InitializationResult> initialize() =>
       _ensureReady().resolveMapped((result) {
-        if (!result.ok) return result;
-        return startCronScheduler().resolveWithValue(result);
+        if (result.ok) _scheduleCronSchedulerStart();
+        return result;
       });
+
+  Completer<APICronScheduler?>? _cronSchedulerReady;
+
+  /// Completes with the [cronScheduler] once started by [initialize] (`null`
+  /// if not enabled, or if it couldn't start).
+  Future<APICronScheduler?> get cronSchedulerReady =>
+      _cronSchedulerReady?.future ?? Future.value(_cronScheduler);
+
+  /// Starts the [cronScheduler] after this API is fully initialized.
+  ///
+  /// The modules (and their repositories) are dependencies of this root,
+  /// initialized only after [initialize] returns: the scheduler is started
+  /// outside of it (in the root `Zone`, where [ensureInitialized] waits for
+  /// the whole initialization instead of seeing a cyclic call), so no job
+  /// runs before the modules are ready.
+  void _scheduleCronSchedulerStart() {
+    if (_cronSchedulerReady != null || _cronScheduler != null) return;
+    if (isClosed || isAuxiliaryInstance || !cronConfig.enabled) return;
+
+    var ready = _cronSchedulerReady = Completer<APICronScheduler?>();
+
+    Zone.root.run(() {
+      Timer.run(() async {
+        APICronScheduler? scheduler;
+        try {
+          await ensureInitialized();
+          scheduler = await startCronScheduler();
+        } catch (e, s) {
+          _log.severe("Can't start the `APICronScheduler`", e, s);
+        }
+        ready.complete(scheduler);
+      });
+    });
+  }
 
   /// The [APICronJob]s declared by this API in code (besides the routes
   /// annotated with [APICron] and the `cron.jobs` config). See
@@ -387,9 +421,10 @@ abstract class APIRoot with Initializable, Closable {
 
   Future<APICronScheduler?>? _cronSchedulerStarting;
 
-  /// Starts the [cronScheduler] if the config `cron.enabled` is `true` (called
-  /// by [initialize]). Not started in an auxiliary instance (a worker
-  /// `Isolate` copy, see [isAuxiliaryInstance]): one scheduler per process.
+  /// Starts the [cronScheduler] if the config `cron.enabled` is `true`
+  /// (called once [initialize] completes, see [cronSchedulerReady]). Not
+  /// started in an auxiliary instance (a worker `Isolate` copy, see
+  /// [isAuxiliaryInstance]): one scheduler per process.
   FutureOr<APICronScheduler?> startCronScheduler() {
     if (_cronScheduler != null) return _cronScheduler;
     if (isClosed || isAuxiliaryInstance) return null;
@@ -416,6 +451,14 @@ abstract class APIRoot with Initializable, Closable {
       ], config.jobs);
 
       var store = await loadCronStore();
+
+      if (store is APICronStoreMemory) {
+        _log.warning(
+          '`APICronScheduler` with an in-memory store: for a single instance '
+          'of the API only (with more instances, each one runs every job). '
+          'Register `APICronStoreDB.buildRepositories` for a shared store.',
+        );
+      }
 
       var scheduler = APICronScheduler(
         this,

@@ -143,7 +143,10 @@ class APICronJob {
 
   final bool enabled;
 
-  /// The timeout of each call.
+  /// The expected maximum duration of a call: a slower call is logged (a
+  /// warning every [timeout] while it's still running). A route can't be
+  /// cancelled: the call is waited for (never retried or overlapped while
+  /// running), so the job never runs in parallel, and its result is used.
   final Duration timeout;
 
   /// The maximum calls of a run (continuations included).

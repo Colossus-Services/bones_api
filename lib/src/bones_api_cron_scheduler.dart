@@ -118,6 +118,9 @@ class APICronScheduler {
 
   bool get isStarted => _started;
 
+  /// Set by [stop]: the running jobs stop after their current call.
+  bool _stopping = false;
+
   /// The jobs running in this instance.
   final Map<String, Future<APICronJobRun?>> _running = {};
 
@@ -127,6 +130,7 @@ class APICronScheduler {
   void start() {
     if (_started) return;
     _started = true;
+    _stopping = false;
 
     var now = _now;
     var enabled = _jobs.values.where((j) => j.enabled).toList();
@@ -145,14 +149,25 @@ class APICronScheduler {
     _tickSafe();
   }
 
-  /// Stops the periodic checks. A running job keeps its lock until its lease
-  /// expires (then another instance resumes it).
+  /// Stops the periodic checks. A running job stops after its current call
+  /// (not cancelled): its run is left `running` and its lock released, so
+  /// another instance resumes it from its continuation. See [waitRunning].
   void stop() {
     if (!_started) return;
     _started = false;
+    _stopping = true;
     _timer?.cancel();
     _timer = null;
     _log.info('Stopped: owner=$owner, running=${runningJobs.toList()}');
+  }
+
+  /// Waits for the jobs running in this instance (e.g. after [stop]).
+  Future<void> waitRunning() async {
+    while (_running.isNotEmpty) {
+      await Future.wait(
+        _running.values.map((f) => f.then((_) {}, onError: (_) {})),
+      );
+    }
   }
 
   void _tickSafe() {
@@ -201,13 +216,15 @@ class APICronScheduler {
     if (_running.containsKey(name)) return null;
 
     var now = _now;
+    // A scheduled occurrence is at second `0`: a manual run never takes its
+    // slot (seconds are kept by every DB, unlike milliseconds).
     var occurrence = DateTime.utc(
       now.year,
       now.month,
       now.day,
       now.hour,
       now.minute,
-      now.second,
+      now.second == 0 ? 1 : now.second,
     );
 
     var f = _runWithLock(job, occurrence, manual: true);
@@ -287,16 +304,17 @@ class APICronScheduler {
       APICronJobRun? last;
 
       for (var run in running) {
-        if (run.owner != owner) {
+        var previousOwner = run.owner;
+        if (previousOwner != owner) {
           _log.warning(
             'Resuming interrupted run of `${job.name}` '
-            '(${run.scheduledAt.toIso8601String()}, owner `${run.owner}`, '
+            '(${run.scheduledAt.toIso8601String()}, owner `$previousOwner`, '
             'calls ${run.calls}, continuation: ${run.continuation != null})',
           );
         }
         run.owner = owner;
-        last = await _execute(job, run, renewer);
-        if (renewer.lost) return last;
+        last = await _execute(job, run, renewer, previousOwner: previousOwner);
+        if (_isInterrupted(renewer)) return last;
       }
 
       if (occurrence == null) return last;
@@ -377,15 +395,27 @@ class APICronScheduler {
     }
   }
 
+  /// The run must stop: the lock was lost (taken over by another instance)
+  /// or this scheduler is stopping.
+  bool _isInterrupted(_LockRenewer renewer) => renewer.lost || _stopping;
+
   Future<APICronJobRun> _execute(
     APICronJob job,
     APICronJobRun run,
-    _LockRenewer renewer,
-  ) async {
+    _LockRenewer renewer, {
+    String? previousOwner,
+  }) async {
     var started = _now;
     run.startedAt ??= started;
     run.status = APICronRunStatus.running;
-    await store.updateRun(run);
+
+    if (!await store.updateRun(run, previousOwner: previousOwner)) {
+      _log.warning(
+        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
+        'taken by another instance',
+      );
+      return run;
+    }
 
     _log.info(
       'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): started, '
@@ -396,42 +426,67 @@ class APICronScheduler {
 
     String? error;
     var succeeded = false;
+    String? interrupted;
 
-    while (true) {
-      if (renewer.lost) {
-        error = 'Lock lost';
-        break;
+    try {
+      while (true) {
+        if (_isInterrupted(renewer)) break;
+
+        if (run.calls >= job.maxCalls) {
+          error = 'Max calls reached (${job.maxCalls}) with a continuation';
+          _log.warning('Run `${job.name}`: $error');
+          break;
+        }
+
+        var (response, callError) = await _callWithRetry(job, run, renewer);
+
+        // Lost or stopping during the call: nothing more is written.
+        if (_isInterrupted(renewer)) break;
+
+        if (response == null) {
+          error = callError;
+          break;
+        }
+
+        run.calls++;
+
+        var continuation = response.continuation;
+        if (continuation != null &&
+            continuation.length > APICronJobRun.maxContinuationLength) {
+          error =
+              'Continuation token too long: ${continuation.length} > '
+              '${APICronJobRun.maxContinuationLength}';
+          break;
+        }
+
+        run.continuation = continuation;
+
+        if (!await store.updateRun(run)) {
+          interrupted = 'taken by another instance';
+          break;
+        }
+
+        if (continuation == null) {
+          succeeded = true;
+          break;
+        }
       }
-
-      if (run.calls >= job.maxCalls) {
-        error = 'Max calls reached (${job.maxCalls}) with a continuation';
-        _log.warning('Run `${job.name}`: $error');
-        break;
-      }
-
-      var (response, callError) = await _callWithRetry(job, run);
-
-      if (response == null) {
-        error = callError;
-        break;
-      }
-
-      run.calls++;
-      var continuation = response.continuation;
-      run.continuation = continuation;
-      await store.updateRun(run);
-
-      if (continuation == null) {
-        succeeded = true;
-        break;
-      }
+    } catch (e, s) {
+      // Never left `running` by an error (it would be resumed again and
+      // again): failed.
+      error = 'Error: $e';
+      _log.severe('Run `${job.name}`: error', e, s);
     }
 
-    if (renewer.lost) {
-      // Another instance took the run over: don't write it as finished.
+    interrupted ??= renewer.lost
+        ? 'lock lost'
+        : (_stopping ? 'scheduler stopped' : null);
+
+    if (interrupted != null) {
+      // Left `running`: resumed by the new owner (or another instance).
       _log.warning(
-        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): lock lost, '
-        'left to the new owner',
+        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
+        '$interrupted, left running after ${run.calls} call(s)',
       );
       return run;
     }
@@ -445,12 +500,18 @@ class APICronScheduler {
         ? APICronRunStatus.succeeded
         : APICronRunStatus.failed;
     run.lastError = succeeded ? null : error;
-    await store.updateRun(run);
+
+    var stored = false;
+    try {
+      stored = await store.updateRun(run);
+    } catch (e, s) {
+      _log.severe('Run `${job.name}`: error storing its result', e, s);
+    }
 
     var msg =
         'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
         '${run.status.name}, calls=${run.calls}, attempts=${run.attempts}, '
-        'duration=${run.durationMs}ms';
+        'duration=${run.durationMs}ms${stored ? '' : ' (not stored)'}';
 
     if (succeeded) {
       _log.info(msg);
@@ -461,14 +522,22 @@ class APICronScheduler {
     return run;
   }
 
+  /// Calls the route of [job], with the [APICronJob.retry] attempts.
+  ///
+  /// A call slower than [APICronJob.timeout] is logged but not cancelled (a
+  /// route can't be cancelled) nor retried while running: it's waited for,
+  /// so the job never runs in parallel, and its result is used.
   Future<(APIResponse?, String?)> _callWithRetry(
     APICronJob job,
     APICronJobRun run,
+    _LockRenewer renewer,
   ) async {
     var retry = job.retry;
     String? lastError;
 
     for (var attempt = 1; attempt <= retry.attempts; attempt++) {
+      if (_isInterrupted(renewer)) return (null, 'Interrupted');
+
       run.attempts++;
 
       var request = _buildRequest(job, run, attempt);
@@ -478,12 +547,10 @@ class APICronScheduler {
       Object? error;
       var retryable = true;
 
+      var call = Future<APIResponse>.sync(() => apiRoot.call(request));
+
       try {
-        response = await Future<APIResponse>.value(
-          apiRoot.call(request),
-        ).timeout(job.timeout);
-      } on TimeoutException {
-        error = 'Timeout (${job.timeout})';
+        response = await _waitCall(job, run, call);
       } catch (e) {
         error = e;
       }
@@ -514,7 +581,8 @@ class APICronScheduler {
         break;
       }
 
-      var delay = _retryAfter(response) ?? retry.delayFor(attempt);
+      var delay =
+          _retryAfter(response, retry.maxDelay) ?? retry.delayFor(attempt);
 
       _log.warning(
         'Run `${job.name}`: call ${run.calls + 1} failed '
@@ -522,18 +590,49 @@ class APICronScheduler {
         '$lastError',
       );
 
-      await store.updateRun(run);
+      if (_isInterrupted(renewer)) return (null, lastError);
       await _sleep(delay);
     }
 
     return (null, lastError);
   }
 
-  static Duration? _retryAfter(APIResponse? response) {
+  /// Waits for [call], logging it every [APICronJob.timeout] while it's
+  /// still running (it's never abandoned: see [_callWithRetry]).
+  Future<APIResponse> _waitCall(
+    APICronJob job,
+    APICronJobRun run,
+    Future<APIResponse> call,
+  ) async {
+    var waited = Duration.zero;
+    while (true) {
+      try {
+        var response = await call.timeout(job.timeout);
+        if (waited > Duration.zero) {
+          _log.warning(
+            'Run `${job.name}`: call ${run.calls + 1} finished after its '
+            'timeout (${job.timeout}): ${response.status.name}',
+          );
+        }
+        return response;
+      } on TimeoutException {
+        waited += job.timeout;
+        _log.warning(
+          'Run `${job.name}`: call ${run.calls + 1} still running after '
+          '$waited (timeout ${job.timeout}): waiting for it',
+        );
+      }
+    }
+  }
+
+  /// The `Retry-After` delay (in seconds) of [response], at most [maxDelay].
+  static Duration? _retryAfter(APIResponse? response, Duration maxDelay) {
     var v = response?.getHeader('Retry-After');
     if (v == null) return null;
     var secs = int.tryParse(v.trim());
-    return secs != null && secs >= 0 ? Duration(seconds: secs) : null;
+    if (secs == null || secs < 0) return null;
+    var delay = Duration(seconds: secs);
+    return delay > maxDelay ? maxDelay : delay;
   }
 
   APIRequest _buildRequest(APICronJob job, APICronJobRun run, int attempt) {
@@ -581,14 +680,13 @@ class _LockRenewer {
 
   bool _renewing = false;
 
+  Duration get _every => Duration(
+    milliseconds: math.max(1, job.leaseDuration.inMilliseconds ~/ 3),
+  );
+
   void start() {
     if (_timer != null || lost) return;
-
-    var every = Duration(
-      milliseconds: math.max(1, job.leaseDuration.inMilliseconds ~/ 3),
-    );
-
-    _timer = Timer.periodic(every, (_) => _renew());
+    _timer = Timer.periodic(_every, (_) => _renew());
   }
 
   Future<void> _renew() async {
@@ -601,15 +699,24 @@ class _LockRenewer {
         now: scheduler._now,
       );
       if (!ok) {
-        lost = true;
-        _log.warning('Job `${job.name}`: lock lost (taken over)');
-        stop();
+        _lose('taken over');
       }
     } catch (e, s) {
       _log.warning('Job `${job.name}`: error renewing lock', e, s);
+      // Without a renewal the lease runs out, and another instance may take
+      // the lock over: considered lost before that (one renewal of margin).
+      if (!scheduler._now.isBefore(lock.leaseUntil.subtract(_every))) {
+        _lose('lease about to expire without renewal');
+      }
     } finally {
       _renewing = false;
     }
+  }
+
+  void _lose(String reason) {
+    lost = true;
+    _log.warning('Job `${job.name}`: lock lost ($reason)');
+    stop();
   }
 
   void stop() {
