@@ -32,20 +32,34 @@ class CronDBProvider
   );
 }
 
+/// The first call of `blockedPages` of a job waits for its completer.
+final Map<String, Completer<void>> _blockers = {};
+
 class _CronDBModule extends APIModule {
   final List<String> calls;
 
   _CronDBModule(APIRoot apiRoot, this.calls) : super(apiRoot, 'db');
 
+  APIResponse _page(APIRequest request) {
+    var c = request.getParameter('continuation');
+    calls.add('${request.headers['X-Cron-Job']}:${c ?? ''}');
+    var page = (int.tryParse('${c ?? ''}') ?? 0) + 1;
+    var response = APIResponse.ok('page $page');
+    if (page < 3) response.continuation = '$page';
+    return response;
+  }
+
   @override
   void configure() {
-    routes.any('pages', (request) {
-      var c = request.getParameter('continuation');
-      calls.add('${request.headers['X-Cron-Job']}:${c ?? ''}');
-      var page = (int.tryParse('${c ?? ''}') ?? 0) + 1;
-      var response = APIResponse.ok('page $page');
-      if (page < 3) response.continuation = '$page';
-      return response;
+    routes.any('pages', _page);
+
+    routes.any('blockedPages', (request) async {
+      var job = '${request.headers['X-Cron-Job']}';
+      if (request.getParameter('continuation') == null) {
+        calls.add('$job:waiting');
+        await _blockers[job]?.future;
+      }
+      return _page(request);
     });
   }
 }
@@ -53,10 +67,28 @@ class _CronDBModule extends APIModule {
 class _CronDBAPIRoot extends APIRoot {
   final List<String> calls = [];
 
-  _CronDBAPIRoot(String name) : super(name, '1.0');
+  final List<EntityRepositoryProvider> providers;
+
+  _CronDBAPIRoot(
+    String name, {
+    this.providers = const [],
+    Map<String, dynamic>? config,
+  }) : super(name, '1.0', apiConfig: config);
 
   @override
   Set<APIModule> loadModules() => {_CronDBModule(this, calls)};
+
+  @override
+  FutureOr<List<EntityRepositoryProvider>> loadEntityRepositoryProviders() =>
+      providers;
+}
+
+Future<void> _waitUntil(FutureOr<bool> Function() condition) async {
+  for (var i = 0; i < 200; i++) {
+    if (await condition()) return;
+    await Future.delayed(const Duration(milliseconds: 25));
+  }
+  fail('Condition not reached');
 }
 
 DateTime _utc(int y, int m, int d, [int h = 0, int min = 0]) =>
@@ -310,6 +342,114 @@ void runCronStoreDBTests(
 
       api1.close();
       api2.close();
+    });
+
+    Map<String, dynamic> cronConfig(String path) => {
+      'cron': {
+        'enabled': true,
+        'check_interval': '1h',
+        'history_days': 0,
+        'jobs': {
+          // Always the same occurrence (Jan 1st of this year), due at start:
+          job: {'path': path, 'schedule': '0 0 1 1 *', 'max_lateness': '400d'},
+        },
+      },
+    };
+
+    DateTime occurrence() => CronExpression.parse(
+      '0 0 1 1 *',
+    ).previousBefore(DateTime.now())!.toUtc();
+
+    test(
+      'APIRoot: two instances on the same DB run the occurrence once',
+      () async {
+        var a = _CronDBAPIRoot(
+          '$job-a',
+          providers: [provider],
+          config: cronConfig('/db/pages'),
+        );
+        var b = _CronDBAPIRoot(
+          '$job-b',
+          providers: [provider],
+          config: cronConfig('/db/pages'),
+        );
+
+        await Future.wait([
+          Future.value(a.ensureInitialized()),
+          Future.value(b.ensureInitialized()),
+        ]);
+
+        var sa = (await a.cronSchedulerReady)!;
+        var sb = (await b.cronSchedulerReady)!;
+
+        // The DB store, resolved from the registered repositories:
+        expect(sa.store, isA<APICronStoreDB>());
+        expect(sb.store, isA<APICronStoreDB>());
+
+        await _waitUntil(
+          () async =>
+              (await store.getRun(job, occurrence()))?.status ==
+              APICronRunStatus.succeeded,
+        );
+        await sa.waitRunning();
+        await sb.waitRunning();
+
+        expect([...a.calls, ...b.calls], ['$job:', '$job:1', '$job:2']);
+        expect(await store.getLock(job), isNull);
+
+        a.close();
+        b.close();
+      },
+    );
+
+    test('APIRoot: a root closed mid-run is resumed by another', () async {
+      var blocker = _blockers[job] = Completer<void>();
+
+      var a = _CronDBAPIRoot(
+        '$job-a',
+        providers: [provider],
+        config: cronConfig('/db/blockedPages'),
+      );
+      await a.ensureInitialized();
+      var sa = (await a.cronSchedulerReady)!;
+
+      await _waitUntil(() => a.calls.isNotEmpty);
+      expect(a.calls, ['$job:waiting']);
+
+      // Closed while its first call runs: the call finishes, nothing more.
+      a.close();
+      blocker.complete();
+      await sa.waitRunning();
+
+      var interrupted = (await store.getRun(job, occurrence()))!;
+      expect(interrupted.status, APICronRunStatus.running);
+      expect(interrupted.calls, 0);
+      expect(await store.getLock(job), isNull, reason: 'Released');
+
+      // Another instance starts and resumes it:
+      var b = _CronDBAPIRoot(
+        '$job-b',
+        providers: [provider],
+        config: cronConfig('/db/blockedPages'),
+      );
+      await b.ensureInitialized();
+      var sb = (await b.cronSchedulerReady)!;
+
+      await _waitUntil(
+        () async =>
+            (await store.getRun(job, occurrence()))?.status ==
+            APICronRunStatus.succeeded,
+      );
+      await sb.waitRunning();
+
+      var resumed = (await store.getRun(job, occurrence()))!;
+      expect(resumed.id, interrupted.id);
+      expect(resumed.owner, sb.owner);
+      expect(resumed.calls, 3);
+      expect(a.calls, ['$job:waiting', '$job:']);
+      expect(b.calls, ['$job:waiting', '$job:', '$job:1', '$job:2']);
+
+      b.close();
     });
   });
 }

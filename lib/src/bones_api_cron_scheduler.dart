@@ -382,10 +382,19 @@ class APICronScheduler {
     }
   }
 
+  /// Deletes the runs of [job] older than [historyDays], but never one still
+  /// in the [APICronJob.maxLateness] window: without its run, that
+  /// occurrence would be due (and run) again.
   Future<void> _pruneHistory(APICronJob job) async {
     if (historyDays <= 0) return;
     try {
-      var before = _now.subtract(Duration(days: historyDays));
+      var now = _now;
+      var before = now.subtract(Duration(days: historyDays));
+
+      // One more day of margin (the occurrences checked are in the window):
+      var lateness = now.subtract(job.maxLateness + const Duration(days: 1));
+      if (lateness.isBefore(before)) before = lateness;
+
       var n = await store.deleteRunsBefore(job.name, before);
       if (n > 0) {
         _log.fine('Job `${job.name}`: $n old run(s) deleted');

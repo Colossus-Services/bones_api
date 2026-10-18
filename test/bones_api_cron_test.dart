@@ -1,4 +1,6 @@
 @TestOn('vm')
+import 'dart:math' as math;
+
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -193,6 +195,9 @@ class _TestStore extends APICronStoreMemory {
   bool failDelete = false;
   bool failRenew = false;
 
+  /// [selectRunningRuns] throws only for this job.
+  String? failJob;
+
   /// [getRun] always returns `null` (a run claimed meanwhile by another
   /// instance, not seen by the check).
   bool hideRuns = false;
@@ -208,8 +213,12 @@ class _TestStore extends APICronStoreMemory {
   APICronJobRun? getRun(String job, DateTime scheduledAt) =>
       hideRuns ? null : super.getRun(job, scheduledAt);
 
+  /// [updateRun] returns `false` (the run taken by another instance).
+  bool rejectUpdates = false;
+
   @override
   bool updateRun(APICronJobRun run, {String? previousOwner}) {
+    if (rejectUpdates) return false;
     var failAfter = failUpdateAfter;
     if (failAfter != null && ++updates > failAfter) {
       throw StateError('update failed');
@@ -219,7 +228,7 @@ class _TestStore extends APICronStoreMemory {
 
   @override
   List<APICronJobRun> selectRunningRuns(String job) {
-    if (failSelectRunning) throw StateError('store down');
+    if (failSelectRunning || failJob == job) throw StateError('store down');
     return super.selectRunningRuns(job);
   }
 
@@ -445,6 +454,142 @@ void main() {
       expect(resolveCronTimeZone(' utc '), same(tz.UTC));
       expect(resolveCronTimeZone('Europe/Paris').name, 'Europe/Paris');
       expect(() => resolveCronTimeZone('Mars/Olympus'), throwsArgumentError);
+    });
+  });
+
+  group('CronExpression (properties, against a minute by minute scan)', () {
+    // Deterministic random cases:
+    var rand = math.Random(20261018);
+
+    String field(int min, int max) {
+      int v() => min + rand.nextInt(max - min + 1);
+      switch (rand.nextInt(6)) {
+        case 0:
+          return '*';
+        case 1:
+          return '*/${1 + rand.nextInt(max ~/ 2 + 1)}';
+        case 2:
+          return '${v()}';
+        case 3:
+          var a = v(), b = v();
+          return '${math.min(a, b)}-${math.max(a, b)}';
+        case 4:
+          return '${v()},${v()}';
+        default:
+          var a = v(), b = v();
+          return '${math.min(a, b)}-${math.max(a, b)}/${1 + rand.nextInt(3)}';
+      }
+    }
+
+    // Day of month and month mostly `*`: matches within the scan window.
+    String expression() => [
+      field(0, 59),
+      field(0, 23),
+      rand.nextInt(4) == 0 ? field(1, 28) : '*',
+      '*',
+      rand.nextInt(3) == 0 ? field(0, 6) : '*',
+    ].join(' ');
+
+    const window = Duration(days: 35);
+
+    DateTime wallOf(DateTime instant, tz.Location location) {
+      var t = tz.TZDateTime.from(instant, location);
+      return DateTime.utc(t.year, t.month, t.day, t.hour, t.minute);
+    }
+
+    /// The first matching minute after [from] (by instants), or `null`.
+    DateTime? scanNext(CronExpression c, DateTime from, tz.Location loc) {
+      var t = DateTime.utc(
+        from.year,
+        from.month,
+        from.day,
+        from.hour,
+        from.minute,
+      ).add(const Duration(minutes: 1));
+      var end = from.add(window);
+      for (; t.isBefore(end); t = t.add(const Duration(minutes: 1))) {
+        if (c.matches(wallOf(t, loc))) return t;
+      }
+      return null;
+    }
+
+    /// The last matching minute not after [to] (by instants), or `null`.
+    DateTime? scanPrevious(CronExpression c, DateTime to, tz.Location loc) {
+      var t = DateTime.utc(to.year, to.month, to.day, to.hour, to.minute);
+      var end = to.subtract(window);
+      for (; t.isAfter(end); t = t.subtract(const Duration(minutes: 1))) {
+        if (c.matches(wallOf(t, loc))) return t;
+      }
+      return null;
+    }
+
+    void checkCases(tz.Location location, List<DateTime> Function() instants) {
+      var compared = 0;
+      addTearDown(() => expect(compared, greaterThan(100)));
+
+      for (var i = 0; i < 60; i++) {
+        var expr = expression();
+        var c = CronExpression.parse(expr);
+
+        for (var from in instants()) {
+          var reason = '`$expr` from $from (${location.name})';
+
+          var next = c.nextAfter(from, location)?.toUtc();
+          var scannedNext = scanNext(c, from, location);
+          if (scannedNext != null) {
+            compared++;
+            expect(next, scannedNext, reason: 'nextAfter $reason');
+          } else if (next != null) {
+            expect(
+              next.difference(from) >= window,
+              isTrue,
+              reason: 'nextAfter $reason: $next',
+            );
+          }
+
+          var prev = c.previousBefore(from, location)?.toUtc();
+          var scannedPrev = scanPrevious(c, from, location);
+          if (scannedPrev != null) {
+            compared++;
+            expect(prev, scannedPrev, reason: 'previousBefore $reason');
+          } else if (prev != null) {
+            expect(
+              from.difference(prev) >= window,
+              isTrue,
+              reason: 'previousBefore $reason: $prev',
+            );
+          }
+        }
+      }
+    }
+
+    DateTime randomInstant(int month) => DateTime.utc(
+      2026,
+      month,
+      1 + rand.nextInt(10),
+      rand.nextInt(24),
+      rand.nextInt(60),
+      rand.nextInt(60),
+    );
+
+    test('UTC', () {
+      checkCases(tz.UTC, () => [randomInstant(1 + rand.nextInt(12))]);
+    });
+
+    test('Europe/Paris (away from daylight saving changes)', () {
+      var paris = resolveCronTimeZone('Europe/Paris');
+      // Summer time (Apr 20 - Sep 20) and winter time (Nov 20 - Feb 20)
+      // windows: the scan doesn't cross a change.
+      checkCases(paris, () {
+        var summer = DateTime.utc(2026, 5, 1 + rand.nextInt(20), 12);
+        var winter = DateTime.utc(2026, 12, 1 + rand.nextInt(20), 12);
+        return [summer, winter];
+      });
+    });
+
+    test('America/Sao_Paulo', () {
+      var sp = resolveCronTimeZone('America/Sao_Paulo');
+      checkCases(sp, () => [randomInstant(1 + rand.nextInt(12))]);
     });
   });
 
@@ -1126,6 +1271,54 @@ void main() {
       expect(() => s.runNow('unknown'), throwsArgumentError);
     });
 
+    test('several jobs due in one check: all run, independently', () async {
+      _calls.block = Completer<void>();
+
+      var s = scheduler([job('ok'), job('pages'), job('blocked')]);
+      var running = s.tick();
+
+      // `ok` and `pages` finish while `blocked` still runs:
+      await _waitUntil(
+        () => _calls.of('ok').isNotEmpty && _calls.of('pages').length == 3,
+      );
+      expect(s.runningJobs, {'blocked'});
+
+      _calls.block!.complete();
+      var runs = await running;
+      expect(runs.map((r) => r.job).toSet(), {'ok', 'pages', 'blocked'});
+      expect(runs.every((r) => r.status == APICronRunStatus.succeeded), isTrue);
+    });
+
+    test('a job failing in its check does not stop the others', () async {
+      var testStore = _TestStore()..failJob = 'pages';
+      var runs = await scheduler([
+        job('ok'),
+        job('pages'),
+      ], store2: testStore).tick();
+      expect(runs.single.job, 'ok');
+      expect(_calls.of('ok'), hasLength(1));
+      expect(_calls.of('pages'), isEmpty);
+    });
+
+    test('POST job with payload and parameters', () async {
+      var s = scheduler([
+        APICronJob(
+          name: 'post',
+          schedule: '0 10 * * *',
+          path: '/jobs/ok',
+          method: APIRequestMethod.POST,
+          parameters: {'a': 1},
+          payload: {'b': 2},
+        ),
+      ]);
+      expect((await s.tick()).single.status, APICronRunStatus.succeeded);
+
+      var request = _calls.of('ok').single;
+      expect(request.method, APIRequestMethod.POST);
+      expect(request.getParameter('a'), 1);
+      expect(request.payload, {'b': 2});
+    });
+
     test('disabled job: not run', () async {
       var s = scheduler([
         job('ok').withConfig({'enabled': false}),
@@ -1382,6 +1575,57 @@ void main() {
       await running;
     });
 
+    test(
+      'a run taken by another instance before it starts: not called',
+      () async {
+        var testStore = _TestStore()..rejectUpdates = true;
+        var run = (await scheduler([
+          job('ok'),
+        ], store2: testStore).tick()).single;
+        expect(run.status, APICronRunStatus.running);
+        expect(_calls.requests, isEmpty);
+        expect(testStore.getLock('ok'), isNull, reason: 'Released');
+      },
+    );
+
+    test('APICronStoreMemory: same owner renews, default clock', () {
+      var lock = store.acquireLock('j', 'a', const Duration(minutes: 5))!;
+      var again = store.acquireLock('j', 'a', const Duration(minutes: 10))!;
+      expect(again.id, lock.id);
+      expect(again.leaseUntil.isAfter(lock.leaseUntil), isTrue);
+      expect(store.renewLock(again, const Duration(minutes: 1)), isTrue);
+      expect(store.releaseLock(again), isTrue);
+    });
+
+    test(
+      'pruning keeps the runs in the maxLateness window: no re-run',
+      () async {
+        // Jan 1st, due for 400 days; history of 30 days:
+        var s = APICronScheduler(
+          api,
+          [
+            job(
+              'ok',
+              schedule: '0 0 1 1 *',
+              maxLateness: const Duration(days: 400),
+            ),
+          ],
+          store: store,
+          clock: () => now,
+          sleep: (d) async {},
+          historyDays: 30,
+        );
+
+        expect((await s.tick()).single.scheduledAt, _utc(2026, 1, 1));
+        expect(store.getRun('ok', _utc(2026, 1, 1)), isNotNull, reason: 'Kept');
+
+        // The next check: the occurrence is still in its window, not run again.
+        now = now.add(const Duration(minutes: 1));
+        expect(await s.tick(), isEmpty);
+        expect(_calls.of('ok'), hasLength(1));
+      },
+    );
+
     test('start / stop', () async {
       var s = APICronScheduler(
         api,
@@ -1445,6 +1689,11 @@ void main() {
             'check_interval': '1h',
             'jobs': {
               'reflected.refresh': {'enabled': false},
+              'reflected.workHours': {
+                'schedule': '0 8 * * *',
+                'timeout': '30s',
+                'retry': {'attempts': 9},
+              },
               'from-config': {'path': '/jobs/ok', 'schedule': '* * * * *'},
             },
           },
@@ -1469,6 +1718,14 @@ void main() {
         'from-config',
       });
       expect(scheduler.jobs['reflected.refresh']!.enabled, isFalse);
+
+      // An `@APICron.at` job overridden by the config (the rest kept):
+      var workHours = scheduler.jobs['reflected.workHours']!;
+      expect(workHours.schedule.expression, '0 8 * * *');
+      expect(workHours.timeout, const Duration(seconds: 30));
+      expect(workHours.retry.attempts, 9);
+      expect(workHours.retry.initialDelay, const Duration(seconds: 10));
+      expect(workHours.timeZone, 'America/Sao_Paulo');
 
       // The first check, at start: `from-config` runs every minute.
       for (var i = 0; i < 50 && _calls.of('ok').isEmpty; i++) {

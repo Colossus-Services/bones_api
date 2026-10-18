@@ -44,7 +44,8 @@ section "Cron: scheduled routes".
   - Missed occurrences (servers down): the latest runs once if not older
     than `maxLateness` (default 1 day); older ones are recorded as skipped.
   - `runNow(job)`, `selectRuns(job)`, and history pruning (`history_days`,
-    default 90).
+    default 90; never a running run, nor a run still in its job's
+    `maxLateness` window, that would run again).
   - Logged by the logger `APICron`.
 - `APICronStore`: `APICronStoreMemory` (single instance) and
   `APICronStoreDB` (tables `api_cron_job_run` and `api_cron_job_lock`; add
