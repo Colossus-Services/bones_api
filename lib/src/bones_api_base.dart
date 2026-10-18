@@ -366,10 +366,28 @@ abstract class APIRoot with Initializable, Closable {
 
   Completer<APICronScheduler?>? _cronSchedulerReady;
 
-  /// Completes with the [cronScheduler] once started by [initialize] (`null`
-  /// if not enabled, or if it couldn't start).
-  Future<APICronScheduler?> get cronSchedulerReady =>
-      _cronSchedulerReady?.future ?? Future.value(_cronScheduler);
+  bool _cronSchedulerStartScheduled = false;
+
+  /// `true` if the [cronScheduler] should be started (cron enabled, not
+  /// closed nor an auxiliary instance).
+  bool get _cronSchedulerEnabled =>
+      !isClosed && !isAuxiliaryInstance && cronConfig.enabled;
+
+  /// Completes with the [cronScheduler] once started after [initialize]
+  /// (also if requested before it), or `null` if not enabled, if it couldn't
+  /// start, or after [close].
+  Future<APICronScheduler?> get cronSchedulerReady {
+    var ready = _cronSchedulerReady;
+    if (ready != null) return ready.future;
+
+    var scheduler = _cronScheduler;
+    if (scheduler != null || !_cronSchedulerEnabled) {
+      return Future.value(scheduler);
+    }
+
+    // Requested before `initialize`: completed when started.
+    return (_cronSchedulerReady = Completer<APICronScheduler?>()).future;
+  }
 
   /// Starts the [cronScheduler] after this API is fully initialized.
   ///
@@ -378,22 +396,36 @@ abstract class APIRoot with Initializable, Closable {
   /// outside of it (in the root `Zone`, where [ensureInitialized] waits for
   /// the whole initialization instead of seeing a cyclic call), so no job
   /// runs before the modules are ready.
+  ///
+  /// Never fails the initialization of the API (an error is logged).
   void _scheduleCronSchedulerStart() {
-    if (_cronSchedulerReady != null || _cronScheduler != null) return;
-    if (isClosed || isAuxiliaryInstance || !cronConfig.enabled) return;
+    try {
+      if (_cronSchedulerStartScheduled || _cronScheduler != null) return;
+      if (!_cronSchedulerEnabled) return;
+      _cronSchedulerStartScheduled = true;
+    } catch (e, s) {
+      _log.severe("Can't schedule the `APICronScheduler` start", e, s);
+      return;
+    }
 
-    var ready = _cronSchedulerReady = Completer<APICronScheduler?>();
+    var ready = _cronSchedulerReady ??= Completer<APICronScheduler?>();
 
     Zone.root.run(() {
       Timer.run(() async {
         APICronScheduler? scheduler;
         try {
-          await ensureInitialized();
-          scheduler = await startCronScheduler();
+          var init = await ensureInitialized();
+          if (init.ok) {
+            scheduler = await startCronScheduler();
+          } else {
+            _log.severe(
+              "API initialization failed: `APICronScheduler` not started",
+            );
+          }
         } catch (e, s) {
           _log.severe("Can't start the `APICronScheduler`", e, s);
         }
-        ready.complete(scheduler);
+        if (!ready.isCompleted) ready.complete(scheduler);
       });
     });
   }
@@ -410,8 +442,17 @@ abstract class APIRoot with Initializable, Closable {
       APICronStoreDB.tryResolve() ?? APICronStoreMemory();
 
   /// The `cron` config of this API. See [APICronConfig].
-  APICronConfig get cronConfig =>
-      APICronConfig.fromMap(apiConfig.getAsMap('cron'));
+  ///
+  /// A map is the full config; a boolean is `enabled` (`cron: true`);
+  /// anything else (an app's own `cron` key) is disabled.
+  APICronConfig get cronConfig {
+    var config = apiConfig.get('cron');
+    if (config is Map) return APICronConfig.fromMap(config);
+    var enabled = config is bool
+        ? config
+        : (config is String ? TypeParser.parseBool(config) : null);
+    return APICronConfig(enabled: enabled ?? false);
+  }
 
   APICronScheduler? _cronScheduler;
 
@@ -426,7 +467,12 @@ abstract class APIRoot with Initializable, Closable {
   /// started in an auxiliary instance (a worker `Isolate` copy, see
   /// [isAuxiliaryInstance]): one scheduler per process.
   FutureOr<APICronScheduler?> startCronScheduler() {
-    if (_cronScheduler != null) return _cronScheduler;
+    var current = _cronScheduler;
+    if (current != null) {
+      // Stopped manually (`cronScheduler.stop()`): started again.
+      if (!current.isStarted && !isClosed) current.start();
+      return current;
+    }
     if (isClosed || isAuxiliaryInstance) return null;
 
     var config = cronConfig;
@@ -503,6 +549,10 @@ abstract class APIRoot with Initializable, Closable {
 
     _cronScheduler?.stop();
     _cronScheduler = null;
+
+    var cronReady = _cronSchedulerReady;
+    _cronSchedulerReady = null;
+    if (cronReady != null && !cronReady.isCompleted) cronReady.complete(null);
 
     tryCallSync(() => onClose());
 

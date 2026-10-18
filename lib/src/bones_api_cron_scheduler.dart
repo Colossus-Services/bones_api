@@ -65,11 +65,20 @@ class APICronScheduler {
        _sleep = sleep ?? Future<void>.delayed,
        _jobs = _indexJobs(jobs);
 
+  /// Indexes [jobs] by name. A job with an invalid lazy setting (an unknown
+  /// time zone, see [APICronJob.validate]) is skipped (logged): it doesn't
+  /// stop the other jobs.
   static Map<String, APICronJob> _indexJobs(Iterable<APICronJob> jobs) {
     var map = <String, APICronJob>{};
     for (var job in jobs) {
       if (map.containsKey(job.name)) {
         throw ArgumentError('Duplicated cron job name: ${job.name}');
+      }
+      try {
+        job.validate();
+      } catch (e) {
+        _log.severe('Invalid cron job `${job.name}` (skipped): $e');
+        continue;
       }
       map[job.name] = job;
     }
@@ -86,6 +95,10 @@ class APICronScheduler {
   /// one) and applies [config] (the `cron.jobs` config): a config entry
   /// overrides the job of its name, or adds a new job (with `schedule` and
   /// `path`).
+  ///
+  /// An invalid config entry is skipped (logged), and an entry with only
+  /// overrides (no `schedule`/`path`) for a job that doesn't exist is
+  /// ignored: a bad or stale entry doesn't stop the other jobs.
   static List<APICronJob> mergeJobs(
     Iterable<Iterable<APICronJob>> sources,
     Map<String, Map> config,
@@ -98,10 +111,23 @@ class APICronScheduler {
     }
 
     for (var e in config.entries) {
-      var base = jobs[e.key];
-      jobs[e.key] = base != null
-          ? base.withConfig(e.value)
-          : APICronJob.fromConfig(e.key, e.value);
+      var name = e.key;
+      var base = jobs[name];
+
+      if (base == null && !APICronJob.isFullConfig(e.value)) {
+        _log.warning(
+          'Cron config of an unknown job `$name` (ignored): ${e.value}',
+        );
+        continue;
+      }
+
+      try {
+        jobs[name] = base != null
+            ? base.withConfig(e.value)
+            : APICronJob.fromConfig(name, e.value);
+      } catch (err) {
+        _log.severe('Invalid cron config of job `$name` (skipped): $err');
+      }
     }
 
     return jobs.values.toList();
@@ -179,10 +205,20 @@ class APICronScheduler {
 
   /// Checks the due jobs and runs them. Completes when the runs started by
   /// this check finish (with their runs).
+  ///
+  /// Nothing is checked after [stop] (until [start] again), nor if the API
+  /// initialization failed.
   Future<List<APICronJobRun>> tick() async {
-    // Started by `APIRoot.initialize`: the modules and repositories may still
-    // be initializing.
-    await apiRoot.ensureInitialized();
+    if (_stopping) return [];
+
+    var init = await apiRoot.ensureInitialized();
+    if (!init.ok) {
+      _log.severe('API not initialized: no cron jobs checked');
+      return [];
+    }
+
+    // Stopped while waiting for the initialization:
+    if (_stopping) return [];
 
     var futures = <Future<APICronJobRun?>>[];
 
@@ -205,13 +241,16 @@ class APICronScheduler {
   }
 
   /// Runs the job [name] now (an occurrence at the current time), with the
-  /// same lock and claim of a scheduled run. `null` if the job is unknown,
-  /// already running or locked by another instance.
+  /// same lock and claim of a scheduled run. `null` if already running,
+  /// locked by another instance or this scheduler is stopped ([stop]).
+  /// Throws an [ArgumentError] for an unknown job.
   Future<APICronJobRun?> runNow(String name) async {
     var job = _jobs[name];
     if (job == null) {
       throw ArgumentError.value(name, 'name', 'Unknown cron job');
     }
+
+    if (_stopping) return null;
 
     if (_running.containsKey(name)) return null;
 
@@ -340,7 +379,7 @@ class APICronScheduler {
 
       return await _execute(job, run, renewer);
     } finally {
-      renewer.stop();
+      await renewer.stop();
       if (!renewer.lost) {
         await store.releaseLock(lock);
       }
@@ -510,17 +549,27 @@ class APICronScheduler {
         : APICronRunStatus.failed;
     run.lastError = succeeded ? null : error;
 
-    var stored = false;
+    bool stored;
     try {
       stored = await store.updateRun(run);
     } catch (e, s) {
       _log.severe('Run `${job.name}`: error storing its result', e, s);
+      stored = false;
+    }
+
+    if (!stored) {
+      // Rejected (taken by another instance) or not stored: as stored.
+      _log.warning(
+        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): result '
+        '(${run.status.name}) not stored: interrupted',
+      );
+      return run..status = APICronRunStatus.running;
     }
 
     var msg =
         'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
         '${run.status.name}, calls=${run.calls}, attempts=${run.attempts}, '
-        'duration=${run.durationMs}ms${stored ? '' : ' (not stored)'}';
+        'duration=${run.durationMs}ms';
 
     if (succeeded) {
       _log.info(msg);
@@ -687,20 +736,23 @@ class _LockRenewer {
 
   bool lost = false;
 
-  bool _renewing = false;
+  /// Completes when the renewal in progress (if any) finishes.
+  Completer<void>? _renewing;
+
+  bool _stopped = false;
 
   Duration get _every => Duration(
     milliseconds: math.max(1, job.leaseDuration.inMilliseconds ~/ 3),
   );
 
   void start() {
-    if (_timer != null || lost) return;
+    if (_timer != null || lost || _stopped) return;
     _timer = Timer.periodic(_every, (_) => _renew());
   }
 
   Future<void> _renew() async {
-    if (_renewing || lost) return;
-    _renewing = true;
+    if (_renewing != null || lost || _stopped) return;
+    var renewing = _renewing = Completer<void>();
     try {
       var ok = await scheduler.store.renewLock(
         lock,
@@ -718,18 +770,28 @@ class _LockRenewer {
         _lose('lease about to expire without renewal');
       }
     } finally {
-      _renewing = false;
+      _renewing = null;
+      renewing.complete();
     }
   }
 
   void _lose(String reason) {
     lost = true;
     _log.warning('Job `${job.name}`: lock lost ($reason)');
-    stop();
+    _cancel();
   }
 
-  void stop() {
+  void _cancel() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  /// Stops the renewals and waits for the one in progress: a renewal
+  /// finishing after the lock is released would store the lock again (the
+  /// repositories auto-insert on update), blocking the job for a lease.
+  Future<void> stop() async {
+    _stopped = true;
+    _cancel();
+    await _renewing?.future;
   }
 }

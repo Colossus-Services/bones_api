@@ -163,14 +163,34 @@ class CronReflectedModule extends APIModule {
   APIResponse<String> notScheduled(APIRequest request) => APIResponse.ok('no');
 }
 
+/// Two jobs with the same default name (`dup.twice`): rejected when its
+/// routes are configured. Not loaded by the test roots.
+@EnableReflection()
+class CronDuplicatedModule extends APIModule {
+  CronDuplicatedModule(APIRoot apiRoot) : super(apiRoot, 'dup');
+
+  @override
+  void configure() {
+    routes.anyFrom(reflection);
+  }
+
+  @APICron('0 1 * * *')
+  @APICron('0 2 * * *')
+  APIResponse<String> twice(APIRequest request) => APIResponse.ok('twice');
+}
+
 class _CronAPIRoot extends APIRoot {
   final List<APICronJob> codeJobs;
   final APICronStore? store;
+
+  /// [loadCronJobs] throws.
+  final bool failCronJobs;
 
   _CronAPIRoot({
     Map<String, dynamic>? config,
     this.codeJobs = const [],
     this.store,
+    this.failCronJobs = false,
   }) : super('cron-test', '1.0', apiConfig: config);
 
   @override
@@ -180,7 +200,10 @@ class _CronAPIRoot extends APIRoot {
   };
 
   @override
-  FutureOr<List<APICronJob>> loadCronJobs() => codeJobs;
+  FutureOr<List<APICronJob>> loadCronJobs() {
+    if (failCronJobs) throw StateError('Jobs not available');
+    return codeJobs;
+  }
 
   @override
   FutureOr<APICronStore> loadCronStore() => store ?? super.loadCronStore();
@@ -204,8 +227,11 @@ class _TestStore extends APICronStoreMemory {
 
   int renewals = 0;
 
-  /// [updateRun] throws after this many calls.
+  /// [updateRun] throws once, after this many calls.
   int? failUpdateAfter;
+
+  /// [updateRun] returns `false` after this many calls (the run taken over).
+  int? rejectUpdatesAfter;
 
   int updates = 0;
 
@@ -219,10 +245,11 @@ class _TestStore extends APICronStoreMemory {
   @override
   bool updateRun(APICronJobRun run, {String? previousOwner}) {
     if (rejectUpdates) return false;
-    var failAfter = failUpdateAfter;
-    if (failAfter != null && ++updates > failAfter) {
+    var n = ++updates;
+    if (failUpdateAfter != null && n == failUpdateAfter! + 1) {
       throw StateError('update failed');
     }
+    if (rejectUpdatesAfter != null && n > rejectUpdatesAfter!) return false;
     return super.updateRun(run, previousOwner: previousOwner);
   }
 
@@ -246,10 +273,75 @@ class _TestStore extends APICronStoreMemory {
   }
 }
 
+/// A store with slow lock renewals, recording the lock operations.
+class _SlowRenewStore extends APICronStore {
+  final APICronStoreMemory store = APICronStoreMemory();
+
+  final List<String> events = [];
+
+  @override
+  FutureOr<APICronJobRun?> getRun(String job, DateTime scheduledAt) =>
+      store.getRun(job, scheduledAt);
+
+  @override
+  FutureOr<APICronJobRun?> lastRun(String job) => store.lastRun(job);
+
+  @override
+  FutureOr<APICronJobRun?> claimRun(APICronJobRun run) => store.claimRun(run);
+
+  @override
+  FutureOr<bool> updateRun(APICronJobRun run, {String? previousOwner}) =>
+      store.updateRun(run, previousOwner: previousOwner);
+
+  @override
+  FutureOr<List<APICronJobRun>> selectRunningRuns(String job) =>
+      store.selectRunningRuns(job);
+
+  @override
+  FutureOr<List<APICronJobRun>> selectRuns(String job, {int limit = 20}) =>
+      store.selectRuns(job, limit: limit);
+
+  @override
+  FutureOr<int> deleteRunsBefore(String job, DateTime before) =>
+      store.deleteRunsBefore(job, before);
+
+  @override
+  FutureOr<APICronJobLock?> getLock(String job) => store.getLock(job);
+
+  @override
+  FutureOr<APICronJobLock?> acquireLock(
+    String job,
+    String owner,
+    Duration lease, {
+    DateTime? now,
+  }) => store.acquireLock(job, owner, lease, now: now);
+
+  @override
+  Future<bool> renewLock(
+    APICronJobLock lock,
+    Duration lease, {
+    DateTime? now,
+  }) async {
+    events.add('renew-start');
+    await Future.delayed(const Duration(milliseconds: 60));
+    var ok = store.renewLock(lock, lease, now: now);
+    events.add('renew-end');
+    return ok;
+  }
+
+  @override
+  FutureOr<bool> releaseLock(APICronJobLock lock) {
+    events.add('release');
+    return store.releaseLock(lock);
+  }
+}
+
 Future<void> _waitUntil(bool Function() condition) async {
-  for (var i = 0; i < 100 && !condition(); i++) {
+  for (var i = 0; i < 300; i++) {
+    if (condition()) return;
     await Future.delayed(const Duration(milliseconds: 10));
   }
+  fail('Condition not reached');
 }
 
 void main() {
@@ -647,15 +739,49 @@ void main() {
         ),
         throwsArgumentError,
       );
-      expect(
+      // The time zone is resolved lazily (no database load to build a job):
+      var badZone = APICronJob(
+        name: 'a',
+        schedule: '* * * * *',
+        path: '/a',
+        timeZone: 'X/Y',
+      );
+      expect(() => badZone.validate(), throwsArgumentError);
+
+      // Not positive durations / no attempts:
+      for (var create in <APICronJob Function()>[
         () => APICronJob(
           name: 'a',
           schedule: '* * * * *',
           path: '/a',
-          timeZone: 'X/Y',
+          leaseDuration: Duration.zero,
         ),
-        throwsArgumentError,
-      );
+        () => APICronJob(
+          name: 'a',
+          schedule: '* * * * *',
+          path: '/a',
+          timeout: const Duration(seconds: -1),
+        ),
+        () => APICronJob(
+          name: 'a',
+          schedule: '* * * * *',
+          path: '/a',
+          maxLateness: Duration.zero,
+        ),
+        () => APICronJob(
+          name: 'a',
+          schedule: '* * * * *',
+          path: '/a',
+          retry: const APICronRetry(attempts: 0),
+        ),
+        () => APICronJob.fromConfig('a', {
+          'schedule': '@daily',
+          'path': '/a',
+          'lease_duration': '0s',
+        }),
+      ]) {
+        expect(create, throwsArgumentError);
+      }
       expect(
         () => APICronJob(name: 'a', schedule: 'bad', path: '/a'),
         throwsFormatException,
@@ -1169,6 +1295,80 @@ void main() {
       },
     );
 
+    test('the result rejected by the store: reported as interrupted', () async {
+      // The start and the call stored; the result rejected (taken over):
+      var testStore = _TestStore()..rejectUpdatesAfter = 2;
+      var run = (await scheduler([job('ok')], store2: testStore).tick()).single;
+      expect(run.status, APICronRunStatus.running);
+      expect(
+        testStore.getRun('ok', _utc(2026, 10, 18, 10))!.status,
+        APICronRunStatus.running,
+      );
+    });
+
+    test('after stop: tick and runNow do nothing', () async {
+      var s = scheduler([job('ok')]);
+      s.start();
+      await _waitUntil(() => _calls.of('ok').isNotEmpty);
+      await s.waitRunning();
+      s.stop();
+
+      now = now.add(const Duration(days: 1));
+      expect(await s.tick(), isEmpty);
+      expect(await s.runNow('ok'), isNull);
+      expect(_calls.of('ok'), hasLength(1));
+      expect(store.selectRuns('ok'), hasLength(1), reason: 'Nothing claimed');
+
+      // Started again: works.
+      s.start();
+      await _waitUntil(() => _calls.of('ok').length == 2);
+      await s.waitRunning();
+      s.stop();
+    });
+
+    test('the lock is released after the renewal in progress', () async {
+      var slowStore = _SlowRenewStore();
+      _calls.block = Completer<void>();
+
+      var s = scheduler([
+        job('blocked', leaseDuration: const Duration(milliseconds: 30)),
+      ], store2: slowStore);
+      var running = s.tick();
+
+      await _waitUntil(() => slowStore.events.contains('renew-start'));
+      // Finishes while a (slow) renewal runs:
+      _calls.block!.complete();
+      await running;
+
+      var events = slowStore.events;
+      var release = events.indexOf('release');
+      expect(release, greaterThan(0));
+      // Every renewal started before the release ended before it:
+      expect(
+        events.sublist(0, release).where((e) => e == 'renew-start').length,
+        events.sublist(0, release).where((e) => e == 'renew-end').length,
+      );
+      expect(events.sublist(release), ['release']);
+      expect(slowStore.getLock('blocked'), isNull);
+    });
+
+    test(
+      'a job with an invalid time zone is skipped, the others run',
+      () async {
+        var s = scheduler([
+          APICronJob(
+            name: 'bad-zone',
+            schedule: '0 10 * * *',
+            path: '/jobs/ok',
+            timeZone: 'Mars/Olympus',
+          ),
+          job('pages'),
+        ]);
+        expect(s.jobs.keys, ['pages']);
+        expect((await s.tick()).single.job, 'pages');
+      },
+    );
+
     test('internal system authentication and headers', () async {
       var run = (await scheduler([job('auth')]).tick()).single;
       expect(run.status, APICronRunStatus.succeeded);
@@ -1215,7 +1415,7 @@ void main() {
 
       var s = scheduler([job('blocked', schedule: '* * * * *')]);
       var first = s.tick();
-      await Future.delayed(const Duration(milliseconds: 20));
+      await _waitUntil(() => _calls.of('blocked').isNotEmpty);
       expect(s.runningJobs, {'blocked'});
 
       // The next minute, while still running:
@@ -1421,9 +1621,13 @@ void main() {
       var running = s.tick();
       await _waitUntil(() => _calls.of('blocked').isNotEmpty);
 
-      // The renewals fail and the clock passes the lease:
+      // The renewals fail and the clock passes the lease: the next failed
+      // renewal loses the lock (and stops the renewals).
       now = now.add(const Duration(seconds: 1));
-      await _waitUntil(() => testStore.renewals >= 2);
+      var renewals = testStore.renewals;
+      await _waitUntil(() => testStore.renewals > renewals);
+      await Future.delayed(const Duration(milliseconds: 80));
+      expect(testStore.renewals, renewals + 1, reason: 'Renewals stopped');
       _calls.block!.complete();
 
       var run = (await running).single;
@@ -1728,32 +1932,150 @@ void main() {
       expect(workHours.timeZone, 'America/Sao_Paulo');
 
       // The first check, at start: `from-config` runs every minute.
-      for (var i = 0; i < 50 && _calls.of('ok').isEmpty; i++) {
-        await Future.delayed(const Duration(milliseconds: 20));
-      }
-      expect(_calls.of('ok'), isNotEmpty);
+      await _waitUntil(() => _calls.of('ok').isNotEmpty);
       expect(_calls.of('ok').first.headers['X-Cron-Job'], 'from-config');
 
+      // No late call landing in the next test:
+      await scheduler.waitRunning();
       api.close();
       expect(scheduler.isStarted, isFalse);
       expect(api.cronScheduler, isNull);
     });
 
-    test('a scheduler that fails to start does not fail the API', () async {
-      var api = _CronAPIRoot(
-        config: {
-          'cron': {
-            'enabled': true,
-            'jobs': {
-              'broken': {'path': '/jobs/ok'},
+    test(
+      'bad or stale cron.jobs entries are skipped, the others kept',
+      () async {
+        var api = _CronAPIRoot(
+          config: {
+            'cron': {
+              'enabled': true,
+              'check_interval': '1h',
+              'jobs': {
+                // Overrides of a job that doesn't exist (renamed): ignored.
+                'old-name': {'enabled': false},
+                // Invalid: skipped.
+                'broken': {'path': '/jobs/ok', 'schedule': 'not a cron'},
+                'zero-lease': {
+                  'path': '/jobs/ok',
+                  'schedule': '@daily',
+                  'lease_duration': 0,
+                },
+                // A non-map `retry` is ignored; `attempts` at the top level:
+                'daily-report': {'retry': 'bad', 'attempts': 6},
+              },
             },
           },
+        );
+        await api.ensureInitialized();
+
+        var scheduler = (await api.cronSchedulerReady)!;
+        expect(scheduler.jobs.keys.toSet(), {
+          'reflected.refresh',
+          'daily-report',
+          'reflected.workHours',
+        });
+        expect(scheduler.jobs['daily-report']!.retry.attempts, 6);
+        expect(
+          scheduler.jobs['daily-report']!.retry.initialDelay,
+          const Duration(minutes: 1),
+          reason: 'The annotation retry kept',
+        );
+
+        await scheduler.waitRunning();
+        api.close();
+      },
+    );
+
+    test('a scheduler that fails to start does not fail the API', () async {
+      var api = _CronAPIRoot(
+        failCronJobs: true,
+        config: {
+          'cron': {'enabled': true},
         },
       );
       await api.ensureInitialized();
       expect(api.isInitialized, isTrue);
       expect(await api.cronSchedulerReady, isNull);
       expect(api.cronScheduler, isNull);
+      api.close();
+    });
+
+    test('`cron` config: a boolean, or any other value (disabled)', () async {
+      for (var (value, enabled) in [
+        (false, false),
+        ('no', false),
+        (42, false),
+        (['x'], false),
+        (true, true),
+        ('true', true),
+      ]) {
+        var api = _CronAPIRoot(
+          store: APICronStoreMemory(),
+          config: {'cron': value},
+        );
+        var init = await api.ensureInitialized();
+        expect(init.ok, isTrue, reason: '`cron: $value`');
+        expect(api.cronConfig.enabled, enabled, reason: '`cron: $value`');
+
+        var scheduler = await api.cronSchedulerReady;
+        expect(scheduler != null, enabled, reason: '`cron: $value`');
+        await scheduler?.waitRunning();
+        api.close();
+      }
+    });
+
+    test('cronSchedulerReady: before initialize, and after close', () async {
+      var api = _CronAPIRoot(
+        store: APICronStoreMemory(),
+        config: {
+          'cron': {'enabled': true, 'check_interval': '1h'},
+        },
+      );
+
+      // Requested before the initialization: completed when started.
+      var ready = api.cronSchedulerReady;
+      await api.ensureInitialized();
+      var scheduler = (await ready)!;
+      expect(identical(scheduler, api.cronScheduler), isTrue);
+
+      // Stopped by hand: started again by `startCronScheduler`.
+      await scheduler.waitRunning();
+      scheduler.stop();
+      expect(identical(await api.startCronScheduler(), scheduler), isTrue);
+      expect(scheduler.isStarted, isTrue);
+
+      await scheduler.waitRunning();
+      api.close();
+      expect(await api.cronSchedulerReady, isNull);
+    });
+
+    test('closed before the start: the scheduler never starts', () async {
+      var api = _CronAPIRoot(
+        store: APICronStoreMemory(),
+        config: {
+          'cron': {'enabled': true},
+        },
+      );
+      var ready = api.cronSchedulerReady;
+      var init = api.ensureInitialized();
+      api.close();
+      await init;
+      expect(await ready, isNull);
+      expect(api.cronScheduler, isNull);
+    });
+
+    test('two @APICron with the same name in a module: an error', () {
+      var api = _CronAPIRoot();
+      expect(
+        () => CronDuplicatedModule(api).ensureConfigured(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Duplicated cron job name'),
+          ),
+        ),
+      );
       api.close();
     });
 

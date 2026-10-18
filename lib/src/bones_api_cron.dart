@@ -36,12 +36,14 @@ Duration? parseCronDuration(Object? value, [Duration? def]) {
 
 /// The retry policy of the calls of an [APICronJob].
 ///
-/// A call is retried after an [APIResponseStatus.ERROR] response, a thrown
-/// error or a timeout, up to [attempts] (the first call included), waiting
-/// [delayFor] between attempts (or the response `Retry-After` header, in
-/// seconds). [APIResponseStatus.UNAUTHORIZED],
+/// A call is retried after an [APIResponseStatus.ERROR] response or a thrown
+/// error, up to [attempts] (the first call included), waiting [delayFor]
+/// between attempts (or the response `Retry-After` header, in seconds, at
+/// most [maxDelay]). [APIResponseStatus.UNAUTHORIZED],
 /// [APIResponseStatus.BAD_REQUEST] and [APIResponseStatus.NOT_FOUND] are not
-/// retried (retrying won't change them).
+/// retried (retrying won't change them). A call slower than
+/// [APICronJob.timeout] is not retried: it's waited for (see
+/// [APICronJob.timeout]).
 class APICronRetry {
   static const APICronRetry defaultRetry = APICronRetry();
 
@@ -162,7 +164,15 @@ class APICronJob {
 
   final APICronRetry retry;
 
+  /// The location of [timeZone], resolved on first use (loading the time
+  /// zones database only when needed: not while the routes are configured,
+  /// nor with the scheduler disabled). Throws an [ArgumentError] for an
+  /// unknown time zone (see [validate]).
   late final tz.Location location = resolveCronTimeZone(timeZone);
+
+  /// Validates what is resolved lazily ([location]). Throws an
+  /// [ArgumentError] if invalid.
+  void validate() => location;
 
   APICronJob({
     required this.name,
@@ -188,8 +198,20 @@ class APICronJob {
     if (maxCalls < 1) {
       throw ArgumentError.value(maxCalls, 'maxCalls', 'Not positive');
     }
-    // Validates the time zone:
-    location;
+    // A zero lease would let another instance take the lock (and run the
+    // job in parallel) at once:
+    for (var (n, d) in [
+      ('timeout', timeout),
+      ('maxLateness', maxLateness),
+      ('leaseDuration', leaseDuration),
+    ]) {
+      if (d <= Duration.zero) {
+        throw ArgumentError.value(d, n, 'Not positive');
+      }
+    }
+    if (retry.attempts < 1) {
+      throw ArgumentError.value(retry.attempts, 'retry.attempts', '< 1');
+    }
   }
 
   /// The next occurrence after [from].
@@ -201,8 +223,8 @@ class APICronJob {
 
   /// A copy of this job with [config] applied (the `cron.jobs.<name>`
   /// config): `schedule`, `time_zone`, `method`, `path`, `parameters`,
-  /// `enabled`, `timeout`, `max_calls`, `max_lateness`, `lease_duration`
-  /// and `retry`.
+  /// `enabled`, `timeout`, `max_calls`, `max_lateness`, `lease_duration`,
+  /// `retry` and `attempts` (over the attempts of `retry`).
   APICronJob withConfig(Map? config) {
     if (config == null || config.isEmpty) return this;
     return APICronJob.fromConfig(name, config, base: this);
@@ -224,6 +246,16 @@ class APICronJob {
     }
 
     var parameters = get('parameters');
+
+    var retryConfig = get('retry');
+    var retry = (base?.retry ?? APICronRetry.defaultRetry).withConfig(
+      retryConfig is Map ? retryConfig : null,
+    );
+
+    var attempts = parseInt(get('attempts'));
+    if (attempts != null) {
+      retry = retry.withConfig({'attempts': attempts});
+    }
 
     return APICronJob(
       name: name,
@@ -252,11 +284,14 @@ class APICronJob {
         get('lease_duration', 'leaseDuration'),
         base?.leaseDuration ?? const Duration(minutes: 5),
       )!,
-      retry: (base?.retry ?? APICronRetry.defaultRetry).withConfig(
-        get('retry') as Map?,
-      ),
+      retry: retry,
     );
   }
+
+  /// `true` if [config] (a `cron.jobs.<name>` config) defines a whole job
+  /// (`schedule` and `path`), not only overrides of a job of the code.
+  static bool isFullConfig(Map config) =>
+      config['schedule'] != null && config['path'] != null;
 
   @override
   String toString() =>

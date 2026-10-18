@@ -355,9 +355,15 @@ Future<APIResponse<int>> updateRates(APIRequest request) async { ... }
 ```
 
 Both `@APICron(...)` and `@APICron.at(...)` accept `name` (default
-`<module>.<route>`), `timeZone`, `parameters`, `enabled`, `maxCalls`,
-`attempts`, `timeout`, `maxLateness`, `leaseDuration` and `retry`; the
-`cron.jobs.<name>` config overrides them.
+`<module>.<route>`; distinct names for more than one `@APICron` on a route),
+`timeZone`, `parameters`, `enabled`, `maxCalls`, `attempts`, `timeout`,
+`maxLateness`, `leaseDuration` and `retry`. The `cron.jobs.<name>` config
+overrides them (`schedule`, `time_zone`, `enabled`, `parameters`,
+`max_calls`, `attempts`, `timeout`, `max_lateness`, `lease_duration`,
+`retry`). A config entry for an unknown job (without `schedule` and `path`),
+or an invalid one, is skipped with a log: it doesn't stop the other jobs.
+
+`cron: true` (or `false`) is also accepted, for `enabled` only.
 
 Jobs can also be declared by overriding `APIRoot.loadCronJobs()` (returning
 `APICronJob`s).
@@ -377,15 +383,16 @@ Jobs can also be declared by overriding `APIRoot.loadCronJobs()` (returning
 - **Once per occurrence, never in parallel:** each occurrence is claimed in
   the `APICronStore` and the job holds a lock (with a lease, renewed while
   running) during its run, also with several instances of the API. A run
-  interrupted by a stopped instance is resumed by another one after the lease
-  expires, from its last continuation token. The leases use each instance's
-  clock: keep the servers' clocks synchronized (NTP).
+  interrupted is resumed from its last continuation token by the next check
+  of any instance: at once after a graceful stop (its lock is released), or
+  after the lease expires if its instance died. The leases use each
+  instance's clock: keep the servers' clocks synchronized (NTP).
 - **Start and stop:** the scheduler starts once the API and its modules are
   initialized (`APIRoot.cronSchedulerReady`), and `APIRoot.close` stops it: a
   running job stops after its current call, left to be resumed.
 - **Missed occurrences** (servers down): the latest one runs once if not
   older than `max_lateness` (default `1d`); older ones are recorded as
-  `skipped`.
+  `skipped` (at most the 100 after the last run, per check).
 - **Logs:** the logger `APICron` (start, calls, retries, skipped occurrences,
   lock take-overs, results), and the run history (`selectRuns`).
 

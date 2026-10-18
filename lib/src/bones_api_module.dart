@@ -78,7 +78,18 @@ abstract class APIModule with Initializable {
   List<APICronJob> get cronJobs => List<APICronJob>.unmodifiable(_cronJobs);
 
   /// Adds a [job] of this module (see `APICronScheduler`).
-  void addCronJob(APICronJob job) => _cronJobs.add(job);
+  ///
+  /// Throws a [StateError] if this module already has a job with the same
+  /// name (e.g. two [APICron] on a route without distinct names).
+  void addCronJob(APICronJob job) {
+    if (_cronJobs.any((j) => j.name == job.name)) {
+      throw StateError(
+        "Duplicated cron job name `${job.name}` in module `$name`: "
+        "use distinct `APICron.name`s",
+      );
+    }
+    _cronJobs.add(job);
+  }
 
   bool _configured = false;
 
@@ -611,8 +622,28 @@ class APIRouteBuilder<M extends APIModule> {
   /// Adds a route from [apiMethod], using the same name of the methods as route.
   /// See [MethodReflectionExtension.isAPIMethod].
   ///
+  /// The [APICron] annotations of [apiMethod] add the [APIModule.cronJobs] of
+  /// the route (only if the route is added).
+  ///
   /// - [requestMethod] the route request method.
   bool apiMethod(
+    MethodReflection apiMethod, [
+    APIRequestMethod? requestMethod,
+  ]) {
+    var added = _apiMethodRoute(apiMethod, requestMethod);
+
+    if (added) {
+      for (var cron in apiMethod.annotations.whereType<APICron>()) {
+        module.addCronJob(
+          cron.toJob(module.name, apiMethod.name, requestMethod),
+        );
+      }
+    }
+
+    return added;
+  }
+
+  bool _apiMethodRoute(
     MethodReflection apiMethod, [
     APIRequestMethod? requestMethod,
   ]) {
@@ -646,10 +677,6 @@ class APIRouteBuilder<M extends APIModule> {
     }
 
     var config = apiMethod.annotations.whereType<APIRouteConfig>().firstOrNull;
-
-    for (var cron in apiMethod.annotations.whereType<APICron>()) {
-      module.addCronJob(cron.toJob(module.name, apiMethod.name, requestMethod));
-    }
 
     if (returnsAPIResponse) {
       var returnTypeInfo = apiMethod.returnType!.typeInfo;

@@ -7,7 +7,11 @@ section "Cron: scheduled routes".
   (`CronExpression`), in an IANA time zone (daylight saving aware).
   - Declared by `@APICron` on a reflected route method, by
     `APIRoot.loadCronJobs()`, or by the `cron.jobs` config (which can also
-    override or disable a job of the code by name).
+    override or disable a job of the code by name). An invalid config entry,
+    or one for an unknown job, is skipped (logged): the other jobs run.
+  - `timeout`, `maxLateness` and `leaseDuration` must be positive, and
+    `retry.attempts` at least 1. The time zone is resolved when the scheduler
+    starts (a job with an unknown one is skipped).
   - `@APICron('30 23 * * *', ...)` takes a cron expression, and
     `@APICron.at(minute: '30', hour: '23', ...)` the schedule by its fields
     (`minute`, `hour`, `dayOfMonth`, `month`, `dayOfWeek`; default `*`).
@@ -25,24 +29,29 @@ section "Cron: scheduled routes".
     `BAD_REQUEST` and `NOT_FOUND` are not retried.
   - `timeout`: a slower call is logged, but waited for (a route can't be
     cancelled): never retried or overlapped while running.
-- `APICronScheduler`: started when the config `cron.enabled` is `true`, once
-  `APIRoot` and its modules are fully initialized (`cronSchedulerReady`);
-  not in auxiliary worker isolates (one per process). Stopped by
+- `APICronScheduler`: started when the config `cron.enabled` (or
+  `cron: true`) is `true`, once `APIRoot` and its modules are successfully
+  initialized (`cronSchedulerReady`); not in auxiliary worker isolates (one
+  per process). A `cron` config of another type is ignored (disabled), and
+  the scheduler never fails the API initialization. Stopped by
   `APIRoot.close`: a running job stops after its current call (left
-  resumable, its lock released; see `waitRunning`).
+  resumable, its lock released; see `waitRunning`), and no other check or
+  `runNow` runs until started again.
   - Each occurrence runs once: its run is claimed in the `APICronStore`
     (unique job + scheduled time), also among several instances.
   - A job never runs in parallel: a lock with a lease, renewed while running
-    (and considered lost if the lease runs out unrenewed). A run interrupted
-    (its instance stopped) is resumed by another instance after the lease
-    expires, from its last continuation token. A run is only written by its
-    owner while running: an instance that lost the lock writes nothing.
+    (and considered lost if the lease runs out unrenewed). An interrupted run
+    is resumed from its last continuation token by the next check: at once
+    after a graceful stop (lock released), or after the lease expires if its
+    instance died. A run is only written by its owner while running: an
+    instance that lost the lock writes nothing.
   - A run that fails by an error (or a continuation token over 4096
     characters) is marked failed, never left running.
   - The leases use each instance's clock: keep the servers' clocks
     synchronized (NTP).
   - Missed occurrences (servers down): the latest runs once if not older
-    than `maxLateness` (default 1 day); older ones are recorded as skipped.
+    than `maxLateness` (default 1 day); older ones are recorded as skipped
+    (at most the 100 after the last run, per check).
   - `runNow(job)`, `selectRuns(job)`, and history pruning (`history_days`,
     default 90; never a running run, nor a run still in its job's
     `maxLateness` window, that would run again).
@@ -53,7 +62,8 @@ section "Cron: scheduled routes".
   API). `APIRoot.loadCronStore()` uses the DB store when its repositories
   are registered (otherwise the in-memory store, with a warning: single
   instance only).
-- `APIModule.cronJobs` and `addCronJob`. Note: modules with generated
+- `APIModule.cronJobs` and `addCronJob` (a duplicated job name in a module
+  is an error; an `@APICron` job is only added with its route). Note: modules with generated
   reflection (`routes.anyFrom(reflection)`) need the reflection code
   regenerated (`build_runner`) to include the new `cronJobs` field.
 - New dependency: `timezone`.
