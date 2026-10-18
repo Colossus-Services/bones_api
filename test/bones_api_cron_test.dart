@@ -988,6 +988,17 @@ void main() {
       expect(APICronStoreDB.tryResolve(), isNull);
     });
 
+    test('APICronStoreDB.buildRepositories: SQL repositories, no cast', () {
+      // Both kinds of provider lists, with no cast (checked by the compiler):
+      List<DBSQLEntityRepository> Function(DBSQLAdapter) sql =
+          APICronStoreDB.buildRepositories;
+      List<EntityRepository<Object>> Function(DBSQLAdapter) generic =
+          APICronStoreDB.buildRepositories;
+      expect(sql, same(generic));
+      // No repository built here: it would register the cron entities for
+      // the other tests (see `bones_api_cron_db_tests_base.dart`).
+    });
+
     test('APIAuthentication.system', () {
       var auth = APIAuthentication.system('cron:x');
       expect(auth.isSystem, isTrue);

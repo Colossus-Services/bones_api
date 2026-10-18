@@ -1,3 +1,10 @@
+## 1.27.2
+
+- `APICronStoreDB.buildRepositories` returns `List<DBSQLEntityRepository>`
+  (was `List<EntityRepository<Object>>`): it can be added to a provider's
+  list of `DBSQLEntityRepository` with no cast, and still to a list of
+  `EntityRepository` (lists are covariant).
+
 ## 1.27.1
 
 - Cron time zones: the full `timezone` database is used

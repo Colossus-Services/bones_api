@@ -516,20 +516,23 @@ class APICronStoreDB extends APICronStore {
 
   /// The repositories of the cron tables for [adapter], to be returned by
   /// [DBRelationalEntityRepositoryProvider.buildRepositories].
-  static List<EntityRepository<Object>> buildRepositories(
-    DBSQLAdapter adapter,
-  ) => [
-    DBSQLEntityRepository<APICronJobRun>(
-      adapter,
-      runsTable,
-      apiCronJobRunEntityHandler,
-    ),
-    DBSQLEntityRepository<APICronJobLock>(
-      adapter,
-      locksTable,
-      apiCronJobLockEntityHandler,
-    ),
-  ];
+  ///
+  /// A `List<DBSQLEntityRepository>`: it can be added to a list of
+  /// [DBSQLEntityRepository] or of [EntityRepository] (the list is
+  /// covariant), with no cast.
+  static List<DBSQLEntityRepository> buildRepositories(DBSQLAdapter adapter) =>
+      [
+        DBSQLEntityRepository<APICronJobRun>(
+          adapter,
+          runsTable,
+          apiCronJobRunEntityHandler,
+        ),
+        DBSQLEntityRepository<APICronJobLock>(
+          adapter,
+          locksTable,
+          apiCronJobLockEntityHandler,
+        ),
+      ];
 
   /// An [APICronStoreDB] with the repositories of the cron entities known by
   /// the entity handlers (registered with [buildRepositories]), or `null`.
