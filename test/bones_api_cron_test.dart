@@ -149,6 +149,48 @@ class _CronAPIRoot extends APIRoot {
 DateTime _utc(int y, int m, int d, [int h = 0, int min = 0, int s = 0]) =>
     DateTime.utc(y, m, d, h, min, s);
 
+/// An [APICronStoreMemory] with failures and counters, for the error paths.
+class _TestStore extends APICronStoreMemory {
+  bool failSelectRunning = false;
+  bool failDelete = false;
+  bool failRenew = false;
+
+  /// [getRun] always returns `null` (a run claimed meanwhile by another
+  /// instance, not seen by the check).
+  bool hideRuns = false;
+
+  int renewals = 0;
+
+  @override
+  APICronJobRun? getRun(String job, DateTime scheduledAt) =>
+      hideRuns ? null : super.getRun(job, scheduledAt);
+
+  @override
+  List<APICronJobRun> selectRunningRuns(String job) {
+    if (failSelectRunning) throw StateError('store down');
+    return super.selectRunningRuns(job);
+  }
+
+  @override
+  int deleteRunsBefore(String job, DateTime before) {
+    if (failDelete) throw StateError('delete failed');
+    return super.deleteRunsBefore(job, before);
+  }
+
+  @override
+  bool renewLock(APICronJobLock lock, Duration lease, {DateTime? now}) {
+    renewals++;
+    if (failRenew) throw StateError('renew failed');
+    return super.renewLock(lock, lease, now: now);
+  }
+}
+
+Future<void> _waitUntil(bool Function() condition) async {
+  for (var i = 0; i < 100 && !condition(); i++) {
+    await Future.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 void main() {
   group('CronExpression', () {
     test('parse: fields, lists, ranges, steps, names', () {
@@ -296,6 +338,54 @@ void main() {
         c.nextAfter(_utc(2026, 7, 10), sp)!.toUtc(),
         equals(_utc(2026, 7, 10, 12)),
       );
+    });
+
+    test('previousBefore around daylight saving changes (Europe/Paris)', () {
+      var paris = resolveCronTimeZone('Europe/Paris');
+      var gap = CronExpression.parse('30 2 * * *');
+
+      // Spring: the occurrence of the gap day is after `to` (01:10Z = 03:10
+      // CEST): the previous one is the day before.
+      expect(
+        gap.previousBefore(_utc(2026, 3, 29, 1, 10), paris)!.toUtc(),
+        equals(_utc(2026, 3, 28, 1, 30)),
+      );
+
+      // The same as reported by `nextAfter`, once passed:
+      var spring = gap.nextAfter(_utc(2026, 3, 28, 12), paris)!;
+      expect(
+        gap.previousBefore(spring.add(const Duration(minutes: 1)), paris),
+        equals(spring),
+      );
+
+      // Fall: 02:30 happens twice (CEST 00:30Z, CET 01:30Z) and runs once,
+      // at 01:30Z, whether checked in the 1st or the 2nd 02:xx hour:
+      expect(
+        gap.nextAfter(_utc(2026, 10, 25, 0, 20), paris)!.toUtc(),
+        equals(_utc(2026, 10, 25, 1, 30)),
+      );
+      expect(
+        gap.nextAfter(_utc(2026, 10, 25, 1, 16), paris)!.toUtc(),
+        equals(_utc(2026, 10, 25, 1, 30)),
+      );
+      expect(
+        gap.nextAfter(_utc(2026, 10, 25, 1, 30), paris)!.toUtc(),
+        equals(_utc(2026, 10, 26, 1, 30)),
+      );
+      // In the 1st 02:xx hour, the 02:30 of the day is still ahead:
+      expect(
+        gap.previousBefore(_utc(2026, 10, 25, 0, 40), paris)!.toUtc(),
+        equals(_utc(2026, 10, 24, 0, 30)),
+      );
+    });
+
+    test('==, hashCode, toString', () {
+      var a = CronExpression.parse('0 10 * * *');
+      var b = CronExpression.parse('0 10 * * *');
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(equals(CronExpression.parse('0 11 * * *'))));
+      expect(a.toString(), '0 10 * * *');
     });
 
     test('resolveCronTimeZone', () {
@@ -481,6 +571,98 @@ void main() {
       expect(r.headers, isEmpty);
 
       expect(APIResponse.exposeHeaders, contains('X-Continuation'));
+    });
+
+    test('toString', () {
+      expect(const APICronRetry().toString(), contains('attempts: 3'));
+      expect(const APICron('@daily', name: 'x').toString(), contains('@daily'));
+      expect(
+        APICronConfig.fromMap({'enabled': true}).toString(),
+        contains('enabled: true'),
+      );
+      expect(
+        APICronJob(
+          name: 'n',
+          schedule: '@daily',
+          path: '/a',
+          enabled: false,
+        ).toString(),
+        contains('disabled'),
+      );
+
+      var job = const APICron('@daily', attempts: 2).toJob('m', 'r');
+      expect(job.name, 'm.r');
+      expect(job.retry.attempts, 2);
+    });
+
+    test('APICronJobRun and APICronJobLock fields', () {
+      var run = APICronJobRun('job', _utc(2026, 10, 18, 10), owner: 'o');
+      expect(run.status, APICronRunStatus.running);
+      expect(run.isFinished, isFalse);
+
+      // Values from a DB row (strings, numbers):
+      run.setField('attempts', '3');
+      run.setField('calls', 2.0);
+      run.setField('startedAt', _utc(2026, 1, 2).millisecondsSinceEpoch);
+      run.setField('finishedAt', '2026-01-02T00:05:00Z');
+      run.setField('status', 'skipped');
+      expect(run.attempts, 3);
+      expect(run.calls, 2);
+      expect(run.startedAt, _utc(2026, 1, 2));
+      expect(run.finishedAt, _utc(2026, 1, 2, 0, 5));
+      expect(run.status, APICronRunStatus.skipped);
+      expect(run.isFinished, isTrue);
+
+      run.setField('status', 'unknown');
+      expect(run.status, APICronRunStatus.running);
+
+      run.lastError = 'e' * 5000;
+      expect(run.lastError!.length, APICronJobRun.maxErrorLength);
+
+      expect(() => run.setField('nope', 1), throwsStateError);
+      expect(run.fieldsNames, contains('scheduledAt'));
+      expect(run.getFieldType('job'), TypeInfo.tString);
+      expect(run.getFieldEntityAnnotations('job'), isNotEmpty);
+      expect(run.toJson()['job'], 'job');
+      expect(run.toString(), contains('job: job'));
+
+      var lock = APICronJobLock('job', 'o', _utc(2026, 1, 1, 10));
+      expect(lock.isExpired(_utc(2026, 1, 1, 9)), isFalse);
+      expect(lock.isExpired(_utc(2026, 1, 1, 10)), isTrue);
+      expect(lock.acquiredAt, isNotNull);
+      expect(lock.toString(), contains('owner: o'));
+    });
+
+    test('APICronStoreMemory: not held / not stored', () {
+      var store = APICronStoreMemory();
+      var now = _utc(2026, 1, 1, 10);
+      const lease = Duration(minutes: 5);
+
+      expect(store.updateRun(APICronJobRun('j', now)), isFalse);
+
+      var a = store.acquireLock('j', 'a', lease, now: now)!;
+      // Expired: taken over by `b`.
+      var b = store.acquireLock(
+        'j',
+        'b',
+        lease,
+        now: now.add(const Duration(minutes: 10)),
+      )!;
+      expect(b.id, isNot(a.id));
+
+      expect(store.renewLock(a, lease), isFalse);
+      expect(store.releaseLock(a), isFalse);
+      expect(store.getLock('j')!.owner, 'b');
+      expect(store.releaseLock(b), isTrue);
+      expect(store.renewLock(b, lease), isFalse);
+      expect(store.releaseLock(b), isFalse);
+
+      expect(store.lastRun('j'), isNull);
+      expect(store.deleteRunsBefore('j', now), 0);
+    });
+
+    test('APICronStoreDB.tryResolve: no repositories', () {
+      expect(APICronStoreDB.tryResolve(), isNull);
     });
 
     test('APIAuthentication.system', () {
@@ -840,6 +1022,123 @@ void main() {
       );
     });
 
+    test('the lock is renewed while running', () async {
+      var testStore = _TestStore();
+      _calls.block = Completer<void>();
+
+      var s = scheduler([
+        job('blocked', leaseDuration: const Duration(milliseconds: 60)),
+      ], store2: testStore);
+      var running = s.tick();
+
+      await _waitUntil(() => testStore.renewals >= 3);
+      expect(testStore.renewals, greaterThanOrEqualTo(3));
+
+      // Held (renewed): another instance can't run it.
+      var other = scheduler(
+        [job('blocked', leaseDuration: const Duration(milliseconds: 60))],
+        owner: 'b',
+        store2: testStore,
+      );
+      expect(await other.tick(), isEmpty);
+
+      _calls.block!.complete();
+      expect((await running).single.status, APICronRunStatus.succeeded);
+      expect(_calls.of('blocked'), hasLength(1));
+    });
+
+    test('lock lost while running: left to the new owner', () async {
+      _calls.block = Completer<void>();
+
+      var s = scheduler([
+        job('blocked', leaseDuration: const Duration(milliseconds: 60)),
+      ]);
+      var running = s.tick();
+      await _waitUntil(() => _calls.of('blocked').isNotEmpty);
+
+      // Another instance took the lock over (e.g. this one was paused past
+      // its lease):
+      store.releaseLock(store.getLock('blocked')!);
+      store.acquireLock(
+        'blocked',
+        'thief',
+        const Duration(minutes: 5),
+        now: now,
+      );
+
+      await Future.delayed(const Duration(milliseconds: 80));
+      _calls.block!.complete();
+
+      var run = (await running).single;
+      expect(run.status, APICronRunStatus.running, reason: 'Not finished');
+      expect(store.getLock('blocked')!.owner, 'thief', reason: 'Not released');
+    });
+
+    test('lock renewal errors are only logged', () async {
+      var testStore = _TestStore()..failRenew = true;
+      _calls.block = Completer<void>();
+
+      var s = scheduler([
+        job('blocked', leaseDuration: const Duration(milliseconds: 30)),
+      ], store2: testStore);
+      var running = s.tick();
+
+      await _waitUntil(() => testStore.renewals >= 2);
+      _calls.block!.complete();
+
+      expect((await running).single.status, APICronRunStatus.succeeded);
+    });
+
+    test('a store error in a check is logged, not thrown', () async {
+      var testStore = _TestStore()..failSelectRunning = true;
+      var s = scheduler([job('ok')], store2: testStore);
+      expect(await s.tick(), isEmpty);
+      expect(_calls.requests, isEmpty);
+      expect(s.runningJobs, isEmpty);
+    });
+
+    test('history pruning errors are only logged', () async {
+      var testStore = _TestStore()..failDelete = true;
+      var s = APICronScheduler(
+        api,
+        [job('ok')],
+        store: testStore,
+        clock: () => now,
+        sleep: (d) async {},
+        historyDays: 30,
+      );
+      expect((await s.tick()).single.status, APICronRunStatus.succeeded);
+    });
+
+    test('occurrence claimed by another instance after the check', () async {
+      var testStore = _TestStore()..hideRuns = true;
+      testStore.claimRun(
+        APICronJobRun(
+          'ok',
+          _utc(2026, 10, 18, 10),
+          owner: 'other',
+          status: APICronRunStatus.succeeded,
+        ),
+      );
+
+      var s = scheduler([job('ok')], store2: testStore);
+      expect(await s.tick(), isEmpty);
+      expect(_calls.requests, isEmpty);
+      expect(testStore.getLock('ok'), isNull, reason: 'Lock released');
+    });
+
+    test('runNow: already running', () async {
+      _calls.block = Completer<void>();
+      var s = scheduler([job('blocked')]);
+      var running = s.tick();
+      await _waitUntil(() => s.runningJobs.isNotEmpty);
+
+      expect(await s.runNow('blocked'), isNull);
+
+      _calls.block!.complete();
+      await running;
+    });
+
     test('start / stop', () async {
       var s = APICronScheduler(
         api,
@@ -872,7 +1171,24 @@ void main() {
       await api.ensureInitialized();
       expect(api.cronScheduler, isNull);
       expect(api.cronConfig.enabled, isFalse);
+      expect(await api.startCronScheduler(), isNull);
       api.close();
+    });
+
+    test('default store: in memory without the DB repositories', () async {
+      var api = _CronAPIRoot(
+        config: {
+          'cron': {'enabled': true, 'check_interval': '1h'},
+        },
+      );
+      await api.ensureInitialized();
+      expect(api.cronScheduler!.store, isA<APICronStoreMemory>());
+      expect(
+        identical(await api.startCronScheduler(), api.cronScheduler),
+        isTrue,
+      );
+      api.close();
+      expect(await api.startCronScheduler(), isNull, reason: 'Closed');
     });
 
     test('enabled: started with the jobs of code, routes and config', () async {

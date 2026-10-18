@@ -85,6 +85,13 @@ void runCronStoreDBTests(
     // Each test with its own job names (the tables are shared):
     setUp(() => job = 'job${++jobCount}');
 
+    test('tryResolve: the registered repositories', () async {
+      var resolved = APICronStoreDB.tryResolve()!;
+      var t = _utc(2026, 10, 18, 10);
+      expect(await resolved.claimRun(APICronJobRun(job, t)), isNotNull);
+      expect((await store.getRun(job, t))?.job, job);
+    });
+
     test('claimRun: each occurrence once', () async {
       var t = _utc(2026, 10, 18, 10);
 
