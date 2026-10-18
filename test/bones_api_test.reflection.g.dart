@@ -184,6 +184,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -315,6 +316,21 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<MyInfoModule, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -471,6 +487,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -495,6 +512,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -678,6 +696,20 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
             __PR(__TR.tListInt, 'list', false, true),
             __PR(__TR.tInt, 'm', false, true),
           ],
+          null,
+          null,
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<MyInfoModule, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
           null,
           null,
           null,

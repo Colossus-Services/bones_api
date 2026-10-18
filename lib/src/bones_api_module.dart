@@ -14,6 +14,7 @@ import 'package:swiss_knife/swiss_knife.dart' show MimeType, DataURLBase64;
 import 'bones_api_authentication.dart';
 import 'bones_api_base.dart';
 import 'bones_api_config.dart';
+import 'bones_api_cron.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_extension.dart';
@@ -29,6 +30,7 @@ final _log = logging.Logger('APIModule');
 abstract class APIModule with Initializable {
   static const Set<String> interfaceMethodsNames = <String>{
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -67,6 +69,27 @@ abstract class APIModule with Initializable {
 
   /// Configures this API module. Usually defines the routes of this instance.
   void configure();
+
+  final List<APICronJob> _cronJobs = <APICronJob>[];
+
+  /// The [APICronJob]s of this module: its routes annotated with [APICron]
+  /// (added when the routes are configured, see [ensureConfigured]) and the
+  /// ones added with [addCronJob].
+  List<APICronJob> get cronJobs => List<APICronJob>.unmodifiable(_cronJobs);
+
+  /// Adds a [job] of this module (see `APICronScheduler`).
+  ///
+  /// Throws a [StateError] if this module already has a job with the same
+  /// name (e.g. two [APICron] on a route without distinct names).
+  void addCronJob(APICronJob job) {
+    if (_cronJobs.any((j) => j.name == job.name)) {
+      throw StateError(
+        "Duplicated cron job name `${job.name}` in module `$name`: "
+        "use distinct `APICron.name`s",
+      );
+    }
+    _cronJobs.add(job);
+  }
 
   bool _configured = false;
 
@@ -599,8 +622,28 @@ class APIRouteBuilder<M extends APIModule> {
   /// Adds a route from [apiMethod], using the same name of the methods as route.
   /// See [MethodReflectionExtension.isAPIMethod].
   ///
+  /// The [APICron] annotations of [apiMethod] add the [APIModule.cronJobs] of
+  /// the route (only if the route is added).
+  ///
   /// - [requestMethod] the route request method.
   bool apiMethod(
+    MethodReflection apiMethod, [
+    APIRequestMethod? requestMethod,
+  ]) {
+    var added = _apiMethodRoute(apiMethod, requestMethod);
+
+    if (added) {
+      for (var cron in apiMethod.annotations.whereType<APICron>()) {
+        module.addCronJob(
+          cron.toJob(module.name, apiMethod.name, requestMethod),
+        );
+      }
+    }
+
+    return added;
+  }
+
+  bool _apiMethodRoute(
     MethodReflection apiMethod, [
     APIRequestMethod? requestMethod,
   ]) {

@@ -14,6 +14,9 @@ import 'package:swiss_knife/swiss_knife.dart' show MimeType;
 
 import 'bones_api_authentication.dart';
 import 'bones_api_config.dart';
+import 'bones_api_cron.dart';
+import 'bones_api_cron_scheduler.dart';
+import 'bones_api_cron_store.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_rules.dart';
 import 'bones_api_error_zone.dart';
@@ -48,7 +51,7 @@ typedef APILogger =
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.26.0';
+  static const String VERSION = '1.27.0';
 
   static bool _boot = false;
 
@@ -355,7 +358,174 @@ abstract class APIRoot with Initializable, Closable {
   FutureOr<List<Initializable>> loadDependencies() => <Initializable>[];
 
   @override
-  FutureOr<InitializationResult> initialize() => _ensureReady();
+  FutureOr<InitializationResult> initialize() =>
+      _ensureReady().resolveMapped((result) {
+        if (result.ok) _scheduleCronSchedulerStart();
+        return result;
+      });
+
+  Completer<APICronScheduler?>? _cronSchedulerReady;
+
+  bool _cronSchedulerStartScheduled = false;
+
+  /// `true` if the [cronScheduler] should be started (cron enabled, not
+  /// closed nor an auxiliary instance).
+  bool get _cronSchedulerEnabled =>
+      !isClosed && !isAuxiliaryInstance && cronConfig.enabled;
+
+  /// Completes with the [cronScheduler] once started after [initialize]
+  /// (also if requested before it), or `null` if not enabled, if it couldn't
+  /// start, or after [close].
+  Future<APICronScheduler?> get cronSchedulerReady {
+    var ready = _cronSchedulerReady;
+    if (ready != null) return ready.future;
+
+    var scheduler = _cronScheduler;
+    if (scheduler != null || !_cronSchedulerEnabled) {
+      return Future.value(scheduler);
+    }
+
+    // Requested before `initialize`: completed when started.
+    return (_cronSchedulerReady = Completer<APICronScheduler?>()).future;
+  }
+
+  /// Starts the [cronScheduler] after this API is fully initialized.
+  ///
+  /// The modules (and their repositories) are dependencies of this root,
+  /// initialized only after [initialize] returns: the scheduler is started
+  /// outside of it (in the root `Zone`, where [ensureInitialized] waits for
+  /// the whole initialization instead of seeing a cyclic call), so no job
+  /// runs before the modules are ready.
+  ///
+  /// Never fails the initialization of the API (an error is logged).
+  void _scheduleCronSchedulerStart() {
+    try {
+      if (_cronSchedulerStartScheduled || _cronScheduler != null) return;
+      if (!_cronSchedulerEnabled) return;
+      _cronSchedulerStartScheduled = true;
+    } catch (e, s) {
+      _log.severe("Can't schedule the `APICronScheduler` start", e, s);
+      return;
+    }
+
+    var ready = _cronSchedulerReady ??= Completer<APICronScheduler?>();
+
+    Zone.root.run(() {
+      Timer.run(() async {
+        APICronScheduler? scheduler;
+        try {
+          var init = await ensureInitialized();
+          if (init.ok) {
+            scheduler = await startCronScheduler();
+          } else {
+            _log.severe(
+              "API initialization failed: `APICronScheduler` not started",
+            );
+          }
+        } catch (e, s) {
+          _log.severe("Can't start the `APICronScheduler`", e, s);
+        }
+        if (!ready.isCompleted) ready.complete(scheduler);
+      });
+    });
+  }
+
+  /// The [APICronJob]s declared by this API in code (besides the routes
+  /// annotated with [APICron] and the `cron.jobs` config). See
+  /// [APICronScheduler].
+  FutureOr<List<APICronJob>> loadCronJobs() => <APICronJob>[];
+
+  /// The [APICronStore] of the [cronScheduler]. Default: an [APICronStoreDB]
+  /// if its repositories are registered ([APICronStoreDB.buildRepositories]),
+  /// otherwise an [APICronStoreMemory] (single instance only).
+  FutureOr<APICronStore> loadCronStore() =>
+      APICronStoreDB.tryResolve() ?? APICronStoreMemory();
+
+  /// The `cron` config of this API. See [APICronConfig].
+  ///
+  /// A map is the full config; a boolean is `enabled` (`cron: true`);
+  /// anything else (an app's own `cron` key) is disabled.
+  APICronConfig get cronConfig {
+    var config = apiConfig.get('cron');
+    if (config is Map) return APICronConfig.fromMap(config);
+    var enabled = config is bool
+        ? config
+        : (config is String ? TypeParser.parseBool(config) : null);
+    return APICronConfig(enabled: enabled ?? false);
+  }
+
+  APICronScheduler? _cronScheduler;
+
+  /// The [APICronScheduler] of this API, if started (the config
+  /// `cron.enabled` is `true`).
+  APICronScheduler? get cronScheduler => _cronScheduler;
+
+  Future<APICronScheduler?>? _cronSchedulerStarting;
+
+  /// Starts the [cronScheduler] if the config `cron.enabled` is `true`
+  /// (called once [initialize] completes, see [cronSchedulerReady]). Not
+  /// started in an auxiliary instance (a worker `Isolate` copy, see
+  /// [isAuxiliaryInstance]): one scheduler per process.
+  FutureOr<APICronScheduler?> startCronScheduler() {
+    var current = _cronScheduler;
+    if (current != null) {
+      // Stopped manually (`cronScheduler.stop()`): started again.
+      if (!current.isStarted && !isClosed) current.start();
+      return current;
+    }
+    if (isClosed || isAuxiliaryInstance) return null;
+
+    var config = cronConfig;
+    if (!config.enabled) return null;
+
+    return _cronSchedulerStarting ??= _startCronSchedulerImpl(config);
+  }
+
+  Future<APICronScheduler?> _startCronSchedulerImpl(
+    APICronConfig config,
+  ) async {
+    try {
+      var moduleJobs = <APICronJob>[
+        for (var m in modules) ...(m..ensureConfigured()).cronJobs,
+      ];
+
+      var codeJobs = await loadCronJobs();
+
+      var jobs = APICronScheduler.mergeJobs([
+        moduleJobs,
+        codeJobs,
+      ], config.jobs);
+
+      var store = await loadCronStore();
+
+      if (store is APICronStoreMemory) {
+        _log.warning(
+          '`APICronScheduler` with an in-memory store: for a single instance '
+          'of the API only (with more instances, each one runs every job). '
+          'Register `APICronStoreDB.buildRepositories` for a shared store.',
+        );
+      }
+
+      var scheduler = APICronScheduler(
+        this,
+        jobs,
+        store: store,
+        checkInterval: config.checkInterval,
+        historyDays: config.historyDays,
+      );
+
+      if (isClosed) return null;
+
+      _cronScheduler = scheduler;
+      scheduler.start();
+      return scheduler;
+    } catch (e, s) {
+      _log.severe("Can't start the `APICronScheduler`", e, s);
+      return null;
+    } finally {
+      _cronSchedulerStarting = null;
+    }
+  }
 
   /// The default module to use when request module doesn't match.
   String? get defaultModuleName => null;
@@ -376,6 +546,13 @@ abstract class APIRoot with Initializable, Closable {
     if (!(super.close() as bool)) return false;
 
     EntityRulesResolver.unregisterContextProvider(_entityRulesContextProvider);
+
+    _cronScheduler?.stop();
+    _cronScheduler = null;
+
+    var cronReady = _cronSchedulerReady;
+    _cronSchedulerReady = null;
+    if (cronReady != null && !cronReady.isCompleted) cronReady.complete(null);
 
     tryCallSync(() => onClose());
 
@@ -3422,8 +3599,31 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   static final String headerXAccessTokenExpiration =
       "X-Access-Token-Expiration";
 
+  /// The header with the continuation token of a route with more work to do
+  /// (another page, a cursor...). See [continuation].
+  static final String headerXContinuation = "X-Continuation";
+
   static final String exposeHeaders =
-      "Content-Length, Content-Type, Last-Modified, $headerXAccessToken, $headerXAccessTokenExpiration";
+      "Content-Length, Content-Type, Last-Modified, $headerXAccessToken, $headerXAccessTokenExpiration, $headerXContinuation";
+
+  /// The continuation token of this response ([headerXContinuation]): the
+  /// route has more work to do, and should be called again with it (as the
+  /// `continuation` parameter). `null` when done.
+  ///
+  /// Followed by the `APICronScheduler` calls of an `APICronJob`.
+  String? get continuation {
+    var token = getHeader(headerXContinuation)?.trim();
+    return token == null || token.isEmpty ? null : token;
+  }
+
+  set continuation(String? token) {
+    var headerLC = headerXContinuation.toLowerCase();
+    headers.removeWhere((k, _) => k.toLowerCase() == headerLC);
+    token = token?.trim();
+    if (token != null && token.isNotEmpty) {
+      headers[headerXContinuation] = token;
+    }
+  }
 
   /// Returns `true` if this response has `CORS` (Cross-origin Resource Sharing) headers set.
   bool get hasCORS =>

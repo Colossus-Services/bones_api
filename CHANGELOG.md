@@ -1,3 +1,73 @@
+## 1.27.0
+
+Cron: scheduled calls of API routes (`APICronScheduler`), see the README
+section "Cron: scheduled routes".
+
+- `APICronJob`: a route called on a 5 fields cron expression
+  (`CronExpression`), in an IANA time zone (daylight saving aware).
+  - Declared by `@APICron` on a reflected route method, by
+    `APIRoot.loadCronJobs()`, or by the `cron.jobs` config (which can also
+    override or disable a job of the code by name). An invalid config entry,
+    or one for an unknown job, is skipped (logged): the other jobs run.
+  - `timeout`, `maxLateness` and `leaseDuration` must be positive, and
+    `retry.attempts` at least 1. The time zone is resolved when the scheduler
+    starts (a job with an unknown one is skipped).
+  - `@APICron('30 23 * * *', ...)` takes a cron expression, and
+    `@APICron.at(minute: '30', hour: '23', ...)` the schedule by its fields
+    (`minute`, `hour`, `dayOfMonth`, `month`, `dayOfWeek`; default `*`).
+    Both accept `name`, `timeZone`, `parameters`, `enabled`, `maxCalls`,
+    `attempts`, `timeout`, `maxLateness`, `leaseDuration` and `retry`.
+  - Called through `APIRoot.call`, with an internal system authentication
+    (`APIAuthentication.system`, passes `APIRouteAuthenticatedRule`), the
+    requester source `internal` and the headers `X-Cron-Job`,
+    `X-Cron-Scheduled-At`, `X-Cron-Run` and `X-Cron-Attempt`.
+  - Continuation: while the response has the header `X-Continuation`
+    (`APIResponse.continuation`), the route is called again with the
+    parameter `continuation`, up to `maxCalls` per run.
+  - Retries (`APICronRetry`): exponential backoff (default 3 attempts: 30s,
+    2m), honoring `Retry-After` (capped by `maxDelay`). `UNAUTHORIZED`,
+    `BAD_REQUEST` and `NOT_FOUND` are not retried.
+  - `timeout`: a slower call is logged, but waited for (a route can't be
+    cancelled): never retried or overlapped while running.
+- `APICronScheduler`: started when the config `cron.enabled` (or
+  `cron: true`) is `true`, once `APIRoot` and its modules are successfully
+  initialized (`cronSchedulerReady`); not in auxiliary worker isolates (one
+  per process). A `cron` config of another type is ignored (disabled), and
+  the scheduler never fails the API initialization. Stopped by
+  `APIRoot.close`: a running job stops after its current call (left
+  resumable, its lock released; see `waitRunning`), and no other check or
+  `runNow` runs until started again.
+  - Each occurrence runs once: its run is claimed in the `APICronStore`
+    (unique job + scheduled time), also among several instances.
+  - A job never runs in parallel: a lock with a lease, renewed while running
+    (and considered lost if the lease runs out unrenewed). An interrupted run
+    is resumed from its last continuation token by the next check: at once
+    after a graceful stop (lock released), or after the lease expires if its
+    instance died. A run is only written by its owner while running: an
+    instance that lost the lock writes nothing.
+  - A run that fails by an error (or a continuation token over 4096
+    characters) is marked failed, never left running.
+  - The leases use each instance's clock: keep the servers' clocks
+    synchronized (NTP).
+  - Missed occurrences (servers down): the latest runs once if not older
+    than `maxLateness` (default 1 day); older ones are recorded as skipped
+    (at most the 100 after the last run, per check).
+  - `runNow(job)`, `selectRuns(job)`, and history pruning (`history_days`,
+    default 90; never a running run, nor a run still in its job's
+    `maxLateness` window, that would run again).
+  - Logged by the logger `APICron`.
+- `APICronStore`: `APICronStoreMemory` (single instance) and
+  `APICronStoreDB` (tables `api_cron_job_run` and `api_cron_job_lock`; add
+  `APICronStoreDB.buildRepositories(adapter)` to the repositories of the
+  API). `APIRoot.loadCronStore()` uses the DB store when its repositories
+  are registered (otherwise the in-memory store, with a warning: single
+  instance only).
+- `APIModule.cronJobs` and `addCronJob` (a duplicated job name in a module
+  is an error; an `@APICron` job is only added with its route). Note: modules with generated
+  reflection (`routes.anyFrom(reflection)`) need the reflection code
+  regenerated (`build_runner`) to include the new `cronJobs` field.
+- New dependency: `timezone`.
+
 ## 1.26.0
 
 - Fix: a route method with an `APIRequest` as its only positional parameter

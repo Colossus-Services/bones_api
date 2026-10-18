@@ -263,6 +263,14 @@ class APIPasswordNotHashed extends APIPasswordHashAlgorithm {
   String hashPassword(String password) => password;
 }
 
+/// The [APIAuthentication.data] of a system authentication.
+class _APISystemAuthenticationData {
+  const _APISystemAuthenticationData();
+
+  @override
+  String toString() => 'system';
+}
+
 class APIAuthentication {
   final APIToken token;
 
@@ -284,6 +292,25 @@ class APIAuthentication {
          permissions ?? <APIPermission>[],
        ),
        _credential = credential;
+
+  /// An internal authentication of the system itself (e.g. a scheduled call
+  /// of an `APICronJob`), named [username]: not issued to any client (no
+  /// credential, not stored), it's set directly in an `APIRequest` built by
+  /// the server and passes the authenticated route rules.
+  ///
+  /// The token expires after [duration] (default: 1 day).
+  factory APIAuthentication.system(
+    String username, {
+    List<APIPermission>? permissions,
+    Duration duration = const Duration(days: 1),
+  }) => APIAuthentication(
+    APIToken(username, duration: duration),
+    permissions: permissions,
+    data: const _APISystemAuthenticationData(),
+  );
+
+  /// `true` if this is a system authentication ([APIAuthentication.system]).
+  bool get isSystem => data is _APISystemAuthenticationData;
 
   String get username => token.username;
 

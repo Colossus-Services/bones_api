@@ -182,6 +182,7 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
     'apiConfig',
     'apiRoot',
     'authenticationRoute',
+    'cronJobs',
     'cyclicDependencies',
     'defaultRouteName',
     'hashCode',
@@ -327,6 +328,21 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
           true,
           (o) =>
               () => o!.defaultRouteName,
+          null,
+          obj,
+          false,
+        );
+      case 'cronjobs':
+        return FieldReflection<ModuleRole, List<APICronJob>>(
+          this,
+          APIModule,
+          const __TR<List<APICronJob>>(List, <__TR>[
+            __TR<APICronJob>(APICronJob),
+          ]),
+          'cronJobs',
+          false,
+          (o) =>
+              () => o!.cronJobs,
           null,
           obj,
           false,
@@ -484,6 +500,7 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
       'version': obj?.version,
       'apiConfig': obj?.apiConfig,
       'defaultRouteName': obj?.defaultRouteName,
+      'cronJobs': obj?.cronJobs,
       'allRoutesNames': obj?.allRoutesNames,
       'routes': obj?.routes,
       'authenticationRoute': obj?.authenticationRoute,
@@ -508,6 +525,7 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
 
   static const List<String> _methodsNames = const <String>[
     'acceptsRequest',
+    'addCronJob',
     'addRoute',
     'addRouteHandler',
     'apiInfo',
@@ -630,6 +648,20 @@ class ModuleRole$reflection extends ClassReflection<ModuleRole>
           (o) => o!.list,
           obj,
           null,
+          null,
+          null,
+          null,
+        );
+      case 'addcronjob':
+        return MethodReflection<ModuleRole, void>(
+          this,
+          APIModule,
+          'addCronJob',
+          __TR.tVoid,
+          false,
+          (o) => o!.addCronJob,
+          obj,
+          const <__PR>[__PR(__TR<APICronJob>(APICronJob), 'job', false, true)],
           null,
           null,
           null,
