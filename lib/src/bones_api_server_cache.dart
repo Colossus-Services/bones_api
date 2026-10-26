@@ -367,23 +367,37 @@ class APIServerResponseCache {
 
     return cached200.resolveMapped((cached200) {
       var cachedEntries = cached200.asCachedEntries;
+      if (cachedEntries == null || cachedEntries.isEmpty) return null;
 
-      var cached2 = cachedEntries.resolveAlternative(request);
-      if (cached2 == null) return null;
+      return cachedEntries.resolveAlternative(request).resolveMapped((cached2) {
+        if (cached2 == null) return null;
 
-      assert(cached2.validate(request));
-      _put(cached2);
+        assert(cached2.validate(request));
 
-      if (cached2 is _CachedResponse200) {
-        var cachedResponse304 = cached2.asCachedResponse304;
-        if (cachedResponse304 != null) {
-          _put(cachedResponse304);
+        // Only if still cached: the file may have been modified while
+        // the alternative was encoded (asynchronously):
+        if (_isCached(cachedEntries.first)) {
+          _put(cached2);
+
+          if (cached2 is _CachedResponse200) {
+            var cachedResponse304 = cached2.asCachedResponse304;
+            if (cachedResponse304 != null) {
+              _put(cachedResponse304);
+            }
+          }
         }
-      }
 
-      return cached2.toResponse(request);
+        return cached2.toResponse(request);
+      });
     });
   }
+
+  /// Returns `true` if [cachedResponse] is still in the cache.
+  bool _isCached(_CachedResponse cachedResponse) =>
+      _cachedResponses[cachedResponse.key]?.asCachedEntries?.any(
+        (e) => identical(e, cachedResponse),
+      ) ??
+      false;
 
   FutureOr<Response?> _getCachedResponse404(
     Request request,
@@ -410,10 +424,14 @@ class APIServerResponseCache {
 
   /// Returns `true` if the `200` [response] for [request] will be cached:
   /// a `GET` with a known `Content-Length` up to [maxContentLength].
+  ///
+  /// The uncompressed length is used ([uncompressedContentLength]), so the
+  /// result is the same before and after [compressResponse] (the cached
+  /// alternatives can also be uncompressed).
   bool isCacheable(Request request, Response response) {
     if (response.statusCode != 200 || request.method != 'GET') return false;
 
-    var contentLength = response.contentLength;
+    var contentLength = uncompressedContentLength(response);
     return contentLength != null && contentLength <= maxContentLength;
   }
 
@@ -884,7 +902,7 @@ abstract class _CachedResponse
     Duration timeout = _FileStat.defaultStatTimeout,
   }) => fileStat?.isFileModifiedAsync(timeout: timeout) ?? false;
 
-  _CachedResponse? resolveAlternative(Request request) => null;
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) => null;
 
   Response? toValidResponse(Request request, DateTime? requestInitTime) {
     if (validate(request)) {
@@ -1006,18 +1024,28 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
   APIContentEncoding? get contentEncodingType =>
       APIContentEncoding.parse(contentEncoding);
 
-  Uint8List? decompressContent() {
-    final content = this.content;
-    if (content == null || encoding != null) return null;
+  /// Set if the compressed [content] failed to be decompressed.
+  bool _undecodable = false;
 
+  /// Returns `true` if [content] can be converted to another encoding
+  /// (or decompressed): a binary content, not compressed or compressed
+  /// with a supported encoding that decodes.
+  bool get isConvertible =>
+      content != null &&
+      encoding == null &&
+      !_undecodable &&
+      (!isCompressedContent || contentEncodingType != null);
+
+  Uint8List? decompressContent() {
+    if (!isConvertible) return null;
+
+    final content = this.content!;
     if (!isCompressedContent) return content;
 
-    final contentEncodingType = this.contentEncodingType;
-    if (contentEncodingType == null) return null;
-
     try {
-      return decodeContent(content, contentEncodingType);
+      return decodeContent(content, contentEncodingType!);
     } catch (e, s) {
+      _undecodable = true;
       _log.warning(
         "Can't decompress cached `$contentEncoding` content: $path",
         e,
@@ -1028,32 +1056,23 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
   }
 
   /// Compresses [content] to [targetEncoding], decompressing it first if
-  /// it's compressed with another encoding.
-  (Uint8List, String)? compressContent(
+  /// it's compressed with another encoding. A large Brotli encoding runs
+  /// in a background `Isolate` ([APIResponseCompression.encodeAsync]).
+  ///
+  /// Returns `null` if [content] is not [isConvertible] or the encoding
+  /// fails (check [isConvertible] to tell them apart).
+  FutureOr<Uint8List?> compressContent(
     APIContentEncoding targetEncoding,
     APIResponseCompression compression,
   ) {
-    final content = this.content;
-    if (content == null || encoding != null) return null;
+    if (!isConvertible) return null;
 
-    if (isCompressedContent) {
-      if (contentEncoding == targetEncoding.headerValue) {
-        return (content, targetEncoding.headerValue);
-      }
+    if (contentEncoding == targetEncoding.headerValue) return content;
 
-      final decompressed = decompressContent();
-      if (decompressed == null) return null;
+    final decompressed = decompressContent();
+    if (decompressed == null) return null;
 
-      final compressed = compression.encode(decompressed, targetEncoding);
-      if (compressed == null) return null;
-
-      return (compressed, targetEncoding.headerValue);
-    }
-
-    final compressed = compression.encode(content, targetEncoding);
-    if (compressed == null) return null;
-
-    return (compressed, targetEncoding.headerValue);
+    return compression.encodeAsync(decompressed, targetEncoding);
   }
 
   @override
@@ -1138,16 +1157,48 @@ class _CachedResponse200 extends _CachedResponseWithBody {
   /// (e.g., a Brotli encoder error): not tried again.
   final Set<APIContentEncoding> _failedEncodings = {};
 
-  _CachedResponse200? compressedCopy(APIContentEncoding targetEncoding) {
+  /// The [compressedCopy]s being encoded (asynchronously), shared by
+  /// concurrent requests.
+  final Map<APIContentEncoding, Future<_CachedResponse200?>> _pendingCopies =
+      {};
+
+  FutureOr<_CachedResponse200?> compressedCopy(
+    APIContentEncoding targetEncoding,
+  ) {
     if (_failedEncodings.contains(targetEncoding)) return null;
 
-    var compressed = this.compressContent(targetEncoding, compression);
-    if (compressed == null) {
-      _failedEncodings.add(targetEncoding);
+    var pending = _pendingCopies[targetEncoding];
+    if (pending != null) return pending;
+
+    var compressed = compressContent(targetEncoding, compression);
+
+    if (compressed is Future<Uint8List?>) {
+      return _pendingCopies[targetEncoding] = compressed
+          .then((compressed) => _compressedCopyFrom(targetEncoding, compressed))
+          .whenComplete(() {
+            // Not `=>`: `remove` returns this `Future`, and `whenComplete`
+            // would wait for it (itself).
+            _pendingCopies.remove(targetEncoding);
+          });
+    }
+
+    return _compressedCopyFrom(targetEncoding, compressed);
+  }
+
+  _CachedResponse200? _compressedCopyFrom(
+    APIContentEncoding targetEncoding,
+    Uint8List? compressContent,
+  ) {
+    if (compressContent == null) {
+      // Not an encoder failure if this content can't be converted at all
+      // (e.g., an unsupported or corrupted source encoding):
+      if (isConvertible) {
+        _failedEncodings.add(targetEncoding);
+      }
       return null;
     }
 
-    var (compressContent, compressedEncoding) = compressed;
+    var compressedEncoding = targetEncoding.headerValue;
 
     return _CachedResponse200(
       path: path,
@@ -1188,7 +1239,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       final best = _requestEncoding(request);
       if (best != null &&
           best.headerValue != contentEncoding &&
-          contentEncodingType != null) {
+          isConvertible) {
         return false;
       }
     } else if (shouldCompress() && _requestEncoding(request) != null) {
@@ -1218,24 +1269,28 @@ class _CachedResponse200 extends _CachedResponseWithBody {
   }
 
   @override
-  _CachedResponse? resolveAlternative(Request request) {
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) {
     final best = _requestEncoding(request);
 
     if (isCompressedContent) {
       if (best != null && best.headerValue != contentEncoding) {
-        var copy = compressedCopy(best);
-        if (copy != null) return copy;
+        return compressedCopy(best)
+            .resolveMapped((copy) => copy ?? _decompressedAlternative(request));
       }
 
-      if (!request.requestAcceptsEncoding(contentEncoding!)) {
-        return decompressedCopy();
-      }
+      return _decompressedAlternative(request);
     } else if (best != null && shouldCompress()) {
       return compressedCopy(best);
     }
 
     return null;
   }
+
+  /// The [decompressedCopy] if [request] doesn't accept [contentEncoding].
+  _CachedResponse200? _decompressedAlternative(Request request) =>
+      request.requestAcceptsEncoding(contentEncoding!)
+      ? null
+      : decompressedCopy();
 
   @override
   Response toResponse(Request request, {DateTime? requestInitTime}) {
@@ -1593,13 +1648,28 @@ extension _FutureOrObjectExtension on FutureOr<Object?> {
 }
 
 extension _ListCachedResponseExtension on List<_CachedResponse>? {
-  _CachedResponse? resolveAlternative(Request request) {
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) {
     final self = this;
     if (self == null) return null;
 
-    for (var cached in self) {
-      var cached2 = cached.resolveAlternative(request);
-      if (cached2 != null) {
+    return _resolveAlternativeFrom(self, 0, request);
+  }
+
+  static FutureOr<_CachedResponse?> _resolveAlternativeFrom(
+    List<_CachedResponse> entries,
+    int start,
+    Request request,
+  ) {
+    for (var i = start; i < entries.length; ++i) {
+      var cached2 = entries[i].resolveAlternative(request);
+
+      if (cached2 is Future<_CachedResponse?>) {
+        final next = i + 1;
+        return cached2.then(
+          (cached2) =>
+              cached2 ?? _resolveAlternativeFrom(entries, next, request),
+        );
+      } else if (cached2 != null) {
         return cached2;
       }
     }
@@ -1645,11 +1715,8 @@ extension _RequestExtension on Request {
         headers[HttpHeaders.acceptEncodingHeader],
       );
 
-  bool requestAcceptsEncoding(String contentEncoding) {
-    var coding = contentEncoding.trim().toLowerCase();
-    if (coding == 'x-gzip') coding = 'gzip';
-    return acceptEncodingQuality(acceptedEncodings, coding) > 0;
-  }
+  bool requestAcceptsEncoding(String contentEncoding) =>
+      acceptsContentEncodingFrom(acceptedEncodings, contentEncoding);
 }
 
 final _requestAcceptedEncodings = Expando<Map<String, double>>(

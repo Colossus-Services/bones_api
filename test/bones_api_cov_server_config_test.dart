@@ -385,6 +385,14 @@ void main() {
       expect(config2.port, equals(80));
     });
 
+    test('fromArgs: --compression-encodings false', () {
+      for (var off in ['false', 'none', 'off']) {
+        var config = APIServerConfig.fromArgs(['--compression-encodings', off]);
+        expect(config.compressionEncodings, isEmpty, reason: off);
+        expect(config.responseCompression.isEnabled, isFalse, reason: off);
+      }
+    });
+
     test('normalizeAddress', () {
       for (var a in ['*', '0', '::', '0:0:0:0:0:0:0:0']) {
         expect(APIServerConfig.normalizeAddress(a), equals('0.0.0.0'));
@@ -604,6 +612,47 @@ void main() {
       expect(
         APIServerConfig.resolveCompressionEncodings(null),
         equals(APIContentEncoding.defaultEncodings),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings(' ON '),
+        equals(APIContentEncoding.defaultEncodings),
+      );
+      // `false` (bool or string) and the like: compression disabled:
+      expect(APIServerConfig.resolveCompressionEncodings(false), isEmpty);
+      for (var off in [
+        'false',
+        'FALSE',
+        'off',
+        'no',
+        ' none ',
+        'none,deflate',
+      ]) {
+        expect(
+          APIServerConfig.resolveCompressionEncodings(off),
+          isEmpty,
+          reason: off,
+        );
+      }
+      expect(APIServerConfig.resolveCompressionEncodings([false]), isEmpty);
+      expect(APIServerConfig.resolveCompressionEncodings(['', ' ']), isEmpty);
+      expect(
+        APIServerConfig.resolveCompressionEncodings(
+          null,
+          apiConfig: APIConfig({
+            'server': {'compression_encodings': false},
+          }),
+        ),
+        isEmpty,
+      );
+      // A known encoding wins over a disabled value:
+      expect(
+        APIServerConfig.resolveCompressionEncodings('none,br'),
+        equals([APIContentEncoding.br]),
+      );
+      // Duplicates removed, order kept:
+      expect(
+        APIServerConfig.resolveCompressionEncodings('gzip,br,x-gzip'),
+        equals([APIContentEncoding.gzip, APIContentEncoding.br]),
       );
       // Clamped:
       expect(

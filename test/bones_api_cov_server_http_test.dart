@@ -308,7 +308,9 @@ void main() {
       expect(res.headers.value('content-length'), equals('${res.body.length}'));
       expect(res.headers.value('vary'), contains('Accept-Encoding'));
       expect(res.headers.value('vary'), contains('Origin'));
-      expect(res.headers.value('server-timing'), contains('obj-json-br;dur='));
+      // Compressed once, by `compressResponse` (not while encoding the JSON):
+      expect(res.headers.value('server-timing'), contains(',br;dur='));
+      expect(res.headers.value('server-timing'), isNot(contains('obj-json-')));
       expect((json.decode(_bodyStr(res)) as List).length, equals(300));
 
       // A higher `q` wins over the server order:
@@ -1027,6 +1029,64 @@ void main() {
         expect(resNone.headers.value('content-encoding'), isNull);
         expect(utf8.decode(resNone.body), equals(data));
       }
+    });
+
+    test('HEAD: not compressed, keeps the `Content-Length`', () async {
+      var length = File(pack_path.join(docRoot.path, 'data.txt')).lengthSync();
+
+      for (var i = 0; i < 2; ++i) {
+        var res = await _request(
+          '${apiServer.url}data.txt',
+          method: 'HEAD',
+          headers: {'accept-encoding': 'br'},
+        );
+        expect(res.status, equals(200));
+        expect(res.headers.value('content-encoding'), isNull);
+        expect(res.headers.value('content-length'), equals('$length'));
+        expect(res.headers.value('vary'), contains('Accept-Encoding'));
+        expect(res.body, isEmpty);
+      }
+    });
+
+    test('large file: br (q9+, encoded in an `Isolate`)', () async {
+      // Over `APIBrotli.isolateMinLength(9)`:
+      var data = List.generate(
+        3000,
+        (i) => 'line $i: ${'abc' * (i % 37)} ${i * 7919 % 10007}',
+      ).join('\n');
+      expect(data.length, greaterThan(APIBrotli.isolateMinLength(9)));
+
+      File(pack_path.join(docRoot.path, 'large.txt')).writeAsStringSync(data);
+
+      // Concurrent requests:
+      var responses = await Future.wait([
+        for (var i = 0; i < 3; ++i)
+          _request(
+            '${apiServer.url}large.txt',
+            headers: {'accept-encoding': 'br'},
+          ),
+      ]);
+
+      for (var res in responses) {
+        expect(res.status, equals(200));
+        expect(res.headers.value('content-encoding'), equals('br'));
+        expect(_bodyStr(res), equals(data));
+      }
+
+      // Cached alternatives (identity and gzip, from the br content):
+      var resGz = await _request(
+        '${apiServer.url}large.txt',
+        headers: {'accept-encoding': 'gzip'},
+      );
+      expect(resGz.headers.value('content-encoding'), equals('gzip'));
+      expect(_bodyStr(resGz), equals(data));
+
+      var resNone = await _request(
+        '${apiServer.url}large.txt',
+        noAcceptEncoding: true,
+      );
+      expect(resNone.headers.value('content-encoding'), isNull);
+      expect(utf8.decode(resNone.body), equals(data));
     });
   });
 

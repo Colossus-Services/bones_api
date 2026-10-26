@@ -6,14 +6,23 @@
     (q-values, `q=0` and `*` respected): the best one in
     `APIServerConfig.compressionEncodings` (default `[br, gzip]`; on a tie
     the server order wins).
-  - JSON payloads (`AutoCompressSink`), other API responses and static files
-    (`createCompressionMiddleware`).
+  - API responses (JSON included) are compressed in one place, with the
+    headers of the final response (`compressResponse`), and static files
+    by `createCompressionMiddleware`. `HEAD` responses only get the `Vary`.
+  - A large Brotli encoding runs in a background `Isolate`
+    (`APIBrotli.encodeAsync`), not blocking the server's event loop:
+    from about 5ms of encoding (`APIBrotli.isolateMinLength`: 128 KB at
+    quality `9`+, 256 KB at `6`+, 1 MB below). Concurrent requests for the
+    same cached file share one encoding.
   - The static files cache keeps the identity, `gzip` and `br` variants of
     each file (a `gzip` file is transcoded to `br` when preferred).
   - If the Brotli encoder fails, the next accepted encoding is used (the
-    static files cache doesn't retry a failed conversion).
+    static files cache doesn't retry a failed conversion). A cached file
+    with an encoding that can't be decoded (e.g., `deflate`) is only served
+    to the requests accepting it.
   - Static files: the higher quality (Brotli `9`+, GZip `7`) is only used
-    for the responses that will be cached (`APIServerResponseCache.isCacheable`).
+    for the responses that will be cached (`APIServerResponseCache.isCacheable`,
+    which now checks the uncompressed length, `uncompressedContentLength`).
 - Fix: a JSON payload of 512+ bytes was always sent GZip-compressed, even
   without `Accept-Encoding: gzip` in the request. Now it's compressed only
   with an accepted encoding.
@@ -31,8 +40,8 @@
 - `Vary: Accept-Encoding` is sent with responses that can be compressed.
 - `APIServerConfig`:
   - `compressionEncodings` (`--compression-encodings br,gzip`,
-    `server.compression_encodings`): an empty list (or `none`) disables the
-    response compression (also the `HttpServer.autoCompress` GZip, which is
+    `server.compression_encodings`): an empty list, `false` (or `none`,
+    `off`, `no`) disables the response compression (also the `HttpServer.autoCompress` GZip, which is
     disabled when `gzip` is not listed). Unknown encodings are ignored
     (logged); if none is known, the defaults are used.
   - `brotliQuality` (`--brotli-quality 5`, `server.brotli_quality`;
@@ -43,7 +52,8 @@
 - New `bones_api_utils_compression.dart` (exported by
   `bones_api_server.dart`): `APIContentEncoding`, `APIResponseCompression`,
   `APIBrotli`, `parseAcceptEncoding`, `resolveContentEncoding`,
-  `compressResponse`, `createCompressionMiddleware`, `mergeVaryHeader`.
+  `normalizeContentCoding`, `compressResponse`, `createCompressionMiddleware`,
+  `mergeVaryHeader`.
 - **Dart SDK `>=3.13.5`** (required by `brotli_fast`).
   - Sources reformatted for the 3.13 language version, and
     `prefer_initializing_formals` applied (private named parameters: the

@@ -1,4 +1,5 @@
 @TestOn('vm')
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -10,11 +11,24 @@ import 'package:test/test.dart';
 Uint8List _textBytes([int lines = 200]) =>
     utf8.encode(List.generate(lines, (i) => 'line $i: hello world').join('\n'));
 
-Request _get({String? acceptEncoding}) => Request(
-  'GET',
+Request _get({String? acceptEncoding, String method = 'GET'}) => Request(
+  method,
   Uri.parse('http://localhost/x'),
   headers: {'accept-encoding': ?acceptEncoding},
 );
+
+/// Text over [APIBrotli.isolateMinLength] at [quality].
+Uint8List _largeTextBytes(int quality) {
+  var lines = 1000;
+  Uint8List data;
+  do {
+    data = utf8.encode(
+      List.generate(lines, (i) => 'line $i: ${i * 7919 % 10007}').join('\n'),
+    );
+    lines *= 2;
+  } while (data.length <= APIBrotli.isolateMinLength(quality));
+  return data;
+}
 
 Future<Uint8List> _read(Response response) async {
   var b = BytesBuilder(copy: false);
@@ -166,6 +180,22 @@ void main() {
       expect(resolveContentEncoding('br', [APIContentEncoding.gzip]), isNull);
       expect(resolveContentEncoding('br, gzip', []), isNull);
     });
+
+    test('normalizeContentCoding', () {
+      expect(normalizeContentCoding(' GZip '), equals('gzip'));
+      expect(normalizeContentCoding('X-GZIP'), equals('gzip'));
+      expect(normalizeContentCoding('Br'), equals('br'));
+      expect(normalizeContentCoding('deflate'), equals('deflate'));
+    });
+
+    test('acceptsContentEncodingFrom', () {
+      var accepted = parseAcceptEncoding('x-gzip, br;q=0');
+      expect(acceptsContentEncodingFrom(accepted, 'gzip'), isTrue);
+      expect(acceptsContentEncodingFrom(accepted, 'X-Gzip'), isTrue);
+      expect(acceptsContentEncodingFrom(accepted, 'br'), isFalse);
+      expect(acceptsContentEncodingFrom(accepted, 'deflate'), isFalse);
+      expect(acceptsContentEncoding('x-gzip', ' GZIP '), isTrue);
+    });
   });
 
   group('APIBrotli', () {
@@ -253,6 +283,47 @@ void main() {
         await tmp.delete(recursive: true);
       }
     }, skip: _hasBrotliCLI() ? false : 'No `brotli` CLI in the PATH');
+
+    test('isolateMinLength', () {
+      // Higher qualities are slower: offloaded from smaller inputs.
+      expect(
+        APIBrotli.isolateMinLength(11),
+        equals(APIBrotli.isolateMinLength(9)),
+      );
+      expect(
+        APIBrotli.isolateMinLength(9),
+        lessThan(APIBrotli.isolateMinLength(6)),
+      );
+      expect(
+        APIBrotli.isolateMinLength(6),
+        lessThan(APIBrotli.isolateMinLength(5)),
+      );
+      expect(
+        APIBrotli.isolateMinLength(0),
+        equals(APIBrotli.isolateMinLength(5)),
+      );
+    });
+
+    test('encodeAsync: small input, encoded inline', () {
+      var data = _textBytes();
+      var encoded = APIBrotli.encodeAsync(data, quality: 9);
+      expect(encoded, isA<Uint8List>());
+      expect(APIBrotli.decode(encoded as Uint8List), equals(data));
+    });
+
+    test('encodeAsync: large input, encoded in an `Isolate`', () async {
+      for (var q in [5, 9]) {
+        var data = _largeTextBytes(q);
+        var encoded = APIBrotli.encodeAsync(data, quality: q);
+        expect(encoded, isA<Future<Uint8List?>>(), reason: 'q: $q');
+
+        var bytes = (await encoded)!;
+        expect(bytes.length, lessThan(data.length));
+        expect(APIBrotli.decode(bytes), equals(data), reason: 'q: $q');
+        // Same output as inline:
+        expect(bytes, equals(APIBrotli.encode(data, quality: q)));
+      }
+    });
   });
 
   group('encodeContent/decodeContent', () {
@@ -269,6 +340,22 @@ void main() {
         gzip.decode(encodeContent(data, APIContentEncoding.gzip)!),
         equals(data),
       );
+    });
+
+    test('encodeContentAsync', () async {
+      var data = _textBytes();
+
+      for (var encoding in APIContentEncoding.values) {
+        var encoded = encodeContentAsync(data, encoding);
+        expect(encoded, isA<Uint8List>(), reason: '$encoding');
+        expect(decodeContent((await encoded)!, encoding), equals(data));
+      }
+
+      var large = _largeTextBytes(9);
+      var encoded = const APIResponseCompression(brotliQuality: 9)
+          .encodeAsync(large, APIContentEncoding.br);
+      expect(encoded, isA<Future>());
+      expect(APIBrotli.decode((await encoded)!), equals(large));
     });
 
     test('decodeContent: maxOutputSize (br)', () {
@@ -391,6 +478,59 @@ void main() {
       expect(r.headers['x-compression-ratio'], isNull);
       expect(r.headers['server-timing'], isNull);
       expect(gzip.decode(await _read(r)), equals(data));
+    });
+
+    test('uncompressed length in the context', () async {
+      var data = _textBytes();
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'br'),
+        textResponse(data),
+      );
+      expect(r.contentLength, lessThan(data.length));
+      expect(r.context[uncompressedLengthContextKey], equals(data.length));
+      expect(uncompressedContentLength(r), equals(data.length));
+
+      // Not compressed: the `Content-Length`.
+      var r2 = await compressResponse(_get(), textResponse(data));
+      expect(r2.context[uncompressedLengthContextKey], isNull);
+      expect(uncompressedContentLength(r2), equals(data.length));
+    });
+
+    test('HEAD: not compressed, only `Vary`', () async {
+      var length = _textBytes().length;
+      var read = false;
+      var body = StreamController<List<int>>(onListen: () => read = true);
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'br', method: 'HEAD'),
+        Response.ok(
+          body.stream,
+          headers: {'content-type': 'text/plain', 'content-length': '$length'},
+        ),
+      );
+
+      expect(r.headers['content-encoding'], isNull);
+      expect(r.headers['content-length'], equals('$length'));
+      expect(r.headers['vary'], equals('Accept-Encoding'));
+      // The body is not read:
+      expect(read, isFalse);
+      unawaited(body.close()); // Never listened: `close` doesn't complete.
+    });
+
+    test('large br: encoded in an `Isolate`', () async {
+      var data = _largeTextBytes(9);
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'br'),
+        textResponse(data),
+        compression: const APIResponseCompression(brotliQuality: 9),
+      );
+
+      expect(r.headers['content-encoding'], equals('br'));
+      var body = await _read(r);
+      expect(r.contentLength, equals(body.length));
+      expect(APIBrotli.decode(body), equals(data));
     });
 
     test('not accepted: only `Vary`', () async {

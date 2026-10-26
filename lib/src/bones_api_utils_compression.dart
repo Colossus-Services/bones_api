@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:brotli_fast/brotli_fast.dart';
@@ -80,9 +81,8 @@ Map<String, double> parseAcceptEncoding(String? value) {
   for (var entry in value.split(',')) {
     var parts = entry.split(';');
 
-    var coding = parts[0].trim().toLowerCase();
+    var coding = normalizeContentCoding(parts[0]);
     if (coding.isEmpty) continue;
-    if (coding == 'x-gzip') coding = 'gzip';
 
     double? q = 1.0;
 
@@ -118,13 +118,17 @@ double acceptEncodingQuality(Map<String, double> accepted, String coding) =>
 /// Returns `true` if the `Accept-Encoding` header [value] accepts [coding]
 /// (`q > 0`).
 bool acceptsContentEncoding(String? value, String coding) =>
-    acceptEncodingQuality(
-      parseAcceptEncoding(value),
-      _normalizeCoding(coding),
-    ) >
-    0;
+    acceptsContentEncodingFrom(parseAcceptEncoding(value), coding);
 
-String _normalizeCoding(String coding) {
+/// Same as [acceptsContentEncoding], with an already parsed
+/// `Accept-Encoding` ([parseAcceptEncoding]).
+bool acceptsContentEncodingFrom(Map<String, double> accepted, String coding) =>
+    acceptEncodingQuality(accepted, normalizeContentCoding(coding)) > 0;
+
+/// Normalizes a content [coding] name, as used in `Accept-Encoding` and
+/// `Content-Encoding`: trimmed and lowercase, with `x-gzip` taken as `gzip`
+/// (RFC 9110, 8.4.1.3).
+String normalizeContentCoding(String coding) {
   coding = coding.trim().toLowerCase();
   return coding == 'x-gzip' ? 'gzip' : coding;
 }
@@ -179,18 +183,57 @@ abstract final class APIBrotli {
     try {
       return brotliEncode(bytes, quality: quality.clamp(0, 11));
     } catch (e, s) {
-      if (!_encodeErrorLogged) {
-        _encodeErrorLogged = true;
-        _log.severe(
-          "Brotli encoding failed (${bytes.length} bytes, quality: $quality). "
-          "Falling back to another encoding. (Next failures are logged as `FINE`)",
-          e,
-          s,
-        );
-      } else {
-        _log.fine("Brotli encoding failed: $e");
-      }
+      _logEncodeError(bytes.length, quality, e, s);
       return null;
+    }
+  }
+
+  /// The minimal length to [encodeAsync] in a background [Isolate] at
+  /// [quality]: Brotli is pure Dart, and a slow encoding would block the
+  /// event loop (and all the other requests of the isolate).
+  ///
+  /// Starts at about 5ms of encoding (JSON, AOT). `Isolate.run` itself is
+  /// cheap (~0.05ms), but a new isolate initializes the encoder tables
+  /// again: about +1.5ms at quality `6` and +2.5ms at `9`
+  /// (nothing at `0..5`).
+  static int isolateMinLength(int quality) {
+    if (quality >= 9) return 128 * 1024; // ~7ms inline.
+    if (quality >= 6) return 256 * 1024; // ~5ms inline.
+    return 1024 * 1024; // ~5ms inline.
+  }
+
+  /// Same as [encode], but encodes in a background [Isolate] if [bytes]
+  /// is large for [quality] (see [isolateMinLength]).
+  static FutureOr<Uint8List?> encodeAsync(
+    Uint8List bytes, {
+    int quality = defaultQuality,
+  }) {
+    quality = quality.clamp(0, 11);
+    if (bytes.length < isolateMinLength(quality)) {
+      return encode(bytes, quality: quality);
+    }
+
+    return Isolate.run(() => brotliEncode(bytes, quality: quality))
+        .then<Uint8List?>(
+          (encoded) => encoded,
+          onError: (Object e, StackTrace s) {
+            _logEncodeError(bytes.length, quality, e, s);
+            return null;
+          },
+        );
+  }
+
+  static void _logEncodeError(int length, int quality, Object e, StackTrace s) {
+    if (!_encodeErrorLogged) {
+      _encodeErrorLogged = true;
+      _log.severe(
+        "Brotli encoding failed ($length bytes, quality: $quality). "
+        "Falling back to another encoding. (Next failures are logged as `FINE`)",
+        e,
+        s,
+      );
+    } else {
+      _log.fine("Brotli encoding failed: $e");
     }
   }
 
@@ -221,6 +264,22 @@ Uint8List? encodeContent(
     case APIContentEncoding.gzip:
       var encoded = ZLibEncoder(gzip: true, level: gzipLevel).convert(bytes);
       return encoded is Uint8List ? encoded : Uint8List.fromList(encoded);
+  }
+}
+
+/// Same as [encodeContent], but a large Brotli encoding runs in a background
+/// [Isolate] (see [APIBrotli.encodeAsync]). GZip uses the native `zlib`.
+FutureOr<Uint8List?> encodeContentAsync(
+  Uint8List bytes,
+  APIContentEncoding encoding, {
+  int gzipLevel = 4,
+  int brotliQuality = APIBrotli.defaultQuality,
+}) {
+  switch (encoding) {
+    case APIContentEncoding.br:
+      return APIBrotli.encodeAsync(bytes, quality: brotliQuality);
+    case APIContentEncoding.gzip:
+      return encodeContent(bytes, encoding, gzipLevel: gzipLevel);
   }
 }
 
@@ -295,6 +354,18 @@ class APIResponseCompression {
         gzipLevel: gzipLevel,
         brotliQuality: brotliQuality,
       );
+
+  /// Same as [encode], but a large Brotli encoding runs in a background
+  /// [Isolate]. See [encodeContentAsync].
+  FutureOr<Uint8List?> encodeAsync(
+    Uint8List bytes,
+    APIContentEncoding encoding,
+  ) => encodeContentAsync(
+    bytes,
+    encoding,
+    gzipLevel: gzipLevel,
+    brotliQuality: brotliQuality,
+  );
 
   APIResponseCompression copyWith({
     List<APIContentEncoding>? encodings,
@@ -380,12 +451,31 @@ bool canCompressResponse(
   return canGzipEncodeResponse(response, minimalGzipContentLength: minLength);
 }
 
+/// The [Response.context] key with the uncompressed body length of a
+/// response compressed by [compressResponse].
+const String uncompressedLengthContextKey =
+    'bones_api.compression.uncompressed_length';
+
+/// Returns the uncompressed body length of [response]: the
+/// [uncompressedLengthContextKey] if compressed by [compressResponse],
+/// otherwise its [Response.contentLength].
+int? uncompressedContentLength(Response response) {
+  var length = response.context[uncompressedLengthContextKey];
+  return length is int ? length : response.contentLength;
+}
+
 /// Compresses [response] with the best encoding accepted by [request]
 /// (see [APIResponseCompression.resolveRequestEncoding]).
 ///
+/// - `HEAD` requests are not compressed (no body to compress): only the
+///   `Vary` header is added, and the `Content-Length` is kept.
 /// - Adds `Vary: Accept-Encoding` if [response] can be compressed, even if
 ///   [request] does not accept any encoding (for caches).
 /// - Falls back to the next accepted encoding if one fails.
+/// - A large Brotli encoding runs in a background [Isolate]
+///   (see [APIBrotli.encodeAsync]).
+/// - The uncompressed length is set in the [Response.context]
+///   (see [uncompressedContentLength]).
 /// - If [addCompressionRatioHeader] is `true` it adds the header
 ///   `X-Compression-Ratio`, with compression info, e.g.: `0.55 (550/1000)`
 /// - If [addServerTiming] is `true`, includes or appends the encoding
@@ -408,14 +498,23 @@ FutureOr<Response> compressResponse(
     'Accept-Encoding',
   );
 
-  var encoding = compression.resolveRequestEncoding(request);
+  // Same `Vary` as the `GET`, without a body to compress:
+  if (request.method == 'HEAD') {
+    return response.change(headers: {HttpHeaders.varyHeader: vary});
+  }
+
+  var accepted = parseAcceptEncoding(
+    request.headers[HttpHeaders.acceptEncodingHeader],
+  );
+
+  var encoding = compression.resolveAcceptedEncoding(accepted);
   if (encoding == null) {
     return response.change(headers: {HttpHeaders.varyHeader: vary});
   }
 
   return _compressResponseImpl(
-    request,
     response,
+    accepted,
     encoding,
     vary,
     compression,
@@ -425,8 +524,8 @@ FutureOr<Response> compressResponse(
 }
 
 Future<Response> _compressResponseImpl(
-  Request request,
   Response response,
+  Map<String, double> accepted,
   APIContentEncoding encoding,
   String vary,
   APIResponseCompression compression,
@@ -448,19 +547,16 @@ Future<Response> _compressResponseImpl(
     );
   }
 
-  var compressed = compression.encode(bytes, encoding);
+  var compressed = await compression.encodeAsync(bytes, encoding);
 
   if (compressed == null) {
     // Fallback to the next accepted encoding:
     var others = compression.encodings.where((e) => e != encoding).toList();
-    var fallback = resolveContentEncoding(
-      request.headers[HttpHeaders.acceptEncodingHeader],
-      others,
-    );
+    var fallback = resolveContentEncodingFrom(accepted, others);
 
     if (fallback != null) {
       encoding = fallback;
-      compressed = compression.encode(bytes, encoding);
+      compressed = await compression.encodeAsync(bytes, encoding);
     }
   }
 
@@ -485,7 +581,11 @@ Future<Response> _compressResponseImpl(
     serverTimingEntryName: encoding.headerValue,
   );
 
-  return response.change(headers: headers, body: compressed);
+  return response.change(
+    headers: headers,
+    body: compressed,
+    context: {uncompressedLengthContextKey: bytes.length},
+  );
 }
 
 /// Sets the `Content-Encoding` and `Content-Length` headers in [headers]

@@ -497,7 +497,7 @@ void main() {
 
     test('alternatives: a failed conversion is not retried', () async {
       // Not valid GZip data: the conversion to `br` fails (it can't be
-      // decompressed), as a Brotli encoder failure would.
+      // decompressed), and the content is no longer taken as convertible.
       var invalidGzip = List<int>.generate(2000, (i) => i & 0xFF);
 
       var cache = APIServerResponseCache();
@@ -578,11 +578,142 @@ void main() {
       expect(inner.calls, equals(2));
     });
 
+    test('alternatives: unsupported encoding (`deflate`)', () async {
+      var content = List.generate(200, (i) => 'row $i').join('\n');
+      var deflated = ZLibEncoder().convert(utf8.encode(content));
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      inner.overrides['df.txt'] = (request) => Response.ok(
+        deflated,
+        headers: {
+          'content-type': 'text/plain',
+          'content-encoding': 'deflate',
+          'server': 'fake',
+        },
+      );
+
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(
+        _get('df.txt', headers: {'accept-encoding': 'deflate'}),
+      );
+      expect(r1.headers['content-encoding'], equals('deflate'));
+      expect(inner.calls, equals(1));
+
+      // Can't be converted: not served from the cache.
+      for (var encoding in ['br', 'gzip', 'br, gzip']) {
+        var r = await handler(
+          _get('df.txt', headers: {'accept-encoding': encoding}),
+        );
+        expect(r.headers['content-encoding'], equals('deflate'));
+      }
+      expect(inner.calls, equals(4));
+
+      // Still served from the cache when accepted (even if `br` is
+      // preferred, since it can't be converted):
+      for (var encoding in ['deflate', 'br, deflate', 'gzip, deflate']) {
+        var r = await handler(
+          _get('df.txt', headers: {'accept-encoding': encoding}),
+        );
+        expect(r.headers['content-encoding'], equals('deflate'));
+        expect(await r.read().expand((e) => e).toList(), equals(deflated));
+      }
+      expect(inner.calls, equals(4));
+    });
+
+    test('alternatives: large br, encoded in an `Isolate`', () async {
+      var content = List.generate(
+        30000,
+        (i) => 'row $i: ${i * 7919 % 10007}',
+      ).join('\n');
+      expect(content.length, greaterThan(APIBrotli.isolateMinLength(9)));
+      writeFile('large.txt', content);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      var r0 = await handler(_get('large.txt'));
+      expect(r0.headers['content-encoding'], isNull);
+      expect(inner.calls, equals(1));
+
+      // Concurrent requests: one `br` alternative, encoded once:
+      var responses = await Future.wait([
+        for (var i = 0; i < 4; ++i)
+          Future.sync(
+            () =>
+                handler(_get('large.txt', headers: {'accept-encoding': 'br'})),
+          ),
+      ]);
+
+      for (var r in responses) {
+        expect(r.headers['content-encoding'], equals('br'));
+        expect(await _readBody(r), equals(content));
+      }
+      expect(inner.calls, equals(1));
+
+      var brEntries = cache.cachedResponsesLength;
+
+      var r2 = await handler(
+        _get('large.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(r2.headers['content-encoding'], equals('br'));
+      expect(cache.cachedResponsesLength, equals(brEntries));
+      expect(inner.calls, equals(1));
+    });
+
+    test('alternatives: not cached if removed while encoding', () async {
+      var content = List.generate(
+        30000,
+        (i) => 'row $i: ${i * 7919 % 10007}',
+      ).join('\n');
+      writeFile('rm.txt', content);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      await handler(_get('rm.txt'));
+      expect(inner.calls, equals(1));
+
+      // Starts the `br` encoding (asynchronous), then clears the cache
+      // (as an expiration would):
+      var rBr = Future.sync(
+        () => handler(_get('rm.txt', headers: {'accept-encoding': 'br'})),
+      );
+      await Future<void>.delayed(Duration.zero);
+      cache.clear();
+
+      var r = await rBr;
+      expect(r.headers['content-encoding'], equals('br'));
+      expect(await _readBody(r), equals(content));
+
+      // The `br` alternative was not added after the entry was removed:
+      expect(cache.cachedResponsesLength, equals(0));
+    });
+
     test('isCacheable', () {
       var cache = APIServerResponseCache(maxContentLength: 100);
 
       expect(cache.isCacheable(_get('a'), Response.ok('x' * 100)), isTrue);
       expect(cache.isCacheable(_get('a'), Response.ok('x' * 101)), isFalse);
+
+      // A response compressed by `compressResponse`: its uncompressed length.
+      expect(
+        cache.isCacheable(
+          _get('a'),
+          Response.ok('x' * 50, context: {uncompressedLengthContextKey: 101}),
+        ),
+        isFalse,
+      );
+      expect(
+        cache.isCacheable(
+          _get('a'),
+          Response.ok('x' * 50, context: {uncompressedLengthContextKey: 100}),
+        ),
+        isTrue,
+      );
       expect(
         cache.isCacheable(_get('a', method: 'POST'), Response.ok('x')),
         isFalse,
@@ -599,6 +730,46 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('compression middleware: same cacheability as the cache', () async {
+      // Over `maxContentLength` uncompressed, under it compressed:
+      var content = List.generate(400, (i) => 'line ${i % 10}').join('\n');
+      writeFile('edge.txt', content);
+
+      var cache = APIServerResponseCache(maxContentLength: 2000);
+      expect(content.length, greaterThan(cache.maxContentLength));
+
+      var inner = _FakeStaticHandler(tmpDir);
+
+      var resolved = <int>[];
+      var handler = const Pipeline()
+          .addMiddleware(cache.middleware)
+          .addMiddleware(
+            createCompressionMiddleware(
+              resolveCompression: (request, response) {
+                var cacheable = cache.isCacheable(request, response);
+                var q = cacheable ? 9 : 5;
+                resolved.add(q);
+                return APIResponseCompression(brotliQuality: q);
+              },
+            ),
+          )
+          .addHandler(inner.call);
+
+      for (var i = 0; i < 2; ++i) {
+        var r = await handler(
+          _get('edge.txt', headers: {'accept-encoding': 'br'}),
+        );
+        expect(r.headers['content-encoding'], equals('br'));
+        expect(r.contentLength, lessThan(cache.maxContentLength));
+        expect(await _readBody(r), equals(content));
+      }
+
+      // Not cached (the q5 response is not kept): compressed each time.
+      expect(resolved, equals([5, 5]));
+      expect(inner.calls, equals(2));
+      expect(cache.cachedResponsesLength, equals(0));
     });
 
     test('alternatives: custom compression', () async {
