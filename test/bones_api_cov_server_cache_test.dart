@@ -1,8 +1,10 @@
 @TestOn('vm')
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:bones_api/src/bones_api_server_cache.dart';
+import 'package:bones_api/src/bones_api_utils_compression.dart';
 import 'package:path/path.dart' as pack_path;
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -77,8 +79,11 @@ Request _get(
 
 Future<String> _readBody(Response response) async {
   var bytes = await response.read().expand((e) => e).toList();
-  if (response.headers['content-encoding'] == 'gzip') {
-    bytes = gzip.decode(bytes);
+  switch (response.headers['content-encoding']) {
+    case 'gzip':
+      bytes = gzip.decode(bytes);
+    case 'br':
+      bytes = APIBrotli.decode(Uint8List.fromList(bytes));
   }
   return utf8.decode(bytes);
 }
@@ -367,6 +372,169 @@ void main() {
       expect(inner.calls, equals(1));
     });
 
+    test('br alternatives (compress)', () async {
+      var content = List.generate(200, (i) => 'line $i').join('\n');
+      writeFile('big.txt', content);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(_get('big.txt'));
+      expect(r1.headers['content-encoding'], isNull);
+      expect(await _readBody(r1), equals(content));
+      expect(inner.calls, equals(1));
+
+      // Prefers `br` (server order) when both are accepted:
+      var r2 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'gzip, deflate, br'}),
+      );
+      expect(r2.headers['content-encoding'], equals('br'));
+      expect(r2.headers['vary'], contains('Accept-Encoding'));
+      expect(
+        int.parse(r2.headers['content-length']!),
+        lessThan(content.length),
+      );
+      expect(await _readBody(r2), equals(content));
+
+      var r3 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'gzip'}),
+      );
+      expect(r3.headers['content-encoding'], equals('gzip'));
+      expect(await _readBody(r3), equals(content));
+
+      // A higher `q` wins over the server order:
+      var r4 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'br;q=0.5, gzip'}),
+      );
+      expect(r4.headers['content-encoding'], equals('gzip'));
+
+      // All the variants are cached:
+      var r5 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(r5.headers['content-encoding'], equals('br'));
+      expect(await _readBody(r5), equals(content));
+
+      var r6 = await handler(_get('big.txt'));
+      expect(r6.headers['content-encoding'], isNull);
+      expect(await _readBody(r6), equals(content));
+
+      expect(inner.calls, equals(1));
+    });
+
+    test('alternatives: `q=0` and `identity`', () async {
+      var content = List.generate(200, (i) => 'line $i').join('\n');
+      writeFile('big.txt', content);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'br;q=0, gzip;q=0'}),
+      );
+      expect(r1.headers['content-encoding'], isNull);
+      expect(await _readBody(r1), equals(content));
+
+      // `*` accepts `br`, but `gzip` is excluded:
+      var r2 = await handler(
+        _get('big.txt', headers: {'accept-encoding': '*, gzip;q=0'}),
+      );
+      expect(r2.headers['content-encoding'], equals('br'));
+      expect(await _readBody(r2), equals(content));
+
+      // Not a substring match (`gzip` is not `x-gzip-foo`):
+      var r3 = await handler(
+        _get('big.txt', headers: {'accept-encoding': 'x-gzip-foo'}),
+      );
+      expect(r3.headers['content-encoding'], isNull);
+
+      expect(inner.calls, equals(1));
+    });
+
+    test('alternatives: gzip transcoded to br', () async {
+      var content = List.generate(200, (i) => 'row $i').join('\n');
+      var compressed = gzip.encode(utf8.encode(content));
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      inner.overrides['gz.txt'] = (request) => Response.ok(
+        compressed,
+        headers: {
+          'content-type': 'text/plain',
+          'content-encoding': 'gzip',
+          'X-Compression-Ratio': '0.1 (1/10)',
+          'server': 'fake',
+        },
+      );
+
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(
+        _get('gz.txt', headers: {'accept-encoding': 'gzip'}),
+      );
+      expect(r1.headers['content-encoding'], equals('gzip'));
+      expect(inner.calls, equals(1));
+
+      var r2 = await handler(
+        _get('gz.txt', headers: {'accept-encoding': 'br, gzip'}),
+      );
+      expect(r2.headers['content-encoding'], equals('br'));
+      // The stale ratio of the original encoding is not copied:
+      expect(r2.headers['x-compression-ratio'], isNull);
+      expect(await _readBody(r2), equals(content));
+      expect(inner.calls, equals(1));
+
+      // A cached `br` alternative decompressed for a client without encodings:
+      var cache2 = APIServerResponseCache();
+      var handler2 = cache2.middleware(inner.call);
+      await handler2(_get('gz.txt', headers: {'accept-encoding': 'br'}));
+      var r3 = await handler2(_get('gz.txt'));
+      expect(r3.headers['content-encoding'], isNull);
+      expect(await _readBody(r3), equals(content));
+    });
+
+    test('alternatives: custom compression', () async {
+      var content = List.generate(200, (i) => 'line $i').join('\n');
+      writeFile('big.txt', content);
+
+      var inner = _FakeStaticHandler(tmpDir);
+
+      // Compression disabled:
+      var cacheNone = APIServerResponseCache(
+        compression: APIResponseCompression.none,
+      );
+      var handlerNone = cacheNone.middleware(inner.call);
+      await handlerNone(_get('big.txt'));
+
+      var r1 = await handlerNone(
+        _get('big.txt', headers: {'accept-encoding': 'br, gzip'}),
+      );
+      expect(r1.headers['content-encoding'], isNull);
+
+      // Only `gzip`:
+      var cacheGzip = APIServerResponseCache(
+        compression: APIResponseCompression(
+          encodings: [APIContentEncoding.gzip],
+        ),
+      );
+      var handlerGzip = cacheGzip.middleware(inner.call);
+      await handlerGzip(_get('big.txt'));
+
+      var r2 = await handlerGzip(
+        _get('big.txt', headers: {'accept-encoding': 'br, gzip'}),
+      );
+      expect(r2.headers['content-encoding'], equals('gzip'));
+      expect(await _readBody(r2), equals(content));
+
+      var r3 = await handlerGzip(
+        _get('big.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(r3.headers['content-encoding'], isNull);
+      expect(await _readBody(r3), equals(content));
+    });
+
     test('not cacheable responses', () async {
       var cache = APIServerResponseCache(maxContentLength: 10);
       var inner = _FakeStaticHandler(tmpDir);
@@ -493,15 +661,13 @@ void main() {
         contains('fileStatTimeout: 3 h'),
       );
       expect(
-        APIServerResponseCache(
-          fileStatTimeout: Duration(seconds: 7),
-        ).toString(),
+        APIServerResponseCache(fileStatTimeout: Duration(seconds: 7))
+            .toString(),
         contains('fileStatTimeout: 7 sec'),
       );
       expect(
-        APIServerResponseCache(
-          fileStatTimeout: Duration(milliseconds: 7),
-        ).toString(),
+        APIServerResponseCache(fileStatTimeout: Duration(milliseconds: 7))
+            .toString(),
         contains('fileStatTimeout: 7.000 ms'),
       );
       expect(

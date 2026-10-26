@@ -1,6 +1,7 @@
 @TestOn('vm')
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/bones_api_test_vm.dart';
@@ -70,6 +71,8 @@ class _CovHttpModule extends APIModule {
       ),
     );
 
+    routes.any('bigText', (request) => APIResponse.ok('TEXT ' * 500));
+
     routes.any(
       'redirect',
       (request) => APIResponse.redirect(Uri.parse('http://example.com/x')),
@@ -87,16 +90,16 @@ class _CovHttpModule extends APIModule {
 
     routes.any(
       'authRealm',
-      (request) => APIResponse.unauthorized(
-        payload: 'need auth',
-      ).requireAuthentication(type: 'Bearer', realm: 'Cov'),
+      (request) =>
+          APIResponse.unauthorized(payload: 'need auth')
+              .requireAuthentication(type: 'Bearer', realm: 'Cov'),
     );
 
     routes.any(
       'authDefault',
-      (request) => APIResponse.unauthorized(
-        payload: 'need auth',
-      ).requireAuthentication(type: ' ', realm: 'X'),
+      (request) =>
+          APIResponse.unauthorized(payload: 'need auth')
+              .requireAuthentication(type: ' ', realm: 'X'),
     );
 
     routes.any(
@@ -174,6 +177,7 @@ Future<_Res> _request(
   String method = 'GET',
   Map<String, String>? headers,
   List<int>? body,
+  bool noAcceptEncoding = false,
 }) async {
   var client = HttpClient();
   client.autoUncompress = false;
@@ -181,6 +185,10 @@ Future<_Res> _request(
   try {
     var req = await client.openUrl(method, Uri.parse(url));
     req.followRedirects = false;
+    // `HttpClient` sends `Accept-Encoding: gzip` by default:
+    if (noAcceptEncoding) {
+      req.headers.removeAll(HttpHeaders.acceptEncodingHeader);
+    }
     headers?.forEach(req.headers.set);
     if (body != null) req.add(body);
 
@@ -195,8 +203,11 @@ Future<_Res> _request(
 
 String _bodyStr(_Res res) {
   var bytes = res.body;
-  if (res.headers.value('content-encoding') == 'gzip') {
-    bytes = gzip.decode(bytes);
+  switch (res.headers.value('content-encoding')) {
+    case 'gzip':
+      bytes = gzip.decode(bytes);
+    case 'br':
+      bytes = APIBrotli.decode(Uint8List.fromList(bytes));
   }
   return utf8.decode(bytes, allowMalformed: true);
 }
@@ -278,6 +289,65 @@ void main() {
       expect(res2.headers.value('content-encoding'), equals('gzip'));
       expect(res2.headers.value('x-compression-ratio'), isNotNull);
       expect((json.decode(_bodyStr(res2)) as List).length, equals(300));
+    });
+
+    test('json + br', () async {
+      var res = await _request(
+        '${apiServer.url}cov/big',
+        headers: {'accept-encoding': 'gzip, deflate, br'},
+      );
+      expect(res.status, equals(200));
+      expect(res.headers.value('content-encoding'), equals('br'));
+      expect(res.headers.value('content-length'), equals('${res.body.length}'));
+      expect(res.headers.value('vary'), contains('Accept-Encoding'));
+      expect(res.headers.value('vary'), contains('Origin'));
+      expect(res.headers.value('server-timing'), contains('obj-json-br;dur='));
+      expect((json.decode(_bodyStr(res)) as List).length, equals(300));
+
+      // A higher `q` wins over the server order:
+      var res2 = await _request(
+        '${apiServer.url}cov/big',
+        headers: {'accept-encoding': 'br;q=0.1, gzip;q=0.9'},
+      );
+      expect(res2.headers.value('content-encoding'), equals('gzip'));
+      expect((json.decode(_bodyStr(res2)) as List).length, equals(300));
+    });
+
+    test('json: not compressed without `Accept-Encoding`', () async {
+      var res = await _request(
+        '${apiServer.url}cov/big',
+        noAcceptEncoding: true,
+      );
+      expect(res.status, equals(200));
+      expect(res.headers.value('content-encoding'), isNull);
+      expect(res.headers.value('vary'), contains('Accept-Encoding'));
+      expect((json.decode(utf8.decode(res.body)) as List).length, equals(300));
+
+      var res2 = await _request(
+        '${apiServer.url}cov/big',
+        headers: {'accept-encoding': 'br;q=0, gzip;q=0'},
+      );
+      expect(res2.headers.value('content-encoding'), isNull);
+      expect((json.decode(utf8.decode(res2.body)) as List).length, equals(300));
+    });
+
+    test('text + br', () async {
+      var res = await _request(
+        '${apiServer.url}cov/bigText',
+        headers: {'accept-encoding': 'br'},
+      );
+      expect(res.status, equals(200));
+      expect(res.headers.value('content-encoding'), equals('br'));
+      expect(res.headers.value('vary'), contains('Accept-Encoding'));
+      expect(res.headers.value('server-timing'), contains('br;dur='));
+      expect(_bodyStr(res), equals('TEXT ' * 500));
+
+      var res2 = await _request(
+        '${apiServer.url}cov/bigText',
+        noAcceptEncoding: true,
+      );
+      expect(res2.headers.value('content-encoding'), isNull);
+      expect(utf8.decode(res2.body), equals('TEXT ' * 500));
     });
 
     test('redirect', () async {
@@ -713,9 +783,8 @@ void main() {
 
     setUp(() async {
       docRoot = await Directory.systemTemp.createTemp('bones_api_cov_wk_');
-      File(
-        pack_path.join(docRoot.path, 'index.html'),
-      ).writeAsStringSync('<html>WORKER</html>');
+      File(pack_path.join(docRoot.path, 'index.html'))
+          .writeAsStringSync('<html>WORKER</html>');
     });
 
     tearDown(() => docRoot.delete(recursive: true));
@@ -800,20 +869,16 @@ void main() {
     setUpAll(() async {
       docRoot = await Directory.systemTemp.createTemp('bones_api_cov_www_');
 
-      File(
-        pack_path.join(docRoot.path, 'index.html'),
-      ).writeAsStringSync('<html><body>INDEX</body></html>');
-      File(
-        pack_path.join(docRoot.path, 'style.css'),
-      ).writeAsStringSync('body { color: red; }');
-      File(
-        pack_path.join(docRoot.path, 'data.txt'),
-      ).writeAsStringSync('DATA ' * 500);
+      File(pack_path.join(docRoot.path, 'index.html'))
+          .writeAsStringSync('<html><body>INDEX</body></html>');
+      File(pack_path.join(docRoot.path, 'style.css'))
+          .writeAsStringSync('body { color: red; }');
+      File(pack_path.join(docRoot.path, 'data.txt'))
+          .writeAsStringSync('DATA ' * 500);
 
       Directory(pack_path.join(docRoot.path, 'sub')).createSync();
-      File(
-        pack_path.join(docRoot.path, 'sub', 'index.html'),
-      ).writeAsStringSync('<html><body>SUB</body></html>');
+      File(pack_path.join(docRoot.path, 'sub', 'index.html'))
+          .writeAsStringSync('<html><body>SUB</body></html>');
 
       var port = await resolveFreePort(6300);
 
@@ -896,6 +961,90 @@ void main() {
 
       var res7 = await _request('${apiServer.url}missing.txt');
       expect(res7.status, equals(404));
+    });
+
+    test('br + cached alternatives', () async {
+      var data = 'DATA ' * 500;
+
+      for (var i = 0; i < 2; ++i) {
+        var resBr = await _request(
+          '${apiServer.url}data.txt',
+          headers: {'accept-encoding': 'gzip, br'},
+        );
+        expect(resBr.status, equals(200));
+        expect(resBr.headers.value('content-encoding'), equals('br'));
+        expect(resBr.headers.value('vary'), contains('Accept-Encoding'));
+        expect(_bodyStr(resBr), equals(data));
+
+        var resGz = await _request(
+          '${apiServer.url}data.txt',
+          headers: {'accept-encoding': 'gzip'},
+        );
+        expect(resGz.headers.value('content-encoding'), equals('gzip'));
+        expect(_bodyStr(resGz), equals(data));
+
+        var resNone = await _request(
+          '${apiServer.url}data.txt',
+          noAcceptEncoding: true,
+        );
+        expect(resNone.headers.value('content-encoding'), isNull);
+        expect(utf8.decode(resNone.body), equals(data));
+      }
+    });
+  });
+
+  group('APIServer HTTP (compressionEncodings)', () {
+    late Directory docRoot;
+    late APIServer apiServer;
+
+    setUpAll(() async {
+      docRoot = await Directory.systemTemp.createTemp('bones_api_cov_www_');
+      File(pack_path.join(docRoot.path, 'data.txt'))
+          .writeAsStringSync('DATA ' * 500);
+
+      var port = await resolveFreePort(6350);
+
+      apiServer = APIServer(
+        _CovHttpAPIRoot('cov-http-gzip-only'),
+        'localhost',
+        port,
+        documentRoot: docRoot.path,
+        logToConsole: false,
+        compressionEncodings: [APIContentEncoding.gzip],
+        brotliQuality: 2,
+      );
+
+      await apiServer.start();
+    });
+
+    tearDownAll(() async {
+      await apiServer.stop();
+      await docRoot.delete(recursive: true);
+    });
+
+    test('gzip only', () async {
+      expect(apiServer.compressionEncodings, equals([APIContentEncoding.gzip]));
+      expect(apiServer.brotliQuality, equals(2));
+
+      for (var path in ['cov/big', 'cov/bigText', 'data.txt']) {
+        var res = await _request(
+          '${apiServer.url}$path',
+          headers: {'accept-encoding': 'br'},
+        );
+        expect(res.status, equals(200), reason: path);
+        expect(res.headers.value('content-encoding'), isNull, reason: path);
+
+        var res2 = await _request(
+          '${apiServer.url}$path',
+          headers: {'accept-encoding': 'br, gzip'},
+        );
+        expect(
+          res2.headers.value('content-encoding'),
+          equals('gzip'),
+          reason: path,
+        );
+        expect(_bodyStr(res2), isNotEmpty, reason: path);
+      }
     });
   });
 

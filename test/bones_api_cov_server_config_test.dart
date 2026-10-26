@@ -273,6 +273,10 @@ void main() {
         '--max-payload-length',
         '4096',
         '-decompress-payload',
+        '--compression-encodings',
+        'gzip,br',
+        '--brotli-quality',
+        '7',
         '-log-toConsole',
         '-log-queue',
         '--document-root',
@@ -307,6 +311,20 @@ void main() {
       expect(config.staticFilesCacheMaxContentLength, equals(1000));
       expect(config.maxPayloadLength, equals(4096));
       expect(config.decompressPayload, isTrue);
+      expect(
+        config.compressionEncodings,
+        equals([APIContentEncoding.gzip, APIContentEncoding.br]),
+      );
+      expect(config.brotliQuality, equals(7));
+      expect(
+        config.responseCompression,
+        equals(
+          APIResponseCompression(
+            encodings: [APIContentEncoding.gzip, APIContentEncoding.br],
+            brotliQuality: 7,
+          ),
+        ),
+      );
       expect(config.logToConsole, isTrue);
       expect(config.logQueue, isTrue);
       expect(config.serverResponseDelay, equals(Duration(milliseconds: 15)));
@@ -324,6 +342,8 @@ void main() {
       );
       expect(j['args'], isA<List>());
       expect(j['crossOrigin'], isA<Map>());
+      expect(j['compressionEncodings'], equals(['gzip', 'br']));
+      expect(j['brotliQuality'], equals(7));
 
       var config2 = APIServerConfig.fromJson({
         ...j,
@@ -336,6 +356,11 @@ void main() {
       expect(config2.longLivedStaticFilesCached[0], equals('/a.js'));
       expect(config2.longLivedStaticFilesCached[1], isA<RegExp>());
       expect(config2.maxPayloadLength, equals(4096));
+      expect(
+        config2.compressionEncodings,
+        equals([APIContentEncoding.gzip, APIContentEncoding.br]),
+      );
+      expect(config2.brotliQuality, equals(7));
       expect(config2.args.isNotEmpty, isTrue);
       expect(config2.domains, equals(['foo.com']));
     });
@@ -492,6 +517,8 @@ void main() {
           'use_session_id': false,
           'max_payload_length': 123,
           'decompress_payload': true,
+          'compression_encodings': ['gzip'],
+          'brotli_quality': '99',
         },
         'letsencrypt': {'production': true, 'allow-request-certificate': true},
         'log': {'console': false, 'queue': false},
@@ -528,6 +555,36 @@ void main() {
       expect(
         APIServerConfig.resolveDecompressPayload(null, apiConfig: apiConfig),
         isTrue,
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings(null, apiConfig: apiConfig),
+        equals([APIContentEncoding.gzip]),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings('br'),
+        equals([APIContentEncoding.br]),
+      );
+      // Empty: compression disabled:
+      expect(APIServerConfig.resolveCompressionEncodings(''), isEmpty);
+      expect(
+        APIServerConfig.resolveCompressionEncodings(null),
+        equals(APIContentEncoding.defaultEncodings),
+      );
+      // Clamped:
+      expect(
+        APIServerConfig.resolveBrotliQuality(null, apiConfig: apiConfig),
+        equals(11),
+      );
+      expect(APIServerConfig.resolveBrotliQuality(-3), equals(0));
+      expect(APIServerConfig.resolveBrotliQuality(null), equals(5));
+      expect(
+        APIServerConfig.resolveBrotliQuality(
+          null,
+          apiConfig: APIConfig({
+            'server': {'brotli_quality': 6},
+          }),
+        ),
+        equals(6),
       );
       expect(
         APIServerConfig.resolveLetsEncryptProduction(
@@ -890,6 +947,75 @@ void main() {
         rBig2.headers['server-timing'],
         startsWith('prev;dur=1,obj-json-gzip;dur='),
       );
+
+      // With `compression`: negotiated with `acceptEncoding`:
+      const compression = APIResponseCompression();
+
+      var rBr = APIResponse.ok(null, headers: {'vary': 'Origin'});
+      var brBytes = APIServer.resolveBodySync(
+        big,
+        rBr,
+        compression: compression,
+        acceptEncoding: 'gzip, br',
+      ) as Uint8List;
+      expect(rBr.headers['content-encoding'], equals('br'));
+      expect(rBr.headers['vary'], equals('Origin, Accept-Encoding'));
+      expect(rBr.headers['server-timing'], contains('obj-json-br;dur='));
+      expect(rBr.headers['content-length'], equals('${brBytes.length}'));
+      expect(
+        (json.decode(utf8.decode(APIBrotli.decode(brBytes))) as List).length,
+        equals(500),
+      );
+
+      var rGz = APIResponse.ok(null);
+      var gzBytes = await APIServer.resolveBody(
+        Future.value(big),
+        rGz,
+        compression: compression,
+        acceptEncoding: 'gzip',
+      ) as Uint8List;
+      expect(rGz.headers['content-encoding'], equals('gzip'));
+      expect(
+        (json.decode(utf8.decode(gzip.decode(gzBytes))) as List).length,
+        equals(500),
+      );
+
+      // Not accepted: not compressed (the legacy mode always uses GZip):
+      for (var accept in [null, '', 'identity', 'br;q=0, gzip;q=0']) {
+        var rNone = APIResponse.ok(null);
+        var noneBytes = APIServer.resolveBodySync(
+          big,
+          rNone,
+          compression: compression,
+          acceptEncoding: accept,
+        ) as Uint8List;
+        expect(rNone.headers['content-encoding'], isNull, reason: '$accept');
+        expect(rNone.headers['vary'], isNull, reason: '$accept');
+        expect(
+          (json.decode(utf8.decode(noneBytes)) as List).length,
+          equals(500),
+        );
+      }
+
+      // Disabled:
+      var rOff = APIResponse.ok(null);
+      APIServer.resolveBodySync(
+        big,
+        rOff,
+        compression: APIResponseCompression.none,
+        acceptEncoding: 'br, gzip',
+      );
+      expect(rOff.headers['content-encoding'], isNull);
+
+      // Small JSON: not compressed:
+      var rSmall = APIResponse.ok(null);
+      APIServer.resolveBodySync(
+        {'a': 1},
+        rSmall,
+        compression: compression,
+        acceptEncoding: 'br',
+      );
+      expect(rSmall.headers['content-encoding'], isNull);
 
       expect(
         APIServer.exposeHeaders,
@@ -1306,8 +1432,43 @@ void main() {
         throwsStateError,
       );
 
+      var br = await toAPIRequest(
+        compressed('br', APIBrotli.encode(data)!),
+        decompressPayload: true,
+        maxPayloadLength: 1000,
+      );
+      expect(br.payload, equals(data));
+
+      var brNoMax = await toAPIRequest(
+        compressed('br', APIBrotli.encode(data)!),
+        decompressPayload: true,
+      );
+      expect(brNoMax.payload, equals(data));
+
+      // Uncompressed size (260) over the limit, compressed size under it:
+      await expectLater(
+        toAPIRequest(
+          compressed('br', APIBrotli.encode(data)!),
+          decompressPayload: true,
+          maxPayloadLength: 100,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Brotli payload uncompressed size exceeds'),
+          ),
+        ),
+      );
+
+      // Corrupted Brotli stream:
       await expectLater(
         toAPIRequest(compressed('br', data), decompressPayload: true),
+        throwsFormatException,
+      );
+
+      await expectLater(
+        toAPIRequest(compressed('compress', data), decompressPayload: true),
         throwsUnsupportedError,
       );
     });
