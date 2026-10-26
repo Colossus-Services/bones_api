@@ -6,7 +6,8 @@ import 'dart:typed_data';
 
 import 'package:args_simple/args_simple_io.dart';
 import 'package:async_extension/async_extension.dart';
-import 'package:brotli_neo/v2.dart' show BrotliErrorCode, BrotliException;
+import 'package:brotli_fast/brotli_fast.dart'
+    show BrotliErrorCode, BrotliException;
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';

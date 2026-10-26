@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:brotli_neo/v2.dart';
+import 'package:brotli_fast/brotli_fast.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:shelf/shelf.dart';
@@ -164,7 +164,7 @@ APIContentEncoding? resolveContentEncodingFrom(
   return best;
 }
 
-/// Brotli encoding/decoding, using `package:brotli_neo`.
+/// Brotli encoding/decoding, using `package:brotli_fast`.
 abstract final class APIBrotli {
   /// The default Brotli quality for dynamic responses.
   static const int defaultQuality = 5;
@@ -177,10 +177,7 @@ abstract final class APIBrotli {
   /// caller can fall back to another encoding.
   static Uint8List? encode(Uint8List bytes, {int quality = defaultQuality}) {
     try {
-      return BrotliEncoderV2.encode(
-        bytes,
-        options: BrotliEncodeOptions(quality: quality.clamp(0, 11)),
-      );
+      return brotliEncode(bytes, quality: quality.clamp(0, 11));
     } catch (e, s) {
       if (!_encodeErrorLogged) {
         _encodeErrorLogged = true;
@@ -200,30 +197,13 @@ abstract final class APIBrotli {
   /// Decodes the Brotli [bytes].
   ///
   /// If [maxOutputSize] is provided, throws a [BrotliException] when the
-  /// decoded size exceeds it (checked while decoding).
-  static Uint8List decode(Uint8List bytes, {int? maxOutputSize}) {
-    if (maxOutputSize == null) {
-      return BrotliDecoderV2.decode(bytes);
-    }
-
-    final options = BrotliDecodeOptions(maxOutputSize: maxOutputSize);
-
-    try {
-      return BrotliDecoderV2.decode(bytes, options: options);
-    } on BrotliException catch (e) {
-      // `BrotliDecoderV2.decode` doubles its buffer and stops at the last
-      // power of 2 below the limit: retry once with a buffer at the limit.
-      if (e.code != BrotliErrorCode.outputLimitExceeded) rethrow;
-
-      final buffer = Uint8List(maxOutputSize);
-      final length = BrotliDecoderV2.decodeInto(
-        buffer,
+  /// decoded size exceeds it (checked while decoding). Without it, the
+  /// `brotli_fast` default limit applies ([brotliDefaultMaxOutputSize]).
+  static Uint8List decode(Uint8List bytes, {int? maxOutputSize}) =>
+      brotliDecode(
         bytes,
-        options: options,
+        maxOutputSize: maxOutputSize ?? brotliDefaultMaxOutputSize,
       );
-      return Uint8List.sublistView(buffer, 0, length);
-    }
-  }
 }
 
 /// Encodes [bytes] with [encoding].

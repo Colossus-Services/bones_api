@@ -1,6 +1,6 @@
 ## 1.28.0
 
-- Brotli (`br`) response compression, using `brotli_neo` (pure Dart),
+- Brotli (`br`) response compression, using `brotli_fast` (pure Dart),
   next to GZip:
   - The encoding is negotiated with the request's `Accept-Encoding`
     (q-values, `q=0` and `*` respected): the best one in
@@ -44,7 +44,7 @@
   `bones_api_server.dart`): `APIContentEncoding`, `APIResponseCompression`,
   `APIBrotli`, `parseAcceptEncoding`, `resolveContentEncoding`,
   `compressResponse`, `createCompressionMiddleware`, `mergeVaryHeader`.
-- **Dart SDK `>=3.13.5`** (required by `brotli_neo`).
+- **Dart SDK `>=3.13.5`** (required by `brotli_fast`).
   - Sources reformatted for the 3.13 language version, and
     `prefer_initializing_formals` applied (private named parameters: the
     public parameter names are unchanged).

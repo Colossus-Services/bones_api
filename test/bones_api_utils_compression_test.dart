@@ -198,8 +198,8 @@ void main() {
     });
 
     test('decode: maxOutputSize above the last buffer doubling', () {
-      // `BrotliDecoderV2.decode` doubles from ~1 MB: 1, 2, 4 MB... A 4.5 MB
-      // output under a 5 MB limit needs the retry with a buffer at the limit.
+      // The decoder buffer doubles from ~1 MB: 1, 2, 4 MB... A 4.5 MB output
+      // under a 5 MB limit needs the last step to grow up to the limit.
       var data = Uint8List(1024 * 1024 * 9 ~/ 2);
       for (var i = 0; i < data.length; ++i) {
         data[i] = (i * 31 + (i >> 9)) & 0xFF;
