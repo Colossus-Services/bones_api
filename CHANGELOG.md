@@ -10,20 +10,31 @@
     (`createCompressionMiddleware`).
   - The static files cache keeps the identity, `gzip` and `br` variants of
     each file (a `gzip` file is transcoded to `br` when preferred).
-  - If the Brotli encoder fails, the next accepted encoding is used.
+  - If the Brotli encoder fails, the next accepted encoding is used (the
+    static files cache doesn't retry a failed conversion).
+  - Static files: the higher quality (Brotli `9`+, GZip `7`) is only used
+    for the responses that will be cached (`APIServerResponseCache.isCacheable`).
 - Fix: a JSON payload of 512+ bytes was always sent GZip-compressed, even
   without `Accept-Encoding: gzip` in the request. Now it's compressed only
   with an accepted encoding.
   - `APIServer.resolveBody`/`resolveBodySync` called without the new
     `compression` parameter keep the old behavior (GZip).
+- Fix: a large JSON error body (`APIResponse.error`) was GZip-compressed
+  without a `Content-Encoding` header. Now it's compressed once, with it.
+- Fix: responses without a full body (`206 Partial Content`, a
+  `Content-Range`, `204`, `304`) are not compressed (`Range` requests of
+  static files).
+- Fix: a cached compressed `404` body is served with its `Content-Encoding`,
+  and only to requests accepting it.
 - `Accept-Encoding` is parsed (it was a substring match: `gzip;q=0` was
-  taken as accepting `gzip`).
+  taken as accepting `gzip`). `x-gzip` is taken as `gzip`.
 - `Vary: Accept-Encoding` is sent with responses that can be compressed.
 - `APIServerConfig`:
   - `compressionEncodings` (`--compression-encodings br,gzip`,
-    `server.compression_encodings`): an empty list disables the response
-    compression (also the `HttpServer.autoCompress` GZip, which is
-    disabled when `gzip` is not listed).
+    `server.compression_encodings`): an empty list (or `none`) disables the
+    response compression (also the `HttpServer.autoCompress` GZip, which is
+    disabled when `gzip` is not listed). Unknown encodings are ignored
+    (logged); if none is known, the defaults are used.
   - `brotliQuality` (`--brotli-quality 5`, `server.brotli_quality`;
     `0..11`, default `5`). Cached static files use at least `9`
     (and GZip level `7`, as before).

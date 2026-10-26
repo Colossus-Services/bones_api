@@ -87,6 +87,31 @@ void main() {
       );
       // Other parameters are ignored:
       expect(parseAcceptEncoding('br;level=1;q=0.4'), equals({'br': 0.4}));
+      // `x-gzip` is `gzip`:
+      expect(parseAcceptEncoding('x-gzip'), equals({'gzip': 1.0}));
+      expect(
+        parseAcceptEncoding('gzip;q=0.2, x-gzip;q=0.6'),
+        equals({'gzip': 0.6}),
+      );
+    });
+
+    test('x-gzip', () {
+      expect(acceptsContentEncoding('x-gzip', 'gzip'), isTrue);
+      expect(acceptsContentEncoding('gzip', 'x-gzip'), isTrue);
+      expect(
+        resolveContentEncoding('x-gzip', APIContentEncoding.defaultEncodings),
+        equals(APIContentEncoding.gzip),
+      );
+      expect(
+        resolveContentEncodingFrom({
+          'gzip': 1.0,
+        }, APIContentEncoding.defaultEncodings),
+        equals(APIContentEncoding.gzip),
+      );
+      expect(
+        const APIResponseCompression().resolveAcceptedEncoding({'br': 0.5}),
+        equals(APIContentEncoding.br),
+      );
     });
 
     test('acceptsContentEncoding', () {
@@ -166,6 +191,29 @@ void main() {
         equals(data),
       );
 
+      expect(
+        () => APIBrotli.decode(encoded, maxOutputSize: data.length - 1),
+        throwsFormatException,
+      );
+    });
+
+    test('decode: maxOutputSize above the last buffer doubling', () {
+      // `BrotliDecoderV2.decode` doubles from ~1 MB: 1, 2, 4 MB... A 4.5 MB
+      // output under a 5 MB limit needs the retry with a buffer at the limit.
+      var data = Uint8List(1024 * 1024 * 9 ~/ 2);
+      for (var i = 0; i < data.length; ++i) {
+        data[i] = (i * 31 + (i >> 9)) & 0xFF;
+      }
+      var encoded = APIBrotli.encode(data, quality: 1)!;
+
+      expect(
+        APIBrotli.decode(encoded, maxOutputSize: 1024 * 1024 * 5),
+        equals(data),
+      );
+      expect(
+        APIBrotli.decode(encoded, maxOutputSize: data.length),
+        equals(data),
+      );
       expect(
         () => APIBrotli.decode(encoded, maxOutputSize: data.length - 1),
         throwsFormatException,
@@ -370,6 +418,35 @@ void main() {
       var encoded = textResponse(data, headers: {'content-encoding': 'gzip'});
       expect(await compressResponse(req, encoded), same(encoded));
 
+      // Partial content / no full body:
+      var partial = Response(
+        206,
+        body: data,
+        headers: {
+          'content-type': 'text/plain',
+          'content-range': 'bytes 0-${data.length - 1}/${data.length * 2}',
+        },
+      );
+      expect(await compressResponse(req, partial), same(partial));
+
+      var range = Response.ok(
+        data,
+        headers: {'content-type': 'text/plain', 'content-range': 'bytes */1'},
+      );
+      expect(await compressResponse(req, range), same(range));
+
+      var notModified = Response.notModified();
+      expect(await compressResponse(req, notModified), same(notModified));
+
+      // Error responses with a full body are compressed:
+      var notFound = Response.notFound(
+        data,
+        headers: {'content-type': 'text/plain'},
+      );
+      var notFoundBr = await compressResponse(req, notFound);
+      expect(notFoundBr.statusCode, equals(404));
+      expect(notFoundBr.headers['content-encoding'], equals('br'));
+
       // Disabled:
       var plain = textResponse(data);
       expect(
@@ -449,6 +526,29 @@ void main() {
       var r3 = await handler(_get());
       expect(r3.headers['content-encoding'], isNull);
       expect(await _read(r3), equals(data));
+    });
+
+    test('resolveCompression', () async {
+      var data = _textBytes();
+
+      var resolved = <String>[];
+
+      var handler =
+          createCompressionMiddleware(
+            resolveCompression: (request, response) {
+              resolved.add(request.url.path);
+              return APIResponseCompression(
+                encodings: [APIContentEncoding.gzip],
+              );
+            },
+          )(
+            (request) =>
+                Response.ok(data, headers: {'content-type': 'text/plain'}),
+          );
+
+      var r = await handler(_get(acceptEncoding: 'br, gzip'));
+      expect(r.headers['content-encoding'], equals('gzip'));
+      expect(resolved, equals(['x']));
     });
   });
 

@@ -1121,6 +1121,10 @@ class APIServerConfig {
   /// Resolves [compressionEncodings] (a [List] or a comma separated [String],
   /// e.g. `br,gzip`), falling back to `server.compression_encodings` in
   /// [apiConfig], then to [APIContentEncoding.defaultEncodings].
+  ///
+  /// - An empty value (or `none`) disables the response compression.
+  /// - Unknown encodings are ignored (logged). If none is known, the
+  ///   defaults are used.
   static List<APIContentEncoding> resolveCompressionEncodings(
     Object? compressionEncodings, {
     APIConfig? apiConfig,
@@ -1129,10 +1133,46 @@ class APIServerConfig {
       'server',
       'compression_encodings',
     );
-    return List.unmodifiable(
-      APIContentEncoding.parseList(compressionEncodings) ??
-          APIContentEncoding.defaultEncodings,
-    );
+
+    // Not defined, or a flag without a value:
+    if (compressionEncodings == null ||
+        compressionEncodings is bool ||
+        compressionEncodings == 'true') {
+      return APIContentEncoding.defaultEncodings;
+    }
+
+    var items =
+        (compressionEncodings is Iterable
+                ? compressionEncodings
+                : compressionEncodings.toString().split(','))
+            .map((e) => e is APIContentEncoding ? e : '${e ?? ''}'.trim())
+            .where((e) => e is APIContentEncoding || (e as String).isNotEmpty)
+            .toList();
+
+    if (items.isEmpty ||
+        (items.length == 1 &&
+            items.first is String &&
+            equalsIgnoreAsciiCase(items.first as String, 'none'))) {
+      return const <APIContentEncoding>[];
+    }
+
+    var encodings = APIContentEncoding.parseList(items)!;
+
+    var unknown = items
+        .where((e) => APIContentEncoding.parse(e) == null)
+        .toList();
+
+    if (encodings.isEmpty) {
+      _log.warning(
+        "Unknown `compression_encodings`: $unknown. "
+        "Using the defaults: ${APIContentEncoding.defaultEncodings.map((e) => e.name).toList()}",
+      );
+      return APIContentEncoding.defaultEncodings;
+    } else if (unknown.isNotEmpty) {
+      _log.warning("Ignoring unknown `compression_encodings`: $unknown");
+    }
+
+    return List.unmodifiable(encodings);
   }
 
   /// Resolves [brotliQuality], falling back to `server.brotli_quality` in
@@ -2963,9 +3003,13 @@ final class APIServerWorker extends _APIServerBase {
 
     var compression = responseCompression;
 
+    APIResponseCompression Function(Request request, Response response)?
+    resolveCompression;
+
     if (cacheStaticFilesResponses) {
-      // Allow higher compression if the `Response`s are being cached:
-      compression = compression.copyWith(
+      // Allow higher compression if the `Response`s are being cached
+      // (compressed once):
+      var cachedCompression = compression.copyWith(
         gzipLevel: 7,
         brotliQuality: math.max(compression.brotliQuality, 9),
       );
@@ -2973,16 +3017,23 @@ final class APIServerWorker extends _APIServerBase {
       var responseCache = _responseCache = APIServerResponseCache(
         maxMemorySize: staticFilesCacheMaxMemorySize,
         maxContentLength: staticFilesCacheMaxContentLength,
-        compression: compression,
+        compression: cachedCompression,
       );
 
       pipeline = pipeline.addMiddleware(responseCache.middleware);
+
+      // Not cached (e.g., too large): compressed on each request.
+      resolveCompression = (request, response) =>
+          responseCache.isCacheable(request, response)
+          ? cachedCompression
+          : compression;
     }
 
     pipeline = pipeline
         .addMiddleware(
           createCompressionMiddleware(
             compression: compression,
+            resolveCompression: resolveCompression,
             addCompressionRatioHeader: true,
             addServerTiming: true,
           ),
@@ -3680,11 +3731,13 @@ final class APIServerWorker extends _APIServerBase {
       if (payload is APIResponse) {
         var apiResponse2 = payload;
 
+        // Not compressed here: the `headers` are from `apiResponse`
+        // (the encoding headers would be set in `apiResponse2`).
+        // Compressed later by `_processResponse`.
         return APIServer.resolveBody(
           apiResponse2.payload,
           apiResponse2,
-          compression: compression,
-          acceptEncoding: acceptEncoding,
+          compression: APIResponseCompression.none,
         ).resolveMapped((payload2) {
           var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
 
@@ -3942,7 +3995,13 @@ final class APIServerWorker extends _APIServerBase {
 
           var errorContent = stackTrace != null ? '$error\n$stackTrace' : error;
 
-          var retError = APIServer.resolveBodySync(errorContent, apiResponse);
+          // Not compressed here: `headers` were already resolved.
+          // Compressed later by `_processResponse`.
+          var retError = APIServer.resolveBodySync(
+            errorContent,
+            apiResponse,
+            compression: APIResponseCompression.none,
+          );
 
           headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
 

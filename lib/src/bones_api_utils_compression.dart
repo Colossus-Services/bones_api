@@ -68,7 +68,8 @@ enum APIContentEncoding {
 /// lowercase coding names to their `q` value (`0.0` to `1.0`).
 ///
 /// An entry with an invalid `q` value is ignored. If a coding is
-/// repeated, its highest `q` value is kept.
+/// repeated, its highest `q` value is kept. `x-gzip` is taken as `gzip`
+/// (RFC 9110, 8.4.1.3).
 Map<String, double> parseAcceptEncoding(String? value) {
   if (value == null) return {};
   value = value.trim();
@@ -81,6 +82,7 @@ Map<String, double> parseAcceptEncoding(String? value) {
 
     var coding = parts[0].trim().toLowerCase();
     if (coding.isEmpty) continue;
+    if (coding == 'x-gzip') coding = 'gzip';
 
     double? q = 1.0;
 
@@ -116,7 +118,16 @@ double acceptEncodingQuality(Map<String, double> accepted, String coding) =>
 /// Returns `true` if the `Accept-Encoding` header [value] accepts [coding]
 /// (`q > 0`).
 bool acceptsContentEncoding(String? value, String coding) =>
-    acceptEncodingQuality(parseAcceptEncoding(value), coding.toLowerCase()) > 0;
+    acceptEncodingQuality(
+      parseAcceptEncoding(value),
+      _normalizeCoding(coding),
+    ) >
+    0;
+
+String _normalizeCoding(String coding) {
+  coding = coding.trim().toLowerCase();
+  return coding == 'x-gzip' ? 'gzip' : coding;
+}
 
 /// Resolves the best [APIContentEncoding] in [available] for the
 /// `Accept-Encoding` header [value]: the one with the highest `q` value.
@@ -128,9 +139,16 @@ APIContentEncoding? resolveContentEncoding(
   List<APIContentEncoding> available,
 ) {
   if (available.isEmpty) return null;
+  return resolveContentEncodingFrom(parseAcceptEncoding(value), available);
+}
 
-  var accepted = parseAcceptEncoding(value);
-  if (accepted.isEmpty) return null;
+/// Same as [resolveContentEncoding], with an already parsed
+/// `Accept-Encoding` ([parseAcceptEncoding]).
+APIContentEncoding? resolveContentEncodingFrom(
+  Map<String, double> accepted,
+  List<APIContentEncoding> available,
+) {
+  if (available.isEmpty || accepted.isEmpty) return null;
 
   APIContentEncoding? best;
   var bestQ = 0.0;
@@ -184,12 +202,27 @@ abstract final class APIBrotli {
   /// If [maxOutputSize] is provided, throws a [BrotliException] when the
   /// decoded size exceeds it (checked while decoding).
   static Uint8List decode(Uint8List bytes, {int? maxOutputSize}) {
-    return BrotliDecoderV2.decode(
-      bytes,
-      options: maxOutputSize != null
-          ? BrotliDecodeOptions(maxOutputSize: maxOutputSize)
-          : const BrotliDecodeOptions(),
-    );
+    if (maxOutputSize == null) {
+      return BrotliDecoderV2.decode(bytes);
+    }
+
+    final options = BrotliDecodeOptions(maxOutputSize: maxOutputSize);
+
+    try {
+      return BrotliDecoderV2.decode(bytes, options: options);
+    } on BrotliException catch (e) {
+      // `BrotliDecoderV2.decode` doubles its buffer and stops at the last
+      // power of 2 below the limit: retry once with a buffer at the limit.
+      if (e.code != BrotliErrorCode.outputLimitExceeded) rethrow;
+
+      final buffer = Uint8List(maxOutputSize);
+      final length = BrotliDecoderV2.decodeInto(
+        buffer,
+        bytes,
+        options: options,
+      );
+      return Uint8List.sublistView(buffer, 0, length);
+    }
   }
 }
 
@@ -265,6 +298,11 @@ class APIResponseCompression {
   APIContentEncoding? resolveEncoding(String? value) =>
       resolveContentEncoding(value, encodings);
 
+  /// Resolves the [APIContentEncoding] for an already parsed
+  /// `Accept-Encoding` ([parseAcceptEncoding]).
+  APIContentEncoding? resolveAcceptedEncoding(Map<String, double> accepted) =>
+      resolveContentEncodingFrom(accepted, encodings);
+
   /// Resolves the [APIContentEncoding] for [request].
   APIContentEncoding? resolveRequestEncoding(Request request) =>
       resolveEncoding(request.headers[HttpHeaders.acceptEncodingHeader]);
@@ -338,13 +376,29 @@ String mergeVaryHeader(Object? currentVary, String field) {
   return [...fields, field].join(', ');
 }
 
-/// Returns `true` if [response] can be compressed: no `Content-Encoding`,
-/// not an already compressed `Content-Type`, and not smaller
-/// than [minLength]. See [canGzipEncodeResponse].
+/// Returns `true` if [response] can be compressed: a status with a full
+/// body (not `1xx`, `204`, `206` or `304`, and no `Content-Range`),
+/// no `Content-Encoding`, not an already compressed `Content-Type`, and
+/// not smaller than [minLength]. See [canGzipEncodeResponse].
 bool canCompressResponse(
   Response response, {
   int minLength = APIResponseCompression.defaultMinLength,
-}) => canGzipEncodeResponse(response, minimalGzipContentLength: minLength);
+}) {
+  final statusCode = response.statusCode;
+  if (statusCode < 200 ||
+      statusCode == HttpStatus.noContent ||
+      statusCode == HttpStatus.partialContent ||
+      statusCode == HttpStatus.notModified) {
+    return false;
+  }
+
+  // A range of the (uncompressed) representation:
+  if (response.headers.containsKey(HttpHeaders.contentRangeHeader)) {
+    return false;
+  }
+
+  return canGzipEncodeResponse(response, minimalGzipContentLength: minLength);
+}
 
 /// Compresses [response] with the best encoding accepted by [request]
 /// (see [APIResponseCompression.resolveRequestEncoding]).
@@ -514,8 +568,14 @@ void defineContentEncodingHeaders(
 }
 
 /// A [Middleware] that compresses the responses using [compressResponse].
+///
+/// If [resolveCompression] is provided, it chooses the compression of each
+/// response (e.g., a higher quality for responses that will be cached),
+/// otherwise [compression] is used.
 Middleware createCompressionMiddleware({
   APIResponseCompression compression = const APIResponseCompression(),
+  APIResponseCompression Function(Request request, Response response)?
+  resolveCompression,
   bool addCompressionRatioHeader = true,
   bool addServerTiming = true,
 }) {
@@ -525,7 +585,9 @@ Middleware createCompressionMiddleware({
         (response) => compressResponse(
           request,
           response,
-          compression: compression,
+          compression: resolveCompression != null
+              ? resolveCompression(request, response)
+              : compression,
           addCompressionRatioHeader: addCompressionRatioHeader,
           addServerTiming: addServerTiming,
         ),

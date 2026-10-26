@@ -408,14 +408,17 @@ class APIServerResponseCache {
     }
   }
 
-  Future<Response>? _cacheResponse200(Request request, Response response) {
-    var method = request.method;
-    if (method != 'GET') {
-      return null;
-    }
+  /// Returns `true` if the `200` [response] for [request] will be cached:
+  /// a `GET` with a known `Content-Length` up to [maxContentLength].
+  bool isCacheable(Request request, Response response) {
+    if (response.statusCode != 200 || request.method != 'GET') return false;
 
     var contentLength = response.contentLength;
-    if (contentLength == null || contentLength > maxContentLength) return null;
+    return contentLength != null && contentLength <= maxContentLength;
+  }
+
+  Future<Response>? _cacheResponse200(Request request, Response response) {
+    if (!isCacheable(request, response)) return null;
 
     var path = request.url.path;
 
@@ -1131,9 +1134,18 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     );
   }
 
+  /// The encodings that failed to be created from this content
+  /// (e.g., a Brotli encoder error): not tried again.
+  final Set<APIContentEncoding> _failedEncodings = {};
+
   _CachedResponse200? compressedCopy(APIContentEncoding targetEncoding) {
+    if (_failedEncodings.contains(targetEncoding)) return null;
+
     var compressed = this.compressContent(targetEncoding, compression);
-    if (compressed == null) return null;
+    if (compressed == null) {
+      _failedEncodings.add(targetEncoding);
+      return null;
+    }
 
     var (compressContent, compressedEncoding) = compressed;
 
@@ -1148,9 +1160,21 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     );
   }
 
-  /// The best encoding for [request] (`null` for no compression).
-  APIContentEncoding? _requestEncoding(Request request) =>
-      compression.resolveRequestEncoding(request);
+  /// The best encoding for [request] (`null` for no compression),
+  /// excluding the [_failedEncodings].
+  APIContentEncoding? _requestEncoding(Request request) {
+    final accepted = request.acceptedEncodings;
+    if (_failedEncodings.isEmpty) {
+      return compression.resolveAcceptedEncoding(accepted);
+    }
+
+    return resolveContentEncodingFrom(
+      accepted,
+      compression.encodings
+          .where((e) => !_failedEncodings.contains(e))
+          .toList(),
+    );
+  }
 
   @override
   bool validate(Request request) {
@@ -1167,7 +1191,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
           contentEncodingType != null) {
         return false;
       }
-    } else if (_requestEncoding(request) != null && shouldCompress()) {
+    } else if (shouldCompress() && _requestEncoding(request) != null) {
       return false;
     }
 
@@ -1334,8 +1358,13 @@ class _CachedResponse404 extends _CachedResponseWithBody {
     this.server,
   }) : super(statusCode: 404, fileStat: _FileStat.notFoundFrom(file));
 
+  /// A compressed 404 body (by the compression middleware) is only
+  /// valid for a request that accepts its encoding.
   @override
   bool validate(Request request) {
+    if (isCompressedContent) {
+      return request.requestAcceptsEncoding(contentEncoding!);
+    }
     return true;
   }
 
@@ -1344,9 +1373,14 @@ class _CachedResponse404 extends _CachedResponseWithBody {
     markUsage();
 
     final server = this.server;
+    final contentEncoding = isCompressedContent ? this.contentEncoding : null;
 
     var headers = <String, List<String>>{
       if (server != null) 'Server': [server],
+      if (contentEncoding != null) ...{
+        HttpHeaders.contentEncodingHeader: [contentEncoding],
+        HttpHeaders.varyHeader: ['Accept-Encoding'],
+      },
     };
 
     configureMetricsHeaders(headers, requestInitTime: requestInitTime);
@@ -1604,11 +1638,23 @@ extension _RequestExtension on Request {
   String? get ifModifiedSinceHeader =>
       headers[HttpHeaders.ifModifiedSinceHeader];
 
-  bool requestAcceptsEncoding(String contentEncoding) => acceptsContentEncoding(
-    headers[HttpHeaders.acceptEncodingHeader],
-    contentEncoding,
-  );
+  /// The parsed `Accept-Encoding` ([parseAcceptEncoding]), parsed once
+  /// per [Request].
+  Map<String, double> get acceptedEncodings =>
+      _requestAcceptedEncodings[this] ??= parseAcceptEncoding(
+        headers[HttpHeaders.acceptEncodingHeader],
+      );
+
+  bool requestAcceptsEncoding(String contentEncoding) {
+    var coding = contentEncoding.trim().toLowerCase();
+    if (coding == 'x-gzip') coding = 'gzip';
+    return acceptEncodingQuality(acceptedEncodings, coding) > 0;
+  }
 }
+
+final _requestAcceptedEncodings = Expando<Map<String, double>>(
+  'acceptedEncodings',
+);
 
 extension _ResponseExtension on Response {
   String get contentLengthHeader =>

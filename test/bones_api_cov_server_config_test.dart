@@ -564,8 +564,43 @@ void main() {
         APIServerConfig.resolveCompressionEncodings('br'),
         equals([APIContentEncoding.br]),
       );
-      // Empty: compression disabled:
+      // Empty or `none`: compression disabled:
       expect(APIServerConfig.resolveCompressionEncodings(''), isEmpty);
+      expect(APIServerConfig.resolveCompressionEncodings([]), isEmpty);
+      expect(APIServerConfig.resolveCompressionEncodings('None'), isEmpty);
+      // Unknown ones ignored; none known (or a flag): the defaults:
+      expect(
+        APIServerConfig.resolveCompressionEncodings('gzip, deflate'),
+        equals([APIContentEncoding.gzip]),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings([
+          APIContentEncoding.gzip,
+          'br',
+        ]),
+        equals([APIContentEncoding.gzip, APIContentEncoding.br]),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings('gzp,brr'),
+        equals(APIContentEncoding.defaultEncodings),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings(
+          null,
+          apiConfig: APIConfig({
+            'server': {'compression_encodings': 'deflate'},
+          }),
+        ),
+        equals(APIContentEncoding.defaultEncodings),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings(true),
+        equals(APIContentEncoding.defaultEncodings),
+      );
+      expect(
+        APIServerConfig.resolveCompressionEncodings('true'),
+        equals(APIContentEncoding.defaultEncodings),
+      );
       expect(
         APIServerConfig.resolveCompressionEncodings(null),
         equals(APIContentEncoding.defaultEncodings),

@@ -495,6 +495,112 @@ void main() {
       expect(await _readBody(r3), equals(content));
     });
 
+    test('alternatives: a failed conversion is not retried', () async {
+      // Not valid GZip data: the conversion to `br` fails (it can't be
+      // decompressed), as a Brotli encoder failure would.
+      var invalidGzip = List<int>.generate(2000, (i) => i & 0xFF);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      inner.overrides['bad.txt'] = (request) => Response.ok(
+        invalidGzip,
+        headers: {
+          'content-type': 'text/plain',
+          'content-encoding': 'gzip',
+          'server': 'fake',
+        },
+      );
+
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(
+        _get('bad.txt', headers: {'accept-encoding': 'gzip'}),
+      );
+      expect(r1.headers['content-encoding'], equals('gzip'));
+      expect(inner.calls, equals(1));
+
+      // Prefers `br`: the conversion fails, so the inner handler is called
+      // once more, then the cached `gzip` entry is used:
+      for (var i = 0; i < 3; ++i) {
+        var r = await handler(
+          _get('bad.txt', headers: {'accept-encoding': 'br, gzip'}),
+        );
+        expect(r.headers['content-encoding'], equals('gzip'));
+        expect(await r.read().expand((e) => e).toList(), equals(invalidGzip));
+      }
+      expect(inner.calls, equals(2));
+    });
+
+    test('404: compressed body', () async {
+      var body = utf8.encode('Not Found! ' * 200);
+      var compressed = APIBrotli.encode(Uint8List.fromList(body))!;
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      inner.overrides['nf.txt'] = (request) {
+        var accepts =
+            request.headers['accept-encoding']?.contains('br') ?? false;
+        return Response.notFound(
+          accepts ? compressed : body,
+          headers: {
+            'content-type': 'text/plain',
+            'server': 'fake',
+            if (accepts) 'content-encoding': 'br',
+          },
+          context: {'file_not_found': File('${tmpDir.path}/nf.txt')},
+        );
+      };
+
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(
+        _get('nf.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(r1.statusCode, equals(404));
+      expect(r1.headers['content-encoding'], equals('br'));
+      expect(inner.calls, equals(1));
+
+      // Cached: keeps the `Content-Encoding`:
+      var r2 = await handler(
+        _get('nf.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(r2.statusCode, equals(404));
+      expect(r2.headers['content-encoding'], equals('br'));
+      expect(r2.headers['vary'], equals('Accept-Encoding'));
+      expect(await _readBody(r2), equals(utf8.decode(body)));
+      expect(inner.calls, equals(1));
+
+      // Not accepted: not served from the compressed cached entry:
+      var r3 = await handler(_get('nf.txt'));
+      expect(r3.statusCode, equals(404));
+      expect(r3.headers['content-encoding'], isNull);
+      expect(await _readBody(r3), equals(utf8.decode(body)));
+      expect(inner.calls, equals(2));
+    });
+
+    test('isCacheable', () {
+      var cache = APIServerResponseCache(maxContentLength: 100);
+
+      expect(cache.isCacheable(_get('a'), Response.ok('x' * 100)), isTrue);
+      expect(cache.isCacheable(_get('a'), Response.ok('x' * 101)), isFalse);
+      expect(
+        cache.isCacheable(_get('a', method: 'POST'), Response.ok('x')),
+        isFalse,
+      );
+      expect(cache.isCacheable(_get('a'), Response.notFound('x')), isFalse);
+      expect(
+        cache.isCacheable(
+          _get('a'),
+          Response.ok(
+            Stream<List<int>>.fromIterable([
+              [1],
+            ]),
+          ),
+        ),
+        isFalse,
+      );
+    });
+
     test('alternatives: custom compression', () async {
       var content = List.generate(200, (i) => 'line $i').join('\n');
       writeFile('big.txt', content);

@@ -74,6 +74,13 @@ class _CovHttpModule extends APIModule {
     routes.any('bigText', (request) => APIResponse.ok('TEXT ' * 500));
 
     routes.any(
+      'errorBig',
+      (request) => APIResponse.error(
+        error: {'errors': List.generate(100, (i) => 'error #$i')},
+      ),
+    );
+
+    routes.any(
       'redirect',
       (request) => APIResponse.redirect(Uri.parse('http://example.com/x')),
     );
@@ -329,6 +336,36 @@ void main() {
       );
       expect(res2.headers.value('content-encoding'), isNull);
       expect((json.decode(utf8.decode(res2.body)) as List).length, equals(300));
+    });
+
+    test('error with a large JSON error', () async {
+      // Not compressed without `Accept-Encoding` (it was always GZip, and
+      // without the `Content-Encoding` header):
+      var res = await _request(
+        '${apiServer.url}cov/errorBig',
+        noAcceptEncoding: true,
+      );
+      expect(res.status, equals(500));
+      expect(res.headers.value('content-encoding'), isNull);
+      expect(
+        (json.decode(utf8.decode(res.body)) as Map)['errors'],
+        hasLength(100),
+      );
+
+      // Compressed once, with the header:
+      for (var encoding in ['br', 'gzip']) {
+        var res2 = await _request(
+          '${apiServer.url}cov/errorBig',
+          headers: {'accept-encoding': encoding},
+        );
+        expect(res2.status, equals(500));
+        expect(res2.headers.value('content-encoding'), equals(encoding));
+        expect(
+          (json.decode(_bodyStr(res2)) as Map)['errors'],
+          hasLength(100),
+          reason: encoding,
+        );
+      }
     });
 
     test('text + br', () async {
