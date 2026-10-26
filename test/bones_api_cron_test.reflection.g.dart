@@ -90,7 +90,7 @@ class CronDuplicatedModule$reflection
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   CronDuplicatedModule$reflection withObject([CronDuplicatedModule? obj]) =>
@@ -1100,7 +1100,7 @@ class CronReflectedModule$reflection
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   CronReflectedModule$reflection withObject([CronReflectedModule? obj]) =>

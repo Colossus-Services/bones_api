@@ -80,7 +80,7 @@ class MyInfoModule$reflection extends ClassReflection<MyInfoModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   MyInfoModule$reflection withObject([MyInfoModule? obj]) =>

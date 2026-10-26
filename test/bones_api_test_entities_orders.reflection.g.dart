@@ -104,7 +104,7 @@ class Bonus$reflection extends ClassReflection<Bonus> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Bonus$reflection withObject([Bonus? obj]) =>
@@ -627,7 +627,7 @@ class Campaign$reflection extends ClassReflection<Campaign>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Campaign$reflection withObject([Campaign? obj]) =>
@@ -1179,7 +1179,7 @@ class CampaignConfig$reflection extends ClassReflection<CampaignConfig>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   CampaignConfig$reflection withObject([CampaignConfig? obj]) =>
@@ -1726,7 +1726,7 @@ class Item$reflection extends ClassReflection<Item> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Item$reflection withObject([Item? obj]) =>
@@ -2261,7 +2261,7 @@ class Order$reflection extends ClassReflection<Order> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Order$reflection withObject([Order? obj]) =>

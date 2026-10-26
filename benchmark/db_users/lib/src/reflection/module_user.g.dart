@@ -108,7 +108,7 @@ class ModuleUser$reflection extends ClassReflection<ModuleUser>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   ModuleUser$reflection withObject([ModuleUser? obj]) =>

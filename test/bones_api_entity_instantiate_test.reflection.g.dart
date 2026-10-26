@@ -174,7 +174,7 @@ class Counter$reflection extends ClassReflection<Counter>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Counter$reflection withObject([Counter? obj]) =>
@@ -443,7 +443,7 @@ class Coupon$reflection extends ClassReflection<Coupon> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Coupon$reflection withObject([Coupon? obj]) =>
@@ -685,7 +685,7 @@ class Invoice$reflection extends ClassReflection<Invoice>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Invoice$reflection withObject([Invoice? obj]) =>
@@ -966,7 +966,7 @@ class Label$reflection extends ClassReflection<Label> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Label$reflection withObject([Label? obj]) =>
@@ -1232,7 +1232,7 @@ class Note$reflection extends ClassReflection<Note> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Note$reflection withObject([Note? obj]) =>
@@ -1493,7 +1493,7 @@ class Profile$reflection extends ClassReflection<Profile>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Profile$reflection withObject([Profile? obj]) =>
@@ -1804,7 +1804,7 @@ class Project$reflection extends ClassReflection<Project>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Project$reflection withObject([Project? obj]) =>
@@ -2215,7 +2215,7 @@ class Seat$reflection extends ClassReflection<Seat> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Seat$reflection withObject([Seat? obj]) =>
@@ -2454,7 +2454,7 @@ class Settings$reflection extends ClassReflection<Settings>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Settings$reflection withObject([Settings? obj]) =>
@@ -2762,7 +2762,7 @@ class Tag$reflection extends ClassReflection<Tag> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Tag$reflection withObject([Tag? obj]) =>
@@ -2999,7 +2999,7 @@ class Task$reflection extends ClassReflection<Task> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Task$reflection withObject([Task? obj]) =>
@@ -3322,7 +3322,7 @@ class TaskState$reflection extends EnumReflection<TaskState>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   TaskState$reflection withObject([TaskState? obj]) =>
@@ -3400,7 +3400,7 @@ class TaskStep$reflection extends ClassReflection<TaskStep>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   TaskStep$reflection withObject([TaskStep? obj]) =>
@@ -3646,7 +3646,7 @@ class Ticket$reflection extends ClassReflection<Ticket> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Ticket$reflection withObject([Ticket? obj]) =>

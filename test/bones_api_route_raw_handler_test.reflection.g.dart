@@ -91,7 +91,7 @@ class RawHandlerModule$reflection extends ClassReflection<RawHandlerModule>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   RawHandlerModule$reflection withObject([RawHandlerModule? obj]) =>
