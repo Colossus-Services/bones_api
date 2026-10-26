@@ -1,10 +1,14 @@
 @TestOn('vm')
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:bones_api/src/bones_api_utils_compression.dart';
 import 'package:bones_api/src/bones_api_utils_sink.dart';
 import 'package:test/test.dart';
+
+Uint8List _failingBrotliEncoder(Uint8List bytes, int quality) =>
+    throw StateError('Simulated Brotli encoder failure');
 
 void main() {
   group('BytesBuffer', () {
@@ -311,6 +315,26 @@ void main() {
       bs.addSlice([1, 2, 3, 4], 1, 3, true);
       expect(bs.inputLength, equals(2));
       expect(APIBrotli.decode(bs.toBytes()), equals([2, 3]));
+    });
+
+    test('encoder failure: falls back to GZip', () {
+      APIBrotli.encoder = _failingBrotliEncoder;
+      addTearDown(() => APIBrotli.encoder = APIBrotli.defaultEncoder);
+
+      var data = _text();
+
+      var bs = BrotliSink();
+      bs.add(data);
+      bs.close();
+
+      expect(bs.encoding, equals(APIContentEncoding.gzip));
+      expect(gzip.decode(bs.toBytes()), equals(data));
+
+      var sink = AutoCompressSink(encoding: APIContentEncoding.br);
+      sink.add(data);
+      sink.close();
+      expect(sink.activeEncoding, equals(APIContentEncoding.gzip));
+      expect(gzip.decode(sink.toBytes()), equals(data));
     });
   });
 

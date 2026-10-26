@@ -6,8 +6,11 @@ import 'dart:typed_data';
 import 'package:brotli_fast/brotli_fast.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_gzip/shelf_gzip.dart';
+
+import 'bones_api_utils_isolate_pool.dart';
 
 final _log = logging.Logger('APIContentEncoding');
 
@@ -168,10 +171,32 @@ APIContentEncoding? resolveContentEncodingFrom(
   return best;
 }
 
+/// A Brotli encoder function. See [APIBrotli.encoder].
+typedef APIBrotliEncoder = Uint8List Function(Uint8List bytes, int quality);
+
 /// Brotli encoding/decoding, using `package:brotli_fast`.
 abstract final class APIBrotli {
   /// The default Brotli quality for dynamic responses.
   static const int defaultQuality = 5;
+
+  /// The default [encoder]: `brotliEncode`.
+  static Uint8List defaultEncoder(Uint8List bytes, int quality) =>
+      brotliEncode(bytes, quality: quality);
+
+  /// The Brotli encoder used by [encode] and [encodeAsync].
+  ///
+  /// Replaceable in tests (e.g., to simulate an encoder failure). It must be
+  /// a top-level or static function, sent to the [Isolate] of [encodeAsync].
+  @visibleForTesting
+  static APIBrotliEncoder encoder = defaultEncoder;
+
+  /// The [APIIsolatePool] of [encodeAsync]: long-lived workers (the encoder
+  /// tables are initialized once per worker), and at most
+  /// [APIIsolatePool.maxIsolates] concurrent encodings (the others wait).
+  ///
+  /// One pool per isolate (e.g., per `APIServerWorker`). Can be replaced
+  /// (close the previous one).
+  static APIIsolatePool isolatePool = APIIsolatePool(debugName: 'APIBrotli');
 
   static bool _encodeErrorLogged = false;
 
@@ -181,29 +206,29 @@ abstract final class APIBrotli {
   /// caller can fall back to another encoding.
   static Uint8List? encode(Uint8List bytes, {int quality = defaultQuality}) {
     try {
-      return brotliEncode(bytes, quality: quality.clamp(0, 11));
+      return encoder(bytes, quality.clamp(0, 11));
     } catch (e, s) {
       _logEncodeError(bytes.length, quality, e, s);
       return null;
     }
   }
 
-  /// The minimal length to [encodeAsync] in a background [Isolate] at
+  /// The minimal length to [encodeAsync] in the [isolatePool] at
   /// [quality]: Brotli is pure Dart, and a slow encoding would block the
   /// event loop (and all the other requests of the isolate).
   ///
-  /// Starts at about 5ms of encoding (JSON, AOT). `Isolate.run` itself is
-  /// cheap (~0.05ms), but a new isolate initializes the encoder tables
-  /// again: about +1.5ms at quality `6` and +2.5ms at `9`
-  /// (nothing at `0..5`).
+  /// Starts at about 1.5ms of encoding (JSON, AOT): the pool workers keep
+  /// the encoder tables initialized, so an encoding costs about the same
+  /// in a worker as inline (a new isolate per encoding, like `Isolate.run`,
+  /// would add ~1.5ms at quality `6` and ~2.5ms at `9`).
   static int isolateMinLength(int quality) {
-    if (quality >= 9) return 128 * 1024; // ~7ms inline.
-    if (quality >= 6) return 256 * 1024; // ~5ms inline.
-    return 1024 * 1024; // ~5ms inline.
+    if (quality >= 9) return 32 * 1024; // ~1.9ms inline.
+    if (quality >= 6) return 64 * 1024; // ~1.3ms inline.
+    return 256 * 1024; // ~1.2ms inline.
   }
 
-  /// Same as [encode], but encodes in a background [Isolate] if [bytes]
-  /// is large for [quality] (see [isolateMinLength]).
+  /// Same as [encode], but encodes in the [isolatePool] (a background
+  /// [Isolate]) if [bytes] is large for [quality] (see [isolateMinLength]).
   static FutureOr<Uint8List?> encodeAsync(
     Uint8List bytes, {
     int quality = defaultQuality,
@@ -213,7 +238,10 @@ abstract final class APIBrotli {
       return encode(bytes, quality: quality);
     }
 
-    return Isolate.run(() => brotliEncode(bytes, quality: quality))
+    final encoder = APIBrotli.encoder;
+
+    return isolatePool
+        .run(() => encoder(bytes, quality))
         .then<Uint8List?>(
           (encoded) => encoded,
           onError: (Object e, StackTrace s) {

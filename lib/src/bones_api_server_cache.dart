@@ -1098,7 +1098,9 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     super.contentEncoding,
     super.encoding,
     this.compression = APIServerResponseCache.defaultCompression,
-  }) : super(statusCode: 200);
+    Set<APIContentEncoding>? failedEncodings,
+  }) : _failedEncodings = failedEncodings ?? {},
+       super(statusCode: 200);
 
   /// The compression used to resolve and create the alternatives.
   final APIResponseCompression compression;
@@ -1150,12 +1152,15 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       headers: _alternativeHeaders(decompressContent.length, null),
       content: decompressContent,
       compression: compression,
+      failedEncodings: _failedEncodings,
     );
   }
 
   /// The encodings that failed to be created from this content
-  /// (e.g., a Brotli encoder error): not tried again.
-  final Set<APIContentEncoding> _failedEncodings = {};
+  /// (e.g., a Brotli encoder error): not tried again. Shared with the
+  /// alternatives created from it (same representation), so they don't
+  /// prefer (and retry) a failed encoding.
+  final Set<APIContentEncoding> _failedEncodings;
 
   /// The [compressedCopy]s being encoded (asynchronously), shared by
   /// concurrent requests.
@@ -1208,6 +1213,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       content: compressContent,
       contentEncoding: compressedEncoding,
       compression: compression,
+      failedEncodings: _failedEncodings,
     );
   }
 

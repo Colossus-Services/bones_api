@@ -11,9 +11,17 @@
     by `createCompressionMiddleware`. `HEAD` responses only get the `Vary`.
   - A large Brotli encoding runs in a background `Isolate`
     (`APIBrotli.encodeAsync`), not blocking the server's event loop:
-    from about 5ms of encoding (`APIBrotli.isolateMinLength`: 128 KB at
-    quality `9`+, 256 KB at `6`+, 1 MB below). Concurrent requests for the
+    from about 1.5ms of encoding (`APIBrotli.isolateMinLength`: 32 KB at
+    quality `9`+, 64 KB at `6`+, 256 KB below). Concurrent requests for the
     same cached file share one encoding.
+  - The encodings run in `APIBrotli.isolatePool`, a new `APIIsolatePool`
+    (`bones_api_utils_isolate_pool.dart`): long-lived workers (the encoder
+    tables are initialized once per worker, ~2.5ms saved per encoding at
+    quality `9`), at most `maxIsolates` (default: half of the processors,
+    `1..4`) with the other encodings queued, and workers idle for
+    `idleTimeout` (default 30s) exit. With 30 concurrent 256 KB q9
+    encodings, the event loop stalls at most ~2ms (~60-100ms spawning an
+    isolate per encoding, ~400ms encoding inline).
   - The static files cache keeps the identity, `gzip` and `br` variants of
     each file (a `gzip` file is transcoded to `br` when preferred).
   - If the Brotli encoder fails, the next accepted encoding is used (the
@@ -53,7 +61,8 @@
   `bones_api_server.dart`): `APIContentEncoding`, `APIResponseCompression`,
   `APIBrotli`, `parseAcceptEncoding`, `resolveContentEncoding`,
   `normalizeContentCoding`, `compressResponse`, `createCompressionMiddleware`,
-  `mergeVaryHeader`.
+  `mergeVaryHeader`. And `bones_api_utils_isolate_pool.dart`:
+  `APIIsolatePool`.
 - **Dart SDK `>=3.13.5`** (required by `brotli_fast`).
   - Sources reformatted for the 3.13 language version, and
     `prefer_initializing_formals` applied (private named parameters: the

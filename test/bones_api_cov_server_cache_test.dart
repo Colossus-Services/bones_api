@@ -77,6 +77,11 @@ Request _get(
   String method = 'GET',
 }) => Request(method, Uri.parse('http://localhost/$path'), headers: headers);
 
+/// A top-level function: sendable to the `Isolate` of
+/// [APIBrotli.encodeAsync].
+Uint8List _failingBrotliEncoder(Uint8List bytes, int quality) =>
+    throw StateError('Simulated Brotli encoder failure');
+
 Future<String> _readBody(Response response) async {
   var bytes = await response.read().expand((e) => e).toList();
   switch (response.headers['content-encoding']) {
@@ -493,6 +498,56 @@ void main() {
       var r3 = await handler2(_get('gz.txt'));
       expect(r3.headers['content-encoding'], isNull);
       expect(await _readBody(r3), equals(content));
+    });
+
+    test('alternatives: Brotli encoder failure', () async {
+      APIBrotli.encoder = _failingBrotliEncoder;
+      addTearDown(() => APIBrotli.encoder = APIBrotli.defaultEncoder);
+
+      var small = List.generate(200, (i) => 'line $i').join('\n');
+      writeFile('small.txt', small);
+
+      // Over `APIBrotli.isolateMinLength(9)`: fails in the `Isolate`.
+      var large = List.generate(
+        30000,
+        (i) => 'row $i: ${i * 7919 % 10007}',
+      ).join('\n');
+      expect(large.length, greaterThan(APIBrotli.isolateMinLength(9)));
+      writeFile('large.txt', large);
+
+      for (var (path, content) in [
+        ('small.txt', small),
+        ('large.txt', large),
+      ]) {
+        var cache = APIServerResponseCache();
+        var inner = _FakeStaticHandler(tmpDir);
+        var handler = cache.middleware(inner.call);
+
+        await handler(_get(path));
+        expect(inner.calls, equals(1), reason: path);
+
+        // `br` fails: not cached, from the inner handler:
+        var r1 = await handler(
+          _get(path, headers: {'accept-encoding': 'br, gzip'}),
+        );
+        expect(r1.headers['content-encoding'], isNull, reason: path);
+        expect(await _readBody(r1), equals(content));
+        expect(inner.calls, equals(2), reason: path);
+
+        // Not retried: the next accepted encoding (`gzip`), from the cache:
+        var r2 = await handler(
+          _get(path, headers: {'accept-encoding': 'br, gzip'}),
+        );
+        expect(r2.headers['content-encoding'], equals('gzip'), reason: path);
+        expect(await _readBody(r2), equals(content));
+
+        // Only `br` accepted: the uncompressed entry, from the cache:
+        var r3 = await handler(_get(path, headers: {'accept-encoding': 'br'}));
+        expect(r3.headers['content-encoding'], isNull, reason: path);
+        expect(await _readBody(r3), equals(content));
+
+        expect(inner.calls, equals(2), reason: path);
+      }
     });
 
     test('alternatives: a failed conversion is not retried', () async {

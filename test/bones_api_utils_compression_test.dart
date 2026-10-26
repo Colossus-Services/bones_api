@@ -17,6 +17,11 @@ Request _get({String? acceptEncoding, String method = 'GET'}) => Request(
   headers: {'accept-encoding': ?acceptEncoding},
 );
 
+/// A top-level function: sendable to the `Isolate` of
+/// [APIBrotli.encodeAsync].
+Uint8List _failingBrotliEncoder(Uint8List bytes, int quality) =>
+    throw StateError('Simulated Brotli encoder failure');
+
 /// Text over [APIBrotli.isolateMinLength] at [quality].
 Uint8List _largeTextBytes(int quality) {
   var lines = 1000;
@@ -643,6 +648,54 @@ void main() {
       );
       expect(r.headers['content-encoding'], equals('gzip'));
       expect(gzip.decode(await _read(r)), equals(data));
+    });
+  });
+
+  group('Brotli encoder failure', () {
+    setUp(() => APIBrotli.encoder = _failingBrotliEncoder);
+    tearDown(() => APIBrotli.encoder = APIBrotli.defaultEncoder);
+
+    test('encode / encodeAsync: `null`', () async {
+      var data = _textBytes();
+
+      // Logged as `SEVERE` once, then as `FINE`:
+      expect(APIBrotli.encode(data), isNull);
+      expect(APIBrotli.encode(data), isNull);
+      expect(encodeContent(data, APIContentEncoding.br), isNull);
+
+      // In an `Isolate` (the encoder is sent to it):
+      var large = _largeTextBytes(9);
+      var encoded = APIBrotli.encodeAsync(large, quality: 9);
+      expect(encoded, isA<Future>());
+      expect(await encoded, isNull);
+    });
+
+    test(
+      'compressResponse: falls back to the next accepted encoding',
+      () async {
+        var data = _textBytes();
+
+        var r = await compressResponse(
+          _get(acceptEncoding: 'br, gzip'),
+          Response.ok(data, headers: {'content-type': 'text/plain'}),
+        );
+        expect(r.headers['content-encoding'], equals('gzip'));
+        expect(r.headers['vary'], equals('Accept-Encoding'));
+        expect(gzip.decode(await _read(r)), equals(data));
+      },
+    );
+
+    test('compressResponse: no other accepted encoding', () async {
+      var data = _textBytes();
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'br'),
+        Response.ok(data, headers: {'content-type': 'text/plain'}),
+      );
+      expect(r.headers['content-encoding'], isNull);
+      expect(r.headers['vary'], equals('Accept-Encoding'));
+      expect(r.context[uncompressedLengthContextKey], isNull);
+      expect(await _read(r), equals(data));
     });
   });
 
