@@ -948,9 +948,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       var s = definition.substring(idx1 + 1, idx2);
 
-      var field = RegExp(
-        r'\(([^()]+?)\)',
-      ).firstMatch(s)?.group(1)?.replaceAll("'", '').replaceAll('"', '').trim();
+      var field = RegExp(r'\(([^()]+?)\)')
+          .firstMatch(s)
+          ?.group(1)
+          ?.replaceAll("'", '')
+          .replaceAll('"', '')
+          .trim();
 
       if (field == null || field.isEmpty) return null;
 
@@ -959,13 +962,16 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       Set<String>? values;
 
       if (arrayDef != null && arrayDef.isNotEmpty) {
-        values = RegExp(
-          r"'(.*?)'",
-        ).allMatches(arrayDef).map((m) => m.group(1)).nonNulls.toSet();
+        values = RegExp(r"'(.*?)'")
+            .allMatches(arrayDef)
+            .map((m) => m.group(1))
+            .nonNulls
+            .toSet();
       } else {
-        var singleValue = RegExp(
-          r"\s+=\s+'(.*?)'",
-        ).firstMatch(s)?.group(1)?.trim();
+        var singleValue = RegExp(r"\s+=\s+'(.*?)'")
+            .firstMatch(s)
+            ?.group(1)
+            ?.trim();
 
         if (singleValue != null) {
           values = {singleValue};

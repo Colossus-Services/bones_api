@@ -56,17 +56,17 @@ class MergeEntityRulesError<R extends EntityRules<R>> extends Error {
 enum EntityAccessRuleType { allow, block, mask }
 
 /// An [EntityAccessRules.condition].
-typedef EntityAccessRulesCondition =
-    bool Function(EntityAccessRulesContext? context);
+typedef EntityAccessRulesCondition = bool Function(
+  EntityAccessRulesContext? context,
+);
 
 /// An [EntityAccessRules.masker].
-typedef EntityAccessRulesMasker =
-    Object? Function(
-      EntityAccessRulesContext? context,
-      Object object,
-      String field,
-      Object? value,
-    );
+typedef EntityAccessRulesMasker = Object? Function(
+  EntityAccessRulesContext? context,
+  Object object,
+  String field,
+  Object? value,
+);
 
 /// An [EntityAccessRules] context passed to rules with a condition ([EntityAccessRulesCondition]).
 class EntityAccessRulesContext {

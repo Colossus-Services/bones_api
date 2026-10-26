@@ -389,11 +389,9 @@ void main() {
     test('group complex', () async {
       var conditionParser = ConditionParser();
 
-      var c1 =
-          conditionParser.parse(
-                ' address.countryCode == ? && address.state == ? && address.latitude > ?:lat1 && address.latitude < ?:lat2 && address.longitude >= ?:long1 && address.longitude <= ?:long2 ',
-              )
-              as GroupConditionAND;
+      var c1 = conditionParser.parse(
+        ' address.countryCode == ? && address.state == ? && address.latitude > ?:lat1 && address.latitude < ?:lat2 && address.longitude >= ?:long1 && address.longitude <= ?:long2 ',
+      ) as GroupConditionAND;
 
       expect(c1.conditions.length, equals(6));
       expect(c1.conditions[0], isA<KeyConditionEQ>());

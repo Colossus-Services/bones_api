@@ -156,16 +156,14 @@ class EntityField extends EntityAnnotation {
   final bool Function(Object? value)? validator;
 
   const EntityField({
-    bool hidden = false,
-    bool unique = false,
-    bool indexed = false,
+    this._hidden = false,
+    this._unique = false,
+    this._indexed = false,
     this.minimum,
     this.maximum,
     this.validator,
     this.regexp,
-  }) : _hidden = hidden,
-       _unique = unique,
-       _indexed = indexed;
+  });
 
   const EntityField.visible() : this(hidden: false);
 

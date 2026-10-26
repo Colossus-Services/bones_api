@@ -1140,13 +1140,12 @@ class APIModuleProxy extends ClassProxy {
        );
 }
 
-typedef APIModuleProxyTargetResolver =
-    ClassProxyListener<T>? Function<T>(
-      Object target,
-      String? moduleName,
-      bool? responsesAsJson,
-      APIModuleProxyResponseErrorHandler? errorHandler,
-    );
+typedef APIModuleProxyTargetResolver = ClassProxyListener<T>? Function<T>(
+  Object target,
+  String? moduleName,
+  bool? responsesAsJson,
+  APIModuleProxyResponseErrorHandler? errorHandler,
+);
 
 /// A [APIModuleProxy] caller for a specific module ([moduleName]).
 ///
@@ -1188,12 +1187,11 @@ class APIModuleProxyCaller<T> extends ClassProxyDelegateListener<T> {
 
     if (target is HttpClient) {
       return APIModuleProxyHttpCaller(
-            target,
-            moduleRoute: moduleName,
-            responsesAsJson: responsesAsJson,
-            errorHandler: errorHandler,
-          )
-          as ClassProxyListener<T>;
+        target,
+        moduleRoute: moduleName,
+        responsesAsJson: responsesAsJson,
+        errorHandler: errorHandler,
+      ) as ClassProxyListener<T>;
     }
 
     throw StateError("Can't resolve `APIModuleProxyListener` target: $target");
@@ -1439,15 +1437,15 @@ class APIModuleProxyDirectCaller<T> extends APIModuleProxyCallerListener<T> {
   }
 }
 
-typedef APIModuleHttpProxyRequestHandler =
-    FutureOr<dynamic>? Function(
-      APIModuleProxyHttpCaller proxy,
-      String methodName,
-      Map<String, Object?> parameters,
-    );
+typedef APIModuleHttpProxyRequestHandler = FutureOr<dynamic>? Function(
+  APIModuleProxyHttpCaller proxy,
+  String methodName,
+  Map<String, Object?> parameters,
+);
 
-typedef APIModuleProxyResponseErrorHandler =
-    void Function(APIModuleProxyCallerResponseError responseError);
+typedef APIModuleProxyResponseErrorHandler = void Function(
+  APIModuleProxyCallerResponseError responseError,
+);
 
 /// An [APIModuleProxy] caller that performs HTTP requests.
 /// Implements a [ClassProxyListener] that redirects calls to [httpClient].

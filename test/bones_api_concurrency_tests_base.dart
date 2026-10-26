@@ -390,9 +390,8 @@ void runConcurrencyTests(
 
           var results = await Future.wait([
             for (var i = 0; i < 10; ++i)
-              now(
-                () => storeUser(newUser(email, 'U$i')),
-              ).then<Object?>((id) => id, onError: (Object e) => e),
+              now(() => storeUser(newUser(email, 'U$i')))
+                  .then<Object?>((id) => id, onError: (Object e) => e),
           ]);
 
           bool isError(Object? r) => r is Error || r is Exception;

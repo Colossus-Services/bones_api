@@ -116,9 +116,10 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
       char('-').optional() &
       char('0').or(digit().plus()) &
       char('.').seq(digit().plus()).optional() &
-      pattern(
-        'eE',
-      ).seq(pattern('-+').optional()).seq(digit().plus()).optional();
+      pattern('eE')
+          .seq(pattern('-+').optional())
+          .seq(digit().plus())
+          .optional();
 
   Parser<String> wordPrimitive() =>
       ((letter() | char('_')) & word().star()).flatten();

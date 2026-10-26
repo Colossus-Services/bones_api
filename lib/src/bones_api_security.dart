@@ -123,9 +123,8 @@ abstract class APISecurity {
     if (credentials.isEmpty) return null;
 
     for (var credential in credentials) {
-      var auth = await prepareCredential(
-        credential,
-      ).resolveMapped((c) => _authenticateImpl(c, request: request));
+      var auth = await prepareCredential(credential)
+          .resolveMapped((c) => _authenticateImpl(c, request: request));
 
       if (auth != null) {
         return auth;
@@ -141,9 +140,8 @@ abstract class APISecurity {
   }) {
     if (credential == null) return null;
 
-    return prepareCredential(
-      credential,
-    ).resolveMapped((c) => _authenticateImpl(c, request: request));
+    return prepareCredential(credential)
+        .resolveMapped((c) => _authenticateImpl(c, request: request));
   }
 
   FutureOr<APIAuthentication?> _authenticateImpl(
@@ -313,9 +311,8 @@ abstract class APISecurity {
 
     var credential = APICredential(apiToken.username, token: apiToken.token);
 
-    return prepareCredential(
-      credential,
-    ).resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
+    return prepareCredential(credential)
+        .resolveMapped((c) => _resumeAuthenticationImpl(c, request: request));
   }
 
   FutureOr<APIAuthentication?> _resumeAuthenticationImpl(

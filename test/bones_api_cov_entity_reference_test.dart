@@ -1020,18 +1020,16 @@ void main() {
         ),
       );
 
-      var ref1 = EntityReferenceList<_Thing>.fromEntities([
-        t1,
-      ]).toEntityReference();
+      var ref1 = EntityReferenceList<_Thing>.fromEntities([t1])
+          .toEntityReference();
       expect(ref1.entity, same(t1));
       expect(ref1.id, equals(1));
 
       var refEmpty = EntityReferenceList<_Thing>.asEmpty().toEntityReference();
       expect(refEmpty.isNull, isTrue);
 
-      var refEmpty2 = EntityReferenceList<_Thing>.fromEntities(
-        [],
-      ).toEntityReference();
+      var refEmpty2 = EntityReferenceList<_Thing>.fromEntities([])
+          .toEntityReference();
       expect(refEmpty2.isNull, isTrue);
     });
 

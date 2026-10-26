@@ -20,26 +20,19 @@ class APIRootStarter<A extends APIRoot> {
   final FutureOr<bool> Function()? _stopper;
 
   /// Instantiate from an already defined [APIRoot] instance.
-  APIRootStarter.fromInstance(
-    A apiRoot, {
-    FutureOr<bool> Function()? preInitializer,
-    FutureOr<bool> Function()? stopper,
-  }) : _apiRoot = apiRoot,
-       _preInitializer = preInitializer,
-       _stopper = stopper,
-       _apiRootInstantiator = null,
-       _apiConfigProvider = null;
+  APIRootStarter.fromInstance(A apiRoot, {this._preInitializer, this._stopper})
+    : _apiRoot = apiRoot,
+      _apiRootInstantiator = null,
+      _apiConfigProvider = null;
 
   /// Instantiate using instantiator [Function]s.
   APIRootStarter.fromInstantiator(
     A Function(APIConfig? apiConfig) apiRootInstantiator, {
     FutureOr<APIConfig?> Function()? apiConfig,
-    FutureOr<bool> Function()? preInitializer,
-    FutureOr<bool> Function()? stopper,
+    this._preInitializer,
+    this._stopper,
   }) : _apiRootInstantiator = apiRootInstantiator,
-       _apiConfigProvider = apiConfig,
-       _preInitializer = preInitializer,
-       _stopper = stopper;
+       _apiConfigProvider = apiConfig;
 
   /// Returns the [APIRoot] instance if already instantiated.
   /// See [getAPIRoot].

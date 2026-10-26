@@ -208,15 +208,13 @@ class MyCommandServe extends CommandSourceFileBase {
     argParser.addFlag(
       'hotreload',
       abbr: 'r',
-      help:
-          'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed).',
+      help: 'Runs APIServer with Hot Reload (spawns a Dart VM with `--enable-vm-service` if needed).',
     );
 
     argParser.addFlag(
       'build',
       abbr: 'b',
-      help:
-          'Allows automatic reflection build if the inspector detects the need at startup.',
+      help: 'Allows automatic reflection build if the inspector detects the need at startup.',
     );
   }
 

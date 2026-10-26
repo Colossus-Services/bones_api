@@ -15,8 +15,9 @@ import 'package:test/test.dart';
 import 'bones_api_test_entities.dart';
 import 'bones_api_test_fake_gcs.dart';
 
-typedef _AdapterCreator =
-    DBAdapter Function(EntityRepositoryProvider parentRepositoryProvider);
+typedef _AdapterCreator = DBAdapter Function(
+  EntityRepositoryProvider parentRepositoryProvider,
+);
 
 /// A provider with the main test entities stored by a [DBObjectAdapter].
 class _ObjectEntitiesProvider extends DBEntityRepositoryProvider<DBAdapter> {

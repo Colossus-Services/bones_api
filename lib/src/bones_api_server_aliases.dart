@@ -65,9 +65,8 @@ class AliasEntry {
     this.virtualSegments = const [],
     this.targetSegments = const [],
     List<Object>? patternTokens,
-    List<Object>? targetParts,
+    this._targetParts,
   }) : _patternTokens = patternTokens,
-       _targetParts = targetParts,
        _literalPrefix = _tokenLiteral(patternTokens?.firstOrNull),
        _literalSuffix = _tokenLiteral(patternTokens?.lastOrNull),
        _minLength = _patternMinLength(patternTokens);

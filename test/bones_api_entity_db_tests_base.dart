@@ -13,12 +13,11 @@ import 'bones_api_test_entities_orders.dart';
 
 final _log = logging.Logger('bones_api_test_adapter');
 
-typedef DBAdapterCreator<A extends DBAdapter> =
-    A Function(
-      EntityRepositoryProvider? parentRepositoryProvider,
-      int dbPort,
-      Map<String, dynamic>? dbConfig,
-    );
+typedef DBAdapterCreator<A extends DBAdapter> = A Function(
+  EntityRepositoryProvider? parentRepositoryProvider,
+  int dbPort,
+  Map<String, dynamic>? dbConfig,
+);
 
 class TestEntityRepositoryProvider extends DBSQLEntityRepositoryProvider {
   final DBAdapterCreator<DBSQLAdapter> sqlAdapterCreator;
@@ -2079,9 +2078,8 @@ Future<bool> runAdapterTests(
           );
 
           expect(
-            (await addressAPIRepository.selectByID(
-              1,
-            ))?.stores.map((e) => e.name),
+            (await addressAPIRepository.selectByID(1))?.stores
+                .map((e) => e.name),
             equals(['s11', 's12']),
           );
 
@@ -2103,9 +2101,9 @@ Future<bool> runAdapterTests(
             equals('joe@$testDomain'),
           );
           expect(
-            (await userAPIRepository.selectByAddressID(
-              address.id!,
-            )).single.email,
+            (await userAPIRepository.selectByAddressID(address.id!))
+                .single
+                .email,
             equals('joe@$testDomain'),
           );
 
@@ -3568,14 +3566,15 @@ Future<bool> runAdapterTests(
         );
 
         Future<List<int?>> roleIdsOfUser() async =>
-            (await userAPIRepository.selectByID(
-              userId,
-            ))!.roles.map((r) => r.id).toList()..sort();
+            (await userAPIRepository.selectByID(userId))!.roles
+                .map((r) => r.id)
+                .toList()
+              ..sort();
 
         Future<List<int?>> usersWithAdmin() async =>
-            (await userAPIRepository.selectByRoleId(
-              admin.id!,
-            )).map((u) => u.id).toList();
+            (await userAPIRepository.selectByRoleId(admin.id!))
+                .map((u) => u.id)
+                .toList();
 
         expect(await roleIdsOfUser(), equals([admin.id, guest.id]..sort()));
         expect(await usersWithAdmin(), contains(userId));
@@ -3823,9 +3822,8 @@ Future<bool> runAdapterTests(
           await orderRepo.store(otherOrder);
 
           // Query orders by campaign id using multi-level chain
-          var results = (await orderRepo.selectByCampaignId(
-            campaignId,
-          )).toList();
+          var results = (await orderRepo.selectByCampaignId(campaignId))
+              .toList();
           var numbers = results.map((o) => o.orderNumber).toList();
 
           expect(numbers, contains('ORD-CHAIN-001'));
@@ -4386,9 +4384,8 @@ Future<bool> runAdapterTests(
 
         // A single-row select: any positive offset skips the only row.
         expect(
-          (await photoRepo.entityRepository.select(
-            ConditionID(ids.first),
-          )).map((e) => e.id),
+          (await photoRepo.entityRepository.select(ConditionID(ids.first)))
+              .map((e) => e.id),
           equals([ids.first]),
         );
         expect(

@@ -13,8 +13,10 @@ final _log = logging.Logger('EntityReference');
 
 typedef EntityFetcher<T> = FutureOr<T?> Function(Object? id, Type type);
 
-typedef EntitiesFetcher<T> =
-    FutureOr<List<T?>?> Function(List<Object?> ids, Type type);
+typedef EntitiesFetcher<T> = FutureOr<List<T?>?> Function(
+  List<Object?> ids,
+  Type type,
+);
 
 abstract class EntityInstantiator<T> {
   T instantiate();

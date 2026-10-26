@@ -526,21 +526,18 @@ void main() {
     test('Future.populateMultiCache', () async {
       var caches = <(Object?,), Map<String, int>>{};
 
-      var v1 = await Future<int>.value(
-        5,
-      ).populateMultiCache(caches, 'k1', (1,), () => <String, int>{});
+      var v1 = await Future<int>.value(5)
+          .populateMultiCache(caches, 'k1', (1,), () => <String, int>{});
       expect(v1, equals(5));
       expect(caches[(1,)]!['k1'], equals(5));
 
-      var v2 = await Future<int?>.value(
-        6,
-      ).populateMultiCache(caches, 'k2', (1,), () => <String, int>{});
+      var v2 = await Future<int?>.value(6)
+          .populateMultiCache(caches, 'k2', (1,), () => <String, int>{});
       expect(v2, equals(6));
       expect(caches[(1,)]!['k2'], equals(6));
 
-      var v3 = await Future<int?>.value(
-        null,
-      ).populateMultiCache(caches, 'k3', (1,), () => <String, int>{});
+      var v3 = await Future<int?>.value(null)
+          .populateMultiCache(caches, 'k3', (1,), () => <String, int>{});
       expect(v3, isNull);
       expect(caches[(1,)]!.containsKey('k3'), isFalse);
     });

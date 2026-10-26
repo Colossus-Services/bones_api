@@ -486,9 +486,8 @@ void main() {
         equals(5),
       );
       expect(
-        ConditionID<Map>(
-          ConditionParameter.key('id'),
-        ).resolveIDValue(parameters: {'id': 7}),
+        ConditionID<Map>(ConditionParameter.key('id'))
+            .resolveIDValue(parameters: {'id': 7}),
         equals(7),
       );
       expect(ConditionID<Map>(9).resolveIDValue(), equals(9));
@@ -497,9 +496,8 @@ void main() {
       expect(ConditionID<Map>(5).matchesEntity({'id': 6}), isFalse);
       expect(ConditionID<Map>(5).matchesEntityMap({'id': 5}), isTrue);
       expect(
-        ConditionID<Map>(
-          ConditionParameter.key('x'),
-        ).matchesEntityMap({'id': 5}, namedParameters: {'x': 5}),
+        ConditionID<Map>(ConditionParameter.key('x'))
+            .matchesEntityMap({'id': 5}, namedParameters: {'x': 5}),
         isTrue,
       );
 

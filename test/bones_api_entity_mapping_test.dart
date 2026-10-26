@@ -217,15 +217,13 @@ class _AsyncUsersProvider implements EntityProvider {
     requested.add(id);
     return Future.delayed(
       Duration.zero,
-      () =>
-          User(
-                'user-$id@test.com',
-                'pass',
-                Address('NY', 'New York', 'Main St', 1),
-                [],
-                id: id as int,
-              )
-              as O,
+      () => User(
+        'user-$id@test.com',
+        'pass',
+        Address('NY', 'New York', 'Main St', 1),
+        [],
+        id: id as int,
+      ) as O,
     );
   }
 }

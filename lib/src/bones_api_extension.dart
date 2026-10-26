@@ -930,17 +930,16 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
 
   List<E>? toCastedList<E>(Object? val) {
     return callCasted<List?>(<A>() {
-          if (val is List<A>) {
-            return val;
-          } else if (val is Iterable<A>) {
-            return val.toList();
-          } else if (val is A) {
-            return <A>[val];
-          } else {
-            return null;
-          }
-        })
-        as List<E>?;
+      if (val is List<A>) {
+        return val;
+      } else if (val is Iterable<A>) {
+        return val.toList();
+      } else if (val is A) {
+        return <A>[val];
+      } else {
+        return null;
+      }
+    }) as List<E>?;
   }
 
   EntityReferenceList<T> toEntityReferenceList(

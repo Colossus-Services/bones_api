@@ -797,9 +797,9 @@ extension SQLBuilderIterableMapEntryExtension<K>
   List<MapEntry<K, CreateTableSQL>> toHierarchicalOrder({
     bool verbose = false,
   }) {
-    var allSQLs = expand(
-      (e) => e.value.allSQLBuilders,
-    ).toList().toHierarchicalOrder(verbose: verbose);
+    var allSQLs = expand((e) => e.value.allSQLBuilders)
+        .toList()
+        .toHierarchicalOrder(verbose: verbose);
 
     var ordered = sorted((a, b) {
       var i1 = allSQLs.indexOf(a.value);
@@ -927,9 +927,9 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
         : refTables.where((r) => _indexOfTable(r, 0) != null).toList();
   }
 
-  Map<SQLBuilder, List<String>> _entriesReferences() => map(
-    (e) => MapEntry(e, _referenceTablesInList(e.referenceTables)),
-  ).toMapFromEntries();
+  Map<SQLBuilder, List<String>> _entriesReferences() =>
+      map((e) => MapEntry(e, _referenceTablesInList(e.referenceTables)))
+          .toMapFromEntries();
 
   Map<SQLBuilder, List<String>> _entriesRelationships() =>
       whereType<CreateTableSQL>()

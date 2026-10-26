@@ -1238,8 +1238,7 @@ void main() {
         ),
         equals({
           'address': '<T:Address> Address',
-          'userInfo':
-              '<T:EntityReference<UserInfo>> EntityReference<<T:UserInfo> UserInfo>',
+          'userInfo': '<T:EntityReference<UserInfo>> EntityReference<<T:UserInfo> UserInfo>',
           'photo': '<T:Photo> Photo',
         }),
       );
@@ -1285,8 +1284,7 @@ void main() {
         ),
         equals({
           'stores': '<T:List<Store>> List<<T:Store> Store>',
-          'closedStores':
-              '<T:EntityReferenceList<Store>> EntityReferenceList<<T:Store> Store>',
+          'closedStores': '<T:EntityReferenceList<Store>> EntityReferenceList<<T:Store> Store>',
         }),
       );
     });

@@ -327,9 +327,8 @@ Map<K, V>? deepCopyMap<K, V>(Map<K, V>? map) {
   if (K == dynamic || K == Object) {
     if (map is Map<String, Object?>) {
       return map.map<String, V>(
-            (k, V v) => MapEntry<String, V>(k as String, deepCopy(v) as V),
-          )
-          as Map<K, V>;
+        (k, V v) => MapEntry<String, V>(k as String, deepCopy(v) as V),
+      ) as Map<K, V>;
     }
   }
 

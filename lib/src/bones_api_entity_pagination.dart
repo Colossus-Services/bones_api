@@ -2,13 +2,16 @@ import 'package:async_extension/async_extension.dart';
 
 /// Loads the entries of [page] (1-based) of an [EntityPagination],
 /// with at most [limit] entries.
-typedef EntityPageLoader<O extends Object> =
-    FutureOr<List<O>> Function(int page, int limit);
+typedef EntityPageLoader<O extends Object> = FutureOr<List<O>> Function(
+  int page,
+  int limit,
+);
 
 /// Notified of what an [EntityPagination] is fetching.
 /// See [EntityPagination.onEvent] and [EntityPaginationEvent].
-typedef EntityPaginationListener<O extends Object> =
-    void Function(EntityPaginationEvent<O> event);
+typedef EntityPaginationListener<O extends Object> = void Function(
+  EntityPaginationEvent<O> event,
+);
 
 /// An event of an [EntityPagination]. See [EntityPagination.onEvent].
 ///
@@ -621,9 +624,8 @@ class EntityPagination<O extends Object> {
 
     if (_isPageKnownEmpty(next)) return null;
 
-    return loadPage(
-      next,
-    ).resolveMapped((entries) => entries.isEmpty ? null : entries);
+    return loadPage(next)
+        .resolveMapped((entries) => entries.isEmpty ? null : entries);
   }
 
   /// Loads every page from page 1 until the end, so that afterwards
