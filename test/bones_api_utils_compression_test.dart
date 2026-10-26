@@ -23,7 +23,11 @@ Uint8List _failingBrotliEncoder(Uint8List bytes, int quality) =>
     throw StateError('Simulated Brotli encoder failure');
 
 /// Text over [APIBrotli.isolateMinLength] at [quality].
-Uint8List _largeTextBytes(int quality) {
+Uint8List _largeTextBytes(int quality) =>
+    _largeBytes(APIBrotli.isolateMinLength(quality));
+
+/// Text over [minLength].
+Uint8List _largeBytes(int minLength) {
   var lines = 1000;
   Uint8List data;
   do {
@@ -31,7 +35,7 @@ Uint8List _largeTextBytes(int quality) {
       List.generate(lines, (i) => 'line $i: ${i * 7919 % 10007}').join('\n'),
     );
     lines *= 2;
-  } while (data.length <= APIBrotli.isolateMinLength(quality));
+  } while (data.length <= minLength);
   return data;
 }
 
@@ -331,6 +335,72 @@ void main() {
     });
   });
 
+  group('APIGZip', () {
+    test('encode', () {
+      var data = _textBytes();
+      for (var level in [1, 4, 9]) {
+        var encoded = APIGZip.encode(data, level: level);
+        expect(encoded.length, lessThan(data.length));
+        expect(gzip.decode(encoded), equals(data), reason: 'level: $level');
+      }
+    });
+
+    test('isolateMinLength', () {
+      expect(
+        APIGZip.isolateMinLength(9),
+        lessThan(APIGZip.isolateMinLength(6)),
+      );
+      expect(
+        APIGZip.isolateMinLength(6),
+        lessThan(APIGZip.isolateMinLength(4)),
+      );
+      expect(APIGZip.isolateMinLength(1), equals(APIGZip.isolateMinLength(4)));
+    });
+
+    test('encodeAsync: small input, encoded inline', () {
+      var data = _textBytes();
+      var encoded = APIGZip.encodeAsync(data);
+      expect(encoded, isA<Uint8List>());
+      expect(gzip.decode(encoded as Uint8List), equals(data));
+    });
+
+    test('encodeAsync: large input, encoded in the pool', () async {
+      for (var level in [4, 9]) {
+        var data = _largeBytes(APIGZip.isolateMinLength(level));
+        var encoded = APIGZip.encodeAsync(data, level: level);
+        expect(encoded, isA<Future<Uint8List?>>(), reason: 'level: $level');
+
+        var bytes = (await encoded)!;
+        expect(gzip.decode(bytes), equals(data), reason: 'level: $level');
+        // Same output as inline:
+        expect(bytes, equals(APIGZip.encode(data, level: level)));
+      }
+    });
+
+    test('encodeAsync: failure in the pool, `null`', () async {
+      // An invalid level: `ZLibEncoder` throws in the worker isolate.
+      var data = _largeBytes(APIGZip.isolateMinLength(99));
+      expect(await APIGZip.encodeAsync(data, level: 99), isNull);
+    });
+
+    test('shares the pool with Brotli', () async {
+      var br = _largeTextBytes(9);
+      var gz = _largeBytes(APIGZip.isolateMinLength(9));
+
+      var results = await Future.wait([
+        Future.value(APIBrotli.encodeAsync(br, quality: 9)),
+        Future.value(APIGZip.encodeAsync(gz, level: 9)),
+      ]);
+      expect(APIBrotli.decode(results[0]!), equals(br));
+      expect(gzip.decode(results[1]!), equals(gz));
+
+      expect(
+        compressionIsolatePool.isolatesLength,
+        inInclusiveRange(1, compressionIsolatePool.maxIsolates),
+      );
+    });
+  });
+
   group('encodeContent/decodeContent', () {
     test('round trip', () {
       var data = _textBytes();
@@ -361,6 +431,15 @@ void main() {
           .encodeAsync(large, APIContentEncoding.br);
       expect(encoded, isA<Future>());
       expect(APIBrotli.decode((await encoded)!), equals(large));
+
+      // GZip in the same pool:
+      var largeGz = _largeBytes(APIGZip.isolateMinLength(4));
+      var encodedGz = const APIResponseCompression().encodeAsync(
+        largeGz,
+        APIContentEncoding.gzip,
+      );
+      expect(encodedGz, isA<Future>());
+      expect(gzip.decode((await encodedGz)!), equals(largeGz));
     });
 
     test('decodeContent: maxOutputSize (br)', () {
@@ -536,6 +615,20 @@ void main() {
       var body = await _read(r);
       expect(r.contentLength, equals(body.length));
       expect(APIBrotli.decode(body), equals(data));
+    });
+
+    test('large gzip: encoded in the pool', () async {
+      var data = _largeBytes(APIGZip.isolateMinLength(4));
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'gzip'),
+        textResponse(data),
+      );
+
+      expect(r.headers['content-encoding'], equals('gzip'));
+      var body = await _read(r);
+      expect(r.contentLength, equals(body.length));
+      expect(gzip.decode(body), equals(data));
     });
 
     test('not accepted: only `Vary`', () async {

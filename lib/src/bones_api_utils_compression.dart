@@ -171,6 +171,18 @@ APIContentEncoding? resolveContentEncodingFrom(
   return best;
 }
 
+/// The [APIIsolatePool] of the large compression encodings
+/// ([APIBrotli.encodeAsync], [APIGZip.encodeAsync], [encodeContentAsync]):
+/// long-lived workers (e.g., the Brotli encoder tables are initialized once
+/// per worker), and at most [APIIsolatePool.maxIsolates] concurrent
+/// encodings (the others wait). Shared by Brotli and GZip.
+///
+/// One pool per isolate (e.g., per `APIServerWorker`). Can be replaced
+/// (close the previous one).
+APIIsolatePool compressionIsolatePool = APIIsolatePool(
+  debugName: 'APICompression',
+);
+
 /// A Brotli encoder function. See [APIBrotli.encoder].
 typedef APIBrotliEncoder = Uint8List Function(Uint8List bytes, int quality);
 
@@ -190,14 +202,6 @@ abstract final class APIBrotli {
   @visibleForTesting
   static APIBrotliEncoder encoder = defaultEncoder;
 
-  /// The [APIIsolatePool] of [encodeAsync]: long-lived workers (the encoder
-  /// tables are initialized once per worker), and at most
-  /// [APIIsolatePool.maxIsolates] concurrent encodings (the others wait).
-  ///
-  /// One pool per isolate (e.g., per `APIServerWorker`). Can be replaced
-  /// (close the previous one).
-  static APIIsolatePool isolatePool = APIIsolatePool(debugName: 'APIBrotli');
-
   static bool _encodeErrorLogged = false;
 
   /// Encodes [bytes] with Brotli at [quality] (`0` to `11`).
@@ -213,7 +217,7 @@ abstract final class APIBrotli {
     }
   }
 
-  /// The minimal length to [encodeAsync] in the [isolatePool] at
+  /// The minimal length to [encodeAsync] in the [compressionIsolatePool] at
   /// [quality]: Brotli is pure Dart, and a slow encoding would block the
   /// event loop (and all the other requests of the isolate).
   ///
@@ -227,8 +231,9 @@ abstract final class APIBrotli {
     return 256 * 1024; // ~1.2ms inline.
   }
 
-  /// Same as [encode], but encodes in the [isolatePool] (a background
-  /// [Isolate]) if [bytes] is large for [quality] (see [isolateMinLength]).
+  /// Same as [encode], but encodes in the [compressionIsolatePool] (a
+  /// background [Isolate]) if [bytes] is large for [quality]
+  /// (see [isolateMinLength]).
   static FutureOr<Uint8List?> encodeAsync(
     Uint8List bytes, {
     int quality = defaultQuality,
@@ -240,7 +245,7 @@ abstract final class APIBrotli {
 
     final encoder = APIBrotli.encoder;
 
-    return isolatePool
+    return compressionIsolatePool
         .run(() => encoder(bytes, quality))
         .then<Uint8List?>(
           (encoded) => encoded,
@@ -277,37 +282,90 @@ abstract final class APIBrotli {
       );
 }
 
+/// GZip encoding, using the `dart:io` `zlib` (native, but synchronous:
+/// it blocks the event loop while encoding).
+abstract final class APIGZip {
+  /// The default GZip level for dynamic responses.
+  static const int defaultLevel = 4;
+
+  /// Encodes [bytes] with GZip at [level] (`-1` to `9`).
+  static Uint8List encode(Uint8List bytes, {int level = defaultLevel}) {
+    var encoded = ZLibEncoder(gzip: true, level: level).convert(bytes);
+    return encoded is Uint8List ? encoded : Uint8List.fromList(encoded);
+  }
+
+  /// The minimal length to [encodeAsync] in the [compressionIsolatePool] at
+  /// [level].
+  ///
+  /// Starts at about 1.5ms of encoding (JSON, AOT), as
+  /// [APIBrotli.isolateMinLength]: an encoding costs about the same in a
+  /// pool worker as inline (+0.1ms).
+  static int isolateMinLength(int level) {
+    if (level >= 9) return 192 * 1024; // ~1.9ms inline.
+    if (level >= 6) return 384 * 1024; // ~1.6ms inline.
+    return 768 * 1024; // ~1.6ms inline.
+  }
+
+  /// Same as [encode], but encodes in the [compressionIsolatePool] (a
+  /// background [Isolate]) if [bytes] is large for [level]
+  /// (see [isolateMinLength]).
+  ///
+  /// Returns `null` if the encoding fails in the [Isolate] (logged).
+  static FutureOr<Uint8List?> encodeAsync(
+    Uint8List bytes, {
+    int level = defaultLevel,
+  }) {
+    if (bytes.length < isolateMinLength(level)) {
+      return encode(bytes, level: level);
+    }
+
+    return compressionIsolatePool
+        .run(() => encode(bytes, level: level))
+        .then<Uint8List?>(
+          (encoded) => encoded,
+          onError: (Object e, StackTrace s) {
+            _log.severe(
+              "GZip encoding failed (${bytes.length} bytes, level: $level)",
+              e,
+              s,
+            );
+            return null;
+          },
+        );
+  }
+}
+
 /// Encodes [bytes] with [encoding].
 ///
 /// Returns `null` if the encoding fails.
 Uint8List? encodeContent(
   Uint8List bytes,
   APIContentEncoding encoding, {
-  int gzipLevel = 4,
+  int gzipLevel = APIGZip.defaultLevel,
   int brotliQuality = APIBrotli.defaultQuality,
 }) {
   switch (encoding) {
     case APIContentEncoding.br:
       return APIBrotli.encode(bytes, quality: brotliQuality);
     case APIContentEncoding.gzip:
-      var encoded = ZLibEncoder(gzip: true, level: gzipLevel).convert(bytes);
-      return encoded is Uint8List ? encoded : Uint8List.fromList(encoded);
+      return APIGZip.encode(bytes, level: gzipLevel);
   }
 }
 
-/// Same as [encodeContent], but a large Brotli encoding runs in a background
-/// [Isolate] (see [APIBrotli.encodeAsync]). GZip uses the native `zlib`.
+/// Same as [encodeContent], but a large encoding runs in the
+/// [compressionIsolatePool] (see [APIBrotli.encodeAsync] and
+/// [APIGZip.encodeAsync]).
 FutureOr<Uint8List?> encodeContentAsync(
   Uint8List bytes,
   APIContentEncoding encoding, {
-  int gzipLevel = 4,
+  int gzipLevel = APIGZip.defaultLevel,
   int brotliQuality = APIBrotli.defaultQuality,
 }) {
   switch (encoding) {
     case APIContentEncoding.br:
       return APIBrotli.encodeAsync(bytes, quality: brotliQuality);
     case APIContentEncoding.gzip:
-      return encodeContent(bytes, encoding, gzipLevel: gzipLevel);
+      return APIGZip.encodeAsync(bytes, level: gzipLevel);
   }
 }
 
@@ -332,7 +390,7 @@ class APIResponseCompression {
   static const int defaultMinLength = 512;
 
   /// The default GZip compression level.
-  static const int defaultGzipLevel = 4;
+  static const int defaultGzipLevel = APIGZip.defaultLevel;
 
   /// The accepted encodings, in order of preference.
   /// An empty list disables the compression.
