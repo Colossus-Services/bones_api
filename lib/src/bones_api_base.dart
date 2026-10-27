@@ -35,23 +35,24 @@ final _log = logging.Logger('APIRoot');
 /// An [APIRoot] [APIRequest] handler.
 ///
 /// See [APIRoot.preApiRequestHandlers] and [APIRoot.posApiRequestHandlers].
-typedef APIRequestHandler =
-    FutureOr<APIResponse<T>?> Function<T>(APIRoot apiRoot, APIRequest request);
+typedef APIRequestHandler = FutureOr<APIResponse<T>?> Function<T>(
+  APIRoot apiRoot,
+  APIRequest request,
+);
 
 /// An [APIRoot] logger function.
-typedef APILogger =
-    void Function(
-      APIRoot apiRoot,
-      String type,
-      String? message, [
-      Object? error,
-      StackTrace? stackTrace,
-    ]);
+typedef APILogger = void Function(
+  APIRoot apiRoot,
+  String type,
+  String? message, [
+  Object? error,
+  StackTrace? stackTrace,
+]);
 
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.27.2';
+  static const String VERSION = '1.28.0';
 
   static bool _boot = false;
 
@@ -1271,8 +1272,9 @@ class APIRouteConfig {
 }
 
 /// An API route handler
-typedef APIRouteFunction<T> =
-    FutureOr<APIResponse<T>> Function(APIRequest request);
+typedef APIRouteFunction<T> = FutureOr<APIResponse<T>> Function(
+  APIRequest request,
+);
 
 /// A route handler, with its [function] and [rules].
 abstract class APIRouteHandler<T> {
@@ -1405,9 +1407,8 @@ abstract class APIRouteHandler<T> {
 
     final initTime = DateTime.now();
 
-    return callImpl(
-      request,
-    ).resolveMapped((response) => callResponse(response, initTime));
+    return callImpl(request)
+        .resolveMapped((response) => callResponse(response, initTime));
   }
 
   FutureOr<APIResponse<T>> callImpl(APIRequest request);
@@ -1730,7 +1731,7 @@ class APIMetric {
 abstract class APIMetricSet {
   Map<String, APIMetric>? _metrics;
 
-  APIMetricSet({Map<String, APIMetric>? metrics}) : _metrics = metrics;
+  APIMetricSet({this._metrics});
 
   /// Returns `true` if any metric is set. See [metrics].
   bool get hasMetrics => _metrics != null && _metrics!.isNotEmpty;

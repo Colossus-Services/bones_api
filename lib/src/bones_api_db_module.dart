@@ -162,8 +162,7 @@ class APIDBModule extends APIModule {
     if (credential == null) {
       if (!development) {
         throw APIResponse.error(
-          error:
-              "Not a `development` environment to allow unauthenticated access.",
+          error: "Not a `development` environment to allow unauthenticated access.",
         );
       }
 
@@ -733,9 +732,8 @@ class APIDBModule extends APIModule {
           var value = e.value;
 
           if (value is String &&
-              RegExp(
-                r'^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?Z?$',
-              ).hasMatch(value)) {
+              RegExp(r'^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?Z?$')
+                  .hasMatch(value)) {
             var d = TypeParser.parseDateTime(value);
             if (d != null) {
               var d2 = DateTime.utc(

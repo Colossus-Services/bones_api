@@ -367,9 +367,10 @@ void runCronStoreDBTests(
       },
     };
 
-    DateTime occurrence() => CronExpression.parse(
-      '0 0 1 1 *',
-    ).previousBefore(DateTime.now())!.toUtc();
+    DateTime occurrence() =>
+        CronExpression.parse('0 0 1 1 *')
+            .previousBefore(DateTime.now())!
+            .toUtc();
 
     test(
       'APIRoot: two instances on the same DB run the occurrence once',

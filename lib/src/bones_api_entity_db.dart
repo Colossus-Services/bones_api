@@ -216,12 +216,10 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     this.capability, {
     this.parentRepositoryProvider,
     this.connectivity = DBAdapterConnectivity.any,
-    Object? populateSource,
-    Object? populateSourceVariables,
-    String? workingPath,
-  }) : _populateSource = populateSource,
-       _populateSourceVariables = populateSourceVariables,
-       _workingPath = workingPath {
+    this._populateSource,
+    this._populateSourceVariables,
+    this._workingPath,
+  }) {
     boot();
 
     _instances.add(this);
@@ -908,10 +906,9 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
 
     return _repositoriesAdapters.putIfAbsent(
-          name,
-          () => instantiateRepositoryAdapter<O>(name, tableName, type),
-        )
-        as DBRepositoryAdapter<O>;
+      name,
+      () => instantiateRepositoryAdapter<O>(name, tableName, type),
+    ) as DBRepositoryAdapter<O>;
   }
 
   DBRepositoryAdapter<O> instantiateRepositoryAdapter<O>(
@@ -936,9 +933,8 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   DBRepositoryAdapter<O>? getRepositoryAdapterByTableName<O>(String tableName) {
     if (isClosed) return null;
     return _repositoriesAdapters.values.firstWhereOrNull(
-          (e) => e.tableName == tableName,
-        )
-        as DBRepositoryAdapter<O>?;
+      (e) => e.tableName == tableName,
+    ) as DBRepositoryAdapter<O>?;
   }
 
   final Map<Type, EntityRepository> _entityRepositories =

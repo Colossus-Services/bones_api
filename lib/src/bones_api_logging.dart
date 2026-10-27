@@ -162,8 +162,10 @@ class DBLog {
 }
 
 typedef MessageLogger = void Function(logging.Level level, String message);
-typedef MessagesBlockLogger =
-    Future<void> Function(logging.Level level, List<String> messages);
+typedef MessagesBlockLogger = Future<void> Function(
+  logging.Level level,
+  List<String> messages,
+);
 
 abstract class LoggerHandler {
   static LoggerHandler create(logging.Logger logger) =>

@@ -85,13 +85,11 @@ class _CovRoot extends APIRoot {
 
   _CovRoot(
     String name, {
-    String? defaultModuleName,
-    String? securityModuleName,
+    this._defaultModuleName,
+    this._securityModuleName,
     super.preApiRequestHandlers,
     super.posApiRequestHandlers,
-  }) : _defaultModuleName = defaultModuleName,
-       _securityModuleName = securityModuleName,
-       super(name, '1.0');
+  }) : super(name, '1.0');
 
   @override
   String? get defaultModuleName => _defaultModuleName;

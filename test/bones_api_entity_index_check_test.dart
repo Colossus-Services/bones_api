@@ -128,7 +128,7 @@ class _SchemeAdapter extends DBSQLMemoryAdapter {
   final bool constraintSupport;
 
   _SchemeAdapter({
-    SQLDialect? dialect,
+    this._dialect,
     this.indexes,
     this.uniqueIndexes,
     this.constraints,
@@ -136,7 +136,7 @@ class _SchemeAdapter extends DBSQLMemoryAdapter {
     this.renameColumns = const {},
     this.constraintSupport = false,
     super.parentRepositoryProvider,
-  }) : _dialect = dialect;
+  });
 
   @override
   SQLDialect get dialect => _dialect ?? super.dialect;
@@ -1174,48 +1174,51 @@ void main() {
       );
     });
 
-    test('checkTables: warned, not an error; kept in tablesDuplicates', () async {
-      var p = _CheckProvider(
-        const [],
-        dialect: _postgres,
-        indexes: {
-          ..._baseIndexes,
-          'code_copy': ['code'],
-        },
-        uniqueIndexes: _baseUnique,
-        checkConstraints: {
-          'sales_day_day_check': TableEnumConstraint('day', ['a']),
-          'day_check_2': TableEnumConstraint('day', ['a', 'b']),
-        },
-      );
+    test(
+      'checkTables: warned, not an error; kept in tablesDuplicates',
+      () async {
+        var p = _CheckProvider(
+          const [],
+          dialect: _postgres,
+          indexes: {
+            ..._baseIndexes,
+            'code_copy': ['code'],
+          },
+          uniqueIndexes: _baseUnique,
+          checkConstraints: {
+            'sales_day_day_check': TableEnumConstraint('day', ['a']),
+            'day_check_2': TableEnumConstraint('day', ['a', 'b']),
+          },
+        );
 
-      var c = await _check(p.adapter);
-      expect(c.ok, isTrue, reason: c.error);
+        var c = await _check(p.adapter);
+        expect(c.ok, isTrue, reason: c.error);
 
-      var d = p.adapter.tablesDuplicates['sales_day'];
-      expect(d, isNotNull);
-      expect(d!.indexes, [
-        ['sales_day__code__unique', 'code_copy'],
-      ]);
-      expect(d.checkConstraints, {
-        'day': ['sales_day_day_check', 'day_check_2'],
-      });
-      expect(d.dropSQLs, contains('DROP INDEX IF EXISTS "code_copy" ;'));
-      expect(
-        d.dropSQLs,
-        contains(
-          'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "day_check_2" ;  -- {a, b}',
-        ),
-      );
+        var d = p.adapter.tablesDuplicates['sales_day'];
+        expect(d, isNotNull);
+        expect(d!.indexes, [
+          ['sales_day__code__unique', 'code_copy'],
+        ]);
+        expect(d.checkConstraints, {
+          'day': ['sales_day_day_check', 'day_check_2'],
+        });
+        expect(d.dropSQLs, contains('DROP INDEX IF EXISTS "code_copy" ;'));
+        expect(
+          d.dropSQLs,
+          contains(
+            'ALTER TABLE "sales_day" DROP CONSTRAINT IF EXISTS "day_check_2" ;  -- {a, b}',
+          ),
+        );
 
-      // Fixed: none on the next check.
-      p.adapter
-        ..indexes = {..._baseIndexes}
-        ..checkConstraints = null;
+        // Fixed: none on the next check.
+        p.adapter
+          ..indexes = {..._baseIndexes}
+          ..checkConstraints = null;
 
-      c = await _check(p.adapter);
-      expect(c.ok, isTrue, reason: c.error);
-      expect(p.adapter.tablesDuplicates, isEmpty);
-    });
+        c = await _check(p.adapter);
+        expect(c.ok, isTrue, reason: c.error);
+        expect(p.adapter.tablesDuplicates, isEmpty);
+      },
+    );
   });
 }

@@ -2,39 +2,82 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Automatically switches to GZip compression when input exceeds [minGZipLength].
-class AutoGZipSink extends ByteConversionSinkBuffered {
-  /// Inner sink that may switch between plain and gzip modes.
+import 'bones_api_utils_compression.dart';
+
+/// Automatically switches to [encoding] compression when the input reaches
+/// [minCompressLength]. If [encoding] is `null` it never compresses.
+class AutoCompressSink extends ByteConversionSinkBuffered {
+  /// Inner sink that may switch between plain and compressed modes.
   ByteConversionSinkBuffered _sink;
 
-  /// Minimum input size to trigger GZip compression.
-  final int minGZipLength;
+  /// The compression to use. If `null` it never compresses.
+  final APIContentEncoding? encoding;
 
-  AutoGZipSink({this.minGZipLength = 512, int capacity = 1024})
-    : _sink = BytesSink(capacity: capacity);
+  /// Minimum input size to trigger the compression.
+  final int minCompressLength;
+
+  /// The GZip compression level.
+  final int gzipLevel;
+
+  /// The Brotli quality.
+  final int brotliQuality;
+
+  AutoCompressSink({
+    required this.encoding,
+    this.minCompressLength = 512,
+    this.gzipLevel = 4,
+    this.brotliQuality = APIBrotli.defaultQuality,
+    int capacity = 1024,
+  }) : _sink = BytesSink(capacity: capacity);
 
   @override
   int get inputLength => _sink.inputLength;
 
-  bool _gzip = false;
+  bool _compressing = false;
+
+  /// Returns `true` if the compression is active.
+  bool get isCompressing => _compressing;
+
+  /// The active encoding, or `null` if not compressing.
+  ///
+  /// After [close], a [BrotliSink] that fell back to GZip reports
+  /// [APIContentEncoding.gzip].
+  APIContentEncoding? get activeEncoding {
+    if (!_compressing) return null;
+    final sink = _sink;
+    return sink is BrotliSink ? sink.encoding : APIContentEncoding.gzip;
+  }
 
   /// Returns `true` if GZip compression is active.
-  bool get isGzip => _gzip;
+  bool get isGzip => activeEncoding == APIContentEncoding.gzip;
 
-  /// Switches to GZip compression. Keeps previously added data.
-  void switchToGzip() {
-    if (_gzip) return;
+  /// Returns `true` if Brotli compression is active.
+  bool get isBrotli => activeEncoding == APIContentEncoding.br;
+
+  /// Switches to [encoding] compression. Keeps previously added data.
+  void switchToCompression() {
+    final encoding = this.encoding;
+    if (_compressing || encoding == null) return;
     var prevBytes = _sink.toBytes(copy: true);
     _sink.reset();
-    _sink = GZipSink(bytesSink: _sink);
-    _gzip = true;
+    _sink = switch (encoding) {
+      APIContentEncoding.br => BrotliSink(
+        quality: brotliQuality,
+        gzipLevel: gzipLevel,
+        bytesSink: _sink,
+      ),
+      APIContentEncoding.gzip => GZipSink(level: gzipLevel, bytesSink: _sink),
+    };
+    _compressing = true;
     _sink.add(prevBytes);
   }
 
   @override
   void add(List<int> chunk) {
-    if (!_gzip && _sink.length + chunk.length >= minGZipLength) {
-      switchToGzip();
+    if (!_compressing &&
+        encoding != null &&
+        _sink.length + chunk.length >= minCompressLength) {
+      switchToCompression();
     }
     _sink.add(chunk);
   }
@@ -51,18 +94,119 @@ class AutoGZipSink extends ByteConversionSinkBuffered {
   @override
   int get length => _sink.length;
 
-  /// Resets internal state and disables GZip if active.
+  /// Resets internal state and disables the compression if active.
   @override
   void reset() {
-    if (!_gzip) {
+    if (!_compressing) {
       _sink.reset();
     } else {
-      var gzipSink = _sink as GZipSink;
-      gzipSink.close(); // Avoid memory leak
-      _sink = gzipSink._bytesSink;
+      final sink = _sink;
+      if (sink is GZipSink) {
+        sink.close(); // Avoid memory leak
+        _sink = sink._bytesSink;
+      } else if (sink is BrotliSink) {
+        _sink = sink._bytesSink;
+      }
       _sink.reset();
-      _gzip = false;
+      _compressing = false;
     }
+  }
+}
+
+/// Automatically switches to GZip compression when input exceeds [minGZipLength].
+/// See [AutoCompressSink].
+class AutoGZipSink extends AutoCompressSink {
+  AutoGZipSink({int minGZipLength = 512, super.capacity})
+    : super(
+        encoding: APIContentEncoding.gzip,
+        minCompressLength: minGZipLength,
+      );
+
+  /// Minimum input size to trigger GZip compression.
+  int get minGZipLength => minCompressLength;
+
+  /// Switches to GZip compression. Keeps previously added data.
+  void switchToGzip() => switchToCompression();
+}
+
+/// Buffers the input and encodes it with Brotli on [close].
+///
+/// If the Brotli encoder fails, the input is encoded with GZip instead
+/// (see [encoding]).
+class BrotliSink extends ByteConversionSinkBuffered {
+  final ByteConversionSinkBuffered _bytesSink;
+  final BytesSink _input;
+
+  /// The Brotli quality.
+  final int quality;
+
+  /// The GZip level used in the fallback.
+  final int gzipLevel;
+
+  BrotliSink({
+    this.quality = APIBrotli.defaultQuality,
+    this.gzipLevel = 4,
+    ByteConversionSinkBuffered? bytesSink,
+    int capacity = 1024 * 4,
+  }) : _bytesSink = bytesSink ?? BytesSink(capacity: capacity),
+       _input = BytesSink(capacity: capacity);
+
+  APIContentEncoding _encoding = APIContentEncoding.br;
+
+  /// The encoding of the output: [APIContentEncoding.br], or
+  /// [APIContentEncoding.gzip] if the Brotli encoder failed.
+  APIContentEncoding get encoding => _encoding;
+
+  bool _closed = false;
+
+  @override
+  int get length => _bytesSink.length;
+
+  @override
+  int get capacity => _bytesSink.capacity;
+
+  @override
+  int get inputLength => _input.length;
+
+  @override
+  void add(List<int> chunk) => _input.add(chunk);
+
+  @override
+  void addSlice(List<int> chunk, int start, int end, bool isLast) {
+    _input.addSlice(chunk, start, end, false);
+    if (isLast) close();
+  }
+
+  @override
+  void close() {
+    if (_closed) return;
+    _closed = true;
+
+    final input = _input.toBytes();
+
+    var output = APIBrotli.encode(input, quality: quality);
+    if (output == null) {
+      output = encodeContent(
+        input,
+        APIContentEncoding.gzip,
+        gzipLevel: gzipLevel,
+      )!;
+      _encoding = APIContentEncoding.gzip;
+    }
+
+    _bytesSink.add(output);
+  }
+
+  @override
+  Uint8List toBytes({bool copy = false}) => _bytesSink.toBytes(copy: copy);
+
+  /// Resets the input and output buffers.
+  @override
+  void reset() {
+    _input.reset();
+    _bytesSink.reset();
+    _encoding = APIContentEncoding.br;
+    _closed = false;
   }
 }
 

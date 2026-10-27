@@ -440,10 +440,8 @@ void main() {
       a.depsGate!.complete();
       b.depsGate!.complete();
 
-      var results = await Future.wait([
-        Future.value(r1),
-        Future.value(r2),
-      ]).timeout(const Duration(seconds: 10));
+      var results = await Future.wait([Future.value(r1), Future.value(r2)])
+          .timeout(const Duration(seconds: 10));
 
       expect(results.every((r) => r.ok), isTrue);
       g.expectAllInitializedOnce();
@@ -463,10 +461,8 @@ void main() {
       await pumpEventQueue();
       a.depsGate!.complete();
 
-      var results = await Future.wait([
-        Future.value(r1),
-        Future.value(r2),
-      ]).timeout(const Duration(seconds: 10));
+      var results = await Future.wait([Future.value(r1), Future.value(r2)])
+          .timeout(const Duration(seconds: 10));
 
       expect(results.every((r) => r.ok), isTrue);
       g.expectAllInitializedOnce();
@@ -1167,9 +1163,8 @@ void main() {
             a.initGate!.complete();
           }
 
-          var result = await Future.value(
-            r,
-          ).timeout(const Duration(seconds: 10));
+          var result = await Future.value(r)
+              .timeout(const Duration(seconds: 10));
           expect(result.ok, isTrue);
           expect(populated, repos.map((e) => e.name).toList());
           g.expectAllInitializedOnce();

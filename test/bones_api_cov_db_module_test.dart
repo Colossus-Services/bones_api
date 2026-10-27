@@ -555,9 +555,9 @@ void main() {
       var file = archive.files.single;
       expect(file.name, endsWith('/dump.json'));
 
-      var json =
-          jsonDecode(utf8.decode(file.content as List<int>))
-              as Map<String, dynamic>;
+      var json = jsonDecode(
+        utf8.decode(file.content as List<int>),
+      ) as Map<String, dynamic>;
       expect(
         ((json['user'] as List).single as Map)['email'],
         equals('joe@test.com'),

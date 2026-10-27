@@ -81,9 +81,8 @@ class FakeGCS {
 
   http.Response _upload(http.Request request) {
     var contentType = request.headers['content-type'] ?? '';
-    var boundary = RegExp(
-      r'boundary="?([^";]+)"?',
-    ).firstMatch(contentType)![1]!;
+    var boundary = RegExp(r'boundary="?([^";]+)"?')
+        .firstMatch(contentType)![1]!;
 
     var body = latin1.decode(request.bodyBytes);
     var parts = body

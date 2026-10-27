@@ -38,9 +38,8 @@ void main() {
 
     test('basic', () async {
       {
-        var resp = APIResponse<List>.unauthorized(
-          error: "Not allowed",
-        ).requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+        var resp = APIResponse<List>.unauthorized(error: "Not allowed")
+            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
 
         expect(resp, isA<APIResponse<List>>());
         expect(resp.error, equals("Not allowed"));
@@ -66,9 +65,8 @@ void main() {
       }
 
       {
-        var resp = APIResponse<List>.unauthorized(
-          payloadDynamic: "Not allowed",
-        ).requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
+        var resp = APIResponse<List>.unauthorized(payloadDynamic: "Not allowed")
+            .requireAuthentication(require: true, type: 'Basic', realm: 'Foo');
 
         expect(resp, isA<APIResponse<List>>());
         expect(resp.payload, isNull);
@@ -310,9 +308,8 @@ void main() {
       expect(APIServerConfig.parseDomains(MapEntry('', '')), isEmpty);
 
       expect(
-        APIServerConfig.parseDomains(
-          MapEntry('foo.com', '/var/www'),
-        ).map((key, value) => MapEntry(key, value.path)),
+        APIServerConfig.parseDomains(MapEntry('foo.com', '/var/www'))
+            .map((key, value) => MapEntry(key, value.path)),
         equals({'foo.com': '/var/www'}),
       );
 
@@ -324,9 +321,8 @@ void main() {
       );
 
       expect(
-        APIServerConfig.parseDomains(
-          'foo.com=/var/www&bar.com=/var/www2',
-        ).map((key, value) => MapEntry(key, value.path)),
+        APIServerConfig.parseDomains('foo.com=/var/www&bar.com=/var/www2')
+            .map((key, value) => MapEntry(key, value.path)),
         equals({'foo.com': '/var/www', 'bar.com': '/var/www2'}),
       );
 
@@ -341,9 +337,8 @@ void main() {
       );
 
       expect(
-        APIServerConfig.parseDomains(
-          'bar.com=/var/www2',
-        ).map((key, value) => MapEntry(key, value.path)),
+        APIServerConfig.parseDomains('bar.com=/var/www2')
+            .map((key, value) => MapEntry(key, value.path)),
         equals({'bar.com': '/var/www2'}),
       );
     });

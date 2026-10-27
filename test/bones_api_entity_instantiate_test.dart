@@ -560,13 +560,11 @@ void main() {
         expect(outcome, isNot(isA<Map>()), reason: '$map');
       }
 
-      var p =
-          handler.instantiateFromMapImpl({
-                'name': 'p',
-                'mainStep': 10,
-                'steps': stepsOf([10, 11]),
-              })
-              as Project;
+      var p = handler.instantiateFromMapImpl({
+        'name': 'p',
+        'mainStep': 10,
+        'steps': stepsOf([10, 11]),
+      }) as Project;
       expect(p.mainStep, isA<EntityReference<TaskStep>>());
       expect(p.mainStep.id, equals(10));
       expect(p.steps, isA<EntityReferenceList<TaskStep>>());
@@ -574,14 +572,12 @@ void main() {
       expect(p.reviewStep, isNull);
       expect(p.active, isTrue);
 
-      var p2 =
-          handler.instantiateFromMapImpl({
-                'name': 'p',
-                'mainStep': step,
-                'reviewStep': {'id': 11, 'name': 's2'},
-                'steps': EntityReferenceList<TaskStep>.fromEntities([step]),
-              })
-              as Project;
+      var p2 = handler.instantiateFromMapImpl({
+        'name': 'p',
+        'mainStep': step,
+        'reviewStep': {'id': 11, 'name': 's2'},
+        'steps': EntityReferenceList<TaskStep>.fromEntities([step]),
+      }) as Project;
       expect(p2.mainStep.entity, same(step));
       expect(p2.reviewStep!.entity!.name, equals('s2'));
       expect(p2.steps.entities, equals([step]));
@@ -631,16 +627,14 @@ void main() {
         _expectSameAsWithResolvers(handler, project(values));
       }
 
-      var p =
-          handler.instantiateFromMapImpl(
-                project({
-                  'budget': '1.50',
-                  'active': 0,
-                  'startTime': '07:30:00',
-                  'createdAt': created.millisecondsSinceEpoch,
-                }),
-              )
-              as Project;
+      var p = handler.instantiateFromMapImpl(
+        project({
+          'budget': '1.50',
+          'active': 0,
+          'startTime': '07:30:00',
+          'createdAt': created.millisecondsSinceEpoch,
+        }),
+      ) as Project;
       expect(p.budget, equals(Decimal.parse('1.5')));
       expect(p.active, isFalse);
       expect(p.startTime, equals(Time(7, 30)));
@@ -702,12 +696,10 @@ void main() {
         _expectSameAsWithResolvers(handler, map);
       }
 
-      var s =
-          handler.instantiateFromMapImpl({
-                'tags': ['a'],
-                'ranks': [1],
-              })
-              as Settings;
+      var s = handler.instantiateFromMapImpl({
+        'tags': ['a'],
+        'ranks': [1],
+      }) as Settings;
       expect(s.tags, isA<List<String>>());
       expect(s.tags, equals(['a']));
       expect(s.ranks, isA<List<int>>());
@@ -779,9 +771,10 @@ void main() {
         _expectSameAsWithResolvers(handler, map);
       }
 
-      var label =
-          handler.instantiateFromMapImpl({'name': 'n', 'colorCode': 'red'})
-              as Label;
+      var label = handler.instantiateFromMapImpl({
+        'name': 'n',
+        'colorCode': 'red',
+      }) as Label;
       expect(label.color, equals('red'));
     });
 
@@ -798,9 +791,10 @@ void main() {
         _expectSameAsWithResolvers(handler, map);
       }
 
-      var invoice =
-          handler.instantiateFromMapImpl({'number': 'A1', 'total': '9.99'})
-              as Invoice;
+      var invoice = handler.instantiateFromMapImpl({
+        'number': 'A1',
+        'total': '9.99',
+      }) as Invoice;
       expect(invoice.total, equals(Decimal.parse('9.99')));
     });
 
@@ -824,12 +818,10 @@ void main() {
         _expectSameAsWithResolvers(handler, map);
       }
 
-      var c =
-          handler.instantiateFromMapImpl({
-                'values': [1, 2],
-                'value': 3,
-              })
-              as Counter;
+      var c = handler.instantiateFromMapImpl({
+        'values': [1, 2],
+        'value': 3,
+      }) as Counter;
       expect(c.values, isA<List<int>>());
       expect(c.value, equals(3));
     });
@@ -854,14 +846,12 @@ void main() {
         _expectSameAsWithResolvers(handler, map);
       }
 
-      var p =
-          handler.instantiateFromMapImpl({
-                'name': 'n',
-                'bio': null,
-                'verified': 1,
-                'balance': '1.5',
-              })
-              as Profile;
+      var p = handler.instantiateFromMapImpl({
+        'name': 'n',
+        'bio': null,
+        'verified': 1,
+        'balance': '1.5',
+      }) as Profile;
       // A `null` value sets a nullable field to `null`:
       expect(p.bio, isNull);
       expect(p.verified, isTrue);
@@ -1100,10 +1090,10 @@ void main() {
       ]''';
 
       for (var round = 0; round < 2; ++round) {
-        var decoded =
-            (proxy.resolveResponse(profilesType, proxy.decodeJson(json))
-                    as List)
-                .cast<Profile>();
+        var decoded = (proxy.resolveResponse(
+          profilesType,
+          proxy.decodeJson(json),
+        ) as List).cast<Profile>();
 
         expect(
           decoded

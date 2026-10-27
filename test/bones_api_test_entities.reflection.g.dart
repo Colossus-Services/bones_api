@@ -134,7 +134,7 @@ class Account$reflection extends ClassReflection<Account>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Account$reflection withObject([Account? obj]) =>
@@ -686,7 +686,7 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Address$reflection withObject([Address? obj]) =>
@@ -1358,7 +1358,7 @@ class Photo$reflection extends ClassReflection<Photo> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Photo$reflection withObject([Photo? obj]) =>
@@ -1966,7 +1966,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Role$reflection withObject([Role? obj]) =>
@@ -2532,7 +2532,7 @@ class RoleType$reflection extends EnumReflection<RoleType>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   RoleType$reflection withObject([RoleType? obj]) => RoleType$reflection(obj);
@@ -2609,7 +2609,7 @@ class Store$reflection extends ClassReflection<Store> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Store$reflection withObject([Store? obj]) =>
@@ -3183,7 +3183,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   User$reflection withObject([User? obj]) =>
@@ -3903,7 +3903,7 @@ class UserInfo$reflection extends ClassReflection<UserInfo>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   UserInfo$reflection withObject([UserInfo? obj]) =>

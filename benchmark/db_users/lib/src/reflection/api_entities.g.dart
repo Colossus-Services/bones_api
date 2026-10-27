@@ -87,7 +87,7 @@ class Address$reflection extends ClassReflection<Address>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Address$reflection withObject([Address? obj]) =>
@@ -425,7 +425,7 @@ class Role$reflection extends ClassReflection<Role> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Role$reflection withObject([Role? obj]) =>
@@ -672,7 +672,7 @@ class User$reflection extends ClassReflection<User> with __ReflectionMixin {
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   User$reflection withObject([User? obj]) =>

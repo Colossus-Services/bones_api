@@ -221,9 +221,9 @@ class SQL implements SQLWrapper {
     this.namedParameters,
     this.parametersByPlaceholder, {
     this.sqlCondition,
-    String? sqlPositional,
-    List<String>? parametersKeysByPosition,
-    List<Object?>? parametersValuesByPosition,
+    this._sqlPositional,
+    this._parametersKeysByPosition,
+    this._parametersValuesByPosition,
     this.condition,
     this.entityName,
     this.idFieldName,
@@ -237,10 +237,7 @@ class SQL implements SQLWrapper {
     this.relationship,
     this.tablesAliases,
     RegExp? placeholderRegexp,
-  }) : _sqlPositional = sqlPositional,
-       _parametersKeysByPosition = parametersKeysByPosition,
-       _parametersValuesByPosition = parametersValuesByPosition,
-       placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
+  }) : placeholderRegexp = placeholderRegexp ?? _defaultPlaceholderRegexp;
 
   SQL copy() => SQL(
     sql,
@@ -631,18 +628,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     super.minConnections,
     super.maxConnections,
     DBSQLAdapterCapability super.capability, {
-    bool generateTables = false,
-    bool checkTables = true,
-    Object? populateTables,
+    this._generateTables = false,
+    this._checkTables = true,
+    this._populateTables,
     super.parentRepositoryProvider,
     super.connectivity,
     super.populateSource,
     super.populateSourceVariables,
     super.workingPath,
     this.logSQL = false,
-  }) : _generateTables = generateTables,
-       _checkTables = checkTables,
-       _populateTables = populateTables {
+  }) {
     boot();
 
     _conditionSQLGenerator = ConditionSQLEncoder(
@@ -1045,9 +1040,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         .map((e) => _checkDBTableScheme(e.key, e.value))
         .toList();
 
-    return _checkEntityIndexesNamesInUse(
-      repositoriesChecks,
-    ).resolveMapped((_) => _checkDBTablesResults(repositoriesChecks));
+    return _checkEntityIndexesNamesInUse(repositoriesChecks)
+        .resolveMapped((_) => _checkDBTablesResults(repositoriesChecks));
   }
 
   /// Of the missing `@EntityIndex`es, the ones whose name is in use outside
@@ -1884,9 +1878,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             }
           });
         }
-      } else if (RegExp(
-        r'(?:^|\s+)(?:CREATE|ALTER)\s+TABLE\s',
-      ).hasMatch(tables)) {
+      } else if (RegExp(r'(?:^|\s+)(?:CREATE|ALTER)\s+TABLE\s')
+          .hasMatch(tables)) {
         _log.info('Populating $this tables [SQL length: ${tables.length}]...');
 
         return populateTablesFromSQLs(tables).resolveMapped((tables) {

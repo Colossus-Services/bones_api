@@ -585,9 +585,9 @@ class TableScheme with FieldsFromMap {
 
       var rels1 = rels
           .where(
-            (rel) => StringUtils.toLowerCaseSimpleUnderscored(
-              rel.relationshipTable,
-            ).contains(sourceFieldSimpleUnderscored),
+            (rel) =>
+                StringUtils.toLowerCaseSimpleUnderscored(rel.relationshipTable)
+                    .contains(sourceFieldSimpleUnderscored),
           )
           .toList();
 
@@ -600,9 +600,9 @@ class TableScheme with FieldsFromMap {
       if (rels1.isEmpty) {
         rels1 = rels
             .where(
-              (rel) => StringUtils.toLowerCaseSimpleCached(
-                rel.relationshipTable,
-              ).contains(sourceFieldSimple),
+              (rel) =>
+                  StringUtils.toLowerCaseSimpleCached(rel.relationshipTable)
+                      .contains(sourceFieldSimple),
             )
             .toList();
       }
@@ -1802,8 +1802,9 @@ abstract class ConditionEncoder {
       '${parameterKey}__$index';
 }
 
-typedef ValueEncoder<E, P extends EncodingValue<E, P>> =
-    E Function(P parameterValue);
+typedef ValueEncoder<E, P extends EncodingValue<E, P>> = E Function(
+  P parameterValue,
+);
 
 abstract class EncodingValue<E, T extends EncodingValue<E, T>> {
   final String key;

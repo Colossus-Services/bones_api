@@ -672,9 +672,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     bool Function(String fieldName, TypeInfo fieldType) typeFilter, [
     O? o,
   ]) => Map<String, TypeInfo>.unmodifiable(
-    fieldsTypes(
-      o,
-    ).entries.where((e) => typeFilter(e.key, e.value)).toMapFromEntries(),
+    fieldsTypes(o).entries
+        .where((e) => typeFilter(e.key, e.value))
+        .toMapFromEntries(),
   );
 
   Map<String, TypeInfo> fieldsWithTypeAndAnnotations(
@@ -1063,12 +1063,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       );
       if (!eagerEntityType) {
         return elementType.toEntityReferenceList(
-              value,
-              entityProvider: entityProvider,
-              entityHandler: valEntityHandler,
-              entityCache: entityCache,
-            )
-            as T;
+          value,
+          entityProvider: entityProvider,
+          entityHandler: valEntityHandler,
+          entityCache: entityCache,
+        ) as T;
       }
 
       return _resolveListValueByType<T>(
@@ -1983,9 +1982,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   Map<String, dynamic> getFields(O o) {
     return Map<String, dynamic>.fromEntries(
-      fieldsNames(
-        o,
-      ).map((key) => MapEntry<String, dynamic>(key, getField(o, key))),
+      fieldsNames(o)
+          .map((key) => MapEntry<String, dynamic>(key, getField(o, key))),
     );
   }
 
@@ -3073,9 +3071,8 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   ClassReflectionEntityHandler(
     this.classType, {
     EntityHandlerProvider? provider,
-    ClassReflection<O>? reflection,
-  }) : _reflection = reflection,
-       super(provider, type: classType);
+    this._reflection,
+  }) : super(provider, type: classType);
 
   @override
   String get typeName => reflection.className;
@@ -6449,13 +6446,12 @@ class TransactionAbortedError extends Error {
 
 typedef ErrorFilter = bool Function(Object, StackTrace);
 
-typedef TransactionErrorResolver =
-    Object? Function(
-      Object error,
-      StackTrace stackTrace,
-      Object? operation,
-      Object? previousError,
-    );
+typedef TransactionErrorResolver = Object? Function(
+  Object error,
+  StackTrace stackTrace,
+  Object? operation,
+  Object? previousError,
+);
 
 typedef TransactionExecution<R, C> = FutureOr<R> Function(C context);
 

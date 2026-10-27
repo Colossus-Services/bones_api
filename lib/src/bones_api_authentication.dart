@@ -287,11 +287,10 @@ class APIAuthentication {
     List<APIPermission>? permissions,
     this.resumed = false,
     this.data,
-    APICredential? credential,
+    this._credential,
   }) : permissions = List<APIPermission>.unmodifiable(
          permissions ?? <APIPermission>[],
-       ),
-       _credential = credential;
+       );
 
   /// An internal authentication of the system itself (e.g. a scheduled call
   /// of an `APICronJob`), named [username]: not issued to any client (no

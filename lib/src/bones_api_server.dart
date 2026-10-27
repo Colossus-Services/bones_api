@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:args_simple/args_simple_io.dart';
 import 'package:async_extension/async_extension.dart';
+import 'package:brotli_fast/brotli_fast.dart'
+    show BrotliErrorCode, BrotliException;
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
 import 'package:mime/mime.dart';
@@ -12,7 +15,6 @@ import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_gzip/shelf_gzip.dart';
 import 'package:shelf_letsencrypt/shelf_letsencrypt.dart';
 import 'package:shelf_static/shelf_static.dart';
 import 'package:statistics/statistics.dart' hide IterableIntExtension;
@@ -30,6 +32,7 @@ import 'bones_api_server_cache.dart';
 import 'bones_api_session.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
+import 'bones_api_utils_compression.dart';
 import 'bones_api_utils_httpclient.dart';
 import 'bones_api_utils_isolate.dart';
 import 'bones_api_utils_json.dart';
@@ -565,13 +568,34 @@ class APIServerConfig {
   final int? maxPayloadLength;
 
   /// Whether to decompress the request payload if it is compressed using
-  /// a supported `Content-Encoding` (e.g., gzip or deflate).
+  /// a supported `Content-Encoding` (gzip, deflate or br).
   ///
   /// If `true`, the payload will be automatically decompressed before processing.
   /// If `false`, compressed payloads will be left as-is.
   ///
   /// Default: false.
   final bool decompressPayload;
+
+  /// The `Content-Encoding`s used to compress the responses, in order of
+  /// preference. Each response uses the best one accepted by the
+  /// request's `Accept-Encoding` header.
+  ///
+  /// An empty list disables the response compression.
+  ///
+  /// Default: [APIContentEncoding.defaultEncodings] (`br`, `gzip`).
+  final List<APIContentEncoding> compressionEncodings;
+
+  /// The Brotli quality (`0` to `11`) for the API responses and the
+  /// non-cached static files. Cached static files use at least `9`.
+  ///
+  /// Default: [APIBrotli.defaultQuality] (`5`).
+  final int brotliQuality;
+
+  /// The [APIResponseCompression] for the API responses.
+  APIResponseCompression get responseCompression => APIResponseCompression(
+    encodings: compressionEncodings,
+    brotliQuality: brotliQuality,
+  );
 
   /// If `true` log messages to [stdout] (console).
   late final bool logToConsole;
@@ -618,6 +642,8 @@ class APIServerConfig {
     int? staticFilesCacheMaxContentLength,
     int? maxPayloadLength,
     bool? decompressPayload,
+    Object? compressionEncodings,
+    int? brotliQuality,
     this.apiConfig,
     bool? logToConsole,
     bool? logQueue,
@@ -714,6 +740,14 @@ class APIServerConfig {
          decompressPayload,
          apiConfig: apiConfig,
        ),
+       compressionEncodings = resolveCompressionEncodings(
+         compressionEncodings,
+         apiConfig: apiConfig,
+       ),
+       brotliQuality = resolveBrotliQuality(
+         brotliQuality,
+         apiConfig: apiConfig,
+       ),
        logToConsole = resolveLogToConsole(logToConsole, apiConfig: apiConfig),
        logQueue = resolveLogQueue(logQueue, apiConfig: apiConfig),
        args = resolveArgs(args);
@@ -788,6 +822,9 @@ class APIServerConfig {
     var maxPayloadLength = a.optionAsInt('max-payload-length');
     var decompressPayload = a.flagOr('decompress-payload', null);
 
+    var compressionEncodings = a.optionAsString('compression-encodings');
+    var brotliQuality = a.optionAsInt('brotli-quality');
+
     var logToConsole = a.flagOr('log-toConsole', null);
 
     var logQueue = a.flagOr('log-queue', null);
@@ -846,6 +883,8 @@ class APIServerConfig {
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
+      compressionEncodings: compressionEncodings,
+      brotliQuality: brotliQuality,
       serverResponseDelay: serverResponseDelay,
       apiConfig: apiConfig,
       logToConsole: logToConsole,
@@ -1078,6 +1117,96 @@ class APIServerConfig {
   }) {
     decompressPayload ??= apiConfig?.getPath('server', 'decompress_payload');
     return decompressPayload ?? false;
+  }
+
+  /// Resolves [compressionEncodings] (a [List] or a comma separated [String],
+  /// e.g. `br,gzip`), falling back to `server.compression_encodings` in
+  /// [apiConfig], then to [APIContentEncoding.defaultEncodings].
+  ///
+  /// - `true` (or `on`/`yes`) uses the defaults.
+  /// - An empty value, `false` (or `none`/`off`/`no`) disables the response
+  ///   compression.
+  /// - Unknown encodings are ignored (logged). If none is known, the
+  ///   defaults are used.
+  static List<APIContentEncoding> resolveCompressionEncodings(
+    Object? compressionEncodings, {
+    APIConfig? apiConfig,
+  }) {
+    compressionEncodings ??= apiConfig?.getPath(
+      'server',
+      'compression_encodings',
+    );
+
+    if (compressionEncodings is bool) {
+      return compressionEncodings
+          ? APIContentEncoding.defaultEncodings
+          : const <APIContentEncoding>[];
+    }
+
+    // Not defined, or enabled without a list:
+    if (compressionEncodings == null ||
+        _compressionEnabledValues.contains(
+          compressionEncodings.toString().trim().toLowerCase(),
+        )) {
+      return APIContentEncoding.defaultEncodings;
+    }
+
+    var items = compressionEncodings is Iterable
+        ? compressionEncodings
+        : compressionEncodings.toString().split(',');
+
+    var encodings = <APIContentEncoding>[];
+    var unknown = <String>[];
+    var disabled = false;
+
+    for (var e in items) {
+      var encoding = APIContentEncoding.parse(e);
+      if (encoding != null) {
+        if (!encodings.contains(encoding)) encodings.add(encoding);
+        continue;
+      }
+
+      var name = '${e ?? ''}'.trim().toLowerCase();
+      if (name.isEmpty) continue;
+
+      if (_compressionDisabledValues.contains(name)) {
+        disabled = true;
+      } else {
+        unknown.add(name);
+      }
+    }
+
+    if (encodings.isEmpty && (disabled || unknown.isEmpty)) {
+      return const <APIContentEncoding>[];
+    }
+
+    if (encodings.isEmpty) {
+      _log.warning(
+        "Unknown `compression_encodings`: $unknown. "
+        "Using the defaults: ${APIContentEncoding.defaultEncodings.map((e) => e.name).toList()}",
+      );
+      return APIContentEncoding.defaultEncodings;
+    } else if (unknown.isNotEmpty) {
+      _log.warning("Ignoring unknown `compression_encodings`: $unknown");
+    }
+
+    return List.unmodifiable(encodings);
+  }
+
+  static const _compressionEnabledValues = {'true', 'on', 'yes'};
+
+  static const _compressionDisabledValues = {'none', 'false', 'off', 'no'};
+
+  /// Resolves [brotliQuality], falling back to `server.brotli_quality` in
+  /// [apiConfig], then to [APIBrotli.defaultQuality]. Clamped to `0..11`.
+  static int resolveBrotliQuality(int? brotliQuality, {APIConfig? apiConfig}) {
+    if (brotliQuality == null) {
+      var value = apiConfig?.getPath('server', 'brotli_quality');
+      brotliQuality = value is num
+          ? value.toInt()
+          : int.tryParse('${value ?? ''}'.trim());
+    }
+    return (brotliQuality ?? APIBrotli.defaultQuality).clamp(0, 11);
   }
 
   static List<Pattern> resolveLongLivedStaticFiles(
@@ -1387,6 +1516,8 @@ class APIServerConfig {
     'staticFilesCacheMaxContentLength': staticFilesCacheMaxContentLength,
     'maxPayloadLength': maxPayloadLength,
     'decompressPayload': decompressPayload,
+    'compressionEncodings': compressionEncodings.map((e) => e.name).toList(),
+    'brotliQuality': brotliQuality,
     'logToConsole': logToConsole,
     'logQueue': logQueue,
     if (args.isNotEmpty) 'args': args.toList(),
@@ -1418,6 +1549,8 @@ class APIServerConfig {
       cacheStaticFilesResponses: json['cacheStaticFilesResponses'],
       maxPayloadLength: json['maxPayloadLength'],
       decompressPayload: json['decompressPayload'],
+      compressionEncodings: json['compressionEncodings'],
+      brotliQuality: json['brotliQuality'],
       logToConsole: json['logToConsole'],
       logQueue: json['logQueue'],
       args: json['args'],
@@ -1470,6 +1603,8 @@ abstract class _APIServerBase extends APIServerConfig {
     super.staticFilesCacheMaxContentLength,
     super.maxPayloadLength,
     super.decompressPayload,
+    super.compressionEncodings,
+    super.brotliQuality,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -1505,6 +1640,8 @@ abstract class _APIServerBase extends APIServerConfig {
             apiServerConfig.staticFilesCacheMaxContentLength,
         maxPayloadLength: apiServerConfig.maxPayloadLength,
         decompressPayload: apiServerConfig.decompressPayload,
+        compressionEncodings: apiServerConfig.compressionEncodings,
+        brotliQuality: apiServerConfig.brotliQuality,
         serverResponseDelay: apiServerConfig.serverResponseDelay,
         logToConsole: apiServerConfig.logToConsole,
         logQueue: apiServerConfig.logQueue,
@@ -1629,6 +1766,8 @@ class APIServer extends _APIServerBase {
     super.cacheStaticFilesResponses,
     super.maxPayloadLength,
     super.decompressPayload,
+    super.compressionEncodings,
+    super.brotliQuality,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -1737,6 +1876,8 @@ class APIServer extends _APIServerBase {
       staticFilesCacheMaxContentLength: staticFilesCacheMaxContentLength,
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
+      compressionEncodings: compressionEncodings,
+      brotliQuality: brotliQuality,
       letsEncryptDirectory: letsEncryptDirectory,
       securePort: securePort,
       useSessionID: useSessionID,
@@ -2026,39 +2167,47 @@ class APIServer extends _APIServerBase {
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => request.read().toList().then((bs) {
-    var allBytes = _loadPayloadBytes(
-      request,
-      bs,
-      maxPayloadLength: maxPayloadLength,
-      decompressPayload: decompressPayload,
-    );
+  }) => request
+      .read()
+      .toList()
+      .then(
+        (bs) => _loadPayloadBytes(
+          request,
+          bs,
+          maxPayloadLength: maxPayloadLength,
+          decompressPayload: decompressPayload,
+        ),
+      )
+      .then((allBytes) {
+        var encoding = mimeType.charsetEncoding ?? utf8;
 
-    var encoding = mimeType.charsetEncoding ?? utf8;
-
-    try {
-      return encoding.decode(allBytes);
-    } catch (_) {
-      return latin1.decode(allBytes);
-    }
-  });
+        try {
+          return encoding.decode(allBytes);
+        } catch (_) {
+          return latin1.decode(allBytes);
+        }
+      });
 
   static Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
     MimeType mimeType,
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => request.read().toList().then((bs) {
-    var allBytes = _loadPayloadBytes(
+  }) => request.read().toList().then(
+    (bs) => _loadPayloadBytes(
       request,
       bs,
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
-    );
-    return (mimeType, allBytes);
-  });
+    ).resolveMapped((allBytes) => (mimeType, allBytes)),
+  );
 
-  static Uint8List _loadPayloadBytes(
+  /// The decoded size limit of a Brotli request payload when
+  /// `maxPayloadLength` is not defined (`64 MB`): a few bytes of Brotli
+  /// can decode to GBs (a "decompression bomb"). See [decompressPayload].
+  static int defaultMaxBrotliPayloadLength = 64 * 1024 * 1024;
+
+  static FutureOr<Uint8List> _loadPayloadBytes(
     Request request,
     List<List<int>> payloadBlocks, {
     int? maxPayloadLength,
@@ -2107,38 +2256,37 @@ class APIServer extends _APIServerBase {
       assert(bytesOffset == allBytesSz);
     }
 
-    if (decompressPayload && bytes.isNotEmpty) {
-      var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    if (!decompressPayload || bytes.isEmpty) return bytes;
 
-      switch (contentEncoding) {
-        case null:
-        case '':
-        case 'identity':
-          {
-            break;
-          }
-        case 'gzip':
-          {
-            bytes = _decodePayloadGzip(bytes, maxPayloadLength);
-          }
-        case 'deflate':
-          {
-            bytes = _decodePayloadZlib(bytes);
-          }
-        default:
-          throw UnsupportedError(
-            "Unknown `Content-Encoding`: $contentEncoding",
-          );
-      }
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
 
-      if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
-        throw StateError(
-          "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).",
-        );
-      }
+    FutureOr<Uint8List> decoded;
+
+    switch (contentEncoding) {
+      case null:
+      case '':
+      case 'identity':
+        return bytes;
+      case 'gzip':
+        decoded = _decodePayloadGzip(bytes, maxPayloadLength);
+      case 'deflate':
+        decoded = _decodePayloadZlib(bytes);
+      case 'br':
+        decoded = _decodePayloadBrotli(bytes, maxPayloadLength);
+      default:
+        throw UnsupportedError("Unknown `Content-Encoding`: $contentEncoding");
     }
 
-    return bytes;
+    final maxLength = maxPayloadLength;
+
+    return decoded.resolveMapped((bytes) {
+      if (maxLength >= 0 && bytes.length > maxLength) {
+        throw StateError(
+          "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxLength).",
+        );
+      }
+      return bytes;
+    });
   }
 
   static Uint8List _decodePayloadGzip(Uint8List bytes, int maxPayloadLength) {
@@ -2158,6 +2306,27 @@ class APIServer extends _APIServerBase {
 
     var decoded = gzip.decode(bytes);
     return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
+  }
+
+  /// Decodes in the [compressionIsolatePool] (not blocking the event loop),
+  /// up to `maxPayloadLength`, or [defaultMaxBrotliPayloadLength] if not
+  /// defined: checked while decoding (Brotli has no uncompressed size
+  /// trailer).
+  static Future<Uint8List> _decodePayloadBrotli(
+    Uint8List bytes,
+    int maxPayloadLength,
+  ) {
+    final limit = maxPayloadLength >= 0
+        ? maxPayloadLength
+        : defaultMaxBrotliPayloadLength;
+
+    return APIBrotli.decodeAsync(bytes, maxOutputSize: limit).catchError(
+      (Object e) => throw StateError(
+        "Can't decompress payload of size ${bytes.length}: Brotli payload uncompressed size exceeds ${maxPayloadLength >= 0 ? '`maxPayloadLength`' : '`defaultMaxBrotliPayloadLength`'} ($limit).",
+      ),
+      test: (e) =>
+          e is BrotliException && e.code == BrotliErrorCode.outputLimitExceeded,
+    );
   }
 
   static Uint8List _decodePayloadZlib(Uint8List bytes) {
@@ -2276,22 +2445,8 @@ class APIServer extends _APIServerBase {
 
   /// Returns [currentVary] with `Origin` appended, preserving any other field
   /// already listed.
-  static String _resolveVaryWithOrigin(Object? currentVary) {
-    var vary = currentVary?.toString().trim() ?? '';
-    if (vary.isEmpty || vary == '*') {
-      return vary.isEmpty ? 'Origin' : vary;
-    }
-
-    var fields = vary
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    if (fields.any((e) => equalsIgnoreAsciiCase(e, 'Origin'))) return vary;
-
-    return [...fields, 'Origin'].join(', ');
-  }
+  static String _resolveVaryWithOrigin(Object? currentVary) =>
+      mergeVaryHeader(currentVary, 'Origin');
 
   static String getOrigin(APIRequest request) {
     var origin = request.headers['origin'];
@@ -2311,17 +2466,30 @@ class APIServer extends _APIServerBase {
 
   /// Resolves a [payload] to an HTTP body (accepts [payload] as a [Future]).
   /// See [resolveBodySync].
+  ///
+  /// A JSON body is compressed with the best [compression] encoding accepted
+  /// by [acceptEncoding] (defaults to the `Accept-Encoding` header of the
+  /// [APIResponse.apiRequest]). If [compression] is `null`, a JSON body is
+  /// always compressed with GZip (if large enough), for backward
+  /// compatibility.
   static FutureOr<Object?> resolveBody(
     Object? payload,
-    APIResponse apiResponse,
-  ) {
+    APIResponse apiResponse, {
+    APIResponseCompression? compression,
+    String? acceptEncoding,
+  }) {
     if (payload == null) return null;
 
     if (payload is Future) {
       return payload.then(
         (value) {
           if (value == null) return null;
-          return _resolveBodyImpl(value, apiResponse);
+          return _resolveBodyImpl(
+            value,
+            apiResponse,
+            compression,
+            acceptEncoding,
+          );
         },
         onError: (e, s) {
           return apiResponse.asError(error: 'ERROR: $e\n$s');
@@ -2329,12 +2497,17 @@ class APIServer extends _APIServerBase {
       );
     }
 
-    return _resolveBodyImpl(payload, apiResponse);
+    return _resolveBodyImpl(payload, apiResponse, compression, acceptEncoding);
   }
 
   /// Resolves a [payload] to an HTTP body (Does NOT accept [payload] as a [Future]).
   /// See [resolveBody].
-  static Object? resolveBodySync(Object? payload, APIResponse apiResponse) {
+  static Object? resolveBodySync(
+    Object? payload,
+    APIResponse apiResponse, {
+    APIResponseCompression? compression,
+    String? acceptEncoding,
+  }) {
     if (payload == null) return null;
 
     if (payload is Future) {
@@ -2343,10 +2516,15 @@ class APIServer extends _APIServerBase {
       );
     }
 
-    return _resolveBodyImpl(payload, apiResponse);
+    return _resolveBodyImpl(payload, apiResponse, compression, acceptEncoding);
   }
 
-  static Object? _resolveBodyImpl(Object payload, APIResponse apiResponse) {
+  static Object? _resolveBodyImpl(
+    Object payload,
+    APIResponse apiResponse,
+    APIResponseCompression? compression,
+    String? acceptEncoding,
+  ) {
     var apiRequestMethod = apiResponse.apiRequest?.method;
 
     if (apiRequestMethod == APIRequestMethod.HEAD) {
@@ -2390,8 +2568,13 @@ class APIServer extends _APIServerBase {
     final jsonEncodeInit = DateTime.now();
 
     try {
-      // Note: `jsonBytes` may be compressed with GZip.
-      var jsonBytes = _jsonEncodePayload(apiResponse, payload);
+      // Note: `jsonBytes` may be compressed (Brotli or GZip).
+      var jsonBytes = _jsonEncodePayload(
+        apiResponse,
+        payload,
+        compression,
+        acceptEncoding,
+      );
       var jsonEncodeTime = DateTime.now().difference(jsonEncodeInit);
 
       apiResponse.setMetric('API-Response-JSON', duration: jsonEncodeTime);
@@ -2409,17 +2592,35 @@ class APIServer extends _APIServerBase {
     }
   }
 
-  /// Encodes the given [payload] to JSON and writes it to an [AutoGZipSink].
+  /// Encodes the given [payload] to JSON and writes it to an [AutoCompressSink].
   ///
-  /// Returns either raw JSON bytes or GZip-compressed JSON bytes.
+  /// Returns either raw JSON bytes or compressed (Brotli or GZip) JSON bytes.
+  /// See [resolveBody].
   static Uint8List _jsonEncodePayload(
     APIResponse<dynamic> apiResponse,
     payload,
+    APIResponseCompression? compression,
+    String? acceptEncoding,
   ) {
     final apiRequest = apiResponse.apiRequest;
 
     final encodeInit = DateTime.now();
-    final bytesSink = AutoGZipSink();
+
+    final AutoCompressSink bytesSink;
+    if (compression == null) {
+      bytesSink = AutoGZipSink();
+    } else {
+      acceptEncoding ??= apiRequest?.getHeader(
+        HttpHeaders.acceptEncodingHeader,
+      );
+
+      bytesSink = AutoCompressSink(
+        encoding: compression.resolveEncoding(acceptEncoding),
+        minCompressLength: compression.minLength,
+        gzipLevel: compression.gzipLevel,
+        brotliQuality: compression.brotliQuality,
+      );
+    }
 
     if (apiRequest != null) {
       final routeHandler = apiRequest.routeHandler;
@@ -2440,6 +2641,7 @@ class APIServer extends _APIServerBase {
             apiResponse,
             bytesSink,
             encodeInit,
+            compression,
           );
         }
       }
@@ -2451,34 +2653,52 @@ class APIServer extends _APIServerBase {
       toEncodable: ReflectionFactory.toJsonEncodable,
     );
 
-    return _resolveJsonEncodePayloadBytes(apiResponse, bytesSink, encodeInit);
+    return _resolveJsonEncodePayloadBytes(
+      apiResponse,
+      bytesSink,
+      encodeInit,
+      compression,
+    );
   }
 
   /// Finalizes the JSON encoding and returns the resulting bytes.
   ///
   /// Closes the [bytesSink] and collects the output.
-  /// If GZip was applied, adds headers to [apiResponse].
-  /// See [_defineGZipEncodedHeaders].
+  /// If a compression was applied, adds the headers to [apiResponse]
+  /// (see [defineContentEncodingHeaders]), and `Vary: Accept-Encoding`
+  /// if [compression] is provided.
   static Uint8List _resolveJsonEncodePayloadBytes(
     APIResponse<dynamic> apiResponse,
-    AutoGZipSink bytesSink,
+    AutoCompressSink bytesSink,
     DateTime encodeInit,
+    APIResponseCompression? compression,
   ) {
     bytesSink.close();
 
     final bytes = bytesSink.toBytes();
 
-    if (bytesSink.isGzip) {
+    final activeEncoding = bytesSink.activeEncoding;
+
+    if (activeEncoding != null) {
       var inputLength = bytesSink.inputLength;
       var compressionCapacity = bytesSink.capacity;
 
-      _defineGZipEncodedHeaders(
+      defineContentEncodingHeaders(
         apiResponse.headers,
+        encoding: activeEncoding,
         bodyLength: inputLength,
         compressedBodyLength: bytes.length,
         compressionCapacity: compressionCapacity,
-        gzipInit: encodeInit,
+        initTime: encodeInit,
+        serverTimingEntryName: 'obj-json-${activeEncoding.headerValue}',
       );
+
+      if (compression != null) {
+        apiResponse.headers[HttpHeaders.varyHeader] = mergeVaryHeader(
+          apiResponse.headers[HttpHeaders.varyHeader],
+          'Accept-Encoding',
+        );
+      }
     }
 
     return bytes;
@@ -2751,6 +2971,8 @@ final class APIServerWorker extends _APIServerBase {
     super.staticFilesCacheMaxContentLength,
     super.maxPayloadLength,
     super.decompressPayload,
+    super.compressionEncodings,
+    super.brotliQuality,
     super.serverResponseDelay,
     super.logToConsole,
     super.logQueue,
@@ -2783,9 +3005,8 @@ final class APIServerWorker extends _APIServerBase {
   ) {
     var staticHandler = _getDirectoryStaticHandler(rootDirectory);
 
-    return staticHandler(
-      apiRequest.toRequest(),
-    ).resolveMapped((response) => _APIResponseStaticFile<T>(response));
+    return staticHandler(apiRequest.toRequest())
+        .resolveMapped((response) => _APIResponseStaticFile<T>(response));
   }
 
   final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
@@ -2809,24 +3030,39 @@ final class APIServerWorker extends _APIServerBase {
 
     var pipeline = const Pipeline().addMiddleware(aliases.middleware);
 
-    var gzipCompressionLevel = 4;
+    var compression = responseCompression;
+
+    APIResponseCompression Function(Request request, Response response)?
+    resolveCompression;
 
     if (cacheStaticFilesResponses) {
+      // Allow higher compression if the `Response`s are being cached
+      // (compressed once):
+      var cachedCompression = compression.copyWith(
+        gzipLevel: 7,
+        brotliQuality: math.max(compression.brotliQuality, 9),
+      );
+
       var responseCache = _responseCache = APIServerResponseCache(
         maxMemorySize: staticFilesCacheMaxMemorySize,
         maxContentLength: staticFilesCacheMaxContentLength,
+        compression: cachedCompression,
       );
 
       pipeline = pipeline.addMiddleware(responseCache.middleware);
 
-      // Allow higher compression if the `Response`s are being cached:
-      gzipCompressionLevel = 7;
+      // Not cached (e.g., too large): compressed on each request.
+      resolveCompression = (request, response) =>
+          responseCache.isCacheable(request, response)
+          ? cachedCompression
+          : compression;
     }
 
     pipeline = pipeline
         .addMiddleware(
-          createGzipMiddleware(
-            compressionLevel: gzipCompressionLevel,
+          createCompressionMiddleware(
+            compression: compression,
+            resolveCompression: resolveCompression,
             addCompressionRatioHeader: true,
             addServerTiming: true,
           ),
@@ -3102,6 +3338,9 @@ final class APIServerWorker extends _APIServerBase {
   Future<bool> _startImpl() async {
     var appliedProps = apiConfig?.applyProperties();
 
+    // Each worker isolate has its own pool: sized by the total of workers.
+    configureCompressionIsolatePool(totalWorkers: totalWorkers);
+
     if (this.logToConsole) {
       _log.handler.logToConsole();
 
@@ -3203,8 +3442,12 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   void _configureServer(HttpServer server) {
-    // Enable built-in [HttpServer] gzip:
-    server.autoCompress = true;
+    // Enable built-in [HttpServer] gzip (only for responses without
+    // a `Content-Encoding`, like the ones too small for `compressResponse`),
+    // unless GZip was disabled in `compressionEncodings`:
+    server.autoCompress = compressionEncodings.contains(
+      APIContentEncoding.gzip,
+    );
   }
 
   void _letsEncryptLogger(
@@ -3492,7 +3735,7 @@ final class APIServerWorker extends _APIServerBase {
       return removeStaticFileCookies(apiResponse.fileResponse);
     }
 
-    var retPayload = APIServer.resolveBody(apiResponse.payload, apiResponse);
+    var retPayload = _resolveBody(apiResponse.payload, apiResponse);
 
     final serverResponseDelay = this.serverResponseDelay;
     if (serverResponseDelay != null && !serverResponseDelay.isNegative) {
@@ -3512,10 +3755,9 @@ final class APIServerWorker extends _APIServerBase {
       if (payload is APIResponse) {
         var apiResponse2 = payload;
 
-        return APIServer.resolveBody(
-          apiResponse2.payload,
-          apiResponse2,
-        ).resolveMapped((payload2) {
+        return _resolveBody(apiResponse2.payload, apiResponse2).resolveMapped((
+          payload2,
+        ) {
           var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
 
           var response = _sendAPIResponse(
@@ -3609,6 +3851,26 @@ final class APIServerWorker extends _APIServerBase {
     return headers;
   }
 
+  /// Resolves the body of an API response, NOT compressed: the API
+  /// responses are only compressed by [_processResponse]
+  /// ([compressResponse]), with the headers of the final [Response].
+  static FutureOr<Object?> _resolveBody(
+    Object? payload,
+    APIResponse apiResponse,
+  ) => APIServer.resolveBody(
+    payload,
+    apiResponse,
+    compression: APIResponseCompression.none,
+  );
+
+  /// Same as [_resolveBody], for a non-[Future] [payload].
+  static Object? _resolveBodySync(Object? payload, APIResponse apiResponse) =>
+      APIServer.resolveBodySync(
+        payload,
+        apiResponse,
+        compression: APIResponseCompression.none,
+      );
+
   FutureOr<Response> _processResponse(
     APIRequest apiRequest,
     APIResponse apiResponse,
@@ -3618,16 +3880,16 @@ final class APIServerWorker extends _APIServerBase {
     apiResponse.disposeAsync();
     apiRequest.disposeAsync();
 
-    if (!acceptsGzipEncoding(request)) {
-      return response;
-    } else {
-      return gzipEncodeResponse(
-        response,
-        addCompressionRatioHeader: true,
-        addServerTiming: true,
-      );
-    }
+    return compressResponse(
+      request,
+      response,
+      compression: _responseCompression,
+      addCompressionRatioHeader: true,
+      addServerTiming: true,
+    );
   }
+
+  late final APIResponseCompression _responseCompression = responseCompression;
 
   bool _needToSendHeaderXAccessToken(
     APIRequest apiRequest,
@@ -3772,7 +4034,7 @@ final class APIServerWorker extends _APIServerBase {
 
           var errorContent = stackTrace != null ? '$error\n$stackTrace' : error;
 
-          var retError = APIServer.resolveBodySync(errorContent, apiResponse);
+          var retError = _resolveBodySync(errorContent, apiResponse);
 
           headers[HttpHeaders.contentTypeHeader] ??= 'text/plain';
 
@@ -3863,68 +4125,5 @@ extension _APIRequestExtension on APIRequest {
     }
 
     return Request(method.name, requestedUri);
-  }
-}
-
-/// Adds GZip-related headers to the given [headers] map.
-///
-/// Sets the `Content-Encoding` and `Content-Length` headers to indicate
-/// GZip compression and its size. Optionally adds:
-///
-/// - `X-Compression-Ratio`: with detailed compression info
-/// - `Server-Timing`: duration of the compression step (if [gzipInit] is provided)
-///
-/// Parameters:
-/// - [bodyLength]: original uncompressed body size in bytes
-/// - [compressedBodyLength]: resulting GZip-compressed size
-/// - [compressionCapacity]: internal capacity allocated for compression
-/// - [addCompressionRatioHeader]: whether to include `X-Compression-Ratio`
-/// - [addServerTiming]: whether to append timing info to `Server-Timing`
-/// - [gzipInit]: start time of GZip encoding, required for timing
-/// - [serverTimingEntryName]: label used in the `Server-Timing` header
-void _defineGZipEncodedHeaders(
-  Map<String, dynamic> headers, {
-  required int bodyLength,
-  required int compressedBodyLength,
-  required int compressionCapacity,
-  bool addCompressionRatioHeader = true,
-  bool addServerTiming = true,
-  DateTime? gzipInit,
-  String serverTimingEntryName = 'obj-json-gzip',
-}) {
-  headers[HttpHeaders.contentEncodingHeader] = 'gzip';
-  headers[HttpHeaders.contentLengthHeader] = compressedBodyLength.toString();
-
-  if (addCompressionRatioHeader) {
-    var compressionRatio = compressedBodyLength / bodyLength;
-
-    var compressionRatioStr = '$compressionRatio';
-    if (compressionRatioStr.length > 6) {
-      compressionRatioStr = compressionRatio.toStringAsFixed(4);
-    }
-
-    headers['X-Compression-Ratio'] =
-        '$compressionRatioStr ($compressedBodyLength/$bodyLength/$compressionCapacity)';
-  }
-
-  if (addServerTiming && gzipInit != null) {
-    const headerServerTiming = 'server-timing';
-
-    var gzipTime = DateTime.now().difference(gzipInit);
-    var dur = gzipTime.inMicroseconds / 1000;
-
-    var serverTiming2 = StringBuffer();
-
-    var serverTiming = headers[headerServerTiming]?.toString();
-    if (serverTiming != null && serverTiming.isNotEmpty) {
-      serverTiming2.write(serverTiming);
-      serverTiming2.write(',');
-    }
-
-    serverTiming2.write(serverTimingEntryName);
-    serverTiming2.write(';dur=');
-    serverTiming2.write(dur);
-
-    headers[headerServerTiming] = serverTiming2.toString();
   }
 }

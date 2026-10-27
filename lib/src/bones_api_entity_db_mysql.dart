@@ -1139,9 +1139,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
       return error;
     } else if (error is MySqlException) {
       if (error.errorNumber == 1062) {
-        var keyMatch = RegExp(
-          r"for key '(?:(\w+)\.(.*?)|(.*?))'",
-        ).firstMatch(error.message);
+        var keyMatch = RegExp(r"for key '(?:(\w+)\.(.*?)|(.*?))'")
+            .firstMatch(error.message);
 
         String? tableName;
         String? fieldName;

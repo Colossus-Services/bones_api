@@ -1,3 +1,82 @@
+## 1.28.0
+
+- Brotli (`br`) response compression, using `brotli_fast` (pure Dart),
+  next to GZip:
+  - The encoding is negotiated with the request's `Accept-Encoding`
+    (q-values, `q=0` and `*` respected): the best one in
+    `APIServerConfig.compressionEncodings` (default `[br, gzip]`; on a tie
+    the server order wins).
+  - API responses (JSON included) are compressed in one place, with the
+    headers of the final response (`compressResponse`), and static files
+    by `createCompressionMiddleware`. `HEAD` responses only get the `Vary`.
+  - A large Brotli or GZip encoding runs in a background `Isolate`
+    (`APIBrotli.encodeAsync`, `APIGZip.encodeAsync`), not blocking the
+    server's event loop: from about 1.5ms of encoding
+    (`APIBrotli.isolateMinLength`: 32 KB at quality `9`+, 64 KB at `6`+,
+    256 KB below; `APIGZip.isolateMinLength`: 192 KB at level `9`, 384 KB at
+    `6`+, 768 KB below). Concurrent requests for the same cached file share
+    one encoding.
+  - The encodings run in `compressionIsolatePool` (shared by Brotli and
+    GZip), a new `APIIsolatePool` (`bones_api_utils_isolate_pool.dart`):
+    long-lived workers (the Brotli encoder tables are initialized once per
+    worker, ~2.5ms saved per encoding at quality `9`), at most
+    `maxIsolates` (default: half of the processors divided by the server
+    workers, `2..4`, `APIIsolatePool.defaultMaxIsolatesFor`; set by each
+    `APIServerWorker`, `configureCompressionIsolatePool`) with the other
+    encodings queued, and workers idle for `idleTimeout` (default 30s) exit.
+    With 30 concurrent 256 KB q9 encodings, the event loop stalls at most
+    ~2ms (~60-100ms spawning an isolate per encoding, ~400ms encoding
+    inline); with 30 concurrent 1 MB GZip level `4`, ~2ms (~67ms inline).
+  - The static files cache keeps the identity, `gzip` and `br` variants of
+    each file (a `gzip` file is transcoded to `br` when preferred).
+  - If the Brotli encoder fails, the next accepted encoding is used (the
+    static files cache doesn't retry a failed conversion). A cached file
+    with an encoding that can't be decoded (e.g., `deflate`) is only served
+    to the requests accepting it.
+  - Static files: the higher quality (Brotli `9`+, GZip `7`) is only used
+    for the responses that will be cached (`APIServerResponseCache.isCacheable`,
+    which now checks the uncompressed length, `uncompressedContentLength`).
+- Fix: a JSON payload of 512+ bytes was always sent GZip-compressed, even
+  without `Accept-Encoding: gzip` in the request. Now it's compressed only
+  with an accepted encoding.
+  - `APIServer.resolveBody`/`resolveBodySync` called without the new
+    `compression` parameter keep the old behavior (GZip).
+- Fix: a large JSON error body (`APIResponse.error`) was GZip-compressed
+  without a `Content-Encoding` header. Now it's compressed once, with it.
+- Fix: responses without a full body (`206 Partial Content`, a
+  `Content-Range`, `204`, `304`) are not compressed (`Range` requests of
+  static files).
+- Fix: a cached compressed `404` body is served with its `Content-Encoding`,
+  and only to requests accepting it.
+- `Accept-Encoding` is parsed (it was a substring match: `gzip;q=0` was
+  taken as accepting `gzip`). `x-gzip` is taken as `gzip`.
+- `Vary: Accept-Encoding` is sent with responses that can be compressed.
+- `APIServerConfig`:
+  - `compressionEncodings` (`--compression-encodings br,gzip`,
+    `server.compression_encodings`): an empty list, `false` (or `none`,
+    `off`, `no`) disables the response compression (also the `HttpServer.autoCompress` GZip, which is
+    disabled when `gzip` is not listed). Unknown encodings are ignored
+    (logged); if none is known, the defaults are used.
+  - `brotliQuality` (`--brotli-quality 5`, `server.brotli_quality`;
+    `0..11`, default `5`). Cached static files use at least `9`
+    (and GZip level `7`, as before).
+- Request payloads with `Content-Encoding: br` are decompressed
+  (`decompressPayload`), with `maxPayloadLength` enforced while decoding
+  (`APIServer.defaultMaxBrotliPayloadLength`, 64 MB, if not defined: a few
+  bytes of Brotli can decode to GBs). Decoded in the `compressionIsolatePool`
+  (`APIBrotli.decodeAsync`), not blocking the event loop.
+- New `bones_api_utils_compression.dart` (exported by
+  `bones_api_server.dart`): `APIContentEncoding`, `APIResponseCompression`,
+  `APIBrotli`, `APIGZip`, `compressionIsolatePool`,
+  `configureCompressionIsolatePool`, `parseAcceptEncoding`,
+  `resolveContentEncoding`, `normalizeContentCoding`, `compressResponse`,
+  `createCompressionMiddleware`, `mergeVaryHeader`. And
+  `bones_api_utils_isolate_pool.dart`: `APIIsolatePool`.
+- **Dart SDK `>=3.13.5`** (required by `brotli_fast`).
+  - Sources reformatted for the 3.13 language version, and
+    `prefer_initializing_formals` applied (private named parameters: the
+    public parameter names are unchanged).
+
 ## 1.27.2
 
 - `APICronStoreDB.buildRepositories` returns `List<DBSQLEntityRepository>`

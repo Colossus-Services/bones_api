@@ -308,31 +308,27 @@ void main() {
       expect(j0['email'], equals(user1.email));
       expect(j0['password'], equals(user1.password));
 
-      var j1 =
-          Json.toJson(
-                user1,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j1['id'], equals(101));
       expect(j1['email'], equals(user1.email));
       expect(j1['password'], isNull);
 
-      var j2 =
-          Json.toJson(
-                user2,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j2['id'], equals(102));
       expect(j2['email'], isNull);
@@ -410,31 +406,27 @@ void main() {
       expect(j0['email'], equals(user1.email));
       expect(j0['password'], equals(user1.password));
 
-      var j1 =
-          Json.toJson(
-                user1,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j1['id'], equals(101));
       expect(j1['email'], equals(user1.email));
       expect(j1['password'], isNull);
 
-      var j2 =
-          Json.toJson(
-                user2,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j2['id'], equals(102));
       expect(j2['email'], equals('@'));
@@ -514,31 +506,27 @@ void main() {
       expect(j0['email'], equals(user1.email));
       expect(j0['password'], equals(user1.password));
 
-      var j1 =
-          Json.toJson(
-                user1,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j1 = Json.toJson(
+        user1,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j1['id'], equals(101));
       expect(j1['email'], equals(user1.email));
       expect(j1['password'], isNull);
 
-      var j2 =
-          Json.toJson(
-                user2,
-                toEncodableProvider: (o) => r1.toJsonEncodable(
-                  apiRequest,
-                  Json.defaultToEncodableJsonProvider(),
-                  o,
-                ),
-              )
-              as Map;
+      var j2 = Json.toJson(
+        user2,
+        toEncodableProvider: (o) => r1.toJsonEncodable(
+          apiRequest,
+          Json.defaultToEncodableJsonProvider(),
+          o,
+        ),
+      ) as Map;
 
       expect(j2['id'], equals(102));
       expect(j2['email'], equals('@'));

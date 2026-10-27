@@ -741,9 +741,8 @@ x-.png = b.png
       try {
         var outsideAliases = File(pack_path.join(outside.path, 'aliases'))
           ..writeAsStringSync('./ = sections/\n');
-        Link(
-          pack_path.join(root.path, 'icons', '.aliases'),
-        ).createSync(outsideAliases.path);
+        Link(pack_path.join(root.path, 'icons', '.aliases'))
+            .createSync(outsideAliases.path);
 
         var aliases = newAliases();
         expect(resolve(aliases, 'icons/food.png'), isNull);
@@ -879,9 +878,8 @@ x-.png = b.png
       docRoot = await Directory.systemTemp.createTemp('bones_api_aliases_www_');
       outside = await Directory.systemTemp.createTemp('bones_api_aliases_out_');
 
-      File(
-        pack_path.join(outside.path, 'secret.txt'),
-      ).writeAsStringSync('SECRET');
+      File(pack_path.join(outside.path, 'secret.txt'))
+          .writeAsStringSync('SECRET');
 
       _write(docRoot, 'index.html', '<html>ROOT</html>');
       _write(docRoot, 'icons/sections/food.png', 'FOOD-PNG');
@@ -911,9 +909,8 @@ garbage line
       _write(docRoot, '.aliases', 'logo.svg = icons/vector/a/b/logo.svg\n');
       _write(docRoot, 'icons/sections/.aliases', 'special.png = food.png\n');
 
-      Link(
-        pack_path.join(docRoot.path, 'icons', 'sections', 'secret.txt'),
-      ).createSync(pack_path.join(outside.path, 'secret.txt'));
+      Link(pack_path.join(docRoot.path, 'icons', 'sections', 'secret.txt'))
+          .createSync(pack_path.join(outside.path, 'secret.txt'));
 
       port = await resolveFreePort(6700);
 

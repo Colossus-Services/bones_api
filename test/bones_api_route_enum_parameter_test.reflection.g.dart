@@ -90,7 +90,7 @@ class Currency$reflection extends EnumReflection<Currency>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   Currency$reflection withObject([Currency? obj]) => Currency$reflection(obj);
@@ -174,7 +174,7 @@ class ExternalIntegrationModule$reflection
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   ExternalIntegrationModule$reflection withObject([
@@ -1196,7 +1196,7 @@ class PaymentType$reflection extends EnumReflection<PaymentType>
   }
 
   @override
-  Version get languageVersion => Version.parse('3.10.0');
+  Version get languageVersion => Version.parse('3.13.0');
 
   @override
   PaymentType$reflection withObject([PaymentType? obj]) =>

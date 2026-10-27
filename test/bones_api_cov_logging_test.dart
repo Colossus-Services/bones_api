@@ -345,9 +345,8 @@ void main() {
       logAllTo(messageLogger: (l, m) => all.add(m));
       expect(LoggerHandler.root.isLoggingAll, isTrue);
 
-      logging.Logger(
-        'cov.a-very-long-logger-name-to-truncate.xxxxxxxxxxxxxxxx',
-      ).info('long-name-message', StateError('err'), StackTrace.current);
+      logging.Logger('cov.a-very-long-logger-name-to-truncate.xxxxxxxxxxxxxxxx')
+          .info('long-name-message', StateError('err'), StackTrace.current);
       await _pump(20);
 
       var msg = all.firstWhere((m) => m.contains('long-name-message'));
@@ -370,9 +369,9 @@ void main() {
         platform.setProperty('bones_api.log.max_file_length', '1234');
         platform.setProperty('bones_api.log.max_rotation_files', '3');
 
-        var handler =
-            LoggerHandler.create(logging.Logger('cov.io.props'))
-                as LoggerHandlerIO;
+        var handler = LoggerHandler.create(
+          logging.Logger('cov.io.props'),
+        ) as LoggerHandlerIO;
         expect(handler.logMaxFileLength, equals(1234));
         expect(handler.logMaxRotationFiles, equals(3));
       } finally {

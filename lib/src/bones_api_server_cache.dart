@@ -14,6 +14,7 @@ import 'package:shelf/src/message.dart';
 import 'package:shelf_gzip/shelf_gzip.dart';
 
 import 'bones_api_extension_io.dart';
+import 'bones_api_utils_compression.dart';
 
 final _log = logging.Logger('APIServerResponseCache');
 
@@ -37,10 +38,20 @@ class APIServerResponseCache {
   /// The timeout of a resolved [File.stat].
   final Duration fileStatTimeout;
 
+  /// The default [compression]: compressed once and cached, so it uses
+  /// a high Brotli quality.
+  static const APIResponseCompression defaultCompression =
+      APIResponseCompression(brotliQuality: 9);
+
+  /// The compression used to create the compressed alternatives of the
+  /// cached responses, negotiated with the request's `Accept-Encoding`.
+  final APIResponseCompression compression;
+
   APIServerResponseCache({
     int maxContentLength = defaultMaxContentLength,
     int maxMemorySize = defaultMaxMemorySize,
     this.fileStatTimeout = _FileStat.defaultStatTimeout,
+    this.compression = defaultCompression,
   }) : maxContentLength = maxContentLength.clamp(0, 1024 * 1024 * 1024 * 8),
        maxMemorySize = maxMemorySize.clamp(
          1024 * 1024,
@@ -356,23 +367,37 @@ class APIServerResponseCache {
 
     return cached200.resolveMapped((cached200) {
       var cachedEntries = cached200.asCachedEntries;
+      if (cachedEntries == null || cachedEntries.isEmpty) return null;
 
-      var cached2 = cachedEntries.resolveAlternative(request);
-      if (cached2 == null) return null;
+      return cachedEntries.resolveAlternative(request).resolveMapped((cached2) {
+        if (cached2 == null) return null;
 
-      assert(cached2.validate(request));
-      _put(cached2);
+        assert(cached2.validate(request));
 
-      if (cached2 is _CachedResponse200) {
-        var cachedResponse304 = cached2.asCachedResponse304;
-        if (cachedResponse304 != null) {
-          _put(cachedResponse304);
+        // Only if still cached: the file may have been modified while
+        // the alternative was encoded (asynchronously):
+        if (_isCached(cachedEntries.first)) {
+          _put(cached2);
+
+          if (cached2 is _CachedResponse200) {
+            var cachedResponse304 = cached2.asCachedResponse304;
+            if (cachedResponse304 != null) {
+              _put(cachedResponse304);
+            }
+          }
         }
-      }
 
-      return cached2.toResponse(request);
+        return cached2.toResponse(request);
+      });
     });
   }
+
+  /// Returns `true` if [cachedResponse] is still in the cache.
+  bool _isCached(_CachedResponse cachedResponse) =>
+      _cachedResponses[cachedResponse.key]?.asCachedEntries?.any(
+        (e) => identical(e, cachedResponse),
+      ) ??
+      false;
 
   FutureOr<Response?> _getCachedResponse404(
     Request request,
@@ -397,14 +422,21 @@ class APIServerResponseCache {
     }
   }
 
-  Future<Response>? _cacheResponse200(Request request, Response response) {
-    var method = request.method;
-    if (method != 'GET') {
-      return null;
-    }
+  /// Returns `true` if the `200` [response] for [request] will be cached:
+  /// a `GET` with a known `Content-Length` up to [maxContentLength].
+  ///
+  /// The uncompressed length is used ([uncompressedContentLength]), so the
+  /// result is the same before and after [compressResponse] (the cached
+  /// alternatives can also be uncompressed).
+  bool isCacheable(Request request, Response response) {
+    if (response.statusCode != 200 || request.method != 'GET') return false;
 
-    var contentLength = response.contentLength;
-    if (contentLength == null || contentLength > maxContentLength) return null;
+    var contentLength = uncompressedContentLength(response);
+    return contentLength != null && contentLength <= maxContentLength;
+  }
+
+  Future<Response>? _cacheResponse200(Request request, Response response) {
+    if (!isCacheable(request, response)) return null;
 
     var path = request.url.path;
 
@@ -428,6 +460,7 @@ class APIServerResponseCache {
       content: content,
       contentEncoding: contentEncoding,
       encoding: encoding,
+      compression: compression,
     );
 
     assert(cachedResponse.statusCode == 200);
@@ -869,7 +902,7 @@ abstract class _CachedResponse
     Duration timeout = _FileStat.defaultStatTimeout,
   }) => fileStat?.isFileModifiedAsync(timeout: timeout) ?? false;
 
-  _CachedResponse? resolveAlternative(Request request) => null;
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) => null;
 
   Response? toValidResponse(Request request, DateTime? requestInitTime) {
     if (validate(request)) {
@@ -979,39 +1012,67 @@ abstract class _CachedResponseWithBody extends _CachedResponse {
 
   Body createBody() => Body(content, encoding);
 
-  bool get isCompressedContent => contentEncoding == 'gzip';
-
-  static final _defaultGzipDecoder = ZLibDecoder();
-
-  Uint8List? decompressContent() {
-    final content = this.content;
-    if (content == null || encoding != null) return null;
-
+  bool get isCompressedContent {
     final contentEncoding = this.contentEncoding;
-    if (contentEncoding == null) return content;
-
-    if (contentEncoding == 'gzip') {
-      return _defaultGzipDecoder.convert(content).asUint8List;
-    }
-
-    return null;
+    return contentEncoding != null &&
+        contentEncoding.isNotEmpty &&
+        contentEncoding != 'identity';
   }
 
-  static final _defaultGzipEncoder = ZLibEncoder(gzip: true, level: 4);
+  /// The [contentEncoding] as an [APIContentEncoding]
+  /// (`null` if not compressed or not supported).
+  APIContentEncoding? get contentEncodingType =>
+      APIContentEncoding.parse(contentEncoding);
 
-  (Uint8List, String)? compressContent() {
-    final content = this.content;
-    if (content == null || encoding != null) return null;
+  /// Set if the compressed [content] failed to be decompressed.
+  bool _undecodable = false;
 
-    final contentEncoding = this.contentEncoding;
-    if (contentEncoding != null) {
-      if (contentEncoding == 'gzip') return (content, 'gzip');
+  /// Returns `true` if [content] can be converted to another encoding
+  /// (or decompressed): a binary content, not compressed or compressed
+  /// with a supported encoding that decodes.
+  bool get isConvertible =>
+      content != null &&
+      encoding == null &&
+      !_undecodable &&
+      (!isCompressedContent || contentEncodingType != null);
+
+  Uint8List? decompressContent() {
+    if (!isConvertible) return null;
+
+    final content = this.content!;
+    if (!isCompressedContent) return content;
+
+    try {
+      return decodeContent(content, contentEncodingType!);
+    } catch (e, s) {
+      _undecodable = true;
+      _log.warning(
+        "Can't decompress cached `$contentEncoding` content: $path",
+        e,
+        s,
+      );
       return null;
     }
+  }
 
-    var compressed = _defaultGzipEncoder.convert(content).asUint8List;
+  /// Compresses [content] to [targetEncoding], decompressing it first if
+  /// it's compressed with another encoding. A large Brotli encoding runs
+  /// in a background `Isolate` ([APIResponseCompression.encodeAsync]).
+  ///
+  /// Returns `null` if [content] is not [isConvertible] or the encoding
+  /// fails (check [isConvertible] to tell them apart).
+  FutureOr<Uint8List?> compressContent(
+    APIContentEncoding targetEncoding,
+    APIResponseCompression compression,
+  ) {
+    if (!isConvertible) return null;
 
-    return (compressed, 'gzip');
+    if (contentEncoding == targetEncoding.headerValue) return content;
+
+    final decompressed = decompressContent();
+    if (decompressed == null) return null;
+
+    return compression.encodeAsync(decompressed, targetEncoding);
   }
 
   @override
@@ -1036,69 +1097,166 @@ class _CachedResponse200 extends _CachedResponseWithBody {
     super.content,
     super.contentEncoding,
     super.encoding,
-  }) : super(statusCode: 200);
+    this.compression = APIServerResponseCache.defaultCompression,
+    Set<APIContentEncoding>? failedEncodings,
+  }) : _failedEncodings = failedEncodings ?? {},
+       super(statusCode: 200);
+
+  /// The compression used to resolve and create the alternatives.
+  final APIResponseCompression compression;
 
   @override
   int _computeMemorySize() =>
       super._computeMemorySize() + (8 + headers.memorySize);
 
+  /// A copy of [headers] for an alternative with [contentLength]
+  /// and [contentEncoding] (removed if `null`).
+  Map<String, List<String>> _alternativeHeaders(
+    int contentLength,
+    String? contentEncoding,
+  ) {
+    var headers2 = Map<String, List<String>>.from(headers);
+
+    headers2.removeWhere(
+      (k, _) =>
+          equalsIgnoreAsciiCase(k, HttpHeaders.contentEncodingHeader) ||
+          equalsIgnoreAsciiCase(k, HttpHeaders.contentLengthHeader) ||
+          equalsIgnoreAsciiCase(k, 'X-Compression-Ratio'),
+    );
+
+    if (contentEncoding != null) {
+      headers2[HttpHeaders.contentEncodingHeader] = [contentEncoding];
+    }
+
+    headers2[HttpHeaders.contentLengthHeader] = ['$contentLength'];
+
+    var varyKey =
+        headers2.keys.firstWhereOrNull(
+          (k) => equalsIgnoreAsciiCase(k, HttpHeaders.varyHeader),
+        ) ??
+        HttpHeaders.varyHeader;
+
+    headers2[varyKey] = [mergeVaryHeader(headers2[varyKey], 'Accept-Encoding')];
+
+    return headers2;
+  }
+
   _CachedResponse200? decompressedCopy() {
     var decompressContent = this.decompressContent();
     if (decompressContent == null) return null;
 
-    var headers2 = Map<String, List<String>>.from(headers);
-
-    headers2.remove(HttpHeaders.contentEncodingHeader);
-
-    headers2[HttpHeaders.contentLengthHeader] = ['${decompressContent.length}'];
-
     return _CachedResponse200(
       path: path,
       file: file,
       fileStat: fileStat,
-      headers: headers2,
+      headers: _alternativeHeaders(decompressContent.length, null),
       content: decompressContent,
+      compression: compression,
+      failedEncodings: _failedEncodings,
     );
   }
 
-  _CachedResponse200? compressedCopy() {
-    var compressed = this.compressContent();
-    if (compressed == null) return null;
+  /// The encodings that failed to be created from this content
+  /// (e.g., a Brotli encoder error): not tried again. Shared with the
+  /// alternatives created from it (same representation), so they don't
+  /// prefer (and retry) a failed encoding.
+  final Set<APIContentEncoding> _failedEncodings;
 
-    var (compressContent, compressedEncoding) = compressed;
+  /// The [compressedCopy]s being encoded (asynchronously), shared by
+  /// concurrent requests.
+  final Map<APIContentEncoding, Future<_CachedResponse200?>> _pendingCopies =
+      {};
 
-    var headers2 = Map<String, List<String>>.from(headers);
+  FutureOr<_CachedResponse200?> compressedCopy(
+    APIContentEncoding targetEncoding,
+  ) {
+    if (_failedEncodings.contains(targetEncoding)) return null;
 
-    headers2[HttpHeaders.contentEncodingHeader] = [compressedEncoding];
+    var pending = _pendingCopies[targetEncoding];
+    if (pending != null) return pending;
 
-    headers2[HttpHeaders.contentLengthHeader] = ['${compressContent.length}'];
+    var compressed = compressContent(targetEncoding, compression);
+
+    if (compressed is Future<Uint8List?>) {
+      return _pendingCopies[targetEncoding] = compressed
+          .then((compressed) => _compressedCopyFrom(targetEncoding, compressed))
+          .whenComplete(() {
+            // Not `=>`: `remove` returns this `Future`, and `whenComplete`
+            // would wait for it (itself).
+            _pendingCopies.remove(targetEncoding);
+          });
+    }
+
+    return _compressedCopyFrom(targetEncoding, compressed);
+  }
+
+  _CachedResponse200? _compressedCopyFrom(
+    APIContentEncoding targetEncoding,
+    Uint8List? compressContent,
+  ) {
+    if (compressContent == null) {
+      // Not an encoder failure if this content can't be converted at all
+      // (e.g., an unsupported or corrupted source encoding):
+      if (isConvertible) {
+        _failedEncodings.add(targetEncoding);
+      }
+      return null;
+    }
+
+    var compressedEncoding = targetEncoding.headerValue;
 
     return _CachedResponse200(
       path: path,
       file: file,
       fileStat: fileStat,
-      headers: headers2,
+      headers: _alternativeHeaders(compressContent.length, compressedEncoding),
       content: compressContent,
       contentEncoding: compressedEncoding,
+      compression: compression,
+      failedEncodings: _failedEncodings,
+    );
+  }
+
+  /// The best encoding for [request] (`null` for no compression),
+  /// excluding the [_failedEncodings].
+  APIContentEncoding? _requestEncoding(Request request) {
+    final accepted = request.acceptedEncodings;
+    if (_failedEncodings.isEmpty) {
+      return compression.resolveAcceptedEncoding(accepted);
+    }
+
+    return resolveContentEncodingFrom(
+      accepted,
+      compression.encodings
+          .where((e) => !_failedEncodings.contains(e))
+          .toList(),
     );
   }
 
   @override
   bool validate(Request request) {
-    final contentEncoding = this.contentEncoding;
-
-    if (contentEncoding != null) {
+    if (isCompressedContent) {
+      final contentEncoding = this.contentEncoding!;
       if (!request.requestAcceptsEncoding(contentEncoding)) {
         return false;
       }
-    } else if (request.requestAcceptsGzipEncoding() && shouldGzipCompress()) {
+
+      // A better encoding is preferred and this content can be converted:
+      final best = _requestEncoding(request);
+      if (best != null &&
+          best.headerValue != contentEncoding &&
+          isConvertible) {
+        return false;
+      }
+    } else if (shouldCompress() && _requestEncoding(request) != null) {
       return false;
     }
 
     return true;
   }
 
-  bool shouldGzipCompress() {
+  /// Returns `true` if the (uncompressed) content should be compressed.
+  bool shouldCompress() {
     var contentLength = this.contentLength;
     if (contentLength < 1024) {
       return false;
@@ -1117,17 +1275,28 @@ class _CachedResponse200 extends _CachedResponseWithBody {
   }
 
   @override
-  _CachedResponse? resolveAlternative(Request request) {
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) {
+    final best = _requestEncoding(request);
+
     if (isCompressedContent) {
-      if (!request.requestAcceptsEncoding(contentEncoding!)) {
-        return decompressedCopy();
+      if (best != null && best.headerValue != contentEncoding) {
+        return compressedCopy(best)
+            .resolveMapped((copy) => copy ?? _decompressedAlternative(request));
       }
-    } else if (request.requestAcceptsGzipEncoding() && shouldGzipCompress()) {
-      return compressedCopy();
+
+      return _decompressedAlternative(request);
+    } else if (best != null && shouldCompress()) {
+      return compressedCopy(best);
     }
 
     return null;
   }
+
+  /// The [decompressedCopy] if [request] doesn't accept [contentEncoding].
+  _CachedResponse200? _decompressedAlternative(Request request) =>
+      request.requestAcceptsEncoding(contentEncoding!)
+      ? null
+      : decompressedCopy();
 
   @override
   Response toResponse(Request request, {DateTime? requestInitTime}) {
@@ -1250,8 +1419,13 @@ class _CachedResponse404 extends _CachedResponseWithBody {
     this.server,
   }) : super(statusCode: 404, fileStat: _FileStat.notFoundFrom(file));
 
+  /// A compressed 404 body (by the compression middleware) is only
+  /// valid for a request that accepts its encoding.
   @override
   bool validate(Request request) {
+    if (isCompressedContent) {
+      return request.requestAcceptsEncoding(contentEncoding!);
+    }
     return true;
   }
 
@@ -1260,9 +1434,14 @@ class _CachedResponse404 extends _CachedResponseWithBody {
     markUsage();
 
     final server = this.server;
+    final contentEncoding = isCompressedContent ? this.contentEncoding : null;
 
     var headers = <String, List<String>>{
       if (server != null) 'Server': [server],
+      if (contentEncoding != null) ...{
+        HttpHeaders.contentEncodingHeader: [contentEncoding],
+        HttpHeaders.varyHeader: ['Accept-Encoding'],
+      },
     };
 
     configureMetricsHeaders(headers, requestInitTime: requestInitTime);
@@ -1475,13 +1654,28 @@ extension _FutureOrObjectExtension on FutureOr<Object?> {
 }
 
 extension _ListCachedResponseExtension on List<_CachedResponse>? {
-  _CachedResponse? resolveAlternative(Request request) {
+  FutureOr<_CachedResponse?> resolveAlternative(Request request) {
     final self = this;
     if (self == null) return null;
 
-    for (var cached in self) {
-      var cached2 = cached.resolveAlternative(request);
-      if (cached2 != null) {
+    return _resolveAlternativeFrom(self, 0, request);
+  }
+
+  static FutureOr<_CachedResponse?> _resolveAlternativeFrom(
+    List<_CachedResponse> entries,
+    int start,
+    Request request,
+  ) {
+    for (var i = start; i < entries.length; ++i) {
+      var cached2 = entries[i].resolveAlternative(request);
+
+      if (cached2 is Future<_CachedResponse?>) {
+        final next = i + 1;
+        return cached2.then(
+          (cached2) =>
+              cached2 ?? _resolveAlternativeFrom(entries, next, request),
+        );
+      } else if (cached2 != null) {
         return cached2;
       }
     }
@@ -1520,13 +1714,20 @@ extension _RequestExtension on Request {
   String? get ifModifiedSinceHeader =>
       headers[HttpHeaders.ifModifiedSinceHeader];
 
-  bool requestAcceptsGzipEncoding() => requestAcceptsEncoding('gzip');
+  /// The parsed `Accept-Encoding` ([parseAcceptEncoding]), parsed once
+  /// per [Request].
+  Map<String, double> get acceptedEncodings =>
+      _requestAcceptedEncodings[this] ??= parseAcceptEncoding(
+        headers[HttpHeaders.acceptEncodingHeader],
+      );
 
-  bool requestAcceptsEncoding(String contentEncoding) {
-    var acceptEncoding = headers[HttpHeaders.acceptEncodingHeader];
-    return acceptEncoding?.contains(contentEncoding) ?? false;
-  }
+  bool requestAcceptsEncoding(String contentEncoding) =>
+      acceptsContentEncodingFrom(acceptedEncodings, contentEncoding);
 }
+
+final _requestAcceptedEncodings = Expando<Map<String, double>>(
+  'acceptedEncodings',
+);
 
 extension _ResponseExtension on Response {
   String get contentLengthHeader =>

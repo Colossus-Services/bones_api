@@ -60,9 +60,9 @@ void main() {
       expect(userModule.allRoutesNames, equals({...userRoutes}));
 
       {
-        var apiRootInfoJson = (await apiRoot.call(
-          APIRequest.get('/API-INFO'),
-        )).payloadAs<APIRootInfo>().toJson();
+        var apiRootInfoJson = (await apiRoot.call(APIRequest.get('/API-INFO')))
+            .payloadAs<APIRootInfo>()
+            .toJson();
 
         expect(
           Map.from(apiRootInfoJson)..remove('modules'),
@@ -70,9 +70,10 @@ void main() {
         );
 
         expect(
-          List.from(
-            apiRootInfoJson['modules'],
-          ).cast<Map>().map((e) => e['name']).toList(),
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map((e) => e['name'])
+              .toList(),
           equals(['about', 'user']),
         );
 
@@ -80,9 +81,11 @@ void main() {
           List.from(apiRootInfoJson['modules'])
               .cast<Map>()
               .map(
-                (e) => List.from(
-                  e['routes'],
-                ).cast<Map>().map((e) => e['name']).toList(),
+                (e) =>
+                    List.from(e['routes'])
+                        .cast<Map>()
+                        .map((e) => e['name'])
+                        .toList(),
               )
               .toList(),
           equals([aboutRoutes, userRoutes]),
@@ -100,9 +103,10 @@ void main() {
         );
 
         expect(
-          List.from(
-            apiRootInfoJson['modules'],
-          ).cast<Map>().map((e) => e['name']).toList(),
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map((e) => e['name'])
+              .toList(),
           equals(aboutRoutes),
         );
 
@@ -110,9 +114,11 @@ void main() {
           List.from(apiRootInfoJson['modules'])
               .cast<Map>()
               .map(
-                (e) => List.from(
-                  e['routes'],
-                ).cast<Map>().map((e) => e['name']).toList(),
+                (e) =>
+                    List.from(e['routes'])
+                        .cast<Map>()
+                        .map((e) => e['name'])
+                        .toList(),
               )
               .toList(),
           equals([aboutRoutes]),
@@ -130,9 +136,10 @@ void main() {
         );
 
         expect(
-          List.from(
-            apiRootInfoJson['modules'],
-          ).cast<Map>().map((e) => e['name']).toList(),
+          List.from(apiRootInfoJson['modules'])
+              .cast<Map>()
+              .map((e) => e['name'])
+              .toList(),
           equals(['user']),
         );
 
@@ -140,9 +147,11 @@ void main() {
           List.from(apiRootInfoJson['modules'])
               .cast<Map>()
               .map(
-                (e) => List.from(
-                  e['routes'],
-                ).cast<Map>().map((e) => e['name']).toList(),
+                (e) =>
+                    List.from(e['routes'])
+                        .cast<Map>()
+                        .map((e) => e['name'])
+                        .toList(),
               )
               .toList(),
           equals([userRoutes]),
