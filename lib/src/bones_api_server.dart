@@ -2481,19 +2481,24 @@ class APIServer extends _APIServerBase {
     if (payload == null) return null;
 
     if (payload is Future) {
-      return payload.then(
-        (value) {
-          if (value == null) return null;
-          return _resolveBodyImpl(
-            value,
-            apiResponse,
-            compression,
-            acceptEncoding,
-          );
-        },
-        onError: (e, s) {
-          return apiResponse.asError(error: 'ERROR: $e\n$s');
-        },
+      // Listened in its `Zone`: an error of a `Future` created inside an
+      // `APIRoot.call` (an error `Zone`) is not delivered outside it.
+      // The result (a value, also on error) is delivered anywhere.
+      return apiResponse.runInPayloadZone(
+        () => payload.then(
+          (value) {
+            if (value == null) return null;
+            return _resolveBodyImpl(
+              value,
+              apiResponse,
+              compression,
+              acceptEncoding,
+            );
+          },
+          onError: (e, s) {
+            return apiResponse.asError(error: 'ERROR: $e\n$s');
+          },
+        ),
       );
     }
 

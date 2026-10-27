@@ -84,6 +84,17 @@ class _CovHttpModule extends APIModule {
       ),
     );
 
+    // A failing `Future` payload: resolved to another `APIResponse` (error).
+    routes.any(
+      'futureErrorBig',
+      (request) => APIResponse.ok(
+        Future<Object>.delayed(
+          Duration(milliseconds: 1),
+          () => throw StateError('FUTURE-FAILURE ${'x' * 2000}'),
+        ),
+      ),
+    );
+
     // A `Stream` payload:
     routes.any(
       'stream',
@@ -406,6 +417,71 @@ void main() {
         );
         expect((json.decode(_bodyStr(res)) as List).length, equals(300));
       }
+    });
+
+    test('failing `Future` payload: 500, compressed once', () async {
+      // It used to hang: the error of a `Future` created in the `APIRoot`
+      // call `Zone` was not delivered to `resolveBody`.
+      var res = await _request(
+        '${apiServer.url}cov/futureErrorBig',
+        noAcceptEncoding: true,
+      ).timeout(const Duration(seconds: 10));
+      expect(res.status, equals(500));
+      expect(res.headers.value('content-encoding'), isNull);
+      expect(utf8.decode(res.body), contains('FUTURE-FAILURE'));
+
+      for (var encoding in ['br', 'gzip']) {
+        var res2 = await _request(
+          '${apiServer.url}cov/futureErrorBig',
+          headers: {'accept-encoding': encoding},
+        ).timeout(const Duration(seconds: 10));
+        expect(res2.status, equals(500));
+        expect(res2.headers.value('content-encoding'), equals(encoding));
+        expect(
+          res2.headers.value('content-length'),
+          equals('${res2.body.length}'),
+        );
+        expect(_bodyStr(res2), contains('FUTURE-FAILURE'), reason: encoding);
+      }
+    });
+
+    test('`payloadZone`: a failing `Future` payload, `resolveBody`', () async {
+      var apiRoot = apiServer.apiRoot;
+
+      var r = await apiRoot.call(APIRequest.get('/cov/futureErrorBig'));
+      expect(r.payload, isA<Future>());
+      expect(r.payloadZone, isNotNull);
+      expect(r.payloadZone, isNot(same(Zone.current)));
+
+      // Received (not lost as an uncaught error of the call `Zone`):
+      var body = await Future.value(APIServer.resolveBody(r.payload, r))
+          .timeout(const Duration(seconds: 10));
+      expect(body, isA<APIResponse>());
+      var error = body as APIResponse;
+      expect(error.status, equals(APIResponseStatus.ERROR));
+      expect('${error.error}', contains('FUTURE-FAILURE'));
+
+      // A successful `Future` payload:
+      var rOk = await apiRoot.call(APIRequest.get('/cov/futureBig'));
+      expect(rOk.payloadZone, isNotNull);
+      var bodyOk = await Future.value(
+        APIServer.resolveBody(
+          rOk.payload,
+          rOk,
+          compression: APIResponseCompression.none,
+        ),
+      );
+      expect(
+        (json.decode(utf8.decode(bodyOk as List<int>)) as List).length,
+        equals(300),
+      );
+
+      // Not a `Future` payload: no `payloadZone`, `runInPayloadZone` runs
+      // in the current `Zone`.
+      var rText = await apiRoot.call(APIRequest.get('/cov/bigText'));
+      expect(rText.payloadZone, isNull);
+      expect(rText.runInPayloadZone(() => Zone.current), same(Zone.current));
+      expect(r.runInPayloadZone(() => Zone.current), same(r.payloadZone));
     });
 
     test('`Stream` payload: compressed (buffered)', () async {

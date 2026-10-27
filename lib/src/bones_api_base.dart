@@ -969,6 +969,11 @@ abstract class APIRoot with Initializable, Closable {
 
     response._apiRequest = request;
 
+    // Its errors can only be listened in `callZone` (see `payloadZone`):
+    if (response.payload is Future) {
+      response._payloadZone = callZone;
+    }
+
     return response;
   }
 
@@ -3102,6 +3107,22 @@ class APIResponse<T> extends APIMetricSet with APIPayload {
   /// Returns the [APIRequest] of this response.
   /// - Defined only at the end of an [APIRoot.call].
   APIRequest? get apiRequest => _apiRequest;
+
+  Zone? _payloadZone;
+
+  /// The [Zone] where a [Future] [payload] was created: the error [Zone] of
+  /// the [APIRoot.call]. An error of that [Future] is only delivered to the
+  /// listeners registered inside it (errors don't cross error [Zone]s), so
+  /// listen to it with [runInPayloadZone].
+  /// - Defined only at the end of an [APIRoot.call], for a [Future] [payload].
+  Zone? get payloadZone => _payloadZone;
+
+  /// Runs [f] in the [payloadZone] (or the current [Zone] if not defined).
+  /// Use it to listen to a [Future] [payload], so its error is received.
+  R runInPayloadZone<R>(R Function() f) {
+    final zone = _payloadZone;
+    return zone != null ? zone.run(f) : f();
+  }
 
   /// Constructs an [APIResponse].
   ///

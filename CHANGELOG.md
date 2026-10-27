@@ -48,6 +48,12 @@
   static files).
 - Fix: a cached compressed `404` body is served with its `Content-Encoding`,
   and only to requests accepting it.
+- Fix: a request whose `APIResponse` has a failing `Future` payload never
+  got a response (it hung): the error of a `Future` created in the
+  `APIRoot.call` error `Zone` was not delivered to `APIServer.resolveBody`
+  (only logged as an uncaught error). Now it's a `500` error response.
+  - `APIResponse.payloadZone`/`runInPayloadZone`: the `Zone` where a
+    `Future` payload was created, to listen to it.
 - `Accept-Encoding` is parsed (it was a substring match: `gzip;q=0` was
   taken as accepting `gzip`). `x-gzip` is taken as `gzip`.
 - `Vary: Accept-Encoding` is sent with responses that can be compressed.
