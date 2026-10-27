@@ -183,6 +183,34 @@ APIIsolatePool compressionIsolatePool = APIIsolatePool(
   debugName: 'APICompression',
 );
 
+/// Configures the [compressionIsolatePool] of the current isolate for a
+/// server with [totalWorkers] isolates, each with its own pool:
+/// [APIIsolatePool.defaultMaxIsolatesFor] (or [maxIsolates]).
+///
+/// The pool is only replaced if unused (no isolates and nothing queued).
+/// Returns `true` if [compressionIsolatePool] has the requested size.
+bool configureCompressionIsolatePool({int totalWorkers = 1, int? maxIsolates}) {
+  maxIsolates ??= APIIsolatePool.defaultMaxIsolatesFor(workers: totalWorkers);
+
+  var pool = compressionIsolatePool;
+  if (pool.maxIsolates == maxIsolates && !pool.isClosed) return true;
+
+  if (!pool.isClosed && (pool.isolatesLength > 0 || pool.queuedLength > 0)) {
+    _log.warning(
+      "Can't resize the `compressionIsolatePool` in use to `maxIsolates: $maxIsolates`: $pool",
+    );
+    return false;
+  }
+
+  pool.close();
+  compressionIsolatePool = APIIsolatePool(
+    maxIsolates: maxIsolates,
+    idleTimeout: pool.idleTimeout,
+    debugName: pool.debugName,
+  );
+  return true;
+}
+
 /// A Brotli encoder function. See [APIBrotli.encoder].
 typedef APIBrotliEncoder = Uint8List Function(Uint8List bytes, int quality);
 
@@ -280,6 +308,46 @@ abstract final class APIBrotli {
         bytes,
         maxOutputSize: maxOutputSize ?? brotliDefaultMaxOutputSize,
       );
+
+  /// Same as [decode], but decodes in the [compressionIsolatePool] (a
+  /// background [Isolate]), for untrusted input: its decoded size can't be
+  /// known from its length (a few bytes can decode to [maxOutputSize]).
+  ///
+  /// Throws the same [BrotliException] as [decode].
+  static Future<Uint8List> decodeAsync(Uint8List bytes, {int? maxOutputSize}) {
+    final limit = maxOutputSize ?? brotliDefaultMaxOutputSize;
+
+    return compressionIsolatePool
+        .run(() => _decodeInIsolate(bytes, limit))
+        .then((result) {
+          var (decoded, code, message, inputOffset) = result;
+          if (decoded != null) return decoded;
+
+          throw BrotliException(
+            BrotliErrorCode.values.byName(code!),
+            message ?? '',
+            inputOffset: inputOffset,
+          );
+        });
+  }
+
+  /// Returns the decoded bytes, or the [BrotliException] fields (an
+  /// exception thrown in an [Isolate] would be received as a [RemoteError]).
+  static (Uint8List?, String?, String?, int?) _decodeInIsolate(
+    Uint8List bytes,
+    int maxOutputSize,
+  ) {
+    try {
+      return (
+        brotliDecode(bytes, maxOutputSize: maxOutputSize),
+        null,
+        null,
+        null,
+      );
+    } on BrotliException catch (e) {
+      return (null, e.code.name, e.message, e.inputOffset);
+    }
+  }
 }
 
 /// GZip encoding, using the `dart:io` `zlib` (native, but synchronous:

@@ -73,6 +73,28 @@ class _CovHttpModule extends APIModule {
 
     routes.any('bigText', (request) => APIResponse.ok('TEXT ' * 500));
 
+    // A `Future` payload:
+    routes.any(
+      'futureBig',
+      (request) => APIResponse.ok(
+        Future.delayed(
+          Duration(milliseconds: 1),
+          () => List.generate(300, (i) => {'id': i, 'name': 'item $i'}),
+        ),
+      ),
+    );
+
+    // A `Stream` payload:
+    routes.any(
+      'stream',
+      (request) => APIResponse.ok(
+        Stream<List<int>>.fromIterable([
+          for (var i = 0; i < 50; ++i) utf8.encode('chunk $i ' * 10),
+        ]),
+        mimeType: 'text/plain',
+      ),
+    );
+
     routes.any(
       'errorBig',
       (request) => APIResponse.error(
@@ -368,6 +390,63 @@ void main() {
           reason: encoding,
         );
       }
+    });
+
+    test('`Future` payload: compressed', () async {
+      for (var encoding in ['br', 'gzip']) {
+        var res = await _request(
+          '${apiServer.url}cov/futureBig',
+          headers: {'accept-encoding': encoding},
+        );
+        expect(res.status, equals(200));
+        expect(res.headers.value('content-encoding'), equals(encoding));
+        expect(
+          res.headers.value('content-length'),
+          equals('${res.body.length}'),
+        );
+        expect((json.decode(_bodyStr(res)) as List).length, equals(300));
+      }
+    });
+
+    test('`Stream` payload: compressed (buffered)', () async {
+      var expected = [for (var i = 0; i < 50; ++i) 'chunk $i ' * 10].join();
+
+      var res = await _request(
+        '${apiServer.url}cov/stream',
+        headers: {'accept-encoding': 'br'},
+      );
+      expect(res.status, equals(200));
+      expect(res.headers.value('content-encoding'), equals('br'));
+      expect(_bodyStr(res), equals(expected));
+
+      var res2 = await _request(
+        '${apiServer.url}cov/stream',
+        noAcceptEncoding: true,
+      );
+      expect(res2.headers.value('content-encoding'), isNull);
+      expect(utf8.decode(res2.body), equals(expected));
+    });
+
+    test('HEAD of a large JSON: no body, not compressed', () async {
+      var res = await _request(
+        '${apiServer.url}cov/big',
+        method: 'HEAD',
+        headers: {'accept-encoding': 'br, gzip'},
+      );
+      expect(res.status, equals(200));
+      expect(res.headers.value('content-encoding'), isNull);
+      expect(res.body, isEmpty);
+    });
+
+    test('compression pool: sized by the workers', () {
+      // Configured by the `APIServerWorker` start:
+      expect(
+        compressionIsolatePool.maxIsolates,
+        equals(
+          APIIsolatePool.defaultMaxIsolatesFor(workers: apiServer.totalWorkers),
+        ),
+      );
+      expect(compressionIsolatePool.maxIsolates, greaterThanOrEqualTo(2));
     });
 
     test('text + br', () async {
@@ -1141,6 +1220,103 @@ void main() {
           reason: path,
         );
         expect(_bodyStr(res2), isNotEmpty, reason: path);
+      }
+    });
+  });
+
+  group('APIServer HTTP (compressionEncodings: br)', () {
+    late Directory docRoot;
+    late APIServer serverBr;
+
+    setUpAll(() async {
+      docRoot = await Directory.systemTemp.createTemp('bones_api_cov_www_');
+      File(pack_path.join(docRoot.path, 'data.txt'))
+          .writeAsStringSync('DATA ' * 500);
+
+      serverBr = APIServer(
+        _CovHttpAPIRoot('cov-http-br-only'),
+        'localhost',
+        await resolveFreePort(6360),
+        documentRoot: docRoot.path,
+        logToConsole: false,
+        compressionEncodings: [APIContentEncoding.br],
+      );
+      await serverBr.start();
+    });
+
+    tearDownAll(() async {
+      await serverBr.stop();
+      await docRoot.delete(recursive: true);
+    });
+
+    test('br only: no GZip (also no `HttpServer.autoCompress`)', () async {
+      expect(serverBr.compressionEncodings, equals([APIContentEncoding.br]));
+
+      // Small and large responses, API and static files:
+      for (var path in ['cov/ok', 'cov/json', 'cov/big', 'data.txt']) {
+        var res = await _request(
+          '${serverBr.url}$path',
+          headers: {'accept-encoding': 'gzip'},
+        );
+        expect(res.status, equals(200), reason: path);
+        expect(res.headers.value('content-encoding'), isNull, reason: path);
+        expect(utf8.decode(res.body), isNotEmpty, reason: path);
+
+        var res2 = await _request(
+          '${serverBr.url}$path',
+          headers: {'accept-encoding': 'gzip, br'},
+        );
+        expect(
+          res2.headers.value('content-encoding'),
+          path == 'cov/ok' || path == 'cov/json' ? isNull : equals('br'),
+          reason: path,
+        );
+        expect(_bodyStr(res2), isNotEmpty, reason: path);
+      }
+    });
+  });
+
+  group('APIServer HTTP (compressionEncodings: none)', () {
+    late Directory docRoot;
+    late APIServer serverNone;
+
+    setUpAll(() async {
+      docRoot = await Directory.systemTemp.createTemp('bones_api_cov_www_');
+      File(pack_path.join(docRoot.path, 'data.txt'))
+          .writeAsStringSync('DATA ' * 500);
+
+      serverNone = APIServer(
+        _CovHttpAPIRoot('cov-http-none'),
+        'localhost',
+        await resolveFreePort(6370),
+        documentRoot: docRoot.path,
+        logToConsole: false,
+        compressionEncodings: const [],
+      );
+      await serverNone.start();
+    });
+
+    tearDownAll(() async {
+      await serverNone.stop();
+      await docRoot.delete(recursive: true);
+    });
+
+    test('none: never compressed', () async {
+      expect(serverNone.compressionEncodings, isEmpty);
+
+      for (var path in ['cov/ok', 'cov/big', 'cov/bigText', 'data.txt']) {
+        var res = await _request(
+          '${serverNone.url}$path',
+          headers: {'accept-encoding': 'br, gzip, deflate'},
+        );
+        expect(res.status, equals(200), reason: path);
+        expect(res.headers.value('content-encoding'), isNull, reason: path);
+        expect(
+          res.headers.value('vary') ?? '',
+          isNot(contains('Accept-Encoding')),
+          reason: path,
+        );
+        expect(utf8.decode(res.body), isNotEmpty, reason: path);
       }
     });
   });

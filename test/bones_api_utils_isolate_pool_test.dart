@@ -1,6 +1,7 @@
 @TestOn('vm')
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:bones_api/src/bones_api_utils_isolate_pool.dart';
 import 'package:test/test.dart';
@@ -25,6 +26,33 @@ int _throwError() => throw StateError('Computation failure');
 ReceivePort _unsendableResult() => ReceivePort();
 
 int _exitIsolate() => Isolate.exit();
+
+Future<int> _asyncSquare(int n) async {
+  await Future<void>.delayed(const Duration(milliseconds: 5));
+  return n * n;
+}
+
+Future<int> _asyncThrow() async {
+  await Future<void>.delayed(const Duration(milliseconds: 5));
+  throw StateError('Async computation failure');
+}
+
+Uint8List _reverse(Uint8List data) =>
+    Uint8List.fromList(data.reversed.toList());
+
+String? _workerName(int ms) {
+  sleep(Duration(milliseconds: ms));
+  return Isolate.current.debugName;
+}
+
+/// Runs in a new isolate: uses a pool and doesn't close it.
+Future<void> _usePoolWithoutClose(SendPort result) async {
+  var pool = APIIsolatePool(maxIsolates: 2);
+  var squares = await Future.wait([
+    for (var i = 0; i < 4; ++i) pool.run(() => _square(i)),
+  ]);
+  result.send(squares);
+}
 
 /// Waits until [pool] has [length] isolates (fails after 5s).
 Future<void> _waitIsolates(APIIsolatePool pool, int length) async {
@@ -103,13 +131,132 @@ void main() {
     });
 
     test('defaultMaxIsolates', () {
-      expect(APIIsolatePool.defaultMaxIsolates, inInclusiveRange(1, 4));
+      expect(APIIsolatePool.defaultMaxIsolates, inInclusiveRange(2, 4));
+      expect(
+        APIIsolatePool.defaultMaxIsolates,
+        equals(APIIsolatePool.defaultMaxIsolatesFor(workers: 1)),
+      );
 
       var pool = APIIsolatePool();
       expect(pool.maxIsolates, equals(APIIsolatePool.defaultMaxIsolates));
+      // An explicit size can be `1`:
       expect(APIIsolatePool(maxIsolates: 0).maxIsolates, equals(1));
+      expect(APIIsolatePool(maxIsolates: 1).maxIsolates, equals(1));
       pool.close();
     });
+
+    test('defaultMaxIsolatesFor: divided by the workers, from 2 to 4', () {
+      var cores = Platform.numberOfProcessors;
+
+      for (var workers in [-1, 0, 1, 2, 3, 4, 8, 16, 100]) {
+        var expected = ((cores ~/ 2) ~/ (workers < 1 ? 1 : workers)).clamp(
+          2,
+          4,
+        );
+        expect(
+          APIIsolatePool.defaultMaxIsolatesFor(workers: workers),
+          equals(expected),
+          reason: 'workers: $workers, cores: $cores',
+        );
+      }
+
+      // Many workers: never below 2.
+      expect(APIIsolatePool.defaultMaxIsolatesFor(workers: 1000), equals(2));
+      // Never above 4.
+      expect(APIIsolatePool.defaultMaxIsolatesFor(), lessThanOrEqualTo(4));
+    });
+
+    test('async computation', () async {
+      var pool = APIIsolatePool(maxIsolates: 2);
+      addTearDown(pool.close);
+
+      expect(await pool.run(() => _asyncSquare(6)), equals(36));
+      await expectLater(pool.run(_asyncThrow), throwsA(isA<RemoteError>()));
+    });
+
+    test('large data: sent and received intact', () async {
+      var pool = APIIsolatePool(maxIsolates: 1);
+      addTearDown(pool.close);
+
+      var data = Uint8List(4 * 1024 * 1024);
+      for (var i = 0; i < data.length; ++i) {
+        data[i] = (i * 31 + (i >> 11)) & 0xFF;
+      }
+
+      var reversed = await pool.run(() => _reverse(data));
+      expect(reversed.length, equals(data.length));
+      expect(reversed.first, equals(data.last));
+      expect(reversed.last, equals(data.first));
+      expect(_reverse(reversed), equals(data));
+    });
+
+    test('never more than `maxIsolates` distinct workers', () async {
+      var pool = APIIsolatePool(maxIsolates: 3, debugName: 'test-distinct');
+      addTearDown(pool.close);
+
+      var names = await Future.wait([
+        for (var i = 0; i < 60; ++i) pool.run(() => _workerName(2)),
+      ]);
+
+      expect(names.toSet().length, inInclusiveRange(1, 3));
+      expect(names.every((n) => n!.startsWith('test-distinct#')), isTrue);
+      expect(pool.isolatesLength, lessThanOrEqualTo(3));
+    });
+
+    test('idleTimeout race: jobs around the timeout never fail', () async {
+      var pool = APIIsolatePool(
+        maxIsolates: 2,
+        idleTimeout: const Duration(milliseconds: 30),
+      );
+      addTearDown(pool.close);
+
+      // Jobs submitted just before, at and after the idle timeout: a worker
+      // may be idle-notified while a job is sent to it.
+      for (var i = 0; i < 40; ++i) {
+        expect(await pool.run(() => _square(i)), equals(i * i));
+        await Future<void>.delayed(Duration(milliseconds: 25 + (i % 4) * 5));
+      }
+
+      await _waitIsolates(pool, 0);
+      expect(await pool.run(() => _square(3)), equals(9));
+    });
+
+    test("doesn't keep its isolate alive", () async {
+      var exit = ReceivePort();
+      var result = ReceivePort();
+      addTearDown(exit.close);
+      addTearDown(result.close);
+
+      // An isolate using a pool, without closing it: must exit when done.
+      await Isolate.spawn(
+        _usePoolWithoutClose,
+        result.sendPort,
+        onExit: exit.sendPort,
+      );
+
+      expect(await result.first, equals([0, 1, 4, 9]));
+      await exit.first.timeout(const Duration(seconds: 10));
+    });
+
+    test(
+      'close while spawning, unsendable computation: worker exits',
+      () async {
+        // No `idleTimeout`: only the `close` makes the worker exit.
+        var pool = APIIsolatePool(maxIsolates: 1, idleTimeout: null);
+
+        var port = ReceivePort();
+        addTearDown(port.close);
+
+        var job = pool.run(() => port.hashCode);
+        var jobFails = expectLater(job, throwsA(anything));
+
+        // Before the worker is ready (its `SendPort`):
+        pool.close();
+
+        await jobFails;
+        await _waitIsolates(pool, 0);
+      },
+    );
 
     test('computation error: `RemoteError`, pool still usable', () async {
       var pool = APIIsolatePool(maxIsolates: 1);

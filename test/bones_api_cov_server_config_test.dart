@@ -1556,5 +1556,107 @@ void main() {
         throwsUnsupportedError,
       );
     });
+
+    test('payload: br without `maxPayloadLength`, default limit', () async {
+      expect(APIServer.defaultMaxBrotliPayloadLength, equals(64 * 1024 * 1024));
+
+      Request brRequest(List<int> body, {String contentType = 'text/plain'}) =>
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {'content-type': contentType, 'content-encoding': 'br'},
+            body: APIBrotli.encode(Uint8List.fromList(body))!,
+          );
+
+      var prevLimit = APIServer.defaultMaxBrotliPayloadLength;
+      APIServer.defaultMaxBrotliPayloadLength = 1000;
+      addTearDown(() => APIServer.defaultMaxBrotliPayloadLength = prevLimit);
+
+      // A "decompression bomb": a few bytes, over the default limit.
+      var bomb = Uint8List(1001);
+      var bombRequest = brRequest(
+        bomb,
+        contentType: 'application/octet-stream',
+      );
+      expect(bombRequest.contentLength, lessThan(100));
+
+      await expectLater(
+        toAPIRequest(bombRequest, decompressPayload: true),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('`defaultMaxBrotliPayloadLength`'),
+              contains('(1000)'),
+            ),
+          ),
+        ),
+      );
+
+      // At the limit (binary and string payloads):
+      var ok = await toAPIRequest(
+        brRequest(Uint8List(1000), contentType: 'application/octet-stream'),
+        decompressPayload: true,
+      );
+      expect(ok.payload, equals(Uint8List(1000)));
+
+      var text = 'abc ' * 250;
+      var okText = await toAPIRequest(
+        brRequest(utf8.encode(text)),
+        decompressPayload: true,
+      );
+      expect(okText.payload, equals(text));
+
+      // A defined `maxPayloadLength` is used instead (also over the default):
+      var big = utf8.encode('xyz ' * 1000);
+      var okMax = await toAPIRequest(
+        brRequest(big),
+        decompressPayload: true,
+        maxPayloadLength: 5000,
+      );
+      expect(okMax.payload, equals(utf8.decode(big)));
+
+      await expectLater(
+        toAPIRequest(
+          brRequest(big),
+          decompressPayload: true,
+          maxPayloadLength: 3000,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('`maxPayloadLength` (3000)'),
+          ),
+        ),
+      );
+
+      // Not decompressed: no limit applied.
+      var raw = await toAPIRequest(
+        brRequest(bomb, contentType: 'application/octet-stream'),
+      );
+      expect(raw.payload, equals(APIBrotli.encode(bomb)));
+    });
+
+    test('payload: br, large, decoded in the pool', () async {
+      var data = utf8.encode(
+        List.generate(50000, (i) => 'line $i: ${i * 7919 % 10007}').join('\n'),
+      );
+
+      var r = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-encoding': 'br',
+          },
+          body: APIBrotli.encode(Uint8List.fromList(data))!,
+        ),
+        decompressPayload: true,
+      );
+      expect(r.payload, equals(data));
+    });
   });
 }

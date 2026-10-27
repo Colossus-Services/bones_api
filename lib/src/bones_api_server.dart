@@ -2167,39 +2167,47 @@ class APIServer extends _APIServerBase {
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => request.read().toList().then((bs) {
-    var allBytes = _loadPayloadBytes(
-      request,
-      bs,
-      maxPayloadLength: maxPayloadLength,
-      decompressPayload: decompressPayload,
-    );
+  }) => request
+      .read()
+      .toList()
+      .then(
+        (bs) => _loadPayloadBytes(
+          request,
+          bs,
+          maxPayloadLength: maxPayloadLength,
+          decompressPayload: decompressPayload,
+        ),
+      )
+      .then((allBytes) {
+        var encoding = mimeType.charsetEncoding ?? utf8;
 
-    var encoding = mimeType.charsetEncoding ?? utf8;
-
-    try {
-      return encoding.decode(allBytes);
-    } catch (_) {
-      return latin1.decode(allBytes);
-    }
-  });
+        try {
+          return encoding.decode(allBytes);
+        } catch (_) {
+          return latin1.decode(allBytes);
+        }
+      });
 
   static Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
     MimeType mimeType,
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => request.read().toList().then((bs) {
-    var allBytes = _loadPayloadBytes(
+  }) => request.read().toList().then(
+    (bs) => _loadPayloadBytes(
       request,
       bs,
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
-    );
-    return (mimeType, allBytes);
-  });
+    ).resolveMapped((allBytes) => (mimeType, allBytes)),
+  );
 
-  static Uint8List _loadPayloadBytes(
+  /// The decoded size limit of a Brotli request payload when
+  /// `maxPayloadLength` is not defined (`64 MB`): a few bytes of Brotli
+  /// can decode to GBs (a "decompression bomb"). See [decompressPayload].
+  static int defaultMaxBrotliPayloadLength = 64 * 1024 * 1024;
+
+  static FutureOr<Uint8List> _loadPayloadBytes(
     Request request,
     List<List<int>> payloadBlocks, {
     int? maxPayloadLength,
@@ -2248,42 +2256,37 @@ class APIServer extends _APIServerBase {
       assert(bytesOffset == allBytesSz);
     }
 
-    if (decompressPayload && bytes.isNotEmpty) {
-      var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    if (!decompressPayload || bytes.isEmpty) return bytes;
 
-      switch (contentEncoding) {
-        case null:
-        case '':
-        case 'identity':
-          {
-            break;
-          }
-        case 'gzip':
-          {
-            bytes = _decodePayloadGzip(bytes, maxPayloadLength);
-          }
-        case 'deflate':
-          {
-            bytes = _decodePayloadZlib(bytes);
-          }
-        case 'br':
-          {
-            bytes = _decodePayloadBrotli(bytes, maxPayloadLength);
-          }
-        default:
-          throw UnsupportedError(
-            "Unknown `Content-Encoding`: $contentEncoding",
-          );
-      }
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
 
-      if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
-        throw StateError(
-          "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).",
-        );
-      }
+    FutureOr<Uint8List> decoded;
+
+    switch (contentEncoding) {
+      case null:
+      case '':
+      case 'identity':
+        return bytes;
+      case 'gzip':
+        decoded = _decodePayloadGzip(bytes, maxPayloadLength);
+      case 'deflate':
+        decoded = _decodePayloadZlib(bytes);
+      case 'br':
+        decoded = _decodePayloadBrotli(bytes, maxPayloadLength);
+      default:
+        throw UnsupportedError("Unknown `Content-Encoding`: $contentEncoding");
     }
 
-    return bytes;
+    final maxLength = maxPayloadLength;
+
+    return decoded.resolveMapped((bytes) {
+      if (maxLength >= 0 && bytes.length > maxLength) {
+        throw StateError(
+          "Decompressed `$contentEncoding` payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxLength).",
+        );
+      }
+      return bytes;
+    });
   }
 
   static Uint8List _decodePayloadGzip(Uint8List bytes, int maxPayloadLength) {
@@ -2305,21 +2308,25 @@ class APIServer extends _APIServerBase {
     return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
   }
 
-  static Uint8List _decodePayloadBrotli(Uint8List bytes, int maxPayloadLength) {
-    try {
-      return APIBrotli.decode(
-        bytes,
-        // Checked while decoding (Brotli has no uncompressed size trailer):
-        maxOutputSize: maxPayloadLength >= 0 ? maxPayloadLength : null,
-      );
-    } on BrotliException catch (e) {
-      if (e.code == BrotliErrorCode.outputLimitExceeded) {
-        throw StateError(
-          "Can't decompress payload of size ${bytes.length}: Brotli payload uncompressed size exceeds `maxPayloadLength` ($maxPayloadLength).",
-        );
-      }
-      rethrow;
-    }
+  /// Decodes in the [compressionIsolatePool] (not blocking the event loop),
+  /// up to `maxPayloadLength`, or [defaultMaxBrotliPayloadLength] if not
+  /// defined: checked while decoding (Brotli has no uncompressed size
+  /// trailer).
+  static Future<Uint8List> _decodePayloadBrotli(
+    Uint8List bytes,
+    int maxPayloadLength,
+  ) {
+    final limit = maxPayloadLength >= 0
+        ? maxPayloadLength
+        : defaultMaxBrotliPayloadLength;
+
+    return APIBrotli.decodeAsync(bytes, maxOutputSize: limit).catchError(
+      (Object e) => throw StateError(
+        "Can't decompress payload of size ${bytes.length}: Brotli payload uncompressed size exceeds ${maxPayloadLength >= 0 ? '`maxPayloadLength`' : '`defaultMaxBrotliPayloadLength`'} ($limit).",
+      ),
+      test: (e) =>
+          e is BrotliException && e.code == BrotliErrorCode.outputLimitExceeded,
+    );
   }
 
   static Uint8List _decodePayloadZlib(Uint8List bytes) {
@@ -3330,6 +3337,9 @@ final class APIServerWorker extends _APIServerBase {
   @override
   Future<bool> _startImpl() async {
     var appliedProps = apiConfig?.applyProperties();
+
+    // Each worker isolate has its own pool: sized by the total of workers.
+    configureCompressionIsolatePool(totalWorkers: totalWorkers);
 
     if (this.logToConsole) {
       _log.handler.logToConsole();

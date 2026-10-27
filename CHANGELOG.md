@@ -20,7 +20,9 @@
     GZip), a new `APIIsolatePool` (`bones_api_utils_isolate_pool.dart`):
     long-lived workers (the Brotli encoder tables are initialized once per
     worker, ~2.5ms saved per encoding at quality `9`), at most
-    `maxIsolates` (default: half of the processors, `1..4`) with the other
+    `maxIsolates` (default: half of the processors divided by the server
+    workers, `2..4`, `APIIsolatePool.defaultMaxIsolatesFor`; set by each
+    `APIServerWorker`, `configureCompressionIsolatePool`) with the other
     encodings queued, and workers idle for `idleTimeout` (default 30s) exit.
     With 30 concurrent 256 KB q9 encodings, the event loop stalls at most
     ~2ms (~60-100ms spawning an isolate per encoding, ~400ms encoding
@@ -59,10 +61,14 @@
     `0..11`, default `5`). Cached static files use at least `9`
     (and GZip level `7`, as before).
 - Request payloads with `Content-Encoding: br` are decompressed
-  (`decompressPayload`), with `maxPayloadLength` enforced while decoding.
+  (`decompressPayload`), with `maxPayloadLength` enforced while decoding
+  (`APIServer.defaultMaxBrotliPayloadLength`, 64 MB, if not defined: a few
+  bytes of Brotli can decode to GBs). Decoded in the `compressionIsolatePool`
+  (`APIBrotli.decodeAsync`), not blocking the event loop.
 - New `bones_api_utils_compression.dart` (exported by
   `bones_api_server.dart`): `APIContentEncoding`, `APIResponseCompression`,
-  `APIBrotli`, `APIGZip`, `compressionIsolatePool`, `parseAcceptEncoding`,
+  `APIBrotli`, `APIGZip`, `compressionIsolatePool`,
+  `configureCompressionIsolatePool`, `parseAcceptEncoding`,
   `resolveContentEncoding`, `normalizeContentCoding`, `compressResponse`,
   `createCompressionMiddleware`, `mergeVaryHeader`. And
   `bones_api_utils_isolate_pool.dart`: `APIIsolatePool`.

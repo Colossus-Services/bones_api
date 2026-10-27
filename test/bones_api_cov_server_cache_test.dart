@@ -633,6 +633,67 @@ void main() {
       expect(inner.calls, equals(2));
     });
 
+    test('alternatives: 304 and memory accounting', () async {
+      var content = List.generate(300, (i) => 'line $i').join('\n');
+      writeFile('alt.txt', content);
+
+      var cache = APIServerResponseCache();
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      var r0 = await handler(_get('alt.txt'));
+      var lastModified = r0.headers['last-modified']!;
+      // 200 + 304:
+      expect(cache.cachedResponsesLength, equals(2));
+      var memory0 = cache.totalMemorySize;
+
+      // The `br` and `gzip` alternatives: added to the same 200 entry,
+      // their memory counted.
+      var rBr = await handler(
+        _get('alt.txt', headers: {'accept-encoding': 'br'}),
+      );
+      expect(rBr.headers['content-encoding'], equals('br'));
+      var memoryBr = cache.totalMemorySize;
+      expect(memoryBr, greaterThan(memory0));
+
+      var rGz = await handler(
+        _get('alt.txt', headers: {'accept-encoding': 'gzip'}),
+      );
+      expect(rGz.headers['content-encoding'], equals('gzip'));
+      expect(cache.totalMemorySize, greaterThan(memoryBr));
+      expect(cache.cachedResponsesLength, equals(2));
+
+      // Served again: nothing new.
+      var memory = cache.totalMemorySize;
+      for (var encoding in ['br', 'gzip', 'identity']) {
+        var r = await handler(
+          _get('alt.txt', headers: {'accept-encoding': encoding}),
+        );
+        expect(await _readBody(r), equals(content), reason: encoding);
+      }
+      expect(cache.totalMemorySize, equals(memory));
+      expect(inner.calls, equals(1));
+
+      // 304, whatever the `Accept-Encoding`:
+      for (var encoding in ['br', 'gzip', '']) {
+        var r304 = await handler(
+          _get(
+            'alt.txt',
+            headers: {
+              'if-modified-since': lastModified,
+              if (encoding.isNotEmpty) 'accept-encoding': encoding,
+            },
+          ),
+        );
+        expect(r304.statusCode, equals(304), reason: encoding);
+        expect(r304.headers['content-encoding'], isNull, reason: encoding);
+      }
+      expect(inner.calls, equals(1));
+
+      cache.clear();
+      expect(cache.totalMemorySize, equals(0));
+    });
+
     test('alternatives: unsupported encoding (`deflate`)', () async {
       var content = List.generate(200, (i) => 'row $i').join('\n');
       var deflated = ZLibEncoder().convert(utf8.encode(content));

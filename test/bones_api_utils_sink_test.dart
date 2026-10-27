@@ -371,6 +371,16 @@ void main() {
       bs.add([7, 8]);
       bs.close();
       expect(bs.toBytes(), equals([7, 8]));
+
+      // Reused for another large payload: nothing from the previous ones.
+      bs.reset();
+      var data2 = utf8.encode('other payload ' * 100);
+      bs.add(data2);
+      expect(bs.isBrotli, isTrue);
+      bs.close();
+      expect(bs.activeEncoding, equals(APIContentEncoding.br));
+      expect(bs.inputLength, equals(data2.length));
+      expect(APIBrotli.decode(bs.toBytes()), equals(data2));
     });
 
     test('gzip level', () {

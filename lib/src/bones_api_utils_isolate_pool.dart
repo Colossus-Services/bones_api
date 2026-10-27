@@ -19,9 +19,16 @@ import 'dart:math' as math;
 ///   exits (e.g., an unrecoverable error), its computation fails and the
 ///   worker is replaced on demand.
 class APIIsolatePool {
-  /// The default [maxIsolates]: half of the processors, from `1` to `4`.
-  static int get defaultMaxIsolates =>
-      math.max(1, math.min(4, Platform.numberOfProcessors ~/ 2));
+  /// The default [maxIsolates]: see [defaultMaxIsolatesFor] (one worker).
+  static int get defaultMaxIsolates => defaultMaxIsolatesFor();
+
+  /// The default [maxIsolates] for each of [workers] isolates with their own
+  /// pool (e.g., the `APIServerWorker`s): half of the processors divided by
+  /// [workers], from `2` to `4`.
+  static int defaultMaxIsolatesFor({int workers = 1}) => math.max(
+    2,
+    math.min(4, (Platform.numberOfProcessors ~/ 2) ~/ math.max(1, workers)),
+  );
 
   /// The default [idleTimeout].
   static const Duration defaultIdleTimeout = Duration(seconds: 30);
@@ -202,6 +209,15 @@ class _PoolWorker {
       // Not sendable (e.g., the computation captures a `ReceivePort`):
       _jobDone();
       job._fail(e, s);
+      _afterJob(sendPort);
+    }
+  }
+
+  /// After a computation: exits if shutting down, otherwise takes the next.
+  void _afterJob(SendPort? sendPort) {
+    if (_exiting) {
+      sendPort?.send(null);
+    } else {
       _pool._dispatch();
     }
   }
@@ -252,11 +268,7 @@ class _PoolWorker {
       }
     }
 
-    if (_exiting) {
-      _sendPort?.send(null);
-    } else {
-      _pool._dispatch();
-    }
+    _afterJob(_sendPort);
   }
 
   /// Exits the worker isolate (after its current computation).

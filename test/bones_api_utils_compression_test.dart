@@ -5,6 +5,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bones_api/src/bones_api_utils_compression.dart';
+import 'package:bones_api/src/bones_api_utils_isolate_pool.dart';
+import 'package:brotli_fast/brotli_fast.dart'
+    show BrotliErrorCode, BrotliException;
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
@@ -190,6 +193,32 @@ void main() {
       expect(resolveContentEncoding('br, gzip', []), isNull);
     });
 
+    test('resolveContentEncoding: `*` with explicit exclusions', () {
+      var all = APIContentEncoding.defaultEncodings;
+
+      // `*` accepts the not listed ones, an explicit `q=0` excludes:
+      expect(
+        resolveContentEncoding('*, br;q=0', all),
+        equals(APIContentEncoding.gzip),
+      );
+      expect(resolveContentEncoding('*, br;q=0, gzip;q=0', all), isNull);
+      expect(resolveContentEncoding('*;q=0', all), isNull);
+      expect(
+        resolveContentEncoding('*;q=0, gzip', all),
+        equals(APIContentEncoding.gzip),
+      );
+
+      // Only `identity`, or unknown encodings:
+      expect(resolveContentEncoding('identity', all), isNull);
+      expect(resolveContentEncoding('deflate, compress', all), isNull);
+
+      // `x-gzip`:
+      expect(
+        resolveContentEncoding('x-gzip;q=0.9, br;q=0.5', all),
+        equals(APIContentEncoding.gzip),
+      );
+    });
+
     test('normalizeContentCoding', () {
       expect(normalizeContentCoding(' GZip '), equals('gzip'));
       expect(normalizeContentCoding('X-GZIP'), equals('gzip'));
@@ -292,6 +321,56 @@ void main() {
         await tmp.delete(recursive: true);
       }
     }, skip: _hasBrotliCLI() ? false : 'No `brotli` CLI in the PATH');
+
+    test('decodeAsync: in the pool, same results as `decode`', () async {
+      var data = _largeTextBytes(9);
+      var encoded = APIBrotli.encode(data)!;
+
+      expect(await APIBrotli.decodeAsync(encoded), equals(data));
+      expect(
+        await APIBrotli.decodeAsync(encoded, maxOutputSize: data.length),
+        equals(data),
+      );
+
+      // The `BrotliException` is kept (not a `RemoteError`):
+      await expectLater(
+        APIBrotli.decodeAsync(encoded, maxOutputSize: data.length - 1),
+        throwsA(
+          isA<BrotliException>().having(
+            (e) => e.code,
+            'code',
+            BrotliErrorCode.outputLimitExceeded,
+          ),
+        ),
+      );
+
+      await expectLater(
+        APIBrotli.decodeAsync(_textBytes(5)),
+        throwsA(
+          isA<BrotliException>().having(
+            (e) => e.code,
+            'code',
+            isNot(BrotliErrorCode.outputLimitExceeded),
+          ),
+        ),
+      );
+      // A `BrotliException` is a `FormatException`:
+      await expectLater(
+        APIBrotli.decodeAsync(_textBytes(5)),
+        throwsFormatException,
+      );
+    });
+
+    test('decodeAsync: a small "decompression bomb" is limited', () async {
+      // 8 MB of zeros: a few bytes of Brotli.
+      var bomb = APIBrotli.encode(Uint8List(8 * 1024 * 1024), quality: 1)!;
+      expect(bomb.length, lessThan(1024));
+
+      await expectLater(
+        APIBrotli.decodeAsync(bomb, maxOutputSize: 1024 * 1024),
+        throwsA(isA<BrotliException>()),
+      );
+    });
 
     test('isolateMinLength', () {
       // Higher qualities are slower: offloaded from smaller inputs.
@@ -398,6 +477,72 @@ void main() {
         compressionIsolatePool.isolatesLength,
         inInclusiveRange(1, compressionIsolatePool.maxIsolates),
       );
+    });
+  });
+
+  group('configureCompressionIsolatePool', () {
+    late APIIsolatePool original;
+
+    setUp(() => original = compressionIsolatePool);
+    tearDown(() {
+      if (!identical(compressionIsolatePool, original)) {
+        compressionIsolatePool.close();
+      }
+      compressionIsolatePool = original;
+    });
+
+    test('unused pool: replaced, sized by the workers', () {
+      var unused = APIIsolatePool(
+        maxIsolates: 4,
+        idleTimeout: const Duration(seconds: 7),
+        debugName: 'test-pool',
+      );
+      compressionIsolatePool = unused;
+
+      expect(configureCompressionIsolatePool(totalWorkers: 1000), isTrue);
+      expect(compressionIsolatePool, isNot(same(unused)));
+      expect(unused.isClosed, isTrue);
+      // Minimum of 2, keeping the other settings:
+      expect(compressionIsolatePool.maxIsolates, equals(2));
+      expect(
+        compressionIsolatePool.idleTimeout,
+        equals(const Duration(seconds: 7)),
+      );
+      expect(compressionIsolatePool.debugName, equals('test-pool'));
+
+      // Already with that size: kept.
+      var current = compressionIsolatePool;
+      expect(configureCompressionIsolatePool(totalWorkers: 1000), isTrue);
+      expect(compressionIsolatePool, same(current));
+
+      expect(configureCompressionIsolatePool(maxIsolates: 3), isTrue);
+      expect(compressionIsolatePool.maxIsolates, equals(3));
+      expect(
+        compressionIsolatePool.maxIsolates,
+        isNot(equals(current.maxIsolates)),
+      );
+    });
+
+    test('pool in use: not replaced', () async {
+      var inUse = APIIsolatePool(maxIsolates: 4);
+      compressionIsolatePool = inUse;
+      addTearDown(inUse.close);
+
+      expect(await inUse.run(() => 1 + 1), equals(2));
+      expect(inUse.isolatesLength, equals(1));
+
+      expect(configureCompressionIsolatePool(maxIsolates: 2), isFalse);
+      expect(compressionIsolatePool, same(inUse));
+      expect(inUse.isClosed, isFalse);
+    });
+
+    test('closed pool: replaced', () {
+      var closed = APIIsolatePool(maxIsolates: 2)..close();
+      compressionIsolatePool = closed;
+
+      expect(configureCompressionIsolatePool(maxIsolates: 2), isTrue);
+      expect(compressionIsolatePool, isNot(same(closed)));
+      expect(compressionIsolatePool.isClosed, isFalse);
     });
   });
 
@@ -695,6 +840,83 @@ void main() {
         ),
         same(plain),
       );
+    });
+
+    test('only server encodings: gzip-only server, br-only client', () async {
+      var data = _textBytes();
+      const gzipOnly = APIResponseCompression(
+        encodings: [APIContentEncoding.gzip],
+      );
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'br'),
+        textResponse(data),
+        compression: gzipOnly,
+      );
+      expect(r.headers['content-encoding'], isNull);
+      expect(r.headers['vary'], equals('Accept-Encoding'));
+      expect(await _read(r), equals(data));
+
+      var r2 = await compressResponse(
+        _get(acceptEncoding: 'br, gzip;q=0.1'),
+        textResponse(data),
+        compression: gzipOnly,
+      );
+      expect(r2.headers['content-encoding'], equals('gzip'));
+      expect(gzip.decode(await _read(r2)), equals(data));
+    });
+
+    test('minLength', () async {
+      var data = _textBytes();
+      var req = _get(acceptEncoding: 'br');
+
+      // Over the content length: not compressed (no `Vary` either).
+      var big = textResponse(data);
+      var r = await compressResponse(
+        req,
+        big,
+        compression: APIResponseCompression(minLength: data.length + 1),
+      );
+      expect(r, same(big));
+
+      // Small content, small `minLength`:
+      var small = utf8.encode('x' * 100);
+      var r2 = await compressResponse(
+        req,
+        textResponse(small),
+        compression: const APIResponseCompression(minLength: 10),
+      );
+      expect(r2.headers['content-encoding'], equals('br'));
+      expect(APIBrotli.decode(await _read(r2)), equals(small));
+    });
+
+    test('keeps the status, headers and context', () async {
+      var data = _textBytes();
+
+      var r = await compressResponse(
+        _get(acceptEncoding: 'gzip'),
+        Response(
+          201,
+          body: data,
+          headers: {
+            'content-type': 'text/plain; charset=utf-8',
+            'x-custom': 'abc',
+            'cache-control': 'max-age=60',
+            'vary': 'Origin',
+          },
+          context: {'my.key': 123},
+        ),
+      );
+
+      expect(r.statusCode, equals(201));
+      expect(r.headers['content-type'], equals('text/plain; charset=utf-8'));
+      expect(r.headers['x-custom'], equals('abc'));
+      expect(r.headers['cache-control'], equals('max-age=60'));
+      expect(r.headers['vary'], equals('Origin, Accept-Encoding'));
+      expect(r.headers['content-encoding'], equals('gzip'));
+      expect(r.context['my.key'], equals(123));
+      expect(r.context[uncompressedLengthContextKey], equals(data.length));
+      expect(gzip.decode(await _read(r)), equals(data));
     });
 
     test('stream body: small after read', () async {
