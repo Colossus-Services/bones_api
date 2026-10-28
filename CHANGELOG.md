@@ -14,7 +14,7 @@
   - Not only HTTP: an `APIRoot.call` / `doCall` of such a route now returns
     the message as the `APIResponse.error` (was the `payload`), with
     `requiresAuthentication` and `authenticationType` `Bearer`.
-  - `APIRouteHandler.isNotAuthenticatedRefusal`.
+  - `APIRouteHandler.isUnauthenticatedRefusal`.
   - `APIRouteAuthenticatedRule.isAuthenticated`.
 - Fix: `APIServer`: a blank `authenticationRealm` now defaults to `API` (it
   checked the authentication type instead).

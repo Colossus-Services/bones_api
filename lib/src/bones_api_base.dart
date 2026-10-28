@@ -1398,7 +1398,7 @@ abstract class APIRouteHandler<T> {
   /// [APIResponseStatus.UNAUTHORIZED]:
   /// - Not authenticated for any of its [APIRouteAuthenticatedRule]s (no
   ///   credential, or an invalid or expired token), whatever the order of
-  ///   the rules ([isNotAuthenticatedRefusal]): it requires authentication
+  ///   the rules ([isUnauthenticatedRefusal]): it requires authentication
   ///   ([APIResponse.requireAuthentication], `Bearer`), so an HTTP server
   ///   answers `401` with `WWW-Authenticate`. A client can tell a lost login
   ///   from a refused access.
@@ -1411,7 +1411,7 @@ abstract class APIRouteHandler<T> {
         "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules",
       );
 
-      if (isNotAuthenticatedRefusal(request)) {
+      if (isUnauthenticatedRefusal(request)) {
         return APIResponse<T>.unauthorized(
           error: 'UNAUTHORIZED: Not authenticated',
         ).requireAuthentication(type: 'Bearer', realm: 'API');
@@ -1471,7 +1471,7 @@ abstract class APIRouteHandler<T> {
   /// refused by an [APIRouteAuthenticatedRule] of this route. All the rules
   /// are checked, not only the first one refusing it: a route's own rules
   /// come before the global ones of its module.
-  bool isNotAuthenticatedRefusal(APIRequest request) {
+  bool isUnauthenticatedRefusal(APIRequest request) {
     if (APIRouteAuthenticatedRule.isAuthenticated(request)) return false;
 
     return rules.any(
