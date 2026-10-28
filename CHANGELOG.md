@@ -1,3 +1,24 @@
+## 1.29.0
+
+- A route refused by an `APIRouteAuthenticatedRule` (or a subclass, like
+  `APIRoutePermissionTypeRule`) because the request is not authenticated (no
+  credential, or an invalid or expired token) now requires authentication:
+  `401` with `WWW-Authenticate: Bearer realm="API"` and the body
+  `UNAUTHORIZED: Not authenticated`. It was a `403`, the same as an
+  authenticated request refused, so a client could not tell a lost login from
+  a refused access. `Bearer`: no browser prompt (unlike `Basic`).
+  - Whatever the order of the rules: also when another rule refuses it first
+    (a route's own rules come before its module's global ones).
+  - Any other refusal by a route's rules is still a `403`
+    (`UNAUTHORIZED: Rules issues ...`).
+  - Not only HTTP: an `APIRoot.call` / `doCall` of such a route now returns
+    the message as the `APIResponse.error` (was the `payload`), with
+    `requiresAuthentication` and `authenticationType` `Bearer`.
+  - `APIRouteHandler.isUnauthenticatedRefusal`.
+  - `APIRouteAuthenticatedRule.isAuthenticated`.
+- Fix: `APIServer`: a blank `authenticationRealm` now defaults to `API` (it
+  checked the authentication type instead).
+
 ## 1.28.1
 
 - Fix: `generateTables` failing the initialization (PostgreSQL:

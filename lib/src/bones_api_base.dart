@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.28.1';
+  static const String VERSION = '1.29.0';
 
   static bool _boot = false;
 
@@ -1393,6 +1393,16 @@ abstract class APIRouteHandler<T> {
       _responseLogPrefix ??= "RESPONSE> ${module.name}.$routeName: ";
 
   /// Calls this route.
+  ///
+  /// If a rule refuses [request] ([checkRules]), the response is
+  /// [APIResponseStatus.UNAUTHORIZED]:
+  /// - Not authenticated for any of its [APIRouteAuthenticatedRule]s (no
+  ///   credential, or an invalid or expired token), whatever the order of
+  ///   the rules ([isUnauthenticatedRefusal]): it requires authentication
+  ///   ([APIResponse.requireAuthentication], `Bearer`), so an HTTP server
+  ///   answers `401` with `WWW-Authenticate`. A client can tell a lost login
+  ///   from a refused access.
+  /// - Otherwise (authenticated, but refused): `403` in an HTTP server.
   FutureOr<APIResponse<T>> call(APIRequest request) {
     request._routeHandler = this;
 
@@ -1400,6 +1410,12 @@ abstract class APIRouteHandler<T> {
       _log.warning(
         "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules",
       );
+
+      if (isUnauthenticatedRefusal(request)) {
+        return APIResponse<T>.unauthorized(
+          error: 'UNAUTHORIZED: Not authenticated',
+        ).requireAuthentication(type: 'Bearer', realm: 'API');
+      }
 
       return APIResponse.unauthorized(
         payloadDynamic: 'UNAUTHORIZED: Rules issues $rules',
@@ -1448,6 +1464,19 @@ abstract class APIRouteHandler<T> {
     }
 
     return true;
+  }
+
+  /// Returns `true` if [request] is refused because it is not authenticated:
+  /// not authenticated ([APIRouteAuthenticatedRule.isAuthenticated]) and
+  /// refused by an [APIRouteAuthenticatedRule] of this route. All the rules
+  /// are checked, not only the first one refusing it: a route's own rules
+  /// come before the global ones of its module.
+  bool isUnauthenticatedRefusal(APIRequest request) {
+    if (APIRouteAuthenticatedRule.isAuthenticated(request)) return false;
+
+    return rules.any(
+      (rule) => rule is APIRouteAuthenticatedRule && !rule.validate(request),
+    );
   }
 
   APIRouteInfo apiInfo([APIRequest? apiRequest]) =>

@@ -1372,12 +1372,16 @@ class APIRouteNotAuthenticatedRule extends APIRouteRule {
 class APIRouteAuthenticatedRule extends APIRouteRule {
   const APIRouteAuthenticatedRule() : super();
 
-  @override
-  bool validate(APIRequest request) {
+  /// Returns `true` if [request] is authenticated: an [APIAuthentication]
+  /// with a token not expired.
+  static bool isAuthenticated(APIRequest request) {
     var authentication = request.authentication;
     if (authentication == null) return false;
     return !authentication.token.isExpired();
   }
+
+  @override
+  bool validate(APIRequest request) => isAuthenticated(request);
 
   @override
   String toString() {
