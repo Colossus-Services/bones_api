@@ -173,6 +173,14 @@ class _CovHttpModule extends APIModule {
       rules: [_RefuseRule()],
     );
 
+    // The authentication rule after another one (like a module's global
+    // rules after a route's own ones):
+    routes.any(
+      'refusedAuthenticated',
+      (request) => APIResponse.ok([1, 2]),
+      rules: [_RefuseRule(), APIRouteAuthenticatedRule()],
+    );
+
     routes.any(
       'bad',
       (request) => APIResponse.badRequest(payload: 'bad input'),
@@ -637,6 +645,15 @@ void main() {
       var res = await _request('${apiServer.url}cov/refused');
       expect(res.status, equals(403));
       expect(res.headers.value('www-authenticate'), isNull);
+
+      // Not authenticated, with the authentication rule after another one
+      // refusing it: still 401 (not only the first rule refusing it).
+      var res2 = await _request('${apiServer.url}cov/refusedAuthenticated');
+      expect(res2.status, equals(401));
+      expect(
+        res2.headers.value('www-authenticate'),
+        equals('Bearer realm="API"'),
+      );
     });
 
     test('bad request + errors', () async {

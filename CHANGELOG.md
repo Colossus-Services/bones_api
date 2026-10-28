@@ -7,10 +7,14 @@
   `UNAUTHORIZED: Not authenticated`. It was a `403`, the same as an
   authenticated request refused, so a client could not tell a lost login from
   a refused access. `Bearer`: no browser prompt (unlike `Basic`).
+  - Whatever the order of the rules: also when another rule refuses it first
+    (a route's own rules come before its module's global ones).
   - Any other refusal by a route's rules is still a `403`
     (`UNAUTHORIZED: Rules issues ...`).
-  - `APIRouteHandler.failedRule`: the first rule refusing a request
-    (`checkRules` uses it).
+  - Not only HTTP: an `APIRoot.call` / `doCall` of such a route now returns
+    the message as the `APIResponse.error` (was the `payload`), with
+    `requiresAuthentication` and `authenticationType` `Bearer`.
+  - `APIRouteHandler.isNotAuthenticatedRefusal`.
   - `APIRouteAuthenticatedRule.isAuthenticated`.
 - Fix: `APIServer`: a blank `authenticationRealm` now defaults to `API` (it
   checked the authentication type instead).
