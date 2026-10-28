@@ -3812,7 +3812,7 @@ final class APIServerWorker extends _APIServerBase {
       }
 
       var realm = apiResponse.authenticationRealm;
-      if (realm == null || type.trim().isEmpty) {
+      if (realm == null || realm.trim().isEmpty) {
         realm = 'API';
       }
 

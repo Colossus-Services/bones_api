@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.28.1';
+  static const String VERSION = '1.29.0';
 
   static bool _boot = false;
 
@@ -1393,13 +1393,30 @@ abstract class APIRouteHandler<T> {
       _responseLogPrefix ??= "RESPONSE> ${module.name}.$routeName: ";
 
   /// Calls this route.
+  ///
+  /// If a rule refuses [request] ([failedRule]), the response is
+  /// [APIResponseStatus.UNAUTHORIZED]:
+  /// - Not authenticated for an [APIRouteAuthenticatedRule] (no credential,
+  ///   or an invalid or expired token): it requires authentication
+  ///   ([APIResponse.requireAuthentication], `Bearer`), so an HTTP server
+  ///   answers `401` with `WWW-Authenticate`. A client can tell a lost login
+  ///   from a refused access.
+  /// - Otherwise (authenticated, but refused): `403` in an HTTP server.
   FutureOr<APIResponse<T>> call(APIRequest request) {
     request._routeHandler = this;
 
-    if (!checkRules(request)) {
+    var failedRule = this.failedRule(request);
+    if (failedRule != null) {
       _log.warning(
         "UNAUTHORIZED CALL> ${module.name}.$routeName( $parameters ) > rules: $rules",
       );
+
+      if (failedRule is APIRouteAuthenticatedRule &&
+          !APIRouteAuthenticatedRule.isAuthenticated(request)) {
+        return APIResponse<T>.unauthorized(
+          error: 'UNAUTHORIZED: Not authenticated',
+        ).requireAuthentication(type: 'Bearer', realm: 'API');
+      }
 
       return APIResponse.unauthorized(
         payloadDynamic: 'UNAUTHORIZED: Rules issues $rules',
@@ -1438,16 +1455,20 @@ abstract class APIRouteHandler<T> {
   }
 
   /// Check the rules of this route.
-  bool checkRules(APIRequest request) {
-    if (rules.isEmpty) return true;
+  bool checkRules(APIRequest request) => failedRule(request) == null;
+
+  /// The first rule of this route that refuses [request], or `null` if all
+  /// of them accept it.
+  APIRouteRule? failedRule(APIRequest request) {
+    if (rules.isEmpty) return null;
 
     for (var rule in rules) {
       if (!rule.validate(request)) {
-        return false;
+        return rule;
       }
     }
 
-    return true;
+    return null;
   }
 
   APIRouteInfo apiInfo([APIRequest? apiRequest]) =>

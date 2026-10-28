@@ -351,9 +351,12 @@ void main() {
     });
 
     test('route rules', () async {
+      // Not authenticated: requires authentication (`Bearer`).
       var r = await root.doCall(APIRequestMethod.POST, '/cov/secret');
       expect(r.isUnauthorized, isTrue);
-      expect(r.payload, contains('UNAUTHORIZED: Rules issues'));
+      expect(r.error, equals('UNAUTHORIZED: Not authenticated'));
+      expect(r.requiresAuthentication, isTrue);
+      expect(r.authenticationType, equals('Bearer'));
 
       var handler = root
           .getModule('cov')!

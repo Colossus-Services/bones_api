@@ -49,6 +49,17 @@ Future<void> _waitPortOpen(int port) async {
   throw StateError("Port not opened: $port");
 }
 
+/// A rule refusing any request, authenticated or not.
+class _RefuseRule extends APIRouteRule {
+  const _RefuseRule();
+
+  @override
+  bool validate(APIRequest request) => false;
+
+  @override
+  Map<String, Object> toJson() => {'rule': 'refuse'};
+}
+
 class _CovHttpModule extends APIModule {
   _CovHttpModule(APIRoot apiRoot) : super(apiRoot, 'cov');
 
@@ -140,6 +151,26 @@ class _CovHttpModule extends APIModule {
       (request) =>
           APIResponse.unauthorized(payload: 'need auth')
               .requireAuthentication(type: ' ', realm: 'X'),
+    );
+
+    routes.any(
+      'authBlankRealm',
+      (request) =>
+          APIResponse.unauthorized(payload: 'need auth')
+              .requireAuthentication(type: 'Bearer', realm: ' '),
+    );
+
+    // Not a `String` response: a rule's refusal can't be its payload.
+    routes.any(
+      'authenticated',
+      (request) => APIResponse.ok([1, 2]),
+      rules: [APIRouteAuthenticatedRule()],
+    );
+
+    routes.any(
+      'refused',
+      (request) => APIResponse.ok([1, 2]),
+      rules: [_RefuseRule()],
     );
 
     routes.any(
@@ -573,6 +604,39 @@ void main() {
       var res2 = await _request('${apiServer.url}cov/authDefault');
       expect(res2.status, equals(401));
       expect(res2.headers.value('www-authenticate'), equals('Basic realm="X"'));
+
+      // A blank realm: the default one.
+      var res3 = await _request('${apiServer.url}cov/authBlankRealm');
+      expect(res3.status, equals(401));
+      expect(
+        res3.headers.value('www-authenticate'),
+        equals('Bearer realm="API"'),
+      );
+    });
+
+    test('route rules: not authenticated (401) vs refused (403)', () async {
+      // No credential, or an invalid token: 401 + `Bearer` (no browser
+      // prompt, unlike `Basic`), with the error as the body.
+      for (var headers in [
+        <String, String>{},
+        {'authorization': 'Bearer invalid-token'},
+      ]) {
+        var res = await _request(
+          '${apiServer.url}cov/authenticated',
+          headers: headers,
+        );
+        expect(res.status, equals(401), reason: '$headers');
+        expect(
+          res.headers.value('www-authenticate'),
+          equals('Bearer realm="API"'),
+        );
+        expect(_bodyStr(res), equals('UNAUTHORIZED: Not authenticated'));
+      }
+
+      // Refused by a rule that is not about authentication: 403.
+      var res = await _request('${apiServer.url}cov/refused');
+      expect(res.status, equals(403));
+      expect(res.headers.value('www-authenticate'), isNull);
     });
 
     test('bad request + errors', () async {
