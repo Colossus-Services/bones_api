@@ -741,6 +741,153 @@ Future<bool> runAdapterTests(
         expect(await sqlAdapter.checkDBTables(force: true), isTrue);
       });
 
+      test(
+        'generateTables: an existing table missing an indexed column',
+        () async {
+          var sqlAdapter = await entityRepositoryProvider.adapter;
+          var q = sqlAdapter.dialect.elementQuote;
+
+          if (testConfigDB is! APITestConfigDBSQL) {
+            _log.info("Not a `APITestConfigDBSQL`: skipping.");
+            return;
+          }
+
+          var testConfigSQL = testConfigDB;
+
+          var fullCreateTableSQLs = await sqlAdapter
+              .generateFullCreateTableSQLs(withDate: false);
+
+          // Independent of the other tests (e.g. run alone): the tables are
+          // created if not yet.
+          sqlAdapter.disposeTableSchemeCache('address');
+          if (await sqlAdapter.getTableScheme('address') == null) {
+            await sqlAdapter.populateTables(fullCreateTableSQLs);
+          }
+
+          sqlAdapter.disposeTableSchemeCache('address');
+          expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+
+          var isMySQL = sqlAdapter.dialect.name.toLowerCase().contains('mysql');
+
+          // The indexes over `address.city` (if present):
+          Future<void> dropCityIndexes() async {
+            sqlAdapter.disposeTableSchemeCache('address');
+            var scheme = (await sqlAdapter.getTableScheme('address'))!;
+            var cityIndexes = scheme.indexes!.entries
+                .where((e) => e.value.contains('city'))
+                .map((e) => e.key);
+            for (var name in cityIndexes) {
+              await testConfigSQL.runSQL(
+                isMySQL
+                    ? 'DROP INDEX $q$name$q ON ${q}address$q'
+                    : 'DROP INDEX $q$name$q',
+              );
+            }
+            sqlAdapter.disposeTableSchemeCache('address');
+          }
+
+          // A table created before `city` was added to the entity: `city`
+          // (renamed: its values kept) and its indexes missing.
+          await dropCityIndexes();
+          await testConfigSQL.runSQL(
+            'ALTER TABLE ${q}address$q RENAME COLUMN ${q}city$q TO '
+            '${q}city_tmp$q',
+          );
+          sqlAdapter.disposeTableSchemeCache('address');
+
+          try {
+            if (sqlAdapter.dialect.createIndexIfNotExists) {
+              // `checkTables` not pending (already checked): an error naming
+              // the missing column (not only the DB error).
+              await expectLater(
+                () async =>
+                    await sqlAdapter.populateTables(fullCreateTableSQLs),
+                throwsA(
+                  isA<StateError>().having(
+                    (e) => e.message,
+                    'message',
+                    contains(
+                      'table `address` exists without the columns [city]',
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              // MySQL (no `CREATE INDEX IF NOT EXISTS`): the `CREATE INDEX`
+              // errors are ignored.
+              expect(
+                await sqlAdapter.populateTables(fullCreateTableSQLs),
+                contains('address'),
+              );
+            }
+
+            // SQLite: a new adapter is another database (in memory) and
+            // replaces the test config's one (see `bones_api_cov_sqlite_test`).
+            var isSQLite = sqlAdapter.dialect.name.toLowerCase().contains(
+              'sqlite',
+            );
+
+            if (generateTables && checkTables && !isSQLite) {
+              // A new provider, as at boot: `generateTables` passes, and
+              // `checkTables` reports the missing column, with the SQLs to fix
+              // it (also its indexes).
+              var dbConfig = Map<String, dynamic>.of(
+                testConfigDB.apiConfigMap['db'] as Map<String, dynamic>,
+              )..remove('populate');
+
+              var provider = createEntityRepositoryProvider(
+                entityByReflection,
+                sqlAdapterCreator,
+                await testConfigDB.dbPort,
+                dbConfig,
+              );
+
+              try {
+                // Its initialization fails (logged): at `checkTables`.
+                await provider.ensureInitialized();
+                var adapter = await provider.adapter;
+
+                expect(adapter.generatedTables, isTrue);
+                expect(adapter.checkedTables, isFalse);
+              } finally {
+                provider.close();
+              }
+            }
+
+            // The suggested SQLs fix it (also the `city` indexes):
+            var ifNotExists = sqlAdapter.dialect.alterTableAddColumnIfNotExists;
+            await _checkFixedBySuggestedSQLs(
+              sqlAdapter,
+              testConfigSQL,
+              expectedSQLs: [
+                ifNotExists
+                    ? 'ADD COLUMN IF NOT EXISTS ${q}city$q'
+                    : 'ADD COLUMN ${q}city$q',
+                '${q}address__city__idx$q ON ${q}address$q (${q}city$q)',
+              ],
+            );
+          } finally {
+            // The original column (and indexes) back:
+            await dropCityIndexes();
+            var scheme = (await sqlAdapter.getTableScheme('address'))!;
+            if (scheme.fieldsNames.contains('city')) {
+              await testConfigSQL.runSQL(
+                'ALTER TABLE ${q}address$q DROP COLUMN ${q}city$q',
+              );
+            }
+            await testConfigSQL.runSQL(
+              'ALTER TABLE ${q}address$q RENAME COLUMN ${q}city_tmp$q TO '
+              '${q}city$q',
+            );
+            sqlAdapter.disposeTableSchemeCache('address');
+            await sqlAdapter.populateTables(fullCreateTableSQLs);
+            sqlAdapter.disposeTableSchemeCache('address');
+          }
+
+          expect(await sqlAdapter.checkDBTables(force: true), isTrue);
+        },
+      );
+
       test('store: insert, multiple and partial updates', () async {
         var sqlAdapter = await entityRepositoryProvider.adapter;
 

@@ -635,6 +635,86 @@ void main() {
       );
     });
 
+    test('extractCreateIndexInSQL', () {
+      var createIndex = DBSQLAdapter.extractCreateIndexInSQL(
+        'CREATE INDEX IF NOT EXISTS "t__a__idx" ON "t" ("a") ;',
+      )!;
+      expect(createIndex.table, equals('t'));
+      expect(createIndex.columns, equals(['a']));
+
+      createIndex = DBSQLAdapter.extractCreateIndexInSQL(
+        'CREATE UNIQUE INDEX `t__a_b__unique` ON `t` (`a`, b DESC)',
+      )!;
+      expect(createIndex.table, equals('t'));
+      expect(createIndex.columns, equals(['a', 'b']));
+      // An expression: unknown columns.
+      expect(
+        DBSQLAdapter.extractCreateIndexInSQL(
+          'CREATE INDEX t__a__idx ON t (lower(a))',
+        ),
+        isNull,
+      );
+      expect(
+        DBSQLAdapter.extractCreateIndexInSQL('CREATE TABLE t (a INT)'),
+        isNull,
+      );
+    });
+
+    test(
+      'populateTables: CREATE INDEX on a column missing in a table',
+      () async {
+        // A table created before the column `x` was added to the entity:
+        adapter.executeRawSQL('CREATE TABLE m (id INT)');
+
+        var sqls =
+            'CREATE TABLE IF NOT EXISTS "m" (id INT, x INT) ;\n'
+            'CREATE INDEX IF NOT EXISTS "m__x__idx" ON "m" ("x") ;\n'
+            'CREATE INDEX IF NOT EXISTS "m__id__idx" ON "m" ("id") ;\n';
+
+        // Skipped: left to `checkTables` (pending), and the next SQLs run.
+        expect(await adapter.populateTables(sqls), equals(['m']));
+        expect(
+          await adapter.findIndexesNamesInUse('m', ['m__x__idx', 'm__id__idx']),
+          equals({'m__id__idx': 'm'}),
+        );
+
+        // Not a missing column (no table `n2`): still an error.
+        expect(
+          () => adapter.populateTables(
+            'CREATE TABLE IF NOT EXISTS "n" (x INT) ;\n'
+            'CREATE INDEX IF NOT EXISTS "n__x__idx" ON "n2" ("x") ;',
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              startsWith('Error creating table SQL'),
+            ),
+          ),
+        );
+
+        // Without `checkTables`: an error naming the missing columns.
+        var adapter2 = DBSQLiteAdapter(sqliteMemoryPath, checkTables: false);
+        addTearDown(adapter2.close);
+
+        adapter2.executeRawSQL('CREATE TABLE m (id INT)');
+
+        expect(
+          () => adapter2.populateTables(sqls),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('`m` exists without the columns [x]'),
+                isNot(contains('[id]')),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
     test('removeSQLsComments: block comments', () {
       expect(
         DBSQLAdapter.removeSQLsComments('CREATE TABLE a (id INT) ; /* x */'),
@@ -1200,6 +1280,37 @@ void main() {
 
       expect(await _checkError(adapter), isNull);
       expect(adapter.checkedTables, isTrue);
+    });
+
+    test('generateTables: existing table missing indexed columns', () async {
+      var provider = _Provider(generateTables: true, checkTables: true);
+      addTearDown(provider.dispose);
+
+      // A table created before the columns were added to the entity: its
+      // generated `CREATE INDEX`es (`owner`, `code`) can't be created.
+      provider.adapter.executeRawSQL(
+        'CREATE TABLE item (id INTEGER PRIMARY KEY AUTOINCREMENT, title VARCHAR)',
+      );
+
+      // Not a failed `CREATE INDEX` of `generateTables`: reported by
+      // `checkTables`, with the SQLs to fix it.
+      await provider.ensureInitialized();
+      await provider.adapter.ensureInitialized();
+
+      expect(provider.adapter.generatedTables, isTrue);
+      expect(provider.adapter.checkedTables, isFalse);
+
+      var message = (await _checkError(provider.adapter))!;
+      expect(
+        message,
+        contains('  -- missingColumns: [String code , RoleType kind]'),
+      );
+      expect(
+        message,
+        contains(
+          'CREATE INDEX IF NOT EXISTS "item__owner__idx" ON "item" ("owner") ;',
+        ),
+      );
     });
 
     test('no table', () async {
