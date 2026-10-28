@@ -1964,6 +1964,57 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     caseSensitive: false,
   );
 
+  static final RegExp _regExpCreateIndexOn = RegExp(
+    r'''CREATE\s+(?:UNIQUE\s+)?INDEX\s.*?\sON\s+['"`]?(\w+)['"`]?\s*\((.*)\)''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  static final RegExp _regExpIndexColumn = RegExp(
+    r'''^['"`]?(\w+)['"`]?(?:\s+(?:ASC|DESC))?$''',
+    caseSensitive: false,
+  );
+
+  /// Extracts the table and the columns of a `CREATE INDEX` [sql].
+  /// Returns `null` if it's not a `CREATE INDEX`, or if an indexed element
+  /// isn't a plain column (e.g. an expression).
+  static ({String table, List<String> columns})? extractCreateIndexInSQL(
+    String sql,
+  ) {
+    var match = _regExpCreateIndexOn.firstMatch(sql);
+    if (match == null) return null;
+
+    var table = match.group(1)!;
+
+    var columns = <String>[];
+    for (var e in match.group(2)!.split(',')) {
+      var column = _regExpIndexColumn.firstMatch(e.trim())?.group(1);
+      if (column == null) return null;
+      columns.add(column);
+    }
+
+    return (table: table, columns: columns);
+  }
+
+  /// The columns of a failed `CREATE INDEX` [sql] missing in its (existing)
+  /// table: a table created before these columns were added to the entity
+  /// (`CREATE TABLE IF NOT EXISTS` doesn't add them).
+  /// Returns `null` if unknown (not a `CREATE INDEX`, or no table).
+  Future<List<String>?> _createIndexMissingColumns(String sql) async {
+    var createIndex = extractCreateIndexInSQL(sql);
+    if (createIndex == null) return null;
+
+    // Not cached: the next populated SQLs can change the table.
+    var fieldsTypes = await getTableFieldsTypesImpl(createIndex.table);
+    if (fieldsTypes == null) return null;
+
+    var tableColumns = fieldsTypes.keys.map((c) => c.toLowerCase()).toSet();
+
+    return createIndex.columns
+        .where((c) => !tableColumns.contains(c.toLowerCase()))
+        .toList();
+  }
+
   Future<List<String>> _populateTablesFromSQLsImpl(List<String> list) async {
     var tables = <String>[];
 
@@ -1972,12 +2023,34 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var ok = await executeTableSQL(sql);
       if (!ok) {
-        if (!dialect.createIndexIfNotExists) {
-          if (_regExpCreateIndex.hasMatch(sql)) {
+        if (_regExpCreateIndex.hasMatch(sql)) {
+          if (!dialect.createIndexIfNotExists) {
             _log.warning(
               "Ignoring CREATE INDEX error: the SQL dialect does NOT support `IF NOT EXISTS`. SQL> $sql",
             );
             continue;
+          }
+
+          var missingColumns = await _createIndexMissingColumns(sql);
+          if (missingColumns != null && missingColumns.isNotEmpty) {
+            var table = extractCreateIndexInSQL(sql)!.table;
+
+            // `checkTables` reports the missing columns (and this index),
+            // with the SQLs to fix them:
+            if (_checkTables) {
+              _log.warning(
+                "Skipping CREATE INDEX: table `$table` exists without the "
+                "columns $missingColumns (to be reported by `checkTables`). "
+                "SQL> $sql",
+              );
+              continue;
+            }
+
+            throw StateError(
+              "Error creating index SQL: table `$table` exists without the "
+              "columns $missingColumns (add them, or enable `checkTables` to "
+              "get the SQLs to fix it): $sql",
+            );
           }
         }
         throw StateError("Error creating table SQL: $sql");

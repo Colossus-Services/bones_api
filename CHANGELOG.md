@@ -1,3 +1,17 @@
+## 1.28.1
+
+- Fix: `generateTables` failing the initialization (PostgreSQL:
+  `42703: column "..." does not exist`) for an existing table without a
+  column added to the entity later, with an index over it: the
+  `CREATE TABLE IF NOT EXISTS` doesn't add the column, and its
+  `CREATE INDEX` failed.
+  - `DBSQLAdapter.populateTables`: a failing `CREATE INDEX` over columns
+    missing in its (existing) table is skipped, with a warning, when
+    `checkTables` is pending: it then reports the missing columns (and
+    indexes), with the SQLs to fix them. Without `checkTables`: an error
+    naming the missing columns.
+  - New `DBSQLAdapter.extractCreateIndexInSQL`.
+
 ## 1.28.0
 
 - Brotli (`br`) response compression, using `brotli_fast` (pure Dart),
