@@ -6,7 +6,9 @@
   - Updated `data_serializer` to ^1.2.3.
   - Updated `mercury_client` to ^2.4.0.
   - Updated `resource_portable` to ^3.1.4.
-  - Updated `shelf_letsencrypt` to ^2.0.7.
+  - Updated `shelf_letsencrypt` to ^2.0.8: since 2.0.4 (owner-only private
+    keys) it imported `dart:ffi`, failing the web compilation of code
+    importing `bones_api_server.dart` (like the browser tests).
   - Updated `shelf` to ^1.4.3.
   - Updated `shelf_static` to ^1.2.0.
   - Updated `meta` to ^1.19.0.
