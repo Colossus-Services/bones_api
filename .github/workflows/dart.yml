@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1.7.2
@@ -51,6 +52,8 @@ jobs:
   test_vm:
     name: test_vm (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    # A hung test process (normally ~5 min) fails instead of running for hours.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -105,6 +108,7 @@ jobs:
   test_chrome:
     name: test_chrome (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
