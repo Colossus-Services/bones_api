@@ -1,3 +1,29 @@
+## 1.29.1
+
+- Dependencies:
+  - Updated `async_events` to ^1.4.0.
+  - Updated `statistics` to ^1.2.2.
+  - Updated `data_serializer` to ^1.2.3.
+  - Updated `mercury_client` to ^2.4.0.
+  - Updated `resource_portable` to ^3.1.4.
+  - Updated `shelf_letsencrypt` to ^2.0.7.
+  - Updated `shelf` to ^1.4.3.
+  - Updated `shelf_static` to ^1.2.0.
+  - Updated `meta` to ^1.19.0.
+  - Updated `petitparser` to ^7.1.0.
+  - Updated `mime` to ^2.1.0.
+  - Updated `postgres` to ^3.5.20.
+  - Updated `sqlite3` to ^3.8.0.
+  - Updated `yaml` to ^3.1.4.
+  - Updated `crypto` to ^3.0.8.
+  - Updated `archive` to ^4.5.2.
+  - Updated `googleapis_auth` to ^2.3.5.
+  - Updated `_discoveryapis_commons` to ^1.0.8.
+  - Updated `web` to ^1.1.2.
+  - Updated `test` to ^1.33.0.
+  - Updated `coverage` to ^1.16.0.
+  - Updated `vm_service` to ^15.4.0.
+
 ## 1.29.0
 
 - A route refused by an `APIRouteAuthenticatedRule` (or a subclass, like
