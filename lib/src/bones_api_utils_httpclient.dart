@@ -19,10 +19,11 @@ Map<String, dynamic> decodeQueryStringParameters(
 
   for (var pair in pairs) {
     if (pair.isEmpty) continue;
-    var kv = pair.split('=');
+    // Split on the first `=` only: a value can contain `=` (`a=b=c`).
+    var idx = pair.indexOf('=');
 
-    var k = kv[0];
-    var v = kv.length > 1 ? kv[1] : '';
+    var k = idx >= 0 ? pair.substring(0, idx) : pair;
+    var v = idx >= 0 ? pair.substring(idx + 1) : '';
 
     k = _decodeQueryComponent(k, encoding);
     v = _decodeQueryComponent(v, encoding);

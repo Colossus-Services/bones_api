@@ -14,19 +14,19 @@ dependencies:
   async_events: ^1.4.0
   reflection_factory: ^2.13.0
   statistics: ^1.2.2
-  swiss_knife: ^3.4.0
+  swiss_knife: ^3.4.1
   data_serializer: ^1.2.3
   shared_map: ^1.1.9
-  graph_explorer: ^1.1.1
-  ascii_art_tree: ^1.1.0
+  graph_explorer: ^1.1.2
+  ascii_art_tree: ^1.1.1
   map_history: ^1.0.7
-  dart_spawner: ^1.2.0
+  dart_spawner: ^1.2.1
   yaml_writer: ^2.1.0
   mercury_client: ^2.4.0
   project_template: ^1.1.1
   resource_portable: ^3.1.4
   docker_commander: ^3.1.0
-  args_simple: ^1.2.0
+  args_simple: ^1.2.1
   shelf_letsencrypt: ^2.0.8
   shelf: ^1.4.3
   shelf_gzip: ^4.1.0

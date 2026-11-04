@@ -366,6 +366,13 @@ void main() {
       );
     });
 
+    test('value with `=`', () {
+      expect(
+        decodeQueryStringParameters('a=b=c&t=x%3Dy=z&e='),
+        equals({'a': 'b=c', 't': 'x=y=z', 'e': ''}),
+      );
+    });
+
     test('charsets', () {
       // `%E9` is an invalid UTF-8 sequence: falls back to latin1.
       expect(decodeQueryStringParameters('n=caf%E9'), equals({'n': 'café'}));
