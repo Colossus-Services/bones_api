@@ -798,6 +798,82 @@ void main() {
         await expectNotReported();
       });
 
+      // The `transactionResult` set in another error zone: the adapter opened
+      // the transaction (by its operations) outside `execute`, in the
+      // caller's zone. Before 1.30.2 its error never reached `execute` (or
+      // `commit` called from another error zone): a hang, with the error
+      // only reported as uncaught in the zone that set it.
+      Future<(Transaction, List<Object>)> transactionResultFromOtherZone(
+        String message,
+      ) async {
+        var t = Transaction();
+        var op = _select(t);
+        var otherZoneErrors = <Object>[];
+
+        runZonedGuarded(() {
+          t.transactionResult = Future<Object?>.delayed(
+            const Duration(milliseconds: 5),
+            () => throw StateError(message),
+          );
+        }, (e, s) => otherZoneErrors.add(e));
+
+        await op.finish(1);
+        return (t, otherZoneErrors);
+      }
+
+      test('transactionResult from another error zone: execute', () async {
+        var (t, otherZoneErrors) = await transactionResultFromOtherZone(
+          'other zone commit (execute)',
+        );
+
+        var outcome = await _outcomeOf(() => t.execute(() => 1));
+        expect(outcome.error, _stateError('other zone commit (execute)'));
+
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, same(outcome.error));
+        expect(otherZoneErrors, isEmpty);
+        await expectNotReported();
+      });
+
+      test('transactionResult from another error zone: commit', () async {
+        var (t, otherZoneErrors) = await transactionResultFromOtherZone(
+          'other zone commit (commit)',
+        );
+
+        // A 2nd (concurrent) `commit` returns the `transactionResult` too:
+        var commit1 = _outcomeOf(() => t.commit<int>());
+        var commit2 = _outcomeOf(() => t.commit<int>());
+
+        expect(
+          (await commit1).error,
+          _stateError('other zone commit (commit)'),
+        );
+        expect(
+          (await commit2).error,
+          _stateError('other zone commit (commit)'),
+        );
+
+        await _expectFinished(t, committed: false);
+        expect(otherZoneErrors, isEmpty);
+        await expectNotReported();
+      });
+
+      test('transactionResult from another error zone: abort', () async {
+        var (t, otherZoneErrors) = await transactionResultFromOtherZone(
+          'other zone rollback',
+        );
+
+        var outcome = await _outcomeOf(
+          () => t.execute<int>(() => throw StateError('block (other zone)')),
+        );
+        expect(outcome.error, isNull);
+        expect(outcome.value, isNull);
+
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, _stateError('block (other zone)'));
+        expect(otherZoneErrors, isEmpty);
+      });
+
       // A 2nd (concurrent) `commit` while the closer is failing: `null` (as
       // for an aborted transaction), not the `TransactionAbortedError`.
       test('commit: concurrent commit while the closer fails', () async {

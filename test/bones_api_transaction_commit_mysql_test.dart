@@ -33,7 +33,10 @@ void main() {
     ),
     createTablesSQLs: [_createTableSQL],
     storeWithFailingCommit: (t, p) async {
-      await p.ownerRepository.store(CommitTestOwner(name: 'lost'));
+      await p.ownerRepository.store(
+        CommitTestOwner(name: 'lost'),
+        transaction: t,
+      );
 
       var connection = t.context as DBMySqlConnectionWrapper;
       await connection.nativeConnection.close();

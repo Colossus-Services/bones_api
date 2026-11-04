@@ -82,8 +82,10 @@ Future<({Object? value, Object? error})> commitTestOutcomeOf(
 
 /// Tests a real (asynchronous) `COMMIT` that fails, with a DB adapter:
 /// - [createTablesSQLs]: creates the table `commit_test_owner` (`id`, `name`).
-/// - [storeWithFailingCommit]: stores in the executing transaction (one or
-///   more [CommitTestOwner]s) so that its `COMMIT` fails.
+/// - [storeWithFailingCommit]: stores in the transaction (one or more
+///   [CommitTestOwner]s, passing it as `transaction`) so that its `COMMIT`
+///   fails. Called inside its `execute`, or before it (with the transaction
+///   already open: not its 1st operation).
 /// - [commitError]: matches the `COMMIT` error.
 void runTransactionCommitErrorTests({
   required String dbName,
@@ -196,6 +198,51 @@ void runTransactionCommitErrorTests({
       );
 
       await expectFailedCommit(transaction!, outcome);
+      await expectNextTransactionWorks();
+    });
+
+    // The transaction is opened (by its operations) before `execute`, in the
+    // caller's error `Zone`, where the adapter's `COMMIT` (`transactionResult`)
+    // fails. Before 1.30.2 the commit, inside the transaction's error `Zone`,
+    // never received that error: a hang.
+    Future<Transaction> openBeforeExecute() async {
+      var t = Transaction();
+      // The 1st operation runs without opening the transaction (a single
+      // operation): the next ones open it.
+      expect(await provider.ownerRepository.count(transaction: t), equals(0));
+      await storeWithFailingCommit(t, provider);
+      expect(t.isOpen, isTrue);
+      expect(Transaction.executingTransaction, isNull);
+      return t;
+    }
+
+    test('transaction opened before Transaction.execute', () async {
+      var t = await openBeforeExecute();
+
+      var outcome = await commitTestOutcomeOf(
+        () => t.execute<Object?>(() => 1),
+      );
+
+      await expectFailedCommit(t, outcome);
+      await expectNextTransactionWorks();
+    });
+
+    test('transaction opened before Transaction.executeOrError', () async {
+      var t = await openBeforeExecute();
+      var onErrorCalls = 0;
+
+      var outcome = await commitTestOutcomeOf(
+        () => t.executeOrError<Object?>(
+          () => 1,
+          onError: (tr, e, s) {
+            ++onErrorCalls;
+            return -1;
+          },
+        ),
+      );
+
+      await expectFailedCommit(t, outcome);
+      expect(onErrorCalls, equals(0));
       await expectNextTransactionWorks();
     });
   });

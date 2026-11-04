@@ -6785,7 +6785,45 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
   }
 
-  FutureOr? transactionResult;
+  FutureOr? _transactionResult;
+
+  Zone? _transactionResultZone;
+
+  /// The result of this transaction in the [DBAdapter] (its `COMMIT`, or its
+  /// rollback when aborted), set by the adapter when it opens this
+  /// transaction.
+  ///
+  /// A `Future` is always listened to inside the `Zone` where it was set,
+  /// since Dart never delivers the error of a `Future` across error zones:
+  /// a transaction can be opened (by its operations) outside [execute], in
+  /// the caller's error zone, and committed inside [execute], in the
+  /// transaction's error `Zone`.
+  FutureOr? get transactionResult => _transactionResult;
+
+  set transactionResult(FutureOr? value) {
+    _transactionResult = value;
+    _transactionResultZone = value is Future ? Zone.current : null;
+  }
+
+  /// The [transactionResult] [future], receivable in the current `Zone`: if
+  /// it was set in another error zone, it's listened to inside that zone and
+  /// forwarded to a `Future` of the current `Zone` (its value or error).
+  Future<Object?> _transactionResultFuture(Future future) {
+    final resultZone = _transactionResultZone;
+    final currentZone = Zone.current;
+
+    if (resultZone == null || currentZone.inSameErrorZone(resultZone)) {
+      return future;
+    }
+
+    final completer = currentZone.createCompleter<Object?>();
+    // Listened to inside `resultZone` (the same error zone as `future`), to
+    // also receive its error:
+    resultZone.run(
+      () => future.then(completer.complete, onError: completer.completeError),
+    );
+    return completer.future;
+  }
 
   Object? _result;
 
@@ -6994,7 +7032,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     if (_commitCalled) {
       FutureOr<dynamic> retFuture;
-      if (transactionResult != null) {
+      var transactionResult = this.transactionResult;
+      if (transactionResult is Future) {
+        retFuture = _transactionResultFuture(transactionResult);
+      } else if (transactionResult != null) {
         retFuture = transactionResult;
       } else {
         retFuture = _transactionCompleter.future;
@@ -7129,9 +7170,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         var parentStackTrace = _debugStackTrace();
 
         // A failed `COMMIT` of the adapter: see `_commitCompleteGuarded`.
-        var ret = transactionResult.then(
-          (r) => _commitCompleteFinish<R>(r, parentStackTrace),
-        );
+        // The transaction may have been opened (and its `transactionResult`
+        // set) in another error zone: see `_transactionResultFuture`.
+        var ret = _transactionResultFuture(transactionResult)
+            .then((r) => _commitCompleteFinish<R>(r, parentStackTrace));
 
         _transactionCompleter.complete(result);
         return ret;
@@ -7303,9 +7345,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _close();
 
+    var transactionResult = this.transactionResult;
     if (transactionResult != null) {
       if (transactionResult is Future) {
-        return (transactionResult as Future).then(
+        // Opened in another error zone: see `_transactionResultFuture`.
+        return _transactionResultFuture(transactionResult).then(
           (r) {
             _resultCompleter.complete(null);
             return abortError;
@@ -7318,7 +7362,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
           },
         );
       } else {
-        return transactionResult!.resolveMapped((r) {
+        return transactionResult.resolveMapped((r) {
           _resultCompleter.complete(null);
           return abortError;
         });

@@ -33,8 +33,14 @@ void main() {
     ),
     createTablesSQLs: [_createTableSQL],
     storeWithFailingCommit: (t, p) async {
-      await p.ownerRepository.store(CommitTestOwner(name: 'dup'));
-      await p.ownerRepository.store(CommitTestOwner(name: 'dup'));
+      await p.ownerRepository.store(
+        CommitTestOwner(name: 'dup'),
+        transaction: t,
+      );
+      await p.ownerRepository.store(
+        CommitTestOwner(name: 'dup'),
+        transaction: t,
+      );
     },
     commitError: predicate(
       (e) =>

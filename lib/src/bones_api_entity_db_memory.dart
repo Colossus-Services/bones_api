@@ -1707,13 +1707,13 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     Transaction transaction,
     DBSQLMemoryAdapterContext? connection,
   ) {
-    var result2 = super.resolveTransactionResult(
-      result,
-      transaction,
-      connection,
-    );
-
-    if (connection != null && result2 is! TransactionAbortedError) {
+    // `super.resolveTransactionResult` is `async` (always a `Future`): the
+    // check is on the `result` itself. An aborted transaction is cancelled
+    // by `super` (rolled back, and its context disposed): it's not also
+    // consolidated, nor its context disposed again. A committed one is
+    // consolidated synchronously, as soon as its `transactionFuture`
+    // completes.
+    if (connection != null && result is! TransactionAbortedError) {
       var consolidated = _consolidateTransactionContext(connection);
       if (consolidated != null && consolidated) {
         releaseIntoPool(connection);
@@ -1722,7 +1722,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       }
     }
 
-    return result2;
+    return super.resolveTransactionResult(result, transaction, connection);
   }
 
   @override
