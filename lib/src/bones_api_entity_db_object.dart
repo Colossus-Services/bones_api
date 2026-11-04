@@ -127,9 +127,7 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider,
-    ];
+    return <Initializable>[?parentRepositoryProvider];
   }
 }
 

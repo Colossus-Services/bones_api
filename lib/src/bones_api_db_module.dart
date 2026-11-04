@@ -1184,7 +1184,7 @@ class APIDBModule extends APIModule {
     return _normalizeEntityJson(o);
   }
 
-  Map<String, dynamic> _normalizeEntityJson(o) {
+  Map<String, dynamic> _normalizeEntityJson(Object? o) {
     if (o is Map) {
       return o.entries.map((e) {
         var value = _normalizeEntityJsonValue(e.value);
@@ -1195,7 +1195,7 @@ class APIDBModule extends APIModule {
     }
   }
 
-  Object? _normalizeEntityJsonValue(value) {
+  Object? _normalizeEntityJsonValue(Object? value) {
     if (value is Map) {
       if (value.containsKey('EntityReference') && value.containsKey('id')) {
         value = value['id'];

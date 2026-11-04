@@ -1346,10 +1346,7 @@ class APIServerConfig {
       checkDirectoryExistence: checkDirectoryExistence,
     );
 
-    var domains2 = {
-      ...domains,
-      if (documentRootDir != null) RegExp(r'.*'): documentRootDir,
-    };
+    var domains2 = {...domains, RegExp(r'.*'): ?documentRootDir};
 
     return domains2;
   }
@@ -3218,10 +3215,7 @@ final class APIServerWorker extends _APIServerBase {
     var file = fileResolved.file;
     var fileNotFound = fileResolved.fileNotFound;
 
-    return {
-      if (file != null) 'file': file,
-      if (fileNotFound != null) 'file_not_found': fileNotFound,
-    };
+    return {'file': ?file, 'file_not_found': ?fileNotFound};
   }
 
   ({File? file, File? fileNotFound})? _resolveStaticFile(

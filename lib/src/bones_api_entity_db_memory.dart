@@ -73,7 +73,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   }
 
   static FutureOr<DBSQLMemoryAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,
@@ -187,9 +187,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider,
-    ];
+    return <Initializable>[?parentRepositoryProvider];
   }
 
   @override

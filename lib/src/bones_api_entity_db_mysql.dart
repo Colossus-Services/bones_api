@@ -44,7 +44,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   static FutureOr<DBMySQLAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,
@@ -121,8 +121,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              // MySQL can't parse an `OFFSET` without a preceding `LIMIT`:
              offsetRequiresLimit: true,
              maxIdentifierLength: 64,
-             // `mysql1` can't reuse prepared statements, and a statement with
-             // parameters costs 2 round trips: IDs written as values.
+             // `mysql1` has no prepared statements (since 0.21 it writes the
+             // parameters into the statement as literals): IDs as values.
              maxIDsAsParameters: 0,
            ),
            transactions: true,
@@ -226,9 +226,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider,
-    ];
+    return <Initializable>[?parentRepositoryProvider];
   }
 
   @override
@@ -759,7 +757,9 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
     var results = await connection.query(sql);
 
-    var referenceFields = results.map((r) => r.fields).toList(growable: false);
+    var referenceFields = results
+        .map((r) => r.toColumnMap())
+        .toList(growable: false);
 
     var mapEntriesRet = referenceFields
         .map((e) {
@@ -926,10 +926,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
-          var ids = results
-              .map((e) => e.fields)
-              .whereType<Map<String, dynamic>>()
-              .map((e) => e['id']);
+          var ids = results.map((e) => e['id']);
 
           return parseIDs<I>(ids);
         });
@@ -950,11 +947,11 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         .resolveMapped(_resultsToEntitiesMaps);
   }
 
-  /// Each row as a `Map` by column name, built from its `values` (not its
-  /// `fields`): `mysql1` leaves a `NULL` column out of a row's `fields` when
-  /// the statement has parameters (its binary protocol), so the entity would
-  /// get the field's default instead of `null`.
-  List<Map<String, dynamic>> _resultsToEntitiesMaps(Results? results) {
+  /// Each row as a `Map` by column name, built from its `values` and the
+  /// result's columns: every column is present (a `NULL` one as `null`), so
+  /// the entity never gets a field's default instead of `null` (`mysql1` <
+  /// 0.21 left a `NULL` column out of a row's `fields` with parameters).
+  List<Map<String, dynamic>> _resultsToEntitiesMaps(Result? results) {
     if (results == null) return <Map<String, dynamic>>[];
 
     final columns = results.fields;
@@ -996,7 +993,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     }
   }
 
-  FutureOr<List<Results>> _executeSQLs(
+  FutureOr<List<Result>> _executeSQLs(
     List<SQL> sql,
     DBMySqlConnectionWrapper connection,
   ) => sql
@@ -1010,7 +1007,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     SQL sql,
     DBMySqlConnectionWrapper connection,
   ) {
-    FutureOr<Results?> sqlRet = sql.isDummy
+    FutureOr<Result?> sqlRet = sql.isDummy
         ? null
         : connection.query(sql.sqlPositional, sql.parametersValuesByPosition);
 
@@ -1059,7 +1056,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     return connection
         .query(sql.sqlPositional, sql.parametersValuesByPosition)
         .resolveMapped((results) {
-          var affectedRows = results.affectedRows ?? 0;
+          var affectedRows = results.affectedRows;
           if (affectedRows == 0) {
             var entry = sql.parametersByPlaceholder;
             if (!allowAutoInsert) {
@@ -1093,8 +1090,13 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         });
   }
 
-  _resolveResultID(Results results, String table, SQL sql, [Object? entityId]) {
-    if (entityId != null && (results.affectedRows ?? 0) > 0) {
+  Object? _resolveResultID(
+    Result results,
+    String table,
+    SQL sql, [
+    Object? entityId,
+  ]) {
+    if (entityId != null && results.affectedRows > 0) {
       return entityId;
     }
 
@@ -1256,9 +1258,9 @@ abstract class DBMySqlConnectionWrapper
     extends DBConnectionWrapper<MySqlConnection> {
   DBMySqlConnectionWrapper(super.nativeConnection);
 
-  Future<Results> query(String sql, [List<Object?>? values]);
+  Future<Result> query(String sql, [List<Object?>? values]);
 
-  Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values);
+  Future<List<Result>> queryMulti(String sql, Iterable<List<Object?>> values);
 
   Future openTransaction(
     Future Function(DBMySqlConnectionWrapper connectionTransaction) queryBlock,
@@ -1268,6 +1270,23 @@ abstract class DBMySqlConnectionWrapper
   bool isClosedImpl() => _nativeClose;
 
   bool _nativeClose = false;
+
+  /// `mysql1` (since 0.21) closes the connection when a query fails with
+  /// anything but a [MySqlException] (a timeout, a socket error...), without
+  /// exposing it: marks this wrapper closed, so the pool discards it instead
+  /// of handing out a connection that can't be written to.
+  void _onNativeConnectionClosed() => _nativeClose = true;
+
+  Future<T> _trackNativeClose<T>(Future<T> query) async {
+    try {
+      return await query;
+    } on MySqlException {
+      rethrow;
+    } catch (_) {
+      _onNativeConnectionClosed();
+      rethrow;
+    }
+  }
 
   @override
   void closeImpl() {
@@ -1291,17 +1310,18 @@ class _DBMySqlConnectionWrapped extends DBMySqlConnectionWrapper {
   }
 
   @override
-  Future<Results> query(String sql, [List<Object?>? values]) {
+  Future<Result> query(String sql, [List<Object?>? values]) {
     updateLastAccessTime();
-    return nativeConnection.query(sql, values?.cast<Object?>());
+    return _trackNativeClose(
+      nativeConnection.query(sql, values?.cast<Object?>()),
+    );
   }
 
   @override
-  Future<List<Results>> queryMulti(String sql, Iterable<List<Object?>> values) {
+  Future<List<Result>> queryMulti(String sql, Iterable<List<Object?>> values) {
     updateLastAccessTime();
-    return nativeConnection.queryMulti(
-      sql,
-      values.map((e) => e.cast<Object?>()),
+    return _trackNativeClose(
+      nativeConnection.queryMulti(sql, values.map((e) => e.cast<Object?>())),
     );
   }
 
@@ -1331,14 +1351,20 @@ class _DBMySqlConnectionTransaction extends DBMySqlConnectionWrapper {
   String get connectionURL => parent.connectionURL;
 
   @override
-  Future<Results> query(String sql, [List<Object?>? values]) =>
-      transaction.query(sql, values?.cast<Object?>());
+  void _onNativeConnectionClosed() {
+    super._onNativeConnectionClosed();
+    parent._onNativeConnectionClosed();
+  }
 
   @override
-  Future<List<Results>> queryMulti(
-    String sql,
-    Iterable<List<Object?>> values,
-  ) => transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
+  Future<Result> query(String sql, [List<Object?>? values]) =>
+      _trackNativeClose(transaction.query(sql, values?.cast<Object?>()));
+
+  @override
+  Future<List<Result>> queryMulti(String sql, Iterable<List<Object?>> values) =>
+      _trackNativeClose(
+        transaction.queryMulti(sql, values.map((e) => e.cast<Object?>())),
+      );
 
   @override
   String get runtimeTypeNameSafe => '_DBMySqlConnectionTransaction';

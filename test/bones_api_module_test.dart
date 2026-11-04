@@ -597,13 +597,10 @@ Map<String, Object?> _buildTestUserJson(
         : (userInfoRef
               ? {
                   'EntityReference': 'UserInfo',
-                  if (userInfoId != null) 'id': userInfoId,
-                  'entity': {
-                    if (userInfoId != null) 'id': userInfoId,
-                    'info': userInfo,
-                  },
+                  'id': ?userInfoId,
+                  'entity': {'id': ?userInfoId, 'info': userInfo},
                 }
-              : {if (userInfoId != null) 'id': userInfoId, 'info': userInfo}),
+              : {'id': ?userInfoId, 'info': userInfo}),
     'creationTime': 1665501194000,
   };
 }

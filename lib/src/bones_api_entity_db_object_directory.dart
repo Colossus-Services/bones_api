@@ -78,7 +78,7 @@ class DBObjectDirectoryAdapter
   }
 
   static FutureOr<DBObjectDirectoryAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,

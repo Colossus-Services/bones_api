@@ -1,3 +1,56 @@
+## 1.30.0
+
+- `Transaction.execute`/`executeOrError`: a commit that fails synchronously
+  (e.g. a synchronous closer, as with the memory/SQLite adapters) now reaches
+  the caller. It was passed to the `onError` of the internal `asyncTry` and
+  swallowed: the block's result was returned as if the commit succeeded
+  (`async_extension` 1.2.24 fix: an `onFinally` error replaces the result, as
+  in a Dart `try/finally`). A commit error is never passed to `onError`.
+- `DBMySQLAdapter`:
+  - Adapted to `mysql1` 0.22: `Result` (was `Results`, deprecated),
+    `ResultRow.toColumnMap()`/`row[name]` (was the deprecated `fields`), a
+    non-null `affectedRows`. `DBMySqlConnectionWrapper.query`/`queryMulti`
+    return `Future<Result>` (the same type: `Results` is a `typedef` of it).
+  - A connection whose query fails with anything but a `MySqlException` (a
+    timeout, a socket error) is marked closed, so the pool discards it:
+    `mysql1` (since 0.21) closes it in that case, without exposing it.
+  - Note: since `mysql1` 0.21 query parameters are written into the SQL as
+    literals (no prepared statements), and a `DateTime` is sent with its
+    fractional seconds, which the server rounds to the column precision
+    (`TIMESTAMP`: whole seconds). It used to be truncated.
+- `Time`: the comparison operators are typed `bool`, and `+`/`-` `Time`
+  (they were `dynamic`).
+- `lints` 6: explicit types (`strict_top_level_inference`) and null-aware
+  elements (`use_null_aware_elements`).
+- `decodeQueryStringParameters`: split each pair on the first `=` only
+  (`a=b=c` decoded to `{'a': 'b'}`; now `{'a': 'b=c'}`), as `swiss_knife`
+  3.4.1 fixed in its `decodeQueryString`.
+- `APIModuleProxyHttpCaller` (responses): with `swiss_knife` 3.4.1 an
+  `application/xhtml+xml` response is a `MimeType` with `isXHTML` (it parsed as
+  `application/xhtml`): it's read as text, never decoded as JSON.
+- New tests for a failing commit in `Transaction.execute` (sync and async),
+  and for a MySQL connection closed by `mysql1`.
+- GitHub Actions: `dart-lang/setup-dart@v1.8.1`.
+  - Fixed the intermittent hang of the `test_vm (unit)` job:
+    `bones_api_utils_weaklist_test` opened a VM service connection per GC
+    and never disposed them. The `test_vm` jobs' timeout is now 12 min.
+
+- Dependencies:
+  - Updated `async_extension` to ^1.2.24.
+  - Updated `swiss_knife` to ^3.4.1 (of its behaviour fixes only the
+    `MimeType` one above affects `bones_api`).
+  - Updated `mysql1` to ^0.22.0.
+  - Updated `gcloud` to ^0.9.0.
+  - Updated `archive` to ^4.6.0 (only its encoder is used: its decoders'
+    new error contract doesn't apply).
+  - Updated `args_simple` to ^1.2.1.
+  - Updated `ascii_art_tree` to ^1.1.1.
+  - Updated `dart_spawner` to ^1.2.1.
+  - Updated `graph_explorer` to ^1.1.2.
+  - Updated `lints` to ^6.1.0.
+  - `build_runner` kept at ^2.16.2: 2.17 requires `build` 5, and
+    `reflection_factory` 2.13 requires `build` ^4.
+
 ## 1.29.1
 
 - Dependencies:

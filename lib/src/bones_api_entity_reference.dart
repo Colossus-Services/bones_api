@@ -414,7 +414,7 @@ abstract class EntityReferenceBase<T> {
     }
   }
 
-  void _checkValidEntity(entity) {
+  void _checkValidEntity(Object entity) {
     if (_isInvalidEntity(entity)) {
       var type = this.type;
       throw StateError(
@@ -1159,7 +1159,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       var id = this.id;
       return <String, dynamic>{
         'EntityReference': typeName,
-        if (id != null) 'id': id,
+        'id': ?id,
         'entity': entityToJson(jsonEncoder),
       };
     } else if (isIdSet) {
@@ -1534,7 +1534,10 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
          checkGenericType,
        );
 
-  static _normalizeIDs<T>(EntityHandler<T>? entityHandler, List<Object?>? ids) {
+  static List? _normalizeIDs<T>(
+    EntityHandler<T>? entityHandler,
+    List<Object?>? ids,
+  ) {
     return entityHandler != null
         ? entityHandler.normalizeIDs(ids)
         : ids?.toList();

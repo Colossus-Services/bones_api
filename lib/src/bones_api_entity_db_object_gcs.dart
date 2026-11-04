@@ -72,7 +72,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   static FutureOr<DBObjectGCSAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,
@@ -272,7 +272,7 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
   }
 
   static Future<auth.AutoRefreshingAuthClient> createGCSClient(
-    credential,
+    Object? credential,
   ) async {
     if (credential is String) {
       var credentialLC = credential.toLowerCase();

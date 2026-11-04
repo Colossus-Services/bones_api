@@ -8633,7 +8633,7 @@ abstract class IterableEntityRepository<O extends Object>
   }
 
   FutureOr<dynamic> _ensureStoredImpl(
-    o,
+    dynamic o,
     Transaction? transaction,
     TransactionOperation? parentOperation,
   ) {

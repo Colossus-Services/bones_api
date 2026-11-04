@@ -77,7 +77,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   }
 
   static FutureOr<DBSQLiteAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,
@@ -297,9 +297,7 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider,
-    ];
+    return <Initializable>[?parentRepositoryProvider];
   }
 
   @override
