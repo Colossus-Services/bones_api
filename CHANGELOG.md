@@ -7,9 +7,9 @@
   `COMMIT`) when it opens the transaction, in the caller's error `Zone`, and
   the commit listened to it inside the transaction's error `Zone`: the error
   was only reported as uncaught in the caller's zone, and `execute` never
-  completed. The same for the rollback of an aborted transaction (its
-  `resultFuture` never completed), and for `commit` called from another error
-  zone.
+  completed. The same for an aborted transaction (a block error) whose
+  rollback fails (as the adapters do): `execute` and its `resultFuture` never
+  completed. And for `commit` called from another error zone.
   - `Transaction.transactionResult` is now a getter/setter that records the
     `Zone` where it's set: a `Future` is listened to inside that zone, and
     its value or error forwarded to the zone of the commit (or abort).
