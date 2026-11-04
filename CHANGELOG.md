@@ -31,6 +31,9 @@
 - New tests for a failing commit in `Transaction.execute` (sync and async),
   and for a MySQL connection closed by `mysql1`.
 - GitHub Actions: `dart-lang/setup-dart@v1.8.1`.
+  - Fixed the intermittent hang of the `test_vm (unit)` job:
+    `bones_api_utils_weaklist_test` opened a VM service connection per GC
+    and never disposed them. The `test_vm` jobs' timeout is now 12 min.
 
 - Dependencies:
   - Updated `async_extension` to ^1.2.24.
