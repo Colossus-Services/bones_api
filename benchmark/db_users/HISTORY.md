@@ -23,45 +23,56 @@ its date's column here too.
 
 ### `memory`
 
-| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
-|---|--:|--:|--:|
-| `user/byId` | 25303 | 30312 (+19.8%) | 30937 (+2.1%) |
-| `user/byEmail` | 1407 | 1449 (+3.0%) | 1437 (-0.8%) |
-| `user/byState (join, limit 20)` | 1409 | 1594 (+13.1%) | 1601 (+0.4%) |
-| `user/list (page of 20)` | 682 | 720 (+5.6%) | 719 (-0.1%) |
-| `user/count` | 193802 | 320214 (+65.2%) | 320629 (+0.1%) |
-| `authenticate (login)` | 1393 | 1459 (+4.7%) | 1491 (+2.2%) |
-| `user/register` | 2623 | 3514 † | 3525 (+0.3%) |
-| `user/update` | 1881 | 5215 † | 5190 (-0.5%) |
-| `user/remove` | 19969 | 12506 † | 12476 (-0.2%) |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 | 2026-10-15 |
+|---|--:|--:|--:|--:|
+| `user/byId` | 25303 | 30312 (+19.8%) | 30937 (+2.1%) | 35186 (+13.7%) |
+| `user/byEmail` | 1407 | 1449 (+3.0%) | 1437 (-0.8%) | 1478 (+2.9%) |
+| `user/byState (join, limit 20)` | 1409 | 1594 (+13.1%) | 1601 (+0.4%) | 1750 (+9.3%) |
+| `user/list (page of 20)` | 682 | 720 (+5.6%) | 719 (-0.1%) | 741 (+3.1%) |
+| `user/count` | 193802 | 320214 (+65.2%) | 320629 (+0.1%) | 321185 (+0.2%) |
+| `authenticate (login)` | 1393 | 1459 (+4.7%) | 1491 (+2.2%) | 1474 (-1.1%) |
+| `user/register` | 2623 | 3514 † | 3525 (+0.3%) | 3522 (-0.1%) |
+| `user/update` | 1881 | 5215 † | 5190 (-0.5%) | 5331 (+2.7%) |
+| `user/remove` | 19969 | 12506 † | 12476 (-0.2%) | 13410 (+7.5%) |
 
 ### `sqlite`
 
-| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
-|---|--:|--:|--:|
-| `user/byId` | 17138 | 21220 (+23.8%) | 24721 (+16.5%) |
-| `user/byEmail` | 16580 | 20528 (+23.8%) | 24067 (+17.2%) |
-| `user/byState (join, limit 20)` | 2326 | 3184 (+36.9%) | 3283 (+3.1%) |
-| `user/list (page of 20)` | 2405 | 3352 (+39.4%) | 3433 (+2.4%) |
-| `user/count` | 121903 | 162445 (+33.3%) | 195377 (+20.3%) |
-| `authenticate (login)` | 14764 | 18140 (+22.9%) | 20985 (+15.7%) |
-| `user/register` | 7727 | 8284 (+7.2%) | 9719 (+17.3%) |
-| `user/update` | 10302 | 11665 (+13.2%) | 13774 (+18.1%) |
-| `user/remove` | 13036 | 14247 (+9.3%) | 16953 (+19.0%) |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 | 2026-10-15 |
+|---|--:|--:|--:|--:|
+| `user/byId` | 17138 | 21220 (+23.8%) | 24721 (+16.5%) | 28183 (+14.0%) |
+| `user/byEmail` | 16580 | 20528 (+23.8%) | 24067 (+17.2%) | 27357 (+13.7%) |
+| `user/byState (join, limit 20)` | 2326 | 3184 (+36.9%) | 3283 (+3.1%) | 3874 (+18.0%) |
+| `user/list (page of 20)` | 2405 | 3352 (+39.4%) | 3433 (+2.4%) | 4098 (+19.4%) |
+| `user/count` | 121903 | 162445 (+33.3%) | 195377 (+20.3%) | 195471 (+0.0%) |
+| `authenticate (login)` | 14764 | 18140 (+22.9%) | 20985 (+15.7%) | 23181 (+10.5%) |
+| `user/register` | 7727 | 8284 (+7.2%) | 9719 (+17.3%) | 9794 (+0.8%) |
+| `user/update` | 10302 | 11665 (+13.2%) | 13774 (+18.1%) | 14748 (+7.1%) |
+| `user/remove` | 13036 | 14247 (+9.3%) | 16953 (+19.0%) | 17716 (+4.5%) |
 
 ### `postgres`
 
-| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 |
-|---|--:|--:|--:|
-| `user/byId` | 1453 | 1436 (-1.2%) | 1795 (+25.0%) |
-| `user/byEmail` | 1518 | 1414 (-6.9%) | 1823 (+28.9%) |
-| `user/byState (join, limit 20)` | 537 | 733 (+36.5%) | 887 (+21.0%) |
-| `user/list (page of 20)` | 490 | 810 (+65.3%) | 888 (+9.6%) |
-| `user/count` | 6167 | 5424 (-12.0%) | 6693 (+23.4%) |
-| `authenticate (login)` | 1474 | 1350 (-8.4%) | 1724 (+27.7%) |
-| `user/register` | 611 | 629 (+2.9%) | 718 (+14.1%) |
-| `user/update` | 713 | 684 (-4.1%) | 850 (+24.3%) |
-| `user/remove` | 803 | 762 (-5.1%) | 890 (+16.8%) |
+| Operation | 2026-10-03 | 2026-10-13 | 2026-10-14 | 2026-10-15 |
+|---|--:|--:|--:|--:|
+| `user/byId` | 1453 | 1436 (-1.2%) | 1795 (+25.0%) | 1740 (-3.1%) |
+| `user/byEmail` | 1518 | 1414 (-6.9%) | 1823 (+28.9%) | 1793 (-1.6%) |
+| `user/byState (join, limit 20)` | 537 | 733 (+36.5%) | 887 (+21.0%) | 885 (-0.2%) |
+| `user/list (page of 20)` | 490 | 810 (+65.3%) | 888 (+9.6%) | 898 (+1.1%) |
+| `user/count` | 6167 | 5424 (-12.0%) | 6693 (+23.4%) | 6625 (-1.0%) |
+| `authenticate (login)` | 1474 | 1350 (-8.4%) | 1724 (+27.7%) | 1750 (+1.5%) |
+| `user/register` | 611 | 629 (+2.9%) | 718 (+14.1%) | 732 (+1.9%) |
+| `user/update` | 713 | 684 (-4.1%) | 850 (+24.3%) | 820 (-3.5%) |
+| `user/remove` | 803 | 762 (-5.1%) | 890 (+16.8%) | 888 (-0.2%) |
+
+2026-10-15: 1.23.1 at `6eb32fa`, the median of 5 rounds (`--repeat 5`),
+on AC power with the machine idle. Since 2026-10-14: direct constructor
+calls with `reflection_factory` 2.12 (1.23.0), so entities are built
+without the reflective invocation path. SQLite gained the most: the
+operations that build 20 entities (`byState`, `list`) +18–19%,
+single-entity reads +14%, `login` +10%; `count`, which builds no entity,
+is unchanged. Memory, where table scans dominate, gained less (`byId`
++14%, `byState` +9%). PostgreSQL is unchanged (−3.5% to +1.9%, within its
+Docker noise): each call waits on the database for far longer than it
+spends building the entities.
 
 2026-10-14: 1.22.0 at `a508d8f`, the median of 5 rounds (`--repeat 5`),
 on AC power with the machine idle. Since 2026-10-13: the IDs of ID
@@ -90,6 +101,76 @@ operations after it, run on the seeded 1000 users. The memory adapter
 scans tables, so its numbers depend the most on the table size.
 
 ---
+
+### 2026-10-15 — `postgres` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.23.1 (`6eb32fa`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** postgres (PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2), Docker postgres:latest)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 1740 | 574.6 | 560 | 688 | 772 | 1679–1839 |
+| `user/byEmail` | 1793 | 557.9 | 552 | 596 | 645 | 1751–1815 |
+| `user/byState (join, limit 20)` | 885 | 1129.7 | 1134 | 1204 | 1238 | 868–967 |
+| `user/list (page of 20)` | 898 | 1113.6 | 1118 | 1177 | 1206 | 896–915 |
+| `user/count` | 6625 | 150.9 | 149 | 163 | 189 | 6571–6683 |
+| `authenticate (login)` | 1750 | 571.3 | 569 | 605 | 645 | 1709–1758 |
+| `user/register` | 732 | 1366.8 | 1335 | 1733 | 1818 | 703–777 |
+| `user/update` | 820 | 1219.5 | 1209 | 1264 | 1413 | 784–826 |
+| `user/remove` | 888 | 1126.2 | 1124 | 1163 | 1218 | 883–913 |
+
+1.23.1, on AC power with the machine idle (`--docker`, `--repeat 5`).
+Unchanged from 1.22.0 (2026-10-14), within the Docker noise: direct
+constructor calls (1.23.0) save CPU time that is small next to the
+database round trips. An earlier run this day, with the machine in use,
+measured `byState` and `list` at ~1000–1030 ops/sec; it was replaced by
+this one.
+
+### 2026-10-15 — `sqlite` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.23.1 (`6eb32fa`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** sqlite (temporary file)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 28183 | 35.5 | 34 | 40 | 82 | 28076–28230 |
+| `user/byEmail` | 27357 | 36.6 | 35 | 41 | 82 | 27295–27428 |
+| `user/byState (join, limit 20)` | 3874 | 258.1 | 251 | 306 | 322 | 3859–3883 |
+| `user/list (page of 20)` | 4098 | 244.0 | 238 | 298 | 311 | 4092–4101 |
+| `user/count` | 195471 | 5.1 | 5 | 5 | 6 | 195198–195947 |
+| `authenticate (login)` | 23181 | 43.1 | 41 | 47 | 104 | 23164–23200 |
+| `user/register` | 9794 | 102.1 | 86 | 109 | 902 | 9762–9939 |
+| `user/update` | 14748 | 67.8 | 65 | 72 | 91 | 14675–14825 |
+| `user/remove` | 17716 | 56.4 | 48 | 53 | 105 | 17477–17933 |
+
+### 2026-10-15 — `memory` — Mac17,3 (Apple M5)
+
+- **bones_api:** 1.23.1 (`6eb32fa`)
+- **Machine:** Mac17,3 (Apple M5), Apple M5, 10 cores, 16 GB RAM
+- **OS:** macos (Version 26.6.2 (Build 25G83))
+- **Dart:** 3.13.5
+- **DB:** memory (DBSQLMemoryAdapter)
+- **Users:** 1000; **duration:** 3s (warm-up 1s) × 5 rounds, median shown per operation
+
+| Operation | ops/sec | mean (us) | p50 (us) | p95 (us) | p99 (us) | rounds (ops/sec) |
+|---|--:|--:|--:|--:|--:|--:|
+| `user/byId` | 35186 | 28.4 | 27 | 32 | 48 | 34992–35218 |
+| `user/byEmail` | 1478 | 676.8 | 674 | 1253 | 1328 | 1419–1567 |
+| `user/byState (join, limit 20)` | 1750 | 571.6 | 561 | 635 | 648 | 1741–1757 |
+| `user/list (page of 20)` | 741 | 1349.5 | 1350 | 1425 | 1458 | 731–769 |
+| `user/count` | 321185 | 3.1 | 3 | 3 | 4 | 320028–321355 |
+| `authenticate (login)` | 1474 | 678.3 | 701 | 1204 | 1286 | 1443–1569 |
+| `user/register` | 3522 | 283.9 | 280 | 417 | 451 | 3484–3701 |
+| `user/update` | 5331 | 187.6 | 187 | 222 | 235 | 5323–5332 |
+| `user/remove` | 13410 | 74.6 | 75 | 92 | 97 | 11646–13566 |
 
 ### 2026-10-14 — `postgres` — Mac17,3 (Apple M5)
 
