@@ -1308,6 +1308,49 @@ void main() {
       await expectFailedCommit(transaction!, outcome);
       await expectNextTransactionWorks();
     });
+
+    // The transaction is opened (by its operations) before `execute`, in the
+    // caller's error `Zone`, where the adapter's `COMMIT` (`transactionResult`)
+    // fails. Before 1.30.2 the commit, inside the transaction's error `Zone`,
+    // never received that error: a hang.
+    Future<Transaction> openBeforeExecute() async {
+      var t = Transaction();
+      // The 1st operation runs without opening the transaction (a single
+      // operation): the 2nd one opens it.
+      expect(await provider.ownerRepository.count(transaction: t), equals(0));
+      await provider.ownerRepository.store(_Owner(name: 'bad'), transaction: t);
+      expect(t.isOpen, isTrue);
+      expect(Transaction.executingTransaction, isNull);
+      return t;
+    }
+
+    test('transaction opened before Transaction.execute', () async {
+      var t = await openBeforeExecute();
+
+      var outcome = await outcomeOf(() => t.execute<dynamic>(() => 1));
+
+      await expectFailedCommit(t, outcome);
+      await expectNextTransactionWorks();
+    });
+
+    test('transaction opened before Transaction.executeOrError', () async {
+      var t = await openBeforeExecute();
+      var onErrorCalls = 0;
+
+      var outcome = await outcomeOf(
+        () => t.executeOrError<dynamic>(
+          () => 1,
+          onError: (tr, e, s) {
+            ++onErrorCalls;
+            return -1;
+          },
+        ),
+      );
+
+      await expectFailedCommit(t, outcome);
+      expect(onErrorCalls, equals(0));
+      await expectNextTransactionWorks();
+    });
   });
 
   group('checkTables', () {

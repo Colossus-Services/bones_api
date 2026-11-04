@@ -1,3 +1,30 @@
+## 1.30.2
+
+- Fix: a transaction opened before `Transaction.execute`/`executeOrError`
+  (by its operations, e.g. `store(o, transaction: t)` then `t.execute(...)`)
+  hung the caller when its adapter's `COMMIT` failed asynchronously
+  (PostgreSQL, MySQL, SQLite). The adapter sets the `transactionResult` (its
+  `COMMIT`) when it opens the transaction, in the caller's error `Zone`, and
+  the commit listened to it inside the transaction's error `Zone`: the error
+  was only reported as uncaught in the caller's zone, and `execute` never
+  completed. The same for the rollback of an aborted transaction (its
+  `resultFuture` never completed), and for `commit` called from another error
+  zone.
+  - `Transaction.transactionResult` is now a getter/setter that records the
+    `Zone` where it's set: a `Future` is listened to inside that zone, and
+    its value or error forwarded to the zone of the commit (or abort).
+- Fix: `DBSQLMemoryAdapter.resolveTransactionResult` checked
+  `is! TransactionAbortedError` on the `Future` of
+  `super.resolveTransactionResult` (always `true`): the context of an aborted
+  transaction, already cancelled (rolled back and disposed), was also
+  "consolidated" and disposed a 2nd time (miscounting
+  `poolDisposedElementsCount`). The check is now on the transaction's result.
+- New tests: a failing `COMMIT` of a transaction opened before `execute` /
+  `executeOrError` (memory, SQLite, PostgreSQL, MySQL), with `commit` called
+  directly, and its rollback; a `transactionResult` set in another error zone
+  (`execute`, concurrent `commit`s, abort); the memory adapter's aborted and
+  committed `resolveTransactionResult`.
+
 ## 1.30.1
 
 - Fix: an asynchronous commit failure in `Transaction.execute`/`executeOrError`
