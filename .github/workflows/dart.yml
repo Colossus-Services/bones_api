@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1.7.2
+      - uses: dart-lang/setup-dart@v1.8.1
       - name: Dart version
         run: |
           dart --version
@@ -73,7 +73,7 @@ jobs:
             args: -j 3 test/bones_api_concurrency_*_test.dart
     steps:
       - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1.7.2
+      - uses: dart-lang/setup-dart@v1.8.1
       - name: Dart version
         run: |
           dart --version
@@ -115,7 +115,7 @@ jobs:
         shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v7
-      - uses: dart-lang/setup-dart@v1.7.2
+      - uses: dart-lang/setup-dart@v1.8.1
       - name: Dart version
         run: |
           dart --version
