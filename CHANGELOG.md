@@ -1,3 +1,61 @@
+## 1.30.1
+
+- Fix: an asynchronous commit failure in `Transaction.execute`/`executeOrError`
+  hung the caller; it now reaches the caller, and the transaction is finished
+  (`isFinished`, `resultFuture`). The commit runs inside the transaction's
+  error `Zone`, and Dart never delivers a `Future`'s error across error zones:
+  it was only reported as an uncaught error (`[Transaction ERROR]`), and
+  `execute` never completed. This covers both a failing closer and an adapter's
+  failing `COMMIT` (its `transactionResult`: PostgreSQL, MySQL, SQLite), and
+  also `Transaction.executeBlock` and the repository operations that use it.
+  A synchronous result (or error) is still returned (or thrown) synchronously,
+  and a commit error is still never passed to `onError`.
+- `Transaction`: a failed commit (sync or async, also from `commit` called
+  directly) finishes the transaction as aborted, with a
+  `TransactionAbortedError` (`reason: 'Commit failed'`) wrapping the commit
+  error (also in `error`): `isCommitting` is no longer left `true`, the
+  `transactionFuture` (if not completed yet) and `resultFuture` complete, and
+  `executingTransaction` is cleared. A concurrent 2nd `commit` then returns
+  `null` (as for an aborted transaction).
+- `Transaction`: the `resultFuture` of an aborted transaction now completes
+  also when the adapter fails its `transactionResult` (the rollback of the
+  PostgreSQL/MySQL/SQLite adapters): it never completed.
+- `Transaction`: an adapter's `COMMIT` error notified to an auto-commit
+  transaction no longer re-commits it (which only returned the failing
+  `transactionResult` again, as an unlistened, uncaught error).
+- `Transaction.toString`: no infinite recursion when its `abortError` wraps an
+  error that describes the transaction (a failed `COMMIT`'s
+  `DBAdapterException`).
+- New tests: an asynchronous and a synchronous failing commit (`execute`,
+  `executeOrError`, `executeBlock`, `commit`, auto-commit), a failing
+  `transactionResult` (with and without a block error), the transactions after
+  a failed commit, an asynchronous successful commit, and synchronous results.
+  With a real failing `COMMIT`: SQLite (a deferred foreign key), PostgreSQL (a
+  deferred unique constraint) and MySQL (the connection closed before the
+  `COMMIT`).
+
+- Dependencies:
+  - Updated `swiss_knife` to ^3.4.2 (bug fixes; of them `bones_api` is only
+    affected by `MimeType.parse`: `mp3` is `audio/mpeg`, the `jpeg`/`txt`
+    aliases keep the charset, and `'/foo'` is invalid).
+  - Updated `mercury_client` to ^2.4.1: a `String` request body is encoded
+    with the `Content-Type` charset (`APIModuleProxyHttpCaller` sends JSON,
+    still UTF-8), and on the VM binary responses (images other than SVG,
+    audio, video, fonts) stay bytes even with a `charset`.
+  - Updated `args_simple` to ^1.3.0 (`--` ends the options, `--key=value` is
+    split, `-D`/`-P` properties only with `=`/`:`): `APIServerConfig.fromArgs`
+    reads only named options and flags, unaffected.
+  - Updated `graph_explorer` to ^1.2.0 and `ascii_art_tree` to ^1.1.3: the
+    `SQLBuilder` hierarchical order (`toHierarchicalOrder`) uses a stable
+    `sortByInputDependency` (tied SQLs keep their order; the order is still
+    validated, with its fallback).
+  - Updated `dart_spawner` to ^1.3.0: the CLI's spawned isolates
+    (`spawnDartScript`, used by `bones_api serve`/`console`) are no longer
+    reported as exited (`exitCode` 0) when they don't answer a ping within
+    2s with the VM service enabled.
+  - `build_runner` kept at ^2.16.2: 2.17 requires `build` 5, and
+    `reflection_factory` 2.13 requires `build` ^4.
+
 ## 1.30.0
 
 - `Transaction.execute`/`executeOrError`: a commit that fails synchronously

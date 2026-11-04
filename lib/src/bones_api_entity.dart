@@ -6999,7 +6999,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       } else {
         retFuture = _transactionCompleter.future;
       }
-      return retFuture.resolveMapped((r) => r as R?);
+      // A commit that failed meanwhile completes the `transactionFuture` with
+      // its `TransactionAbortedError`: `null`, as `commit` of an aborted
+      // transaction.
+      return retFuture.resolveMapped(
+        (r) => r is TransactionAbortedError ? null : r as R?,
+      );
     }
 
     _commitCalled = true;
@@ -7011,18 +7016,104 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     var result = _lastResult;
     _result = result;
 
-    FutureOr<void>? closerResult;
-
     var closer = _transactionCloser;
     if (closer != null) {
-      closerResult = closer();
+      FutureOr<void> closerResult;
+      try {
+        closerResult = closer();
+      } catch (e, s) {
+        _commitFailed(e, s);
+        rethrow;
+      }
 
-      if (closerResult != null) {
-        return closerResult.resolveWith(() => _commitComplete<R>(result));
+      if (closerResult is Future) {
+        return closerResult.then(
+          (_) => _commitCompleteGuarded<R>(result),
+          onError: (Object e, StackTrace s) {
+            _commitFailed(e, s);
+            Error.throwWithStackTrace(e, s);
+          },
+        );
       }
     }
 
-    return _commitComplete<R>(result);
+    return _commitCompleteGuarded<R>(result);
+  }
+
+  /// [_commitComplete], finishing this transaction with [_commitFailed] on any
+  /// error (sync or async): the adapter's `COMMIT` (`transactionResult`), or a
+  /// [StateError] of [_commitCompleteFinish].
+  FutureOr<R?> _commitCompleteGuarded<R>(Object? result) {
+    try {
+      var ret = _commitComplete<R>(result);
+      if (ret is Future<R?>) {
+        return ret.then(
+          (r) => r,
+          onError: (Object e, StackTrace s) {
+            _commitFailed(e, s);
+            Error.throwWithStackTrace(e, s);
+          },
+        );
+      }
+      return ret;
+    } catch (e, s) {
+      _commitFailed(e, s);
+      rethrow;
+    }
+  }
+
+  /// Finishes this transaction after a failed commit (its closer or its
+  /// [transactionResult] failed): it's aborted, with a [TransactionAbortedError]
+  /// (`reason: 'Commit failed'`) wrapping the commit [error].
+  ///
+  /// The [transactionFuture] (if not completed yet) and the [resultFuture]
+  /// complete as for [abort] (without `completeError`: they belong to the
+  /// transaction's error `Zone`). The commit [error] itself is propagated to
+  /// the caller of [commit] (and of [execute]) by the caller of this method.
+  void _commitFailed(Object error, StackTrace stackTrace) {
+    if (_committed || _aborted) return;
+
+    _endTime ??= DateTime.now();
+
+    // Not already notified (and logged) by `notifyExecutionError` (an
+    // adapter's `COMMIT` failure, in its `transactionResult`):
+    var notified =
+        identical(_error, error) ||
+        (_extraErrors?.any((e) => identical(e, error)) ?? false);
+
+    if (!notified) {
+      if (_error == null) {
+        _error = error;
+      } else {
+        (_extraErrors ??= []).add(error);
+      }
+
+      _logTransaction.severe(
+        '[transaction:$id] Commit failed> ops: ${_operations.length} ; root: ${_operations.firstOrNull}',
+        error,
+        stackTrace,
+      );
+    }
+
+    var abortError = _resolveAbortError(
+      error,
+      stackTrace,
+      'Commit failed',
+      _result,
+    );
+
+    _abortError = abortError;
+    _aborted = true;
+
+    if (!_transactionCompleter.isCompleted) {
+      _transactionCompleter.complete(abortError);
+    }
+
+    _close();
+
+    if (!_resultCompleter.isCompleted) {
+      _resultCompleter.complete(null);
+    }
   }
 
   FutureOr<R?> _commitComplete<R>(Object? result) {
@@ -7037,6 +7128,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       if (transactionResult is Future) {
         var parentStackTrace = _debugStackTrace();
 
+        // A failed `COMMIT` of the adapter: see `_commitCompleteGuarded`.
         var ret = transactionResult.then(
           (r) => _commitCompleteFinish<R>(r, parentStackTrace),
         );
@@ -7218,7 +7310,10 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
             _resultCompleter.complete(null);
             return abortError;
           },
+          // The adapters fail the `transactionResult` of an aborted
+          // transaction (a rollback):
           onError: (e) {
+            _resultCompleter.complete(null);
             return abortError;
           },
         );
@@ -7243,10 +7338,16 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   }
 
   /// Executes the transaction operations dispatches inside [block] then [commit]s.
+  ///
+  /// If the commit fails (synchronously or asynchronously) its error reaches
+  /// the caller, and this transaction is finished as aborted (see
+  /// [abortError]).
   FutureOr<R?> execute<R>(FutureOr<R> Function() block) => _executeImpl(block);
 
   /// Executes the transaction operations dispatches inside [block] then [commit]s.
-  /// If any error occurs it returns the value returned by [onError].
+  /// If any error occurs in [block] it returns the value returned by [onError].
+  /// A commit error is not passed to [onError]: it reaches the caller (see
+  /// [execute]).
   FutureOr<R> executeOrError<R>(
     FutureOr<R> Function() block, {
     required R Function(
@@ -7276,22 +7377,62 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _executingTransaction.set(this, contextZone: zone);
 
     if (onError != null) {
-      return zone.asyncTry<R>(
-        block,
-        onError: (e, s) => _executeCommit(
-          zone,
-          e,
-          s,
-        ).resolveMapped((val) => onError(this, e, s)),
-        onFinally: () => _executeCommit(zone),
+      return _runInZone<R?>(
+        zone,
+        () => asyncTry<R>(
+          block,
+          onError: (e, s) => _executeCommit(
+            zone,
+            e,
+            s,
+          ).resolveMapped((val) => onError(this, e, s)),
+          onFinally: () => _executeCommit(zone),
+        ),
       );
     } else {
-      return zone.asyncTry<R>(
-        block,
-        onError: (e, s) => _executeCommit(zone, e, s),
-        onFinally: () => _executeCommit(zone),
+      return _runInZone<R?>(
+        zone,
+        () => asyncTry<R>(
+          block,
+          onError: (e, s) => _executeCommit(zone, e, s),
+          onFinally: () => _executeCommit(zone),
+        ),
       );
     }
+  }
+
+  /// Runs [action] in [zone] (a context zone of the transaction's error
+  /// `Zone`), returning its outcome to the caller's `Zone`.
+  ///
+  /// Dart never delivers the error of a `Future` across error zones: a
+  /// `Future` that fails inside the transaction's error `Zone` (as an
+  /// asynchronous commit failure) would only be reported there (as an uncaught
+  /// error), and a caller in another error zone would wait for it forever. So
+  /// an asynchronous result is listened to inside [zone] and forwarded to a
+  /// [Completer] of the caller's `Zone`.
+  ///
+  /// A synchronous result (or error) is returned (or thrown) synchronously
+  /// (`FutureOr`).
+  static FutureOr<R> _runInZone<R>(Zone zone, FutureOr<R> Function() action) {
+    final callerZone = Zone.current;
+    if (callerZone.inSameErrorZone(zone)) {
+      return zone.run(action);
+    }
+
+    Completer<R>? completer;
+
+    final ret = zone.run(() {
+      final ret = action();
+      if (ret is Future<R>) {
+        final c = completer = callerZone.createCompleter<R>();
+        // Listened to inside `zone` (the same error zone as `ret`), to also
+        // receive its error:
+        ret.then(c.complete, onError: c.completeError);
+      }
+      return ret;
+    });
+
+    return completer?.future ?? ret;
   }
 
   FutureOr<void> _executeCommit(
@@ -7437,7 +7578,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       abort(error: errorResolved, stackTrace: stackTrace);
     }
 
-    _doAutoCommit();
+    // Once committing (an error of the `COMMIT` itself, notified by the
+    // adapter), `commit` would only return the failing `transactionResult`
+    // again, unlistened (a duplicated uncaught error):
+    if (!_commitCalled) {
+      _doAutoCommit();
+    }
 
     // Also an extra error (after the first one): the operation failed (and
     // its error is not a result).
@@ -7509,11 +7655,37 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     return true;
   }
 
+  bool _inToString = false;
+
   @override
   String toString({
     bool compact = false,
     bool withOperations = true,
     bool withExecutedOperations = true,
+  }) {
+    // The `abortError` can wrap an error that describes this transaction
+    // (a failed commit's `DBAdapterException`, with `toString` as debug
+    // info): avoid an infinite recursion.
+    if (_inToString) {
+      return 'Transaction[#$id]{...}';
+    }
+
+    _inToString = true;
+    try {
+      return _toStringImpl(
+        compact: compact,
+        withOperations: withOperations,
+        withExecutedOperations: withExecutedOperations,
+      );
+    } finally {
+      _inToString = false;
+    }
+  }
+
+  String _toStringImpl({
+    required bool compact,
+    required bool withOperations,
+    required bool withExecutedOperations,
   }) {
     final duration = this.duration;
     final error = this.error;

@@ -32,6 +32,34 @@ TransactionOperationSelect _select(
   parentOperation: parentOperation,
 );
 
+/// The outcome of [f] (its value or error). A hang (the bug fixed in 1.30.1:
+/// an asynchronous commit failure never reaching the caller) times out.
+Future<({Object? value, Object? error})> _outcomeOf(
+  FutureOr<Object?> Function() f,
+) => Future.sync(f)
+    .then<({Object? value, Object? error})>(
+      (v) => (value: v, error: null),
+      onError: (Object e) => (value: null, error: e),
+    )
+    .timeout(const Duration(seconds: 5));
+
+/// The [message] of a [StateError].
+Matcher _stateError(String message) =>
+    isA<StateError>().having((e) => e.message, 'message', message);
+
+/// Asserts that [t] is finished (not committing), and its [resultFuture]
+/// completes.
+Future<void> _expectFinished(Transaction t, {required bool committed}) async {
+  await t.resultFuture.timeout(const Duration(seconds: 5));
+  expect(t.isFinished, isTrue);
+  expect(t.isCommitting, isFalse);
+  expect(t.isCommitted, equals(committed));
+  expect(t.isAborted, equals(!committed));
+  expect(t.isExecuting, isFalse);
+  expect(Transaction.executingTransaction, isNull);
+  expect(Transaction.openInstances, isNot(contains(t)));
+}
+
 void main() {
   group('TransactionAbortedError', () {
     test('withErrorStackTrace / toString', () {
@@ -464,6 +492,27 @@ void main() {
     // `async_extension` < 1.2.24 a synchronous `onFinally` error was passed
     // to `onError` and swallowed: the block's result was returned.
     group('execute: failing commit', () {
+      // The commit errors also reported as uncaught errors of the
+      // transaction's error `Zone` (`[Transaction ERROR]`): none should be.
+      final reported = <Object>[];
+
+      setUpAll(() {
+        Transaction.registerErrorFilter((e, s) {
+          if (e is StateError && e.message.contains('commit')) {
+            reported.add(e);
+            return true;
+          }
+          return false;
+        });
+      });
+
+      setUp(reported.clear);
+
+      Future<void> expectNotReported() async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(reported, isEmpty);
+      }
+
       test('sync commit error reaches the caller', () async {
         var t = Transaction();
         await t.open(() => 'ctx', () => throw StateError('sync commit'));
@@ -478,6 +527,11 @@ void main() {
             ),
           ),
         );
+
+        // Not left committing: finished (aborted by the commit error).
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, _stateError('sync commit'));
+        await expectNotReported();
       });
 
       test('sync commit error reaches the caller (with onError)', () async {
@@ -505,64 +559,450 @@ void main() {
         );
         // A commit error is not a block error:
         expect(onErrorCalls, equals(0));
+
+        await _expectFinished(t, committed: false);
+        await expectNotReported();
       });
 
-      // An asynchronous commit failure (unchanged by `async_extension`
-      // 1.2.24): its `Future` fails inside the transaction's error `Zone`, so
-      // the error is reported there (`[Transaction ERROR]`, through the error
-      // filters) and `execute` doesn't complete. Either way it's never
-      // swallowed (the block's result isn't returned) nor passed to `onError`.
-      Future<void> testAsyncCommitError({required bool withOnError}) async {
-        var message = 'async commit (onError: $withOnError)';
-
-        var reported = Completer<Object>();
-        Transaction.registerErrorFilter((e, s) {
-          if (e is StateError && e.message == message) {
-            if (!reported.isCompleted) reported.complete(e);
-            return true;
-          }
-          return false;
-        });
+      // An asynchronous commit failure: its `Future` fails inside the
+      // transaction's error `Zone`, and Dart never delivers an error across
+      // error zones. Before 1.30.1 the error was only reported there
+      // (`[Transaction ERROR]`) and `execute` never completed (a hang), with
+      // the transaction left committing. It must reach the caller, and not be
+      // passed to `onError` (a commit error is not a block error).
+      Future<void> testAsyncCommitError({
+        required bool withOnError,
+        required bool asyncBlock,
+      }) async {
+        var message =
+            'async commit (onError: $withOnError, asyncBlock: $asyncBlock)';
 
         var t = Transaction();
         await t.open(() => 'ctx', () async => throw StateError(message));
 
-        var onErrorCalls = 0;
-        var outcome = Completer<Object?>();
+        FutureOr<int> block() => asyncBlock ? Future.value(1) : 1;
 
-        Future.sync(
+        var onErrorCalls = 0;
+
+        var outcome = await _outcomeOf(
           () => withOnError
               ? t.executeOrError<int>(
-                  () => 1,
+                  block,
                   onError: (tr, e, s) {
                     ++onErrorCalls;
                     return -1;
                   },
                 )
-              : t.execute(() => 1),
-        ).then(
-          (r) => outcome.complete(r),
-          onError: (Object e) => outcome.complete(e),
+              : t.execute(block),
         );
 
-        var error = await Future.any([
-          reported.future,
-          outcome.future.then((o) => o ?? 'null result'),
-        ]).timeout(const Duration(seconds: 10));
-
-        expect(
-          error,
-          isA<StateError>().having((e) => e.message, 'message', message),
-        );
+        // Not swallowed (the block's result isn't returned):
+        expect(outcome.value, isNull);
+        expect(outcome.error, _stateError(message));
         expect(onErrorCalls, equals(0));
+
+        await _expectFinished(t, committed: false);
+
+        var abortError = t.abortError!;
+        expect(abortError.error, same(outcome.error));
+        expect(abortError.reason, equals('Commit failed'));
+        expect(t.error, same(outcome.error));
+
+        await expectNotReported();
       }
 
-      test('async commit error is not swallowed', () async {
-        await testAsyncCommitError(withOnError: false);
+      test('async commit error reaches the caller', () async {
+        await testAsyncCommitError(withOnError: false, asyncBlock: false);
       });
 
-      test('async commit error is not swallowed (with onError)', () async {
-        await testAsyncCommitError(withOnError: true);
+      test('async commit error reaches the caller (with onError)', () async {
+        await testAsyncCommitError(withOnError: true, asyncBlock: false);
+      });
+
+      test('async commit error reaches the caller (async block)', () async {
+        await testAsyncCommitError(withOnError: false, asyncBlock: true);
+      });
+
+      test(
+        'async commit error reaches the caller (async block, with onError)',
+        () async {
+          await testAsyncCommitError(withOnError: true, asyncBlock: true);
+        },
+      );
+
+      // As the PostgreSQL/MySQL/SQLite adapters: the `COMMIT` is the
+      // `transactionResult`, completed after the `transactionFuture`.
+      test('failing transactionResult reaches the caller', () async {
+        var t = Transaction();
+
+        var outcome = await _outcomeOf(
+          () => t.execute(() {
+            var op = _select(t);
+            t.transactionResult = Future<Object?>.delayed(
+              const Duration(milliseconds: 1),
+              () => throw StateError('transactionResult commit'),
+            );
+            return op.finish(10);
+          }),
+        );
+
+        expect(outcome.error, _stateError('transactionResult commit'));
+
+        // The `transactionFuture` was completed (before the `COMMIT`):
+        expect(await t.transactionFuture, equals(10));
+
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, same(outcome.error));
+        await expectNotReported();
+      });
+
+      test(
+        'failing transactionResult reaches the caller (executeOrError)',
+        () async {
+          var t = Transaction();
+          var onErrorCalls = 0;
+
+          var outcome = await _outcomeOf(
+            () => t.executeOrError<int>(
+              () async {
+                var op = _select(t);
+                t.transactionResult = Future<Object?>.delayed(
+                  const Duration(milliseconds: 1),
+                  () => throw StateError('transactionResult commit (onError)'),
+                );
+                return op.finish(10);
+              },
+              onError: (tr, e, s) {
+                ++onErrorCalls;
+                return -1;
+              },
+            ),
+          );
+
+          expect(
+            outcome.error,
+            _stateError('transactionResult commit (onError)'),
+          );
+          expect(onErrorCalls, equals(0));
+          await _expectFinished(t, committed: false);
+          await expectNotReported();
+        },
+      );
+
+      test('executeBlock: async commit error reaches the caller', () async {
+        Transaction? transaction;
+
+        var outcome = await _outcomeOf(
+          () => Transaction.executeBlock<int>((t) {
+            transaction = t;
+            t.open(
+              () => 'ctx',
+              () async => throw StateError('executeBlock commit'),
+            );
+            return 1;
+          }),
+        );
+
+        expect(outcome.error, _stateError('executeBlock commit'));
+        await _expectFinished(transaction!, committed: false);
+        await expectNotReported();
+      });
+
+      // `commit` called directly (not by `execute`): the error already
+      // reached the caller (same zone), but the transaction was left
+      // committing and its `resultFuture` never completed.
+      test('commit: async closer error finishes the transaction', () async {
+        var t = Transaction();
+        await t.open(() => 'ctx', () async => throw StateError('commit()'));
+        var op = _select(t);
+        await op.finish(1);
+
+        var outcome = await _outcomeOf(() => t.commit<int>());
+        expect(outcome.error, _stateError('commit()'));
+
+        await _expectFinished(t, committed: false);
+
+        // Already finished:
+        expect(await t.commit<int>(), isNull);
+        expect(t.abort(), isNull);
+        await expectNotReported();
+      });
+
+      // A `COMMIT` error after another error notified while committing: an
+      // extra error (`extraErrors`).
+      test('commit error after a notified error', () async {
+        var t = Transaction();
+
+        var outcome = await _outcomeOf(
+          () => t.execute(() {
+            var op = _select(t);
+            t.transactionResult = t.transactionFuture
+                .then<Object?>((r) => throw StateError('notified commit'))
+                .catchError((Object e, StackTrace s) {
+                  try {
+                    t.notifyExecutionError<Object?>(e, s);
+                  } catch (_) {}
+                  throw StateError('other commit');
+                });
+            return op.finish(1);
+          }),
+        );
+
+        expect(outcome.error, _stateError('other commit'));
+        expect(t.error, _stateError('notified commit'));
+        expect(t.extraErrors, [same(outcome.error)]);
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, same(outcome.error));
+        await expectNotReported();
+      });
+
+      // A synchronous error of the commit completion (here the result cast):
+      // thrown synchronously (the transaction was already committed).
+      test('commit: sync completion error', () async {
+        var t = Transaction();
+        var op = _select(t);
+        await op.finish('not an int');
+        t.transactionResult = 'tr';
+
+        expect(() => t.commit<int>(), throwsA(isA<TypeError>()));
+        expect(t.isCommitted, isTrue);
+        expect(t.isFinished, isTrue);
+        await t.resultFuture.timeout(const Duration(seconds: 5));
+      });
+
+      // `execute` called inside the `Zone` of a finished transaction (the
+      // same error zone): the outcome needs no forwarding.
+      test('execute inside the zone of a finished transaction', () async {
+        var nested = Completer<({Object? value, Object? error})>();
+        Transaction? inner;
+
+        var t = Transaction();
+        await t.execute(() {
+          // Runs in `t`'s zone, after `t` finished:
+          Future<void>.delayed(const Duration(milliseconds: 10), () {
+            expect(Transaction.executingTransaction, isNull);
+            var t2 = inner = Transaction();
+            t2.open(
+              () => 'ctx',
+              () async => throw StateError('nested zone commit'),
+            );
+            _outcomeOf(() => t2.execute(() => 1)).then(nested.complete);
+          });
+          return 1;
+        });
+        expect(t.isCommitted, isTrue);
+
+        var outcome = await nested.future.timeout(const Duration(seconds: 5));
+        expect(outcome.error, _stateError('nested zone commit'));
+        await _expectFinished(inner!, committed: false);
+        await expectNotReported();
+      });
+
+      // A 2nd (concurrent) `commit` while the closer is failing: `null` (as
+      // for an aborted transaction), not the `TransactionAbortedError`.
+      test('commit: concurrent commit while the closer fails', () async {
+        var t = Transaction();
+        await t.open(() => 'ctx', () async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          throw StateError('concurrent commit');
+        });
+        var op = _select(t);
+        await op.finish(1);
+
+        var commit1 = _outcomeOf(() => t.commit<int>());
+        var commit2 = _outcomeOf(() => t.commit<int>());
+
+        expect((await commit1).error, _stateError('concurrent commit'));
+
+        var outcome2 = await commit2;
+        expect(outcome2.error, isNull);
+        expect(outcome2.value, isNull);
+
+        await _expectFinished(t, committed: false);
+        await expectNotReported();
+      });
+
+      // A block error aborts the transaction: the adapters then fail the
+      // `transactionResult` with the `TransactionAbortedError` (a rollback).
+      Future<void> testBlockErrorWithFailingResult({
+        required bool withOnError,
+      }) async {
+        var t = Transaction();
+        var onErrorCalls = 0;
+
+        Future<int> block() async {
+          var op = _select(t);
+          await op.finish(1);
+          t.transactionResult = t.transactionFuture.then(
+            (r) => r is TransactionAbortedError ? throw r : r,
+          );
+          throw StateError('block (onError: $withOnError)');
+        }
+
+        var outcome = await _outcomeOf(
+          () => withOnError
+              ? t.executeOrError<int>(
+                  block,
+                  onError: (tr, e, s) {
+                    ++onErrorCalls;
+                    expect(e, _stateError('block (onError: true)'));
+                    return -1;
+                  },
+                )
+              : t.execute<int>(block),
+        );
+
+        expect(outcome.error, isNull);
+        expect(outcome.value, withOnError ? equals(-1) : isNull);
+        expect(onErrorCalls, equals(withOnError ? 1 : 0));
+
+        // Before 1.30.1 the `resultFuture` never completed:
+        await _expectFinished(t, committed: false);
+        expect(
+          t.abortError?.error,
+          _stateError('block (onError: $withOnError)'),
+        );
+      }
+
+      test('block error + failing transactionResult', () async {
+        await testBlockErrorWithFailingResult(withOnError: false);
+      });
+
+      test('block error + failing transactionResult (with onError)', () async {
+        await testBlockErrorWithFailingResult(withOnError: true);
+      });
+
+      // An auto-commit transaction (no `execute`), with the adapters' flow: a
+      // failed `COMMIT` is notified (`notifyExecutionError`) and fails the
+      // `transactionResult`.
+      test('autoCommit: failing transactionResult', () async {
+        var t = Transaction.autoCommit();
+        var op = _select(t);
+
+        t.transactionResult = t.transactionFuture
+            .then((r) => Future<void>.delayed(const Duration(milliseconds: 1)))
+            .then<Object?>((_) => throw StateError('autoCommit commit'))
+            .catchError(
+              (Object e, StackTrace s) => t.notifyExecutionError(e, s),
+            );
+
+        var outcome = await _outcomeOf(() => op.finish(1));
+        expect(outcome.error, _stateError('autoCommit commit'));
+
+        await _expectFinished(t, committed: false);
+        expect(t.error, same(outcome.error));
+        await expectNotReported();
+      });
+
+      test('transactions after a failed commit', () async {
+        var t1 = Transaction();
+        await t1.open(() => 'ctx', () async => throw StateError('t1 commit'));
+
+        var outcome1 = await _outcomeOf(() => t1.execute(() => 1));
+        expect(outcome1.error, _stateError('t1 commit'));
+        await _expectFinished(t1, committed: false);
+
+        // Finished: can't execute again.
+        expect(() => t1.execute(() => 1), throwsStateError);
+
+        // No stale `executingTransaction`: a new (sequential) transaction.
+        var t2 = Transaction();
+        var r2 = await t2.execute(() {
+          expect(Transaction.executingTransaction, same(t2));
+          var op = _select(t2);
+          return op.finish(2);
+        });
+        expect(r2, equals(2));
+        await _expectFinished(t2, committed: true);
+
+        // `executeBlock` creates a new transaction (not the failed one):
+        Transaction? t3;
+        var r3 = await Transaction.executeBlock<int>((t) {
+          t3 = t;
+          expect(Transaction.executingTransaction, same(t));
+          return 3;
+        });
+        expect(r3, equals(3));
+        expect(t3, isNot(same(t1)));
+
+        // Nested `executeBlock` (uses the executing transaction), after the
+        // failed commit:
+        var outer = Transaction();
+        var rOuter = await outer.execute(() async {
+          expect(Transaction.executingTransaction, same(outer));
+
+          // Executing `outer`: can't execute another transaction inside.
+          expect(() => Transaction().execute(() => 1), throwsStateError);
+
+          return Transaction.executeBlock<int>((t) {
+            expect(t, same(outer));
+            var op = _select(t);
+            return op.finish(4);
+          });
+        });
+        expect(rOuter, equals(4));
+        await _expectFinished(outer, committed: true);
+        await expectNotReported();
+      });
+
+      test('async commit success', () async {
+        var t = Transaction();
+        var closed = false;
+        await t.open(() => 'ctx', () async {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+          closed = true;
+        });
+
+        var outcome = await _outcomeOf(
+          () => t.execute(() async {
+            var op = _select(t);
+            return op.finish(5);
+          }),
+        );
+
+        expect(outcome.error, isNull);
+        expect(outcome.value, equals(5));
+        expect(closed, isTrue);
+        expect(await t.resultFuture, equals(5));
+        await _expectFinished(t, committed: true);
+        expect(t.abortError, isNull);
+      });
+
+      // `FutureOr`: a synchronous commit keeps the result synchronous.
+      test('sync result stays synchronous', () async {
+        var t = Transaction();
+        var r = t.execute(() {
+          var op = _select(t);
+          t.transactionResult = 'tr';
+          op.finish(6);
+          return 6;
+        });
+        expect(r, isNot(isA<Future>()));
+        expect(r, equals(6));
+        await _expectFinished(t, committed: true);
+
+        var t2 = Transaction();
+        var r2 = t2.executeOrError<int>(() {
+          t2.transactionResult = 'tr';
+          return 7;
+        }, onError: (tr, e, s) => -1);
+        expect(r2, isNot(isA<Future>()));
+        expect(r2, equals(7));
+
+        // A sync commit error is thrown synchronously:
+        var t3 = Transaction();
+        await t3.open(() => 'ctx', () => throw StateError('sync commit 3'));
+        Object? syncError;
+        try {
+          t3.execute(() {
+            t3.transactionResult = 'tr';
+            return 1;
+          });
+        } catch (e) {
+          syncError = e;
+        }
+        expect(syncError, _stateError('sync commit 3'));
+        await _expectFinished(t3, committed: false);
       });
     });
 
