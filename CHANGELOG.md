@@ -1,3 +1,46 @@
+## 1.30.0
+
+- `Transaction.execute`/`executeOrError`: a commit that fails synchronously
+  (e.g. a synchronous closer, as with the memory/SQLite adapters) now reaches
+  the caller. It was passed to the `onError` of the internal `asyncTry` and
+  swallowed: the block's result was returned as if the commit succeeded
+  (`async_extension` 1.2.24 fix: an `onFinally` error replaces the result, as
+  in a Dart `try/finally`). A commit error is never passed to `onError`.
+- `DBMySQLAdapter`:
+  - Adapted to `mysql1` 0.22: `Result` (was `Results`, deprecated),
+    `ResultRow.toColumnMap()`/`row[name]` (was the deprecated `fields`), a
+    non-null `affectedRows`. `DBMySqlConnectionWrapper.query`/`queryMulti`
+    return `Future<Result>` (the same type: `Results` is a `typedef` of it).
+  - A connection whose query fails with anything but a `MySqlException` (a
+    timeout, a socket error) is marked closed, so the pool discards it:
+    `mysql1` (since 0.21) closes it in that case, without exposing it.
+  - Note: since `mysql1` 0.21 query parameters are written into the SQL as
+    literals (no prepared statements), and a `DateTime` is sent with its
+    fractional seconds, which the server rounds to the column precision
+    (`TIMESTAMP`: whole seconds). It used to be truncated.
+- `Time`: the comparison operators are typed `bool`, and `+`/`-` `Time`
+  (they were `dynamic`).
+- `lints` 6: explicit types (`strict_top_level_inference`) and null-aware
+  elements (`use_null_aware_elements`).
+- New tests for a failing commit in `Transaction.execute` (sync and async).
+- GitHub Actions: `dart-lang/setup-dart@v1.8.1`.
+
+- Dependencies:
+  - Updated `async_extension` to ^1.2.24.
+  - Updated `swiss_knife` to ^3.4.0 (its behaviour fixes don't affect
+    `bones_api`: it doesn't use the changed functions).
+  - Updated `mysql1` to ^0.22.0.
+  - Updated `gcloud` to ^0.9.0.
+  - Updated `archive` to ^4.6.0 (only its encoder is used: its decoders'
+    new error contract doesn't apply).
+  - Updated `args_simple` to ^1.2.0.
+  - Updated `ascii_art_tree` to ^1.1.0.
+  - Updated `dart_spawner` to ^1.2.0.
+  - Updated `graph_explorer` to ^1.1.1.
+  - Updated `lints` to ^6.1.0.
+  - `build_runner` kept at ^2.16.2: 2.17 requires `build` 5, and
+    `reflection_factory` 2.13 requires `build` ^4.
+
 ## 1.29.1
 
 - Dependencies:
