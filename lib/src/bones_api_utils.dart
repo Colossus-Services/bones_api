@@ -430,7 +430,7 @@ class IdenticalSet<O> {
   IdenticalSet({int groups = 7})
     : _groups = List.filled(groups.clamp(2, 1000), null);
 
-  List<O> _getGroup(o) {
+  List<O> _getGroup(Object? o) {
     var h = o.hashCode;
     var gIdx = h % _groups.length;
     var g = _groups[gIdx] ??= <O>[];

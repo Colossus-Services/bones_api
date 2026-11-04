@@ -1356,8 +1356,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     // The table's columns of the entity's fields (e.g. a legacy
     // `creationDate` column), as the other checks map them:
     var repoToSchemeMap = <String, String>{
-      for (var e in schemeToRepoMap.entries)
-        if (e.value case var field?) field: e.key,
+      for (var e in schemeToRepoMap.entries) ?e.value: e.key,
     };
 
     String fieldColumn(String field) =>

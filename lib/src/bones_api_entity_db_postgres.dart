@@ -52,7 +52,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   }
 
   static FutureOr<DBPostgreSQLAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,
@@ -317,9 +317,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   List<Initializable> initializeDependencies() {
     var parentRepositoryProvider = this.parentRepositoryProvider;
-    return <Initializable>[
-      if (parentRepositoryProvider != null) parentRepositoryProvider,
-    ];
+    return <Initializable>[?parentRepositoryProvider];
   }
 
   static final RegExp _regExpUniqueViolationKey = RegExp(r'Key \((.+?)\)=\(');

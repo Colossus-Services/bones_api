@@ -21,7 +21,7 @@ class PortListener {
 
   final ListQueue _unflushedQueue = ListQueue();
 
-  void _onData(o) {
+  void _onData(dynamic o) {
     if (_waitingQueue.isEmpty) {
       _unflushedQueue.addLast(o);
       return;

@@ -498,13 +498,13 @@ class Time implements Comparable<Time> {
       millisecond.hashCode ^
       microsecond.hashCode;
 
-  operator <(Time other) => totalMicrosecond < other.totalMicrosecond;
+  bool operator <(Time other) => totalMicrosecond < other.totalMicrosecond;
 
-  operator <=(Time other) => totalMicrosecond <= other.totalMicrosecond;
+  bool operator <=(Time other) => totalMicrosecond <= other.totalMicrosecond;
 
-  operator >(Time other) => totalMicrosecond > other.totalMicrosecond;
+  bool operator >(Time other) => totalMicrosecond > other.totalMicrosecond;
 
-  operator >=(Time other) => totalMicrosecond >= other.totalMicrosecond;
+  bool operator >=(Time other) => totalMicrosecond >= other.totalMicrosecond;
 
   /// Adds a [Duration], [Time], or [int] (ms) to the current instance,
   /// returning a new [Time] instance.
@@ -516,7 +516,7 @@ class Time implements Comparable<Time> {
   ///
   /// Throws:
   /// - A [StateError] if [other] is not `null`, `Time`, `int`, or `Duration`.
-  operator +(Object? other) {
+  Time operator +(Object? other) {
     if (other == null) return this;
 
     if (other is Time) {
@@ -544,7 +544,7 @@ class Time implements Comparable<Time> {
   ///
   /// Throws:
   /// - A [StateError] if [other] is not `null`, `Time`, `int`, or `Duration`.
-  operator -(Object? other) {
+  Time operator -(Object? other) {
     if (other == null) return this;
 
     if (other is Time) {

@@ -647,7 +647,7 @@ class CreateTableSQL extends TableSQL {
     var refsStr = refs.isNotEmpty ? 'refs: $refs' : null;
     var relsStr = rels.isNotEmpty ? 'rels: $rels' : null;
 
-    return 'CREATE TABLE $table {${[if (parentStr != null) parentStr, if (refsStr != null) refsStr, if (relsStr != null) relsStr].join(', ')}}';
+    return 'CREATE TABLE $table {${[?parentStr, ?refsStr, ?relsStr].join(', ')}}';
   }
 }
 
@@ -762,7 +762,7 @@ class AlterTableSQL extends TableSQL {
     var parentStr = parentTable != null ? 'parent: $parentTable' : null;
     var refsStr = refs.isNotEmpty ? 'refs: $refs' : null;
 
-    return 'ALTER TABLE $table {${[if (parentStr != null) parentStr, if (refsStr != null) refsStr].join(', ')}}';
+    return 'ALTER TABLE $table {${[?parentStr, ?refsStr].join(', ')}}';
   }
 }
 

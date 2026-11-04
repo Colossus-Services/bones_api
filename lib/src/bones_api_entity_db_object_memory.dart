@@ -65,7 +65,7 @@ class DBObjectMemoryAdapter
   }
 
   static FutureOr<DBObjectMemoryAdapter?> _instantiate(
-    config, {
+    Map<String, dynamic> config, {
     int? minConnections,
     int? maxConnections,
     EntityRepositoryProvider? parentRepositoryProvider,

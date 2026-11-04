@@ -10,23 +10,23 @@ executables:
   bones_api:
 
 dependencies:
-  async_extension: ^1.2.22
+  async_extension: ^1.2.23
   async_events: ^1.4.0
   reflection_factory: ^2.13.0
   statistics: ^1.2.2
-  swiss_knife: ^3.3.14
+  swiss_knife: ^3.4.0
   data_serializer: ^1.2.3
   shared_map: ^1.1.9
-  graph_explorer: ^1.0.2
-  ascii_art_tree: ^1.0.6
+  graph_explorer: ^1.1.1
+  ascii_art_tree: ^1.1.0
   map_history: ^1.0.7
-  dart_spawner: ^1.1.0
+  dart_spawner: ^1.2.0
   yaml_writer: ^2.1.0
   mercury_client: ^2.4.0
   project_template: ^1.1.1
   resource_portable: ^3.1.4
   docker_commander: ^3.1.0
-  args_simple: ^1.1.0
+  args_simple: ^1.2.0
   shelf_letsencrypt: ^2.0.8
   shelf: ^1.4.3
   shelf_gzip: ^4.1.0
@@ -40,13 +40,13 @@ dependencies:
   collection: ^1.19.1
   mime: ^2.1.0
   postgres: ^3.5.20
-  mysql1: ^0.20.0
+  mysql1: ^0.22.0
   sqlite3: ^3.8.0
-  gcloud: ^0.8.19
+  gcloud: ^0.9.0
   yaml: ^3.1.4
   crypto: ^3.0.8
   path: ^1.9.1
-  archive: ^4.5.2
+  archive: ^4.6.0
   stream_channel: ^2.1.4
   http: ^1.6.0
   googleapis_auth: ^2.3.5
@@ -57,7 +57,7 @@ dependencies:
   timezone: ^0.11.2
 
 dev_dependencies:
-  lints: ^5.1.1
+  lints: ^6.1.0
   build_runner: ^2.16.2
   build_verify: ^3.1.1
   test: ^1.33.0

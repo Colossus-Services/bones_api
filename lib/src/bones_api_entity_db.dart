@@ -405,7 +405,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
   }) => InitializationResult.ok(
     this,
     dependencies: [
-      if (parentRepositoryProvider != null) parentRepositoryProvider!,
+      ?parentRepositoryProvider,
       if (withEntityRepositories) ...entityRepositories,
     ],
   );
@@ -1613,7 +1613,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   }
 
   FutureOr<dynamic> _ensureStoredImpl(
-    o,
+    dynamic o,
     Transaction? transaction,
     TransactionOperation? parentOperation,
   ) {

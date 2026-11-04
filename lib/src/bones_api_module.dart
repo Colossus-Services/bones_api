@@ -1276,17 +1276,17 @@ class APIModuleProxyCallerResponseError extends APIModuleProxyCallerError {
         if (responseStackTrace != null &&
             !identical(response.stackTrace, responseStackTrace))
           responseStackTrace,
-        if (responseStatus != null) responseStatus,
+        ?responseStatus,
       ];
     } else {
       return [
-        if (response != null) response,
+        ?response,
         if (responseError != null &&
             !identical(response, responseError) &&
             !message.contains('$responseError'))
           responseError,
-        if (responseStackTrace != null) responseStackTrace,
-        if (responseStatus != null) responseStatus,
+        ?responseStackTrace,
+        ?responseStatus,
       ];
     }
   }
