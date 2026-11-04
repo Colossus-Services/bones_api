@@ -1186,6 +1186,130 @@ void main() {
     });
   });
 
+  // A `COMMIT` that fails: a deferred foreign key is only checked at the
+  // `COMMIT`. SQLite's `COMMIT` is asynchronous (the adapter's
+  // `transactionResult`), inside the transaction's error `Zone`: before 1.30.1
+  // its error never reached the caller of `Transaction.execute` (a hang).
+  group('DBSQLiteAdapter: failing COMMIT', () {
+    late _Provider provider;
+
+    setUp(() async {
+      provider = _Provider(generateTables: false, checkTables: false);
+      await provider.ensureInitialized();
+
+      var adapter = provider.adapter;
+      adapter.executeRawSQL(
+        'CREATE TABLE owner (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR)',
+      );
+      adapter.executeRawSQL(
+        'CREATE TABLE guard_parent (id INTEGER PRIMARY KEY)',
+      );
+      adapter.executeRawSQL(
+        'CREATE TABLE guard (parent_id INTEGER '
+        'REFERENCES guard_parent(id) DEFERRABLE INITIALLY DEFERRED)',
+      );
+      // An owner named `bad` inserts a dangling (deferred) reference: the
+      // `INSERT` succeeds, the `COMMIT` fails.
+      adapter.executeRawSQL(
+        "CREATE TRIGGER owner_guard AFTER INSERT ON owner WHEN NEW.name = 'bad' "
+        'BEGIN INSERT INTO guard VALUES (-1); END',
+      );
+    });
+
+    tearDown(() => provider.dispose());
+
+    Future<({Object? value, Object? error})> outcomeOf(
+      FutureOr<Object?> Function() f,
+    ) => Future.sync(f)
+        .then<({Object? value, Object? error})>(
+          (v) => (value: v, error: null),
+          onError: (Object e) => (value: null, error: e),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    Future<void> expectFailedCommit(
+      Transaction t,
+      ({Object? value, Object? error}) outcome,
+    ) async {
+      expect(outcome.value, isNull);
+      expect('${outcome.error}', contains('FOREIGN KEY constraint failed'));
+
+      await t.resultFuture.timeout(const Duration(seconds: 10));
+      expect(t.isFinished, isTrue);
+      expect(t.isCommitting, isFalse);
+      expect(t.isCommitted, isFalse);
+      expect(t.isAborted, isTrue);
+      expect(Transaction.executingTransaction, isNull);
+
+      // The `abortError` wraps the commit error, that describes the
+      // transaction (no infinite recursion):
+      expect(t.abortError?.error, same(outcome.error));
+      expect(t.toString(), contains('abortError: TransactionAbortedError>'));
+
+      // Rolled back:
+      var rows = provider.adapter.executeRawSQL(
+        'SELECT count(*) AS n FROM owner',
+      );
+      expect(rows.first['n'], equals(0));
+    }
+
+    Future<void> expectNextTransactionWorks() async {
+      var t2 = Transaction();
+      var id = await t2.execute(
+        () => provider.ownerRepository.store(_Owner(name: 'ok')),
+      );
+      expect(id, isNotNull);
+      expect(t2.isCommitted, isTrue);
+      expect(await provider.ownerRepository.count(), equals(1));
+    }
+
+    test('Transaction.execute', () async {
+      var t = Transaction();
+      var outcome = await outcomeOf(
+        () => t.execute<dynamic>(
+          () => provider.ownerRepository.store(_Owner(name: 'bad')),
+        ),
+      );
+
+      await expectFailedCommit(t, outcome);
+      await expectNextTransactionWorks();
+    });
+
+    test('Transaction.executeOrError', () async {
+      var t = Transaction();
+      var onErrorCalls = 0;
+
+      var outcome = await outcomeOf(
+        () => t.executeOrError<dynamic>(
+          () => provider.ownerRepository.store(_Owner(name: 'bad')),
+          onError: (tr, e, s) {
+            ++onErrorCalls;
+            return -1;
+          },
+        ),
+      );
+
+      await expectFailedCommit(t, outcome);
+      // A commit error is not a block error:
+      expect(onErrorCalls, equals(0));
+      await expectNextTransactionWorks();
+    });
+
+    test('Transaction.executeBlock', () async {
+      Transaction? transaction;
+
+      var outcome = await outcomeOf(
+        () => Transaction.executeBlock((t) {
+          transaction = t;
+          return provider.ownerRepository.store(_Owner(name: 'bad'));
+        }),
+      );
+
+      await expectFailedCommit(transaction!, outcome);
+      await expectNextTransactionWorks();
+    });
+  });
+
   group('checkTables', () {
     test('missing columns', () async {
       var provider = _Provider(generateTables: false, checkTables: false);
