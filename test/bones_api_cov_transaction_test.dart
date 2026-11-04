@@ -728,6 +728,76 @@ void main() {
         await expectNotReported();
       });
 
+      // A `COMMIT` error after another error notified while committing: an
+      // extra error (`extraErrors`).
+      test('commit error after a notified error', () async {
+        var t = Transaction();
+
+        var outcome = await _outcomeOf(
+          () => t.execute(() {
+            var op = _select(t);
+            t.transactionResult = t.transactionFuture
+                .then<Object?>((r) => throw StateError('notified commit'))
+                .catchError((Object e, StackTrace s) {
+                  try {
+                    t.notifyExecutionError<Object?>(e, s);
+                  } catch (_) {}
+                  throw StateError('other commit');
+                });
+            return op.finish(1);
+          }),
+        );
+
+        expect(outcome.error, _stateError('other commit'));
+        expect(t.error, _stateError('notified commit'));
+        expect(t.extraErrors, [same(outcome.error)]);
+        await _expectFinished(t, committed: false);
+        expect(t.abortError?.error, same(outcome.error));
+        await expectNotReported();
+      });
+
+      // A synchronous error of the commit completion (here the result cast):
+      // thrown synchronously (the transaction was already committed).
+      test('commit: sync completion error', () async {
+        var t = Transaction();
+        var op = _select(t);
+        await op.finish('not an int');
+        t.transactionResult = 'tr';
+
+        expect(() => t.commit<int>(), throwsA(isA<TypeError>()));
+        expect(t.isCommitted, isTrue);
+        expect(t.isFinished, isTrue);
+        await t.resultFuture.timeout(const Duration(seconds: 5));
+      });
+
+      // `execute` called inside the `Zone` of a finished transaction (the
+      // same error zone): the outcome needs no forwarding.
+      test('execute inside the zone of a finished transaction', () async {
+        var nested = Completer<({Object? value, Object? error})>();
+        Transaction? inner;
+
+        var t = Transaction();
+        await t.execute(() {
+          // Runs in `t`'s zone, after `t` finished:
+          Future<void>.delayed(const Duration(milliseconds: 10), () {
+            expect(Transaction.executingTransaction, isNull);
+            var t2 = inner = Transaction();
+            t2.open(
+              () => 'ctx',
+              () async => throw StateError('nested zone commit'),
+            );
+            _outcomeOf(() => t2.execute(() => 1)).then(nested.complete);
+          });
+          return 1;
+        });
+        expect(t.isCommitted, isTrue);
+
+        var outcome = await nested.future.timeout(const Duration(seconds: 5));
+        expect(outcome.error, _stateError('nested zone commit'));
+        await _expectFinished(inner!, committed: false);
+        await expectNotReported();
+      });
+
       // A 2nd (concurrent) `commit` while the closer is failing: `null` (as
       // for an aborted transaction), not the `TransactionAbortedError`.
       test('commit: concurrent commit while the closer fails', () async {
