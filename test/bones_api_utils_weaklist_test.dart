@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
+import 'package:vm_service/vm_service.dart' show VmService;
 import 'package:vm_service/vm_service_io.dart';
 
 void main() async {
@@ -18,10 +19,22 @@ void main() async {
     return;
   }
 
+  // One VM service connection, disposed at the end: a connection left open
+  // per `gc` call could keep this suite from closing (with `--coverage` the
+  // test runner also talks to the VM service), hanging the whole CI job.
+  VmService? vmService;
+
+  tearDownAll(() async {
+    await vmService?.dispose();
+    vmService = null;
+  });
+
   Future<void> gc() async {
     final isolateId = Service.getIsolateId(Isolate.current)!;
-    final vmService = await vmServiceConnectUri(_toWebSocket(serverUri));
-    final profile = await vmService.getAllocationProfile(isolateId, gc: true);
+    final service = vmService ??= await vmServiceConnectUri(
+      _toWebSocket(serverUri),
+    );
+    final profile = await service.getAllocationProfile(isolateId, gc: true);
 
     var memoryUsage = profile.memoryUsage;
     print('** GC> Memory: $memoryUsage');

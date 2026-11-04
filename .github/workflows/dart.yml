@@ -52,8 +52,9 @@ jobs:
   test_vm:
     name: test_vm (${{ matrix.suite }})
     runs-on: ubuntu-latest
-    # A hung test process (normally ~5 min) fails instead of running for hours.
-    timeout-minutes: 20
+    # A hung test process (normally <= ~5.5 min) fails instead of running for
+    # hours.
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
