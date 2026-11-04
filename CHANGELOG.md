@@ -15,7 +15,8 @@
   `TransactionAbortedError` (`reason: 'Commit failed'`) wrapping the commit
   error (also in `error`): `isCommitting` is no longer left `true`, the
   `transactionFuture` (if not completed yet) and `resultFuture` complete, and
-  `executingTransaction` is cleared.
+  `executingTransaction` is cleared. A concurrent 2nd `commit` then returns
+  `null` (as for an aborted transaction).
 - `Transaction`: the `resultFuture` of an aborted transaction now completes
   also when the adapter fails its `transactionResult` (the rollback of the
   PostgreSQL/MySQL/SQLite adapters): it never completed.

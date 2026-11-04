@@ -728,6 +728,30 @@ void main() {
         await expectNotReported();
       });
 
+      // A 2nd (concurrent) `commit` while the closer is failing: `null` (as
+      // for an aborted transaction), not the `TransactionAbortedError`.
+      test('commit: concurrent commit while the closer fails', () async {
+        var t = Transaction();
+        await t.open(() => 'ctx', () async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          throw StateError('concurrent commit');
+        });
+        var op = _select(t);
+        await op.finish(1);
+
+        var commit1 = _outcomeOf(() => t.commit<int>());
+        var commit2 = _outcomeOf(() => t.commit<int>());
+
+        expect((await commit1).error, _stateError('concurrent commit'));
+
+        var outcome2 = await commit2;
+        expect(outcome2.error, isNull);
+        expect(outcome2.value, isNull);
+
+        await _expectFinished(t, committed: false);
+        await expectNotReported();
+      });
+
       // A block error aborts the transaction: the adapters then fail the
       // `transactionResult` with the `TransactionAbortedError` (a rollback).
       Future<void> testBlockErrorWithFailingResult({

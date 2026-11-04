@@ -38,7 +38,11 @@ void main() {
       var connection = t.context as DBMySqlConnectionWrapper;
       await connection.nativeConnection.close();
     },
-    // Not a `MySqlException`: the socket is closed.
-    commitError: isNotNull,
+    // Not a `MySqlException`: the `COMMIT` can't be written to the closed
+    // socket (`mysql1`: "Cannot write to socket, it is closed").
+    commitError: predicate(
+      (e) => '$e'.contains('closed'),
+      'a closed connection error',
+    ),
   );
 }

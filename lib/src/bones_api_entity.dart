@@ -6999,7 +6999,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       } else {
         retFuture = _transactionCompleter.future;
       }
-      return retFuture.resolveMapped((r) => r as R?);
+      // A commit that failed meanwhile completes the `transactionFuture` with
+      // its `TransactionAbortedError`: `null`, as `commit` of an aborted
+      // transaction.
+      return retFuture.resolveMapped(
+        (r) => r is TransactionAbortedError ? null : r as R?,
+      );
     }
 
     _commitCalled = true;
@@ -7023,7 +7028,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
       if (closerResult is Future) {
         return closerResult.then(
-          (_) => _commitComplete<R>(result),
+          (_) => _commitCompleteGuarded<R>(result),
           onError: (Object e, StackTrace s) {
             _commitFailed(e, s);
             Error.throwWithStackTrace(e, s);
@@ -7032,7 +7037,29 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       }
     }
 
-    return _commitComplete<R>(result);
+    return _commitCompleteGuarded<R>(result);
+  }
+
+  /// [_commitComplete], finishing this transaction with [_commitFailed] on any
+  /// error (sync or async): the adapter's `COMMIT` (`transactionResult`), or a
+  /// [StateError] of [_commitCompleteFinish].
+  FutureOr<R?> _commitCompleteGuarded<R>(Object? result) {
+    try {
+      var ret = _commitComplete<R>(result);
+      if (ret is Future<R?>) {
+        return ret.then(
+          (r) => r,
+          onError: (Object e, StackTrace s) {
+            _commitFailed(e, s);
+            Error.throwWithStackTrace(e, s);
+          },
+        );
+      }
+      return ret;
+    } catch (e, s) {
+      _commitFailed(e, s);
+      rethrow;
+    }
   }
 
   /// Finishes this transaction after a failed commit (its closer or its
@@ -7101,13 +7128,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       if (transactionResult is Future) {
         var parentStackTrace = _debugStackTrace();
 
+        // A failed `COMMIT` of the adapter: see `_commitCompleteGuarded`.
         var ret = transactionResult.then(
           (r) => _commitCompleteFinish<R>(r, parentStackTrace),
-          // The adapter's `COMMIT` failed:
-          onError: (Object e, StackTrace s) {
-            _commitFailed(e, s);
-            Error.throwWithStackTrace(e, s);
-          },
         );
 
         _transactionCompleter.complete(result);
