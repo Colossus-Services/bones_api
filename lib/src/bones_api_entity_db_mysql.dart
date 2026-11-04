@@ -1271,6 +1271,23 @@ abstract class DBMySqlConnectionWrapper
 
   bool _nativeClose = false;
 
+  /// `mysql1` (since 0.21) closes the connection when a query fails with
+  /// anything but a [MySqlException] (a timeout, a socket error...), without
+  /// exposing it: marks this wrapper closed, so the pool discards it instead
+  /// of handing out a connection that can't be written to.
+  void _onNativeConnectionClosed() => _nativeClose = true;
+
+  Future<T> _trackNativeClose<T>(Future<T> query) async {
+    try {
+      return await query;
+    } on MySqlException {
+      rethrow;
+    } catch (_) {
+      _onNativeConnectionClosed();
+      rethrow;
+    }
+  }
+
   @override
   void closeImpl() {
     _nativeClose = true;
@@ -1295,15 +1312,16 @@ class _DBMySqlConnectionWrapped extends DBMySqlConnectionWrapper {
   @override
   Future<Result> query(String sql, [List<Object?>? values]) {
     updateLastAccessTime();
-    return nativeConnection.query(sql, values?.cast<Object?>());
+    return _trackNativeClose(
+      nativeConnection.query(sql, values?.cast<Object?>()),
+    );
   }
 
   @override
   Future<List<Result>> queryMulti(String sql, Iterable<List<Object?>> values) {
     updateLastAccessTime();
-    return nativeConnection.queryMulti(
-      sql,
-      values.map((e) => e.cast<Object?>()),
+    return _trackNativeClose(
+      nativeConnection.queryMulti(sql, values.map((e) => e.cast<Object?>())),
     );
   }
 
@@ -1333,12 +1351,20 @@ class _DBMySqlConnectionTransaction extends DBMySqlConnectionWrapper {
   String get connectionURL => parent.connectionURL;
 
   @override
+  void _onNativeConnectionClosed() {
+    super._onNativeConnectionClosed();
+    parent._onNativeConnectionClosed();
+  }
+
+  @override
   Future<Result> query(String sql, [List<Object?>? values]) =>
-      transaction.query(sql, values?.cast<Object?>());
+      _trackNativeClose(transaction.query(sql, values?.cast<Object?>()));
 
   @override
   Future<List<Result>> queryMulti(String sql, Iterable<List<Object?>> values) =>
-      transaction.queryMulti(sql, values.map((e) => e.cast<Object?>()));
+      _trackNativeClose(
+        transaction.queryMulti(sql, values.map((e) => e.cast<Object?>())),
+      );
 
   @override
   String get runtimeTypeNameSafe => '_DBMySqlConnectionTransaction';

@@ -10,7 +10,7 @@ executables:
   bones_api:
 
 dependencies:
-  async_extension: ^1.2.23
+  async_extension: ^1.2.24
   async_events: ^1.4.0
   reflection_factory: ^2.13.0
   statistics: ^1.2.2

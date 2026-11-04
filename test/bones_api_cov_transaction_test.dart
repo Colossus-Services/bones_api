@@ -458,6 +458,114 @@ void main() {
       expect(r3, equals(3));
     });
 
+    // The commit runs in `execute`'s `onFinally` (`asyncTry`): a commit that
+    // fails reaches the caller, also when it throws synchronously (a sync
+    // closer, as the memory/SQLite adapters' commits). With
+    // `async_extension` < 1.2.24 a synchronous `onFinally` error was passed
+    // to `onError` and swallowed: the block's result was returned.
+    group('execute: failing commit', () {
+      test('sync commit error reaches the caller', () async {
+        var t = Transaction();
+        await t.open(() => 'ctx', () => throw StateError('sync commit'));
+
+        await expectLater(
+          Future.sync(() => t.execute(() => 1)),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'sync commit',
+            ),
+          ),
+        );
+      });
+
+      test('sync commit error reaches the caller (with onError)', () async {
+        var t = Transaction();
+        await t.open(() => 'ctx', () => throw StateError('sync commit'));
+
+        var onErrorCalls = 0;
+        await expectLater(
+          Future.sync(
+            () => t.executeOrError<int>(
+              () => 1,
+              onError: (tr, e, s) {
+                ++onErrorCalls;
+                return -1;
+              },
+            ),
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'sync commit',
+            ),
+          ),
+        );
+        // A commit error is not a block error:
+        expect(onErrorCalls, equals(0));
+      });
+
+      // An asynchronous commit failure (unchanged by `async_extension`
+      // 1.2.24): its `Future` fails inside the transaction's error `Zone`, so
+      // the error is reported there (`[Transaction ERROR]`, through the error
+      // filters) and `execute` doesn't complete. Either way it's never
+      // swallowed (the block's result isn't returned) nor passed to `onError`.
+      Future<void> testAsyncCommitError({required bool withOnError}) async {
+        var message = 'async commit (onError: $withOnError)';
+
+        var reported = Completer<Object>();
+        Transaction.registerErrorFilter((e, s) {
+          if (e is StateError && e.message == message) {
+            if (!reported.isCompleted) reported.complete(e);
+            return true;
+          }
+          return false;
+        });
+
+        var t = Transaction();
+        await t.open(() => 'ctx', () async => throw StateError(message));
+
+        var onErrorCalls = 0;
+        var outcome = Completer<Object?>();
+
+        Future.sync(
+          () => withOnError
+              ? t.executeOrError<int>(
+                  () => 1,
+                  onError: (tr, e, s) {
+                    ++onErrorCalls;
+                    return -1;
+                  },
+                )
+              : t.execute(() => 1),
+        ).then(
+          (r) => outcome.complete(r),
+          onError: (Object e) => outcome.complete(e),
+        );
+
+        var error = await Future.any([
+          reported.future,
+          outcome.future.then((o) => o ?? 'null result'),
+        ]).timeout(const Duration(seconds: 10));
+
+        expect(
+          error,
+          isA<StateError>().having((e) => e.message, 'message', message),
+        );
+        expect(onErrorCalls, equals(0));
+      }
+
+      test('async commit error is not swallowed', () async {
+        await testAsyncCommitError(withOnError: false);
+      });
+
+      test('async commit error is not swallowed (with onError)', () async {
+        await testAsyncCommitError(withOnError: true);
+      });
+    });
+
     test('executeBlock', () async {
       var r = await Transaction.executeBlock((t) {
         var op = _select(t);
