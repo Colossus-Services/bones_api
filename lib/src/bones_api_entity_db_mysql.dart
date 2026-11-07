@@ -6,6 +6,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
 
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
@@ -124,6 +125,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              // `mysql1` has no prepared statements (since 0.21 it writes the
              // parameters into the statement as literals): IDs as values.
              maxIDsAsParameters: 0,
+             // `REGEXP_LIKE` (MySQL 8.0.4+):
+             regExpSyntax: SQLRegExpSyntax.mysql,
            ),
            transactions: true,
            transactionAbort: true,

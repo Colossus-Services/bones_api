@@ -645,6 +645,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       sqlElementQuote: dialect.elementQuote,
       intParameterTypeSuffix: dialect.intParameterTypeSuffix,
       maxIDsAsParameters: dialect.maxIDsAsParameters,
+      regExpSyntax: dialect.regExpSyntax,
     );
   }
 

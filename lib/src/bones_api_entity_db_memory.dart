@@ -8,6 +8,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db_sql.dart';
@@ -109,6 +110,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
              'generic',
              acceptsReturningSyntax: true,
              acceptsInsertIgnore: true,
+             // The conditions are matched in memory:
+             regExpSyntax: SQLRegExpSyntax.dart,
            ),
            transactions: true,
            transactionAbort: true,
@@ -1169,6 +1172,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       var entries = candidates.where((e) {
         return sql.condition!.matchesEntityMap(
           e.value,
+          positionalParameters: sql.positionalParameters,
           namedParameters: sql.parametersByPlaceholder,
           entityHandler: entityHandler,
         );
@@ -1185,6 +1189,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
           var match = sql.condition!.matchesEntityMap(
             obj,
+            positionalParameters: sql.positionalParameters,
             namedParameters: sql.parametersByPlaceholder,
             entityHandler: entityHandler,
           );

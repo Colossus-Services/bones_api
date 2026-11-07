@@ -4544,6 +4544,266 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('RegExp conditions: =~ /.../ and !~ /.../', () async {
+        final userInfoRepo = entityRepositoryProvider.userInfoAPIRepository;
+        final addressRepo = entityRepositoryProvider.addressAPIRepository;
+        final userRepo = entityRepositoryProvider.userAPIRepository;
+        final roleRepo = entityRepositoryProvider.roleAPIRepository;
+
+        var infos = {
+          'multiLine': 'rx:alpha\nbeta',
+          'upper': 'rx:ALPHA',
+          'newLineEnd': 'rx:abc\n',
+          'slash': 'rx:a/b',
+          'percent': 'rx:100% (x)',
+        };
+
+        var idsByName = <String, Object>{};
+        for (var e in infos.entries) {
+          idsByName[e.key] = (await userInfoRepo.store(UserInfo(e.value)))!;
+        }
+        var namesByID = idsByName.map((k, v) => MapEntry(v, k));
+
+        // The names of the `UserInfo` created here that match a [query]:
+        Future<Set<String>> select(
+          String query, {
+          Object? parameters,
+          List? positionalParameters,
+          Map<String, Object?>? namedParameters,
+        }) async {
+          var sel = await userInfoRepo.selectByQuery(
+            query,
+            parameters: parameters,
+            positionalParameters: positionalParameters,
+            namedParameters: namedParameters,
+          );
+          return sel.map((e) => namesByID[e.id]).nonNulls.toSet();
+        }
+
+        // Matches anywhere, case-sensitive:
+        expect(await select('info =~ /^rx:alpha/'), equals({'multiLine'}));
+        expect(await select('info =~ /alpha/'), equals({'multiLine'}));
+        expect(await select('info =~ /ALPHA/'), equals({'upper'}));
+
+        // `i`:
+        expect(
+          await select('info =~ /^RX:ALPHA/i'),
+          equals({'multiLine', 'upper'}),
+        );
+
+        // `.` matches a line terminator:
+        expect(await select('info =~ /alpha.beta/'), equals({'multiLine'}));
+
+        // `^`/`$`: only the start/end of the whole value (not of a line):
+        expect(await select('info =~ /^beta/'), isEmpty);
+        expect(await select('info =~ /alpha\$/i'), equals({'upper'}));
+        expect(await select('info =~ /beta\$/'), equals({'multiLine'}));
+        // Not before a final line terminator (as ICU's `$`, in MySQL):
+        expect(await select('info =~ /abc\$/'), isEmpty);
+        expect(await select('info =~ /abc\\n\$/'), equals({'newLineEnd'}));
+        // A `$` in a class is a literal:
+        expect(await select('info =~ /[\$]/'), isEmpty);
+
+        // An escaped `/`, and characters special in SQL (`%`, `(`):
+        expect(await select(r'info =~ /a\/b$/'), equals({'slash'}));
+        expect(await select(r'info =~ /100% \(x\)$/'), equals({'percent'}));
+        expect(await select(r"info =~ /'/"), isEmpty);
+
+        // Word boundaries (`\y` in PostgreSQL), and an identity escape:
+        expect(await select(r'info =~ /\bbeta\b/'), equals({'multiLine'}));
+        expect(
+          await select(r'info =~ /\balpha\b/i'),
+          equals({'multiLine', 'upper'}),
+        );
+        expect(await select(r'info =~ /\Blpha/'), equals({'multiLine'}));
+        expect(await select(r'info =~ /100\% \(x\)$/'), equals({'percent'}));
+
+        // `!~`:
+        expect(
+          await select('info !~ /^rx:alpha/i'),
+          equals({'newLineEnd', 'slash', 'percent'}),
+        );
+
+        // In groups:
+        expect(
+          await select(r'info =~ /^rx:a\// || info == "rx:ALPHA"'),
+          equals({'slash', 'upper'}),
+        );
+        expect(
+          await select(r'info =~ /^rx:a/ && info !~ /\n/'),
+          equals({'slash'}),
+        );
+
+        // Parameters (a `String` or a `RegExp`):
+        expect(
+          await select(
+            'info =~ /?:p/',
+            namedParameters: {'p': RegExp(r'^rx:alpha', caseSensitive: false)},
+          ),
+          equals({'multiLine', 'upper'}),
+        );
+        expect(
+          await select('info =~ /?:p/i', parameters: {'p': '^rx:alpha\$'}),
+          equals({'upper'}),
+        );
+        expect(
+          await select('info !~ /?/', positionalParameters: [r'^rx:a']),
+          equals({'upper', 'percent'}),
+        );
+        expect(
+          await select('info =~ /?#0/', parameters: [r'^rx:a/']),
+          equals({'slash'}),
+        );
+
+        // `selectFirstByQuery` passes the `positionalParameters`:
+        var first = await userInfoRepo.selectFirstByQuery(
+          'info =~ /?/',
+          positionalParameters: [r'^rx:100%'],
+        );
+        expect(first?.id, equals(idsByName['percent']));
+
+        // A `RegExp` as an `IN` value: not compared as text.
+        expect(
+          () async =>
+              await select('info =~ ?', positionalParameters: [RegExp('x')]),
+          throwsA(isA<ArgumentError>()),
+        );
+
+        // A non-text column (cast to text):
+        var a1 = Address('RX', 'Rx City', 'Rx Street', 901);
+        var a2 = Address('RX', 'rx town', 'Rx Street', 1901);
+        var addressIDs = [
+          (await addressRepo.store(a1))!,
+          (await addressRepo.store(a2))!,
+        ];
+
+        Future<List<Object?>> selectAddresses(String query) async =>
+            (await addressRepo.selectByQuery(query))
+                .map((e) => e.id)
+                .where(addressIDs.contains)
+                .toList();
+
+        expect(
+          await selectAddresses(r'number =~ /^90\d$/'),
+          equals([addressIDs[0]]),
+        );
+        expect(
+          await selectAddresses('number =~ /01\$/'),
+          unorderedEquals(addressIDs),
+        );
+        expect(
+          await selectAddresses('number !~ /^9/'),
+          equals([addressIDs[1]]),
+        );
+
+        // REGRESSION: 2 positional parameters of the same field shared one
+        // placeholder (the 1st value): `number > 900 AND number < 900`.
+        Future<List<Object?>> selectAddressesBy(
+          String query,
+          List parameters,
+        ) async => (await addressRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => e.id).where(addressIDs.contains).toList();
+
+        expect(
+          await selectAddressesBy('number > ? && number < ?', [900, 1000]),
+          equals([addressIDs[0]]),
+        );
+        expect(
+          await selectAddressesBy('number >= ? && number <= ?', [1901, 1901]),
+          equals([addressIDs[1]]),
+        );
+        expect(
+          await selectAddressesBy('number =~ ? && number !~ ?', [
+            [901, 1901],
+            [901],
+          ]),
+          equals([addressIDs[1]]),
+        );
+
+        // A related entity's field (a join), an enum, and a list
+        // relationship:
+        var u1 = User('rx1@$testDomain', 'p', a1, [
+          Role(RoleType.admin),
+        ], creationTime: DateTime.utc(2020));
+        var u2 = User('rx2@$testDomain', 'p', a2, [
+          Role(RoleType.guest),
+          Role(RoleType.unknown),
+        ], creationTime: DateTime.utc(2020));
+        var userIDs = [
+          (await userRepo.store(u1))!,
+          (await userRepo.store(u2))!,
+        ];
+
+        Future<List<Object?>> selectUsers(String query) async =>
+            (await userRepo.selectByQuery(query))
+                .map((e) => e.id)
+                .where(userIDs.contains)
+                .toList();
+
+        expect(
+          await selectUsers('address.city =~ /^rx city\$/i'),
+          equals([userIDs[0]]),
+        );
+        expect(
+          await selectUsers('address.city !~ /City/'),
+          equals([userIDs[1]]),
+        );
+        expect(await selectUsers('roles.type =~ /^gu/'), equals([userIDs[1]]));
+        expect(
+          await selectUsers('roles.type =~ /^(admin|unknown)\$/'),
+          unorderedEquals(userIDs),
+        );
+        expect(
+          // (Only one row of a user's roles matches: the SQL adapters return
+          // a user once per matching row of a list relationship.)
+          await selectUsers('roles.type !~ /^(admin|guest)\$/'),
+          equals([userIDs[1]]),
+        );
+        expect(
+          await selectUsers(
+            'email =~ /^rx/ && (address.city =~ /town/ || email =~ /^RX1@/i)',
+          ),
+          unorderedEquals(userIDs),
+        );
+        expect(
+          await selectUsers('email =~ /^rx/ && roles.type =~ /^adm/'),
+          equals([userIDs[0]]),
+        );
+
+        // A regexp and another condition, of the same field, by position:
+        Future<List<Object?>> selectUsersBy(String query, List params) async =>
+            (await userRepo.selectByQuery(
+              query,
+              parameters: params,
+            )).map((e) => e.id).where(userIDs.contains).toList();
+
+        expect(
+          await selectUsersBy('email =~ /?/ && email != ?', [
+            '^rx',
+            'rx1@$testDomain',
+          ]),
+          equals([userIDs[1]]),
+        );
+        expect(
+          await selectUsersBy('email != ? && email =~ /?/i', [
+            'rx2@$testDomain',
+            '^RX',
+          ]),
+          equals([userIDs[0]]),
+        );
+
+        var roleIDs = [...u1.roles, ...u2.roles].map((r) => r.id).toList();
+        expect(
+          (await roleRepo.selectByQuery('type =~ /^(ADMIN|GUEST)\$/i'))
+              .map((e) => e.id)
+              .where(roleIDs.contains)
+              .toList(),
+          unorderedEquals([u1.roles[0].id, u2.roles[0].id]),
+        );
+      });
+
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [

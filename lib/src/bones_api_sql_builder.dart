@@ -7,6 +7,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_base.dart';
+import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
@@ -166,6 +167,10 @@ class SQLDialect extends DBDialect {
   /// reused) and one without as 1.
   final int maxIDsAsParameters;
 
+  /// How a regular expression condition (`field =~ /.../`) is written. See
+  /// [SQLRegExpSyntax].
+  final SQLRegExpSyntax regExpSyntax;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -187,6 +192,7 @@ class SQLDialect extends DBDialect {
     this.maxIdentifierLength,
     this.intParameterTypeSuffix,
     this.maxIDsAsParameters = 512,
+    this.regExpSyntax = SQLRegExpSyntax.function,
   });
 
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause

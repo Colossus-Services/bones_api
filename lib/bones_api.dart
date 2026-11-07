@@ -62,6 +62,7 @@
 /// {@canonicalFor bones_api_condition.KeyConditionLessThan}
 /// {@canonicalFor bones_api_condition.KeyConditionNotEQ}
 /// {@canonicalFor bones_api_condition.KeyConditionNotIN}
+/// {@canonicalFor bones_api_condition.KeyConditionRegExp}
 /// {@canonicalFor bones_api_condition.KeyConditionValue}
 /// {@canonicalFor bones_api_condition.KeyCondition}
 /// {@canonicalFor bones_api_condition_encoder.ConditionEncoder}
@@ -90,6 +91,7 @@
 /// {@canonicalFor bones_api_condition_parser.jsonEscapeCharsString}
 /// {@canonicalFor bones_api_condition_parser.jsonEscapeChars}
 /// {@canonicalFor bones_api_condition_sql.ConditionSQLEncoder}
+/// {@canonicalFor bones_api_condition_sql.SQLRegExpSyntax}
 /// {@canonicalFor bones_api_config.APIConfigProvider}
 /// {@canonicalFor bones_api_config.APIConfig}
 /// {@canonicalFor bones_api_db_module.APIDBModule}
