@@ -20,13 +20,101 @@ class ConditionSQLEncoder extends ConditionEncoder {
   /// See `SQLDialect.regExpSyntax`.
   final SQLRegExpSyntax regExpSyntax;
 
+  /// Builds the `FROM` clause (`FROM table as alias JOIN ...`, without the
+  /// `WHERE`) of a condition encoded in a sub-context, for the subquery of a
+  /// [ConditionNOT] through other tables. Set by the SQL adapter.
+  final String Function(String table, EncodingContext subContext)?
+  subqueryFromSQL;
+
+  /// See `SQLDialect.subqueryAsDerivedTable`.
+  final bool subqueryAsDerivedTable;
+
   ConditionSQLEncoder(
     SchemeProvider super.schemeProvider, {
     required this.sqlElementQuote,
     this.intParameterTypeSuffix,
     this.maxIDsAsParameters = 512,
     this.regExpSyntax = SQLRegExpSyntax.function,
+    this.subqueryFromSQL,
+    this.subqueryAsDerivedTable = false,
   });
+
+  /// Encodes a [ConditionNOT], the complement of its condition (see
+  /// [ConditionNOT]), encoded in a sub-context ([EncodingContext.sub]):
+  /// - Only of the main table's fields: `NOT COALESCE(( cond ), FALSE)` (an
+  ///   unknown, `NULL`, condition is not matched, so its negation is).
+  /// - Through other tables: `id NOT IN ( SELECT id FROM ... WHERE cond )`
+  ///   (with its own `JOIN`s: through a to-many relationship, the entities
+  ///   without a matching related one; with [subqueryAsDerivedTable], in a
+  ///   derived table).
+  @override
+  FutureOr<EncodingContext> encodeConditionNOT(
+    ConditionNOT c,
+    EncodingContext context,
+  ) {
+    var sub = EncodingContext.sub(context);
+
+    return encodeCondition(c.condition, sub).resolveMapped((sub) {
+      var conditionSQL = sub.outputString.trim();
+
+      // `!ANY`: nothing.
+      if (conditionSQL.isEmpty) {
+        context.write(' FALSE ');
+        return context;
+      }
+
+      if (sub.fieldsReferencedTables.isEmpty &&
+          sub.relationshipTables.isEmpty) {
+        // The same aliases (only of the main table):
+        for (var e in sub.tableAliases.entries) {
+          context.tableAliases.putIfAbsent(e.key, () => e.value);
+        }
+
+        // An ID condition is never unknown (the ID is never `NULL`): a plain
+        // (indexable) `NOT`.
+        context.write(
+          c.condition.isIDCondition
+              ? ' NOT ( $conditionSQL ) '
+              : ' NOT COALESCE(( $conditionSQL ), FALSE) ',
+        );
+        return context;
+      }
+
+      var subqueryFromSQL = this.subqueryFromSQL;
+      if (subqueryFromSQL == null) {
+        throw ConditionEncodingError(
+          'A negated condition through other tables needs a subquery '
+          '(`subqueryFromSQL`): $c',
+        );
+      }
+
+      var table = context.tableNameOrEntityName;
+
+      return _resolveTableIDField(table).resolveMapped((idField) {
+        var q = sqlElementQuote;
+
+        var subAlias = sub.resolveEntityAlias(table);
+        var from = subqueryFromSQL(table, sub);
+
+        var subquery =
+            'SELECT $q$subAlias$q.$q$idField$q $from WHERE $conditionSQL';
+
+        if (subqueryAsDerivedTable) {
+          subquery =
+              'SELECT ${q}not_ids$q.$q$idField$q FROM ( $subquery ) '
+              'as ${q}not_ids$q';
+        }
+
+        var alias = context.resolveEntityAlias(table);
+        context.write(' $q$alias$q.$q$idField$q NOT IN ( $subquery ) ');
+        return context;
+      });
+    });
+  }
+
+  FutureOr<String> _resolveTableIDField(String table) => schemeProvider!
+      .getTableScheme(table)
+      .resolveMapped((tableScheme) => tableScheme?.idFieldName ?? 'id');
 
   @override
   String get groupOpener => '(';
@@ -334,16 +422,21 @@ class ConditionSQLEncoder extends ConditionEncoder {
         placeholders[parameterKey] = syntax.adaptPattern(pattern);
       }
 
-      context.write(' ');
-      context.write(
-        syntax.matchSQL(
-          tableKey,
-          parameterPlaceholder(parameterKey),
-          caseInsensitive: caseInsensitive,
-          not: c.not,
-          castToText: keyType != String,
-        ),
+      var matchSQL = syntax.matchSQL(
+        tableKey,
+        parameterPlaceholder(parameterKey),
+        caseInsensitive: caseInsensitive,
+        not: c.not,
+        castToText: keyType != String,
       );
+
+      context.write(' ');
+      if (c.not) {
+        // `!~` also matches a `null` column (as `!=` and `NOT IN`):
+        context.write('( $matchSQL OR $tableKey IS NULL )');
+      } else {
+        context.write(matchSQL);
+      }
       context.write(' ');
 
       return context;
@@ -370,8 +463,21 @@ class ConditionSQLEncoder extends ConditionEncoder {
         operator,
         c.value,
         valueAsList,
+        negated: c.isNegated,
+        nullable: !_isMainTableIDKey(c, context),
       );
     });
+  }
+
+  /// If [c]'s key is the ID of the main table (never `NULL`).
+  bool _isMainTableIDKey(KeyCondition c, EncodingContext context) {
+    var keys = c.keys;
+    if (keys.length != 1) return false;
+    var key = keys.first;
+    var tableFieldID = context.tableFieldID;
+    return key is ConditionKeyField &&
+        tableFieldID != null &&
+        key.name == tableFieldID;
   }
 
   @override
@@ -394,12 +500,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
     String tableKey,
     String operator,
     dynamic values,
-    bool valueAsList,
-  ) {
-    context.write(' ');
-    context.write(tableKey);
-    context.write(' ');
-
+    bool valueAsList, {
+    bool negated = false,
+    bool nullable = true,
+  }) {
     // The encoding value rather than only its text: a null supplied as a
     // parameter encodes to a placeholder, so the text alone cannot say whether
     // the comparison is against null.
@@ -412,31 +516,100 @@ class ConditionSQLEncoder extends ConditionEncoder {
     );
 
     return valueRet.resolveMapped((value) {
+      // A `null` in an `IN` list: as `IS NULL` (as when matched in memory).
+      // In SQL `x IN (1, NULL)` doesn't match a `NULL`, and
+      // `x NOT IN (1, NULL)` matches nothing.
+      var listWithNull = false;
+      if (value is EncodingValueList<String> &&
+          (operator == 'IN' || operator == 'NOT IN')) {
+        var elements = value.asList;
+        var nonNulls = elements
+            .where((e) => !_isNullListElement(e, context))
+            .toList();
+
+        if (nonNulls.length < elements.length || elements.isEmpty) {
+          for (var e in elements) {
+            if (!nonNulls.contains(e)) {
+              _markPlaceholderInlinedAsNull(e, context);
+            }
+          }
+
+          if (nonNulls.isEmpty) {
+            value = EncodingValueNull(
+              value.key,
+              value.type,
+              encodeEncodingValueNull,
+            );
+          } else {
+            listWithNull = true;
+            value = EncodingValueList(
+              value.key,
+              value.type,
+              nonNulls,
+              encodeEncodingValueList,
+            );
+          }
+        }
+      }
+
       if (isNullEncodingValue(value, context)) {
         switch (operator) {
           case '=':
           case 'IN':
             {
-              context.write('IS NULL ');
+              context.write(' $tableKey IS NULL ');
               _markPlaceholderInlinedAsNull(value, context);
               return context;
             }
           case '!=':
           case 'NOT IN':
             {
-              context.write('IS NOT NULL ');
+              context.write(' $tableKey IS NOT NULL ');
               _markPlaceholderInlinedAsNull(value, context);
               return context;
             }
         }
       }
 
+      // A negated operator also matches a `null` column (as when matched in
+      // memory): `( x != v OR x IS NULL )`; unless the list has a `null`:
+      // `( x NOT IN (v) AND x IS NOT NULL )`. And `( x IN (v) OR x IS NULL )`.
+      String? nullSQL;
+      if (listWithNull) {
+        nullSQL = negated
+            ? 'AND $tableKey IS NOT NULL'
+            : 'OR $tableKey IS NULL';
+      } else if (negated && nullable) {
+        nullSQL = 'OR $tableKey IS NULL';
+      }
+
+      context.write(nullSQL != null ? ' ( ' : ' ');
+      context.write(tableKey);
+      context.write(' ');
       context.write(operator);
       context.write(' ');
       context.write(value.encode);
       context.write(' ');
+
+      if (nullSQL != null) {
+        context.write(nullSQL);
+        context.write(' ) ');
+      }
+
       return context;
     });
+  }
+
+  /// If an element of an `IN` list is `null` (a value or a parameter's).
+  bool _isNullListElement(
+    EncodingValue<String, Object?> e,
+    EncodingContext context,
+  ) {
+    if (e is EncodingPlaceholderIndex<String>) {
+      var k = parameterPlaceholderIndexKey(e.key, e.index);
+      return context.parametersPlaceholders[k] == null;
+    }
+    return isNullEncodingValue(e, context);
   }
 
   /// Records that [value]'s placeholder was written as `IS NULL`/`IS NOT NULL`,
@@ -450,6 +623,11 @@ class ConditionSQLEncoder extends ConditionEncoder {
   ) {
     if (value is EncodingPlaceholder) {
       context.markPlaceholderInlinedAsNull(value.key);
+    } else if (value is EncodingPlaceholderIndex<String>) {
+      // An element of an `IN` list:
+      context.markPlaceholderInlinedAsNull(
+        parameterPlaceholderIndexKey(value.key, value.index),
+      );
     }
   }
 

@@ -4804,6 +4804,222 @@ Future<bool> runAdapterTests(
         );
       });
 
+      test('Negation: !(...), and nulls of the negated operators', () async {
+        final userRepo = entityRepositoryProvider.userAPIRepository;
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        var a1 = Address('NX', 'NX City', 'NX Street', 1);
+        var a2 = Address('NX', 'NX Town', 'NX Street', 2);
+
+        var u1 = User(
+          'nx1@$testDomain',
+          'p',
+          a1,
+          [Role(RoleType.admin)],
+          level: 10,
+          creationTime: DateTime.utc(2020),
+        );
+        var u2 = User('nx2@$testDomain', 'p', a2, [
+          Role(RoleType.guest),
+          Role(RoleType.unknown),
+        ], creationTime: DateTime.utc(2020));
+        var u3 = User(
+          'nx3@$testDomain',
+          'p',
+          a1,
+          [],
+          level: 5,
+          creationTime: DateTime.utc(2020),
+        );
+
+        var userIDs = <Object>[];
+        for (var u in [u1, u2, u3]) {
+          userIDs.add((await userRepo.store(u))!);
+        }
+        var userNames = {userIDs[0]: 'u1', userIDs[1]: 'u2', userIDs[2]: 'u3'};
+
+        Future<Set<String>> users(String query, {Object? parameters}) async =>
+            (await userRepo.selectByQuery(
+              query,
+              parameters: parameters,
+            )).map((e) => userNames[e.id]).nonNulls.toSet();
+
+        var s1 = Store('nx-a', 1, owner: u1);
+        var s2 = Store('nx-b', null, owner: null);
+        var s3 = Store('nx-c', 3, owner: u2);
+
+        var storeIDs = <Object>[];
+        for (var s in [s1, s2, s3]) {
+          storeIDs.add((await storeRepo.store(s))!);
+        }
+        var storeNames = {
+          storeIDs[0]: 's1',
+          storeIDs[1]: 's2',
+          storeIDs[2]: 's3',
+        };
+
+        Future<Set<String>> stores(String query, {Object? parameters}) async =>
+            (await storeRepo.selectByQuery(
+              query,
+              parameters: parameters,
+            )).map((e) => storeNames[e.id]).nonNulls.toSet();
+
+        // A field of the main table (`NOT COALESCE(...)`), with `null`:
+        expect(await stores('!(number == 1)'), equals({'s2', 's3'}));
+        expect(await stores('!number == 1'), equals({'s2', 's3'}));
+        expect(await stores('!(number > 1)'), equals({'s1', 's2'}));
+        expect(await stores('!!(number == 1)'), equals({'s1'}));
+        expect(await stores('!(number == 1 || number == 3)'), equals({'s2'}));
+        expect(
+          await stores(
+            'name =~ /^nx-/ && !(number == ? || name == ?)',
+            parameters: [3, 'nx-a'],
+          ),
+          equals({'s2'}),
+        );
+
+        // The negated operators also match a `null` field (since 1.32.0):
+        expect(await stores('number != 1'), equals({'s2', 's3'}));
+        expect(await stores('number !~ [1, 2]'), equals({'s2', 's3'}));
+        expect(await stores(r'number !~ /^1$/'), equals({'s2', 's3'}));
+        // A `null` in the list: as `IS NULL` (SQL `NOT IN (1, NULL)` matches
+        // nothing):
+        expect(await stores('number !~ [1, null]'), equals({'s3'}));
+        expect(await stores('number =~ [1, null]'), equals({'s1', 's2'}));
+        expect(
+          await stores(
+            'number !~ ?',
+            parameters: [
+              [3, null],
+            ],
+          ),
+          equals({'s1'}),
+        );
+        // ... but not `!= null` (`IS NOT NULL`):
+        expect(await stores('number != null'), equals({'s1', 's3'}));
+        expect(await stores('!(number == null)'), equals({'s1', 's3'}));
+
+        // A to-one relationship (a subquery): a missing owner is included.
+        expect(
+          await stores(r'!(owner.email =~ /^nx1@/)'),
+          equals({'s2', 's3'}),
+        );
+        expect(
+          await stores('owner.email != ?', parameters: ['nx1@$testDomain']),
+          equals({'s2', 's3'}),
+        );
+        expect(
+          await stores('name =~ /^nx-/ && !(owner.level == 10)'),
+          equals({'s2', 's3'}),
+        );
+
+        // A to-many relationship: no matching related entity.
+        // REGRESSION: in memory, `==` compared the whole list of a to-many
+        // relationship with the value (nothing matched).
+        expect(await users('roles.type == "admin"'), equals({'u1'}));
+        expect(
+          await users('roles.id == ?', parameters: [u1.roles.first.id]),
+          equals({'u1'}),
+        );
+
+        // The negated operators compare each related row (as a SQL join),
+        // also without any (a `NULL` row): "some role not admin".
+        expect(await users('roles.type != "admin"'), equals({'u2', 'u3'}));
+        expect(
+          await users('roles.type !~ ["guest"] && email =~ /^nx/'),
+          equals({'u1', 'u2', 'u3'}),
+        );
+        expect(
+          await users(r'roles.type !~ /^(admin|guest)$/ && email =~ /^nx/'),
+          equals({'u2', 'u3'}),
+        );
+
+        // `!(...)`: "no role admin".
+        expect(await users('!(roles.type == "admin")'), equals({'u2', 'u3'}));
+        expect(
+          await users('!(roles.type =~ ["guest", "admin"])'),
+          equals({'u3'}),
+        );
+        expect(
+          await users('!(roles.type == "admin" || level == 5)'),
+          equals({'u2'}),
+        );
+        expect(
+          await users('email =~ /^nx/ && !(roles.type =~ /^gu/)'),
+          equals({'u1', 'u3'}),
+        );
+
+        // Nulls (`level`), nested, and in groups:
+        expect(await users('!(level == 10)'), equals({'u2', 'u3'}));
+        expect(await users('level != 10'), equals({'u2', 'u3'}));
+        expect(await users('!(level > 1)'), equals({'u2'}));
+        expect(
+          await users('!(level == 10) && !(roles.type == "guest")'),
+          equals({'u3'}),
+        );
+        expect(
+          await users('level == 10 || !(address.city =~ /city/i)'),
+          equals({'u1', 'u2'}),
+        );
+        expect(
+          await users('!(email =~ /^nx/ && !(level == 5))'),
+          equals({'u3'}),
+        );
+
+        // Parameters, by position and by name:
+        expect(
+          await users('!(level == ?) && email =~ /?/', parameters: [10, '^nx']),
+          equals({'u2', 'u3'}),
+        );
+        expect(
+          await users(
+            '!(roles.type == ?:t) && email =~ /?:e/',
+            parameters: {'t': 'admin', 'e': '^nx'},
+          ),
+          equals({'u2', 'u3'}),
+        );
+
+        // The complement: `cond` and `!(cond)` split the rows.
+        for (var cond in [
+          'number == 1',
+          'number > 1',
+          'number != 3',
+          r'owner.email =~ /^nx2@/',
+          'owner.level == 10 || number == 3',
+        ]) {
+          var all = await stores('name =~ /^nx-/');
+          var yes = await stores('name =~ /^nx-/ && ($cond)');
+          var no = await stores('name =~ /^nx-/ && !($cond)');
+          expect(yes.intersection(no), isEmpty, reason: cond);
+          expect(yes.union(no), equals(all), reason: cond);
+        }
+        for (var cond in [
+          'roles.type == "admin"',
+          'roles.type =~ /^(guest|unknown)\$/',
+          'level == 5 || roles.type == "guest"',
+        ]) {
+          var all = await users('email =~ /^nx/');
+          var yes = await users('email =~ /^nx/ && ($cond)');
+          var no = await users('email =~ /^nx/ && !($cond)');
+          expect(yes.intersection(no), isEmpty, reason: cond);
+          expect(yes.union(no), equals(all), reason: cond);
+        }
+
+        // A `DELETE` with a subquery of its own table (MySQL: a derived
+        // table):
+        var d1 = Store('nxd-1', 1);
+        var d2 = Store('nxd-2', 2, owner: u1);
+        var d1ID = (await storeRepo.store(d1))!;
+        var d2ID = (await storeRepo.store(d2))!;
+
+        var deleted = await storeRepo.deleteByQuery(
+          r'name =~ /^nxd-/ && !(owner.email =~ /^nx1@/)',
+        );
+        expect(deleted.map((e) => e.id), equals([d1ID]));
+        expect(await storeRepo.selectByID(d1ID), isNull);
+        expect((await storeRepo.selectByID(d2ID))?.id, equals(d2ID));
+      });
+
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [

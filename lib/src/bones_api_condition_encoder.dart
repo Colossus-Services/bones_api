@@ -1041,6 +1041,9 @@ class EncodingContext {
 
   String? tableFieldID;
 
+  /// The context of this sub-context, if any (see [EncodingContext.sub]).
+  final EncodingContext? parent;
+
   EncodingContext(
     this.entityName, {
     this.parameters,
@@ -1049,10 +1052,31 @@ class EncodingContext {
     this.transaction,
     this.tableName,
     this.tableFieldID,
-  });
+  }) : parent = null,
+       parametersPlaceholders = <String, dynamic>{};
 
-  /// The encoded parameters placeholders and values.
-  final Map<String, dynamic> parametersPlaceholders = <String, dynamic>{};
+  /// A sub-context of [parent], to encode a part of its condition apart (e.g.
+  /// in a subquery): its own output, tables aliases (starting with the
+  /// [parent]'s) and referenced tables, but the same parameters and
+  /// placeholders (and encoding parameters) as the [parent].
+  EncodingContext.sub(EncodingContext this.parent)
+    : entityName = parent.entityName,
+      parameters = parent.parameters,
+      positionalParameters = parent.positionalParameters,
+      namedParameters = parent.namedParameters,
+      encodingParameters = (parent.encodingParameters ??= <String, Object?>{}),
+      transaction = parent.transaction,
+      tableName = parent.tableName,
+      tableFieldID = parent.tableFieldID,
+      parametersPlaceholders = parent.parametersPlaceholders {
+    tableAliases.addAll(parent!.tableAliases);
+  }
+
+  /// The root context (without a [parent]).
+  EncodingContext get root => parent?.root ?? this;
+
+  /// The encoded parameters placeholders and values (shared with a [parent]).
+  final Map<String, dynamic> parametersPlaceholders;
 
   /// The placeholders whose comparison was written as `IS NULL`/`IS NOT NULL`
   /// instead of as the placeholder itself. Only these can end up resolved but
@@ -1062,13 +1086,15 @@ class EncodingContext {
   /// and allocating a `Set` per encoded condition is not free.
   Set<String>? _nullInlinedPlaceholders;
 
-  /// Marks [parameterKey] as having been written as SQL `NULL` inline.
+  /// Marks [parameterKey] as having been written as SQL `NULL` inline (in the
+  /// [root] context).
   void markPlaceholderInlinedAsNull(String parameterKey) =>
-      (_nullInlinedPlaceholders ??= <String>{}).add(parameterKey);
+      (root._nullInlinedPlaceholders ??= <String>{}).add(parameterKey);
 
-  /// The keys marked by [markPlaceholderInlinedAsNull].
+  /// The keys marked by [markPlaceholderInlinedAsNull] (in the [root]
+  /// context).
   Iterable<String> get nullInlinedPlaceholders =>
-      _nullInlinedPlaceholders ?? const <String>{};
+      root._nullInlinedPlaceholders ?? const <String>{};
 
   /// The table aliases used in the encoded output.
   final Map<String, String> tableAliases = <String, String>{};
@@ -1416,10 +1442,21 @@ abstract class ConditionEncoder {
       return encodeIDConditionIN(c, context);
     } else if (c is ConditionANY) {
       return context;
+    } else if (c is ConditionNOT) {
+      return encodeConditionNOT(c, context);
     } else {
       throw ConditionEncodingError("$c");
     }
   }
+
+  /// Encodes a [ConditionNOT]. Not abstract, for the existing subclasses:
+  /// throws a [ConditionEncodingError] if not overridden.
+  FutureOr<EncodingContext> encodeConditionNOT(
+    ConditionNOT c,
+    EncodingContext context,
+  ) => throw ConditionEncodingError(
+    'Negated conditions not supported by $runtimeType: $c',
+  );
 
   FutureOr<EncodingContext> encodeIDCondition(
     ConditionID c,
@@ -1481,24 +1518,21 @@ abstract class ConditionEncoder {
 
     context.write(groupOpener);
 
-    var c1 = conditions.first;
-    var c1Ret = encodeCondition(c1, context);
+    // One after another: a condition writes to the shared output when it's
+    // resolved (possibly asynchronously, e.g. a `TableScheme` not cached yet),
+    // so the next one (and its operator) can only start after it.
+    var ret = encodeCondition(conditions.first, context);
 
-    return c1Ret.resolveMapped((s) {
-      var rets = conditions
-          .skip(1)
-          .map((c2) {
-            s.write(operator);
-            return encodeCondition(c2, context);
-          })
-          .toList(growable: false);
-
-      return rets.resolveAllReduced((value, element) => element).resolveMapped((
-        s,
-      ) {
-        s.write(groupCloser);
-        return s;
+    for (var c2 in conditions.skip(1)) {
+      ret = ret.resolveMapped((s) {
+        s.write(operator);
+        return encodeCondition(c2, context);
       });
+    }
+
+    return ret.resolveMapped((s) {
+      s.write(groupCloser);
+      return s;
     });
   }
 

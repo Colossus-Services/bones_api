@@ -45,6 +45,7 @@
 /// {@canonicalFor bones_api_condition.ConditionKeyField}
 /// {@canonicalFor bones_api_condition.ConditionKeyIndex}
 /// {@canonicalFor bones_api_condition.ConditionKey}
+/// {@canonicalFor bones_api_condition.ConditionNOT}
 /// {@canonicalFor bones_api_condition.ConditionParameter}
 /// {@canonicalFor bones_api_condition.ConditionParseCache}
 /// {@canonicalFor bones_api_condition.ConditionQuery}

@@ -284,9 +284,11 @@ void main() {
     });
 
     test('null, non-text values, lists', () {
+      // A `null`: matches `!~` (as `!=` and `!~ [...]`, since 1.32.0).
       expect(matches('x =~ /a/', {'x': null}), isFalse);
-      expect(matches('x !~ /a/', {'x': null}), isFalse);
+      expect(matches('x !~ /a/', {'x': null}), isTrue);
       expect(matches('x =~ /a/', {'y': 'a'}), isFalse);
+      expect(matches('x !~ /a/', {'y': 'a'}), isTrue);
 
       expect(matches(r'n =~ /^9\d$/', {'n': 91}), isTrue);
       expect(matches(r'n =~ /^9\d$/', {'n': 191}), isFalse);
@@ -302,9 +304,24 @@ void main() {
       expect(matches(r'tags =~ /^b\d/', o), isTrue);
       expect(matches(r'tags =~ /^c/', o), isFalse);
       expect(matches(r'tags !~ /^a/', o), isTrue);
+      // A `null` element isn't a value (nor a SQL row):
       expect(matches(r'tags !~ /\d$/', o), isFalse);
+      expect(
+        matches(r'tags !~ /a/', {
+          'tags': [null],
+        }),
+        isTrue,
+        reason: 'No value: as an empty list',
+      );
+      expect(
+        matches(r'tags !~ /\d$/', {
+          'tags': ['a1', 'b2'],
+        }),
+        isFalse,
+      );
       expect(matches('tags =~ /a/', {'tags': []}), isFalse);
-      expect(matches('tags !~ /a/', {'tags': []}), isFalse);
+      // No element: `!~` matches (as SQL's outer join, a `NULL` row).
+      expect(matches('tags !~ /a/', {'tags': []}), isTrue);
 
       expect(matches('tags.[1] =~ /^b/', o), isTrue);
     });
@@ -521,7 +538,8 @@ void main() {
       expect(
         sql2.outputString,
         equals(
-          "( NOT REGEXP_LIKE(\"ac\".\"email\", @regexp__p, 'cn') AND "
+          "( ( NOT REGEXP_LIKE(\"ac\".\"email\", @regexp__p, 'cn') OR "
+          "\"ac\".\"email\" IS NULL ) AND "
           "REGEXP_LIKE(\"ac\".\"pass\", @regexp__p_1, 'cn') )",
         ),
       );
@@ -571,7 +589,10 @@ void main() {
         'email !~ /?/',
         parameters: ['^jo'],
       );
-      expect(sql2.outputString, equals('( "ac"."email" !~ @email )'));
+      expect(
+        sql2.outputString,
+        equals('( ( "ac"."email" !~ @email OR "ac"."email" IS NULL ) )'),
+      );
       expect(sql2.parametersPlaceholders, equals({'email': '^jo'}));
 
       // A `RegExp`: its pattern, and its case flag in the SQL.
@@ -675,7 +696,7 @@ void main() {
           sql3.outputString,
           equals(
             '( "ac"."id" IN ( @id__0 , @id__1 ) AND '
-            '"ac"."id" NOT IN ( @id_1__0 ) )',
+            '( "ac"."id" NOT IN ( @id_1__0 ) OR "ac"."id" IS NULL ) )',
           ),
         );
         expect(
@@ -708,7 +729,7 @@ void main() {
           sql4.outputString,
           equals(
             "( REGEXP_LIKE(\"ac\".\"email\", @email, 'cn') AND "
-            '"ac"."email" != @email_1 )',
+            '( "ac"."email" != @email_1 OR "ac"."email" IS NULL ) )',
           ),
         );
         expect(
