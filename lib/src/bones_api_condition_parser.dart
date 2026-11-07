@@ -229,22 +229,31 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   Parser start() => ref0(condition).end();
 
   Parser<Condition> condition() =>
-      (conditionGroup() | conditionParenthesis() | conditionMatch()).map(
-        (v) => v as Condition,
-      );
+      (conditionGroup() |
+              ref0(conditionNot) |
+              conditionParenthesis() |
+              conditionMatch())
+          .map((v) => v as Condition);
 
   Parser<Condition> conditionParenthesisOrValue() =>
-      (conditionParenthesis() | conditionMatch()).map((v) {
+      (ref0(conditionNot) | conditionParenthesis() | conditionMatch()).map((v) {
         return v as Condition;
       });
 
   Parser<Condition> conditionParenthesis() =>
       (char('(').trim() &
-              (conditionGroup() | conditionMatch()) &
+              (conditionGroup() | ref0(conditionNot) | conditionMatch()) &
               char(')').trim())
           .map((l) {
             return l[1] as Condition;
           });
+
+  /// A negation: `!` and a parenthesized condition, a comparison, or another
+  /// negation (`!a == 1 && b == 2` is `(!(a == 1)) && b == 2`).
+  Parser<ConditionNOT> conditionNot() =>
+      (char('!').trim() &
+              (ref0(conditionNot) | conditionParenthesis() | conditionMatch()))
+          .map((l) => ConditionNOT(l[1] as Condition));
 
   Parser<Condition> conditionGroup() =>
       (conditionGroupAND() | conditionGroupOR()).map((v) => v as Condition);

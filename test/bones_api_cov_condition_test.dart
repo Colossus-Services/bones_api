@@ -1210,11 +1210,14 @@ void main() {
         'name != "a" && id > 1 && id >= 2 && id < 3 && id <= 4 && id !~ [5, 6]',
         'user',
       );
+      // A negated operator also matches a `null` column (since 1.32.0):
       expect(
         sql.outputString,
         equals(
-          '( "us"."name" != \'a\' AND "us"."id" > 1 AND "us"."id" >= 2 AND '
-          '"us"."id" < 3 AND "us"."id" <= 4 AND "us"."id" NOT IN ( 5 , 6 ) )',
+          '( ( "us"."name" != \'a\' OR "us"."name" IS NULL ) AND '
+          '"us"."id" > 1 AND "us"."id" >= 2 AND "us"."id" < 3 AND '
+          '"us"."id" <= 4 AND '
+          '( "us"."id" NOT IN ( 5 , 6 ) OR "us"."id" IS NULL ) )',
         ),
       );
     });

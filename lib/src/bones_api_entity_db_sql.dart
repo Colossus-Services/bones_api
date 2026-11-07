@@ -646,6 +646,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       intParameterTypeSuffix: dialect.intParameterTypeSuffix,
       maxIDsAsParameters: dialect.maxIDsAsParameters,
       regExpSyntax: dialect.regExpSyntax,
+      subqueryFromSQL: _fromSQL,
+      subqueryAsDerivedTable: dialect.subqueryAsDerivedTable,
     );
   }
 
@@ -3396,243 +3398,226 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return retEncodedSQL.resolveMapped((encodedSQL) {
       var conditionSQL = encodedSQL.outputString;
 
-      var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
-        encodedSQL,
-        table,
+      var from = _fromSQL(table, encodedSQL);
+      if (conditionSQL.isNotEmpty) {
+        from = '$from WHERE $conditionSQL';
+      }
+
+      var sqlQuery = sqlBuilder(from, encodedSQL);
+
+      return SQL(
+        sqlQuery,
+        positionalParameters ?? (parameters is List ? parameters : null),
+        namedParameters ??
+            (parameters is Map<String, dynamic> ? parameters : null),
+        encodedSQL.parametersPlaceholders,
+        condition: matcher,
+        sqlCondition: conditionSQL,
+        entityName: encodedSQL.entityName,
+        mainTable: table,
+        tablesAliases: encodedSQL.tableAliases,
+        limit: limit,
+        offset: offset,
+        orderByID: orderByID,
+        orderDirection: orderDirection,
       );
+    });
+  }
 
-      var q = dialect.elementQuote;
+  /// The `FROM` clause (without the `WHERE`) of an [encodedSQL] condition
+  /// of [table]: the table and the `JOIN`s of its referenced tables and
+  /// relationships. Also used for the subqueries of [ConditionNOT].
+  String _fromSQL(String table, EncodingContext encodedSQL) {
+    var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
+      encodedSQL,
+      table,
+    );
 
-      if (encodedSQL.fieldsReferencedTables.isEmpty &&
-          encodedSQL.relationshipTables.isEmpty) {
-        String from;
-        if (conditionSQL.isNotEmpty) {
-          from = 'FROM $q$table$q as $q$tableAlias$q WHERE $conditionSQL';
+    var q = dialect.elementQuote;
+
+    if (encodedSQL.fieldsReferencedTables.isEmpty &&
+        encodedSQL.relationshipTables.isEmpty) {
+      return 'FROM $q$table$q as $q$tableAlias$q';
+    } else {
+      var joins = <_JoinEntry>[];
+
+      for (var e in encodedSQL.referencedTablesFields.entries) {
+        var refTable = e.key;
+        var refTableAlias = encodedSQL.resolveEntityAlias(refTable);
+
+        var innerRef = e.value.every(
+          (ref) => encodedSQL.isInnerFieldReference(ref),
+        );
+
+        var join = StringBuffer();
+
+        if (innerRef) {
+          join.write('INNER JOIN ');
         } else {
-          from = 'FROM $q$table$q as $q$tableAlias$q';
+          join.write('LEFT OUTER JOIN ');
         }
 
-        var sqlQuery = sqlBuilder(from, encodedSQL);
+        join.write('$q$refTable$q as $q$refTableAlias$q ON ');
 
-        return SQL(
-          sqlQuery,
-          positionalParameters ?? (parameters is List ? parameters : null),
-          namedParameters ??
-              (parameters is Map<String, dynamic> ? parameters : null),
-          encodedSQL.parametersPlaceholders,
-          condition: matcher,
-          sqlCondition: conditionSQL,
-          entityName: encodedSQL.entityName,
-          mainTable: table,
-          tablesAliases: encodedSQL.tableAliases,
-          limit: limit,
-          offset: offset,
-          orderByID: orderByID,
-          orderDirection: orderDirection,
-        );
-      } else {
-        var joins = <_JoinEntry>[];
+        var defAliases = <String>[refTableAlias];
+        var refAliases = <String>[];
 
-        for (var e in encodedSQL.referencedTablesFields.entries) {
-          var refTable = e.key;
-          var refTableAlias = encodedSQL.resolveEntityAlias(refTable);
-
-          var innerRef = e.value.every(
-            (ref) => encodedSQL.isInnerFieldReference(ref),
+        for (var fieldRef in e.value) {
+          var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
+            encodedSQL,
+            fieldRef.sourceTable,
+          );
+          var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
+            encodedSQL,
+            fieldRef.targetTable,
           );
 
-          var join = StringBuffer();
-
-          if (innerRef) {
-            join.write('INNER JOIN ');
-          } else {
-            join.write('LEFT OUTER JOIN ');
-          }
-
-          join.write('$q$refTable$q as $q$refTableAlias$q ON ');
-
-          var defAliases = <String>[refTableAlias];
-          var refAliases = <String>[];
-
-          for (var fieldRef in e.value) {
-            var sourceTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-              encodedSQL,
-              fieldRef.sourceTable,
-            );
-            var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-              encodedSQL,
-              fieldRef.targetTable,
-            );
-
-            refAliases.add(sourceTableAlias);
-            refAliases.add(targetTableAlias);
-
-            join.write(q);
-            join.write(sourceTableAlias);
-            join.write(q);
-            join.write('.');
-            join.write(q);
-            join.write(fieldRef.sourceField);
-            join.write(q);
-
-            join.write(' = ');
-
-            join.write(q);
-            join.write(targetTableAlias);
-            join.write(q);
-            join.write('.');
-            join.write(q);
-            join.write(fieldRef.targetField);
-            join.write(q);
-            join.write(' ');
-          }
-
-          refAliases.removeAll(defAliases);
-
-          joins.add((
-            defs: defAliases,
-            refs: refAliases,
-            join: join.toString(),
-          ));
-        }
-
-        for (var e in encodedSQL.relationshipTables.entries) {
-          var targetTable = e.key;
-          var relationship = e.value;
-
-          var relTable = relationship.relationshipTable;
-          var relTableAlias = encodedSQL.resolveEntityAlias(relTable);
-
-          String sourceTableField;
-          String sourceRelationshipField;
-
-          if (relationship.sourceTable == table) {
-            sourceTableField = relationship.sourceField;
-            sourceRelationshipField = relationship.sourceRelationshipField;
-          } else {
-            sourceTableField = relationship.targetField;
-            sourceRelationshipField = relationship.targetRelationshipField;
-          }
-
-          var innerRel = encodedSQL.isInnerRelationshipTable(relationship);
-
-          var join = StringBuffer();
-
-          if (innerRel) {
-            join.write('INNER JOIN ');
-          } else {
-            join.write('LEFT OUTER JOIN ');
-          }
-
-          join.write('$q$relTable$q as $q$relTableAlias$q ON (');
+          refAliases.add(sourceTableAlias);
+          refAliases.add(targetTableAlias);
 
           join.write(q);
-          join.write(relTableAlias);
+          join.write(sourceTableAlias);
           join.write(q);
           join.write('.');
           join.write(q);
-          join.write(sourceRelationshipField);
+          join.write(fieldRef.sourceField);
           join.write(q);
 
           join.write(' = ');
-
-          join.write(q);
-          join.write(tableAlias);
-          join.write(q);
-          join.write('.');
-          join.write(q);
-          join.write(sourceTableField);
-          join.write(q);
-
-          join.write(') ');
-
-          var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
-            encodedSQL,
-            targetTable,
-          );
-
-          String targetTableField;
-          String targetRelationshipField;
-
-          if (relationship.targetTable == targetTable) {
-            targetTableField = relationship.targetField;
-            targetRelationshipField = relationship.targetRelationshipField;
-          } else {
-            targetTableField = relationship.sourceField;
-            targetRelationshipField = relationship.sourceRelationshipField;
-          }
-
-          if (innerRel) {
-            join.write('INNER JOIN ');
-          } else {
-            join.write('LEFT OUTER JOIN ');
-          }
-
-          join.write('$q$targetTable$q as $q$targetTableAlias$q ON (');
 
           join.write(q);
           join.write(targetTableAlias);
           join.write(q);
           join.write('.');
           join.write(q);
-          join.write(targetTableField);
+          join.write(fieldRef.targetField);
           join.write(q);
-
-          join.write(' = ');
-
-          join.write(q);
-          join.write(relTableAlias);
-          join.write(q);
-          join.write('.');
-          join.write(q);
-          join.write(targetRelationshipField);
-          join.write(q);
-
-          join.write(') ');
-
-          joins.add((
-            defs: [relTableAlias, targetTableAlias],
-            refs: [tableAlias],
-            join: join.toString(),
-          ));
+          join.write(' ');
         }
 
-        var allJoinRefsResolved = joins.sortJoins({tableAlias});
+        refAliases.removeAll(defAliases);
 
-        var join = joins.map((e) => e.join).join(' ');
+        joins.add((defs: defAliases, refs: refAliases, join: join.toString()));
+      }
 
-        var from =
-            'FROM $q$table$q as $q$tableAlias$q $join WHERE $conditionSQL';
+      for (var e in encodedSQL.relationshipTables.entries) {
+        var targetTable = e.key;
+        var relationship = e.value;
 
-        if (!allJoinRefsResolved) {
-          _log.warning(
-            "Not all JOIN references where resolved while building SQL>\n"
-            "$from\n"
-            "$joins\n"
-            "$matcher",
-          );
+        var relTable = relationship.relationshipTable;
+        var relTableAlias = encodedSQL.resolveEntityAlias(relTable);
+
+        String sourceTableField;
+        String sourceRelationshipField;
+
+        if (relationship.sourceTable == table) {
+          sourceTableField = relationship.sourceField;
+          sourceRelationshipField = relationship.sourceRelationshipField;
+        } else {
+          sourceTableField = relationship.targetField;
+          sourceRelationshipField = relationship.targetRelationshipField;
         }
 
-        var sqlQuery = sqlBuilder(from, encodedSQL);
+        var innerRel = encodedSQL.isInnerRelationshipTable(relationship);
 
-        return SQL(
-          sqlQuery,
-          positionalParameters ?? (parameters is List ? parameters : null),
-          namedParameters ??
-              (parameters is Map<String, dynamic> ? parameters : null),
-          encodedSQL.parametersPlaceholders,
-          condition: matcher,
-          sqlCondition: conditionSQL,
-          entityName: encodedSQL.entityName,
-          mainTable: table,
-          tablesAliases: encodedSQL.tableAliases,
-          limit: limit,
-          offset: offset,
-          orderByID: orderByID,
-          orderDirection: orderDirection,
+        var join = StringBuffer();
+
+        if (innerRel) {
+          join.write('INNER JOIN ');
+        } else {
+          join.write('LEFT OUTER JOIN ');
+        }
+
+        join.write('$q$relTable$q as $q$relTableAlias$q ON (');
+
+        join.write(q);
+        join.write(relTableAlias);
+        join.write(q);
+        join.write('.');
+        join.write(q);
+        join.write(sourceRelationshipField);
+        join.write(q);
+
+        join.write(' = ');
+
+        join.write(q);
+        join.write(tableAlias);
+        join.write(q);
+        join.write('.');
+        join.write(q);
+        join.write(sourceTableField);
+        join.write(q);
+
+        join.write(') ');
+
+        var targetTableAlias = _conditionSQLGenerator.resolveEntityAlias(
+          encodedSQL,
+          targetTable,
+        );
+
+        String targetTableField;
+        String targetRelationshipField;
+
+        if (relationship.targetTable == targetTable) {
+          targetTableField = relationship.targetField;
+          targetRelationshipField = relationship.targetRelationshipField;
+        } else {
+          targetTableField = relationship.sourceField;
+          targetRelationshipField = relationship.sourceRelationshipField;
+        }
+
+        if (innerRel) {
+          join.write('INNER JOIN ');
+        } else {
+          join.write('LEFT OUTER JOIN ');
+        }
+
+        join.write('$q$targetTable$q as $q$targetTableAlias$q ON (');
+
+        join.write(q);
+        join.write(targetTableAlias);
+        join.write(q);
+        join.write('.');
+        join.write(q);
+        join.write(targetTableField);
+        join.write(q);
+
+        join.write(' = ');
+
+        join.write(q);
+        join.write(relTableAlias);
+        join.write(q);
+        join.write('.');
+        join.write(q);
+        join.write(targetRelationshipField);
+        join.write(q);
+
+        join.write(') ');
+
+        joins.add((
+          defs: [relTableAlias, targetTableAlias],
+          refs: [tableAlias],
+          join: join.toString(),
+        ));
+      }
+
+      var allJoinRefsResolved = joins.sortJoins({tableAlias});
+
+      var join = joins.map((e) => e.join).join(' ');
+
+      var from = 'FROM $q$table$q as $q$tableAlias$q $join';
+
+      if (!allJoinRefsResolved) {
+        _log.warning(
+          "Not all JOIN references where resolved while building SQL>\n"
+          "$from\n"
+          "$joins\n"
+          "${encodedSQL.outputString}",
         );
       }
-    });
+
+      return from;
+    }
   }
 
   FutureOr<Iterable<Map<String, dynamic>>> selectSQL(

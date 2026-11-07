@@ -171,6 +171,11 @@ class SQLDialect extends DBDialect {
   /// [SQLRegExpSyntax].
   final SQLRegExpSyntax regExpSyntax;
 
+  /// If `true`, a subquery of the main table (in a negated condition,
+  /// `!(...)`) is wrapped in a derived table: MySQL can't select from the
+  /// table being deleted/updated in a subquery (error 1093).
+  final bool subqueryAsDerivedTable;
+
   const SQLDialect(
     super.name, {
     this.elementQuote = '',
@@ -193,6 +198,7 @@ class SQLDialect extends DBDialect {
     this.intParameterTypeSuffix,
     this.maxIDsAsParameters = 512,
     this.regExpSyntax = SQLRegExpSyntax.function,
+    this.subqueryAsDerivedTable = false,
   });
 
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause

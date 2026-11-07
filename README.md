@@ -721,11 +721,37 @@ condition over the entity's fields:
 | `=~`, `!~` | in, not in a list | `state =~ ["NY", "CA"]` |
 | `=~ /.../`, `!~ /.../` | matches, does not match a regexp | `email =~ /@corp\.com$/i` |
 | `&&`, `\|\|`, `( )` | and, or, grouping | `(a == 1 \|\| b == 2) && c != null` |
+| `!` | not (a group or a comparison) | `!(a == 1 \|\| b == 2)`, `!name =~ /^x/` |
 
 A key can be a path through related entities (`address.city`) or a list
 index (`phones.[0]`). A value is JSON (strings also in `'...'`), or a
 parameter: `?` (positional), `?#1` (by index) or `?:name` (by name).
 `#ID == ?` matches the entity ID.
+
+#### Negation and `null`
+
+`!` negates the parenthesized condition or the single comparison after it:
+`!a == 1 && b == 2` is `(!(a == 1)) && b == 2`. It can be nested
+(`!(a == 1 && !(b == 2))`).
+
+`!(cond)` is the complement of `cond`: exactly the entities that `cond`
+doesn't match, also when `cond` is unknown (a `null` field, or a missing
+related entity). So `cond` and `!(cond)` together match every entity, once.
+
+- Through a to-many relationship, `!` means "none matches":
+  `!(roles.type == "admin")` matches the users without an admin role (also
+  those without roles). In SQL, a `NOT IN` subquery.
+- The negated operators (`!=`, `!~ [...]`, `!~ /.../`) also match a `null`
+  field (or a missing related entity): `level != 10` matches a `null` level.
+  `!= null` is `IS NOT NULL`.
+- Through a to-many relationship, the operators compare each related entity:
+  `roles.type != "admin"` matches the users with some role that isn't admin
+  (or without roles). For "without an admin role" use
+  `!(roles.type == "admin")`.
+- A comparison (`>`, `>=`, `<`, `<=`) with a `null` doesn't match.
+
+The matching is the same in every `SQLAdapter` (PostgreSQL, MySQL, SQLite
+and `DBSQLMemoryAdapter`).
 
 #### Regular expressions
 
@@ -753,7 +779,7 @@ The matching is the same in every `SQLAdapter` (PostgreSQL, MySQL, SQLite and
 - A non-text field is matched by its text (e.g. `number =~ /^9\d$/`; an enum
   by its name; a reference to an entity by its ID). The text of a boolean
   (`true` or `1`), a date or a decimal depends on the database.
-- A `null` field matches neither `=~` nor `!~`.
+- A `null` field matches `!~` and not `=~` (see "Negation and `null`").
 - The pattern is always sent as a SQL parameter.
 - Use the syntax common to the databases' regexp engines (PostgreSQL's,
   MySQL's ICU and Dart's): characters and classes (`[a-z]`, `\d`, `\w`, `\s`),

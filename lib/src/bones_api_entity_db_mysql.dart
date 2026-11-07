@@ -127,6 +127,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
              maxIDsAsParameters: 0,
              // `REGEXP_LIKE` (MySQL 8.0.4+):
              regExpSyntax: SQLRegExpSyntax.mysql,
+             // A `DELETE` can't select its own table in a subquery:
+             subqueryAsDerivedTable: true,
            ),
            transactions: true,
            transactionAbort: true,

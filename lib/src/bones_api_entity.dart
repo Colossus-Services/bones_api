@@ -2176,11 +2176,15 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return n;
   }
 
+  // A `null` in a comparison (`>`, `>=`, `<`, `<=`) doesn't match (as SQL's
+  // unknown, `NULL`): not an error.
+
   static bool graterThanValue(
     Object? value1,
     Object? value2, {
     EntityHandler? entityHandler,
   }) {
+    if (value1 == null || value2 == null) return false;
     var n1 = valueToDynamicNumber(value1);
     var n2 = valueToDynamicNumber(value2);
     return n1 > n2;
@@ -2191,6 +2195,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     Object? value2, {
     EntityHandler? entityHandler,
   }) {
+    if (value1 == null || value2 == null) return false;
     var n1 = valueToDynamicNumber(value1);
     var n2 = valueToDynamicNumber(value2);
     return n1 >= n2;
@@ -2201,6 +2206,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     Object? value2, {
     EntityHandler? entityHandler,
   }) {
+    if (value1 == null || value2 == null) return false;
     var n1 = valueToDynamicNumber(value1);
     var n2 = valueToDynamicNumber(value2);
     return n1 < n2;
@@ -2211,6 +2217,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     Object? value2, {
     EntityHandler? entityHandler,
   }) {
+    if (value1 == null || value2 == null) return false;
     var n1 = valueToDynamicNumber(value1);
     var n2 = valueToDynamicNumber(value2);
     return n1 <= n2;

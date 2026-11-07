@@ -717,6 +717,16 @@ abstract class Condition<O> extends ConditionElement
         namedParameters: namedParameters,
         entityHandler: keyEntityHandler,
       );
+    } else if (value1 is Iterable && value2 is! Iterable) {
+      // The values of a to-many relationship: any of them (as a SQL join of
+      // its rows, and as a parameter's value: [ConditionParameter.matches]).
+      return value1.any(
+        (v) => EntityHandler.equalsValuesBasic(
+          v,
+          value2,
+          entityHandler: keyEntityHandler,
+        ),
+      );
     } else {
       var match = EntityHandler.equalsValuesBasic(
         value1,
@@ -976,6 +986,92 @@ class GroupConditionOR<O> extends GroupCondition<O> {
 
   @override
   String encode() => '( ${conditions.join(' || ')} )';
+}
+
+/// The negation of a [condition]: `!(condition)` or `!key op value`.
+///
+/// The complement of the [condition]: matches exactly the entities that the
+/// [condition] doesn't, including those with a `null` field (or without a
+/// related entity) where the [condition] is unknown. Through a to-many
+/// relationship it matches the entities without any matching related one:
+/// `!(roles.type == "admin")` matches the users without an admin role.
+class ConditionNOT<O> extends Condition<O> {
+  /// The negated condition.
+  final Condition condition;
+
+  ConditionNOT(this.condition) : super._() {
+    condition._parent = this;
+  }
+
+  @override
+  bool get isIDCondition => condition.isIDCondition;
+
+  /// A `NOT` is encoded apart from its parent (a subquery or its own group),
+  /// so its [condition] starts again with inner joins.
+  @override
+  bool get isInner => true;
+
+  @override
+  void resolve({
+    Condition? parent,
+    required List<ConditionParameter> parameters,
+  }) {
+    _parent = parent;
+
+    var parametersSize0 = parameters.length;
+    condition.resolve(parent: this, parameters: parameters);
+    _setParameters(parameters.sublist(parametersSize0));
+
+    _markResolved();
+  }
+
+  @override
+  ConditionNOT<T> cast<T>() {
+    if (this is ConditionNOT<T>) {
+      return this as ConditionNOT<T>;
+    }
+    return ConditionNOT<T>(condition.cast<T>())
+      .._markResolved(resolved, _parent);
+  }
+
+  @override
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => !condition.matchesEntity(
+    o,
+    entityHandler: entityHandler,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
+
+  @override
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) => !condition.matchesEntityMap(
+    o,
+    entityHandler: entityHandler,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
+
+  @override
+  String encode() {
+    var c = condition;
+    // A group is already in parentheses:
+    return c is GroupCondition && c.conditions.length > 1
+        ? '!${c.encode()}'
+        : '!( ${c.encode()} )';
+  }
 }
 
 class ConditionANY<O> extends Condition<O> {
@@ -1309,6 +1405,15 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     }
   }
 
+  /// If `true` this is a negated operator (`!=`, `!~`), that also matches a
+  /// `null` field.
+  bool get isNegated => false;
+
+  /// A negated operator needs an outer join: a missing related entity is a
+  /// `null` field, which it matches.
+  @override
+  bool get isInner => !isNegated && super.isInner;
+
   @override
   void resolve({
     Condition? parent,
@@ -1606,6 +1711,10 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
 class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   KeyConditionNotEQ(super.keys, dynamic super.value);
 
+  /// `true`, unless comparing with `null` (`IS NOT NULL`).
+  @override
+  bool get isNegated => value != null;
+
   @override
   KeyConditionNotEQ<T> cast<T>() =>
       this is KeyConditionNotEQ<T>
@@ -1623,12 +1732,12 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(
+    return _notEquals(
       keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
+      null,
+      parameters,
+      positionalParameters,
+      namedParameters,
     );
   }
 
@@ -1642,15 +1751,39 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return !equalsConditionValue(
+    return _notEquals(
       keyValue?.value,
+      keyValue,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+  }
+
+  /// The values of a to-many relationship are compared one by one (as a SQL
+  /// join of its rows): any of them not equal, or none (a `NULL` row).
+  bool _notEquals(
+    Object? keyValue,
+    KeyConditionValue? keyConditionValue,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    bool notEquals(Object? v) => !equalsConditionValue(
+      v,
       value,
       parameters: parameters,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
+      keyType: keyConditionValue?.type,
+      keyEntityHandler: keyConditionValue?.entityHandler,
     );
+
+    if (keyValue is Iterable && value is! Iterable) {
+      return keyValue.isEmpty || keyValue.any(notEquals);
+    }
+
+    return notEquals(keyValue);
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1905,6 +2038,9 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
   }) : super(keys, valuesAsList(values));
 
   @override
+  bool get isNegated => not;
+
+  @override
   KeyConditionINBase<T> cast<T>();
 
   @override
@@ -1917,15 +2053,13 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    var inValues = inConditionValues(
+    return _matchesIn(
       keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
+      parameters,
+      positionalParameters,
+      namedParameters,
+      null,
     );
-
-    return inValues != not;
   }
 
   @override
@@ -1938,8 +2072,27 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    var inValues = inConditionValues(
+    return _matchesIn(
       keyValue?.value,
+      parameters,
+      positionalParameters,
+      namedParameters,
+      entityHandler,
+    );
+  }
+
+  /// With [not] (`NOT IN`), the values of a to-many relationship are
+  /// compared one by one (as a SQL join of its rows): any of them not in, or
+  /// none (a `NULL` row).
+  bool _matchesIn(
+    Object? keyValue,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  ) {
+    bool inValues(Object? v) => inConditionValues(
+      v,
       value,
       parameters: parameters,
       positionalParameters: positionalParameters,
@@ -1947,7 +2100,11 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       entityHandler: entityHandler,
     );
 
-    return inValues != not;
+    if (not && keyValue is Iterable) {
+      return keyValue.isEmpty || keyValue.any((v) => !inValues(v));
+    }
+
+    return inValues(keyValue) != not;
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);
@@ -1992,12 +2149,15 @@ class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
 /// - `^` and `$` match only at the start and end of the whole value.
 ///
 /// A value that is not a [String] is matched by its text (an [Enum] by its
-/// name). A `null` value matches neither `=~` nor `!~` (as in SQL). A list
-/// value (e.g. of a relationship) matches `=~` if any element matches, and
-/// `!~` if any element does not match (as a SQL join of its rows).
+/// name). A `null` value matches `!~` and not `=~` (as `!=` and `!~ [...]`).
+/// A list value (e.g. of a relationship) matches `=~` if any element matches,
+/// and `!~` if any element does not match (as a SQL join of its rows).
 class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
   /// If `true`, the condition is `!~` (does not match).
   final bool not;
+
+  @override
+  bool get isNegated => not;
 
   /// The `i` flag.
   final bool caseInsensitive;
@@ -2169,21 +2329,23 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     RegExp regExp, {
     EntityHandler? entityHandler,
   }) {
-    if (keyValue == null) return false;
+    // A `null` matches only `!~` (as `!=` and `!~ [...]`):
+    bool matchesText(Object? v) =>
+        v == null ? not : regExp.hasMatch(valueToText(v)) != not;
 
-    bool matchesText(Object v) => regExp.hasMatch(valueToText(v)) != not;
+    if (keyValue == null) return not;
 
+    // The values of a to-many relationship: any of them (as a SQL join of its
+    // rows); without any, `!~` matches (a `NULL` row).
     if (keyValue is EntityReferenceList) {
-      return (keyValue.ids ?? const []).nonNulls.any(matchesText);
+      var ids = keyValue.ids ?? const [];
+      return (not && ids.isEmpty) || ids.any(matchesText);
     } else if (keyValue is Iterable) {
-      return keyValue
-          .map((v) => _entityID(v, entityHandler))
-          .nonNulls
-          .any(matchesText);
+      return (not && keyValue.isEmpty) ||
+          keyValue.map((v) => _entityID(v, entityHandler)).any(matchesText);
     }
 
-    var v = _entityID(keyValue, entityHandler);
-    return v != null && matchesText(v);
+    return matchesText(_entityID(keyValue, entityHandler));
   }
 
   /// The ID of [value], if it's an entity or a reference, otherwise [value].
@@ -2214,7 +2376,7 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
   ) {
-    if (keyValue == null) return false;
+    if (keyValue == null) return not;
 
     var regExp = _resolveRegExp(
       parameters,

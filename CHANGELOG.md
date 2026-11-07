@@ -1,3 +1,47 @@
+## 1.32.0
+
+- **Breaking (query results):** the negated operators also match a `null`
+  field (or a missing related entity), the same in every `SQLAdapter`:
+  - SQL: `x != v` is `( x != v OR x IS NULL )`, `x !~ [...]` is
+    `( x NOT IN (...) OR x IS NULL )` and `x !~ /re/` is
+    `( NOT <match> OR x IS NULL )`. Before, a `null` column didn't match
+    them in SQL, but did in `DBSQLMemoryAdapter`. `x != null` is still
+    `IS NOT NULL`.
+  - `x !~ /re/` (1.31.0: matched neither `=~` nor `!~`) now matches a `null`.
+  - A negated operator's `JOIN`s are outer (`KeyCondition.isNegated`).
+  - Through a to-many relationship they compare each related entity, also
+    without any (as a SQL outer join): `roles.type != "admin"` matches the
+    users with some role that isn't admin, or without roles (memory: before,
+    `!=` matched any user, and `!~ [...]` "none in").
+- New: negation, `!`, of a parenthesized condition or a single comparison:
+  `!(a == 1 || b == 2)`, `!name =~ /^x/`, nested `!(a && !(b))`.
+  `!a == 1 && b == 2` is `(!(a == 1)) && b == 2`.
+  - `ConditionNOT`: the complement of its condition, also when it's unknown
+    (a `null` field or a missing related entity). Through a to-many
+    relationship, "none matches": `!(roles.type == "admin")` matches the users
+    without an admin role.
+  - SQL: of the main table's fields, `NOT COALESCE(( cond ), FALSE)`; through
+    other tables, `id NOT IN ( SELECT id FROM ... WHERE cond )`, with the
+    subquery's own `JOIN`s (MySQL, `SQLDialect.subqueryAsDerivedTable`: in a
+    derived table, also for a `DELETE`).
+  - `EncodingContext.sub`: a sub-context sharing its parent's parameters and
+    placeholders. `ConditionSQLEncoder.subqueryFromSQL`: the `FROM` clause of
+    a subquery, from the adapter (`DBSQLAdapter._fromSQL`, also used by
+    `_generateSQLFrom`).
+  - `ConditionEncoder.encodeConditionNOT`: not abstract (throws a
+    `ConditionEncodingError`), for the existing subclasses.
+- Fix: in memory, `==` over a to-many relationship compared the whole list
+  with the value (`roles.type == "admin"` matched nothing); now any of them,
+  as in SQL.
+- Fix: in memory, a comparison (`>`, `>=`, `<`, `<=`) with a `null` field
+  threw an `ArgumentError`; now it doesn't match, as in SQL.
+- README: "Negation and `null`".
+- New tests: `bones_api_condition_not_test.dart` (parsing, round trips,
+  matching, the SQL), and on every `SQLAdapter` (memory, SQLite, PostgreSQL,
+  MySQL): `!` over fields, to-one and to-many relationships, nested, with
+  parameters, a `DELETE`, the complement of each condition, and the `null`s
+  of the negated operators.
+
 ## 1.31.0
 
 - New: regular expression conditions in queries: `field =~ /pattern/flags`
