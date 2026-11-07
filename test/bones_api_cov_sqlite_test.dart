@@ -611,6 +611,32 @@ void main() {
       );
     });
 
+    test('the `regexp` function and the `REGEXP` operator', () {
+      Object? sql(String expr, [List<Object?>? parameters]) =>
+          adapter.executeRawSQL('SELECT $expr AS r', parameters).first['r'];
+
+      // `regexp(pattern, value [, flags])`:
+      expect(sql("regexp('^a.c\$', 'abc')"), equals(1));
+      expect(sql("regexp('^A', 'abc')"), equals(0));
+      expect(sql("regexp('^A', 'abc', 'i')"), equals(1));
+      expect(sql("regexp('^A', 'abc', '')"), equals(0));
+      // `.` matches a line terminator, `\$` only at the end:
+      expect(sql('regexp(?, ?)', ['a.c', 'a\nc']), equals(1));
+      expect(sql('regexp(?, ?)', [r'c$', 'abc\n']), equals(0));
+      // A non-text value, and `NULL`:
+      expect(sql(r"regexp('^\d+$', 123)"), equals(1));
+      expect(sql("regexp('a', NULL)"), isNull);
+      expect(sql("NOT regexp('a', NULL)"), isNull);
+      expect(sql("regexp(NULL, 'a')"), isNull);
+
+      // `value REGEXP pattern` (`regexp(pattern, value)`):
+      expect(sql("'abc' REGEXP '^ab'"), equals(1));
+      expect(sql("'abc' REGEXP '^b'"), equals(0));
+
+      // An invalid pattern: an SQL error.
+      expect(() => sql("regexp('(', 'a')"), throwsA(isA<Exception>()));
+    });
+
     test('populateTables', () async {
       expect(await adapter.populateTables(null), isEmpty);
       expect(await adapter.populateTables('no tables here'), isEmpty);
