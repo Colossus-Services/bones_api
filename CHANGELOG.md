@@ -34,7 +34,17 @@
   with the value (`roles.type == "admin"` matched nothing); now any of them,
   as in SQL.
 - Fix: in memory, a comparison (`>`, `>=`, `<`, `<=`) with a `null` field
-  threw an `ArgumentError`; now it doesn't match, as in SQL.
+  threw an `ArgumentError`; now it doesn't match, as in SQL. Over a to-many
+  relationship (a list) it also threw; now any element, as in SQL.
+- Fix: a `null` in an `IN` list is as `IS NULL`, as in memory: SQL
+  `x =~ [1, null]` is `( x IN (1) OR x IS NULL )` (`IN (1, NULL)` didn't
+  match a `NULL`), and `x !~ [1, null]` is `( x NOT IN (1) AND x IS NOT NULL )`
+  (`NOT IN (1, NULL)` matches nothing). Also of a parameter's list.
+- Fix: the conditions of a group (`&&`, `||`) are encoded one after another:
+  one resolved asynchronously (e.g. a `TableScheme` not cached yet) could be
+  written after the next one.
+- The main table's ID (never `NULL`) has no `OR id IS NULL`, and `!` of an ID
+  condition is a plain `NOT ( ... )`.
 - README: "Negation and `null`".
 - New tests: `bones_api_condition_not_test.dart` (parsing, round trips,
   matching, the SQL), and on every `SQLAdapter` (memory, SQLite, PostgreSQL,

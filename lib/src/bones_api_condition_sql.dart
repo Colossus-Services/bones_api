@@ -70,7 +70,13 @@ class ConditionSQLEncoder extends ConditionEncoder {
           context.tableAliases.putIfAbsent(e.key, () => e.value);
         }
 
-        context.write(' NOT COALESCE(( $conditionSQL ), FALSE) ');
+        // An ID condition is never unknown (the ID is never `NULL`): a plain
+        // (indexable) `NOT`.
+        context.write(
+          c.condition.isIDCondition
+              ? ' NOT ( $conditionSQL ) '
+              : ' NOT COALESCE(( $conditionSQL ), FALSE) ',
+        );
         return context;
       }
 
@@ -457,8 +463,21 @@ class ConditionSQLEncoder extends ConditionEncoder {
         operator,
         c.value,
         valueAsList,
+        negated: c.isNegated,
+        nullable: !_isMainTableIDKey(c, context),
       );
     });
+  }
+
+  /// If [c]'s key is the ID of the main table (never `NULL`).
+  bool _isMainTableIDKey(KeyCondition c, EncodingContext context) {
+    var keys = c.keys;
+    if (keys.length != 1) return false;
+    var key = keys.first;
+    var tableFieldID = context.tableFieldID;
+    return key is ConditionKeyField &&
+        tableFieldID != null &&
+        key.name == tableFieldID;
   }
 
   @override
@@ -481,12 +500,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
     String tableKey,
     String operator,
     dynamic values,
-    bool valueAsList,
-  ) {
-    // A negated operator also matches a `null` column (as when matched in
-    // memory): `( x != v OR x IS NULL )`.
-    var negated = operator == '!=' || operator == 'NOT IN';
-
+    bool valueAsList, {
+    bool negated = false,
+    bool nullable = true,
+  }) {
     // The encoding value rather than only its text: a null supplied as a
     // parameter encodes to a placeholder, so the text alone cannot say whether
     // the comparison is against null.
@@ -499,6 +516,42 @@ class ConditionSQLEncoder extends ConditionEncoder {
     );
 
     return valueRet.resolveMapped((value) {
+      // A `null` in an `IN` list: as `IS NULL` (as when matched in memory).
+      // In SQL `x IN (1, NULL)` doesn't match a `NULL`, and
+      // `x NOT IN (1, NULL)` matches nothing.
+      var listWithNull = false;
+      if (value is EncodingValueList<String> &&
+          (operator == 'IN' || operator == 'NOT IN')) {
+        var elements = value.asList;
+        var nonNulls = elements
+            .where((e) => !_isNullListElement(e, context))
+            .toList();
+
+        if (nonNulls.length < elements.length || elements.isEmpty) {
+          for (var e in elements) {
+            if (!nonNulls.contains(e)) {
+              _markPlaceholderInlinedAsNull(e, context);
+            }
+          }
+
+          if (nonNulls.isEmpty) {
+            value = EncodingValueNull(
+              value.key,
+              value.type,
+              encodeEncodingValueNull,
+            );
+          } else {
+            listWithNull = true;
+            value = EncodingValueList(
+              value.key,
+              value.type,
+              nonNulls,
+              encodeEncodingValueList,
+            );
+          }
+        }
+      }
+
       if (isNullEncodingValue(value, context)) {
         switch (operator) {
           case '=':
@@ -518,7 +571,19 @@ class ConditionSQLEncoder extends ConditionEncoder {
         }
       }
 
-      context.write(negated ? ' ( ' : ' ');
+      // A negated operator also matches a `null` column (as when matched in
+      // memory): `( x != v OR x IS NULL )`; unless the list has a `null`:
+      // `( x NOT IN (v) AND x IS NOT NULL )`. And `( x IN (v) OR x IS NULL )`.
+      String? nullSQL;
+      if (listWithNull) {
+        nullSQL = negated
+            ? 'AND $tableKey IS NOT NULL'
+            : 'OR $tableKey IS NULL';
+      } else if (negated && nullable) {
+        nullSQL = 'OR $tableKey IS NULL';
+      }
+
+      context.write(nullSQL != null ? ' ( ' : ' ');
       context.write(tableKey);
       context.write(' ');
       context.write(operator);
@@ -526,14 +591,25 @@ class ConditionSQLEncoder extends ConditionEncoder {
       context.write(value.encode);
       context.write(' ');
 
-      if (negated) {
-        context.write('OR ');
-        context.write(tableKey);
-        context.write(' IS NULL ) ');
+      if (nullSQL != null) {
+        context.write(nullSQL);
+        context.write(' ) ');
       }
 
       return context;
     });
+  }
+
+  /// If an element of an `IN` list is `null` (a value or a parameter's).
+  bool _isNullListElement(
+    EncodingValue<String, Object?> e,
+    EncodingContext context,
+  ) {
+    if (e is EncodingPlaceholderIndex<String>) {
+      var k = parameterPlaceholderIndexKey(e.key, e.index);
+      return context.parametersPlaceholders[k] == null;
+    }
+    return isNullEncodingValue(e, context);
   }
 
   /// Records that [value]'s placeholder was written as `IS NULL`/`IS NOT NULL`,
@@ -547,6 +623,11 @@ class ConditionSQLEncoder extends ConditionEncoder {
   ) {
     if (value is EncodingPlaceholder) {
       context.markPlaceholderInlinedAsNull(value.key);
+    } else if (value is EncodingPlaceholderIndex<String>) {
+      // An element of an `IN` list:
+      context.markPlaceholderInlinedAsNull(
+        parameterPlaceholderIndexKey(value.key, value.index),
+      );
     }
   }
 

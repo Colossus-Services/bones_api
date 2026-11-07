@@ -552,6 +552,11 @@ abstract class Condition<O> extends ConditionElement
 
   bool get isIDCondition => false;
 
+  /// If [value1] (an entity's) is the values of a to-many relationship,
+  /// compared one by one (as a SQL join of its rows) with a single [value2].
+  static bool _isToManyValues(Object? value1, Object? value2) =>
+      value1 is Iterable && value2 is! Iterable;
+
   bool greaterThanConditionValue(
     Object? value1,
     Object? value2, {
@@ -561,6 +566,20 @@ abstract class Condition<O> extends ConditionElement
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
   }) {
+    if (_isToManyValues(value1, value2)) {
+      return (value1 as Iterable).any(
+        (v) => greaterThanConditionValue(
+          v,
+          value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          keyType: keyType,
+          keyEntityHandler: keyEntityHandler,
+        ),
+      );
+    }
+
     if (value1 is ConditionParameter) {
       return value1.greaterThan(
         value2,
@@ -596,6 +615,20 @@ abstract class Condition<O> extends ConditionElement
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
   }) {
+    if (_isToManyValues(value1, value2)) {
+      return (value1 as Iterable).any(
+        (v) => greaterThanOrEqualConditionValue(
+          v,
+          value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          keyType: keyType,
+          keyEntityHandler: keyEntityHandler,
+        ),
+      );
+    }
+
     if (value1 is ConditionParameter) {
       return value1.greaterThanOrEqual(
         value2,
@@ -631,6 +664,20 @@ abstract class Condition<O> extends ConditionElement
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
   }) {
+    if (_isToManyValues(value1, value2)) {
+      return (value1 as Iterable).any(
+        (v) => lessThanConditionValue(
+          v,
+          value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          keyType: keyType,
+          keyEntityHandler: keyEntityHandler,
+        ),
+      );
+    }
+
     if (value1 is ConditionParameter) {
       return value1.lessThan(
         value2,
@@ -666,6 +713,20 @@ abstract class Condition<O> extends ConditionElement
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
   }) {
+    if (_isToManyValues(value1, value2)) {
+      return (value1 as Iterable).any(
+        (v) => lessThanOrEqualConditionValue(
+          v,
+          value2,
+          parameters: parameters,
+          positionalParameters: positionalParameters,
+          namedParameters: namedParameters,
+          keyType: keyType,
+          keyEntityHandler: keyEntityHandler,
+        ),
+      );
+    }
+
     if (value1 is ConditionParameter) {
       return value1.lessThanOrEqual(
         value2,
@@ -1034,6 +1095,13 @@ class ConditionNOT<O> extends Condition<O> {
       .._markResolved(resolved, _parent);
   }
 
+  /// If the [condition] has nothing to match (an empty group): as SQL encodes
+  /// it, every entity (and its negation, none).
+  bool get _isEmptyCondition {
+    var c = _unwrappedCondition;
+    return c is GroupCondition && c.conditions.isEmpty;
+  }
+
   @override
   bool matchesEntity(
     O o, {
@@ -1041,13 +1109,15 @@ class ConditionNOT<O> extends Condition<O> {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
-  }) => !condition.matchesEntity(
-    o,
-    entityHandler: entityHandler,
-    parameters: parameters,
-    positionalParameters: positionalParameters,
-    namedParameters: namedParameters,
-  );
+  }) =>
+      !_isEmptyCondition &&
+      !condition.matchesEntity(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
 
   @override
   bool matchesEntityMap(
@@ -1056,17 +1126,29 @@ class ConditionNOT<O> extends Condition<O> {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
-  }) => !condition.matchesEntityMap(
-    o,
-    entityHandler: entityHandler,
-    parameters: parameters,
-    positionalParameters: positionalParameters,
-    namedParameters: namedParameters,
-  );
+  }) =>
+      !_isEmptyCondition &&
+      !condition.matchesEntityMap(
+        o,
+        entityHandler: entityHandler,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
+
+  /// The [condition], without the groups of a single condition (parsed as
+  /// the condition itself).
+  Condition get _unwrappedCondition {
+    var c = condition;
+    while (c is GroupCondition && c.conditions.length == 1) {
+      c = c.conditions.first;
+    }
+    return c;
+  }
 
   @override
   String encode() {
-    var c = condition;
+    var c = _unwrappedCondition;
     // A group is already in parentheses:
     return c is GroupCondition && c.conditions.length > 1
         ? '!${c.encode()}'
@@ -2336,13 +2418,17 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     if (keyValue == null) return not;
 
     // The values of a to-many relationship: any of them (as a SQL join of its
-    // rows); without any, `!~` matches (a `NULL` row).
+    // rows: a `null`, e.g. an unsaved reference, isn't a row); without any,
+    // `!~` matches (a `NULL` row).
+    Iterable<Object>? values;
     if (keyValue is EntityReferenceList) {
-      var ids = keyValue.ids ?? const [];
-      return (not && ids.isEmpty) || ids.any(matchesText);
+      values = (keyValue.ids ?? const []).nonNulls;
     } else if (keyValue is Iterable) {
-      return (not && keyValue.isEmpty) ||
-          keyValue.map((v) => _entityID(v, entityHandler)).any(matchesText);
+      values = keyValue.map((v) => _entityID(v, entityHandler)).nonNulls;
+    }
+
+    if (values != null) {
+      return (not && values.isEmpty) || values.any(matchesText);
     }
 
     return matchesText(_entityID(keyValue, entityHandler));

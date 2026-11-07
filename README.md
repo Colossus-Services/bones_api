@@ -749,6 +749,8 @@ related entity). So `cond` and `!(cond)` together match every entity, once.
   (or without roles). For "without an admin role" use
   `!(roles.type == "admin")`.
 - A comparison (`>`, `>=`, `<`, `<=`) with a `null` doesn't match.
+- A `null` in a list is as `== null`: `x =~ [1, null]` matches a `null` `x`,
+  and `x !~ [1, null]` doesn't.
 
 The matching is the same in every `SQLAdapter` (PostgreSQL, MySQL, SQLite
 and `DBSQLMemoryAdapter`).

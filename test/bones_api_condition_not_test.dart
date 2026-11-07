@@ -384,6 +384,142 @@ void main() {
     });
   });
 
+  group('Review fixes', () {
+    ConditionSQLEncoder encoder({SchemeProvider? schemeProvider}) =>
+        ConditionSQLEncoder(
+          schemeProvider ?? _TestSchemeProvider(),
+          sqlElementQuote: '"',
+          subqueryFromSQL: (table, sub) =>
+              'FROM "$table" as "${sub.resolveEntityAlias(table)}" JOIN',
+        );
+
+    Future<EncodingContext> encode(
+      String query, {
+      Object? parameters,
+      String? tableFieldID,
+      SchemeProvider? schemeProvider,
+    }) async => await encoder(schemeProvider: schemeProvider).encode(
+      Condition.parse(query),
+      'account',
+      parameters: parameters,
+      tableName: 'account',
+      tableFieldID: tableFieldID,
+    );
+
+    bool matches(String query, Map<String, dynamic> o, {Object? parameters}) =>
+        Condition.parse(query).matchesEntityMap(o, parameters: parameters);
+
+    test('comparisons over a to-many list: any element', () {
+      var o = {
+        'roles': [1, 5],
+      };
+      expect(matches('roles > 3', o), isTrue);
+      expect(matches('roles >= 5', o), isTrue);
+      expect(matches('roles < 1', o), isFalse);
+      expect(matches('roles <= 1', o), isTrue);
+      expect(matches('!(roles > 3)', o), isFalse);
+      expect(
+        matches('!(roles > 3)', {
+          'roles': [1, 2],
+        }),
+        isTrue,
+      );
+      expect(matches('roles > ?', o, parameters: [4]), isTrue);
+      expect(matches('roles > 1', {'roles': []}), isFalse);
+    });
+
+    test('a `null` in an `IN` list (SQL as memory)', () async {
+      // Memory:
+      expect(matches('a !~ [10, null]', {'a': null}), isFalse);
+      expect(matches('a !~ [10, null]', {'a': 5}), isTrue);
+      expect(matches('a !~ [10, null]', {'a': 10}), isFalse);
+      expect(matches('a =~ [10, null]', {'a': null}), isTrue);
+      expect(matches('a =~ [10, null]', {'a': 5}), isFalse);
+
+      // SQL:
+      var sql = await encode('pass !~ ["x", null]');
+      expect(
+        sql.outputString,
+        equals(
+          '( ( "ac"."pass" NOT IN ( \'x\' ) AND "ac"."pass" IS NOT NULL ) )',
+        ),
+      );
+
+      var sql2 = await encode('pass =~ ["x", null]');
+      expect(
+        sql2.outputString,
+        equals('( ( "ac"."pass" IN ( \'x\' ) OR "ac"."pass" IS NULL ) )'),
+      );
+
+      var sql3 = await encode('pass =~ [null]');
+      expect(sql3.outputString, equals('( "ac"."pass" IS NULL )'));
+
+      // A parameter's list: its `null` placeholder is dropped.
+      var sql4 = await encode(
+        'pass !~ ?',
+        parameters: [
+          ['x', null],
+        ],
+      );
+      expect(
+        sql4.outputString,
+        equals(
+          '( ( "ac"."pass" NOT IN ( @pass__0 ) AND "ac"."pass" IS NOT NULL ) )',
+        ),
+      );
+      expect(sql4.parametersPlaceholders, equals({'pass__0': 'x'}));
+    });
+
+    test('encode: a group of a single condition', () {
+      var c = ConditionNOT(
+        GroupConditionAND([
+          GroupConditionOR([KeyConditionEQ(ConditionKey.parse('a'), 1)]),
+        ]),
+      );
+      expect(c.encode(), equals('!( a == 1 )'));
+      expect(Condition.parse(c.encode()).encode(), equals('!( a == 1 )'));
+    });
+
+    test('an empty group: every entity (and its negation, none)', () async {
+      var c = ConditionNOT(GroupConditionAND([]));
+      expect(c.matchesEntityMap({'a': 1}), isFalse);
+      expect(c.matchesEntity({'a': 1}), isFalse);
+
+      var sql = await encoder().encode(c, 'account', tableName: 'account');
+      expect(sql.outputString, equals('( FALSE )'));
+    });
+
+    test('the main table ID: never `NULL`', () async {
+      var sql = await encode('id != 1 && id !~ [2]', tableFieldID: 'id');
+      expect(
+        sql.outputString,
+        equals('( "ac"."id" != 1 AND "ac"."id" NOT IN ( 2 ) )'),
+      );
+
+      var sql2 = await encode('!(#ID == 3)', tableFieldID: 'id');
+      expect(sql2.outputString, startsWith('( NOT ( '));
+    });
+
+    test(
+      'a group: in order, also with an asynchronous `TableScheme`',
+      () async {
+        var sql = await encode(
+          '!(address.city == "x") && email == "a" && !(pass == "b") && admin == true',
+          schemeProvider: _AsyncTestSchemeProvider(),
+        );
+        expect(
+          sql.outputString,
+          equals(
+            '( "ac"."id" NOT IN ( SELECT "ac"."id" FROM "account" as "ac" JOIN '
+            'WHERE "ad"."city" = \'x\' ) AND "ac"."email" = \'a\' AND '
+            'NOT COALESCE(( "ac"."pass" = \'b\' ), FALSE) AND '
+            '"ac"."admin" = true )',
+          ),
+        );
+      },
+    );
+  });
+
   group('EncodingContext.sub', () {
     test('shares the parameters, not the output', () {
       var parent = EncodingContext(
@@ -418,6 +554,19 @@ void main() {
       expect(sub.nullInlinedPlaceholders, equals(['k']));
     });
   });
+}
+
+/// Resolves each [TableScheme] asynchronously (as when not cached yet).
+class _AsyncTestSchemeProvider extends _TestSchemeProvider {
+  @override
+  FutureOr<TableScheme?> getTableScheme(
+    String table, {
+    TableRelationshipReference? relationship,
+    Object? contextID,
+  }) => Future.delayed(
+    Duration(milliseconds: 1),
+    () => getTableSchemeImpl(table, relationship, contextID: contextID),
+  );
 }
 
 class _TestSchemeProvider extends SchemeProvider {

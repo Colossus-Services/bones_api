@@ -1518,24 +1518,21 @@ abstract class ConditionEncoder {
 
     context.write(groupOpener);
 
-    var c1 = conditions.first;
-    var c1Ret = encodeCondition(c1, context);
+    // One after another: a condition writes to the shared output when it's
+    // resolved (possibly asynchronously, e.g. a `TableScheme` not cached yet),
+    // so the next one (and its operator) can only start after it.
+    var ret = encodeCondition(conditions.first, context);
 
-    return c1Ret.resolveMapped((s) {
-      var rets = conditions
-          .skip(1)
-          .map((c2) {
-            s.write(operator);
-            return encodeCondition(c2, context);
-          })
-          .toList(growable: false);
-
-      return rets.resolveAllReduced((value, element) => element).resolveMapped((
-        s,
-      ) {
-        s.write(groupCloser);
-        return s;
+    for (var c2 in conditions.skip(1)) {
+      ret = ret.resolveMapped((s) {
+        s.write(operator);
+        return encodeCondition(c2, context);
       });
+    }
+
+    return ret.resolveMapped((s) {
+      s.write(groupCloser);
+      return s;
     });
   }
 

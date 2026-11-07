@@ -4882,6 +4882,19 @@ Future<bool> runAdapterTests(
         expect(await stores('number != 1'), equals({'s2', 's3'}));
         expect(await stores('number !~ [1, 2]'), equals({'s2', 's3'}));
         expect(await stores(r'number !~ /^1$/'), equals({'s2', 's3'}));
+        // A `null` in the list: as `IS NULL` (SQL `NOT IN (1, NULL)` matches
+        // nothing):
+        expect(await stores('number !~ [1, null]'), equals({'s3'}));
+        expect(await stores('number =~ [1, null]'), equals({'s1', 's2'}));
+        expect(
+          await stores(
+            'number !~ ?',
+            parameters: [
+              [3, null],
+            ],
+          ),
+          equals({'s1'}),
+        );
         // ... but not `!= null` (`IS NOT NULL`):
         expect(await stores('number != null'), equals({'s1', 's3'}));
         expect(await stores('!(number == null)'), equals({'s1', 's3'}));

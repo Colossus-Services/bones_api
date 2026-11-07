@@ -304,8 +304,15 @@ void main() {
       expect(matches(r'tags =~ /^b\d/', o), isTrue);
       expect(matches(r'tags =~ /^c/', o), isFalse);
       expect(matches(r'tags !~ /^a/', o), isTrue);
-      // The `null` element doesn't match `\d$`:
-      expect(matches(r'tags !~ /\d$/', o), isTrue);
+      // A `null` element isn't a value (nor a SQL row):
+      expect(matches(r'tags !~ /\d$/', o), isFalse);
+      expect(
+        matches(r'tags !~ /a/', {
+          'tags': [null],
+        }),
+        isTrue,
+        reason: 'No value: as an empty list',
+      );
       expect(
         matches(r'tags !~ /\d$/', {
           'tags': ['a1', 'b2'],
