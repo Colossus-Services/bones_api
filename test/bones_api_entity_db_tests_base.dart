@@ -4609,6 +4609,15 @@ Future<bool> runAdapterTests(
         expect(await select(r'info =~ /100% \(x\)$/'), equals({'percent'}));
         expect(await select(r"info =~ /'/"), isEmpty);
 
+        // Word boundaries (`\y` in PostgreSQL), and an identity escape:
+        expect(await select(r'info =~ /\bbeta\b/'), equals({'multiLine'}));
+        expect(
+          await select(r'info =~ /\balpha\b/i'),
+          equals({'multiLine', 'upper'}),
+        );
+        expect(await select(r'info =~ /\Blpha/'), equals({'multiLine'}));
+        expect(await select(r'info =~ /100\% \(x\)$/'), equals({'percent'}));
+
         // `!~`:
         expect(
           await select('info !~ /^rx:alpha/i'),
@@ -4687,6 +4696,32 @@ Future<bool> runAdapterTests(
           equals([addressIDs[1]]),
         );
 
+        // REGRESSION: 2 positional parameters of the same field shared one
+        // placeholder (the 1st value): `number > 900 AND number < 900`.
+        Future<List<Object?>> selectAddressesBy(
+          String query,
+          List parameters,
+        ) async => (await addressRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => e.id).where(addressIDs.contains).toList();
+
+        expect(
+          await selectAddressesBy('number > ? && number < ?', [900, 1000]),
+          equals([addressIDs[0]]),
+        );
+        expect(
+          await selectAddressesBy('number >= ? && number <= ?', [1901, 1901]),
+          equals([addressIDs[1]]),
+        );
+        expect(
+          await selectAddressesBy('number =~ ? && number !~ ?', [
+            [901, 1901],
+            [901],
+          ]),
+          equals([addressIDs[1]]),
+        );
+
         // A related entity's field (a join), an enum, and a list
         // relationship:
         var u1 = User('rx1@$testDomain', 'p', a1, [
@@ -4734,6 +4769,28 @@ Future<bool> runAdapterTests(
         );
         expect(
           await selectUsers('email =~ /^rx/ && roles.type =~ /^adm/'),
+          equals([userIDs[0]]),
+        );
+
+        // A regexp and another condition, of the same field, by position:
+        Future<List<Object?>> selectUsersBy(String query, List params) async =>
+            (await userRepo.selectByQuery(
+              query,
+              parameters: params,
+            )).map((e) => e.id).where(userIDs.contains).toList();
+
+        expect(
+          await selectUsersBy('email =~ /?/ && email != ?', [
+            '^rx',
+            'rx1@$testDomain',
+          ]),
+          equals([userIDs[1]]),
+        );
+        expect(
+          await selectUsersBy('email != ? && email =~ /?/i', [
+            'rx2@$testDomain',
+            '^RX',
+          ]),
           equals([userIDs[0]]),
         );
 

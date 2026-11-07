@@ -1569,9 +1569,13 @@ abstract class ConditionEncoder {
     EncodingContext context,
   );
 
+  /// Encodes a [KeyConditionRegExp]. Not abstract, for the existing
+  /// subclasses: throws a [ConditionEncodingError] if not overridden.
   FutureOr<EncodingContext> encodeKeyConditionRegExp(
     KeyConditionRegExp c,
     EncodingContext context,
+  ) => throw ConditionEncodingError(
+    'Regexp conditions not supported by $runtimeType: $c',
   );
 
   FutureOr<EncodingValue<String, Object?>> resolveParameterValue(
@@ -1581,6 +1585,8 @@ abstract class ConditionEncoder {
     Type? valueType, {
     bool valueAsList = false,
   }) {
+    var placeholders = context.parametersPlaceholders;
+
     if (valueAsList) {
       return _resolveParameterValueImpl(
         value,
@@ -1592,12 +1598,23 @@ abstract class ConditionEncoder {
             ? values
             : (values is Iterable ? values.toList(growable: false) : [values]);
 
+        // A key already holding other values (e.g. `id =~ ? && id !~ ?`,
+        // both keyed by the field `id`) can't be reused:
+        bool sameValues(String k) => list.indexed.every((e) {
+          var ki = parameterPlaceholderIndexKey(k, e.$1);
+          return !placeholders.containsKey(ki) || placeholders[ki] == e.$2;
+        });
+
+        var listKey = sameValues(valueKey)
+            ? valueKey
+            : newParameterKey(context, valueKey, accept: sameValues);
+
         var placeHolders = list.mapIndexed((i, v) {
-          var k = parameterPlaceholderIndexKey(valueKey, i);
-          context.parametersPlaceholders[k] ??= v;
+          var k = parameterPlaceholderIndexKey(listKey, i);
+          placeholders[k] ??= v;
           var placeholder = parameterPlaceholder(k);
           return EncodingPlaceholderIndex(
-            valueKey,
+            listKey,
             valueType,
             placeholder,
             i,
@@ -1606,37 +1623,58 @@ abstract class ConditionEncoder {
         }).toList();
 
         return EncodingValueList(
-          valueKey,
+          listKey,
           valueType,
           placeHolders,
           encodeEncodingValueList,
         );
       });
     } else {
-      var placeholder = parameterPlaceholder(valueKey);
+      return _resolveParameterValueImpl(
+        value,
+        context,
+        valueType,
+        false,
+      ).resolveMapped((val) {
+        // A key already holding another value (e.g. `id > ? && id < ?`, both
+        // keyed by the field `id`) can't be reused:
+        var key =
+            !placeholders.containsKey(valueKey) || placeholders[valueKey] == val
+            ? valueKey
+            : newParameterKey(context, valueKey);
 
-      if (!context.parametersPlaceholders.containsKey(valueKey)) {
-        return _resolveParameterValueImpl(
-          value,
-          context,
-          valueType,
-          false,
-        ).resolveMapped((val) {
-          context.parametersPlaceholders[valueKey] ??= val;
-          return EncodingPlaceholder(
-            valueKey,
-            valueType,
-            placeholder,
-            encodeEncodingPlaceholder,
-          );
-        });
-      } else {
+        placeholders[key] ??= val;
+
         return EncodingPlaceholder(
-          valueKey,
+          key,
           valueType,
-          placeholder,
+          parameterPlaceholder(key),
           encodeEncodingPlaceholder,
         );
+      });
+    }
+  }
+
+  /// A parameter key, from [prefix], not used by the [context]'s
+  /// placeholders (nor as an `IN` list key) nor named parameters:
+  /// `prefix`, `prefix_1`, `prefix_2`... Or, the first one that [accept]s.
+  String newParameterKey(
+    EncodingContext context,
+    String prefix, {
+    bool Function(String key)? accept,
+  }) {
+    var placeholders = context.parametersPlaceholders;
+    var namedParameters = context.namedParameters;
+
+    for (var i = 0; ; ++i) {
+      var k = i == 0 ? prefix : '${prefix}_$i';
+
+      if (i > 0 && accept != null && accept(k)) return k;
+
+      if (!placeholders.containsKey(k) &&
+          !placeholders.containsKey(parameterPlaceholderIndexKey(k, 0)) &&
+          (namedParameters == null || !namedParameters.containsKey(k))) {
+        return k;
       }
     }
   }
@@ -1656,7 +1694,7 @@ abstract class ConditionEncoder {
 
     // Not a regexp pattern parameter (`/?/`), which `encodeKeyConditionRegExp`
     // resolves: a `RegExp` here would be compared as its text.
-    ConditionParameter.checkNotRegExpValue(paramValue);
+    ConditionParameter.checkNotRegExpValue(paramValue, deep: true);
 
     if (valueType != null) {
       return resolveValueToType(

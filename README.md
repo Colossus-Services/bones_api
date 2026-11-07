@@ -751,13 +751,15 @@ The matching is the same in every `SQLAdapter` (PostgreSQL, MySQL, SQLite and
 - `.` also matches a line terminator, and `^`/`$` match only at the start/end
   of the whole value.
 - A non-text field is matched by its text (e.g. `number =~ /^9\d$/`; an enum
-  by its name). The text of a date or a decimal depends on the database.
+  by its name; a reference to an entity by its ID). The text of a boolean
+  (`true` or `1`), a date or a decimal depends on the database.
 - A `null` field matches neither `=~` nor `!~`.
 - The pattern is always sent as a SQL parameter.
 - Use the syntax common to the databases' regexp engines (PostgreSQL's,
   MySQL's ICU and Dart's): characters and classes (`[a-z]`, `\d`, `\w`, `\s`),
-  anchors, quantifiers, groups and `|`. Lookarounds, backreferences and word
-  boundaries (`\b`) are not portable.
+  anchors, quantifiers, groups, `|` and word boundaries (`\b`, `\B`: written
+  as `\y`, `\Y` for PostgreSQL). Lookarounds, backreferences and POSIX
+  classes (`[[:alpha:]]`) are not portable.
 - MySQL: 8.0.4+ (`REGEXP_LIKE`). SQLite: a `regexp` function registered by
   the `DBSQLiteAdapter`.
 

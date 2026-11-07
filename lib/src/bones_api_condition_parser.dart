@@ -311,7 +311,7 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
   /// any other `\x` is kept as is. The only flag is `i`.
   Parser<_RegExpValue> _conditionRegExp() =>
       (char('/') &
-              (conditionParameter() | conditionRegExpBody()) &
+              (_conditionRegExpParameter() | conditionRegExpBody()) &
               char('/') &
               letter().star().flatten())
           .trim()
@@ -330,6 +330,24 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
             }
 
             return _RegExpValue(pattern, flags.contains('i'));
+          });
+
+  /// A parameter as a whole regexp (`/?/`, `/?#1/`, `/?:name/`): not
+  /// trimmed, and followed by the closing `/` (e.g. `/ ?\d/` is a pattern).
+  Parser<ConditionParameter> _conditionRegExpParameter() =>
+      (char('?') &
+              ((char('#') & digit().star().flatten()) |
+                      (char(':') & word().star().flatten()))
+                  .optional() &
+              char('/').and())
+          .map((l) {
+            var spec = l[1] as List?;
+            if (spec == null) return ConditionParameter();
+
+            var s = spec[1] as String;
+            return spec[0] == '#'
+                ? ConditionParameter.index(s.isNotEmpty ? int.parse(s) : -1)
+                : ConditionParameter.key(s);
           });
 
   Parser<String> conditionRegExpBody() =>

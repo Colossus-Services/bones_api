@@ -1172,6 +1172,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       var entries = candidates.where((e) {
         return sql.condition!.matchesEntityMap(
           e.value,
+          positionalParameters: sql.positionalParameters,
           namedParameters: sql.parametersByPlaceholder,
           entityHandler: entityHandler,
         );
@@ -1188,6 +1189,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
           var match = sql.condition!.matchesEntityMap(
             obj,
+            positionalParameters: sql.positionalParameters,
             namedParameters: sql.parametersByPlaceholder,
             entityHandler: entityHandler,
           );

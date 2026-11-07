@@ -205,22 +205,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
   /// A parameter key for an ID not used by the [context]'s parameters.
   String _newIDParameterKey(EncodingContext context) =>
-      _newParameterKey(context, 'id__p');
-
-  /// A parameter key, from [prefix], not used by the [context]'s parameters.
-  String _newParameterKey(EncodingContext context, String prefix) {
-    var placeholders = context.parametersPlaceholders;
-    var namedParameters = context.namedParameters;
-
-    for (var i = 0; ; ++i) {
-      var k = i == 0 ? prefix : '$prefix$i';
-      if (!placeholders.containsKey(k) &&
-          !placeholders.containsKey(parameterPlaceholderIndexKey(k, 0)) &&
-          (namedParameters == null || !namedParameters.containsKey(k))) {
-        return k;
-      }
-    }
-  }
+      newParameterKey(context, 'id__p');
 
   @override
   FutureOr<EncodingContext> encodeKeyConditionEQ(
@@ -330,23 +315,22 @@ class ConditionSQLEncoder extends ConditionEncoder {
             ? patternParameter.key
             : patternParameter.contextKey;
 
+        if (key == null || key.isEmpty) key = 'regexp__p';
+
         // The parameter's own key, unless already used for another value
-        // (e.g. `name == ?:p && name =~ /?:p/`):
-        if (key != null &&
-            key.isNotEmpty &&
-            (!placeholders.containsKey(key) ||
-                placeholders[key] == placeholderValue)) {
-          parameterKey = key;
-        } else {
-          parameterKey = _newParameterKey(context, 'regexp__p');
-        }
+        // (e.g. `name == ? && name =~ /?/`, both keyed by `name`):
+        parameterKey =
+            !placeholders.containsKey(key) ||
+                placeholders[key] == placeholderValue
+            ? key
+            : newParameterKey(context, key);
 
         placeholders[parameterKey] = placeholderValue;
       } else {
         pattern = c.pattern!;
         caseInsensitive = c.caseInsensitive;
 
-        parameterKey = _newParameterKey(context, 'regexp__p');
+        parameterKey = newParameterKey(context, 'regexp__p');
         placeholders[parameterKey] = syntax.adaptPattern(pattern);
       }
 
@@ -988,7 +972,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
 /// only at the start/end of the whole value.
 enum SQLRegExpSyntax {
   /// PostgreSQL: `value ~ pattern` (`~*`, `!~`, `!~*`). A non-text value is
-  /// cast to `TEXT`.
+  /// cast to `TEXT`. A word boundary `\b`/`\B` is rewritten as `\y`/`\Y` (in
+  /// PostgreSQL `\b` is a backspace, and `\B` a backslash).
   postgres,
 
   /// MySQL 8.0.4+: `REGEXP_LIKE(value, pattern, 'cn')`: `c`/`i` (case), `n`
@@ -1006,6 +991,7 @@ enum SQLRegExpSyntax {
 
   /// The pattern to bind as the parameter of [matchSQL].
   String adaptPattern(String pattern) => switch (this) {
+    postgres => wordBoundaryAsPostgres(pattern),
     mysql => dollarAsEndOfInput(pattern),
     _ => pattern,
   };
@@ -1039,37 +1025,115 @@ enum SQLRegExpSyntax {
     }
   }
 
-  /// Rewrites each `$` of [pattern] (not escaped, nor in a `[...]` class) as
-  /// `\z` (end of input).
+  /// Rewrites each `$` of [pattern] as `\z` (end of input) for ICU (MySQL):
+  /// not an escaped one (`\$`), nor in a class (`[...]`, also nested:
+  /// `[[:digit:]$]`), nor quoted (`\Q...\E`).
   static String dollarAsEndOfInput(String pattern) {
     if (!pattern.contains(r'$')) return pattern;
 
+    return _rewritePattern(
+      pattern,
+      nestedClasses: true,
+      quoting: true,
+      rewrite: (token) => token == r'$' ? r'\z' : null,
+    );
+  }
+
+  /// Rewrites each word boundary `\b`/`\B` of [pattern] as PostgreSQL's
+  /// `\y`/`\Y`: not in a class (`[\b]` is a backspace, as in PostgreSQL).
+  static String wordBoundaryAsPostgres(String pattern) {
+    if (!pattern.contains(r'\b') && !pattern.contains(r'\B')) return pattern;
+
+    return _rewritePattern(
+      pattern,
+      nestedClasses: false,
+      quoting: false,
+      rewrite: (token) => switch (token) {
+        r'\b' => r'\y',
+        r'\B' => r'\Y',
+        _ => null,
+      },
+    );
+  }
+
+  /// Scans [pattern] by token (`\x` escapes, characters), and replaces each
+  /// one outside of a class (`[...]`) by [rewrite] (unless `null`).
+  ///
+  /// - In a class, a POSIX class (`[:alpha:]`, `[=a=]`, `[.a.]`) is a token,
+  ///   and a `]` right after `[` or `[^` is a literal.
+  /// - [nestedClasses]: a `[` in a class opens a nested class (ICU).
+  /// - [quoting]: `\Q...\E` is kept as is (ICU).
+  static String _rewritePattern(
+    String pattern, {
+    required bool nestedClasses,
+    required bool quoting,
+    required String? Function(String token) rewrite,
+  }) {
     var s = StringBuffer();
-    var inClass = false;
+    var classDepth = 0;
+    // The index after a class opening (`[` or `[^`):
+    var classStart = -1;
 
     for (var i = 0; i < pattern.length; ++i) {
       var c = pattern[i];
 
       if (c == r'\' && i + 1 < pattern.length) {
+        var n = pattern[i + 1];
+
+        if (quoting && n == 'Q') {
+          var end = pattern.indexOf(r'\E', i + 2);
+          var stop = end < 0 ? pattern.length : end + 2;
+          s.write(pattern.substring(i, stop));
+          i = stop - 1;
+          continue;
+        }
+
+        var token = '$c$n';
+        ++i;
+        s.write((classDepth == 0 ? rewrite(token) : null) ?? token);
+        continue;
+      }
+
+      if (classDepth > 0) {
+        if (c == ']' && i != classStart) {
+          --classDepth;
+        } else if (c == '[' && i + 1 < pattern.length) {
+          var n = pattern[i + 1];
+          if (n == ':' || n == '=' || n == '.') {
+            // A POSIX class: up to its closing `:]`, `=]` or `.]`.
+            var end = pattern.indexOf('$n]', i + 2);
+            if (end >= 0) {
+              s.write(pattern.substring(i, end + 2));
+              i = end + 1;
+              continue;
+            }
+          }
+          if (nestedClasses) {
+            ++classDepth;
+            classStart = _classContentStart(pattern, i);
+          }
+        }
         s.write(c);
-        s.write(pattern[++i]);
         continue;
       }
 
-      if (inClass) {
-        if (c == ']') inClass = false;
-      } else if (c == '[') {
-        inClass = true;
-      } else if (c == r'$') {
-        s.write(r'\z');
+      if (c == '[') {
+        ++classDepth;
+        classStart = _classContentStart(pattern, i);
+        s.write(c);
         continue;
       }
 
-      s.write(c);
+      s.write(rewrite(c) ?? c);
     }
 
     return s.toString();
   }
+
+  /// The index of the first character of the class opened at [i] (`[`),
+  /// after a `^`.
+  static int _classContentStart(String pattern, int i) =>
+      i + 1 < pattern.length && pattern[i + 1] == '^' ? i + 2 : i + 1;
 
   /// The SQL function [function] (see [SQLRegExpSyntax.function]):
   /// `regexp(pattern, value [, flags])`, or `null` for a `null` argument.

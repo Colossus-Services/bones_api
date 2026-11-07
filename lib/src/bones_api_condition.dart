@@ -2,6 +2,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_utils.dart';
 import 'bones_api_utils_collections.dart';
@@ -136,7 +137,9 @@ class ConditionParameter extends ConditionElement {
 
     var index = this.index;
 
-    if (index == null) {
+    // A positional `?` is keyed by its field only without positional values:
+    // with them, its position (e.g. `id > ? && id < ?`: both keyed by `id`).
+    if (index == null && positionalParameters == null) {
       var key = contextKey;
       if (key != null && key.isNotEmpty) {
         var value = namedParameters?[key] ?? encodingParameters?[key];
@@ -176,12 +179,16 @@ class ConditionParameter extends ConditionElement {
     return null;
   }
 
-  /// Throws an [ArgumentError] if [value] is (or contains) a [RegExp]: as an
-  /// `==`/`=~` (`IN`) value it would be compared, not matched. A regexp
-  /// parameter is written `/?/`: `field =~ /?/`.
-  static void checkNotRegExpValue(Object? value) {
+  /// Throws an [ArgumentError] if [value] is a [RegExp] (or, with [deep], an
+  /// [Iterable] with one): as an `==`/`=~` (`IN`) value it would be
+  /// compared, not matched. A regexp parameter is written `/?/`:
+  /// `field =~ /?/`.
+  ///
+  /// When matching each entity, only `deep: false` (`O(1)`): the elements
+  /// of a list are checked as they are compared.
+  static void checkNotRegExpValue(Object? value, {bool deep = false}) {
     if (value is RegExp ||
-        (value is Iterable && value.any((e) => e is RegExp))) {
+        (deep && value is Iterable && value.any((e) => e is RegExp))) {
       throw ArgumentError(
         'A `RegExp` parameter value is only matched as a regexp pattern: '
         'write the parameter between `/`, e.g. `field =~ /?/` '
@@ -226,15 +233,14 @@ class ConditionParameter extends ConditionElement {
         );
         return equals;
       } else {
-        var contains = myValue
-            .where(
-              (v) => EntityHandler.equalsValuesBasic(
-                v,
-                otherValue,
-                entityHandler: entityHandler,
-              ),
-            )
-            .isNotEmpty;
+        var contains = myValue.where((v) {
+          checkNotRegExpValue(v);
+          return EntityHandler.equalsValuesBasic(
+            v,
+            otherValue,
+            entityHandler: entityHandler,
+          );
+        }).isNotEmpty;
         return contains;
       }
     } else if (otherValue is Iterable) {
@@ -386,6 +392,7 @@ class ConditionParameter extends ConditionElement {
 
     if (myValue is List) {
       for (var v1 in myValue) {
+        checkNotRegExpValue(v1);
         for (var v2 in values) {
           var otherValue = v2 is ConditionParameter
               ? v2.getValue(
@@ -2042,7 +2049,8 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
 
   /// The Dart [RegExp] with the semantics of a [KeyConditionRegExp]: `.`
   /// matches a line terminator (`dotAll`) and `^`/`$` only the start/end of
-  /// the whole input (not `multiLine`). Cached.
+  /// the whole input (not `multiLine`). It's `unicode` (by code point) if the
+  /// [pattern] is valid in that stricter mode (e.g. not with `\-`). Cached.
   ///
   /// Throws a [FormatException] for an invalid [pattern].
   static RegExp toDartRegExp(String pattern, {bool caseInsensitive = false}) {
@@ -2050,13 +2058,22 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     var regExp = _regExpCache[key];
     if (regExp != null) return regExp;
 
-    regExp = RegExp(
+    RegExp compile(bool unicode) => RegExp(
       pattern,
       caseSensitive: !caseInsensitive,
       dotAll: true,
       multiLine: false,
-      unicode: true,
+      unicode: unicode,
     );
+
+    try {
+      // By code point (as the databases), when the pattern is valid in the
+      // stricter `unicode` mode:
+      regExp = compile(true);
+    } on FormatException {
+      // E.g. an identity escape (`\-`, `\@`), valid in the databases:
+      regExp = compile(false);
+    }
 
     if (_regExpCache.length >= 256) {
       _regExpCache.remove(_regExpCache.keys.first);
@@ -2115,19 +2132,97 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     }
   }
 
-  /// Matches a [keyValue] (see the class documentation).
-  bool matchesValue(Object? keyValue, String pattern, bool caseInsensitive) {
-    if (keyValue == null) return false;
+  /// The [RegExp] of a literal pattern (without a parameter).
+  RegExp? _literalRegExp;
 
-    var regExp = toDartRegExp(pattern, caseInsensitive: caseInsensitive);
-
-    if (keyValue is Iterable) {
-      return keyValue.nonNulls.any(
-        (v) => regExp.hasMatch(valueToText(v)) != not,
+  /// The [RegExp] of this condition, with its parameter's value, if any.
+  ///
+  /// A parameter's value is resolved on each call (not cached by the
+  /// parameters instances: their content can change), but its [RegExp] is
+  /// cached by [toDartRegExp].
+  RegExp _resolveRegExp(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var pattern = this.pattern;
+    if (pattern != null) {
+      return _literalRegExp ??= toDartRegExp(
+        pattern,
+        caseInsensitive: caseInsensitive,
       );
     }
 
-    return regExp.hasMatch(valueToText(keyValue)) != not;
+    var (paramPattern, paramCaseInsensitive) = resolvePattern(
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
+
+    return toDartRegExp(paramPattern, caseInsensitive: paramCaseInsensitive);
+  }
+
+  /// Matches a [keyValue] with [regExp] (see the class documentation). An
+  /// entity (or reference) is matched by its ID.
+  bool matchesValue(
+    Object? keyValue,
+    RegExp regExp, {
+    EntityHandler? entityHandler,
+  }) {
+    if (keyValue == null) return false;
+
+    bool matchesText(Object v) => regExp.hasMatch(valueToText(v)) != not;
+
+    if (keyValue is EntityReferenceList) {
+      return (keyValue.ids ?? const []).nonNulls.any(matchesText);
+    } else if (keyValue is Iterable) {
+      return keyValue
+          .map((v) => _entityID(v, entityHandler))
+          .nonNulls
+          .any(matchesText);
+    }
+
+    var v = _entityID(keyValue, entityHandler);
+    return v != null && matchesText(v);
+  }
+
+  /// The ID of [value], if it's an entity or a reference, otherwise [value].
+  static Object? _entityID(Object? value, EntityHandler? entityHandler) {
+    if (value == null ||
+        value is String ||
+        value is num ||
+        value is bool ||
+        value is Enum ||
+        value is DateTime) {
+      return value;
+    }
+
+    if (value is EntityReference) return value.id;
+
+    var handler = entityHandler?.getEntityHandler(obj: value);
+    if (handler != null && handler.type == value.runtimeType) {
+      return handler.getID(value);
+    }
+
+    return value;
+  }
+
+  bool _matches(
+    Object? keyValue,
+    EntityHandler? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    if (keyValue == null) return false;
+
+    var regExp = _resolveRegExp(
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+
+    return matchesValue(keyValue, regExp, entityHandler: entityHandler);
   }
 
   @override
@@ -2137,18 +2232,13 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityKeyValue(o, entityHandler);
-    if (keyValue == null) return false;
-
-    var (pattern, caseInsensitive) = resolvePattern(
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-
-    return matchesValue(keyValue, pattern, caseInsensitive);
-  }
+  }) => _matches(
+    getEntityKeyValue(o, entityHandler),
+    entityHandler,
+    parameters,
+    positionalParameters,
+    namedParameters,
+  );
 
   @override
   bool matchesEntityMap(
@@ -2157,18 +2247,13 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityMapKeyValue(o, entityHandler)?.value;
-    if (keyValue == null) return false;
-
-    var (pattern, caseInsensitive) = resolvePattern(
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-
-    return matchesValue(keyValue, pattern, caseInsensitive);
-  }
+  }) => _matches(
+    getEntityMapKeyValue(o, entityHandler)?.value,
+    entityHandler,
+    parameters,
+    positionalParameters,
+    namedParameters,
+  );
 
   @override
   KeyConditionRegExp<T> cast<T>() =>

@@ -3,6 +3,11 @@ import 'package:test/test.dart';
 
 enum _Color { red, green }
 
+class _Owner {
+  @override
+  String toString() => 'Owner#12';
+}
+
 void main() {
   group('KeyConditionRegExp: parse', () {
     KeyConditionRegExp parseRegExp(String query) {
@@ -86,6 +91,16 @@ void main() {
       var c3 = parseRegExp('name !~ /?:p/');
       expect(c3.patternParameter!.key, equals('p'));
       expect(c3.not, isTrue);
+
+      expect(parseRegExp('name =~ /?#/').patternParameter!.index, equals(-1));
+      expect(parseRegExp('name =~ /?:/').patternParameter!.key, isEmpty);
+
+      // Only a whole regexp is a parameter: an optional space then digits.
+      var c4 = parseRegExp(r'code =~ / ?\d+/');
+      expect(c4.pattern, equals(r' ?\d+'));
+      expect(c4.patternParameter, isNull);
+      expect(parseRegExp(r'code =~ /a?/').pattern, equals('a?'));
+      expect(parseRegExp(r'code =~ /\??/').pattern, equals(r'\??'));
     });
 
     test('groups', () {
@@ -130,6 +145,10 @@ void main() {
       for (var q in ['x =~ /(/', 'x =~ /[a/', 'x =~ /a{2,1}/']) {
         expect(() => Condition.parse(q), throwsFormatException, reason: q);
       }
+
+      // A `?` after other characters is a pattern, not a parameter:
+      // invalid (nothing to repeat) at the start of a pattern.
+      expect(() => Condition.parse(r'x =~ /?\d/'), throwsFormatException);
 
       // An empty or unterminated regexp:
       for (var q in ['x =~ //', 'x =~ /a', r'x =~ /a\/']) {
@@ -236,6 +255,32 @@ void main() {
       var o = {'t': 'São 😀'};
       expect(matches(r't =~ /^S.o .$/', o), isTrue);
       expect(matches('t =~ /SÃO/i', o), isTrue);
+    });
+
+    test('identity escapes (invalid in Dart\'s `unicode` mode)', () {
+      // Valid in PostgreSQL and MySQL: accepted (not a `FormatException`).
+      expect(matches(r'name =~ /^foo\-bar$/', {'name': 'foo-bar'}), isTrue);
+      expect(matches(r'email =~ /\@corp$/', {'email': 'a@corp'}), isTrue);
+      expect(
+        KeyConditionRegExp.toDartRegExp(r'\-').isUnicode,
+        isFalse,
+        reason: 'Not valid in the `unicode` mode',
+      );
+      expect(KeyConditionRegExp.toDartRegExp(r'\.').isUnicode, isTrue);
+    });
+
+    test('word boundaries', () {
+      var o = {'name': 'John Smith'};
+      expect(matches(r'name =~ /\bsmith\b/i', o), isTrue);
+      expect(matches(r'name =~ /\Bmith/', o), isTrue);
+      expect(matches(r'name =~ /\bmith/', o), isFalse);
+    });
+
+    test('an entity reference: by its ID', () {
+      var ref = EntityReference<_Owner>.fromID(12);
+      expect(matches(r'owner =~ /^12$/', {'owner': ref}), isTrue);
+      expect(matches(r'owner !~ /^12$/', {'owner': ref}), isFalse);
+      expect(matches(r'owner =~ /^1$/', {'owner': ref}), isFalse);
     });
 
     test('null, non-text values, lists', () {
@@ -392,6 +437,15 @@ void main() {
       expect(d(r'[a\]$]$'), equals(r'[a\]$]\z'));
       expect(d(r'[^$a]b$'), equals(r'[^$a]b\z'));
 
+      // Nested and POSIX classes (ICU), a `]` first in a class, quoting:
+      expect(d(r'[[:digit:]$]+$'), equals(r'[[:digit:]$]+\z'));
+      expect(d(r'[a[$]]$'), equals(r'[a[$]]\z'));
+      expect(d(r'[]$]$'), equals(r'[]$]\z'));
+      expect(d(r'[^]$]$'), equals(r'[^]$]\z'));
+      expect(d(r'\Q$\E$'), equals(r'\Q$\E\z'));
+      expect(d(r'\Q$'), equals(r'\Q$'));
+      expect(d(r'a\'), equals(r'a\'));
+
       expect(SQLRegExpSyntax.mysql.adaptPattern(r'a$'), equals(r'a\z'));
       for (var s in [
         SQLRegExpSyntax.postgres,
@@ -399,6 +453,30 @@ void main() {
         SQLRegExpSyntax.dart,
       ]) {
         expect(s.adaptPattern(r'a$'), equals(r'a$'), reason: '$s');
+      }
+    });
+
+    test('adaptPattern / wordBoundaryAsPostgres', () {
+      String w(String p) => SQLRegExpSyntax.wordBoundaryAsPostgres(p);
+
+      expect(w('abc'), equals('abc'));
+      expect(w(r'\bsmith\b'), equals(r'\ysmith\y'));
+      expect(w(r'\Bmith'), equals(r'\Ymith'));
+      // An escaped `\`, then `b`:
+      expect(w(r'\\b'), equals(r'\\b'));
+      // In a class, `\b` is a backspace (also in PostgreSQL):
+      expect(w(r'[\b]\b'), equals(r'[\b]\y'));
+      expect(w(r'[[:alpha:]\b]+\b'), equals(r'[[:alpha:]\b]+\y'));
+      // `[` in a class is a literal (not nested):
+      expect(w(r'[[]\b'), equals(r'[[]\y'));
+
+      expect(SQLRegExpSyntax.postgres.adaptPattern(r'\bx$'), equals(r'\yx$'));
+      for (var s in [
+        SQLRegExpSyntax.mysql,
+        SQLRegExpSyntax.function,
+        SQLRegExpSyntax.dart,
+      ]) {
+        expect(s.adaptPattern(r'\bx'), equals(r'\bx'), reason: '$s');
       }
     });
 
@@ -444,12 +522,12 @@ void main() {
         sql2.outputString,
         equals(
           "( NOT REGEXP_LIKE(\"ac\".\"email\", @regexp__p, 'cn') AND "
-          "REGEXP_LIKE(\"ac\".\"pass\", @regexp__p1, 'cn') )",
+          "REGEXP_LIKE(\"ac\".\"pass\", @regexp__p_1, 'cn') )",
         ),
       );
       expect(
         sql2.parametersPlaceholders,
-        equals({'regexp__p': r'x\z', 'regexp__p1': 'y'}),
+        equals({'regexp__p': r'x\z', 'regexp__p_1': 'y'}),
       );
 
       var sql3 = await encode(SQLRegExpSyntax.function, 'email =~ /a/');
@@ -540,11 +618,11 @@ void main() {
       );
       expect(
         sql.outputString,
-        equals('( "ac"."email" = @email AND "ac"."email" ~ @regexp__p )'),
+        equals('( "ac"."email" = @email AND "ac"."email" ~ @email_1 )'),
       );
       expect(
         sql.parametersPlaceholders,
-        equals({'email': 'joe', 'regexp__p': '^j'}),
+        equals({'email': 'joe', 'email_1': '^j'}),
       );
 
       // The same value: the same key.
@@ -559,6 +637,86 @@ void main() {
       );
       expect(sql2.parametersPlaceholders, equals({'p': 'x'}));
     });
+
+    test(
+      'positional parameters of the same field: not one placeholder',
+      () async {
+        // REGRESSION: both were `@id` bound to the 1st value (`id > 1 AND
+        // id < 1`).
+        var sql = await encode(
+          SQLRegExpSyntax.postgres,
+          'id > ? && id < ?',
+          parameters: [1, 10],
+        );
+        expect(
+          sql.outputString,
+          equals('( "ac"."id" > @id AND "ac"."id" < @id_1 )'),
+        );
+        expect(sql.parametersPlaceholders, equals({'id': 1, 'id_1': 10}));
+
+        // The same value: one placeholder.
+        var sql2 = await encode(
+          SQLRegExpSyntax.postgres,
+          'id >= ? && id <= ?',
+          parameters: [3, 3],
+        );
+        expect(sql2.parametersPlaceholders, equals({'id': 3}));
+
+        // `IN` lists:
+        var sql3 = await encode(
+          SQLRegExpSyntax.postgres,
+          'id =~ ? && id !~ ?',
+          parameters: [
+            [1, 2],
+            [2],
+          ],
+        );
+        expect(
+          sql3.outputString,
+          equals(
+            '( "ac"."id" IN ( @id__0 , @id__1 ) AND '
+            '"ac"."id" NOT IN ( @id_1__0 ) )',
+          ),
+        );
+        expect(
+          sql3.parametersPlaceholders,
+          equals({'id__0': 1, 'id__1': 2, 'id_1__0': 2}),
+        );
+
+        // Matched in memory with the positional values and the placeholders
+        // (as `DBSQLMemoryAdapter` does):
+        var c = Condition.parse('id > ? && id < ?');
+        for (var (id, expected) in [(5, true), (1, false), (10, false)]) {
+          expect(
+            c.matchesEntityMap(
+              {'id': id},
+              positionalParameters: [1, 10],
+              namedParameters: sql.parametersPlaceholders.cast(),
+            ),
+            expected,
+            reason: 'id: $id',
+          );
+        }
+
+        // A regexp first, then `!=` on the same field:
+        var sql4 = await encode(
+          SQLRegExpSyntax.mysql,
+          r'email =~ /?/ && email != ?',
+          parameters: [r'@corp\.com$', 'admin@corp.com'],
+        );
+        expect(
+          sql4.outputString,
+          equals(
+            "( REGEXP_LIKE(\"ac\".\"email\", @email, 'cn') AND "
+            '"ac"."email" != @email_1 )',
+          ),
+        );
+        expect(
+          sql4.parametersPlaceholders,
+          equals({'email': r'@corp\.com\z', 'email_1': 'admin@corp.com'}),
+        );
+      },
+    );
 
     test('a `RegExp` as an `IN` parameter: an error', () async {
       expect(
