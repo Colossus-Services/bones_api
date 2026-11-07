@@ -523,11 +523,21 @@ class ConditionSQLEncoder extends ConditionEncoder {
       if (value is EncodingValueList<String> &&
           (operator == 'IN' || operator == 'NOT IN')) {
         var elements = value.asList;
+
+        // An empty list (`x =~ []`, or a parameter's `[]`): `IN` matches
+        // nothing and `NOT IN` everything, also a `NULL` (as in memory). It
+        // is not a `null` (`x =~ null` and `[null]` are `IS NULL`, and arrive
+        // as a list with a `null`).
+        if (elements.isEmpty) {
+          context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
+          return context;
+        }
+
         var nonNulls = elements
             .where((e) => !_isNullListElement(e, context))
             .toList();
 
-        if (nonNulls.length < elements.length || elements.isEmpty) {
+        if (nonNulls.length < elements.length) {
           for (var e in elements) {
             if (!nonNulls.contains(e)) {
               _markPlaceholderInlinedAsNull(e, context);
@@ -976,11 +986,19 @@ class ConditionSQLEncoder extends ConditionEncoder {
       var values = _valueToList(value);
 
       if (values.isEmpty) {
-        return EncodingValueNull(
-          fieldKey ?? '?',
-          fieldType,
-          encodeEncodingValueNull,
-        );
+        // An empty `IN` list is not a `null`: it matches nothing.
+        return valueAsList
+            ? EncodingValueList(
+                fieldKey ?? '?',
+                fieldType,
+                <EncodingValue<String, Object?>>[],
+                encodeEncodingValueList,
+              )
+            : EncodingValueNull(
+                fieldKey ?? '?',
+                fieldType,
+                encodeEncodingValueNull,
+              );
       } else if (values.length == 1) {
         var v = value.first;
         value = v;

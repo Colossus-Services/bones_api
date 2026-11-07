@@ -4899,6 +4899,35 @@ Future<bool> runAdapterTests(
         expect(await stores('number != null'), equals({'s1', 's3'}));
         expect(await stores('!(number == null)'), equals({'s1', 's3'}));
 
+        // An empty list is not a `null` (1.32.0 wrote it as `IS NULL`):
+        // `=~ []` matches nothing, `!~ []` everything (also a `null`).
+        var noNumbers = {'number': <int>[]};
+        expect(await stores('number =~ ?', parameters: noNumbers), isEmpty);
+        expect(
+          await stores('number !~ ?', parameters: noNumbers),
+          equals({'s1', 's2', 's3'}),
+        );
+        expect(
+          await stores('!(number =~ ?)', parameters: noNumbers),
+          equals({'s1', 's2', 's3'}),
+        );
+        expect(
+          await stores('owner =~ ?', parameters: {'owner': <int>[]}),
+          isEmpty,
+        );
+        expect(
+          await stores(
+            'name == ? || number =~ ?',
+            parameters: {'name': 'nx-b', 'number': <int>[]},
+          ),
+          equals({'s2'}),
+        );
+        // ... and a `null` parameter is `IS NULL`:
+        expect(
+          await stores('number =~ ?', parameters: {'number': null}),
+          equals({'s2'}),
+        );
+
         // A to-one relationship (a subquery): a missing owner is included.
         expect(
           await stores(r'!(owner.email =~ /^nx1@/)'),

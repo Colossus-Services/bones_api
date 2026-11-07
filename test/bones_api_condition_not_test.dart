@@ -470,6 +470,56 @@ void main() {
       expect(sql4.parametersPlaceholders, equals({'pass__0': 'x'}));
     });
 
+    test('an empty `IN` list is not a `null` (SQL as memory)', () async {
+      // Memory: `=~ []` matches nothing, `!~ []` everything (also a `null`);
+      // `=~ null` is "is null".
+      for (var a in [null, 5]) {
+        var empty = {'a': <int>[]};
+        expect(matches('a =~ ?', {'a': a}, parameters: empty), isFalse);
+        expect(matches('a !~ ?', {'a': a}, parameters: empty), isTrue);
+        expect(matches('!(a =~ ?)', {'a': a}, parameters: empty), isTrue);
+      }
+      var aNull = {'a': null};
+      expect(matches('a =~ ?', {'a': null}, parameters: aNull), isTrue);
+      expect(matches('a =~ ?', {'a': 5}, parameters: aNull), isFalse);
+
+      // SQL (1.32.0 wrote `[]` as `IS NULL`/`IS NOT NULL`):
+      Future<String> sql(String q, Object? p) async =>
+          (await encode(q, parameters: p)).outputString;
+
+      expect(await sql('pass =~ ?', {'pass': <String>[]}), '( FALSE )');
+      expect(await sql('pass !~ ?', {'pass': <String>[]}), '( TRUE )');
+      expect(await sql('pass =~ ?', [<String>[]]), '( FALSE )');
+      expect(await sql('id =~ ?', {'id': <int>[]}), '( FALSE )');
+      expect(await sql('id !~ ?', {'id': <int>[]}), '( TRUE )');
+      expect(await sql('pass =~ []', null), '( FALSE )');
+      expect(await sql('pass !~ []', null), '( TRUE )');
+      expect(
+        await sql('!(pass =~ ?)', {'pass': <String>[]}),
+        '( NOT COALESCE(( FALSE ), FALSE) )',
+      );
+      expect(
+        await sql('email == ? || pass =~ ?', {
+          'email': 'a',
+          'pass': <String>[],
+        }),
+        '( "ac"."email" = @email OR FALSE )',
+      );
+
+      // A `null` (as a list) is still `IS NULL`:
+      expect(await sql('pass =~ ?', {'pass': null}), '( "ac"."pass" IS NULL )');
+      expect(
+        await sql('pass !~ ?', {'pass': null}),
+        '( "ac"."pass" IS NOT NULL )',
+      );
+      expect(
+        await sql('pass =~ ?', {
+          'pass': [null],
+        }),
+        '( "ac"."pass" IS NULL )',
+      );
+    });
+
     test('encode: a group of a single condition', () {
       var c = ConditionNOT(
         GroupConditionAND([
